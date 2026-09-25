@@ -23,11 +23,7 @@ import java.util.UUID;
 
 /**
  * Frontend mirror of the backend {@code JobOrderItemStockEntryDto} (REQ-ORDERS-028): one game-item
- * inventory entry earmarked to a job order, rendered as a row of the order-detail Item-Bestand
- * panel. {@code quantity} is the entry's total physical stock in whole units, {@code
- * allocatedQuantity} the whole-unit slice earmarked to this order (Variante C, REQ-INV-027), {@code
- * delivered} the per-(entry, order) marker of that slice, and {@code version} the entry's
- * optimistic-lock token the delivered toggle echoes.
+ * inventory entry earmarked to a job order, shown in the order-detail Item-Bestand panel.
  *
  * @param inventoryEntryId the inventory entry's primary key
  * @param version the entry's {@code @Version} (0 when the persisted version is still {@code null})

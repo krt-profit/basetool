@@ -17,28 +17,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * Admin material-aliases page module (/admin/material-aliases), extracted verbatim from the former
- * inline script of admin/material-aliases.html (ADR-0069, follow-up to #924).
- *
- * On DOMContentLoaded wires the in-place alias CRUD: one delegated submit listener handles the
- * create, update and delete forms via krtFetch.write (KRT conflict dialog), maintaining the list
- * rows and the "no aliases yet" placeholder in place and echoing the new @Version back into the
- * edit form. Native form submit stays the no-JS fallback.
- *
- * The ALIAS_MSG toast strings and the ALIAS_CONFLICT dialog labels are defined by the inline
- * Thymeleaf bootstrap block of admin/material-aliases.html, which executes immediately before this
- * classic script.
- */
-
 /* global ALIAS_MSG, ALIAS_CONFLICT */
 
 document.addEventListener('DOMContentLoaded', function () {
     const table = document.getElementById('aliasesTable');
     const tbody = table ? table.querySelector('tbody') : null;
 
-    // Reads a form field's trimmed value, mapping an empty string to null so optional fields
-    // (and especially the UUID-typed externalUuid) deserialize cleanly server-side.
     function fieldOrNull(form, name) {
         const el = form.elements[name];
         const value = el && el.value != null ? el.value.trim() : '';
@@ -62,11 +46,6 @@ document.addEventListener('DOMContentLoaded', function () {
         return payload;
     }
 
-    // Builds a list row from the created alias. The trash SVG is constant markup (no user data);
-    // all alias values are written via textContent. The new delete form is handled by the
-    // delegated submit listener below, so no per-row binding is needed.
-    // Rebuilds the "no aliases yet" placeholder row removed by the first create, so deleting the
-    // last alias restores it instead of leaving a header over an empty body.
     function buildEmptyAliasRow() {
         const tr = document.createElement('tr');
         tr.setAttribute('data-alias-empty', '');
@@ -114,7 +93,6 @@ document.addEventListener('DOMContentLoaded', function () {
         return tr;
     }
 
-    // Re-renders the first five data cells of an existing list row after an edit.
     function patchAliasRow(alias) {
         const row = tbody ? tbody.querySelector('tr[data-alias-id="' + alias.id + '"]') : null;
         if (!row) {
@@ -167,8 +145,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (row) {
                     row.remove();
                 }
-                // Restore the placeholder when the last alias is gone (the old full reload
-                // re-rendered this server-side empty-state row).
                 if (tb && !tb.querySelector('tr:not([data-alias-empty])')) {
                     tb.appendChild(buildEmptyAliasRow());
                 }

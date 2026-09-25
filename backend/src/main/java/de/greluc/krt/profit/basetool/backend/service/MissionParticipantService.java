@@ -60,19 +60,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Owns the mission participant lifecycle: sign-up (registered user and external participant), the
- * per-participant attribute edit, check-in / check-out, payout-preference changes, removal, the
- * party-lead assignment, and co-manager add/remove. Extracted from {@code MissionService} (L1 step
- * 2, #920) so the participants responsibility no longer shares that god-class's dependencies.
+ * Owns the mission participant lifecycle: sign-up, attribute edits, check-in/out, payout
+ * preference, removal, party lead and co-managers.
  *
- * <p>Concurrency (REQ-ORG-018 / the CLAUDE.md optimistic-lock rules) is preserved verbatim across
- * the move: participant add/remove/attribute edits deliberately do <strong>not</strong> {@code
- * save(mission)} (the participants collection is {@code @OptimisticLock(excluded = true)}), so they
- * never bump the row's {@code @Version} and never 409 a concurrent mission-level edit; the
- * per-participant edit guards on the participant's own {@code @Version}; and the party-lead change
- * guards + bumps only the {@code partyLeadVersion} section counter through {@code
- * MissionSectionVersions}. {@code MissionService} keeps its public participant methods as thin
- * delegations, so the controller and transaction boundaries are unchanged.
+ * <p>Participant writes never bump the mission's {@code @Version}; the attribute edit guards on the
+ * participant's own version and the party-lead change on {@code partyLeadVersion} (REQ-ORG-018).
  */
 @Slf4j
 @Service
@@ -106,9 +98,8 @@ public class MissionParticipantService {
   private final ParticipantTargetResolver participantTargetResolver;
 
   /**
-   * Mid-form participant add — accepts a user reference, optional guest name (when the user isn't
-   * authenticated), an optional desired job type, and an optional comment. Convenience overload
-   * that delegates to the full form with {@code orgUnitIds=null} and no explicit payout choice.
+   * Adds a participant with a user reference or guest name, an optional desired job type and
+   * comment; delegates to the full overload without org units or payout choice.
    */
   @Transactional
   public Mission addParticipant(
@@ -121,30 +112,12 @@ public class MissionParticipantService {
   }
 
   /**
-   * Full-form participant add. Resolves the user reference from {@code userId} (or by
-   * case-insensitive {@code guestName} match against existing users — promotes a guest entry to a
-   * linked-user entry when the guest name turns out to be a real member).
+   * Adds a participant, resolving the user from {@code userId} or by case-insensitive {@code
+   * guestName} match.
    *
-   * <p>Org-unit affiliations are stamped per kind of participant:
-   *
-   * <ul>
-   *   <li><b>Registered user</b> — affiliations are auto-derived from the user's memberships (every
-   *       Staffel and Spezialkommando they belong to); the submitted {@code orgUnitIds} are
-   *       ignored. A user with no membership at all gets no affiliation (no more wrong IRIDIUM
-   *       fallback).
-   *   <li><b>External participant</b> (a person with no account, entered by the Einsatzleitung) —
-   *       the caller-submitted {@code orgUnitIds} are honoured <b>as submitted</b>, resolved by
-   *       {@link #resolveSubmittedOrgUnits(java.util.List)}. That method applies <b>no</b>
-   *       per-org-unit authorization filter, deliberately: the affiliation is a roster label that
-   *       grants nothing, and the endpoint's own gate already decides who may record the
-   *       participant at all. See its Javadoc for why the former audit-H-3 filter was dropped.
-   * </ul>
-   *
-   * <p>{@code payoutPreference} (nullable) fixes the per-mission payout choice at sign-up time —
-   * the sign-up modal's "Auszahlungsart" select. A non-null value wins over the registered user's
-   * profile default (REQ-MISSION-002); {@code null} keeps the existing default chain (profile
-   * default for registered users, entity default {@code PAYOUT} for external participants, who have
-   * no profile to read one from).
+   * <p>A registered user's org-unit affiliations are derived from their memberships; an external
+   * participant keeps the submitted {@code orgUnitIds}. A non-null {@code payoutPreference}
+   * overrides the profile default (REQ-MISSION-002).
    *
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when any referenced
    *     id is unknown
@@ -235,9 +208,8 @@ public class MissionParticipantService {
   }
 
   /**
-   * Look up a single participant on a mission. Verifies the participant actually belongs to the
-   * named mission — a participant id that exists but is attached to a different mission throws 404,
-   * matching what {@link MissionSecurityService#canAccessParticipant} expects.
+   * Returns a participant of the given mission; a participant of another mission counts as not
+   * found.
    *
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the participant
    *     does not exist on this mission
@@ -251,8 +223,7 @@ public class MissionParticipantService {
   }
 
   /**
-   * Returns all participants of a mission that are not yet assigned to any unit (crew). Used to
-   * filter the "Crew zuweisen" dropdown so only unassigned participants are selectable.
+   * Returns the participants of a mission not yet assigned to any unit or crew.
    *
    * @param missionId mission id
    * @return list of unassigned participants
@@ -302,17 +273,11 @@ public class MissionParticipantService {
   }
 
   /**
-   * Updates a participant's per-mission attributes (job type, ship, unit, crew, guest name, payout
-   * preference). Per-participant optimistic lock via the participant's own {@code @Version} field —
-   * the wider mission's version is NOT bumped, so concurrent participant edits don't collide with
-   * each other or with mission-level edits.
+   * Updates a participant's per-mission attributes, guarded by the participant's own version; the
+   * mission's version is not bumped.
    *
-   * @param authentication the caller's authentication, used to answer "may this caller manage the
-   *     mission" against the mission this method has already loaded. A caller who may not - in
-   *     practice, until ADR-0159, an anonymous guest holding their row's capability token - may
-   *     edit their own desired job type, comment, payout preference and guest name, but may neither
-   *     set nor clear the planned mission job type (the Einsatzleiter designation), and may not
-   *     rename their row onto a registered member or onto another guest of the same mission.
+   * @param authentication the caller; a caller who may not manage the mission can neither set the
+   *     planned job type nor rename the row onto a member or another guest
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the participant
    *     or any referenced id is unknown
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when stale
@@ -453,17 +418,8 @@ public class MissionParticipantService {
   }
 
   /**
-   * Marks a participant as checked in. Sets {@code startTime} to {@code now()} only if the
-   * participant has not been checked in before — a repeated check-in is a no-op so the original
-   * arrival time is preserved.
-   *
-   * <p>The idempotency guard is a data-integrity requirement, not a nicety: {@code startTime} feeds
-   * the credited-time payout breakdown, so a second check-in that reset it to a later {@code now()}
-   * would silently shrink the participant's credited duration and skew the money distribution. The
-   * endpoint carries no client version and any stale crew-board view still renders the "Einchecken"
-   * button (REQ-FE-010 staleness window), so a duplicate delivery is realistic — the guard makes it
-   * harmless instead of a silent lost update (#1134). {@code checkOut} keeps the opposite,
-   * override-on-repeat semantics on purpose (late check-out corrections).
+   * Marks a participant as checked in, setting {@code startTime} only on the first check-in so the
+   * credited time cannot be shortened by a repeat.
    */
   @Transactional
   public Mission checkIn(UUID missionId, UUID participantId) {
@@ -540,9 +496,7 @@ public class MissionParticipantService {
   }
 
   /**
-   * Sets (or clears) the mission's party lead — either a registered user, a free-text guest name,
-   * or nothing. Guarded and bumped through the dedicated {@code partyLeadVersion} section counter
-   * so changing the lead never collides with a concurrent core / schedule / flags edit
+   * Sets or clears the mission's party lead, guarded by the {@code partyLeadVersion} counter
    * (REQ-ORG-018).
    *
    * @param missionId the mission id
@@ -620,16 +574,11 @@ public class MissionParticipantService {
   }
 
   /**
-   * Resolves every org unit a registered user belongs to (Staffel and/or Spezialkommandos) into the
-   * managed {@link OrgUnit} entities to stamp on the participant. Reads the membership rows via
-   * {@link OrgUnitMembershipService#findAllMembershipsForUser(UUID)} (already Staffel-first, then
-   * SK alphabetical) and materialises each org-unit id through the polymorphic {@code
-   * OrgUnitRepository}. A user with no memberships yields an empty list — there is deliberately no
-   * IRIDIUM fallback, so an admin who belongs to nothing shows no affiliation on the roster.
+   * Resolves every org unit a registered user belongs to, Staffel first, for stamping on the
+   * participant; no memberships yield no affiliation.
    *
    * @param userId the registered user whose memberships to resolve; never {@code null}.
-   * @return the managed org-unit entities, membership order preserved; never {@code null}, possibly
-   *     empty.
+   * @return the managed org units in membership order; never {@code null}, possibly empty.
    */
   private List<OrgUnit> resolveMembershipOrgUnits(@NotNull UUID userId) {
     List<UUID> orgUnitIds =
@@ -646,31 +595,12 @@ public class MissionParticipantService {
   }
 
   /**
-   * Resolves a caller-submitted {@code orgUnitIds} list for an <b>external</b> participant entry (a
-   * person with no account, ADR-0159 decision D4) to the org units to persist. That affiliation is
-   * mission-scoped roster metadata only: it is a label on a single mission's participant row,
-   * drives nothing but the roster badges (see {@code MissionMapper.orgUnitsToReferenceDtos}),
-   * grants no permissions and touches no user data. Anyone who may record or edit the external
-   * participant at all — the endpoint gates govern that, {@code canSeeMission} on the add paths and
-   * {@code canAccessParticipant} on the attribute edit, cross-Staffel included — may therefore
-   * label it with any Staffel or SK:
-   *
-   * <ul>
-   *   <li>{@code null} / empty input → empty list (no affiliation).
-   *   <li>otherwise → every id that resolves to a real {@link OrgUnit} is kept, in submission
-   *       order; a {@code null} or unknown id is silently skipped (a roster mislabel is not a
-   *       forgery worth a 403, and a non-resolving id simply yields no badge).
-   * </ul>
-   *
-   * <p>This deliberately drops the former audit-H-3 authorization filter (admin / own-membership
-   * required): that gate denied an SK lead from tagging an external participant with the relevant
-   * org unit, even though the tag carries no authority. Registered-user participants are
-   * unaffected: their affiliations are auto-derived from their actual memberships in the caller
-   * paths, never from this submitted list.
+   * Resolves the submitted org-unit ids of an external participant into org units, in submission
+   * order, skipping {@code null} and unknown ids. The affiliation is a roster label that grants
+   * nothing, so no per-unit authorization applies.
    *
    * @param submittedOrgUnitIds the caller-supplied org-unit ids from the request DTO.
-   * @return the managed org-unit entities to persist on the external participant; never {@code
-   *     null}, possibly empty.
+   * @return the managed org units to persist; never {@code null}, possibly empty.
    */
   private List<OrgUnit> resolveSubmittedOrgUnits(List<UUID> submittedOrgUnitIds) {
     if (submittedOrgUnitIds == null || submittedOrgUnitIds.isEmpty()) {

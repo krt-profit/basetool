@@ -41,18 +41,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Pins the Spring Security URL-filter chain for {@code GET /api/v1/users/{id}/memberships}. Before
- * the SecurityConfig fix the URL fell into the {@code /api/v1/users/**} catch-all which is gated on
- * {@code hasRole('ADMIN')} — every non-admin (Officer, KRT Member) got a 403 from the URL filter
- * before the {@link UserController#getUserMemberships} method-level {@code @PreAuthorize} was even
- * evaluated. The frontend's {@code OrgUnitContextAdvice} then silently swallowed the 403 and
- * rendered an empty {@code availableOrgUnits} list, surfacing as "Kein Bereichskontext" in the
- * sidebar chip for any non-admin user.
- *
- * <p>These tests assert all four caller classes can reach the endpoint at the URL-filter level. The
- * concrete role allow-list is owned by the method-level {@code @PreAuthorize} (defence in depth) —
- * the URL rule only opens the gate. A regression where the catch-all swallows the path again would
- * surface here as a 403 instead of the expected 200.
+ * Verifies that every caller class passes the URL filter for {@code GET
+ * /api/v1/users/{id}/memberships} instead of hitting the admin-only {@code /api/v1/users/**} rule;
+ * the method-level {@code @PreAuthorize} owns the role allow-list.
  */
 @SpringBootTest
 class UserMembershipsSecurityTest {
@@ -71,9 +62,7 @@ class UserMembershipsSecurityTest {
   }
 
   /**
-   * Squadron-Member users must reach {@code GET /api/v1/users/{id}/memberships}. Regression guard
-   * for the original bug: the {@code /api/v1/users/**} catch-all was {@code hasRole('ADMIN')} only,
-   * masking the method-level allow-list.
+   * Verifies that a squadron member reaches {@code GET /api/v1/users/{id}/memberships}.
    *
    * @throws Exception MockMvc plumbing.
    */
@@ -132,10 +121,7 @@ class UserMembershipsSecurityTest {
   }
 
   /**
-   * Unauthenticated callers are rejected at the URL-filter level. The application-wide {@code
-   * anyRequest().authenticated()} catch-all in SecurityConfig already covers this — the test pins
-   * that the new {@code /memberships}-specific rule does not accidentally weaken the gate to
-   * permit-all.
+   * Verifies that unauthenticated callers are rejected at the URL-filter level.
    *
    * @throws Exception MockMvc plumbing.
    */

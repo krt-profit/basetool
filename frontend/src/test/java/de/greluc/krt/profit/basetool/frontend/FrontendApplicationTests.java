@@ -43,13 +43,9 @@ class FrontendApplicationTests {
   void contextLoads() {}
 
   /**
-   * REQ-OBS-015 (#1202): {@link FrontendApplication} excludes Spring Data's {@code
-   * DataWebAutoConfiguration} because this module does no Spring Data web binding, so its {@link
-   * ProxyingHandlerMethodArgumentResolver} must be absent from the MVC resolver chain. That
-   * resolver is what logged the "not annotated with @ProjectedPayload" WARN for {@code
-   * OrgUnitContextAdvice}'s interface-typed {@code @ModelAttribute} catalogue parameters; with it
-   * gone the false positive can no longer be raised. Asserting on the live resolver list (rather
-   * than the exclude annotation) proves the exclusion actually took effect end-to-end.
+   * Verifies that Spring Data's {@link ProxyingHandlerMethodArgumentResolver} is absent from the
+   * MVC resolver chain, because {@link FrontendApplication} excludes {@code
+   * DataWebAutoConfiguration} (REQ-OBS-015).
    */
   @Test
   void springDataWebProxyingResolverIsNotRegistered() {

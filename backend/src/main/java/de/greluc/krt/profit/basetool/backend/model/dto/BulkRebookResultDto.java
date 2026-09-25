@@ -20,14 +20,11 @@
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
 /**
- * Outcome of a bulk rebooking (Massen-Umbuchen, REQ-INV-036): how many of the marked rows actually
- * moved and how many were skipped because they already sat in the requested target state.
+ * Outcome of a bulk rebooking (REQ-INV-036): how many marked rows moved and how many were skipped
+ * because they already sat in the target state.
  *
- * <p>The two counts always sum to the number of ids the request carried — a row that could not move
- * for any <em>other</em> reason aborts the whole transaction instead of being counted here, so a
- * returned result never hides a failure. The page reports both numbers so a selection that was
- * largely a no-op (e.g. "Alle markieren" onto a location most of the stock already sits at) does
- * not read as a full success.
+ * <p>The two counts always sum to the number of requested ids; any other failure aborts the whole
+ * transaction.
  *
  * @param rebooked the number of rows that were moved
  * @param skipped the number of rows that already sat in the requested target state

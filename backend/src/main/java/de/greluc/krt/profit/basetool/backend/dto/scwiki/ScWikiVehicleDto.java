@@ -25,13 +25,10 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * SC Wiki vehicle DTO — a row from {@code /api/vehicles} (SC_WIKI_SYNC_PLAN.md §8.6), consumed by
- * the R4 {@code ScWikiVehicleSyncService} to fill the Wiki-owned columns on an existing {@code
- * ship_type} row matched by {@code external_uuid}.
+ * SC Wiki vehicle row from {@code /api/vehicles}, used by {@code ScWikiVehicleSyncService} to fill
+ * the Wiki-owned columns of the {@code ship_type} matched by {@code external_uuid}.
  *
- * <p>Only the Wiki-owned / Wiki-richer fields are modelled; the 36 capability {@code is_*} flags,
- * dimensions, fuel and urls stay UEX-owned (§6.3.5 — those are never written by the Wiki sync).
- * {@link #description} is a locale → text map; the sync reads {@code en_EN} / {@code de_DE}.
+ * <p>Only Wiki-owned fields are modelled; {@link #description} maps locale to text.
  *
  * @param uuid in-game asset UUID (the join key against {@code ship_type.external_uuid})
  * @param slug Wiki URL slug

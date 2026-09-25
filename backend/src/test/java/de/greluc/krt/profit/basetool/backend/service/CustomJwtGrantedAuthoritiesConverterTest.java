@@ -68,10 +68,9 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 /**
- * Mockito unit tests for {@link CustomJwtGrantedAuthoritiesConverter}, focused on the epic #692 /
- * REQ-ORG-015 cascade: a Bereichsleitung / OL leadership membership must mint officer-equivalent
- * flat roles ({@code ROLE_LOGISTICIAN} / {@code ROLE_MISSION_MANAGER}) plus contextual authorities
- * for every org unit the leadership reaches downward, and a plain member must be unaffected.
+ * Unit tests for {@link CustomJwtGrantedAuthoritiesConverter}'s leadership cascade (REQ-ORG-015):
+ * Bereichsleitung and OL memberships mint officer-equivalent flat and downward contextual
+ * authorities.
  */
 @ExtendWith(MockitoExtension.class)
 class CustomJwtGrantedAuthoritiesConverterTest {
@@ -85,12 +84,8 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   private final List<String> gatewayClientIds = new ArrayList<>();
 
   /**
-   * A real instance, not a mock: the default empty allowlist is the state most of these tests need
-   * — no caller is a gateway, so the machine-identity carve-out never fires and each case exercises
-   * the ordinary member path it was written for (ADR-0129).
-   *
-   * <p>A spy rather than a plain field so the two carve-out tests can set an allowlist on it and
-   * drive the other branch.
+   * A real, spied instance with an empty gateway allowlist by default, so the machine-identity
+   * carve-out only fires where a test sets one (ADR-0129).
    */
   @Spy
   private final IngestGatewayProperties ingestGatewayProperties =
@@ -120,21 +115,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   private static final UUID DESCENDANT_SK_ID = UUID.randomUUID();
 
   /**
-   * A configured gateway is a machine: exactly one marker authority, and no registration.
-   *
-   * <p>The carve-out shipped untested, which is how the defect it fixes reached production in the
-   * first place. Both halves are asserted, because each fails differently:
-   *
-   * <ul>
-   *   <li>The authority set is {@code ROLE_INGEST_GATEWAY} and <em>nothing else</em>. A named
-   *       authority rather than an empty set, so a misconfiguration reads as "authenticated as a
-   *       machine" instead of "not authenticated" — and nothing extra, so the gateway's own bearer
-   *       can reach no member surface.
-   *   <li>{@code userReconciliationService} is never touched. That is the actual production
-   *       failure: the gateway's first call created an {@code app_user} row for itself, stamped it
-   *       PENDING, granted the default blueprints, notified the admins, and then 403'd its own
-   *       account. Asserting only the authorities would still pass while all of that happened.
-   * </ul>
+   * A configured gateway gets only {@code ROLE_INGEST_GATEWAY} and is never registered as a user.
    */
   @Test
   void grantsAConfiguredGatewayTheMachineAuthorityAndNeverRegistersIt() {
@@ -170,16 +151,7 @@ class CustomJwtGrantedAuthoritiesConverterTest {
     verify(userReconciliationService).syncUser(jwt);
   }
 
-  /**
-   * REQ-SEC-036 - the request is authorised by the roles the TOKEN carried, not by the row's.
-   *
-   * <p>The two are the same set for every client whose claim is complete. They differ for a
-   * partial-scope client, and this is the case that makes the split worth its cost: because that
-   * path deliberately no longer overwrites the stored roles, the row an administrator's app request
-   * loads still holds {@code Admin}. Reading the roles back off it here would hand the app exactly
-   * the authority its Keycloak client scope was configured to withhold - a guard that made the
-   * problem worse than the defect it replaced.
-   */
+  /** The request is authorised by the token's roles, not the stored ones (REQ-SEC-036). */
   @Test
   void authorisesWithTheEffectiveRolesRatherThanTheStoredOnes() {
     User admin = userWithNoRoles();
@@ -298,11 +270,8 @@ class CustomJwtGrantedAuthoritiesConverterTest {
   }
 
   /**
-   * The guarantee the session key must not cost: a realm role granted or revoked in Keycloak takes
-   * effect on the next refreshed token, exactly as it did while {@code issuedAt} was in the key.
-   * The refreshed token carries the new role list, the claims fingerprint differs, and the
-   * authorities are re-assembled — here the revocation is observable in the result, not only in the
-   * call count.
+   * A refreshed token with changed realm roles misses the cache and its authorities reflect the
+   * change immediately.
    */
   @Test
   void convert_refreshedTokenWithChangedRoles_missesAndReflectsTheChangeImmediately() {

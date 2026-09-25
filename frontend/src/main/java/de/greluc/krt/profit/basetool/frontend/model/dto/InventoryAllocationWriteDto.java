@@ -22,10 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.util.UUID;
 
 /**
- * Frontend mirror of the backend's per-allocation write payload (Variante C, REQ-INV-027), relayed
- * verbatim by {@code InventoryWriteController} to the add / change / remove allocation endpoints.
- * The amount is only meaningful for add/change (delete ignores it); the backend enforces its
- * presence and the over-allocation rule.
+ * Frontend mirror of the backend's per-allocation write payload (REQ-INV-027), relayed to the add,
+ * change and remove allocation endpoints.
  *
  * @param field which quantity split the write targets.
  * @param targetId the earmarked job order or mission id.

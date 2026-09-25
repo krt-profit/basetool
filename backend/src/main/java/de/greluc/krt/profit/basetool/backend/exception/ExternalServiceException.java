@@ -20,21 +20,11 @@
 package de.greluc.krt.profit.basetool.backend.exception;
 
 /**
- * Thrown when an upstream service the backend depends on (Keycloak, UEX, …) returns an error
- * response or is unreachable.
+ * Thrown when an upstream service (Keycloak, UEX, …) returns an error or is unreachable.
  *
- * <p>Mapped to HTTP {@code 502 Bad Gateway} by {@link
- * de.greluc.krt.profit.basetool.backend.exception.GlobalExceptionHandler}'s generic {@code
- * AppException} dispatch handler with the stable error code {@code EXTERNAL_SERVICE_ERROR}. {@link
- * #disclosurePolicy()} is {@link ErrorDisclosurePolicy#SUPPRESSED} — inherited from {@link
- * AppExceptionKind#EXTERNAL_SERVICE_ERROR}, the fixed identity passed to the superclass constructor
- * — so the original cause is kept on the exception and logged server-side at ERROR; the {@code
- * detail} body returned to the client is a generic localized message so we do not echo back
- * implementation details (status codes, response bodies) of the upstream service to the caller.
- *
- * <p>Prefer this over a plain {@link RuntimeException} so an upstream outage surfaces as a clearly
- * distinguishable 5xx category in the client and in the logs, rather than being indistinguishable
- * from an unexpected internal bug ({@code 500 INTERNAL_ERROR}).
+ * <p>Mapped to {@code 502 Bad Gateway} with code {@code EXTERNAL_SERVICE_ERROR}. Its {@link
+ * #disclosurePolicy()} is {@link ErrorDisclosurePolicy#SUPPRESSED}: the cause is logged at ERROR
+ * and the client receives only a generic localized detail.
  */
 public final class ExternalServiceException extends AppException {
 
@@ -49,11 +39,10 @@ public final class ExternalServiceException extends AppException {
   }
 
   /**
-   * Creates an {@code ExternalServiceException} that wraps the original failure (network exception,
-   * {@code RestClientResponseException}, …). The cause is logged server-side; the client receives a
-   * generic localized detail to avoid leaking upstream implementation details.
+   * Creates the exception wrapping the original upstream failure; the cause is logged server-side
+   * and never relayed to the client.
    *
-   * @param message human-readable summary for the server log
+   * @param message summary for the server log
    * @param cause underlying upstream failure
    */
   public ExternalServiceException(String message, Throwable cause) {

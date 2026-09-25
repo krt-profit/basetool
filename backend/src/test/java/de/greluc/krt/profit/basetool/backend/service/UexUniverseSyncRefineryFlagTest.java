@@ -41,15 +41,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Pins the correction step that fixes the reported "MIC-L5 / ARC-L4 missing from the refinery
- * picker" bug (REQ-REFINERY-020): after each terminal sweep, {@code
- * UexUniverseSyncService.reconcileRefineryTerminalFlags()} recomputes {@code has_refinery_terminal}
- * on cities and space stations from the live {@code type = 'refinery'} terminals, overriding UEX's
- * unreliable parent-level {@code has_refinery} claim in <em>both</em> directions.
- *
- * <p>The fixture mirrors the real upstream data measured on 2026-07-28: MIC-L5 carries {@code
- * has_refinery = 0} yet hosts terminal 244, while People's Service Station Alpha carries {@code
- * has_refinery = 1} and hosts no refinery terminal at all.
+ * Verifies that {@code UexUniverseSyncService.reconcileRefineryTerminalFlags()} recomputes {@code
+ * has_refinery_terminal} on cities and space stations from the live {@code type = 'refinery'}
+ * terminals, overriding UEX's {@code has_refinery} claim in both directions (REQ-REFINERY-020).
  */
 @SpringBootTest
 @ActiveProfiles("test")

@@ -30,10 +30,8 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
- * Spring Data repository for {@link BankAccountGrant} rows (epic #556, REQ-BANK-009). The composite
- * id makes {@code existsById(new BankAccountGrantId(userId, accountId))} the canonical "may this
- * user see this account" probe used by {@code BankSecurityService}. Grant lists are unbounded by
- * design — a handful of bank staff times a handful of accounts.
+ * Spring Data repository for {@link BankAccountGrant} rows (REQ-BANK-009). {@code existsById(new
+ * BankAccountGrantId(userId, accountId))} is the "may this user see this account" probe.
  */
 @Repository
 public interface BankAccountGrantRepository

@@ -29,12 +29,8 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Write payload for booking an account-to-account transfer (REQ-BANK-011, ADR-0039): two account
- * legs summing to zero and two holder legs summing to zero — value moves between two
- * <strong>different</strong> accounts and physical custody moves with it. Identical source and
- * destination account is a rejected self-transfer ({@code BANK_SELF_TRANSFER}); moving custody
- * between holders without touching an account is a holder Umbuchung ({@code
- * BankHolderTransferRequest}), not a transfer.
+ * Write payload for an account-to-account transfer (REQ-BANK-011): value moves between two
+ * different accounts and custody moves between the two holders.
  *
  * @param sourceAccountId the account the value leaves
  * @param sourceHolderId the player whose stash shrinks
@@ -42,20 +38,14 @@ import org.jetbrains.annotations.Nullable;
  * @param destinationHolderId the player whose stash grows
  * @param amount whole-aUEC amount, at least 1
  * @param note optional free-text note for the booking history and statements
- * @param justification optional free-text justification (Begr&uuml;ndung) for the booking history
- *     and statements (REQ-BANK-045); required by the service when the source account type
- *     {@linkplain
+ * @param justification optional Begr&uuml;ndung (REQ-BANK-045); required when the source account
+ *     type {@linkplain
  *     de.greluc.krt.profit.basetool.backend.model.BankAccountType#requiresDebitJustification()
- *     mandates a reason}, optional otherwise
- * @param staffNote optional free-text note authored by the booking bank employee ("Notiz
- *     Bankmitarbeiter", REQ-BANK-054): internal context for the movement, shown to bank staff and
- *     the account's responsible side but redacted from the org-unit member-facing views
- * @param feeInclusive fee-mode toggle (REQ-BANK-033, #999), effective only on a holder-changing
- *     (fee-bearing) transfer: {@code false} (default, unchanged) means the entered {@code amount}
- *     arrives at the destination and the fee is added on top — the source is debited {@code amount
- *     + fee}; {@code true} means the entered {@code amount} is the gross debited and the
- *     destination receives {@code amount - fee}. A bank-staff choice at booking time only — a
- *     transfer <em>request</em> never carries it (confirmation always books on-top)
+ *     mandates a reason}
+ * @param staffNote optional internal note by the booking bank employee (REQ-BANK-054), hidden from
+ *     the member-facing views
+ * @param feeInclusive fee mode for a holder-changing transfer (REQ-BANK-033): {@code false} debits
+ *     {@code amount + fee}, {@code true} debits {@code amount} and delivers {@code amount - fee}
  */
 public record BankTransferRequest(
     @NotNull UUID sourceAccountId,
@@ -69,11 +59,8 @@ public record BankTransferRequest(
     boolean feeInclusive) {
 
   /**
-   * Convenience constructor for a transfer without a recorded justification (the pre-REQ-BANK-045
-   * shape) and the default on-top fee mode (REQ-BANK-033), delegating to the canonical constructor
-   * with {@code justification} {@code null} and {@code feeInclusive} {@code false}. Inbound JSON is
-   * always deserialized via the canonical (all-component) constructor, so this overload only serves
-   * programmatic callers.
+   * Creates a transfer without justification in the default on-top fee mode; for programmatic
+   * callers only.
    *
    * @param sourceAccountId the account the value leaves
    * @param sourceHolderId the player whose stash shrinks

@@ -49,15 +49,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Render test for the refinery store ("Einlagern") dialog's per-item "Auftrag" dropdown
- * (REQ-ORDERS-018). The dropdown offers only job orders whose requirements include the stored
- * output material. This pins the reported regression: the picker keyed on {@code
- * JobOrderDto.materials}, which is always empty for an {@code ITEM} order (its requirements live in
- * derived item materials, not {@code job_order_material} rows), so every {@code ITEM} order was
- * silently dropped and the dropdown stayed empty even when a matching order existed. The fix feeds
- * the picker from the {@code /api/v1/orders/lookup} reference projection and filters on the
- * kind-agnostic {@code requiredMaterialIds}. Stubs two ITEM orders sharing the lookup: one that
- * requires the good's output material (must render) and one that does not (must be hidden).
+ * Render test for the store dialog's per-item "Auftrag" dropdown (REQ-ORDERS-018): it offers only
+ * job orders whose {@code requiredMaterialIds} include the stored material, including {@code ITEM}
+ * orders.
  */
 @SpringBootTest
 @ActiveProfiles("test")

@@ -22,14 +22,8 @@ package de.greluc.krt.profit.basetool.backend.support;
 import java.util.UUID;
 
 /**
- * The one question the Terms-of-Use boundary asks (REQ-SEC-028).
- *
- * <p>Exists to invert a package dependency, not to abstract for its own sake. {@code
- * config.TermsAcceptanceAccessFilter} needs the answer, but a {@code config -> service} edge closes
- * a cycle that {@code ArchitectureTest} rejects (ADR-0047). Declaring the question in the
- * dependency-free {@code support} leaf and letting {@code service.TermsAcceptanceService} implement
- * it points both packages at the leaf instead of at each other — the remedy the ArchUnit rule
- * names.
+ * The Terms-of-Use acceptance check (REQ-SEC-028), declared in the {@code support} leaf so {@code
+ * config.TermsAcceptanceAccessFilter} can use it without depending on {@code service} (ADR-0047).
  */
 @FunctionalInterface
 public interface TermsConsentCheck {

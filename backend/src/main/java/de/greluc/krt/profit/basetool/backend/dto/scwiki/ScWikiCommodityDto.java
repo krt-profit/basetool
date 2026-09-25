@@ -24,36 +24,15 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.UUID;
 
 /**
- * SC Wiki commodity DTO — a single row from {@code GET /api/commodities}. R1 ships only the subset
- * of fields the R3 {@code ScWikiCommoditySyncService} will consume; the rest of the Wiki payload is
- * tolerated via {@link JsonIgnoreProperties}. R3 expands the record with {@code raw_versions} /
- * {@code refined_versions} / {@code uex_prices} cross-references.
+ * SC Wiki commodity row from {@code GET /api/commodities}; unmapped fields are ignored.
  *
- * <p>Field provenance (verified 2026-05-27 against a live response):
+ * <p>{@code uuid} is the join key across Wiki and UEX when both carry one.
  *
- * <pre>{@code
- * {
- *   "uuid":              "dc6fbcbb-...",
- *   "key":               "Agricium",
- *   "name":              "Agricium",
- *   "slug":              "agricium",
- *   "kind":              "",
- *   "density_g_per_cc":  1,
- *   "is_mineable":       false,
- *   "has_harvestables":  false
- * }
- * }</pre>
- *
- * <p>{@code uuid} is the canonical join key across Wiki and UEX when both systems carry one. The
- * §4.3 "junk filter" runs on {@code name} (HTML, underscores, hardcoded atmosphere terms); see
- * {@code ScWikiCommoditySyncService} (R3) for the filter implementation.
- *
- * @param uuid SC Wiki commodity UUID (matches UEX commodity UUID when both exist)
+ * @param uuid SC Wiki commodity UUID (matches the UEX commodity UUID when both exist)
  * @param key Wiki internal key (e.g. {@code "Agricium"})
- * @param name display name; subject to the §4.3 hard-junk filter
- * @param slug URL slug (lowercased + dash-separated form of {@code key})
- * @param kind taxonomy label (often empty; the §4.3 verification shows it is unreliable for
- *     filtering)
+ * @param name display name; subject to the junk filter of {@code ScWikiCommoditySyncService}
+ * @param slug URL slug (lowercased, dash-separated form of {@code key})
+ * @param kind taxonomy label, often empty and unreliable for filtering
  * @param densityGramPerCc physical density in g/cc (Wiki only)
  * @param isMineable whether the Wiki flags the commodity as mineable
  * @param hasHarvestables whether the Wiki flags the commodity as a harvestable source

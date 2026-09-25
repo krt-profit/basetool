@@ -36,13 +36,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Functional flow: add a ship to the hangar through the UI and verify it appears in the ship list.
- *
- * <p>Ships are staffel-scoped (need an OrgUnit membership) and the add-ship modal selects a
- * ShipType, which is UEX-owned — provided by the SQL catalog seed in {@link E2eStackExtension}
- * (`E2E Ship Type`). {@link BackendSeeder} seeds the IRIDIUM membership in {@link #setUp()}. The
- * ship type select (`#ship-type`) and insurance select (`#ship-insurance`) already carry stable
- * ids; the modal is opened via the `hangar-add-ship` hook and saved via `hangar-ship-submit`.
+ * Adds a ship to the hangar through the UI and verifies it appears in the ship list. The ship type
+ * comes from the catalog seed in {@link E2eStackExtension}; {@link BackendSeeder} seeds the IRIDIUM
+ * membership in {@link #setUp()}.
  */
 @Tag("e2e")
 class HangarAddShipE2eTest {
@@ -78,10 +74,8 @@ class HangarAddShipE2eTest {
   }
 
   /**
-   * Opens the add-ship modal, picks the seeded ship type + an insurance, saves, and asserts the
-   * ship then appears in the hangar list <em>in place</em> — the #578 conversion submits through
-   * {@code krtFetch} to the {@code /hangar/add} twin and re-renders the ship table without
-   * reloading the page, so the new row must show up without any navigation (REQ-FE-001).
+   * Adds a ship through the modal and asserts it appears in the hangar list without a page reload
+   * (REQ-FE-001).
    */
   @Test
   void addsAShipThroughTheUiInPlace() {

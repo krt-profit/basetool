@@ -44,21 +44,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * End-to-end coverage for the one-click ingest handoff (epic #639, {@code REQ-INGEST-003/-004}):
- * the gateway stages a draft in Redis under {@code ingest:handoff:<sub>:<id>}, the extractor opens
- * {@code ?handoff=<id>}, and the frontend pre-fills the existing review form from the staged draft
- * — single-use and scoped to the browsing user.
+ * End-to-end coverage for the one-click ingest handoff (REQ-INGEST-003/-004): a draft staged in
+ * Redis under {@code ingest:handoff:<sub>:<id>} pre-fills the review form via {@code
+ * ?handoff=<id>}.
  *
- * <p>The gateway is not run here; instead the test reproduces what the gateway does, using the real
- * backend matcher: it posts the {@code RefineryExtract} fixture to {@code
- * /api/v1/refinery-orders/import-extract} (resolving the fixture's names against the seeded
- * catalog) and stages the verbatim draft answer in the same Redis the frontend reads. That keeps
- * the draft shape honest — it is the exact JSON production would stage — without standing up the
- * device grant.
- *
- * <p>Covers the happy path (pre-fill matches the manual-upload result), single-use consumption (a
- * replayed id falls back to the friendly notice), and per-{@code sub} isolation (a handoff staged
- * for another user is invisible and stays unconsumed — no IDOR).
+ * <p>Stages the draft itself from the real backend matcher instead of running the gateway. Covers
+ * pre-fill, single-use consumption and per-{@code sub} isolation.
  */
 @Tag("e2e")
 class IngestHandoffE2eTest {
@@ -132,9 +123,8 @@ class IngestHandoffE2eTest {
   }
 
   /**
-   * Happy path + single-use: a staged refinery handoff pre-fills the create form exactly like the
-   * manual upload, and replaying the same id falls back to the friendly notice (the entry was
-   * consumed by the first pickup).
+   * A staged refinery handoff pre-fills the create form like a manual upload; replaying the same id
+   * shows the fallback notice.
    */
   @Test
   void stagedHandoffPrefillsTheFormAndIsSingleUse() {
@@ -234,8 +224,7 @@ class IngestHandoffE2eTest {
 
   /**
    * Wraps a backend draft as the {@link
-   * de.greluc.krt.profit.basetool.frontend.model.dto.StagedHandoff} JSON the gateway stores (kind +
-   * the verbatim draft as a string).
+   * de.greluc.krt.profit.basetool.frontend.model.dto.StagedHandoff} JSON the gateway stores.
    */
   private static String stagedHandoff(String draft) {
     JsonObject staged = new JsonObject();

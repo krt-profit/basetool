@@ -31,12 +31,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Top-level OpenAPI document for the backend module.
- *
- * <p>Sets the spec version, declares the {@code bearer-jwt} security scheme so generated clients
- * know every authenticated endpoint expects a Keycloak JWT, and marks {@code bearer-jwt} as the
- * default security requirement so endpoints without an explicit override inherit it. The project
- * ships only the OpenAPI document ({@code openapi.json}) — Swagger UI is not bundled.
+ * Top-level OpenAPI document of the backend, declaring the {@code bearer-jwt} security scheme as
+ * the default requirement.
  */
 @Configuration
 public class OpenApiConfig {

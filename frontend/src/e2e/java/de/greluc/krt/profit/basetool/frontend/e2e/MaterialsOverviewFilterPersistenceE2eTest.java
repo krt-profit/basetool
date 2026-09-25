@@ -36,20 +36,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Verifies REQ-UI-016: the price-overview matrix filters (material / system multi-selects,
- * has-loading-dock, is-auto-load) are persisted per browser in {@code localStorage} and restored on
- * the next page load — the shipped defect was that every reload reset the whole selection.
+ * E2E check of REQ-UI-016: the price-overview matrix filters persist in {@code localStorage} and
+ * are restored on reload, before the first {@code /materials/overview/data} request.
  *
- * <p>The test sets both boolean filters (always server-rendered, so this part is data-independent
- * and runs on an ephemeral stack with no seeded UEX data), additionally narrows the material
- * multi-select to a subset where the catalogue offers more than one material, reloads, and asserts
- * the widgets come back restored. It also asserts the restored selection is applied to the
- * <em>initial</em> {@code /materials/overview/data} request after the reload — restore must happen
- * before the first fetch, not as a cosmetic widget update after an unfiltered load.
- *
- * <p>Read-only and target-agnostic: it navigates, toggles client-side filter widgets and asserts,
- * mutating no server state, so it is safe against a shared deployment. The actor is {@code
- * test-admin}, who may open the trade pages.
+ * <p>Read-only, so it is safe against a shared deployment.
  */
 @Tag("e2e")
 class MaterialsOverviewFilterPersistenceE2eTest {

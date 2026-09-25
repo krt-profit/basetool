@@ -37,35 +37,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * CRUD service for {@link SpecialCommand} — the Spezialkommando tenant kind introduced by the
- * Spezialkommando R2.a slice (see {@code SPEZIALKOMMANDO_PLAN.md}). Mirrors the {@link
- * SquadronService} surface field-for-field with three exceptions:
- *
- * <ul>
- *   <li>No promotion-feature toggle — Spezialkommandos never carry the promotion subsystem. The V94
- *       {@code chk_org_unit_promotion_only_squadron} CHECK constraint plus the {@link
- *       SpecialCommand} setter override enforce this at the data and JPA layer; no service method
- *       can flip the flag, so none is exposed here.
- *   <li>No Spring Cache integration — SK lifecycle events are rare (admin-only create/delete) and
- *       SK rows are read through the same {@link SpecialCommandRepository} that supplies the
- *       member-management UI's roster, where stale data would surface as a stale chip. Plain
- *       {@code @Transactional(readOnly = true)} suffices; we can revisit caching later if the admin
- *       SK list ever shows up on a hot path.
- *   <li>{@code isPromotionEnabled} is not exposed on the wire — {@link SpecialCommandDto} omits the
- *       field, the constructor of {@link SpecialCommand} forces it to {@code false} regardless of
- *       how the entity is built, so the service has nothing meaningful to mutate.
- * </ul>
+ * CRUD service for {@link SpecialCommand} (Spezialkommando), mirroring {@link SquadronService}
+ * without the promotion toggle and without caching.
  *
  * <p>Same soft-delete, case-insensitive uniqueness and optimistic-locking semantics as {@link
- * SquadronService}. Uniqueness check spans the entire {@code org_unit} table — a Spezialkommando
- * named "IRIDIUM" is rejected because the IRIDIUM Squadron already carries that name (the
- * underlying {@code UNIQUE} constraint on {@code org_unit.name} is global across both kinds). The
- * repository method {@link SpecialCommandRepository#existsByNameIgnoreCase(String)} however filters
- * via the JPA discriminator and therefore only sees other SK rows — uniqueness conflicts with
- * Squadron rows are caught at flush time as a DB-level constraint violation, which the
- * GlobalExceptionHandler maps to a 409 Problem Detail. Acceptable trade-off because admin SK
- * creation is rare and a sane name-collision message ("IRIDIUM already exists") is more useful than
- * the bare DB error in 99% of cases — admins simply do not collide with Squadron names.
+ * SquadronService}. The explicit duplicate check sees only other SKs; a clash with a Squadron name
+ * fails at flush on the global unique constraint and maps to 409.
  */
 @Service
 @RequiredArgsConstructor
@@ -103,9 +80,7 @@ public class SpecialCommandService {
   }
 
   /**
-   * Looks up a Spezialkommando by its UUID. Used by the admin detail page, by the membership-
-   * management endpoints, and by the owner-picker UI to resolve a chip click. Throws when no SK
-   * carries the given id.
+   * Returns the Spezialkommando with the given id.
    *
    * @param id Spezialkommando primary key; never {@code null}.
    * @return the matching entity, never {@code null}.
@@ -116,11 +91,8 @@ public class SpecialCommandService {
   }
 
   /**
-   * Persists a new Spezialkommando. Case-insensitive uniqueness check against other SK rows
-   * surfaces as {@link DuplicateEntityException} → 409 before the SQL UNIQUE constraint trips, so
-   * the admin UI gets a structured validation error instead of a generic optimistic-lock failure.
-   * The {@link SpecialCommand} constructor pre-sets {@code isPromotionEnabled = false} so the V94
-   * CHECK constraint accepts the row regardless of what the inbound DTO carries.
+   * Persists a new Spezialkommando after a case-insensitive name check against other SKs; promotion
+   * is always disabled.
    *
    * @param specialCommand transient entity built from the inbound DTO.
    * @return the persisted entity with id and version populated.
@@ -193,13 +165,9 @@ public class SpecialCommandService {
   }
 
   /**
-   * Toggles the per-SK profit-eligibility flag deciding whether this Spezialkommando may be picked
-   * as the responsible (processing) org unit of a Job Order. SKs of non-Profit departments leave
-   * the flag {@code false}: they can still place orders (as the requesting org unit) but never
-   * appear in the responsible picker. Kept as a dedicated mutator separate from {@link
-   * #updateSpecialCommand(UUID, SpecialCommandDto)} so the flag cannot be flipped as a side-effect
-   * of a name/description edit and the access log can attribute the change to the admin who pressed
-   * the toggle. Flipping the flag never touches any Job Order.
+   * Sets whether this Spezialkommando may be picked as the responsible (processing) org unit of a
+   * Job Order. Separate from {@link #updateSpecialCommand(UUID, SpecialCommandDto)}; existing Job
+   * Orders are not touched.
    *
    * @param id Spezialkommando primary key.
    * @param eligible new value of {@code is_profit_eligible}; {@code true} makes the SK selectable

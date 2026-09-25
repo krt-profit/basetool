@@ -36,9 +36,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Admin wipe-reset end to end (REQ-BANK-013, epic #556): an admin types the confirmation token in
- * the A1 danger modal and submits; every balance is zeroed and the action is audit-logged. The wipe
- * is global, but the e2e classes run sequentially so this never races another class's assertions.
+ * End-to-end test of the admin bank wipe-reset (REQ-BANK-013): confirming the danger modal zeroes
+ * every balance and writes an audit entry.
  */
 @Tag("e2e")
 class BankAdminResetE2eTest {

@@ -46,15 +46,9 @@ import org.mockito.quality.Strictness;
 import org.springframework.security.access.AccessDeniedException;
 
 /**
- * Unit tests for the two orchestration-level guard seams of {@link BankLedgerService#bookTransfer}
- * that fire before any ledger row is written: the destination-visibility gate (REQ-BANK-011) that
- * the orchestrator itself enforces, and the wiring that routes a holder-changing fee-inclusive
- * transfer through {@link BankBookingGuards#requireAmountExceedsFee} (REQ-BANK-033, #999) and
- * aborts the booking when it rejects. Pure Mockito with the extracted {@code BankPostingWriter} /
- * {@code BankBookingGuards} collaborators stubbed — the guards' own decision logic and the
- * KRT-account cap (REQ-BANK-047) are covered directly by {@link BankBookingGuardsTest}, and the
- * account-locking, overdraft and posting arithmetic by the Testcontainers {@code
- * BankLedgerServiceTest} / {@code BankLedgerSplitDepositTest}.
+ * Unit tests for the pre-write guards of {@link BankLedgerService#bookTransfer}: the
+ * destination-visibility gate (REQ-BANK-011) and the routing through {@link
+ * BankBookingGuards#requireAmountExceedsFee} (REQ-BANK-033).
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)

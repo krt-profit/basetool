@@ -40,14 +40,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Verifies that a successful order create pokes the staff live-sync queue room server-side
- * (REQ-FE-015, ADR-0094) — the guest-create path has no socket, so {@code JobOrderWriteController}
- * publishes {@code orders / [queue]} through {@link LiveSyncLocalBus} rather than relying on a
- * client broadcast.
- *
- * <p>Uses an ADMIN principal so the {@code canViewJobOrders} capability advice short-circuits to
- * all-true without a backend round-trip; the mocked {@link BackendApiClient} makes the create POST
- * succeed without a real backend.
+ * Verifies that a successful order create publishes {@code orders / [queue]} through {@link
+ * LiveSyncLocalBus} (REQ-FE-015, ADR-0094).
  */
 @SpringBootTest
 class JobOrderCreatePublishMvcTest {

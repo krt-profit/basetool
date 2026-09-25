@@ -36,11 +36,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 /**
- * Bean Validation contract tests for {@link MembershipDeltaRequest}. The two list components
- * declare {@code List<@Valid StaffelChange>} / {@code List<@Valid SpecialCommandChange>} so
- * element-level constraints cascade into the entries; these tests guard that cascade, which broke
- * silently if the {@code @Valid} were placed on the container (the deprecated {@code @Valid
- * List<...>} form, HV000271) instead of the type argument.
+ * Bean Validation tests that element constraints of {@link MembershipDeltaRequest}'s lists cascade
+ * into the entries via the type-argument {@code @Valid}.
  */
 class MembershipDeltaRequestValidationTest {
 

@@ -51,26 +51,11 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 /**
- * Mockito unit tests for {@link HandleAnonymisationService} — the granted Art. 17 erasure of a
- * member's surviving handle snapshots (REQ-SEC-062).
- *
- * <p>The properties that carry the requirement: <b>every</b> column in {@code
- * HandleAnonymisationService.ANONYMISED_COLUMNS} is reached (erasing seven of eight is worse than
- * erasing none, because the result reads as a completed erasure); every text-matched column is run
- * <b>once per spelling</b>, because a handover is typed by hand and the typist wrote whichever name
- * they call the person; the marker events are written <b>after</b> the updates, so the receipt is
- * not scrubbed by the thing it records; the payload never carries the name that was removed; and
- * the text-matched columns are skipped rather than matched against an empty string when no name is
- * known.
- *
- * <p><b>What this class cannot check is why the set shrank.</b> Three substring {@code REPLACE}
- * statements were removed on 2026-09-17 — over {@code audit_event.details}, {@code
- * bank_audit_event.details} and {@code notification.params} — because they rewrote every row whose
- * text contained a needle the departing member sets on themselves. Mocked repositories cannot see
- * SQL semantics, which is exactly why that defect reached review: the assertions below were green
- * against a statement that could rewrite an unrelated member's rows. Nothing here would have caught
- * it, and nothing here catches its absence either; {@code HandleErasureCoverageTest} is what pins
- * the column set.
+ * Mockito unit tests for {@link HandleAnonymisationService}, the granted Art. 17 erasure of a
+ * member's handle snapshots (REQ-SEC-062): every column in {@code ANONYMISED_COLUMNS} is reached,
+ * text-matched columns run once per spelling and are skipped when no name is known, the marker
+ * events follow the updates, and the payload never carries the removed name. The column set itself
+ * is pinned by {@code HandleErasureCoverageTest}.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)

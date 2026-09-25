@@ -28,12 +28,11 @@ import java.util.UUID;
 import lombok.Data;
 
 /**
- * Form-binding object for Inventory input. The create form has two catalog modes (design §6.2):
- * material mode fills {@link #materialId} + {@link #quality}, item mode fills {@link #gameItemId}
- * (no quality — item rows carry none, REQ-INV-029). Exactly one of the two catalog references must
- * be set; the XOR and the material-mode quality requirement are cross-field rules enforced by
- * {@code InventoryWriteController#validateCatalogMode} (a plain {@code @NotNull} on either field
- * would reject the other mode outright).
+ * Form-binding object of the inventory create form, in material mode ({@link #materialId} + {@link
+ * #quality}) or item mode ({@link #gameItemId}, REQ-INV-029).
+ *
+ * <p>Exactly one catalog reference must be set, enforced by {@code
+ * InventoryWriteController#validateCatalogMode}.
  */
 @Data
 public class InventoryForm {
@@ -83,9 +82,8 @@ public class InventoryForm {
   private Long version;
 
   /**
-   * R5.d owner-picker output: the {@code OrgUnit} the new inventory row should land on. {@code
-   * null} when the target user has at most one org-unit membership (in that case the fragment stays
-   * hidden and the backend stamps the user's home Staffel via the legacy path).
+   * Owner-picker output: the {@code OrgUnit} the new inventory row lands on, or {@code null} for
+   * the backend to stamp the user's home Staffel.
    */
   private UUID owningOrgUnitId;
 
@@ -97,10 +95,8 @@ public class InventoryForm {
   private Boolean mergeStock = false;
 
   /**
-   * Variante-C split-at-check-in (REQ-INV-027, R4): the per-target job-order earmarks the user
-   * entered in the create form, bound from indexed params (e.g. {@code
-   * jobOrderAllocations[0].targetId} / {@code jobOrderAllocations[0].amount}). Empty when no split
-   * was entered — the backend then falls back to the single {@link #jobOrderId}.
+   * Per-job-order earmarks entered in the create form (REQ-INV-027), bound from indexed params;
+   * when empty the backend falls back to {@link #jobOrderId}.
    */
   private List<AllocationRow> jobOrderAllocations = new ArrayList<>();
 

@@ -36,20 +36,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Owns the per-request MDC for the whole gateway (REQ-OBS-001/-002): it reads (or mints) the
- * correlation id, seeds the {@code userId} field, echoes the id back on the response, and clears
- * both keys again when the request unwinds. Runs first so the id is present for the bot-protection,
- * size-cap and rate-limit filters too. The inbound header is sanitized to a short safe charset to
- * keep log lines clean and prevent header/log injection.
- *
- * <p>The {@code userId} starts out as {@value #ANONYMOUS} because this filter runs <em>before</em>
- * Spring Security has authenticated anything — which is exactly right for the pre-auth filters that
- * log underneath it. {@link UserIdMdcFilter}, installed inside the security chain, overwrites it
- * with the JWT {@code sub} once the caller is known and deliberately does <b>not</b> clear it
- * again, so the value survives into the {@link RequestLoggingFilter} access-log line that is
- * emitted outside the security chain. This filter's {@code finally} is therefore the single place
- * where both keys are removed, which is what keeps a pooled or virtual thread from bleeding one
- * request's ids into the next.
+ * Owns the per-request MDC of the gateway (REQ-OBS-001/-002): reads or mints a sanitized
+ * correlation id, seeds {@code userId} with {@value #ANONYMOUS}, echoes the id on the response and
+ * removes both keys when the request ends. Runs first so every later filter logs with the id.
  */
 @Component
 @Order(CorrelationIdFilter.ORDER)

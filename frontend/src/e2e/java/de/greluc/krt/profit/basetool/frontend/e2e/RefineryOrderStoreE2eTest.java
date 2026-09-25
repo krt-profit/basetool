@@ -38,23 +38,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Storing ("einlagern") a refinery order's refined output into the Lager (UC-19) — the completion
- * half of the refinery lifecycle. The store dialog on the order-detail page turns each output good
- * into an append-only {@code InventoryItem} (REQ-INV-001) and flips the order to {@code COMPLETED};
- * the resulting row is stamped onto the assignee's owning org unit (REQ-ORG-004).
+ * Storing ("einlagern") a refinery order's output into the Lager (UC-19): the store dialog turns
+ * each output good into an {@code InventoryItem} (REQ-INV-001), completes the order and stamps the
+ * row onto the assignee's org unit (REQ-ORG-004).
  *
- * <p><b>Drive via UI, verify via API.</b> The headline flow opens the pre-filled store modal in the
- * real browser and submits it; the side effects (order status, the new Lager row, the propagated
- * note) are then asserted through the scoped backend endpoints via {@link BackendSeeder}, the
- * established race-free way to check persistence. The status-guard and note edges run purely
- * through the API.
- *
- * <p>Each test uses its own freshly-seeded input material so its order's output maps 1:1 to a
- * single Lager material — the grouped-inventory probe ({@code
- * /api/v1/inventory/all/grouped?materialIds=…}) then reads back exactly that order's contribution.
- * The seeded manual RAW material has no refined counterpart, so the backend sets the output
- * material equal to the input, and that is the material the store flow inserts. {@code test-admin}
- * (ADMIN, IRIDIUM member) owns every order and drives the flow.
+ * <p>Driven via the UI and verified via the API through {@link BackendSeeder}; each test uses its
+ * own fresh input material so the grouped-inventory probe reads exactly that order's output.
  */
 @Tag("e2e")
 class RefineryOrderStoreE2eTest {

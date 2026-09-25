@@ -27,10 +27,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 /**
- * Spring Data repository for {@link Organisationsleitung}, narrowed by Hibernate's single-table
- * discriminator to {@code kind = 'ORGANISATIONSLEITUNG'} rows. The OL is effectively a singleton
- * tier (one organisation), but the repository exposes the standard lookups so the admin flow that
- * creates and maintains it (epic #692) reads like the other org-unit kinds.
+ * Spring Data repository for the {@link Organisationsleitung}, the singleton top tier of the org
+ * hierarchy.
  */
 @Repository
 public interface OrganisationsleitungRepository extends JpaRepository<Organisationsleitung, UUID> {

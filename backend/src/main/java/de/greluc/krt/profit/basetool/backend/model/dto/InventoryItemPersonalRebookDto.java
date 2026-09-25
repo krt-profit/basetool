@@ -25,29 +25,15 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Request payload for the personal-marker rebooking (Umbuchung) of an inventory row (REQ-INV-007).
+ * Request payload for moving part of an inventory row between the personal and the shared pool
+ * (REQ-INV-007); the direction follows the source row's {@code personal} flag.
  *
- * <p>The direction is <em>not</em> carried in the payload: the service infers it from the source
- * row's {@code personal} flag. A source {@code personal = true} row is <em>de-personalized</em>
- * (moved into the shared squadron pool); a source {@code personal = false} row is
- * <em>personalized</em> (moved into the owner's private pool). Either way the operation is an
- * append-only split — the moved {@link #amount} is decremented off the source row and inserted as a
- * new row with the opposite {@code personal} flag (REQ-INV-001), mirroring the book-out {@code
- * TRANSFER} branch.
- *
- * @param amount the SCU/piece quantity to rebook; must be {@code > 0} and {@code <=} the source
- *     row's available amount (validated in the service)
- * @param version the source row's optimistic-lock {@code @Version}, echoed back so a concurrent
- *     edit surfaces as HTTP 409
- * @param targetOwningOrgUnitId the org-unit pool the new shared row should be stamped on — the
- *     picker output for the <em>de-personalize</em> direction, resolved through {@code
- *     OwnerScopeService.resolveOrgUnitForPickerOutputNullable}. Ignored for the
- *     <em>personalize</em> direction, which carries the owner's existing stamp over to the private
- *     row.
- * @param mergeStock per-action stock-merge opt-in (REQ-INV-026) for the newly inserted row. A
- *     {@code PIECE} material merges the moved quantity into a matching stack unconditionally; an
- *     {@code SCU} material merges only when this is {@code true}. {@code null} is treated as {@code
- *     false}; the flag governs only this one Umbuchung and is never persisted.
+ * @param amount the quantity to rebook; positive and at most the source row's amount
+ * @param version the source row's optimistic-lock version
+ * @param targetOwningOrgUnitId the org unit the new shared row is stamped on; ignored when
+ *     personalizing
+ * @param mergeStock per-action stock-merge opt-in for an {@code SCU} material (REQ-INV-026); {@code
+ *     null} means {@code false}
  */
 public record InventoryItemPersonalRebookDto(
     @NotNull @Min(0) Double amount,

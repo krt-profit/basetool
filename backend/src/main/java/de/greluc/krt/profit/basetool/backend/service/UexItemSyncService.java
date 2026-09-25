@@ -57,60 +57,14 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.util.UriUtils;
 
 /**
- * R2 UEX item sync. Iterates the {@code uex_category} reference table (game-related rows only),
- * calls {@code /items?id_category=<n>} per category, and upserts the rows into {@code game_item}.
+ * Syncs UEX items into {@code game_item}, walking {@code /items?id_category=<n>} for every
+ * game-related {@code uex_category}.
  *
- * <p>Resolution chain per SC_WIKI_SYNC_PLAN.md §8.3.1, R2 subset (Wiki side not yet wired):
- *
- * <ol>
- *   <li>{@code byUexItemId(dto.id)} — fastest path on a re-sync of the same UEX catalogue.
- *   <li>{@code byExternalUuid(dto.uuid)} — joins any row Wiki may have written first (R4+); no-op
- *       in R2's first deploy because Wiki has not run yet.
- *   <li>{@code null} → create a new row stamped {@link GameItemSourceSystem#UEX_ONLY}.
- * </ol>
- *
- * <p>Kind derivation table per §6.3.1 — driven by the row's {@link UexCategory#getSection()}:
- *
- * <ul>
- *   <li>{@code "Armor"} → {@link GameItemKind#ARMOR}
- *   <li>{@code "Clothing"} or {@code "Undersuits"} → {@link GameItemKind#CLOTHING}
- *   <li>{@code "Personal Weapons"} → {@link GameItemKind#WEAPON} (or {@link
- *       GameItemKind#WEAPON_ATTACHMENT} when category name contains {@code "Attachments"})
- *   <li>{@code "Vehicle Weapons"} → {@link GameItemKind#VEHICLE_WEAPON}
- *   <li>{@code "Liveries"} or {@code "Flair"} → {@link GameItemKind#GENERIC}
- *   <li>{@code "Systems"}, {@code "Utility"}, {@code "Avionics"}, {@code "Propulsion"}, {@code
- *       "Module"}, {@code "Technology"} → {@link GameItemKind#VEHICLE_ITEM}
- *   <li>everything else → {@link GameItemKind#GENERIC}
- * </ul>
- *
- * <p>Orphan handling: rows whose {@code uex_item_id} no longer appears in any category response get
- * their {@code uex_deleted_at} stamped via {@link
- * GameItemRepository#markUexDeletedExcept(java.util.Collection, Instant)}. The sweep is gated twice
- * so it never wipes a still-present item: it is skipped when the seen-id set is empty (a sync that
- * fetched nothing) AND when <b>any category fetch came back incomplete</b> — a transport / non-2xx
- * / decode failure, an envelope that self-reported a non-{@code ok} status, or a {@code 304 Not
- * Modified}. All three degrade to an empty row list, which is indistinguishable from a legitimately
- * empty category (UEX has two), so without the {@link UexClient.FetchResult#complete()} flag one
- * 5xx on one of the ~50 per-category calls soft-deleted that whole category — up to ~500 rows —
- * until the next healthy run re-upserted them (REQ-DATA-014). Orphans are reconciled on the next
- * run that fetches every category fresh.
- *
- * <p><strong>No transaction across the fetches (BE-PERF-09).</strong> {@link #syncItems()} holds no
- * transaction: every category is fetched with none open, the manufacturer and ship-type lookups are
- * read once into id maps, each item commits in its own transaction below, and the orphan sweep runs
- * in one of its own. Until 2026-09-22 the run was one read-write transaction around ~50 HTTP calls,
- * pinning a pooled connection for the whole walk while every item opened a second one.
- *
- * <p><strong>Per-item isolation (REQ-DATA-004).</strong> Each item is upserted in its own {@code
- * REQUIRES_NEW} transaction via {@link #upsertItemWithinTransaction(UexItemDto, UexCategory,
- * Instant)}, invoked through the {@link #self} proxy. UEX ships several distinct item ids sharing
- * one in-game {@code uuid} (a base weapon and its skins — e.g. ids 879/5457/5458 all carry the
- * MaxLift tractor-beam uuid), so an insert can collide with the {@code uk_game_item_external_uuid}
- * UNIQUE constraint. Before per-item isolation that single violation poisoned the one big
- * transaction's Hibernate session, so every <em>subsequent</em> item's autoflush re-threw the dead
- * insert and the whole run rolled back (observed in prod: 3376 cascade failures, no {@code
- * Finished} line). With a dedicated nested transaction per item a colliding row rolls back only
- * itself, the caller's {@code catch} skips it, and the rest of the catalogue still commits.
+ * <p>An item resolves by UEX item id, then by external UUID, else is created as {@link
+ * GameItemSourceSystem#UEX_ONLY}. Items missing from every response are marked UEX-deleted via
+ * {@link GameItemRepository#markUexDeletedExcept(java.util.Collection, Instant)}, but only when
+ * every category fetch was complete (REQ-DATA-014). Each item is upserted in its own transaction,
+ * so a colliding row rolls back alone (REQ-DATA-004).
  */
 @Slf4j
 @Service
@@ -118,11 +72,7 @@ import org.springframework.web.util.UriUtils;
 @Transactional(readOnly = true)
 public class UexItemSyncService {
 
-  /**
-   * Cap for the upstream-supplied item name in log lines. UEX is a third party we do not control,
-   * so the value is untrusted free text and goes through {@link LogSafe} first; 64 characters
-   * comfortably fit any real item name.
-   */
+  /** Maximum length of an upstream item name in log lines, logged through {@link LogSafe}. */
   private static final int MAX_NAME_LOG_LENGTH = 64;
 
   private final UexClient uexClient;
@@ -145,28 +95,11 @@ public class UexItemSyncService {
   private final SyncChunkWriter chunkWriter;
 
   /**
-   * Runs the full UEX item sync: ensures the category reference table is fresh, then walks every
-   * game-related category. Empty UEX responses short-circuit per category without wiping local
-   * data.
+   * Runs the full UEX item sync: refreshes the category table, then walks every game-related
+   * category. Holds no transaction itself; an empty response leaves a category's local data intact.
    *
-   * <p>Returns the number of {@code game_item} rows upserted this run — the same {@code upserted}
-   * tally logged in the {@link SyncEventType#SYNC_RUN_SUMMARY} event. {@link UexScheduler} feeds it
-   * into {@code basetool_scheduled_job_items_total{job="uex_sync"}} via {@code
-   * TaskMetrics.recordCounting} so a catalogue outage that returns empty responses (0 upserts)
-   * while the sweep still "succeeds" is visible through the {@code SyncZeroItems} alert (#1041 item
-   * 2).
-   *
-   * <p><strong>Unchanged-catalogue carve-out.</strong> {@link UexClient} does conditional GETs:
-   * when the whole item catalogue is unchanged every category returns {@code 304 Not Modified}, so
-   * the run legitimately upserts nothing. That healthy no-op must NOT read as the empty-200 outage
-   * the alert targets, so when nothing was upserted but at least one category was served from the
-   * {@code 304} cache this returns the live catalogue size ({@link
-   * GameItemRepository#countLiveUexItems()}) to keep the items metric non-zero. A genuine empty-200
-   * outage (no {@code 304} at all) still returns {@code 0} and correctly trips the alert.
-   *
-   * @return the number of {@code game_item} rows upserted across all categories this run, or — when
-   *     nothing was upserted because the catalogue came back unchanged ({@code 304}) — the live UEX
-   *     catalogue size
+   * @return the number of {@code game_item} rows upserted this run, or the live UEX catalogue size
+   *     when nothing was upserted because the catalogue was unchanged ({@code 304})
    */
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public int syncItems() {
@@ -301,18 +234,12 @@ public class UexItemSyncService {
   }
 
   /**
-   * Upserts a single UEX item DTO into the {@code game_item} table in its own {@code REQUIRES_NEW}
-   * transaction (REQ-DATA-004). The dedicated nested transaction is what makes a {@code
-   * uk_game_item_external_uuid} collision — two UEX item ids sharing one in-game uuid — roll back
-   * only this row instead of poisoning the whole run's session. Must be invoked through the {@link
-   * #self} proxy; a direct {@code this} call would be self-invocation and skip the new transaction.
+   * Upserts a single UEX item into {@code game_item} in its own {@code REQUIRES_NEW} transaction,
+   * so a {@code uk_game_item_external_uuid} collision rolls back only this row (REQ-DATA-004). Must
+   * be invoked through the {@link #self} proxy.
    *
-   * <p>Belt-and-braces against that same shared-uuid case: when an existing row (resolved by {@code
-   * uex_item_id}) would have its still-null {@code external_uuid} backfilled with a uuid a
-   * <em>different</em> row already owns, this leaves {@code external_uuid} null rather than letting
-   * the write hit {@code uk_game_item_external_uuid}. The row keeps its {@code uex_item_id} key and
-   * every other UEX column still syncs, so the loser sibling no longer fails every run
-   * (REQ-DATA-005).
+   * <p>An {@code external_uuid} that another row already owns is not backfilled; the row still
+   * syncs its other columns.
    *
    * @param dto inbound UEX row
    * @param category resolved category for kind derivation + FK
@@ -327,9 +254,7 @@ public class UexItemSyncService {
 
   /**
    * Same as {@link #upsertItemWithinTransaction(UexItemDto, UexCategory, Instant)}, resolving the
-   * manufacturer and the linked ship type from preloaded id maps rather than with a query each
-   * (BE-PERF-09). The sync run passes the maps it read once; {@code null} falls back to the per-row
-   * repository lookups.
+   * manufacturer and ship type from preloaded id maps.
    *
    * @param dto inbound UEX row
    * @param category resolved category for kind derivation + FK
@@ -415,9 +340,8 @@ public class UexItemSyncService {
   }
 
   /**
-   * Resolves a candidate {@link GameItem} for the inbound DTO. Order: by UEX item id (fastest
-   * re-resolution path), then by Wiki-shared external UUID (no-op in R2 first deploy), then {@code
-   * null}.
+   * Resolves the existing {@link GameItem} for the inbound DTO by UEX item id, then by external
+   * UUID.
    *
    * @param dto inbound UEX row
    * @return existing row if matched; {@code null} otherwise
@@ -441,18 +365,14 @@ public class UexItemSyncService {
   }
 
   /**
-   * Looks up the local manufacturer row by UEX company id via the {@code manufacturer_uex_company}
-   * alias table (fast path — covers every id-variant of a brand UEX duplicates, ADR-0023), falling
-   * back to a case-insensitive name match. Returns {@code null} when the company can't be resolved
-   * — the row is still persisted; the FK stays NULL and the admin can fix it via {@code
-   * /admin/material-aliases} once that surface is generalised (post-R2).
+   * Resolves the manufacturer by UEX company id through the {@code manufacturer_uex_company} alias
+   * table (ADR-0023), falling back to a case-insensitive name match.
    *
-   * <p>With {@code lookups} both steps are map hits and the result is a {@code getReferenceById}
-   * proxy — no query at all.
+   * <p>With {@code lookups} the result is a {@code getReferenceById} proxy and no query runs.
    *
    * @param dto inbound UEX row
    * @param lookups the run's preloaded id maps, or {@code null} for per-row lookups
-   * @return resolved manufacturer, or {@code null}
+   * @return resolved manufacturer, or {@code null}; the item is persisted either way
    */
   @Nullable
   private Manufacturer resolveManufacturer(UexItemDto dto, @Nullable ItemLookups lookups) {
@@ -525,9 +445,8 @@ public class UexItemSyncService {
   }
 
   /**
-   * The item sync's preloaded id maps (BE-PERF-09). Ids only, so they serve every per-item
-   * transaction of the run; the manufacturer and ship-type catalogues are synced before the items
-   * and do not change during the item walk.
+   * The item sync's preloaded id maps, valid for the whole run because manufacturers and ship types
+   * are synced before the items.
    *
    * @param manufacturerByCompanyId manufacturer id by UEX company id (every alias)
    * @param manufacturerByLowerName manufacturer id by lower-cased name
@@ -539,9 +458,8 @@ public class UexItemSyncService {
       @NotNull Map<Integer, UUID> shipTypeByVehicleId) {}
 
   /**
-   * Maps the row's category to a {@link GameItemKind} per the §6.3.1 table. The decision is driven
-   * by the section first; for Personal Weapons the subcategory name also distinguishes weapons from
-   * attachments.
+   * Maps the row's category to a {@link GameItemKind} by its section and, for Personal Weapons, by
+   * whether the category name marks attachments.
    *
    * @param category resolved category for the row
    * @return derived kind, or {@link GameItemKind#GENERIC} if no specific match applies

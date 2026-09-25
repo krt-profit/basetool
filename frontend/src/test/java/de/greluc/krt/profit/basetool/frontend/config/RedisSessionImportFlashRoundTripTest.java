@@ -35,14 +35,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.serializer.GenericJacksonJsonRedisSerializer;
 
 /**
- * Pins the Redis-session behaviour the refinery-import flash contract depends on (covers
- * REQ-REFINERY-015). The import proxy flashes {@code importRowIssues} across a redirect; the flash
- * map travels through the JSON session serializer of {@link RedisSessionConfig}, which stringifies
- * map keys — an {@code Integer}-keyed map silently comes back {@code String}-keyed, every {@code
- * containsKey(int)} lookup misses, and no inline review flag renders (the exact e2e regression on
- * PR #518). The proxy therefore keys the map by the index's decimal string; this test proves both
- * the stringification (so nobody "simplifies" the key type back) and that the issue records survive
- * the round trip intact for the template's {@code code()}/{@code suggestions()} accessors.
+ * Verifies that the refinery-import flash map survives the Redis session serializer (covers
+ * REQ-REFINERY-015): its keys come back as strings, so the proxy keys by decimal string, and the
+ * issue records stay intact.
  */
 class RedisSessionImportFlashRoundTripTest {
 

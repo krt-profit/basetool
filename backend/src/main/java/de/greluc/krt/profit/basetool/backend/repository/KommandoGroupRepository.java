@@ -26,10 +26,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 /**
- * Spring Data repository for {@link KommandoGroup} (epic #800, REQ-ROLE-003). Backs the
- * Kommandogruppe CRUD on a Staffel and the service-layer "at most four groups per squadron"
- * defence-in-depth check that mirrors the {@code enforce_max_four_kommando_groups_per_squadron} DB
- * trigger.
+ * Spring Data repository for {@link KommandoGroup} (REQ-ROLE-003), backing Kommandogruppe CRUD on a
+ * Staffel and the at-most-four-groups check.
  */
 @Repository
 public interface KommandoGroupRepository extends JpaRepository<KommandoGroup, UUID> {
@@ -45,9 +43,8 @@ public interface KommandoGroupRepository extends JpaRepository<KommandoGroup, UU
   List<KommandoGroup> findBySquadronIdOrderBySortIndexAsc(UUID squadronOrgUnitId);
 
   /**
-   * Counts the Kommandogruppen of the given Staffel. Used by the service to reject a fifth group
-   * with a clean 4xx before the {@code enforce_max_four_kommando_groups_per_squadron} trigger would
-   * raise a 500.
+   * Counts the Kommandogruppen of the given Staffel, so a fifth group is rejected with a 4xx before
+   * the DB trigger fires.
    *
    * @param squadronOrgUnitId the Staffel's org-unit id; never {@code null}.
    * @return the number of Kommandogruppen on this squadron.

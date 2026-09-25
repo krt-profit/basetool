@@ -34,21 +34,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Regression for the Materialbörse Gesuche (requests) surface (REQ-MARKET-015…): switching to a
- * Gesuche tab relabels the CTAs, and the request create modal opens <em>genuinely visible</em> —
- * the same {@code .krt-modal-overlay} display:flex contract the offer release modal follows, which
- * only a real browser verifies (MockMvc render tests do not evaluate CSS).
- *
- * <p>Drives the board in a real engine and asserts: the shared four-tab bar carries the two Gesuche
- * tabs; clicking "Alle Gesuche" reveals the "Material suchen" / "Item suchen" CTAs (and hides the
- * offer CTAs); clicking "Material suchen" opens the request modal (hidden on load, visible after
- * the click); the catalogue picker dropdown stays closed on open and reveals on a click; the
- * Material/ Item kind radio toggles the material vs blueprint-product combobox; and the min-quality
- * + desired- quantity fields are present for both kinds. No inventory seed is needed — a request
- * has no backing Lager row, and the picker shows an empty-notice row without one.
- *
- * <p>The actor is {@code test-admin}, whose seeded IRIDIUM membership carries KRT_MEMBER, the role
- * the board requires.
+ * E2E coverage for the Materialbörse Gesuche tabs (REQ-MARKET-015): the tabs relabel the CTAs, the
+ * request modal opens visibly with its picker closed, the Material/Item radio switches the
+ * combobox, and quality and quantity fields are present for both kinds.
  */
 @Tag("e2e")
 class MaterialboardRequestModalE2eTest {

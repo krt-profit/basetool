@@ -50,11 +50,9 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.web.client.ResourceAccessException;
 
 /**
- * Mockito unit tests for {@link UserDeletionService#deleteUser} — the FK-ordered hard-delete
- * cascade extracted out of {@code UserService} (audit Thema&nbsp;7, #1252). Covers the reassignment
- * / unlink / audit-cleanup ordering that keeps the {@code app_user} delete from tripping a
- * foreign-key violation, plus the fallback-admin resolution through {@link
- * UserService#getCurrentUser()}.
+ * Mockito unit tests for {@link UserDeletionService#deleteUser}: the FK-safe ordering of
+ * reassignment, unlinking and audit cleanup before the {@code app_user} delete, and the
+ * fallback-admin resolution through {@link UserService#getCurrentUser()}.
  */
 @ExtendWith(MockitoExtension.class)
 class UserDeletionServiceTest {
@@ -88,9 +86,8 @@ class UserDeletionServiceTest {
   private final List<String> gatewayClientIds = new ArrayList<>();
 
   /**
-   * A real instance, not a mock: its default is the empty allowlist, which is the state every
-   * pre-existing case here needs — no row is a gateway service account, so the machine-identity
-   * exemption never fires and each case exercises the member path it was written for (ADR-0129).
+   * A real instance with an empty allowlist, so no user is a gateway service account and the tests
+   * exercise the member path (ADR-0129).
    */
   @Spy
   private final IngestGatewayProperties ingestGatewayProperties =
@@ -203,11 +200,8 @@ class UserDeletionServiceTest {
   }
 
   /**
-   * #1827: a consolidation orchestrator removes the Keycloak user itself, and does so
-   * <em>after</em> the database half so a rolled-back transaction leaves it intact for a clean
-   * retry (REQ-SEC-026, ADR-0111). Under the enforced probe those two designs contradict each other
-   * and the orchestrator always loses -- which is exactly how the queue's link action came to throw
-   * on every run from #1460 onward. The waiver is what lets the documented ordering stand.
+   * Verifies that a waived existence check lets the deletion proceed while the Keycloak user still
+   * exists, as an orchestrator that removes it afterwards requires (REQ-SEC-026).
    */
   @Test
   void deleteUser_waived_proceedsEvenWhileTheKeycloakUserIsStillThere() {

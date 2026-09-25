@@ -1,62 +1,10 @@
 // @ts-check
-/*
- * krt-fetch.js — the single client-side seam for frontend write requests and
- * AJAX fragment swaps (epic #571, spec REQ-FE-001..005).
- *
- * Generalizes the former mission-subresource.js (window.MissionSubresource)
- * into a mission-agnostic toolbox loaded globally from fragments/head.html, so
- * every page shares ONE implementation of:
- *
- *  - CSRF header construction (window.krtCsrf) — reads the freshest
- *    meta[name="_csrf"] / meta[name="_csrf_header"] tags, the single source of
- *    truth. Replaces the ~30 hand-rolled readers in 6 syntactic variants.
- *  - retry-on-403 — a bare 403 means the CSRF token was rejected (stale tab,
- *    post-re-login session-id rotation, maximumSessions eviction). krtFetch
- *    transparently refetches the token from GET /csrf, updates the meta tags,
- *    and retries the write exactly once before surfacing the error.
- *  - write (JSON) / submitForm (multipart FormData) — the two write entry
- *    points share ONE request orchestration (send): CSRF header, bare-403
- *    refresh-and-retry-once, X-Reauthenticate redirect,
- *    error/conflict handling, syncVersion and success toast. submitForm lets a
- *    page drop its hand-rolled CSRF+retry FormData loop (S10, #916); it omits
- *    Content-Type so the browser sets the multipart boundary itself.
- *  - JSON / application/problem+json parsing and RFC7807 409 branching
- *    (OPTIMISTIC_LOCK / PESSIMISTIC_LOCK -> reload-confirm; domain conflict
- *    codes -> toast only), carried over verbatim from mission-subresource.js.
- *  - syncVersion — the canonical @Version propagator: on success the fresh
- *    version is written to the container AND every descendant [data-version]
- *    so the user's next action does not 409 (see the concurrency rules in
- *    CLAUDE.md).
- *  - swap — server-rendered HTML fragment swaps for lists / filters /
- *    pagination, including delegated interception of in-container pagination
- *    anchors so paging stays in-place (fixes the known full-reload regression).
- *  - setTrustedHtml / replaceWithTrustedHtml — the one sanctioned innerHTML sink for
- *    server-rendered Thymeleaf fragment text (FE-SEC-05); swap uses it, and so does every page
- *    that inserts a fragment it fetched itself. Markup built in script never goes through it.
- *  - sectionWrite — a factory for pages whose aggregate is saved and
- *    re-rendered as independent sections (#924, mission-detail): builds the
- *    page's { write, refresh, notify } trio around write/swap from a
- *    page-supplied config (i18n dict getter, section->container map, page-URL
- *    getter and peer-broadcast closure, each re-evaluated per call).
- *
- * No user-visible string is hardcoded here: callers pass already-localized
- * labels/messages (e.g. mission-detail's page-local krtMissionWrite wrapper
- * sources them from window.MISSION_SUBRES_I18N). The few inline fallbacks only
- * ever surface if a caller forgets to pass a message AND its i18n dictionary is
- * missing — a developer error, not a user-facing path.
- */
 (function () {
     'use strict';
 
     /**
-     * Returns value when it is a non-empty string, otherwise the fallback. Used
-     * so a missing/blank localized message degrades to a neutral default instead
-     * of rendering "undefined".
-     */
-    /**
-     * A caller-supplied localized string, or the page-wide default for it. The defaults live in
-     * `window.krtFetchI18n` (fragments/head.html, from the bundles); a missing one is rendered as its
-     * key name and reported through `krtI18nText` rather than replaced by a hardcoded literal.
+     * Returns the caller-supplied localized string, or the page-wide default from
+     * `window.krtFetchI18n`; a missing default renders as its key name via `krtI18nText`.
      *
      * @param {unknown} value the caller's already-localized string, if any
      * @param {string} fallbackValue the page-wide default the caller did not override
@@ -77,8 +25,6 @@
     function defaults() {
         return window.krtFetchI18n || {};
     }
-
-    // ---------------------------------------------------------------- krtCsrf
 
     function metaContent(name) {
         const el = document.querySelector('meta[name="' + name + '"]');
@@ -105,9 +51,8 @@
     }
 
     /**
-     * Builds the request headers for a JSON write: Accept + Content-Type +
-     * X-Requested-With, plus the CSRF header read fresh from the meta tags. Any
-     * base headers passed in are merged first (the CSRF header always wins).
+     * Builds the JSON-write headers (Accept, Content-Type, X-Requested-With) plus the CSRF header
+     * read fresh from the meta tags; `base` is merged first, so the CSRF header always wins.
      */
     function csrfHeaders(base) {
         const headers = Object.assign(
@@ -126,16 +71,12 @@
         return headers;
     }
 
-    // De-duplicates concurrent refreshes: parallel writes that all 403 share one
-    // in-flight GET /csrf instead of stampeding the endpoint.
     /** @type {Promise<any> | null} */
     let refreshInFlight = null;
 
     /**
-     * Refetches the CSRF token from GET /csrf, writes it back into the meta tags
-     * (the single source of truth every subsequent krtCsrf.headers() call reads),
-     * and resolves to { headerName, token } — or null if the refresh failed (e.g.
-     * the session is gone and the endpoint 403s/redirects).
+     * Refetches the CSRF token from GET /csrf and writes it into the meta tags. Concurrent calls
+     * share one request; resolves to { headerName, token }, or null when the refresh failed.
      */
     function refreshCsrf() {
         if (refreshInFlight) {
@@ -171,23 +112,11 @@
         refresh: refreshCsrf,
     };
 
-    // ------------------------------------------------------------- re-auth
-
-    // When the frontend OAuth2 session loses its usable token (Keycloak refresh-token rotation
-    // revoked the family, the session idled out, ...) the backend relay fails with
-    // client_authorization_required. The server answers HTML navigations with a 302 to the Keycloak
-    // login flow (browser follows it automatically) and AJAX callers with a 401 carrying the
-    // `X-Reauthenticate: <path>` header. This helper redirects the whole window to that path so the
-    // user silently re-authenticates against the still-alive Keycloak SSO session instead of being
-    // stranded on a dead session (REQ-SEC-012). A short sessionStorage guard prevents a redirect
-    // loop if the fresh session were to be revoked again immediately.
     const REAUTH_GUARD_KEY = 'krtReauthAt';
     const REAUTH_MIN_INTERVAL_MS = 10000;
     const DEFAULT_REAUTH_PATH = '/oauth2/authorization/keycloak';
 
     function reauthRedirect(url) {
-        // Only ever follow a same-origin absolute path — never an attacker-controllable absolute URL
-        // (open-redirect guard), even though the value originates from our own server.
         const target = typeof url === 'string' && url.charAt(0) === '/' ? url : DEFAULT_REAUTH_PATH;
         try {
             const last = Number(window.sessionStorage.getItem(REAUTH_GUARD_KEY) || 0);
@@ -196,9 +125,7 @@
                 return false;
             }
             window.sessionStorage.setItem(REAUTH_GUARD_KEY, String(now));
-        } catch (_storageUnavailable) {
-            /* sessionStorage may be blocked; proceed without the loop guard */
-        }
+        } catch (_storageUnavailable) {}
         window.location.assign(target);
         return true;
     }
@@ -219,14 +146,8 @@
     }
 
     /**
-     * If response carries the X-Terms-Acceptance-Required header, navigates to the consent page and
-     * returns true; otherwise returns false. Safe to call with any Response.
-     *
-     * The sibling of maybeReauthenticate, for the same reason: a gate that can appear mid-session
-     * must not surface as a stalled section or a generic toast. This one fires when a tab was
-     * already open as a new Terms-of-Use wording deployed (REQ-SEC-028) — the moment the feature
-     * first affects anyone. The target comes from the header rather than a hardcoded path so the
-     * context path stays correct.
+     * If response carries the X-Terms-Acceptance-Required header, navigates to the consent page it
+     * names and returns true; otherwise returns false. Safe to call with any Response (REQ-SEC-028).
      */
     function maybeTermsGate(response) {
         if (!response || !response.headers) {
@@ -241,13 +162,8 @@
 
     /**
      * Navigates the window to the consent page, refusing anything that is not a same-origin absolute
-     * path (open-redirect guard, as in reauthRedirect — the value comes from our own server either
-     * way, but a single navigation helper should not depend on that).
-     *
-     * Split out of maybeTermsGate because the gate also reaches clients that never see a
-     * Response. An EventSource can read neither a status nor a header, so the gate arrives as a
-     * `terms-gate` event; a WebSocket can read only the close code and reason, so /ws/sync is
-     * closed with 4003 carrying the consent path. Both hand this helper a bare URL string.
+     * path. Also used by the SSE `terms-gate` event and the /ws/sync 4003 close, which carry a bare
+     * URL.
      *
      * @param {string | null | undefined} url the consent-page path the server named
      * @returns {boolean} true when the browser was sent to the consent page
@@ -263,26 +179,14 @@
     window.krtReauth = { redirect: reauthRedirect, check: maybeReauthenticate };
     window.krtTermsGate = { check: maybeTermsGate, redirect: termsGateRedirect };
 
-    // The guest edit token (security audit M1 / REQ-SEC-018) lived here: a per-row capability
-    // token handed to an anonymous mission sign-up, persisted in localStorage by participant id and
-    // replayed as X-Guest-Edit-Token so the creator could edit their own row without a login. It is
-    // gone with the sign-up that minted it (ADR-0159) — the backend dropped the column in V239, and
-    // an external participant row is the mission leadership's to edit. Nothing reads the stored
-    // values any more; a browser that still holds one simply never sends it.
-
     /**
-     * Assembles the request headers shared by every krtFetch write — the JSON {@link write} and the
-     * multipart {@link submitForm} alike: {@code Accept}, {@code X-Requested-With}, the CSRF header
-     * read fresh from the meta tags. A {@code Content-Type: application/json} is added only when
-     * {@code json} is true; it is deliberately omitted for a {@code FormData} body so the browser sets
-     * the {@code multipart/form-data} boundary itself. Centralising this here keeps the CSRF header
-     * assembly in one place so the two write paths cannot drift.
+     * Assembles the headers shared by {@link write} and {@link submitForm}: Accept,
+     * X-Requested-With and the CSRF header read fresh from the meta tags. Content-Type is set only
+     * for JSON, so a FormData body gets its multipart boundary from the browser.
      *
      * @param json whether the body is JSON (adds Content-Type) rather than FormData (omits it)
-     * @param accept the Accept header value; defaults to application/json. Only a write whose
-     *     endpoint answers something else (e.g. a text/html markdown preview) passes one — Spring
-     *     answers 406 when the Accept header excludes every type a mapping produces
-     * @return a plain headers object ready to hand to {@code fetch}
+     * @param accept the Accept header value; defaults to application/json
+     * @return a plain headers object for `fetch`
      */
     function writeHeaders(json, accept) {
         const headers = {
@@ -300,13 +204,9 @@
         return headers;
     }
 
-    // --------------------------------------------------------------- helpers
-
     /**
-     * Writes newVersion to the container and to every descendant carrying a
-     * [data-version] attribute so the next AJAX action on the same aggregate
-     * sends the fresh version. No-op when newVersion is null or the container
-     * cannot be resolved.
+     * Writes newVersion to the container and every descendant carrying [data-version]. No-op when
+     * newVersion is null or the container cannot be resolved.
      */
     function syncVersion(containerSelector, newVersion) {
         if (newVersion == null) {
@@ -338,13 +238,8 @@
     }
 
     /**
-     * Developer-facing console diagnostic — never localized, never shown to the user. Several
-     * krtFetch paths fail without touching the DOM at all (see swap()'s bail branches), so for the
-     * 43 of 49 `.swap({…})` call sites that pass no errorMessage this is the ONLY trace a "the
-     * button did nothing / the list did not update" report leaves behind. Guarded on `console`
-     * because embedded webviews may not provide one, and a diagnostic must never become the
-     * failure it is reporting. `detail` is optional: it is omitted from the call rather than
-     * passed as undefined, so the console line stays readable.
+     * Logs a developer-facing, unlocalized console warning; a no-op when no console exists.
+     * `detail` is passed only when defined.
      */
     function devWarn(message, detail) {
         if (typeof console === 'undefined' || typeof console.warn !== 'function') {
@@ -357,13 +252,6 @@
         }
     }
 
-    // Double-submit guard (app-wide): record the button that triggered the most recent form submit
-    // — capture phase, so it runs before the form's own preventDefault handler — so write() /
-    // submitForm() can disable it for the in-flight request without every call site threading it
-    // through. A microtask clears it right after the synchronous submit handler runs, and
-    // write()/submitForm() consume+disable it SYNCHRONOUSLY on first use (see resolveSubmitter), so
-    // an unrelated later write never inherits a stale submitter. Raw-fetch writes that do not go
-    // through write() guard their submit button explicitly instead.
     /** @type {Element | null} */
     let pendingSubmitter = null;
     document.addEventListener(
@@ -388,17 +276,6 @@
         return s;
     }
 
-    // Resolve + disable the double-submit button SYNCHRONOUSLY. Called at the very top of write() and
-    // submitForm(), while the submit-event dispatch that captured pendingSubmitter is still on the
-    // stack — BEFORE runSerialized() defers exec() and BEFORE the capture listener's clearing
-    // microtask runs. This synchronous disable is the whole #1133 fix: it is what actually stops the
-    // browser from firing a second submit for the now-disabled button. The pre-fix code consumed the
-    // submitter inside the deferred send(), which since #970's serialization always ran AFTER the
-    // FIFO clearing microtask — so consumePendingSubmitter() there returned null, the button was
-    // never disabled, and the app-wide guard its own comments promised was dead code. An explicit
-    // opts.submitter (raw-fetch call sites that thread their own button) is honoured as-is; otherwise
-    // the auto-captured button is adopted. send() re-enables opts.submitter in its finally on every
-    // settle path, so a queued or in-flight write releases the button when it finishes.
     function resolveSubmitter(opts) {
         if (opts.submitter == null) {
             opts.submitter = consumePendingSubmitter();
@@ -408,43 +285,16 @@
         }
     }
 
-    // ---------------------------------------------- per-key write serialization
-    //
-    // Root fix for the tool-wide "self-collision" 409: a user types into an inline field and then
-    // immediately clicks +/a dropdown/reorder on the SAME section. The blur-triggered `change` write
-    // and the click write used to fire concurrently, each echoing the section version read at call
-    // time, so the second lost the optimistic-lock race against the first and 409'd — and "Aktuelle
-    // Werte laden" then reloaded, discarding the just-typed row. The user was colliding with their
-    // own sequential edits.
-    //
-    // A write may now declare `opts.serialize` — a lock-scope key. Writes sharing a key run STRICTLY
-    // ONE AT A TIME in submission order. Combined with two other properties this removes the stale
-    // version entirely:
-    //   1. write()/submitForm() resolve `opts.url` / `opts.payload` LAZILY (a value OR a `() =>`
-    //      thunk) inside the serialized task, so a queued write reads its version at the moment it is
-    //      actually sent — not when it was queued.
-    //   2. send() awaits a thenable `opts.onSuccess` (typically the caller's fragment refresh, which
-    //      rewrites the `data-*-version` holder), so the NEXT queued write re-reads the FRESH, bumped
-    //      version.
-    // Distinct keys keep running concurrently, so disjoint sections never block each other — the
-    // REQ-ORG-018 fine-grained-lock invariant is preserved (a Ziele edit still cannot stall an
-    // Ablauf / core / schedule edit).
     const serialChains = new Map();
     function noop() {}
     function runSerialized(key, task) {
         if (key == null || key === '') {
-            // No lock scope: keep the historical fire-when-called behaviour (still async).
             return Promise.resolve().then(task);
         }
         const prev = serialChains.get(key) || Promise.resolve();
-        // Run `task` once `prev` SETTLES (fulfilled OR rejected) — a failed write must never stall
-        // the writes queued behind it. The caller still receives task's own result/rejection.
         const result = prev.then(task, task);
         const tail = result.then(noop, noop);
         serialChains.set(key, tail);
-        // Drop the map entry once the chain drains so one-shot section keys do not leak settled
-        // promises. A later write that chained onto this tail overwrites the entry first, so the
-        // guard only deletes when this is still the current tail.
         tail.then(function () {
             if (serialChains.get(key) === tail) {
                 serialChains.delete(key);
@@ -454,18 +304,11 @@
     }
 
     /**
-     * Renders the KRT-styled feedback for a non-ok response.
+     * Shows the error feedback for a non-ok response. A 409 with code OPTIMISTIC_LOCK or
+     * PESSIMISTIC_LOCK also offers a reload; any other 409 only shows the problem detail.
      *
-     * On 409 the RFC 7807 `code` extension decides the UX:
-     *  - OPTIMISTIC_LOCK / PESSIMISTIC_LOCK -> the user's view is stale; show the
-     *    error toast and offer a reload via showKrtConfirm.
-     *  - any other code (DUPLICATE_ENTITY, BUSINESS_CONFLICT, ...) -> a domain
-     *    rule refused the operation; the input is fine, so just show why (no
-     *    reload prompt).
-     *
-     * opts carries the already-localized strings: conflictSectionLabel (error
-     * prefix), errorMessage (generic fallback), and conflict.{title,reloadLabel,
-     * dismissLabel,reloadQuestion,reloadDetailFallback}.
+     * opts carries the localized strings: conflictSectionLabel (prefix), errorMessage (fallback)
+     * and conflict.{title,reloadLabel,dismissLabel,reloadQuestion,reloadDetailFallback}.
      */
     async function handleProblem(response, problem, opts) {
         const options = opts || {};
@@ -535,15 +378,8 @@
     }
 
     /**
-     * Localized message for the one 400 on the owner-stamping path the member can act on, or null
-     * when the problem is something else.
-     *
-     * The fallback below this branch shows `problem.detail` verbatim, and the backend's detail is
-     * developer-facing English — a member on a German UI was told "User belongs to multiple org
-     * units; owningOrgUnitId is required", which is both an i18n violation and an instruction
-     * nobody can act on. The backend now carries the stable code OWNER_ORG_UNIT_REQUIRED
-     * (REQ-ORG-023) precisely so this can be branched on; the wording comes from the bundle via
-     * `window.krtOwnerPickerI18n`, so it is localized once for every picker surface.
+     * Returns the localized message for an OWNER_ORG_UNIT_REQUIRED problem from
+     * `window.krtOwnerPickerI18n`, or null for any other problem (REQ-ORG-023).
      *
      * @param {any} problem the parsed RFC 7807 body, or null
      * @returns {string | null} the localized message, or null when this is not that failure
@@ -584,51 +420,30 @@
     }
 
     /**
-     * Shared request orchestration behind both {@link write} (JSON) and {@link submitForm}
-     * (multipart FormData): the double-submit guard, the bare-403 CSRF-refresh-and-retry-once,
-     * network-error toast, RFC7807 parse, X-Reauthenticate redirect, error/conflict handling,
-     * guest-token capture, syncVersion, success toast and onSuccess callback. The only thing that
-     * differs between a JSON write and a form submit is how the request init (headers + body) is
-     * built, so each caller passes its own {@code buildInit} thunk and the target {@code url}; every
-     * response-side behaviour is identical and defined here exactly once.
+     * Sends a request built by `buildInit` to `url` and handles the response for {@link write} and
+     * {@link submitForm}: submit guard, one CSRF refresh-and-retry on 403, reauth and terms gates,
+     * error handling, version sync, success toast and onSuccess.
      *
      * opts (shared by write / submitForm):
-     *  - containerSelector    DOM container/selector for syncVersion on success
-     *  - sectionLabel         already-localized success-toast prefix (optional)
-     *  - successMessage       already-localized success text (default "Gespeichert.")
-     *  - toast                set false to suppress the success toast
-     *  - conflictSectionLabel already-localized error/conflict prefix (optional)
-     *  - errorMessage         already-localized generic error text
+     *  - containerSelector    container/selector for syncVersion on success
+     *  - sectionLabel         localized success-toast prefix (optional)
+     *  - successMessage       localized success text
+     *  - toast                false suppresses the success toast
+     *  - conflictSectionLabel localized error/conflict prefix (optional)
+     *  - errorMessage         localized generic error text
      *  - conflict             localized conflict strings (see handleProblem)
-     *  - onSuccess            callback(body) run after a 2xx; if it returns a thenable it is AWAITED
-     *                         before the write resolves, so a serialized chain waits for the caller's
-     *                         fragment refresh (which rewrites the version holder) to finish
-     *  - onError              optional callback(status, body, response) run on a non-ok, non-reauth
-     *                         response BEFORE the default handleProblem; return a truthy value to
-     *                         signal "handled" (e.g. rendering 422 field-validation errors) and skip
-     *                         the default toast/conflict handling
-     *  - onNetworkError       optional callback(networkError) run when the request fails at the
-     *                         transport layer (no response ever arrived, so onError never fires);
-     *                         return truthy to signal it surfaced its own error UI and suppress the
-     *                         default network-error toast
-     *  - submitter            optional submit button disabled for the in-flight request and
-     *                         re-enabled when it settles (double-submit guard)
-     *  - accept               optional Accept header value (default application/json) for an
-     *                         endpoint that answers another type, e.g. a text/html preview; a
-     *                         non-JSON 2xx body reaches onSuccess as the response text
-     *  - responseType         optional 'blob': a 2xx body reaches onSuccess as a Blob (e.g. a
-     *                         generated PDF); error bodies are parsed as usual
+     *  - onSuccess            callback(body) after a 2xx; a returned thenable is awaited
+     *  - onError              callback(status, body, response) on a non-ok response before
+     *                         handleProblem; truthy return skips the default handling
+     *  - onNetworkError       callback(networkError) on a transport failure; truthy return
+     *                         suppresses the default toast
+     *  - submitter            button disabled while the request is in flight
+     *  - accept               Accept header value (default application/json)
+     *  - responseType         'blob' delivers a 2xx body to onSuccess as a Blob
      *
-     * Returns { ok, status, body } (plus `redirected` on a 2xx). On a bare 403 the CSRF token is
-     * refreshed from GET /csrf and the request retried exactly once before failing.
+     * Returns { ok, status, body } (plus `redirected` on a 2xx).
      */
     async function send(opts, buildInit, url) {
-        // In-flight double-submit guard: opts.submitter was resolved + disabled SYNCHRONOUSLY by
-        // resolveSubmitter() in write()/submitForm() (the #1133 fix); here we only keep it disabled
-        // for the whole round-trip and re-enable it in the finally below on every
-        // success/error/network path, so a double-click cannot fire a second (duplicate-create /
-        // stale-version) write. Consuming it here instead — as the code did before #1133 — always
-        // lost the microtask race to the capture listener's clear, leaving the button enabled.
         const submitter = opts.submitter || null;
         if (submitter) {
             submitter.disabled = true;
@@ -637,10 +452,6 @@
             let response;
             try {
                 response = await fetch(url, buildInit());
-                // A bare 403 is the CSRF filter rejecting a stale token (it answers
-                // before GlobalExceptionHandler, so the body is not problem+json).
-                // Refresh the token once and retry; a genuine authorization failure
-                // either redirects (302) or 403s again after the refetch and surfaces.
                 if (response.status === 403) {
                     const refreshed = await refreshCsrf();
                     if (refreshed) {
@@ -648,21 +459,12 @@
                     }
                 }
             } catch (networkError) {
-                // Transport-layer failure (offline, DNS/TLS, aborted): the fetch promise rejected
-                // before any response arrived. Keep the raw browser diagnostic in the console for
-                // debugging, but never leak the untranslated message into the user-facing toast
-                // (i18n). The optional onNetworkError hook lets a caller restore optimistic UI (e.g.
-                // re-enable a store button) that the response-side onError never sees on this path;
-                // returning truthy signals it already surfaced its own error UI and suppresses the
-                // default network-error toast.
                 devWarn('krtFetch network error', networkError);
                 let handled = false;
                 if (typeof opts.onNetworkError === 'function') {
                     try {
                         handled = opts.onNetworkError(networkError);
-                    } catch (_callbackError) {
-                        /* a network-error callback must never break the UX */
-                    }
+                    } catch (_callbackError) {}
                 }
                 if (!handled) {
                     errorToast(
@@ -674,28 +476,20 @@
 
             const body = await parseBody(response, opts.responseType);
 
-            // A 401 with X-Reauthenticate means the session lost its OAuth2 token: redirect the
-            // window to re-login instead of toasting an error the user cannot act on.
             if (maybeReauthenticate(response)) {
                 return { ok: false, status: response.status, body };
             }
 
-            // The Terms of Use changed while this tab was open: navigate to the consent page rather
-            // than toasting a write error the user cannot act on (REQ-SEC-028).
             if (maybeTermsGate(response)) {
                 return { ok: false, status: response.status, body };
             }
 
             if (!response.ok) {
-                // Optional caller hook (e.g. 422 field-validation rendering): if it handles the
-                // response it returns truthy and we skip the default toast/conflict handling.
                 if (typeof opts.onError === 'function') {
                     let handled = false;
                     try {
                         handled = opts.onError(response.status, body, response);
-                    } catch (_callbackError) {
-                        /* an error callback must never break the UX */
-                    }
+                    } catch (_callbackError) {}
                     if (handled) {
                         return { ok: false, status: response.status, body };
                     }
@@ -715,20 +509,12 @@
             }
             if (typeof opts.onSuccess === 'function') {
                 try {
-                    // Await a thenable onSuccess so a serialized write does not resolve — and the
-                    // next queued same-key write does not start — until the caller's fragment
-                    // refresh has rewritten the data-*-version holder the next write will re-read
-                    // (see runSerialized). A synchronous onSuccess is unaffected.
                     const outcome = opts.onSuccess(body);
                     if (outcome && typeof outcome.then === 'function') {
                         await outcome;
                     }
-                } catch (_callbackError) {
-                    /* a success callback must never break the UX */
-                }
+                } catch (_callbackError) {}
             }
-            // `redirected` lets a caller that swaps an HTML body refuse a followed redirect (an
-            // error-handler bounce answers 200 with a whole document, not the expected fragment).
             return {
                 ok: true,
                 status: response.status,
@@ -749,27 +535,18 @@
      *  - method               HTTP method (default PATCH)
      *  - url                  target URL, OR a `() => url` thunk resolved at send time
      *  - payload              JSON payload (omitted for GET/DELETE), OR a `() => payload` thunk
-     *  - bodyOnDelete         set true to send the payload with a DELETE as well — for the few
-     *                         endpoints whose DELETE mapping reads a @RequestBody (e.g. the inventory
-     *                         allocation removal, which echoes dimension, target and version). Off by
-     *                         default, so every existing DELETE keeps sending no body.
-     *  - serialize            optional lock-scope key; writes sharing it run one at a time in order
-     *                         (see runSerialized). Pair it with thunk url/payload so a queued write
-     *                         re-reads its optimistic-lock version AFTER the preceding same-key write
-     *                         refreshed the version holder — this is the fix for the self-collision
-     *                         409 where a user's own back-to-back edits shipped a stale version.
+     *  - bodyOnDelete         true also sends the payload with a DELETE (default false)
+     *  - serialize            optional lock-scope key; writes sharing it run one at a time in order.
+     *                         Pair it with thunk url/payload so a queued write reads its version
+     *                         after the preceding write has settled.
      *
      * Returns { ok, status, body }.
      */
     async function write(opts) {
         const method = opts.method || 'PATCH';
 
-        // Disable the double-submit button NOW, synchronously — before runSerialized defers exec()
-        // and before the capture listener's clearing microtask runs (resolveSubmitter / #1133).
         resolveSubmitter(opts);
 
-        // Resolve url + payload lazily inside the serialized task so a queued write reads them — and
-        // any version they embed — at the moment it is actually sent, not when it was queued.
         function exec() {
             const url = typeof opts.url === 'function' ? opts.url() : opts.url;
             const payload = typeof opts.payload === 'function' ? opts.payload() : opts.payload;
@@ -790,23 +567,9 @@
     }
 
     /**
-     * Submits a multipart/form-data (or urlencoded) form write and handles the response via {@link
-     * send} — the FormData twin of {@link write} that lets a page drop its hand-rolled CSRF-header +
-     * retry-on-403 loop (S10, #916). It inherits every response-side behaviour from {@link send},
-     * including the bare-403 CSRF refresh-and-retry and the X-Reauthenticate redirect
-     * (REQ-SEC-012), so a migrated site is a net security improvement over its bespoke loop.
-     *
-     * <p><b>Content-Type is deliberately NOT set.</b> When the body is a {@code FormData} the browser
-     * must set {@code multipart/form-data} together with the boundary parameter itself; a manual
-     * Content-Type would omit the boundary and corrupt the parse. So it asks {@link writeHeaders} for
-     * the shared CSRF header set with {@code json=false}, which omits the
-     * {@code Content-Type} that {@link write} forces to {@code application/json}. The CSRF token rides
-     * in the header, never in the form body.
-     *
-     * <p><b>No-JS fallback.</b> submitForm never runs unless {@code window.krtFetch} loaded, so a
-     * script-disabled browser keeps the form's native {@code th:action}/{@code method=post} submit —
-     * the migrated call site must still guard its listener with {@code if (!window.krtFetch) return;}
-     * (before {@code preventDefault}) so the native redirect handler stays the fallback.
+     * Submits a form body (FormData) and handles the response via {@link send}; the FormData twin of
+     * {@link write}. No Content-Type is set, so the browser supplies the multipart boundary; the CSRF
+     * token travels in a header.
      *
      * opts (in addition to the shared {@link send} opts):
      *  - form                 the <form> element or a selector; its action/method/FormData are used
@@ -819,12 +582,8 @@
     async function submitForm(opts) {
         const form = typeof opts.form === 'string' ? document.querySelector(opts.form) : opts.form;
 
-        // Disable the double-submit button NOW, synchronously — before runSerialized defers exec()
-        // and before the capture listener's clearing microtask runs (resolveSubmitter / #1133).
         resolveSubmitter(opts);
 
-        // Resolve url + snapshot the FormData inside the serialized task so a queued form submit
-        // captures the form's hidden version input AFTER the preceding same-key write refreshed it.
         function exec() {
             const url =
                 (typeof opts.url === 'function' ? opts.url() : opts.url) ||
@@ -852,18 +611,10 @@
         return runSerialized(opts.serialize, exec);
     }
 
-    // ------------------------------------------------------------ fragment swap
-
     /**
-     * Replaces the content of `el` with a server-rendered HTML fragment — the ONE sanctioned
-     * innerHTML sink for markup that did not pass through `escapeHtml` (FE-SEC-05).
-     *
-     * Only for the text of a same-origin response from one of our own Thymeleaf endpoints (a
-     * `?fragment=` render, a stack-entries or modal fragment): every value in it was escaped by the
-     * template engine on the server, so re-escaping it here would break it. Never pass it a string
-     * assembled in script from user or API data — build that with DOM APIs / textContent, or run
-     * each interpolated value through `escapeHtml` / `escapeAttr` and assign directly, where the
-     * lint rule can see the escaping.
+     * Replaces the content of `el` with a server-rendered HTML fragment; the only sanctioned
+     * innerHTML sink for unescaped markup. Pass only the text of a same-origin Thymeleaf fragment
+     * response, never a string assembled from user or API data.
      *
      * @param {Element | null | undefined} el the container whose content is replaced; no-op when
      *     absent
@@ -873,15 +624,13 @@
         if (!el) {
             return;
         }
-        // eslint-disable-next-line no-unsanitized/property -- the documented trusted sink: same-origin Thymeleaf fragment markup, escaped server-side by the template engine.
+        // eslint-disable-next-line no-unsanitized/property
         el.innerHTML = html == null ? '' : String(html);
     }
 
     /**
-     * Replaces `el` itself (the outerHTML twin of {@link setTrustedHtml}) with a server-rendered
-     * fragment whose root is the element's own re-render — the same trust contract: only for the
-     * text of a same-origin Thymeleaf fragment response. The markup is parsed into an inert
-     * `<template>`, so, exactly as with an outerHTML assignment, no script inside it runs.
+     * Replaces `el` itself with a server-rendered fragment, under the same trust contract as
+     * {@link setTrustedHtml}. The markup is parsed into an inert `<template>`, so no script runs.
      *
      * @param {Element | null | undefined} el the element to replace; no-op when absent or detached
      * @param {string | null | undefined} html the fragment markup; null / undefined removes `el`
@@ -896,10 +645,8 @@
     }
 
     /**
-     * Ensures the fragment query parameter (default fragment=results) is present
-     * on url so the controller returns the results fragment rather than the full
-     * page. Resolves relative URLs against the current origin and returns a
-     * same-origin path+query string.
+     * Returns the same-origin path+query of url with the fragment query parameter set, so the
+     * controller renders only the fragment.
      */
     function withFragmentParam(url, paramName, paramValue) {
         const resolved = new URL(url, window.location.origin);
@@ -908,10 +655,8 @@
     }
 
     /**
-     * Strips the internal fragment query parameter and returns the user-facing
-     * same-origin path+query — the URL shown in the address bar after a swap, so a
-     * refresh or a copied deep-link re-renders the same filtered / paged state
-     * server-side.
+     * Returns the same-origin path+query of url without the fragment query parameter, as shown in
+     * the address bar after a swap.
      */
     function withoutFragmentParam(url, paramName) {
         const resolved = new URL(url, window.location.origin);
@@ -929,28 +674,14 @@
      *  - indicator       optional loading element/selector toggled during the fetch
      *  - fragmentParam   query param name (default "fragment")
      *  - fragmentValue   query param value (default "results")
-     *  - history         when true, the address-bar URL is kept in sync via
-     *                    history.replaceState (minus the internal fragment param)
-     *                    so a refresh / deep-link re-renders the same state. We use
-     *                    replaceState, not pushState, so a debounced filter does not
-     *                    flood the back-stack with intermediate keystrokes.
-     *  - preserveScroll  unless false, the window scroll position is restored after
-     *                    the swap so paging/filtering does not jump the page.
-     *  - errorMessage    optional, already-localized string shown as an error toast when
-     *                    the swap bails because the response was redirected or not OK (a
-     *                    whole-document body the swap must not inject); omit it to fail
-     *                    silently. The stale container is left untouched on this path.
+     *  - history         when true, the address-bar URL (minus the fragment param) is updated via
+     *                    history.replaceState
+     *  - preserveScroll  unless false, the window scroll position is restored after the swap
+     *  - errorMessage    optional localized error toast when the response is redirected or not OK;
+     *                    the container is then left untouched
      *
-     * The swap injects the body only on a non-redirected 2xx response; a redirected or
-     * non-OK response (expired-session login bounce, error-handler redirect, 5xx) is
-     * treated as a whole-page body and skipped, so a fragment swap can never paint a
-     * login form or a nested page into the small results container.
-     *
-     * After the swap, a single delegated click listener is installed on the
-     * container so in-container pagination/sort anchors (a.page-btn[href] and
-     * any opted-in a[data-swap][href]) re-swap in place instead of navigating —
-     * fixing the regression where pagination inside an AJAX results container
-     * triggered a full page reload.
+     * Only a non-redirected 2xx body is injected. Afterwards, contained a.page-btn[href] and
+     * a[data-swap][href] anchors re-swap in place. Resolves to true when the container was updated.
      */
     function swap(opts) {
         const container =
@@ -969,17 +700,6 @@
         const url = withFragmentParam(opts.url, paramName, paramValue);
         const scrollY = window.scrollY;
 
-        // Per-container in-flight sequencing (#1151, REQ-FE-013): several independent triggers overlap swaps on
-        // ONE container — the local write's onSuccess refresh, a peer's coalesced live-sync refresh,
-        // the reconnect resync burst, a debounced filter, a create/delete reload. Under the load-
-        // induced latency variance that caused the outage (150 ms vs multi-second), an OLDER request
-        // can resolve LAST and overwrite a newer render with a staler DB snapshot — regressing the
-        // rows' data-version attributes and re-arming the "stale version -> 409 on next click"
-        // landmine, and (with history:true) leaving the address bar on whichever response landed
-        // last. Each swap claims the next sequence number for its container; when it resolves it only
-        // touches the DOM / history / krt:swapped / indicator if it is STILL the latest swap. The
-        // superseded in-flight request is aborted so a slow older read stops wasting a backend
-        // round-trip. The write-side runSerialized() orders writes, never these read-side swaps.
         const seq = (container._krtSwapSeq = (container._krtSwapSeq || 0) + 1);
         if (container._krtSwapAbort) {
             container._krtSwapAbort.abort();
@@ -989,14 +709,11 @@
         function isCurrent() {
             return container._krtSwapSeq === seq;
         }
-        // Only the latest swap owns the indicator: a superseded response must not hide it while a
-        // newer swap is still in flight, so hide it strictly when we are still current.
         function hideIndicatorIfCurrent() {
             if (indicator && isCurrent()) {
                 indicator.style.display = 'none';
             }
         }
-        // Release our aborter slot once we settle, unless a newer swap has already claimed it.
         function releaseAborter() {
             if (container._krtSwapAbort === aborter) {
                 container._krtSwapAbort = null;
@@ -1011,28 +728,13 @@
             signal: aborter ? aborter.signal : undefined,
         })
             .then(function (res) {
-                // Session lost its OAuth2 token: redirect to re-login rather than painting an
-                // error/empty fragment (REQ-SEC-012).
                 if (maybeReauthenticate(res)) {
                     return null;
                 }
-                // Terms-of-Use gate went up mid-session: navigate rather than leave the section
-                // silently stale, which is what a bare redirect-bail would do (REQ-SEC-028).
                 if (maybeTermsGate(res)) {
                     return null;
                 }
-                // A fragment swap must only ever paint section-sized HTML into a small
-                // container. If the request was redirected (an expired session bounced to
-                // the login page, or a controller error handler answered with a redirect)
-                // or the status is not OK, the body is a whole document, not a fragment —
-                // injecting it would dump a login form or a nested page into the results
-                // container. Bail without touching the DOM (#574 review must-fix).
                 if (res.redirected || !res.ok) {
-                    // M11: bailing here is correct, but it used to be completely invisible — no
-                    // toast (unless the caller passed errorMessage), no DOM change, no console
-                    // line. The section simply stopped updating. Record WHY, so a support session
-                    // can tell an expired-session login bounce (redirected) from a 5xx fragment
-                    // render (status) without reproducing the failure.
                     devWarn('krtFetch.swap bailed: response is not a fragment', {
                         url,
                         status: res.status,
@@ -1043,25 +745,15 @@
                 return res.text();
             })
             .then(function (html) {
-                // A newer swap superseded this one while it was in flight: drop the response
-                // wholesale (no innerHTML, no history, no krt:swapped, no indicator toggle) so the
-                // latest render wins and the older snapshot never clobbers it (#1151).
                 if (!isCurrent()) {
                     return false;
                 }
                 hideIndicatorIfCurrent();
                 releaseAborter();
                 if (html === null) {
-                    // Optional caller-supplied (already-localized) toast; krt-fetch.js never
-                    // hardcodes user-visible strings. The stale container is left as-is.
                     if (opts.errorMessage) {
                         errorToast(opts.errorMessage);
                     }
-                    // M11: this is the branch the USER experiences — the swap finished and the
-                    // container still shows the pre-swap render. Only 6 of the 49 `.swap({…})`
-                    // call sites pass an errorMessage, so for the other 43 nothing at all is said.
-                    // `toasted` records which of the two it was, so the console line distinguishes
-                    // "the user was told and ignored it" from "the UI lied by omission".
                     devWarn('krtFetch.swap did not update the container', {
                         url,
                         container: opts.container,
@@ -1071,9 +763,6 @@
                 }
                 setTrustedHtml(container, html);
                 bindSwapAnchorInterception(container, opts);
-                // Let page/global enhancers re-process the freshly swapped subtree
-                // (e.g. the .utc-time localiser in sidebar.html). A one-shot
-                // DOMContentLoaded enhancer would otherwise miss swapped-in content.
                 document.dispatchEvent(new CustomEvent('krt:swapped', { detail: { container } }));
                 if (opts.history) {
                     window.history.replaceState(
@@ -1088,17 +777,8 @@
                 return true;
             })
             .catch(function (error) {
-                // Aborted-by-supersession (a newer swap called abort()) or a genuine transport
-                // error: never paint anything, and only clear the indicator if a newer swap has not
-                // already taken ownership of it.
                 hideIndicatorIfCurrent();
                 releaseAborter();
-                // M11: the comment above already named the two cases; the code then treated them
-                // identically and said nothing about either. A supersession is INTENTIONAL and
-                // happens on every debounced keystroke (#1151 aborts the older read), so warning
-                // on it would make the console useless. A genuine transport failure — offline,
-                // DNS/TLS, the frontend gone — is the opposite: the section silently froze on a
-                // stale render and there is no other signal anywhere that it did.
                 const superseded = (error && error.name === 'AbortError') || !isCurrent();
                 if (!superseded) {
                     devWarn('krtFetch.swap transport failure', { url, error });
@@ -1117,28 +797,19 @@
             if (!anchor || !container.contains(anchor)) {
                 return;
             }
-            // A disabled page-btn renders without an href, but guard anyway so a
-            // CSS-only ".disabled" never triggers a wasted swap.
             if (anchor.classList.contains('disabled')) {
                 event.preventDefault();
                 return;
             }
             event.preventDefault();
-            // Nested swap containers (e.g. bank-account-detail's #bank-bookings-results pager sits
-            // inside the #bank-account-results accountBody region, both bound here): the click
-            // bubbles innermost-first, so the CLOSEST swap container handles its own pagination
-            // anchor and stops the event — otherwise an enclosing container would ALSO swap, firing
-            // a redundant full-section re-render on top of the intended sub-table page change.
             event.stopPropagation();
             swap(Object.assign({}, opts, { url: anchor.getAttribute('href') }));
         });
     }
 
     /**
-     * Binds the in-container pagination/sort anchor interception WITHOUT performing an
-     * initial fetch — for pagination-only lists (no filter) where nothing else calls
-     * swap() on load. Clicking a contained a.page-btn[href] / a[data-swap][href] then
-     * re-swaps the container in place, reusing the given opts (history, indicator, …).
+     * Binds the in-container pagination/sort anchor interception without an initial fetch; a click
+     * on a contained a.page-btn[href] / a[data-swap][href] re-swaps with the given opts.
      */
     function bindSwap(opts) {
         const container =
@@ -1151,48 +822,29 @@
         bindSwapAnchorInterception(container, opts);
     }
 
-    // ------------------------------------------------------------ section-write seam
-
     /**
-     * Builds a page's section-write seam — the { write, refresh, notify } trio for pages whose
-     * aggregate is saved and re-rendered as independent sections (#924; canonical consumer:
-     * mission-detail.js, which re-publishes the trio as the window.krtMissionWrite /
-     * window.krtRefreshMissionSection / window.krtNotifyMissionChanged aliases so its ~60 call
-     * sites stay one-liners).
-     *
-     * Every page-specific lookup is LATE-BOUND — the dict getter, the pageUrl getter and the
-     * broadcast closure are re-evaluated on every call, never captured: the i18n dictionary is
-     * assigned by an inline template bootstrap and the presence client (mission) only exists after
-     * a later conditional bootstrap's DOMContentLoaded.
+     * Builds a page's section-write seam: the { write, refresh, notify } trio for pages whose
+     * aggregate is saved and re-rendered as independent sections. The dict, pageUrl and broadcast
+     * callbacks are re-evaluated on every call.
      *
      * config:
-     *  - dict()               getter for the page's already-localized i18n dictionary
+     *  - dict()               getter for the page's localized i18n dictionary
      *  - dictName             the dictionary's global name, used in the key a missing string is
-     *                         rendered and reported as (`NAME[key]`)
+     *                         reported as (`NAME[key]`)
      *  - keys                 dictionary keys: saveSectionPrefix, conflictSectionPrefix, successKey,
      *                         errorKey, conflictTitleKey, reloadLabelKey, dismissLabelKey,
-     *                         reloadQuestionKey, reloadDetailKey, refreshErrorKey. There are no
-     *                         literal fallbacks (2026-09-23): a key the dictionary lacks renders as
-     *                         its name and is reported (`krtI18nText`); a key the config omits
-     *                         leaves write()'s page-wide krtFetchI18n default in place
+     *                         reloadQuestionKey, reloadDetailKey, refreshErrorKey; an omitted key
+     *                         leaves write()'s krtFetchI18n default in place
      *  - sections             sectionKey -> { container, fragmentValue } map for refresh()
-     *  - pageUrl()            getter for the page's base URL; null while the entity has no id —
-     *                         refresh() then resolves false for that section without fetching
-     *  - broadcast(keys)      optional peer-notification closure (REQ-FE-010); called by refresh()
-     *                         unless opts.broadcast === false (i.e. the refresh itself applies a
-     *                         peer's inbound signal — broadcasting again would echo into a loop)
-     *                         and unconditionally by notify()
+     *  - pageUrl()            getter for the page's base URL; null makes refresh() resolve false
+     *  - broadcast(keys)      optional peer notification (REQ-FE-010); called by refresh() unless
+     *                         opts.broadcast === false, and always by notify()
      *
      * Returns:
-     *  - write(opts)          {@link write} with the section's localized sectionLabel /
-     *                         conflictSectionLabel / successMessage / errorMessage / conflict
-     *                         strings derived from opts.sectionKey via the dict
-     *  - refresh(sectionKeys, opts)  re-renders one or more sections in place via {@link swap}
-     *                         (history:false, preserveScroll:true); accepts a single key or an
-     *                         array; returns a Promise resolving when all swaps complete so
-     *                         callers can close a modal afterwards
-     *  - notify(sectionKeys)  broadcast-only sibling of refresh() for handlers that already
-     *                         patched their own DOM surgically and need no self re-render
+     *  - write(opts)          {@link write} with the localized strings derived from opts.sectionKey
+     *  - refresh(sectionKeys, opts)  re-renders one or more sections via {@link swap}; resolves when
+     *                         all swaps complete
+     *  - notify(sectionKeys)  broadcasts without re-rendering
      */
     function sectionWrite(config) {
         return {
@@ -1216,10 +868,6 @@
                 const k = config.keys;
                 return write(
                     Object.assign({}, opts, {
-                        // Every section write serializes against its own section by default, so a
-                        // user's back-to-back edits of one section run in order and never 409 each
-                        // other; distinct sections keep distinct keys and stay concurrent. A caller
-                        // can override with an explicit opts.serialize (e.g. a per-row scope).
                         serialize: opts.serialize || (key ? 'section:' + key : undefined),
                         sectionLabel: k.saveSectionPrefix
                             ? t(k.saveSectionPrefix + key)
@@ -1257,10 +905,6 @@
                             fragmentValue: cfg.fragmentValue,
                             history: false,
                             preserveScroll: true,
-                            // Surfaced as a toast when a swap bails on a redirect/non-OK response
-                            // (e.g. an expired session bounced to the login page): swap() then leaves
-                            // the stale section untouched rather than painting a full page into the
-                            // container.
                             errorMessage: (config.dict() || {})[config.keys.refreshErrorKey] || '',
                         });
                     }),
@@ -1284,26 +928,11 @@
         replaceWithTrustedHtml,
         syncVersion,
         handleProblem,
-        // Exposed so a page-local onError handler — which bypasses handleProblem entirely — can
-        // render the SAME localized wording for OWNER_ORG_UNIT_REQUIRED instead of falling back to
-        // the backend's English detail (REQ-ORG-023). Duplicating the branch per page is how the
-        // two would drift.
         ownerOrgUnitRequiredMessage,
         maybeReauthenticate,
         reauthRedirect,
         sectionWrite,
-        // Exposed so a raw-fetch write (one not routed through write/submitForm) can share the same
-        // per-key serialization: krtFetch.serialize('scope:id', () => doTheWrite()) runs its task
-        // after the previous same-key task settles. Wrap the WHOLE write — including where it reads
-        // its optimistic-lock version from the DOM — so the version is re-read fresh once the prior
-        // write synced it back, killing the self-collision 409 for raw-fetch call sites too.
         serialize: runSerialized,
         csrf: window.krtCsrf,
     };
-
-    // The former window.MissionSubresource alias was retired in #574; since #924 the page-local
-    // krtMissionWrite wrapper lives in mission-detail.js and is produced by the generic
-    // sectionWrite factory above, so this shared module still carries no mission-specific code,
-    // keys or strings — the mission dictionary, section map and presence broadcast are all
-    // supplied by the page config.
 })();

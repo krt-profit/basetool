@@ -43,25 +43,9 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Data-level regression coverage for {@link
- * InventoryItemRepository#findMaterialStockRowsByJobOrderIds} — the page-batched projection that
- * replaced the per-(order, material) {@code SUM} fan-out of the job-order list (REQ-DATA-003) — run
- * against the real Postgres test schema (Testcontainers + Flyway via the {@code test} profile).
- *
- * <p>The {@link JobOrderServiceAssigneeAndListTest} unit tests stub this query, so they cannot
- * catch two things only the real dialect proves: (1) the JPQL constructor expression {@code new
- * JobOrderMaterialStockRow(a.jobOrder.id, a.inventoryItem.material.id, a.inventoryItem.quality,
- * a.amount)} over {@code InventoryJobOrderAllocation} (Variante C, REQ-INV-027 — the scalar {@code
- * jobOrder} column was dropped) actually parses and binds the right columns on Postgres, and the
- * {@code a.jobOrder.id IN :ids} filter returns only <em>allocated</em> rows (stock carrying no
- * job-order slice excluded); and (2) summing the projected rows at a quality floor in memory
- * reproduces the native {@code sumAmountByMaterialAndJobOrderAndMinQuality} aggregate exactly — the
- * equivalence the list path relies on instead of one {@code SUM} per bucket per order.
- *
- * <p>{@link Transactional} so each method rolls back: the seeded rows must never commit to the
- * shared Testcontainers database. The query still observes them because they are flushed within the
- * test transaction before the read, and every assertion is scoped to the freshly created order id,
- * so rows other suites committed cannot perturb it.
+ * Verifies {@link InventoryItemRepository#findMaterialStockRowsByJobOrderIds} against PostgreSQL:
+ * the projection binds correctly, returns only allocated rows, and summing at a quality floor
+ * matches the per-bucket native aggregate (REQ-DATA-003). Each test rolls back.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -155,7 +139,7 @@ class JobOrderMaterialStockRowQueryDataTest {
   }
 
   /**
-   * Persists one non-personal, job-order-linked inventory item of the given grade and amount.
+   * Persists a non-personal inventory item linked to the given job order.
    *
    * @param user the owning user (NOT NULL FK).
    * @param location the storage location (NOT NULL FK).

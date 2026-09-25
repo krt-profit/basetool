@@ -38,21 +38,11 @@ import java.util.regex.Pattern;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Loads an application's real {@code logback-spring.xml} into a <em>fresh</em>, private {@link
- * LoggerContext} as Spring Boot would for a given set of active profiles, so a test can send an
- * event through exactly the appenders, layouts and encoders production runs.
+ * Loads an application's {@code logback-spring.xml} into a fresh, private {@link LoggerContext} for
+ * a given set of active profiles, so tests exercise the production appenders.
  *
- * <p>Why not Spring Boot's own {@code LogbackLoggingSystem}: it reconfigures the one global context
- * every other test in the JVM logs through, and some of those capture log output to assert on it.
- * Plain Joran on a private context touches nothing shared — but Joran does not know Boot's {@code
- * <springProfile>} element, so this class resolves those blocks textually first: a block whose
- * {@code name} matches the active profiles is unwrapped, any other block is dropped. The expression
- * grammar is the subset the three configurations use — a comma-separated list of profile names,
- * each optionally negated with {@code !}, matching when any entry matches — and a nested {@code
- * <springProfile>} is rejected rather than misread.
- *
- * <p>Every {@code logs/} path in the configuration is redirected into the caller's directory, so
- * the file appenders write to a test-owned temporary directory instead of the module's working
+ * <p>{@code <springProfile>} blocks are resolved textually (comma-separated names, optionally
+ * negated; nesting is rejected), and every {@code logs/} path is redirected into the caller's
  * directory.
  */
 public final class ProfiledLogbackConfig {
@@ -65,18 +55,15 @@ public final class ProfiledLogbackConfig {
   private ProfiledLogbackConfig() {}
 
   /**
-   * Configures and starts a new {@link LoggerContext} from the classpath resource {@code resource}
-   * with {@code activeProfiles} active and every {@code logs/} path redirected into {@code logDir}.
-   * The context gets its own MDC adapter, so a test puts MDC values through {@link
-   * LoggerContext#getMDCAdapter()} without touching the global MDC. Stop the context when done:
-   * that drains the asynchronous appenders and closes the files.
+   * Configures and starts a new {@link LoggerContext} from {@code resource} with its own MDC
+   * adapter; stop it when done to flush the asynchronous appenders.
    *
    * @param resource the classpath location of the configuration, e.g. {@code logback-spring.xml}
    * @param activeProfiles the Spring profiles to treat as active
-   * @param logDir the directory that replaces {@code logs/} in every file path
-   * @return the started context, configured without a single ERROR status
+   * @param logDir the directory replacing {@code logs/} in every file path
+   * @return the started context, configured without any ERROR status
    * @throws IllegalStateException if the resource is missing, a profile block is nested, or Joran
-   *     reports an ERROR status while configuring
+   *     reports an ERROR status
    * @throws UncheckedIOException if the resource cannot be read
    */
   public static @NotNull LoggerContext configure(
@@ -150,8 +137,7 @@ public final class ProfiledLogbackConfig {
   }
 
   /**
-   * Reads a classpath resource as UTF-8 text through the thread's context class loader, which in a
-   * test JVM sees the consuming module's {@code src/main/resources}.
+   * Reads a classpath resource as UTF-8 through the thread's context class loader.
    *
    * @param resource the classpath location
    * @return the resource's content

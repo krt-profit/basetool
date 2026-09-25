@@ -23,11 +23,9 @@ import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Classifies an {@link AuditEvent} row across the audited areas (REQ-AUDIT-001). Each constant
- * carries the {@link AuditDomain} it belongs to, so the persisted {@code domain} column and the
- * event type can never disagree and the admin viewer's per-tab event filter is derived from the
- * enum itself. Like {@link BankAuditEventType} this is the source of truth and is deliberately NOT
- * mirrored by a database CHECK constraint (V113/V154 precedent): the set grows with the domains.
+ * Classifies an {@link AuditEvent} row (REQ-AUDIT-001). Each constant carries its {@link
+ * AuditDomain}, so the persisted domain and type always agree; the set is not mirrored by a
+ * database CHECK constraint.
  */
 @RequiredArgsConstructor
 public enum AuditEventType {
@@ -38,10 +36,7 @@ public enum AuditEventType {
   /**
    * A warehouse inventory row's associations / quality / amount were edited.
    *
-   * @deprecated Historical only — no longer emitted since the in-place edit endpoint {@code PUT
-   *     /api/v1/inventory/{id}} was removed (commit d03a9238b, 2026-07-14); allocations are now
-   *     changed through their own endpoints. Retained because {@code audit_event.event_type} stores
-   *     the enum name, so existing rows would become unreadable if the constant were removed.
+   * @deprecated not emitted; retained so stored audit rows with this name stay readable
    */
   @Deprecated
   INVENTORY_ITEM_UPDATED(AuditDomain.INVENTORY),
@@ -134,20 +129,15 @@ public enum AuditEventType {
   /**
    * A deleted user's inventory rows were bulk-reassigned to the fallback admin.
    *
-   * @deprecated Historical only — no longer emitted since user deletion purges the departing
-   *     member's warehouse rows instead of reassigning them ({@link
-   *     #INVENTORY_PURGED_ON_USER_DELETION}, REQ-DATA-008). Retained because {@code
-   *     audit_event.event_type} stores the enum name, so existing rows would become unreadable if
-   *     the constant were removed.
+   * @deprecated not emitted, user deletion purges the rows instead ({@link
+   *     #INVENTORY_PURGED_ON_USER_DELETION}); retained so stored audit rows stay readable
    */
   @Deprecated
   INVENTORY_OWNER_REASSIGNED(AuditDomain.INVENTORY),
 
   /**
-   * A deleted user's warehouse rows were purged along with their account, together with the
-   * job-order and mission allocations that hung off them (DB cascade). Summary event: a set-based
-   * DELETE exposes no per-row ids, so the payload carries the affected-row count, the deleted user
-   * is the target and the acting admin is the actor.
+   * A deleted user's warehouse rows and their allocations were purged with the account. Summary
+   * event carrying the affected-row count; the deleted user is the target, the admin the actor.
    */
   INVENTORY_PURGED_ON_USER_DELETION(AuditDomain.INVENTORY),
 
@@ -274,10 +264,8 @@ public enum AuditEventType {
   PERSONAL_INVENTORY_DELETED(AuditDomain.PERSONAL_INVENTORY),
 
   /**
-   * A deleted user's complete "Mein Inventar" and personal blueprints were purged along with their
-   * account (REQ-DATA-008). Summary event carrying the two affected-row counts. Both tables key on
-   * the user id and, since V235, cascade from {@code app_user}; the explicit purge is what makes
-   * the counts recordable here.
+   * A deleted user's "Mein Inventar" and personal blueprints were purged with the account
+   * (REQ-DATA-008). Summary event carrying the two affected-row counts.
    */
   PERSONAL_DATA_PURGED_ON_USER_DELETION(AuditDomain.PERSONAL_INVENTORY),
 
@@ -429,13 +417,8 @@ public enum AuditEventType {
   CAPABILITY_FLAGS_CHANGED(AuditDomain.ROLE),
 
   /**
-   * The permission set attached to a role in the local role catalog was replaced by an admin
-   * (REQ-AUDIT-001). {@code role_permissions} holds only the current state, so without this event
-   * neither the previous grant nor the acting admin is recoverable afterwards — the change takes
-   * effect for every holder on their next authentication. The subject is the role's stable {@code
-   * code}; the details payload carries the symmetric difference over the fixed {@code Permissions}
-   * vocabulary (added / removed permission names), never the role's free-text description and never
-   * the affected users.
+   * An admin replaced the permission set of a role in the local role catalog (REQ-AUDIT-001). The
+   * subject is the role's {@code code}; the details carry the added and removed permission names.
    */
   ROLE_PERMISSIONS_CHANGED(AuditDomain.ROLE),
 
@@ -449,41 +432,26 @@ public enum AuditEventType {
   KOMMANDO_GROUP_DELETED(AuditDomain.ROLE),
 
   /**
-   * A user account was hard-deleted by an admin (REQ-DATA-008). The marker event for an operation
-   * that mutates several audited areas at once: it names the removed account and the acting admin,
-   * and its payload summarises what went with it, so the per-area purge events can be correlated
-   * back to one deletion. Recorded in the same transaction as the delete itself.
+   * An admin hard-deleted a user account (REQ-DATA-008). Marker event naming the removed account
+   * and summarising what went with it, so the per-area purge events can be correlated to one
+   * deletion.
    */
   USER_DELETED(AuditDomain.ROLE),
 
   /**
-   * Two accounts of one member were merged by an admin (REQ-SEC-045, ADR-0142 point 5): everything
-   * the source account <em>owned</em> was moved onto the target and the source was left empty.
-   *
-   * <p>The marker event for an operation that mutates several audited areas at once. Its payload
-   * names <b>both account ids</b> and the per-table row counts, and never the callsign — the
-   * collision that makes a merge necessary is a shared username, so writing it here would put a
-   * member's handle in the audit payload (REQ-OBS-004, REQ-BANK-012's no-free-text rule).
-   *
-   * <p>What did <em>not</em> move is as much a part of the record as what did: rows that attribute
-   * an act to whoever performed it at the time stay on the source, because rewriting them would
-   * falsify history rather than repair an identity.
+   * An admin merged two accounts of one member, moving everything the source owned onto the target
+   * (REQ-SEC-045, ADR-0142). The payload carries both account ids and per-table row counts, never
+   * the callsign; rows attributing past acts stay on the source.
    */
   USER_MERGED(AuditDomain.ROLE),
 
   /**
-   * A member raised an Art. 17 erasure request on their own profile (REQ-SEC-061). The subject is
-   * the requesting member (their id and handle snapshot); the details payload carries only the
-   * {@code eraseHistoryRequested} flag — the member writes no free text, so there is none to keep
-   * out.
+   * A member raised an Art. 17 erasure request on their own profile (REQ-SEC-061). The details
+   * carry only the {@code eraseHistoryRequested} flag.
    */
   ACCOUNT_DELETION_REQUESTED(AuditDomain.ROLE),
 
-  /**
-   * A member took their own pending erasure request back before it was decided (REQ-SEC-061).
-   * Recorded rather than deleted, because "asked and changed their mind" is a different fact from
-   * "never asked" and it is the difference an admin needs when a second request arrives.
-   */
+  /** A member withdrew their own pending erasure request before it was decided (REQ-SEC-061). */
   ACCOUNT_DELETION_REQUEST_WITHDRAWN(AuditDomain.ROLE),
 
   /**
@@ -494,60 +462,31 @@ public enum AuditEventType {
   ACCOUNT_DELETION_REQUEST_DECLINED(AuditDomain.ROLE),
 
   /**
-   * An admin carried out a member's erasure request (REQ-SEC-061): the account was deleted and,
-   * when the Art. 17 wish was granted, its surviving handle snapshots anonymised first.
-   *
-   * <p>Written <b>before</b> the delete, in the same transaction, because {@code deletion_request}
-   * cascades away with the {@code app_user} row and the request's own id would otherwise be
-   * unrecoverable. It sits alongside the {@code USER_DELETED} marker REQ-DATA-008 writes; this one
-   * records that the deletion answered a request the member made, which is the fact a later "why
-   * was this account removed" question needs. The payload carries the request id and the two
-   * booleans — what the member asked for and what the admin granted — and no free text.
+   * An admin carried out a member's erasure request (REQ-SEC-061). Written before the delete in the
+   * same transaction; the payload carries the request id plus the requested and granted flags.
    */
   ACCOUNT_DELETION_REQUEST_EXECUTED(AuditDomain.ROLE),
 
   /**
-   * An erasure's local half committed, but the Keycloak account could not be deleted (REQ-SEC-061).
+   * An erasure's local half committed but the Keycloak account could not be deleted (REQ-SEC-061).
    *
-   * <p>The durable record of a half-finished erasure, written in its own transaction after the
-   * business transaction has committed — there is nothing left to attach it to otherwise, because
-   * the {@code app_user} row and the request itself are already gone. That is also why its {@code
-   * target_user_id} is {@code null} while the deleted account's id sits in {@code subject_id}: the
-   * target column is a foreign key to a row that no longer exists.
-   *
-   * <p>It records an <b>operational</b> failure rather than a member-visible one: the local data is
-   * gone, which is what the member asked for, but the surviving Keycloak account can still log in
-   * and the reconciliation will create a fresh row for it — PENDING and refusable for an ordinary
-   * member, ACTIVE for an ADMIN-realm-role holder. The payload carries the request id and the
-   * failing exception's class name, never its message, which can echo Keycloak's own view of the
-   * account.
+   * <p>Written in its own transaction after the commit, with {@code target_user_id} {@code null}
+   * and the deleted account's id in {@code subject_id}. The payload carries the request id and the
+   * exception's class name, never its message.
    */
   ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED(AuditDomain.ROLE),
 
   /**
-   * An admin granted a member's Art. 17 wish and anonymised that member's surviving handle
-   * snapshots (REQ-SEC-062) across both audit trails, the bank booking history, the booking
-   * requests and the two handover recipients.
-   *
-   * <p>The one event type in the activity trail that records a <b>mutation of the trail itself</b>,
-   * which is why it exists: the update relaxes an append-only guarantee, so it must leave a
-   * receipt. It is written after the update and is therefore not anonymised by it. Its details
-   * payload carries the per-column row counts and never the handle that was removed — writing the
-   * value back would undo the erasure in the very row that records it.
+   * An admin anonymised a member's surviving handle snapshots across the audit trails, bank
+   * history, booking requests and handover recipients (REQ-SEC-062). Written after the update; the
+   * details carry per-column row counts, never the removed handle.
    */
   HANDLE_SNAPSHOTS_ANONYMISED(AuditDomain.ROLE),
 
   /**
-   * An admin ran the Personensuche for a name (REQ-SEC-060).
-   *
-   * <p>A <b>read</b> in an otherwise mutation-only trail, recorded because of what it reads: every
-   * place a named person appears, across the whole system. Without a record its misuse would leave
-   * no trace at all, which is not a property this particular query should have.
-   *
-   * <p>The payload carries the <b>length</b> of the search term, the hit count and whether the
-   * result was capped &mdash; never the term itself. The term is somebody's name, and the details
-   * payload takes no user free text (REQ-AUDIT-001). A trail that recorded every name an admin ever
-   * searched for would be a second store of exactly the data the search exists to help remove.
+   * An admin ran the Personensuche for a name (REQ-SEC-060); the one read recorded in this trail.
+   * The payload carries the term's length, the hit count and whether the result was capped, never
+   * the term itself.
    */
   PERSON_SEARCH_PERFORMED(AuditDomain.ROLE),
 

@@ -61,15 +61,9 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
- * Pure-Mockito unit tests for {@link HangarController}. Two non-pass-through behaviours are pinned
- * in detail: (1) the {@code /my-ships} family derives the owner from the JWT via {@code
- * UserService.getUserIdFromJwt} — the test confirms that derived id, never a URL-supplied one,
- * reaches the service (the controller's core data-isolation guarantee for personal-hangar
- * endpoints); (2) {@code /squadron-overview} shapes its response payload based on the caller's role
- * at the HTTP boundary, so the service stays free of {@code SecurityContextHolder} reads (the
- * ArchUnit rule). The role-driven branch is exercised for every caller shape in {@link
- * RoleGateFixture#callers()} — only ADMIN and OFFICER pass {@code includeOwnerDetails=true}
- * downstream.
+ * Pure-Mockito unit tests for {@link HangarController}: the {@code /my-ships} endpoints take the
+ * owner from the JWT, never from the URL, and {@code /squadron-overview} passes {@code
+ * includeOwnerDetails=true} only for ADMIN and OFFICER across {@link RoleGateFixture#callers()}.
  */
 @ExtendWith(MockitoExtension.class)
 class HangarControllerTest {

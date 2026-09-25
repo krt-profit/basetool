@@ -35,16 +35,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The single {@code @PreAuthorize} helper bean for the bank surface (epic #556, ADR-0011), shaped
- * after {@link SpecialCommandSecurityService}.
+ * The {@code @PreAuthorize} helper bean for the bank surface (ADR-0011).
  *
- * <p>Bank authorization has exactly two inputs (REQ-BANK-008/-009/-010): the two bank Keycloak
- * roles (evaluated through the role hierarchy, so {@code ADMIN > BANK_MANAGEMENT > BANK_EMPLOYEE})
- * and the app-managed {@link BankAccountGrant} rows. It deliberately consults <strong>nothing
- * else</strong> — no {@link OwnerScopeService} scoping, no contextual {@code ROLE_X@orgUnitId}
- * authorities, no {@code X-Active-Org-Unit-Id} admin pin: bank membership is fully independent of
- * org-unit membership, in both directions. This independence is by construction (the class has no
- * org-unit dependency to consult) and pinned by tests.
+ * <p>Decides only from the bank roles ({@code ADMIN > BANK_MANAGEMENT > BANK_EMPLOYEE}) and the
+ * {@link BankAccountGrant} rows; org-unit membership and scope are never consulted (REQ-BANK-008).
  */
 @Service
 @RequiredArgsConstructor
@@ -77,14 +71,11 @@ public class BankSecurityService {
   }
 
   /**
-   * Answers the SpEL-level question whether the caller may <em>see</em> the given account: bank
-   * staff with either the management role or any grant row on the account (row existence = view
-   * access, REQ-BANK-009). A non-existent account id is treated as denied — the controller layer
-   * surfaces the 404 separately for callers that pass.
+   * Checks whether the caller may see the account: bank management, or bank staff with any grant
+   * row on it (REQ-BANK-009). An unknown account is denied.
    *
    * @param accountId the account to check; never {@code null}
-   * @param authentication current Spring Security authentication; may be {@code null} for anonymous
-   *     calls (defensive — bank URLs already require authentication)
+   * @param authentication the current authentication; may be {@code null}
    * @return {@code true} iff the caller may read the account
    */
   public boolean canSee(@NotNull UUID accountId, Authentication authentication) {
@@ -92,16 +83,11 @@ public class BankSecurityService {
   }
 
   /**
-   * Answers the SpEL-level question whether the caller may see a holder's custody history
-   * (REQ-BANK-032): bank management/admin may inspect <em>any</em> holder, while a plain bank
-   * employee may inspect <strong>only their own</strong> holder row (the one linked to their user
-   * id). A non-existent holder id or a holder whose linked user is gone is denied for
-   * non-management callers. Stays org-unit-blind like every other bank gate (REQ-BANK-008): it
-   * reads only bank roles and the holder→user link, never org-unit scope.
+   * Checks whether the caller may see a holder's custody history (REQ-BANK-032): management may see
+   * any holder, a bank employee only their own.
    *
    * @param holderId the holder whose history is requested; never {@code null}
-   * @param authentication current Spring Security authentication; may be {@code null} for anonymous
-   *     calls (defensive — bank URLs already require authentication)
+   * @param authentication the current authentication; may be {@code null}
    * @return {@code true} iff the caller may read the holder's history
    */
   public boolean canSeeHolder(@NotNull UUID holderId, Authentication authentication) {
@@ -123,11 +109,11 @@ public class BankSecurityService {
   }
 
   /**
-   * Whether the caller may book deposits onto the account: management/admin unrestricted, employees
-   * need {@code can_deposit} on their grant row (REQ-BANK-009).
+   * Checks whether the caller may book deposits onto the account: management unrestricted,
+   * employees need {@code can_deposit} (REQ-BANK-009).
    *
    * @param accountId the receiving account; never {@code null}
-   * @param authentication current Spring Security authentication
+   * @param authentication the current authentication
    * @return {@code true} iff the caller may deposit
    */
   public boolean canDeposit(@NotNull UUID accountId, Authentication authentication) {
@@ -135,11 +121,11 @@ public class BankSecurityService {
   }
 
   /**
-   * Whether the caller may book withdrawals from the account: management/admin unrestricted,
-   * employees need {@code can_withdraw} on their grant row (REQ-BANK-009).
+   * Checks whether the caller may book withdrawals from the account: management unrestricted,
+   * employees need {@code can_withdraw} (REQ-BANK-009).
    *
    * @param accountId the paying account; never {@code null}
-   * @param authentication current Spring Security authentication
+   * @param authentication the current authentication
    * @return {@code true} iff the caller may withdraw
    */
   public boolean canWithdraw(@NotNull UUID accountId, Authentication authentication) {
@@ -147,12 +133,11 @@ public class BankSecurityService {
   }
 
   /**
-   * Whether the caller may transfer out of (or rebook within) the account: management/admin
-   * unrestricted, employees need {@code can_transfer} on the <em>source</em> account (REQ-BANK-011;
-   * the destination must merely be visible, checked in the booking service).
+   * Checks whether the caller may transfer out of the account: management unrestricted, employees
+   * need {@code can_transfer} on the source account (REQ-BANK-011).
    *
    * @param accountId the source account; never {@code null}
-   * @param authentication current Spring Security authentication
+   * @param authentication the current authentication
    * @return {@code true} iff the caller may transfer
    */
   public boolean canTransfer(@NotNull UUID accountId, Authentication authentication) {
@@ -160,13 +145,12 @@ public class BankSecurityService {
   }
 
   /**
-   * Shared evaluation core: authenticated bank staff pass when they are management (hierarchy
-   * grants admins the same) or their own grant row satisfies the capability predicate. Reads only
-   * roles and the grant table — never org-unit state (REQ-BANK-008).
+   * Passes authenticated bank staff that hold the management role or a grant row satisfying the
+   * capability predicate.
    *
    * @param accountId the account under decision
-   * @param authentication current authentication, possibly {@code null}
-   * @param capability the per-grant capability check ({@code g -> true} for plain visibility)
+   * @param authentication the current authentication, possibly {@code null}
+   * @param capability the per-grant check ({@code g -> true} for plain visibility)
    * @return {@code true} iff the caller passes
    */
   private boolean hasCapability(

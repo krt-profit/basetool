@@ -25,34 +25,26 @@ import java.util.Map;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * The per-tier approval limits of one bank account (REQ-BANK-041), shared by both account-detail
- * surfaces: the bank-staff detail page and the org-unit settings panel. Carries the read-only
- * figures everyone may see (which tiers have which ceiling) plus enough structure for the editor —
- * the available role buckets for this account and whether the calling surface may edit.
+ * The per-tier approval limits of one bank account (REQ-BANK-041), with the available role buckets
+ * and whether the calling surface may edit them.
  *
- * <p>A tier missing from {@link #roleLimits} / a {@code null} {@link #allMembersLimit} / a user not
- * in {@link #userLimits} means "no limit" = unlimited (no approval needed). Tiers mirror the
- * account's configurable visibility buckets: squadron sub-ranks / Bereich ranks ({@link
- * #availableRoleCodes}), the all-members bucket ({@link #allMembersSupported}) and individual
- * users.
+ * <p>A missing role tier, a {@code null} {@link #allMembersLimit} or a user absent from {@link
+ * #userLimits} means no limit (no approval needed).
  *
- * @param canEdit whether the calling surface may set/clear limits — only the org-unit bank settings
- *     surface ever sets this {@code true} (responsible holder / bank management / admin,
- *     REQ-BANK-041); the bank-staff account-detail surface always assembles limits read-only
- *     ({@code false}), so a limit is configured exclusively in the org-unit bank
- * @param configurable whether this account type carries per-audience approval limits at all — the
- *     per-audience-editable types {@code ORG_UNIT} / {@code AREA}. The KRT account ({@code CARTEL})
- *     is <em>not</em> per-audience-configurable: it uses the amount-tiered approval ladder managed
- *     in the Verwaltung tab instead (REQ-BANK-047), so this is {@code false} for it
+ * @param canEdit whether the calling surface may set/clear limits; only the org-unit bank settings
+ *     surface sets this {@code true}
+ * @param configurable whether this account type carries per-audience limits ({@code ORG_UNIT} /
+ *     {@code AREA}); {@code false} for the KRT account, which uses the amount-tiered ladder
+ *     (REQ-BANK-047)
  * @param allMembersSupported whether the all-members tier applies to this account
- * @param areaMembersSupported whether the "Mitglieder des Bereichs" cascade tier applies — only for
- *     {@code AREA} (Bereichskonto) accounts (REQ-BANK-048)
- * @param availableRoleCodes the role buckets that may carry a limit on this account ({@code
- *     MembershipRole} names), in display order; empty for SK / CARTEL accounts
- * @param roleLimits the currently configured role-bucket limits, keyed by role code
+ * @param areaMembersSupported whether the "Mitglieder des Bereichs" cascade tier applies (only
+ *     {@code AREA} accounts, REQ-BANK-048)
+ * @param availableRoleCodes the role buckets that may carry a limit, in display order; empty for SK
+ *     / CARTEL accounts
+ * @param roleLimits the configured role-bucket limits, keyed by role code
  * @param allMembersLimit the configured all-members limit, or {@code null} when none is set
- * @param areaMembersLimit the configured "Mitglieder des Bereichs" cascade limit, or {@code null}
- *     when none is set (REQ-BANK-048)
+ * @param areaMembersLimit the configured "Mitglieder des Bereichs" limit, or {@code null} when none
+ *     is set
  * @param userLimits the configured individual-user limits, with resolved display names
  */
 public record BankApprovalLimitsDto(

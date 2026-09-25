@@ -45,28 +45,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Request-scoped context core of {@link OwnerScopeService} (L3 split, #922): resolves the caller's
- * effective org-unit context — the active-context header / persistent Staffel, the {@link
- * ScopePredicate} scope vectors, the caller's membership rows and the cascading/own-level oversight
- * reach — and owns the per-request memoisation those resolutions share. The {@code can*}
- * authorization gates ({@link AccessGateService}) and the create-time owner-stamping ({@link
- * OrgUnitStampingService}) are layered on top of this bean; {@link OwnerScopeService} is the
- * delegating facade that composes all three behind the {@code ownerScopeService} bean name the
- * {@code @PreAuthorize} SpEL strings resolve against.
+ * Resolves the caller's effective org-unit context for the current request: the active pin, the
+ * {@link ScopePredicate} scope vectors, the caller's memberships and oversight reach, memoised per
+ * request.
  *
- * <p>Two org-unit contexts feed into the resolution:
- *
- * <ul>
- *   <li>For a non-admin user, the persistent {@code app_user.squadron_id} they were assigned to
- *       (now sourced from {@code org_unit_membership}).
- *   <li>For an admin, the {@link #ACTIVE_ORG_UNIT_HEADER} request header relayed by the frontend's
- *       WebClient. {@code null} / missing means "all squadrons" — admins are not constrained when
- *       no active selection exists.
- * </ul>
- *
- * <p>The class-level {@code @Transactional(readOnly = true)} mirrors the {@link OwnerScopeService}
- * setting — every repository call here is read-only, and lets Spring skip the dirty-check flush and
- * route to the read replica if one is configured.
+ * <p>{@link AccessGateService} and {@link OrgUnitStampingService} build on it; {@link
+ * OwnerScopeService} is the facade the {@code @PreAuthorize} expressions call. Read-only
+ * transactional.
  */
 @Service
 @RequiredArgsConstructor
@@ -74,15 +59,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class RequestScopeResolver {
 
   /**
-   * Name of the HTTP request header through which the frontend relays the caller's active OrgUnit
-   * selection. A {@code null}/missing value means "no active selection" (admin sees all OrgUnits);
-   * a non-blank UUID restricts the request to that OrgUnit's data for its duration. Source of truth
-   * lives on the frontend (Redis-backed Spring Session via {@code MeFrontendController}); the
-   * backend treats the header as untrusted-but-bounded input — an admin pin is honoured directly, a
-   * non-admin pin only when it matches one of the caller's memberships (re-validated in {@link
-   * #currentScopePredicate()}). Read by {@link #readActiveSquadronFromHeader()}. Re-exported by
-   * {@link OwnerScopeService#ACTIVE_ORG_UNIT_HEADER} so the historical public constant keeps
-   * resolving.
+   * HTTP request header carrying the caller's active OrgUnit pin; absent means no pin. An admin pin
+   * is honoured directly, a non-admin pin only when it matches one of the caller's memberships.
    */
   public static final String ACTIVE_ORG_UNIT_HEADER = "X-Active-Org-Unit-Id";
 
@@ -103,32 +81,22 @@ public class RequestScopeResolver {
       RequestMemo.Key.of(RequestScopeResolver.class, "currentSquadron");
 
   /**
-   * Request-attribute key under which {@link #currentMemberOrgUnitIds()} caches the caller's
-   * membership org-unit ids for the duration of the current HTTP request. Stored as the resolved
-   * {@code Set<UUID>} (possibly empty) directly — a present attribute of type {@link java.util.Set}
-   * means "already resolved this request", so the membership read happens at most once even though
-   * several gates consult it.
+   * Request-memo key for {@link #currentMemberOrgUnitIds()}, so the membership read happens at most
+   * once per request.
    */
   private static final RequestMemo.Key<Set<UUID>> CACHE_KEY_MEMBER_ORG_UNIT_IDS =
       RequestMemo.Key.of(RequestScopeResolver.class, "memberOrgUnitIds");
 
   /**
-   * Request-attribute key under which {@link #currentCallerMemberships()} caches the current
-   * caller's raw {@code org_unit_membership} rows for the duration of the request. The
-   * blueprint-overview gate plus the cascading and own-level oversight scopes each read the same
-   * membership list; memoising it collapses those repeated {@code findAllByIdUserId} reads (e.g.
-   * the gate + body double-read on the availability overview) to a single query per request.
+   * Request-memo key for {@link #currentCallerMemberships()}, so the caller's membership rows are
+   * read once per request.
    */
   private static final RequestMemo.Key<List<OrgUnitMembership>> CACHE_KEY_CALLER_MEMBERSHIPS =
       RequestMemo.Key.of(RequestScopeResolver.class, "callerMemberships");
 
   /**
-   * Request-attribute key under which {@link #canViewJobOrders()} caches its boolean verdict for
-   * the duration of the current HTTP request. The profit-eligibility gate is request-constant (it
-   * derives only from the caller's memberships), yet on the order <em>lookup</em> path it is
-   * consulted once per row via the {@code canSeeJobOrder} filter; memoising the verdict collapses
-   * the otherwise-repeated {@code countProfitEligibleByIdIn} aggregate to a single query per
-   * request. A present attribute of type {@link Boolean} means "already resolved this request".
+   * Request-memo key for {@link #canViewJobOrders()}, so the profit-eligibility query runs once per
+   * request even when checked per row.
    */
   private static final RequestMemo.Key<Boolean> CACHE_KEY_CAN_VIEW_JOB_ORDERS =
       RequestMemo.Key.of(RequestScopeResolver.class, "canViewJobOrders");
@@ -141,18 +109,11 @@ public class RequestScopeResolver {
   private final HttpServletRequest request;
 
   /**
-   * Returns the org-unit context that filters the current request. For admins this reads the {@code
-   * X-Active-Org-Unit-Id} request header (the frontend's switcher pushed there via the relay
-   * filter); for everyone else this loads the user's persistent home squadron. Empty result means
-   * "no filter" for admins ("all squadrons") and "no access" for non-admins (typically
-   * unauthenticated / anonymous).
+   * Returns the org unit that filters the current request: the pin header for an admin, the
+   * persistent home Staffel for everyone else. Memoised per request.
    *
-   * <p>The non-admin branch's {@code org_unit_membership} lookup is memoised on the {@link
-   * HttpServletRequest} via {@link #readPersistentSquadronFromUser()}, so repeated calls within the
-   * same request collapse to a single DB hit. The admin branch reads the request header (in-memory)
-   * and is not cached separately — it is already constant-time.
-   *
-   * @return the active org-unit id, or empty when no filter applies.
+   * @return the active org-unit id; empty means "all squadrons" for an admin and "no access"
+   *     otherwise.
    */
   @NotNull
   public Optional<UUID> currentSquadronId() {
@@ -175,49 +136,13 @@ public class RequestScopeResolver {
   }
 
   /**
-   * R6.c / SPEZIALKOMMANDO_PLAN.md §3.5 + §5.4: returns the full effective scope vector for the
-   * current request, encoded as a {@link ScopePredicate}. Repository queries combine the three
-   * fields ({@code adminAllScope}, {@code activeOrgUnitId}, {@code memberOrgUnitIds}) into a single
-   * JPQL clause that handles every caller class — admin all-scope, admin/non-admin pinned to a
-   * specific OrgUnit, non-admin with multi-membership union, and anonymous — with the same
-   * predicate shape. Before R6.c the staffel-scoped queries took a single nullable {@code
-   * scopeSquadronId} that collapsed admin-all and non-admin-with-multi-membership into the same
-   * code path, silently hiding SK data from multi-membership users.
-   *
-   * <p>Resolution flow:
+   * Returns the effective scope vector of the current request as a {@link ScopePredicate}.
    *
    * <ul>
-   *   <li>Admin without active header → {@code adminAllScope=true}, all other fields empty.
-   *   <li>Admin with active header → {@code activeOrgUnitId=header value}, {@code adminAllScope=
-   *       false}, memberships empty (admins do not constrain by their own memberships even when
-   *       they happen to have some).
-   *   <li>Non-admin (with or without future R5.e pinning) → {@code memberOrgUnitIds = union of
-   *       User.squadron + SK memberships}, {@code adminAllScope=false}, {@code activeOrgUnitId=
-   *       null}. The R5.e pinning will switch this branch to populate {@code activeOrgUnitId} from
-   *       the same X-Active-Org-Unit-Id header that admins use today.
+   *   <li>Admin without pin: {@code adminAllScope=true}.
+   *   <li>Admin with pin: {@code activeOrgUnitId} set, own memberships ignored.
+   *   <li>Non-admin: {@code memberOrgUnitIds} is the union of their memberships and cascaded reach.
    * </ul>
-   *
-   * <p><strong>An unauthenticated caller is a defect, not a case.</strong> It used to resolve to an
-   * all-empty predicate, which the repository fragment read as "no rows except the
-   * organisation-wide escape" — a silent, plausible answer for a request that should never have
-   * reached a scoped query. Since ADR-0159 nothing anonymous gets past the security matrix, so an
-   * empty predicate built here could only come from a gate that was forgotten; it throws instead,
-   * because a scope question asked by a caller with no identity has no honest answer.
-   *
-   * <p>The membership union read is hybrid pre-D3: {@link
-   * de.greluc.krt.profit.basetool.backend.model.User#getSquadron()} for the Staffel link (still
-   * authoritative on {@code app_user.squadron_id}) plus {@link
-   * OrgUnitMembershipRepository#findAllByIdUserIdAndKind} for SK rows. Once D3 drops {@code
-   * app_user.squadron_id} and migrates the legacy Staffel membership onto {@code
-   * org_unit_membership}, this method switches to a single {@code findAllByIdUserId} read.
-   *
-   * <p><b>The refusal is an {@link AuthenticationCredentialsNotFoundException}, not an {@code
-   * IllegalStateException}.</b> Both fail closed; only one of them fails closed in a shape the API
-   * can answer with. {@code GlobalExceptionHandler} maps the latter to a {@code 400} and echoes its
-   * message, so a lost gate would have told the caller “reaching this means an endpoint lost its
-   * gate” under a status that says they sent something wrong. As a Spring Security exception it
-   * lands on the {@code 401 UNAUTHENTICATED} path instead — generic body, DEBUG log, no stack
-   * trace, no 5xx alert — which is what a request with no identity actually is.
    *
    * @return a never-null scope vector describing what the current request should see.
    * @throws AuthenticationCredentialsNotFoundException when the current request carries no
@@ -245,28 +170,12 @@ public class RequestScopeResolver {
   }
 
   /**
-   * Effective scope for the hangar <b>unit overview</b> ({@code /hangar/squadron}, REQ-HANGAR-003).
-   * Identical to {@link #currentScopePredicate()} for every caller except one owner-approved
-   * widening: a non-pinned <b>OL member</b> sees <em>every</em> ship — including the ownerless
-   * personal ships ({@code owningOrgUnit == null}) of members who belong to no org unit at all — so
-   * the OL's cross-org view of the fleet is complete.
+   * Scope for the hangar unit overview (REQ-HANGAR-003): like {@link #currentScopePredicate()},
+   * except that an unpinned OL member gets {@code adminAllScope}, including ownerless ships
+   * (ADR-0048). Grants no other admin rights.
    *
-   * <p>This is a deliberate, narrowly-scoped exception to the REQ-ORG-015 hard invariant
-   * ("OL/Bereich leadership never inherits the admin carve-outs, including ownerless-row access"):
-   * it grants the {@code adminAllScope=true} read <em>only</em> for this one aggregation surface
-   * and confers no {@code isAdmin()} rights anywhere else — every other {@code can*} gate and
-   * scoped list still routes OL through the concrete-membership-union {@link
-   * #currentScopePredicate()}. The exception is recorded in ADR-0048 and amends REQ-ORG-015 in
-   * {@code org-unit-tenancy.md}.
-   *
-   * <p>The widening applies only when <b>no single unit is pinned</b> (owner decision: a pin still
-   * narrows the unit overview to the pinned unit, like every other scoped surface) and only to an
-   * OL member — a plain or BL member keeps their exact membership/cascade reach (their own
-   * Staffeln/SKs, and a BL their Bereich's Staffeln/SKs), and an admin keeps the unchanged
-   * admin-all / admin-pin behaviour.
-   *
-   * @return the unit-overview scope vector: {@code adminAllScope} for a non-pinned OL member,
-   *     otherwise exactly {@link #currentScopePredicate()}.
+   * @return {@code adminAllScope} for an unpinned OL member, otherwise exactly {@link
+   *     #currentScopePredicate()}.
    */
   @NotNull
   public ScopePredicate currentUnitOverviewScope() {
@@ -281,28 +190,16 @@ public class RequestScopeResolver {
   }
 
   /**
-   * Resolves the SQUADRON-scope <em>set</em> for the admin user-list / search / typeahead /
-   * promotion-Bewertungsmatrix queries. REQ-ORG-017 relaxed a member to up to two Staffeln, so the
-   * unpinned non-admin scope is the <b>union</b> of the caller's own Staffeln rather than a single
-   * one. A faithful generalisation of {@link #currentSquadronId()} (the pre-REQ-ORG-017 single
-   * value) that only widens the two-Staffel case and otherwise preserves the legacy behaviour
-   * exactly:
+   * Resolves the Staffel scope set for the user-list, search, typeahead and promotion-matrix
+   * queries (REQ-ORG-017).
    *
    * <ul>
-   *   <li>admin without a pin → {@code null} (no filter — the cross-staffel list);
-   *   <li>admin/non-admin with an active pin → the singleton pinned id;
-   *   <li>non-admin without a pin and at least one Staffel → the set of the caller's own Staffel
-   *       ids (one element for a single-Staffel member — byte-identical to before; two for a
-   *       dual-Staffel member);
-   *   <li>non-admin without a pin and no Staffel → {@code null}, preserving the legacy "unfiltered"
-   *       behaviour (so Bereich/OL leadership and guests keep seeing the full picker list).
+   *   <li>admin without a pin: {@code null};
+   *   <li>any caller with a pin: the pinned id;
+   *   <li>non-admin without a pin: their own Staffel ids, or {@code null} when they have none.
    * </ul>
    *
-   * <p>The returned set is never empty (a caller with no Staffel collapses to {@code null}), so the
-   * repository {@code IN :scopeSquadronIds} clause never degenerates to an {@code IN ()}.
-   *
-   * @return the squadron id set the user-list queries filter on, or {@code null} for the unfiltered
-   *     admin/leadership all-scope.
+   * @return a non-empty squadron id set to filter on, or {@code null} for no filter.
    */
   @Nullable
   public Set<UUID> currentUserListScopeSquadronIds() {
@@ -332,14 +229,9 @@ public class RequestScopeResolver {
   }
 
   /**
-   * {@code true} iff the current non-admin caller holds more than one Staffel (REQ-ORG-017) and has
-   * NOT pinned one of them via the active-context switcher — i.e. a single-Staffel auto-stamp would
-   * have to pick arbitrarily. Create flows that auto-stamp exactly one owning Staffel (e.g. the
-   * promotion topic / rank-requirement create) consult this to honour the owner's "pin, else
-   * choose" decision: when it returns {@code true} they reject the create with a clean 400 telling
-   * the user to pin the target Staffel first, rather than silently defaulting to the name-sorted
-   * primary. Admins are never ambiguous here (they always stamp via an explicit switcher focus or
-   * are rejected in "all squadrons" mode), and a caller with zero or one Staffel is unambiguous.
+   * Whether the non-admin caller holds more than one Staffel and has pinned none, so a
+   * single-Staffel create would have to guess (REQ-ORG-017). Such creates reject with a 400. Always
+   * {@code false} for admins.
    *
    * @return {@code true} iff a single-Staffel auto-stamp would be ambiguous for the current caller.
    */
@@ -362,36 +254,12 @@ public class RequestScopeResolver {
   }
 
   /**
-   * Helper for {@link #currentScopePredicate()}: resolves every OrgUnit id the current non-admin
-   * caller has effective reach over — their direct memberships <em>plus</em> the cascading
-   * leadership expansion (epic #692, REQ-ORG-015). Used by the union-of-memberships branch of the
-   * scope predicate. Returns the empty set for anonymous callers and (technically) for admins,
-   * although the latter never reaches this method through {@link #currentScopePredicate()}.
+   * Resolves every OrgUnit the non-admin caller reaches: direct memberships plus the leadership
+   * cascade of {@link OrgUnitCascadeService#expandWithDescendants(java.util.Collection)}
+   * (REQ-ORG-015). Always a concrete id set, never an admin grant; empty for anonymous callers.
+   * Memoised per request.
    *
-   * <p>Cascade (delegated to {@link
-   * OrgUnitCascadeService#expandWithDescendants(java.util.Collection)} so the converter and this
-   * resolver share one definition): a Bereichsleitung membership ({@code is_bereichsleiter}/{@code
-   * is_bereichskoordinator}/{@code is_bereichsoperator}) widens reach to the Bereich's Staffeln +
-   * SKs; an OL membership ({@code is_ol_member}) widens reach to <em>every</em> org unit; a plain
-   * Staffel/SK membership (or a flag-less Bereich/OL seat) widens nothing. The expansion is always
-   * a concrete id set — never {@code adminAllScope}, never an {@code isAdmin()} grant — so
-   * OL/Bereich leadership stays officer-equivalent and never inherits the admin carve-outs (the
-   * HARD INVARIANT of REQ-ORG-015). For a caller with no leadership flag the result is exactly
-   * their direct membership ids, i.e. byte-for-byte the pre-#692 behaviour.
-   *
-   * <p>The result is memoised on the {@link HttpServletRequest} for the duration of the request.
-   * Since the Job-Order profit gate ({@link #canViewJobOrders()}) landed, the resolver is consulted
-   * more than once per request — the list path reads it via both {@code canViewJobOrders()} and
-   * {@link #currentScopePredicate()}, and the detail/edit paths read it via {@code
-   * canViewJobOrders()} — so the single cached {@code Set<UUID>} collapses what would otherwise be
-   * repeated {@code findAllByIdUserId} + hierarchy reads into one.
-   *
-   * <p>Post-D3: every membership row (Staffel + SK + Bereich + OL) flows through {@code
-   * OrgUnitMembershipRepository.findAllByIdUserId} — the legacy {@code User.squadron} column was
-   * dropped in R9 Step 5 / V101.
-   *
-   * @return the union of OrgUnit ids the caller is a member of or has cascading leadership reach
-   *     over, never {@code null}.
+   * @return the OrgUnit ids the caller is a member of or leads by cascade, never {@code null}.
    */
   @NotNull
   public Set<UUID> currentMemberOrgUnitIds() {
@@ -402,10 +270,8 @@ public class RequestScopeResolver {
   }
 
   /**
-   * The current caller's raw {@code org_unit_membership} rows, memoised on the request. Returns an
-   * empty list for an anonymous caller. Shared by the blueprint-overview gate and the cascading /
-   * own-level oversight scopes so they read the membership table once per request instead of once
-   * each (REQ-DATA-003).
+   * Returns the caller's {@code org_unit_membership} rows, memoised per request (REQ-DATA-003);
+   * empty for an anonymous caller.
    *
    * @return the caller's membership rows, never {@code null}.
    */
@@ -422,12 +288,8 @@ public class RequestScopeResolver {
   }
 
   /**
-   * The org-unit ids the current caller is a <em>direct</em> member of (the raw {@code
-   * org_unit_membership} rows), <strong>without</strong> the leadership cascade that {@link
-   * #currentMemberOrgUnitIds()} adds. This is the "own placed orders" key for the requester-side
-   * job-order access (REQ-ORDERS-023): an order counts as the caller's own iff its requesting org
-   * unit is one the caller directly belongs to — deliberately NOT the cascade, so an OL/Bereich
-   * seat does not turn every unit's orders into "theirs". Empty for an anonymous caller.
+   * Returns the org units the caller is a direct member of, without the leadership cascade; the
+   * "own placed orders" key of the requester-side job-order access (REQ-ORDERS-023).
    *
    * @return the caller's direct-membership org-unit ids, never {@code null}.
    */
@@ -441,27 +303,8 @@ public class RequestScopeResolver {
   }
 
   /**
-   * {@code true} iff the current principal may enter the Job-Order area at all — i.e. see the order
-   * list and order details. Only members of a <em>profit-eligible</em> org unit (Squadron or
-   * Spezialkommando) participate in the order workflow: Kartell departments are split into Profit
-   * and non-Profit, and only the Profit side processes orders. A non-Profit unit may still
-   * <em>place</em> orders (as the requesting/Auftraggeber side) but its members must not see the
-   * order queue — mirroring how, until ADR-0159, an anonymous guest could submit an order yet not
-   * track it.
-   *
-   * <ul>
-   *   <li>Admin → always {@code true} (system-wide oversight, like every other {@code can*}
-   *       short-circuit here).
-   *   <li>Non-admin → {@code true} iff at least one of the caller's membership org units (any kind)
-   *       is flagged {@code is_profit_eligible}.
-   *   <li>Anonymous / member of only non-profit units → {@code false}.
-   * </ul>
-   *
-   * <p>This is the viewer-side gate folded into {@link AccessGateService#canSeeJobOrder(UUID)} (so
-   * order details + material claims respect it) and short-circuited by {@code
-   * JobOrderService.getAllJobOrders} (so the list returns empty). It is independent of which
-   * specific order is responsible to whom — a non-profit member sees nothing, including the
-   * otherwise-public SK queue.
+   * Whether the caller may see the job-order list and details: admins always, others only as a
+   * member of at least one profit-eligible org unit. Memoised per request.
    *
    * @return {@code true} iff the caller may view job orders.
    */
@@ -489,21 +332,9 @@ public class RequestScopeResolver {
   }
 
   /**
-   * {@code true} iff the current principal may view and limited-edit the job orders their own org
-   * unit <em>placed</em> (the requesting/Auftraggeber side) — the capability that drives the "Meine
-   * Auftr&auml;ge" menu entry and stops a non-profit requester from being redirected away from
-   * their own orders (REQ-ORDERS-023). Independent of the profit-eligibility gate {@link
-   * #canViewJobOrders()}: a member of a purely non-profit unit fails {@code canViewJobOrders} yet
-   * may still track the orders that unit requested.
-   *
-   * <ul>
-   *   <li>Admin &rarr; {@code true} (already covered by {@link #canViewJobOrders()}, kept true here
-   *       for consistency).
-   *   <li>Non-admin &rarr; {@code true} iff the caller is a member of at least one org unit (which
-   *       could therefore be the requesting org unit of some order).
-   *   <li>Anonymous / memberless &rarr; {@code false} — a guest may place an order but not track
-   *       it.
-   * </ul>
+   * Whether the caller may view and limited-edit the orders their own org unit placed
+   * (REQ-ORDERS-023), regardless of profit eligibility: admins and any caller with at least one
+   * membership.
    *
    * @return {@code true} iff the caller may view the orders their own org unit requested.
    */
@@ -515,25 +346,11 @@ public class RequestScopeResolver {
   }
 
   /**
-   * #364 blueprint-availability gate: {@code true} iff the current principal may open the org-unit
-   * blueprint availability overview at all. The overview is an oversight feature restricted to
-   * leadership:
-   *
-   * <ul>
-   *   <li>admins — always (they see every org unit, or the one they pinned);
-   *   <li>officers — for their own Staffel;
-   *   <li>Spezialkommando leads — for the SK(s) they lead;
-   *   <li>Bereichsleitung / OL members — for their Bereich's (or every) unit (epic #692 Phase 6).
-   * </ul>
-   *
-   * <p>A plain member, or a contextual logistician who holds no oversight seat, is rejected (no
-   * menu entry, empty / forbidden API). The leadership branch scans the caller's memberships for
-   * any oversight seat — see {@link #isOversightSeat(OrgUnitMembership)}: an SK-lead ({@code
-   * is_lead}, pinned to SK memberships by the V95 CHECK) or — since epic #692 Phase 6 — a
-   * Bereichsleitung / OL membership.
+   * Whether the caller may open the org-unit blueprint availability overview: admins, officers, and
+   * holders of an oversight seat (see {@link #isOversightSeat(OrgUnitMembership)}).
    *
    * @return {@code true} iff the caller is an admin, an officer, or holds at least one oversight
-   *     seat (SK-lead / Bereichsleitung / OL).
+   *     seat.
    */
   public boolean canAccessBlueprintOverview() {
     if (authHelper.isAdmin() || authHelper.hasReachableRole(Roles.authority(Roles.OFFICER))) {
@@ -543,34 +360,17 @@ public class RequestScopeResolver {
   }
 
   /**
-   * #364 effective scope for the blueprint-availability overview <em>and</em> the org-unit bank
-   * balance-view (F1, REQ-BANK-021), encoded as a {@link ScopePredicate} so the aggregation reuses
-   * the same three-field shape as the staffel-scoped list queries. Unlike {@link
-   * #currentScopePredicate()} — which returns the union of <em>all</em> of a non-admin's
-   * memberships — this restricts a non-admin to the org units they have oversight over, mirroring
-   * {@link #canAccessBlueprintOverview()}. This is the <b>cascading</b> (view) scope — it drills
-   * down into subordinate units:
+   * Cascading read scope for the blueprint availability overview and the org-unit bank balances
+   * (REQ-BANK-021): the org units the caller oversees, including subordinate units (REQ-ORG-015).
    *
    * <ul>
-   *   <li>admin → delegates to {@link #currentScopePredicate()} (all org units, or the pinned one);
-   *   <li>officer → their own Staffel (via {@link #readPersistentSquadronFromUser()});
-   *   <li>SK lead → every SK they lead;
-   *   <li>Bereichsleitung → their Bereich <em>and</em> every Staffel/SK of it; OL member → every
-   *       org unit — the cascading, officer-equivalent reach (epic #692 Phase 6, REQ-ORG-015) via
-   *       {@link OrgUnitCascadeService#cascadedOfficerReach(java.util.Collection)}, which also
-   *       contributes the Bereich/OL seat itself so the caller's own AREA/CARTEL account is in
-   *       scope. Never an admin-all marker (the HARD INVARIANT);
-   *   <li>an active pin is honoured only when it points at one of those oversight org units,
-   *       otherwise it is ignored and the full oversight union applies.
+   *   <li>admin: {@link #currentScopePredicate()};
+   *   <li>officer: their Staffel; SK lead: the SKs they lead;
+   *   <li>Bereichsleitung / OL: their seat and everything below it, via {@link
+   *       OrgUnitCascadeService#cascadedOfficerReach(java.util.Collection)}.
    * </ul>
    *
-   * <p>A caller with an empty oversight set (e.g. a plain member who reached the service despite
-   * the gate) yields {@code memberOrgUnitIds = {}}, which the aggregation treats as "no rows".
-   *
-   * <p>This cascading scope is for <b>reads</b> (view). The own-level write scope a
-   * Bereichsleitung/OL may raise a bank booking request against (F2, REQ-BANK-022, owner decision
-   * Q4) is {@link #currentOwnLevelOversightScope()} — deliberately <em>not</em> cascaded, so a
-   * subordinate account reached by drill-down is view-only.
+   * <p>A pin applies only when it names one of these units. An empty set means no rows.
    *
    * @return a never-null cascading scope vector of the org units whose data the caller may oversee.
    */
@@ -602,28 +402,12 @@ public class RequestScopeResolver {
   }
 
   /**
-   * Epic #692 Phase 6 (REQ-BANK-022, owner decision Q4): the caller's <b>own-level</b> oversight
-   * seats, encoded as a {@link ScopePredicate}. This is the write-side companion of {@link
-   * #currentOversightScope()} and is deliberately <em>not</em> cascaded — it names only the org
-   * units the caller leads at their own level, never the descendants they may merely view:
+   * Non-cascading own-level oversight scope, used for org-unit bank booking requests
+   * (REQ-BANK-022): the officer's Staffel, the SKs an SK lead leads, the Bereichsleitung's Bereich
+   * and the OL member's Organisationsleitung, never units below them. Admins get {@link
+   * #currentScopePredicate()}.
    *
-   * <ul>
-   *   <li>admin → delegates to {@link #currentScopePredicate()} (all org units, or the pinned one);
-   *   <li>officer → their own Staffel (the squadron {@code ORG_UNIT} account);
-   *   <li>SK lead → every SK they lead (its {@code ORG_UNIT} account);
-   *   <li>Bereichsleitung → their Bereich (its {@code AREA} account) — but <em>not</em> the child
-   *       Staffel/SK accounts;
-   *   <li>OL member → the Organisationsleitung (the {@code CARTEL} account) — but <em>not</em> the
-   *       AREA/ORG_UNIT accounts below it.
-   * </ul>
-   *
-   * <p>This backs the org-unit bank booking-request gate ({@code
-   * OrgUnitBankAccessService.createBookingRequest}): a Bereichsleitung/OL may raise a
-   * confirm-before-post request only against their own-level account, while subordinate accounts
-   * reached through the cascading view ({@link #currentOversightScope()}) stay view-only. The
-   * officer flow from epic #666 is unchanged — an officer's own-level scope is exactly their
-   * Staffel, as before. An active pin is honoured only when it points at one of the caller's
-   * own-level seats.
+   * <p>A pin applies only when it names one of the caller's own-level seats.
    *
    * @return a never-null, non-cascaded scope vector of the caller's own-level oversight seats.
    */
@@ -654,15 +438,8 @@ public class RequestScopeResolver {
   }
 
   /**
-   * {@code true} iff the membership is an <em>oversight seat</em> — one that confers
-   * officer-equivalent oversight over its own org unit (and, for Bereich/OL, cascading reach below
-   * it). These are every membership carrying a functional rank ({@link
-   * MembershipRole#confersOwnLevelOversight()}, i.e. {@code role != MEMBER}): the SK-lead seat, the
-   * Bereichsleitung / OL seats (epic #692 Phase 6, REQ-ORG-015) and, from epic #800 (REQ-ROLE-002),
-   * the four squadron ranks. A rank-less ({@code MEMBER}) Staffel/SK/Bereich/OL seat is not an
-   * oversight seat. Shared by {@link #canAccessBlueprintOverview()} and {@link
-   * #currentOwnLevelOversightScope()} so the gate and the own-level scope agree on what "oversight"
-   * means.
+   * Whether the membership carries a functional rank ({@link
+   * MembershipRole#confersOwnLevelOversight()}) and therefore oversight over its own org unit.
    *
    * @param m the membership row to classify; never {@code null}.
    * @return {@code true} iff the membership grants own-level oversight over its org unit.
@@ -672,20 +449,9 @@ public class RequestScopeResolver {
   }
 
   /**
-   * {@code true} iff the caller holds <b>Bereich- or OL-level oversight</b> — the seniority that,
-   * on the org-unit bank page, additionally reveals the cartel-wide special accounts
-   * (Sonderkonten), which belong to no single org unit and are therefore not reachable through the
-   * org-unit cascade (REQ-BANK-028). Unlike {@link #isOversightSeat(OrgUnitMembership)} this
-   * deliberately <em>excludes</em> the SK-lead seat and the officer role: an officer or SK lead
-   * oversees only their own unit's account, so they do not get the org-wide special-account view.
-   * The seats that qualify are the Bereichsleitung flags ({@code is_bereichsleiter}/{@code
-   * is_bereichskoordinator}/{@code is_bereichsoperator}) and the OL flag ({@code is_ol_member}) —
-   * now read through {@link MembershipRole#isAreaOrOl()}; a rank-less (chart-only) Bereich/OL
-   * membership does not qualify. Admins always qualify — they see every account anyway.
-   *
-   * <p>This is consulted only by the org-unit-aware bank seam ({@link OrgUnitBankAccessService});
-   * it adds no org-unit logic to the bank itself, which stays org-unit-blind (REQ-BANK-008,
-   * ADR-0011).
+   * Whether the caller holds a Bereich- or OL-level seat ({@link MembershipRole#isAreaOrOl()}),
+   * which reveals the cartel-wide special accounts on the org-unit bank page (REQ-BANK-028).
+   * Excludes officers and SK leads; admins always qualify.
    *
    * @return {@code true} iff the caller is an admin or holds a Bereich-/OL-level oversight seat.
    */
@@ -697,11 +463,7 @@ public class RequestScopeResolver {
   }
 
   /**
-   * {@code true} iff the membership is a Bereich- or OL-level oversight seat — the subset of {@link
-   * #isOversightSeat(OrgUnitMembership)} that excludes the SK-lead and squadron-rank seats, read
-   * through {@link MembershipRole#isAreaOrOl()} ({@code BEREICHSLEITER} / {@code
-   * BEREICHSKOORDINATOR} / {@code BEREICHSOPERATOR} / {@code OL_MEMBER}). Backs {@link
-   * #currentUserHasAreaOrOlOversight()}.
+   * Whether the membership is a Bereichsleitung or OL seat ({@link MembershipRole#isAreaOrOl()}).
    *
    * @param m the membership row to classify; never {@code null}.
    * @return {@code true} iff the membership is a Bereichsleitung or OL seat.
@@ -711,11 +473,8 @@ public class RequestScopeResolver {
   }
 
   /**
-   * {@code true} iff the caller holds an {@code OL_MEMBER} seat — a member of the
-   * Organisationsleitung. Pure membership check (no admin short-circuit), so the org-unit bank seam
-   * can use it to resolve the collegial holder of the {@code CARTEL} account and the
-   * OL-can-configure-SPECIAL-visibility rule (REQ-BANK-037), where "OL" means the OL body, not the
-   * admin carve-out.
+   * Whether the caller holds an {@code OL_MEMBER} seat. Pure membership check without an admin
+   * short-circuit (REQ-BANK-037).
    *
    * @return {@code true} iff the caller has at least one {@code OL_MEMBER} membership.
    */
@@ -725,11 +484,8 @@ public class RequestScopeResolver {
   }
 
   /**
-   * {@code true} iff the caller holds a {@code BEREICHSLEITER} seat on any Bereich. Pure membership
-   * check (no admin short-circuit), used by the org-unit bank seam for the SPECIAL-account
-   * auto-view rule (every Bereichsleiter sees Sonderkonten, REQ-BANK-037) — deliberately narrower
-   * than {@link #currentUserHasAreaOrOlOversight()}, which also includes
-   * Bereichskoordinatoren/-operatoren and OL members.
+   * Whether the caller holds a {@code BEREICHSLEITER} seat on any Bereich. Pure membership check
+   * without an admin short-circuit (REQ-BANK-037).
    *
    * @return {@code true} iff the caller has at least one {@code BEREICHSLEITER} membership.
    */
@@ -739,10 +495,8 @@ public class RequestScopeResolver {
   }
 
   /**
-   * {@code true} iff the caller holds exactly the given {@link MembershipRole} on the given org
-   * unit. Pure membership check used by the org-unit bank seam to resolve a derived responsible
-   * holder (e.g. the {@code STAFFELLEITER} of a Staffel, the {@code BEREICHSLEITER} of a PROFIT
-   * Bereich) and to evaluate {@code MEMBERSHIP_ROLE} view grants.
+   * Whether the caller holds exactly the given {@link MembershipRole} on the given org unit. Pure
+   * membership check without an admin short-circuit.
    *
    * @param orgUnitId the org unit to check; never {@code null}
    * @param role the membership role to match; never {@code null}
@@ -755,9 +509,8 @@ public class RequestScopeResolver {
   }
 
   /**
-   * {@code true} iff the caller is a member of the given org unit at all (any role, including a
-   * rank-less {@code MEMBER} seat). Pure membership check used by the org-unit bank seam to
-   * evaluate the {@code ALL_MEMBERS} view grant on an org-unit account.
+   * Whether the caller holds any membership on the given org unit, including a rank-less {@code
+   * MEMBER} seat.
    *
    * @param orgUnitId the org unit to check; never {@code null}
    * @return {@code true} iff the caller has any membership on that unit
@@ -768,12 +521,8 @@ public class RequestScopeResolver {
   }
 
   /**
-   * {@code true} iff the caller is a member anywhere in the whole area cascade of the given Bereich
-   * — a direct member of the Bereich itself (the Bereichsleitung) <em>or</em> a member of any of
-   * its child Staffeln / Spezialkommandos. Pure membership check used by the org-unit bank seam to
-   * evaluate the {@code AREA_MEMBERS} view grant / approval-limit tier ("Mitglieder des Bereichs",
-   * REQ-BANK-048) on a Bereichskonto. Since the org hierarchy is exactly three levels (OL &gt;
-   * Bereich &gt; Staffel/SK), the Bereich's direct children are its whole subtree.
+   * Whether the caller is a member of the given Bereich or of any of its child Staffeln and
+   * Spezialkommandos (REQ-BANK-048).
    *
    * @param bereichId the owning Bereich org unit; never {@code null}
    * @return {@code true} iff the caller has any membership on the Bereich or one of its children
@@ -789,16 +538,8 @@ public class RequestScopeResolver {
   }
 
   /**
-   * Convenience entry point for the aggregate-service create paths: returns the {@link Squadron}
-   * entity that matches {@link #currentSquadronId()}, loaded from the DB. Empty when the caller has
-   * no effective squadron (admin in "all squadrons" mode, guest, or unauthenticated). Services use
-   * this to stamp {@code owningSquadron} on newly-created aggregates that have no owner field of
-   * their own (e.g. {@code Operation}) — aggregates that DO carry an owner ({@code Ship}, {@code
-   * Mission}, …) prefer to derive the squadron from the owner so a future user-squadron move does
-   * not silently retag history.
-   *
-   * <p>Result is memoised per {@link HttpServletRequest} so repeated calls in one request collapse
-   * to a single {@code orgUnitRepository.findById} round-trip.
+   * Loads the {@link Squadron} matching {@link #currentSquadronId()}, memoised per request; used to
+   * stamp {@code owningSquadron} on created aggregates that have no owner of their own.
    *
    * @return the {@link Squadron} for the current effective context, or empty when none applies.
    */
@@ -822,11 +563,7 @@ public class RequestScopeResolver {
   }
 
   /**
-   * Plan-aligned org-unit-typed accessor: returns the {@link OrgUnit} matching {@link
-   * #currentOrgUnitId()}. Today the active context is always a {@link Squadron} (the admin switcher
-   * accepts only Staffel ids); R2.d will widen the switcher to accept Spezialkommando ids too. The
-   * method's return type is already widened so the eventual rollout is a one-line repository swap
-   * rather than another signature change.
+   * Returns the {@link OrgUnit} matching {@link #currentOrgUnitId()}.
    *
    * @return the current effective {@link OrgUnit}, or empty when none applies.
    */
@@ -836,24 +573,8 @@ public class RequestScopeResolver {
   }
 
   /**
-   * Reports whether the per-squadron promotion-system feature flag is on for the caller's scope.
-   *
-   * <ul>
-   *   <li>Admin without an active pin (all-scopes mode) — {@code true}; admins keep access so they
-   *       can re-enable a squadron that locked itself out without losing the menu entry.
-   *   <li>Admin pinned to a squadron — uses the pinned squadron's flag so the pinned view stays
-   *       consistent with what a member of that squadron would see. An admin who wants to re-enable
-   *       a locked-out squadron either clears the pin first (all-scopes mode) or navigates directly
-   *       to {@code /admin/settings} (not gated by this check).
-   *   <li>Non-admin with an effective squadron — returns the flag stored on that squadron's row.
-   *   <li>Caller without an effective squadron (anonymous / member without squadron) — {@code
-   *       true}, since the squadron-scope filter already returns empty lists for them.
-   * </ul>
-   *
-   * <p>The pin-awareness comes from {@link #currentSquadron()}, which already resolves an admin's
-   * pin from the request header and a non-admin's home squadron from the membership row. The
-   * earlier blanket admin bypass was dropped because it broke the pinned-view UX — see CLAUDE.md
-   * "Multi-squadron tenancy" for the updated semantics.
+   * Whether the per-squadron promotion feature flag is on for the caller's scope: the flag of the
+   * effective (pinned or home) squadron, or {@code true} when there is none.
    *
    * @return {@code true} when the promotion menu may be exposed for the caller.
    */
@@ -862,31 +583,21 @@ public class RequestScopeResolver {
   }
 
   /**
-   * {@code true} iff the current caller may read <em>any</em> promotion data. Promotion is
-   * per-squadron, so a caller needs either the elevated all-squadrons view (admin) or an effective
-   * home squadron to see a system at all. A non-admin without any squadron membership has no
-   * promotion system of their own; every promotion list / eligibility read must short-circuit to
-   * empty for them rather than fall through to the {@code null}-scope cross-squadron union that
-   * admins rely on. Detail reads are already covered by {@link
-   * AccessGateService#canSeeSquadron(UUID)} (which returns {@code false} for a squadron-less
-   * non-admin), so this guard is only needed on the {@code null}-means-all list / eligibility
-   * paths.
+   * Whether the caller may read any promotion data: admins and non-admins with an effective home
+   * squadron. List and eligibility reads return empty otherwise.
    *
-   * @return {@code true} for admins (all-scopes or pinned) and for non-admins with an effective
-   *     squadron; {@code false} for a squadron-less non-admin or anonymous caller.
+   * @return {@code true} for admins and for non-admins with an effective squadron.
    */
   public boolean hasPromotionReadAccess() {
     return authHelper.isAdmin() || currentSquadronId().isPresent();
   }
 
   /**
-   * Throws {@link AccessDeniedException} when the per-squadron promotion-system feature flag is off
-   * for the caller's scope. Admins bypass the check (see {@link
-   * #isPromotionFeatureEnabledForCurrentScope()} for the resolution rules). Used at the top of
-   * every promotion write-service method to short-circuit the request with HTTP 403 before any
-   * mutation runs.
+   * Throws {@link AccessDeniedException} when the promotion feature flag is off for the caller's
+   * scope (see {@link #isPromotionFeatureEnabledForCurrentScope()}); called before every promotion
+   * write.
    *
-   * @throws AccessDeniedException if a non-admin caller's home squadron has the flag disabled.
+   * @throws AccessDeniedException if the flag is disabled for the caller's scope.
    */
   public void assertPromotionFeatureEnabled() {
     if (!isPromotionFeatureEnabledForCurrentScope()) {
@@ -897,12 +608,9 @@ public class RequestScopeResolver {
   }
 
   /**
-   * Reads the active-context pin from the {@link #ACTIVE_ORG_UNIT_HEADER} request header. Shared by
-   * the scope predicates and the create-time owner-stamping ({@link OrgUnitStampingService}) and
-   * the ownerless-personal-row gate ({@link AccessGateService}) so they all honour the same
-   * untrusted pin. Empty on a {@code null}, blank or malformed header value.
+   * Reads the active-context pin from the {@link #ACTIVE_ORG_UNIT_HEADER} request header.
    *
-   * @return the parsed active OrgUnit id, or empty when the header is absent / malformed.
+   * @return the parsed active OrgUnit id, or empty when the header is absent, blank or malformed.
    */
   @NotNull
   public Optional<UUID> readActiveSquadronFromHeader() {
@@ -910,13 +618,11 @@ public class RequestScopeResolver {
   }
 
   /**
-   * Parses a single header value into a UUID. Returns {@link Optional#empty()} on {@code null},
-   * blank, or malformed input. Malformed input is debug-logged inside the caller rather than thrown
-   * so a stray client cannot spam the WARN channel.
+   * Parses a header value into a UUID without throwing.
    *
    * @param raw raw header value from {@link HttpServletRequest#getHeader(String)}; may be {@code
    *     null}.
-   * @return parsed UUID or empty.
+   * @return parsed UUID, or empty on {@code null}, blank or malformed input.
    */
   @NotNull
   private static Optional<UUID> parseHeaderUuid(String raw) {

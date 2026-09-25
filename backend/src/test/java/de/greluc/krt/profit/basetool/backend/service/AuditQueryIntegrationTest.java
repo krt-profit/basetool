@@ -42,13 +42,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.IllegalTransactionStateException;
 
 /**
- * Integration tests for the generic activity-audit query against the real Testcontainers PostgreSQL
- * — the path the mocked {@code AuditServiceTest} cannot cover (REQ-AUDIT-001). Pins that {@code
- * findFiltered} runs without a "could not determine data type of parameter" failure when filters
- * are absent (all-null) and when populated, the exact calls the admin viewer makes; the {@code
- * (CAST(:param AS type) IS NULL OR ...)} pattern is what makes that work on PostgreSQL. Also pins
- * the MANDATORY-propagation invariant: {@code record()} outside a transaction throws (no silent
- * gaps).
+ * Integration tests for the activity-audit query against real Postgres (REQ-AUDIT-001): {@code
+ * findFiltered} runs with and without filters, and {@code record()} outside a transaction throws.
  */
 @SpringBootTest
 @ActiveProfiles("test")

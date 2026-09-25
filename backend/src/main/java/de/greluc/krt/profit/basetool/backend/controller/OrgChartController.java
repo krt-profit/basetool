@@ -45,13 +45,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST surface for the Profit-Bereich org chart. The chart is purely descriptive (it grants no
- * permissions), so read access is open to every authenticated user while every write is
- * ADMIN-gated. The whole chart is read in one call; the inline editor mutates it one position at a
- * time.
- *
- * <p>The user picker the editor needs is served by the existing {@code GET /api/v1/users/lookup} —
- * this controller intentionally adds no user-listing endpoint of its own.
+ * REST surface for the Profit-Bereich org chart. The chart grants no permissions: reads are open to
+ * every authenticated user, writes are ADMIN-only and edit one position at a time.
  */
 @RestController
 @RequestMapping("/api/v1/org-chart")
@@ -120,12 +115,11 @@ public class OrgChartController {
   }
 
   /**
-   * Reassigns the holder and/or reorders an existing position. The rank and scope are immutable;
-   * only the holder and the display order may change. Carries the optimistic-lock version in the
-   * body. ADMIN-only.
+   * Reassigns the holder and/or display order of a position; rank and scope are immutable.
+   * ADMIN-only.
    *
    * @param id the position id.
-   * @param request the edit payload; validated by Jakarta annotations.
+   * @param request the edit payload, carrying the optimistic-lock version.
    * @return the updated position with the bumped version.
    */
   @PutMapping("/positions/{id}")
@@ -152,9 +146,8 @@ public class OrgChartController {
   }
 
   /**
-   * Vacates a Kommando's Kommandoleiter — clears the holder while keeping the Kommando, its name,
-   * its Stv. and its Ensigns. Distinct from {@link #deletePosition}, which removes the whole
-   * Kommando. The optimistic-lock version travels as a query parameter. ADMIN-only.
+   * Clears a Kommando's Kommandoleiter while keeping the Kommando, its name, Stv. and Ensigns;
+   * {@link #deletePosition} removes the whole Kommando. ADMIN-only.
    *
    * @param id the Kommando ({@code COMMAND_LEAD}) position id.
    * @param version the optimistic-lock version the client last saw.

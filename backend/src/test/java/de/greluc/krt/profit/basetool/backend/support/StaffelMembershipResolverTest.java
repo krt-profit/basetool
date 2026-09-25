@@ -44,11 +44,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Mockito unit tests for {@link StaffelMembershipResolver}, the single owner of the "name-sorted
- * primary Staffel" rule (REQ-ORG-017). Pins the contract the three former call sites ({@code
- * OrgUnitMembershipService}, {@code UserMapper}, {@code OwnerScopeService}) relied on: empty input,
- * the single-Staffel fast path that must not touch the squadron table, the case-insensitive name
- * ordering for two Staffeln, and the dangling-membership skip.
+ * Mockito unit tests for {@link StaffelMembershipResolver}, the "name-sorted primary Staffel" rule
+ * (REQ-ORG-017): empty input, the single-Staffel fast path, case-insensitive ordering and the
+ * dangling-membership skip.
  */
 @ExtendWith(MockitoExtension.class)
 class StaffelMembershipResolverTest {

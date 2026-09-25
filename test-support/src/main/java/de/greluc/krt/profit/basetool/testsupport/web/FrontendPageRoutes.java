@@ -26,47 +26,12 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * The frontend's page routes, in one place, for every guard that walks them.
+ * The frontend's page routes in one catalogue, shared by the E2E page sweeps and the {@code
+ * PageRouteCatalogueTest} gate.
  *
- * <p><b>Why this exists.</b> Three E2E classes each carried their own copy of this information:
- * {@code TouchClassLayoutE2eTest.PAGES} (the superset), {@code CorePagesSmokeE2eTest} and {@code
- * AdminPagesSmokeE2eTest} (two slices of it). Three hand-maintained lists of the same facts agree
- * only for as long as somebody remembers all three, and on 2026-09-13 that failed measurably:
- * {@code PAGES} was short by <b>seventeen</b> page routes while its own Javadoc and {@code
- * REQ-UI-009}'s "Enforced by" clause both claimed every route the controllers expose was covered.
- * Adding the seventeen found a real defect on the first run — {@code /admin/notification-rules}
- * renders a 1303px-wide table with no {@code .table-responsive} container, which scrolls the page
- * sideways at every device class, desktop included — and {@code /organisation/leitung} was missing
- * while the very change under review was adding {@code .leitung-group-actions} to a phone flex-wrap
- * fix, so that fix shipped unmeasured.
- *
- * <p><b>What makes this a gate rather than a tidier list.</b> One list is still a list somebody has
- * to remember. {@code PageRouteCatalogueTest} asks the dispatcher for every mapping it knows and
- * fails when a route is in neither {@link #PAGES} nor {@link #NOT_PAGES}. A page added next month
- * is covered on the day it is added, or the build goes red naming it — the same substitution {@code
- * AnonymousSurfaceSweepMvcTest} makes for REQ-SEC-052, on the same engine ({@link
- * EndpointEnumeration}).
- *
- * <p><b>Why not on {@code E2eSupport}, where the touch sweep's Javadoc pointed.</b> Three of the
- * four consumers live in the frontend's {@code e2e} source set, which would have been the natural
- * home for them. The gate is the fourth, and it needs a Spring context and the frontend's own
- * classes, so it lives in {@code src/test} — which by design neither compiles nor depends on the
- * {@code e2e} source set, deliberately kept out of {@code check} because that suite needs a running
- * stack and a downloaded Chromium. A catalogue on {@code E2eSupport} could therefore only be gated
- * by a test that also needed that stack, and would then run only on pull requests carrying the
- * {@code e2e} label — so a controller change without that label would slip past exactly the check
- * built to catch it. {@code test-support} is already on both classpaths ({@code e2eImplementation}
- * extends {@code testImplementation}), which is what lets one catalogue serve a {@code check}-time
- * gate and a stack-time sweep at once.
- *
- * <p><b>Classification stays at runtime, and that is load-bearing.</b> Entries in {@link #PAGES}
- * that turn out not to render an app shell are skipped by the sweep where they are measured, not
- * filtered out here. A Basetool page is recognised by its shell; a fragment or a JSON endpoint
- * simply does not have one. Keeping such entries listed and letting the run classify them is how a
- * route that quietly <i>stops</i> rendering a shell surfaces, instead of being silently absent from
- * a curated list. It is also why the gate compares against the union of two hand-written lists
- * rather than deriving "is a page" from a return type: {@code /inventory/my/stack/entries} returns
- * a view name exactly as {@code /inventory/my} does, and only one of the two is a page.
+ * <p>The gate fails when a dispatcher mapping is in neither {@link #PAGES} nor {@link #NOT_PAGES},
+ * using {@link EndpointEnumeration}. Whether a listed route actually renders an app shell is
+ * decided at sweep time, not here.
  */
 public final class FrontendPageRoutes {
 
@@ -76,13 +41,8 @@ public final class FrontendPageRoutes {
   }
 
   /**
-   * Every route the frontend answers with a page, taken from its {@code @GetMapping}s rather than
-   * chosen.
-   *
-   * <p>The full list of page routes that need no path variable — detail views are reached from
-   * seeded entities instead. Ordered as a reader walks the app (the member surface, then the
-   * administration surface, then the legal pages) rather than alphabetically, so a missing
-   * neighbour is visible to someone reading the list.
+   * Every route without a path variable that the frontend answers with a page, ordered as a reader
+   * walks the app: member surface, administration, legal pages.
    */
   public static final @Unmodifiable List<String> PAGES =
       List.of(
@@ -158,17 +118,11 @@ public final class FrontendPageRoutes {
           "/terms");
 
   /**
-   * Routes that are accounted for and are <b>not</b> pages: HTML fragments, JSON read models, the
-   * notification SSE stream, and one redirect.
+   * Routes that are accounted for but are not pages: HTML fragments, JSON read models, the
+   * notification SSE stream and one redirect.
    *
-   * <p>They are enumerated rather than matched by a predicate so that {@link #PAGES} and this list
-   * together have to cover everything the dispatcher routes. That totality is the gate: a new
-   * endpoint lands in one list or the other by a decision somebody made, and a new <i>page</i>
-   * cannot be forgotten, because forgetting it fails the build instead of going quietly unmeasured.
-   *
-   * <p>Nothing here is skipped for being uninteresting. A predicate over {@code @ResponseBody} or
-   * the return type would classify most of these correctly today and would also, silently,
-   * reclassify a page on the day its handler changed shape.
+   * <p>Enumerated explicitly, so that together with {@link #PAGES} it must cover every routed
+   * endpoint.
    */
   public static final @Unmodifiable List<String> NOT_PAGES =
       List.of(
@@ -204,17 +158,12 @@ public final class FrontendPageRoutes {
           "/notifications/stream");
 
   /**
-   * Whole kinds of route this catalogue does not enumerate, as subtree roots.
+   * Subtree roots the catalogue does not enumerate: the {@code /api/**} proxies, {@code
+   * assetlinks.json}, {@code manifest.webmanifest}, {@code /csrf}, the error page, the actuator
+   * tree and the OAuth2 entry and exit.
    *
-   * <p>Two groups, and neither is a judgement about an individual route. What the frontend owns but
-   * no page sweep is about: the {@code /api/**} proxies, the two machine descriptors ({@code
-   * assetlinks.json} and {@code manifest.webmanifest}), and {@code /csrf}. And what it does not own
-   * at all: Spring's error page, the actuator tree, and the OAuth2 entry and exit, which the
-   * dispatcher reports alongside the application's own mappings.
-   *
-   * <p>Matched with {@link EndpointEnumeration#isUnder}, segment by segment — never {@code
-   * startsWith}, which would let {@code /error} swallow a future {@code /errors} and quietly remove
-   * it from a gate whose whole value is that it covers everything.
+   * <p>Matched segment by segment with {@link EndpointEnumeration#isUnder}, never by {@code
+   * startsWith}.
    */
   public static final @Unmodifiable List<String> NOT_SWEPT_ROOTS =
       List.of(
@@ -254,18 +203,9 @@ public final class FrontendPageRoutes {
           "/personal-inventory/blueprints");
 
   /**
-   * The ADMIN-gated slice {@code AdminPagesSmokeE2eTest} loads.
-   *
-   * <p>A subset of {@link #PAGES}. It is not "every admin page": the ones already covered by a
-   * dedicated flow ({@code /admin/settings}, {@code /admin/materials}, {@code
-   * /admin/special-commands}, {@code /admin/default-blueprints}, {@code /admin/bank}, {@code
-   * /admin/audit-log}, {@code /admin/mission-data}) are left out on purpose, because a page-load
-   * smoke adds nothing to a flow that already drives the page.
-   *
-   * <p>That omission is a judgement about test value, not a fact about the routes, which is why
-   * this list stays curated while {@link #PAGES} is gated. What the gate does give it is that every
-   * entry must exist in {@link #PAGES} — so a typo, or a route renamed out from under it, fails the
-   * build instead of quietly testing nothing.
+   * The ADMIN-gated routes {@code AdminPagesSmokeE2eTest} loads; a curated subset of {@link #PAGES}
+   * that omits admin pages already driven by a dedicated flow. Every entry must exist in {@link
+   * #PAGES}.
    */
   public static final @Unmodifiable List<String> ADMIN_SMOKE =
       List.of(
@@ -285,48 +225,24 @@ public final class FrontendPageRoutes {
           "/admin/personal-blueprints");
 
   /**
-   * The slice {@code AccessibilitySmokeE2eTest} runs the axe WCAG A+AA scan over.
-   *
-   * <p>A subset of {@link #PAGES}, and the smallest of the three slices on purpose: an axe scan
-   * injects and runs the engine inside the page, so it costs far more per route than a page load.
-   * Five representative surfaces — the dashboard, a list, two different queue/create shapes and the
-   * hangar — rather than every page.
-   *
-   * <p>This was the <b>fourth</b> hand-kept copy of the frontend's routes, and it was not one of
-   * the three the 2026-09-13 review named. It is folded in here for the same reason as the other
-   * two slices: which pages are worth an axe scan stays a judgement, but every entry being a page
-   * route that actually exists is checkable, and {@code PageRouteCatalogueTest} now checks it.
+   * The routes {@code AccessibilitySmokeE2eTest} scans with axe for WCAG A+AA; a small subset of
+   * {@link #PAGES}, because a scan is expensive per route.
    */
   public static final @Unmodifiable List<String> A11Y_SMOKE =
       List.of("/", "/missions", "/orders", "/refinery-orders", "/hangar");
 
   /**
-   * The list routes that own a {@code /{id}} detail view.
-   *
-   * <p>Used by the touch sweep only to say so when one of them renders no row: the detail view then
-   * goes unmeasured, and that is worth printing rather than passing over in silence. It is NOT a
-   * failure — an empty list is a legitimate state of a fresh or shared stack, and the {@code smoke}
-   * tag exists so the sweep can run against one.
+   * The list routes that own a {@code /{id}} detail view; the touch sweep reports, without failing,
+   * when one of them renders no row.
    */
   public static final @Unmodifiable Set<String> DETAIL_LIST_PAGES =
       Set.of("/missions", "/operations", "/orders", "/refinery-orders");
 
   /**
-   * The list routes whose detail links leave the list's own path, mapped to the path prefix their
-   * detail view lives under.
+   * List routes whose detail links leave the list's own path, mapped to the prefix their detail
+   * view lives under; the touch sweep otherwise assumes the list's own path.
    *
-   * <p>The touch sweep reaches a detail view by following the first {@code <prefix>/<id>} link a
-   * list renders, and by default the prefix is the list's own path. That holds for every list but
-   * the ones named here. {@code /admin/special-commands} lists the SKs in the admin area, but each
-   * row links to the SK member page {@code /organisation/special-commands/{id}}, which moved out of
-   * {@code /admin/**} because an SK's own lead manages its members too and the admin area stays
-   * admin-only (REQ-ORG-005). Without this entry the sweep would look for {@code
-   * /admin/special-commands/<id>} links, find none, and the member page would silently stop being
-   * measured.
-   *
-   * <p>{@code PageRouteCatalogueTest} checks that every key is a page in {@link #PAGES} and that
-   * every value still owns a routed {@code /{id}} detail pattern, so a rename cannot turn an entry
-   * into a prefix that matches nothing.
+   * <p>Every key must be in {@link #PAGES} and every value must own a routed {@code /{id}} pattern.
    */
   public static final @Unmodifiable Map<String, String> DETAIL_PREFIX_OVERRIDES =
       Map.of("/admin/special-commands", "/organisation/special-commands");

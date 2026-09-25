@@ -45,19 +45,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Pins the two switchable-view invariants of the bank dashboard grid (REQ-BANK-016) against a
- * Thymeleaf attribute-precedence regression that shipped in the card/table + by-Bereich feature:
- * {@code th:if}/{@code th:unless}/{@code th:each} must never share an element with {@code
- * th:replace}, because {@code th:replace} (precedence 1) is processed before the condition (3) and
- * the iteration (2).
- *
- * <p>The two failure modes this guards are exactly what a same-element combination produced: the
- * layout condition was ignored so the {@code accTable} and {@code accGrid} fragments BOTH rendered
- * (table and card grid stacked), and the by-Bereich {@code th:each} left its {@code grp} loop
- * variable unbound so {@code accGroup(null, …)} hit a {@code group.key()} NPE that surfaced as HTTP
- * 500 on the {@code bankGrid} fragment swap — silently breaking every view-toggle. The tests assert
- * one-and-only-one view per layout and a clean grouped render, for both the full page and the
- * {@code fragment=bankGrid} swap the checkboxes fire.
+ * Pins the switchable dashboard views (REQ-BANK-016): exactly one of table and card grid renders
+ * per layout, and the by-Bereich grouping renders cleanly, for the full page and the {@code
+ * fragment=bankGrid} swap.
  */
 @SpringBootTest
 class BankDashboardGroupingMvcTest {

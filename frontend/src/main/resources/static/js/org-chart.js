@@ -17,37 +17,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * Org-chart editor page module (/org-chart), extracted verbatim from the former inline script of
- * org-chart.html (ADR-0069, follow-up to #924).
- *
- * A self-invoking strict-mode IIFE (kept as-is) that drives in-place org-chart editing: the
- * add/reassign/rename/remove/vacate modal (JSON writes through krtFetch.write: CSRF + retry-on-403),
- * the #571 fragment-swap chart refresh with horizontal-scroll restoration, an accessible focus-trap
- * dialog with background inert, and full ARIA-tree keyboard navigation (roving tabindex, arrow/Home/
- * End) re-initialised on krt:swapped. Collapse/expand are local view toggles (no server call).
- *
- * The localized strings live in the OC_I18N dict defined by the inline Thymeleaf bootstrap block of
- * org-chart.html, which executes immediately before this classic script.
- */
-
 /* global OC_I18N */
 
-// ---- Live multi-user sync — the Organigramm (REQ-FE-010 / REQ-FE-015, ADR-0094, #1235) ---------
-// ORG_CHART_SECTIONS is the single source of truth shared by this page's write-side broadcast and
-// its receive-side refresh (the three-mirror-points rule). Its one key is a SUBSET of the server
-// LiveSyncTopicClass.ORG_STRUCTURE whitelist: the room is shared with the admin Organisationsstruktur
-// editor (admin-org-structure.js), which owns the `units` and `forms` keys. Both surfaces render the
-// same hierarchy, so a position edit here pokes the editor's `units` table and a parent-edge change
-// there pokes this `chart` — publishing to a room needs no subscription to it.
-//
-// The chart is read-only for members and editable by admins; every viewer re-pulls its own
-// authorization-checked chartBody fragment, so no chart data ever rides the socket.
 const ORG_CHART_SECTIONS = {
     chart: { container: '#oc-chart', fragmentValue: 'chartBody' },
 };
 
-// The admin editor's unit table, poked but never rendered by this page.
 const ORG_CHART_UNITS_SECTION = 'units';
 
 (function () {
@@ -58,14 +33,6 @@ const ORG_CHART_UNITS_SECTION = 'units';
     const modalContent = modal ? modal.querySelector('.krt-modal') : null;
     let lastTrigger = null;
 
-    // In-place chart refresh after a successful edit (epic #571 / REQ-FE-005). The whole tree
-    // is re-rendered via ?fragment=chartBody and swapped into the stable #oc-chart container,
-    // re-stamping every data-version and rebuilding the add affordances + ARIA tree atomically
-    // — no full-page reload. The innerHTML assignment resets the container's horizontal scroll,
-    // so the caller captures it BEFORE closeModal() (whose focus()/inert-clear reflow can zero
-    // it on Chromium/Firefox) and refreshChart re-applies it across animation frames until the
-    // freshly-swapped tree's layout settles; krtFetch.swap (preserveScroll) keeps the page's
-    // vertical scroll.
     function refreshChart(keepScroll) {
         if (!chart || !window.krtFetch) {
             window.location.reload();
@@ -83,13 +50,6 @@ const ORG_CHART_UNITS_SECTION = 'units';
                 if (!ok) {
                     return;
                 }
-                // Re-apply the captured offset until it sticks. The innerHTML swap resets the
-                // container scroll and the fresh tree lays out asynchronously, so a single
-                // assignment clamps toward 0 while scrollWidth is below its final value (the browser
-                // does not re-expand scrollLeft once layout grows). Re-assert savedX each frame
-                // until the chart's max scroll has stabilised AND the offset has landed; bounded by
-                // a deadline so a refresh that narrows the chart (savedX then unreachable) cannot
-                // spin. Mirrors the former reload-path restoreScrollState settle loop.
                 const deadline = performance.now() + 5000;
                 let prevMax = -1;
                 (function reapply() {
@@ -106,9 +66,6 @@ const ORG_CHART_UNITS_SECTION = 'units';
             });
     }
 
-    // Tells peers the hierarchy changed: the tree here plus the admin editor's unit table. Called
-    // only after a write this page made — never when applying an inbound signal, which would echo
-    // straight back into a loop.
     function broadcastOrgStructureChanged() {
         if (window.krtLiveSync && typeof window.krtLiveSync.sendChanged === 'function') {
             window.krtLiveSync.sendChanged('org-structure', ['chart', ORG_CHART_UNITS_SECTION]);
@@ -119,18 +76,10 @@ const ORG_CHART_UNITS_SECTION = 'units';
         window.krtLiveSync.createReceiver({
             topic: 'org-structure',
             sections: ORG_CHART_SECTIONS,
-            // Global room: the longer coalesce window (#1125) flattens the re-fetch herd.
             coalesceMs: 1500,
-            // No keepScroll argument: the peer-driven path has no modal-close reflow to guard
-            // against, so refreshChart reads the live scrollLeft itself.
             refresh() {
                 refreshChart();
             },
-            // Keeps the tree — and every data-version in it — from being swapped out from
-            // under an open dialog, which would make the admin's next submit 409 on a stale
-            // version. The dialog is a `.krt-modal-overlay` now, so krtLiveSync's generic
-            // "any modal open" probe covers this too; the explicit test stays because this
-            // module owns the guarantee rather than inheriting it.
             busyTest() {
                 return !!modal && window.getComputedStyle(modal).display !== 'none';
             },
@@ -155,7 +104,6 @@ const ORG_CHART_UNITS_SECTION = 'units';
         }
         setBackgroundInert(false);
         window.krtModal.close(modal);
-        // Return focus to the control that opened the dialog (captured on open).
         if (lastTrigger && typeof lastTrigger.focus === 'function') {
             lastTrigger.focus();
         }
@@ -169,9 +117,6 @@ const ORG_CHART_UNITS_SECTION = 'units';
         }
     }
 
-    // While the dialog is open, take the page chrome (header, sidebar, and the
-    // chart itself inside <main>) out of the tab order and hide it from assistive
-    // tech, so Tab and the screen-reader cursor stay inside the dialog.
     function setBackgroundInert(inert) {
         const regions = ['header', 'main', '#sidebar', '#sidebar-overlay'];
         regions.forEach(function (sel) {
@@ -189,9 +134,6 @@ const ORG_CHART_UNITS_SECTION = 'units';
         });
     }
 
-    // The visible, focusable controls inside the dialog, in DOM order — drives the
-    // Tab/Shift+Tab focus trap. Hidden field groups (display:none) have no client
-    // rects and are skipped, as are the hidden <input> state fields.
     function modalFocusable() {
         if (!modalContent) {
             return [];
@@ -219,9 +161,6 @@ const ORG_CHART_UNITS_SECTION = 'units';
         setField('oc-staff-choice', ctx.staffChoice ? '1' : '');
         setField('oc-name', ctx.name);
 
-        // A staff-type picker shows only when adding a Stab member; a name field shows for
-        // renaming or creating a Kommando; the user picker shows for everything except a pure
-        // rename. A Kommando create may leave the leader empty.
         const needsStaffType = !!ctx.staffChoice;
         const needsName = mode === 'rename' || !!ctx.needsName;
         const needsUser = mode !== 'rename';
@@ -229,8 +168,6 @@ const ORG_CHART_UNITS_SECTION = 'units';
         setHidden('oc-name-group', !needsName);
         setHidden('oc-user-group', !needsUser);
 
-        // The chart editor only ever sets a free-text holder now (accounts are mirror-only,
-        // REQ-ROLE-006), so the modal loads the current typed name and offers nothing else.
         setField('oc-display-name', ctx.displayName);
 
         const titleEl = document.getElementById('oc-modal-title');
@@ -264,7 +201,6 @@ const ORG_CHART_UNITS_SECTION = 'units';
         if (focusEl) {
             focusEl.focus();
         }
-        // Trap focus + hide the page behind the dialog from tab order and AT.
         setBackgroundInert(true);
     }
 
@@ -273,9 +209,6 @@ const ORG_CHART_UNITS_SECTION = 'units';
             window.showFrontendErrorToast(OC_I18N.genericError);
             return;
         }
-        // krtFetch.write (REQ-FE-002): CSRF read fresh from the meta tags, the bare-403
-        // refresh-and-retry and the re-auth redirect. The success toast and the error handling stay
-        // this page's own, so the success path runs in onSuccess with toast:false.
         window.krtFetch.write({
             method,
             url,
@@ -284,24 +217,13 @@ const ORG_CHART_UNITS_SECTION = 'units';
             errorMessage: OC_I18N.genericError,
             onSuccess() {
                 window.showFrontendSuccessToast(OC_I18N.saved);
-                // Capture the horizontal scroll BEFORE closeModal(): closeModal() returns focus to
-                // the trigger and clears `inert` on <main>, whose reflow can reset chart.scrollLeft
-                // to 0 on Chromium/Firefox — read it here so refreshChart restores the user's real
-                // offset.
                 const keepScroll = chart ? chart.scrollLeft : 0;
                 closeModal();
-                // Re-render the tree in place — re-stamps every data-version, so the next edit
-                // does not 409 (no reload). #574/#578/#579 chose the same fragment-swap over a node
-                // patch because the add affordances + ARIA order are derived state.
                 refreshChart(keepScroll);
-                // #1235: and tell every peer viewing the Organigramm or the admin editor.
                 broadcastOrgStructureChanged();
             },
             onError(_status, data) {
                 if (data && data.code === 'OPTIMISTIC_LOCK') {
-                    // The version the modal carried is stale; close it and re-render so the user
-                    // retries against the freshly-stamped chart instead of re-409ing — in place,
-                    // which beats the generic reload-confirm here.
                     window.showFrontendErrorToast(OC_I18N.conflict);
                     const keepScroll = chart ? chart.scrollLeft : 0;
                     closeModal();
@@ -328,8 +250,6 @@ const ORG_CHART_UNITS_SECTION = 'units';
             return;
         }
 
-        // The free-text Grand Admiral (REQ-ORG-021) lives on the OL row, not as a position, so it
-        // goes through the OL grand-admiral endpoint with a typed name (reusing the Leitung proxy).
         if (mode === 'grandAdmiral') {
             const gaName = field('oc-display-name').trim();
             if (!gaName) {
@@ -345,8 +265,6 @@ const ORG_CHART_UNITS_SECTION = 'units';
             return;
         }
 
-        // The chart editor only ever sets a free-text holder now (accounts are mirror-only,
-        // REQ-ROLE-006); a backend reject is the backstop if a userId ever reaches it.
         const userOptional = field('oc-user-optional') === '1';
         const displayName = field('oc-display-name').trim();
 
@@ -362,8 +280,6 @@ const ORG_CHART_UNITS_SECTION = 'units';
             return;
         }
 
-        // create — the Stab button picks its type from the modal select; every other
-        // create carries a fixed position type from its add button.
         const staffChoice = field('oc-staff-choice') === '1';
         const positionType = staffChoice ? field('oc-stafftype') : field('oc-position-type');
         if (!displayName && !userOptional) {
@@ -371,7 +287,6 @@ const ORG_CHART_UNITS_SECTION = 'units';
             return;
         }
         const body = { positionType };
-        // An empty name on an optional (COMMAND_LEAD) holder stays a leaderless Kommando.
         if (displayName) {
             body.displayName = displayName;
         }
@@ -419,8 +334,6 @@ const ORG_CHART_UNITS_SECTION = 'units';
             openModal('create', { staffChoice: true });
         });
 
-        // Grand Admiral (REQ-ORG-021): add / rename a free-text holder (a typed name), like every
-        // other chart field. The account Grand Admiral is managed under Leitung and stays read-only.
         window.krtEvents.on('click', 'oc-ga-add', function (btn) {
             lastTrigger = btn;
             openModal('grandAdmiral', {
@@ -479,8 +392,6 @@ const ORG_CHART_UNITS_SECTION = 'units';
             });
         });
 
-        // Vacate just the Kommandoleiter of a Kommando: clears the holder but keeps the
-        // Kommandogruppe (and its Stv. + Ensigns) — distinct from oc-remove on the group head.
         window.krtEvents.on('click', 'oc-vacate', function (btn) {
             const title = OC_I18N.vacateConfirmTitle;
             const message = OC_I18N.vacateConfirm;
@@ -497,11 +408,6 @@ const ORG_CHART_UNITS_SECTION = 'units';
             });
         });
 
-        // Collapse / expand one Bereich (everyone, not just admins). Hides the Bereich's body
-        // (Stab + Staffeln/SKs) below its Bereichsleiter, flips aria-expanded on the toggle and
-        // on the Bereichsleiter treeitem, and — when collapsing — moves the tree's single
-        // tabbable item to the always-visible Bereichsleiter so the roving tabindex never points
-        // at a now-hidden node. No server call; purely a local view toggle.
         window.krtEvents.on('click', 'oc-collapse', function (btn) {
             const bodyId = btn.getAttribute('aria-controls');
             const body = bodyId ? document.getElementById(bodyId) : null;
@@ -539,7 +445,6 @@ const ORG_CHART_UNITS_SECTION = 'units';
                 closeModal();
             }
         });
-        // Esc closes the dialog; Tab/Shift+Tab cycle focus within the .krt-modal frame.
         modal.addEventListener('keydown', function (event) {
             if (event.key === 'Escape') {
                 event.preventDefault();
@@ -565,28 +470,10 @@ const ORG_CHART_UNITS_SECTION = 'units';
         });
     }
 
-    // ---- Tree keyboard navigation (ARIA roving tabindex) -------------------
-    // The chart is an ARIA tree: every box is a role="treeitem" carrying its
-    // depth in aria-level (1 = Bereichsleiter … 6 = Stv./Ensign in a Kommando).
-    // The DOM is a CSS-drawn flat pre-order list — boxes are siblings joined by
-    // connector divs, not physically nested — so parent/child/sibling are derived
-    // purely from aria-level over the flattened treeitem order. Exactly one
-    // treeitem is tabbable at a time; the arrow keys move focus and preserve that
-    // invariant (↑/↓ between siblings, ←/→ between levels, Home/End to the ends).
-    // Wrapped in initOneTree()/initTrees() and re-run on krt:swapped: a chart refresh replaces the
-    // .oc-tree elements, so the roving-tabindex init + the keydown listeners must re-bind on the
-    // fresh elements (the listeners lived on the now-discarded trees). The chart now holds MULTIPLE
-    // independent ARIA trees — the Organisationsleitung, one per Bereich, and the legacy/ungrouped
-    // tier (epic #692 / REQ-ORG-026) — so each is initialised separately: every tree keeps its own
-    // roving tabindex (exactly one tabbable item per tree) and its own keydown listener. chart is
-    // the stable swap container that survives the swap.
     function initOneTree(tree) {
         if (!tree) {
             return;
         }
-        // Visible treeitems only: a Bereich collapsed via its oc-collapse toggle hides its body
-        // (display:none), so those treeitems have a null offsetParent and drop out of the
-        // flattened nav order + roving tabindex — arrow keys skip a collapsed Bereich's subtree.
         const treeItems = function () {
             return Array.prototype.slice
                 .call(tree.querySelectorAll('[role="treeitem"]'))
@@ -598,10 +485,6 @@ const ORG_CHART_UNITS_SECTION = 'units';
             return parseInt(el.getAttribute('aria-level'), 10) || 1;
         };
 
-        // Initial roving state: the first item is tabbable, the rest are reachable
-        // only via the arrow keys. A treeitem whose next item in document order is
-        // one level deeper has children, so it is marked aria-expanded (collapsible Bereiche
-        // start expanded; the oc-collapse handler flips aria-expanded + hides the body).
         const initial = treeItems();
         initial.forEach(function (el, i) {
             el.setAttribute('tabindex', i === 0 ? '0' : '-1');
@@ -621,9 +504,6 @@ const ORG_CHART_UNITS_SECTION = 'units';
             el.focus();
         };
 
-        // sibling = nearest item at the same level not separated by a shallower
-        // (ancestor-boundary) item; child = the immediately following deeper item;
-        // parent = the nearest preceding shallower item.
         const nextSibling = function (list, i) {
             const lvl = levelOf(list[i]);
             for (let j = i + 1; j < list.length; j++) {
@@ -665,8 +545,6 @@ const ORG_CHART_UNITS_SECTION = 'units';
         };
 
         tree.addEventListener('keydown', function (event) {
-            // Only act when a treeitem itself holds focus — never when focus is on
-            // an inner edit/remove button (those keep their native behaviour).
             const current = event.target;
             if (!current || current.getAttribute('role') !== 'treeitem') {
                 return;
@@ -705,7 +583,6 @@ const ORG_CHART_UNITS_SECTION = 'units';
             }
         });
     }
-    // Initialise every tree in the chart (OL + one per Bereich + the legacy tier).
     function initTrees() {
         if (!chart) {
             return;
@@ -713,23 +590,12 @@ const ORG_CHART_UNITS_SECTION = 'units';
         Array.prototype.forEach.call(chart.querySelectorAll('.oc-tree'), initOneTree);
     }
     initTrees();
-    // A successful edit re-renders #oc-chart's contents (replacing every .oc-tree); re-init the
-    // keyboard navigation on the fresh subtrees. Scoped to the chart container so unrelated swaps
-    // elsewhere on the page do not trigger a wasted re-init.
     document.addEventListener('krt:swapped', function (e) {
         if (e && e.detail && e.detail.container === chart) {
             initTrees();
         }
     });
 
-    // ---- Sticky horizontal scrollbar ---------------------------------------
-    // A wide chart is usually also tall, so its native horizontal scrollbar sits at the bottom of
-    // the (tall) chart — often below the fixed footer, so panning means scrolling the whole page
-    // down first. A proxy scrollbar pinned just above the footer mirrors the chart's horizontal
-    // scroll, so it is always one drag away. The proxy is a sibling of the stable #oc-chart
-    // container, so it survives the #571 fragment swaps; a MutationObserver re-measures on collapse
-    // toggles + swaps and window resize covers viewport changes. While the proxy is active the
-    // chart's own bar is suppressed (.oc-chart--proxied) so there is never a duplicate.
     (function initStickyScrollbar() {
         if (!chart) {
             return;
@@ -754,7 +620,6 @@ const ORG_CHART_UNITS_SECTION = 'units';
             chart.classList.add('oc-chart--proxied');
         }
 
-        // Proportional mirror with a dead-band so the two scrollers settle instead of ping-ponging.
         function mirror(from, to) {
             const fromRange = from.scrollWidth - from.clientWidth;
             const toRange = to.scrollWidth - to.clientWidth;

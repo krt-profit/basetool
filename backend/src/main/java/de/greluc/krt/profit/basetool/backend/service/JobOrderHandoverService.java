@@ -63,11 +63,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class JobOrderHandoverService {
 
   /**
-   * Tolerance used when comparing handover / inventory quantities that are stored as {@code
-   * double}. Quantities are user-edited and rounded to the displayed precision (three decimals) on
-   * the way in, so any residual below 1e-4 is floating-point noise rather than a real surplus /
-   * deficit. Picked an order of magnitude below the smallest representable user quantity to keep
-   * the rounding-safe comparison cheap.
+   * Tolerance for comparing {@code double} handover and inventory quantities; residuals below it
+   * are floating-point noise, as quantities are rounded to three decimals.
    */
   private static final double QUANTITY_EPSILON = 1e-4;
 
@@ -91,15 +88,14 @@ public class JobOrderHandoverService {
   private final AuditService auditService;
 
   /**
-   * One handed-over inventory row's scalar snapshot, captured before the row is decremented/deleted
-   * so the {@code INVENTORY_HANDED_OVER} audit events can be emitted after the bulk unlinks without
-   * touching a detached/deleted entity (bulk-clear landmine rules, CLAUDE.md).
+   * Snapshot of one handed-over inventory row, taken before it is decremented or deleted, for
+   * emitting {@code INVENTORY_HANDED_OVER} audit events afterwards.
    *
    * @param itemId the source inventory row id
-   * @param label the {@code material @ location} label snapshot
-   * @param material the material name snapshot
+   * @param label the {@code material @ location} label
+   * @param material the material name
    * @param amount the handed-over amount
-   * @param remaining the post-decrement amount (0 when depleted)
+   * @param remaining the amount left after the decrement (0 when depleted)
    * @param depleted whether the source row was removed
    */
   private record HandedItem(
@@ -111,43 +107,19 @@ public class JobOrderHandoverService {
       boolean depleted) {}
 
   /**
-   * Creates a JobOrder handover and atomically applies the resulting effects:
+   * Creates a job-order handover and atomically applies its effects.
    *
    * <ul>
-   *   <li>reduces inventory amounts (or deletes the row when fully consumed),
+   *   <li>reduces inventory amounts, deleting fully consumed rows,
    *   <li>reduces the open amount per {@link
    *       de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial},
-   *   <li>persists the handover plus its items,
-   *   <li>unlinks remaining inventory rows for materials that are now fully fulfilled,
-   *   <li>completes the JobOrder if all materials are fulfilled.
+   *   <li>persists the handover and its items,
+   *   <li>unlinks remaining inventory of fully fulfilled materials,
+   *   <li>completes the order once every material is fulfilled.
    * </ul>
    *
-   * <p><b>Concurrency / Optimistic Locking:</b> The previous implementation issued the bulk {@code
-   * unlinkJobOrderMaterial} update <em>inside</em> the per-item loop. The bulk update carries
-   * {@code @Modifying(clearAutomatically = true, flushAutomatically = true)} which (1) flushes
-   * pending changes mid-iteration and (2) detaches the {@link JobOrder} aggregate (and all of its
-   * {@link de.greluc.krt.profit.basetool.backend.model.JobOrderMaterial}s) from the persistence
-   * context. Subsequent loop iterations then operated on detached entities and called {@code
-   * jobOrderMaterialRepository.save(mat)} which silently triggers an {@code EntityManager.merge()}.
-   * Combined with the cascade on {@code JobOrder.materials} and the additional {@code
-   * findById}/{@code save}/{@code flush} cycle in {@code
-   * JobOrderService.completeJobOrderWithinTransaction()} this produced a second version-bump on
-   * already-modified rows — a textbook {@link
-   * org.springframework.orm.ObjectOptimisticLockingFailureException} (HTTP 409) when an entire
-   * JobOrder was fulfilled by a single multi-material handover.
-   *
-   * <p>The structural fix (extension of the {@code *WithinTransaction} pattern documented in {@code
-   * AGENTS.md} to the {@code JobOrderMaterial} / {@code Stock} aggregates) consists of three rules
-   * enforced below:
-   *
-   * <ol>
-   *   <li>The loop only mutates managed entities — it relies on Hibernate's dirty checking and
-   *       never calls {@code jobOrderMaterialRepository.save(mat)} explicitly.
-   *   <li>Bulk updates with {@code clearAutomatically=true} are deferred until <em>after</em> the
-   *       loop has completed and the new handover has been persisted.
-   *   <li>The {@link JobOrder} is re-fetched <em>once</em> after the bulk updates so the completion
-   *       check operates on a freshly managed aggregate (with up-to-date {@code @Version}s).
-   * </ol>
+   * <p>The loop mutates only managed entities; bulk unlinks run after it, and the {@link JobOrder}
+   * is re-fetched once before the completion check to avoid spurious optimistic-lock conflicts.
    */
   @Transactional
   public JobOrderHandoverDto createHandover(UUID jobOrderId, JobOrderHandoverCreateDto dto) {

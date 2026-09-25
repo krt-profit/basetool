@@ -46,12 +46,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 
 /**
- * Unit tests for {@link MaterialExternalAliasService}.
- *
- * <p>Coverage for the four behaviours that matter for the R3 sync's correctness: lookup chain uses
- * the case-insensitive alias resolver, create / update reject duplicates — including case-only
- * variants (REQ-REFINERY-010) — create / update reject a missing material, and update enforces the
- * optimistic-lock version.
+ * Unit tests for {@link MaterialExternalAliasService}: case-insensitive lookup, duplicate and
+ * missing-material rejection (REQ-REFINERY-010), and the optimistic-lock check on update.
  */
 @ExtendWith(MockitoExtension.class)
 class MaterialExternalAliasServiceTest {

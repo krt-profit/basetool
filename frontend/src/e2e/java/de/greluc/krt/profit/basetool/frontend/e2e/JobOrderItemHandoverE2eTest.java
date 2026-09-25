@@ -42,24 +42,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Functional flow for ITEM job orders: create one through the UI, deliver it across two item
- * handovers, and verify the per-line decrement, the post-handover edit freeze, and the
- * auto-complete once every line is fully delivered.
+ * E2E flow for ITEM job orders: creates a two-unit order through the UI, delivers it in two item
+ * handovers, and verifies the partial handover, the edit freeze once a handover exists, and
+ * auto-completion when every line is delivered.
  *
- * <p>Item orders order finished items (a blueprint output) rather than raw materials; the backend
- * snapshots the derived materials at create time. The item-handover modal renders one number input
- * per still-outstanding ordered line ({@code entries[i].amount}) and posts to {@code POST
- * /orders/{id}/item-handovers} (LOGISTICIAN/OFFICER/ADMIN-gated), which increments {@code
- * deliveredAmount} and auto-completes the order once outstanding hits zero — at which point the
- * {@code item-handover-open} button disappears ({@code th:if="${hasOutstandingItemLines}"}).
- *
- * <p>The order is created with amount {@code 2} and delivered {@code 1 + 1}, so the run exercises a
- * partial handover (button still present) and the completing handover (button gone). Between the
- * two it asserts the Phase-3 edit freeze: once any item handover exists, {@code GET
- * /orders/{id}/items/edit} redirects back to the detail page instead of rendering the editor. The
- * orderable item the picker offers is seeded once at stack bootstrap ({@link E2eStackExtension}),
- * so the flow needs the ephemeral stack (otherwise the item picker is empty). The actor is {@code
- * test-admin}, which satisfies the handover role gate through the role hierarchy.
+ * <p>Needs the ephemeral stack, which seeds the orderable item; runs as {@code test-admin}.
  */
 @Tag("e2e")
 class JobOrderItemHandoverE2eTest {

@@ -22,19 +22,11 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import java.util.UUID;
 
 /**
- * Flat, internal projection of one job-order-linked <em>game-item</em> stock slice — the item
- * sibling of {@link JobOrderMaterialStockRow}, used to batch the per-(order, game item) earmark
- * sums behind the item-mode allocation pickers (REQ-INV-039, #1742) into a single query
- * (REQ-DATA-003).
- *
- * <p>It carries the <b>allocation</b> amount rather than the row amount: since Variante C
- * (REQ-INV-027) a stock row may be split across several orders, and an order is credited only its
- * own slice. There is no quality dimension — item rows carry none (REQ-INV-029) — which is why this
- * projection has one field fewer than its material sibling rather than a nullable grade.
+ * Internal projection of one game-item allocation slice to a job order, used to batch the
+ * per-(order, game item) earmark sums (REQ-DATA-003).
  *
  * @param jobOrderId the id of the job order the slice is earmarked to.
  * @param gameItemId the id of the row's game item.
- * @param amount the whole units this order has earmarked on the row; never {@code null} for a
- *     persisted allocation.
+ * @param amount the whole units earmarked on the row; never {@code null}.
  */
 public record JobOrderGameItemStockRow(UUID jobOrderId, UUID gameItemId, Double amount) {}

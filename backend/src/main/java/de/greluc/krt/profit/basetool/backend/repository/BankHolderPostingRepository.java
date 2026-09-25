@@ -36,21 +36,16 @@ import org.springframework.stereotype.Repository;
 
 /**
  * Spring Data repository for the append-only {@link BankHolderPosting} holder-ledger legs
- * (ADR-0039). Strictly insert-and-read — the holder ledger is never updated or deleted
- * (REQ-BANK-004, pinned by {@code ArchitectureTest}). A holder's balance is the
- * <strong>global</strong> grouped sum over this table (REQ-BANK-003), decoupled from accounts and
- * allowed to be negative (REQ-BANK-006).
+ * (ADR-0039, REQ-BANK-004). A holder's balance is the global sum over this table and may be
+ * negative (REQ-BANK-003, REQ-BANK-006).
  */
 @Repository
 public interface BankHolderPostingRepository extends JpaRepository<BankHolderPosting, UUID> {
 
   /**
-   * Per-holder global totals across the whole bank in one grouped statement — the "Haelt gesamt"
-   * column of the holder registry (W1 mockup) and the management report's global holder section,
-   * without an N+1. The holder label is the linked user's <em>live</em> effective name (display
-   * name preferred, username fallback, resolved via the left-joined user), falling back to the
-   * {@code handle} snapshot once the user is gone (REQ-BANK-003). Holders without any leg produce
-   * no row (treat as zero).
+   * Returns each holder's global total in one grouped statement, labelled with the linked user's
+   * live name or, once the user is gone, the {@code handle} snapshot (REQ-BANK-003). Holders
+   * without a leg produce no row.
    *
    * @return per-holder global totals with the live display label
    */
@@ -85,12 +80,8 @@ public interface BankHolderPostingRepository extends JpaRepository<BankHolderPos
   boolean existsByHolderId(UUID holderId);
 
   /**
-   * The holder legs of the given transactions with their holder labels, batched in one IN-query —
-   * the per-booking holder annotation for the account history/statement (matched to the account leg
-   * by amount sign) and the negated holder-side mirror of a reversal (ADR-0039). The label is the
-   * linked user's <em>live</em> effective name (display name preferred, username fallback, via the
-   * left-joined user), falling back to the {@code handle} snapshot once the user is gone
-   * (REQ-BANK-003).
+   * Returns the holder legs of the given transactions in one IN-query, labelled with the linked
+   * user's live name or the {@code handle} snapshot (REQ-BANK-003).
    *
    * @param transactionIds the batch of transaction ids
    * @return every holder leg of the given transactions with the live display label
@@ -109,11 +100,8 @@ public interface BankHolderPostingRepository extends JpaRepository<BankHolderPos
       @Param("transactionIds") Collection<UUID> transactionIds);
 
   /**
-   * One page of a holder's custody history — the holder ledger leg joined with its transaction
-   * header in a single statement (REQ-BANK-032, ADR-0039); newest first by default (whitelisted
-   * sort on {@code createdAt}). The account reference and — for a {@code HOLDER_TRANSFER} — the
-   * counter holder are resolved separately from the batched legs (see {@code BankHolderService}),
-   * symmetric to how {@code BankPostingRepository.findBookings} annotates the account history.
+   * Returns one page of a holder's custody history, each leg joined with its transaction header,
+   * newest first by default (REQ-BANK-032).
    *
    * @param holderId the holder
    * @param pageable page, size and whitelisted sort
@@ -130,12 +118,7 @@ public interface BankHolderPostingRepository extends JpaRepository<BankHolderPos
 
   /**
    * Integrity check (REQ-BANK-020, ADR-0052): ids of {@code TRANSFER} / {@code HOLDER_TRANSFER}
-   * transactions whose holder legs do not net to {@code -transfer_fee}. The internal {@code
-   * HOLDER_TRANSFER} Umbuchung is fee-free and nets to zero; a fee-bearing holder-changing {@code
-   * TRANSFER} debits the source the gross (amount + fee) and credits the destination the full
-   * entered amount, so its two holder legs net to {@code -transfer_fee} (real money lost to the
-   * in-game fee). Historical fee-bearing Umbuchung rows booked under ADR-0041 still satisfy the
-   * same check.
+   * transactions whose holder legs do not net to {@code -transfer_fee}.
    *
    * @return the violating transaction ids (empty when sound)
    */
@@ -150,10 +133,8 @@ public interface BankHolderPostingRepository extends JpaRepository<BankHolderPos
   List<UUID> findHolderMovementTransactionsWithNonZeroSum();
 
   /**
-   * Integrity check (REQ-BANK-020): ids of {@code REVERSAL} transactions whose combined holder legs
-   * with the reversed transaction do not cancel per holder — the holder-side negated mirror
-   * (ADR-0039). The account-side mirror is checked by {@code
-   * BankTransactionRepository.findReversalTransactionsNotMirrored}.
+   * Integrity check (REQ-BANK-020): ids of {@code REVERSAL} transactions whose holder legs,
+   * combined with the reversed transaction's, do not cancel per holder.
    *
    * @return the violating reversal transaction ids (empty when sound)
    */

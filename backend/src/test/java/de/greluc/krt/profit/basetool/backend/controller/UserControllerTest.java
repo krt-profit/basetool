@@ -53,16 +53,12 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 /**
- * Pure-method unit tests for {@link UserController}. Coverage was 39% before this file. The key
- * behaviours under test:
+ * Unit tests for {@link UserController}.
  *
  * <ul>
- *   <li>{@code /me} endpoints derive the caller id from the JWT — never from the URL — so callers
- *       cannot impersonate someone else.
- *   <li>Each admin endpoint forwards the path id and request DTO fields verbatim to the service;
- *       the controller does not silently drop / transform values.
- *   <li>The {@code lookup} endpoint returns reference DTOs directly from the service — no mapper
- *       involvement, so the email/sensitive fields cannot accidentally leak.
+ *   <li>{@code /me} endpoints take the caller id from the JWT, never from the URL.
+ *   <li>Admin endpoints forward path id and DTO fields verbatim.
+ *   <li>The {@code lookup} endpoint returns the service's reference DTOs unmapped.
  * </ul>
  */
 @ExtendWith(MockitoExtension.class)

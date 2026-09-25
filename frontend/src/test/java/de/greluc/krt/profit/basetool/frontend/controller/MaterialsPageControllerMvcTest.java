@@ -51,23 +51,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC-level rendering checks for the {@code /materials} category-listing page and the {@code
- * /materials/{id}} detail page.
- *
- * <p>Originally added because Thymeleaf 3.1's JavaScript-inline mechanism truncates the rest of the
- * surrounding {@code <script>} block as soon as it serialises a Java {@code List}/{@code
- * Collection} into a JS context — the substituted {@code ["Aluminum"]} value swallows every event
- * after it. That truncation killed the {@code window.krtEvents.on('click', 'materials-toggle-kind',
- * …)} registration further down in the script, so clicking a category header no longer expanded the
- * materials grid. The autocomplete name list now lives in a {@code <datalist>} sibling element
- * instead, which means the script no longer needs to inline a {@code List}. The detail page carried
- * the same broken pattern (terminal names list); the second test in this class pins the
- * post-datalist filter binding there.
- *
- * <p>The assertions below pin both halves of the contract: the post-datalist binding survives into
- * the rendered HTML, and the page ends with the closing {@code </html>} tag (i.e. Thymeleaf did not
- * abort mid-render). A regression that re-introduces the broken inline pattern would fail the
- * second assertion long before any human notices the missing click handler.
+ * Render tests for the {@code /materials} listing and {@code /materials/{id}} detail pages: the
+ * delegated filter and toggle bindings appear in the output and the page renders completely, which
+ * fails if a Java list is inlined into the page script again.
  */
 @SpringBootTest
 class MaterialsPageControllerMvcTest {
@@ -146,14 +132,8 @@ class MaterialsPageControllerMvcTest {
   }
 
   /**
-   * Mirror of {@link #listMaterials_rendersCategoryToggleBindingAndCompletesScript()} for the
-   * per-material detail page ({@code /materials/{id}}). Pre-fix, {@code material-detail.html}
-   * carried the same broken inline pattern (now {@code const terminalNames = …}) at the top of its
-   * script, so the {@code 'material-detail-filter-terminals'} delegated binding registered at the
-   * tail of the script — plus the surrounding sortable-column handler — silently never wired. The
-   * datalist workaround moves the terminal names into {@code <datalist id="terminalNames-data">}
-   * next to the filter input. This test pins both halves of the same contract: the post-datalist
-   * binding key is in the rendered HTML, and the response actually contains {@code </html>}.
+   * Same as {@link #listMaterials_rendersCategoryToggleBindingAndCompletesScript()} for the detail
+   * page: the terminal filter binding is present and the page renders completely.
    */
   @Test
   @WithMockUser

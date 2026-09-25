@@ -78,29 +78,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Inventory-item facade — the single service seam the {@code InventoryItemController} and the
- * material-collection / craftability callers depend on for the squadron's physical stock of refined
- * and raw materials.
+ * Inventory-item facade for the squadron's physical stock, used by {@code InventoryItemController}
+ * and the material-collection and craftability callers.
  *
- * <p>Each item links to a material (UEX commodity), optionally to a user (the owner, or null for
- * shared/squadron stock), and optionally to a job order or mission. This class implements the
- * create/update/note cycle directly and delegates the two large cohesive clusters carved out in the
- * L2 split (#921) so the public API stays byte-for-byte stable:
- *
- * <ul>
- *   <li>every read / aggregation projection (per-material aggregate, {@code /grouped} roll-ups,
- *       per-stack drilldowns, flat and per-material listings, craftability stock slices, job-order
- *       material collection) → {@link InventoryAggregationService};
- *   <li>every checkout write (book-out consume/transfer/sell, personal↔shared rebooking, bulk
- *       checkout, delivered toggle, admin global wipe) → {@link InventoryCheckoutService}.
- * </ul>
- *
- * <p>The delegating write methods keep their own {@code @Transactional} so the read-write
- * transaction opens here and the sub-service's {@code @Transactional} joins it (REQUIRED
- * propagation) — a delegating write is never trapped in the class-level {@code readOnly} default.
- * This facade stays in the {@code staffelScopedServicesMustWireOwnerScopeOrAuthHelper} whitelist
- * and keeps its {@code OwnerScopeService} dependency (used by {@link #createInventoryItem}) so the
- * multi-tenant org-unit stamp cannot be dropped.
+ * <p>Implements create, update, note and allocation writes itself; reads and aggregations delegate
+ * to {@link InventoryAggregationService}, checkout writes to {@link InventoryCheckoutService}.
+ * Delegating writes carry their own {@code @Transactional}, so the read-write transaction opens
+ * here.
  */
 @Service
 @RequiredArgsConstructor
@@ -122,16 +106,11 @@ public class InventoryItemService {
   private final InventoryCheckoutService inventoryCheckoutService;
 
   /**
-   * Pools the caller's entire "My Inventory" stock into one SCU total per (material, quality) pair
-   * for the blueprint craftability calculation (#781). Strictly owner-scoped to {@code userId}
-   * (both personal and shared rows the user owns count, matching the default {@code /inventory/my}
-   * view); never org-unit-scoped, because craftability answers "what can I craft from my stock".
-   * The quality is preserved in the result so the calculator can consume the best-quality slices
-   * first.
+   * Pools the user's entire stock (personal and shared rows) into one SCU total per (material,
+   * quality) pair for the blueprint craftability calculation. Owner-scoped, never org-unit-scoped.
    *
    * @param userId the owning user; never {@code null}
-   * @return one slice per (material, quality) the user owns, with the summed SCU; never {@code
-   *     null}
+   * @return one slice per (material, quality) the user owns; never {@code null}
    */
   public List<OwnedStockSlice> getOwnedStockSlices(@NotNull UUID userId) {
     return inventoryAggregationService.getOwnedStockSlices(userId);
@@ -148,8 +127,7 @@ public class InventoryItemService {
   }
 
   /**
-   * Per-material drilldown — lists every individual inventory row for the given material. Used by
-   * the inventory drilldown page.
+   * Lists every inventory row of one material for the drilldown page.
    *
    * @param materialId material to drill into
    * @param pageable page request
@@ -161,8 +139,7 @@ public class InventoryItemService {
   }
 
   /**
-   * User-scoped inventory list. Excludes personal items because those have their own dedicated
-   * service.
+   * Lists the user's inventory rows, excluding personal items.
    *
    * @param userId owner id
    * @param pageable page request
@@ -184,7 +161,7 @@ public class InventoryItemService {
   }
 
   /**
-   * Job-order/mission-filtered convenience overload.
+   * Aggregates the user's stock filtered only by job order and mission.
    *
    * @param userId owner id
    * @param jobOrderIds optional job order filter
@@ -197,9 +174,9 @@ public class InventoryItemService {
   }
 
   /**
-   * Filter-only convenience overload of {@link #getMyAggregatedInventory(UUID, List, List, Integer,
-   * List, List, boolean, boolean)} that returns both the caller's shared and personal stacks (no
-   * personal-only narrowing) and no location narrowing.
+   * Aggregates the user's shared and personal stock with the given filters, without location
+   * narrowing; see {@link #getMyAggregatedInventory(UUID, List, List, Integer, List, List, boolean,
+   * boolean)}.
    *
    * @param userId owner id
    * @param materialIds optional material filter
@@ -220,9 +197,7 @@ public class InventoryItemService {
   }
 
   /**
-   * Full-filter user-scoped aggregation. Loads the user's items via the parameterized repository
-   * query and groups them in memory — the {@code GroupedInventoryDto} shape is what the {@code
-   * /grouped} frontend endpoint returns directly.
+   * Aggregates the user's stock with the full filter surface into the {@code /grouped} shape.
    *
    * @param userId owner id
    * @param materialIds optional material filter
@@ -230,12 +205,9 @@ public class InventoryItemService {
    * @param minQuality optional min-quality filter
    * @param jobOrderIds optional job order filter
    * @param missionIds optional mission filter
-   * @param personalOnly when {@code true}, narrows the result to the caller's private stock ({@code
-   *     personal = true} rows) — the "Mein Lager" personal-entries-only filter
-   * @param nonPersonalOnly when {@code true}, narrows the result to the caller's shared stock
-   *     ({@code personal = false} rows) — the "Mein Lager" non-personal-entries-only filter;
-   *     mutually exclusive with {@code personalOnly}, and when both are {@code false} both shared
-   *     and personal stacks are returned
+   * @param personalOnly {@code true} to return only private ({@code personal = true}) stock
+   * @param nonPersonalOnly {@code true} to return only shared stock; mutually exclusive with {@code
+   *     personalOnly}, both {@code false} returns everything
    * @return aggregated items
    * @throws NotFoundException when the user id is unknown
    */
@@ -260,12 +232,8 @@ public class InventoryItemService {
   }
 
   /**
-   * Material facade for the "Mein Lager" select-all (REQ-INV-034): returns the ids of every
-   * material inventory entry the caller owns that matches the same filter surface as {@link
-   * #getMyAggregatedInventory}, across all stacks and unbounded by the lazy per-stack pagination.
-   * Delegates to {@link InventoryAggregationService#getMyEntryIds}. The frontend's "Alle markieren"
-   * feeds these ids straight into a bulk check-out so it covers the whole filtered view rather than
-   * only the entries currently expanded on screen.
+   * Returns the ids of every material entry the user owns that matches the {@link
+   * #getMyAggregatedInventory} filters, unpaginated, for the "Mein Lager" select-all (REQ-INV-034).
    *
    * @param userId owner id
    * @param materialIds optional material filter
@@ -273,9 +241,9 @@ public class InventoryItemService {
    * @param minQuality optional min-quality filter
    * @param jobOrderIds optional job order filter
    * @param missionIds optional mission filter
-   * @param personalOnly when {@code true}, narrows to the caller's private stock rows
-   * @param nonPersonalOnly when {@code true}, narrows to the caller's shared stock rows
-   * @return the ids of every matching material entry, in creation order
+   * @param personalOnly {@code true} to match only private stock rows
+   * @param nonPersonalOnly {@code true} to match only shared stock rows
+   * @return the matching entry ids, in creation order
    * @throws NotFoundException when the user id is unknown
    */
   public List<UUID> getMyEntryIds(
@@ -299,8 +267,8 @@ public class InventoryItemService {
   }
 
   /**
-   * Convenience overload of {@link #getAllAggregatedInventory(List, List, Integer, List, List)}
-   * without location, job-order and mission filters.
+   * Aggregates squadron-wide stock by material and quality only; see {@link
+   * #getAllAggregatedInventory(List, List, Integer, List, List)}.
    *
    * @param materialIds optional material filter
    * @param minQuality optional min-quality filter
@@ -312,8 +280,7 @@ public class InventoryItemService {
   }
 
   /**
-   * Squadron-wide aggregated inventory with the full filter surface. Mirrors {@link
-   * #getMyAggregatedInventory} but scopes to all users (admin/logistician view).
+   * Aggregates squadron-wide stock across all users with the full filter surface.
    *
    * @param materialIds optional material filter
    * @param locationIds optional storage-location filter (REQ-INV-040)
@@ -333,21 +300,17 @@ public class InventoryItemService {
   }
 
   /**
-   * Lazily loads one of the caller's own stacks' entries, oldest-first, paginated — the per-stack
-   * drill-down for the "my inventory" view. Scoped to the caller ({@code userId}); the {@code
-   * personal} flag is part of the stock identity, so a private and a shared stack at the same
-   * location/quality drill down separately. {@code null} job-order / mission / owning-org-unit
-   * arguments match rows where that association is itself {@code null}.
+   * Pages the entries of one of the caller's own stacks, oldest first. {@code null} job-order,
+   * mission or org-unit arguments match rows where that association is {@code null}.
    *
    * @param userId the calling owner whose stack to drill into
    * @param materialId the stack's material
    * @param locationId the stack's storage location
    * @param quality the stack's quality grade, or {@code null}
-   * @param personal whether the stack is private stock (defaults to {@code false} when {@code
-   *     null})
+   * @param personal whether the stack is private stock ({@code null} means {@code false})
    * @param owningOrgUnitId the stack's owning org-unit pool id, or {@code null}
-   * @param pageable the page request (the query forces oldest-first by creation instant)
-   * @return one page of the stack's entries, oldest-first
+   * @param pageable the page request (sorting is forced oldest-first)
+   * @return one page of the stack's entries
    */
   public Page<InventoryItemDto> getMyStackEntries(
       UUID userId,
@@ -362,19 +325,17 @@ public class InventoryItemService {
   }
 
   /**
-   * Lazily loads one global stack's entries, oldest-first, paginated — the per-stack drill-down for
-   * the squadron-wide Lager view. The same scope predicate as the grouped view is applied so the
-   * drill-down can never widen visibility beyond the caller's org-unit slice; the stack's owner is
-   * an explicit argument because a global stack is per-owner. {@code null} job-order / mission /
-   * owning-org-unit arguments match rows where that association is itself {@code null}.
+   * Pages the entries of one squadron-wide stack, oldest first, within the caller's org-unit scope.
+   * {@code null} job-order, mission or org-unit arguments match rows where that association is
+   * {@code null}.
    *
    * @param materialId the stack's material
    * @param userId the stack's owning user
    * @param locationId the stack's storage location
    * @param quality the stack's quality grade, or {@code null}
    * @param owningOrgUnitId the stack's owning org-unit pool id, or {@code null}
-   * @param pageable the page request (the query forces oldest-first by creation instant)
-   * @return one page of the stack's entries, oldest-first
+   * @param pageable the page request (sorting is forced oldest-first)
+   * @return one page of the stack's entries
    */
   public Page<InventoryItemDto> getAllStackEntries(
       UUID materialId,
@@ -388,7 +349,7 @@ public class InventoryItemService {
   }
 
   /**
-   * Convenience overload without job-order/mission filters.
+   * Pages squadron-wide inventory filtered by material and quality only.
    *
    * @param materialIds optional material filter
    * @param minQuality optional min-quality filter
@@ -401,8 +362,7 @@ public class InventoryItemService {
   }
 
   /**
-   * Flat paged squadron-wide inventory with optional filters. Not aggregated — one row per {@code
-   * InventoryItem}.
+   * Pages squadron-wide inventory, one row per {@code InventoryItem}, with optional filters.
    *
    * @param materialIds optional material filter
    * @param locationIds optional storage-location filter (REQ-INV-040)
@@ -424,14 +384,11 @@ public class InventoryItemService {
   }
 
   /**
-   * Lists every inventory item linked to {@code missionId} as display DTOs for the mission-detail
-   * Wirtschaft "Lagereinträge" table (#1138). Replaces the former eagerly embedded {@code
-   * MissionDto.inventoryEntries} with a dedicated read. Deliberately unscoped among members — it
-   * reproduces exactly the removed field's behaviour, the shared mission-stockpile view visible to
-   * any member (the {@code /api/v1/inventory/**} filter rule already refuses a non-member).
+   * Lists every inventory item linked to a mission for the mission-detail "Lagereinträge" table.
+   * Visible to any member.
    *
    * @param missionId the mission whose linked inventory to list
-   * @return the mission's inventory items as DTOs (empty when none)
+   * @return the mission's inventory items (empty when none)
    */
   @Transactional(readOnly = true)
   public List<InventoryItemDto> getMissionInventory(UUID missionId) {
@@ -445,20 +402,16 @@ public class InventoryItemService {
   }
 
   /**
-   * Creates a new inventory item. Resolves every shallow id reference (material or game item,
-   * location, owner, mission, job order) and rejects with 404 / 400 for unknown ids. The catalog
-   * kind follows the DTO's XOR (REQ-INV-029): exactly one of {@code materialId} / {@code
-   * gameItemId} is set (bean-validated, re-implied here by the branched resolution). A job-order
-   * link triggers the kind-matching eligibility check — a material row's material must be required
-   * by the order (REQ-ORDERS-018), a game-item row's game item must be requested by an ITEM order
-   * (REQ-INV-031) — and a game-item payload carrying any mission reference is rejected as a
-   * service-level belt behind the DTO guard (item rows carry no mission dimension).
+   * Creates an inventory item, resolving all referenced ids. Exactly one of {@code materialId} /
+   * {@code gameItemId} is set (REQ-INV-029).
+   *
+   * <p>A job-order link requires the material to be required by the order (REQ-ORDERS-018) or the
+   * game item to be requested by an ITEM order (REQ-INV-031); game-item rows may not reference a
+   * mission.
    *
    * @throws NotFoundException when any referenced id is unknown
-   * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when the material /
-   *     game item does not satisfy the job order's requirements, the payload violates the catalog
-   *     XOR or the quality-by-kind pairing (V220 CHECKs), or a game-item payload carries a mission
-   *     reference
+   * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when the job-order
+   *     requirement, catalog-kind or quality rules are violated, or a game-item row names a mission
    */
   @Transactional
   public InventoryItemDto createInventoryItem(
@@ -583,24 +536,20 @@ public class InventoryItemService {
   private static final double OVER_ALLOCATION_EPSILON = 1e-6;
 
   /**
-   * Adds a quantity slice earmarking part of the entry to a job order or mission (Variante C,
-   * REQ-INV-027). Guards: the entry must not be personal (personal stock carries no assignment); a
-   * job-order slice's material must be required by the order (REQ-ORDERS-018); the same target may
-   * be allocated only once (the per-dimension unique constraint); and the new Σ of the dimension
-   * must stay within the entry's amount (rule R5, else 422). The write bumps the entry's
-   * {@code @Version} (loaded under a forced increment), so the returned DTO carries the version the
-   * client must echo on its next edit.
+   * Earmarks part of a non-personal entry to a job order or mission (REQ-INV-027).
    *
-   * @param id the inventory entry id.
-   * @param dto the allocation write payload (dimension, target, amount, echoed entry version).
-   * @return the updated entry DTO (new version + both refreshed slice lists).
-   * @throws NotFoundException when the entry, job order or mission is unknown.
-   * @throws BadRequestException when the entry is personal, the material is not required by the
-   *     order, the amount is missing/non-positive/fractional-for-PIECE, or the target is already
-   *     allocated.
-   * @throws OverAllocationException when the new dimension Σ would exceed the entry's amount.
+   * <p>Each target may be allocated once, and a dimension's total must not exceed the entry's
+   * amount. Bumps the entry's {@code @Version}.
+   *
+   * @param id the inventory entry id
+   * @param dto dimension, target, amount and echoed entry version
+   * @return the updated entry with its new version
+   * @throws NotFoundException when the entry, job order or mission is unknown
+   * @throws BadRequestException when the entry is personal, the material is not required, the
+   *     amount is invalid, or the target is already allocated
+   * @throws OverAllocationException when the dimension total would exceed the entry's amount
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the echoed version
-   *     is stale.
+   *     is stale
    */
   @Transactional
   public InventoryItemDto addAllocation(UUID id, InventoryAllocationWriteDto dto) {
@@ -658,20 +607,17 @@ public class InventoryItemService {
   }
 
   /**
-   * Changes the amount of an existing quantity slice (Variante C, REQ-INV-027). The target slice
-   * must exist; the new Σ of the dimension (with this slice's new amount substituted for its old
-   * one) must stay within the entry's amount (rule R5, else 422). Same {@code @Version} bump and
-   * personal guard as {@link #addAllocation}.
+   * Changes the amount of an existing allocation slice (REQ-INV-027); the dimension total must stay
+   * within the entry's amount. Bumps the entry's {@code @Version}.
    *
-   * @param id the inventory entry id.
-   * @param dto the allocation write payload (dimension, target, new amount, echoed entry version).
-   * @return the updated entry DTO.
-   * @throws NotFoundException when the entry or the target slice is unknown.
-   * @throws BadRequestException when the entry is personal or the amount is
-   *     missing/non-positive/fractional-for-PIECE.
-   * @throws OverAllocationException when the new dimension Σ would exceed the entry's amount.
+   * @param id the inventory entry id
+   * @param dto dimension, target, new amount and echoed entry version
+   * @return the updated entry
+   * @throws NotFoundException when the entry or the target slice is unknown
+   * @throws BadRequestException when the entry is personal or the amount is invalid
+   * @throws OverAllocationException when the dimension total would exceed the entry's amount
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the echoed version
-   *     is stale.
+   *     is stale
    */
   @Transactional
   public InventoryItemDto changeAllocation(UUID id, InventoryAllocationWriteDto dto) {
@@ -714,18 +660,15 @@ public class InventoryItemService {
   }
 
   /**
-   * Removes a quantity slice, releasing its amount back to the entry's unallocated remainder
-   * (Variante C, REQ-INV-027). Removal only lowers a dimension's Σ, so there is no over-allocation
-   * check and no personal guard (a personal entry simply has no slices to remove → 404). The target
-   * slice must exist. Same {@code @Version} bump as {@link #addAllocation}.
+   * Removes an allocation slice, returning its amount to the unallocated remainder (REQ-INV-027).
+   * Bumps the entry's {@code @Version}.
    *
-   * @param id the inventory entry id.
-   * @param dto the allocation write payload (dimension, target, echoed entry version; amount
-   *     ignored).
-   * @return the updated entry DTO.
-   * @throws NotFoundException when the entry or the target slice is unknown.
+   * @param id the inventory entry id
+   * @param dto dimension, target and echoed entry version; amount is ignored
+   * @return the updated entry
+   * @throws NotFoundException when the entry or the target slice is unknown
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the echoed version
-   *     is stale.
+   *     is stale
    */
   @Transactional
   public InventoryItemDto removeAllocation(UUID id, InventoryAllocationWriteDto dto) {
@@ -755,15 +698,12 @@ public class InventoryItemService {
   }
 
   /**
-   * Maps a just-flushed entry to its DTO carrying the post-commit force-increment version (see
-   * {@link InventoryAllocations#forcedNextVersion}). The allocation writes only mutate an
-   * inverse-side slice and force-bump the entry {@code @Version} via {@code
-   * OPTIMISTIC_FORCE_INCREMENT}, which Hibernate applies at commit — so the client must echo {@code
-   * loaded + 1}, not the pre-increment value the entity still shows here, or its next write to the
-   * same entry 409s (REQ-FE-003).
+   * Maps a just-flushed entry to its DTO with the version it will carry after the commit-time
+   * forced increment ({@link InventoryAllocations#forcedNextVersion}), so the client echoes the
+   * right value.
    *
-   * @param saved the just-flushed entry; never {@code null}.
-   * @return the entry DTO carrying the version the client should echo next.
+   * @param saved the just-flushed entry; never {@code null}
+   * @return the entry DTO with the version to echo next
    */
   private InventoryItemDto mapWithForcedVersion(InventoryItem saved) {
     return inventoryItemMapper
@@ -772,18 +712,15 @@ public class InventoryItemService {
   }
 
   /**
-   * Loads an entry for a per-allocation write under a forced version increment and enforces the
-   * optimistic-lock echo. The forced increment (see {@code
-   * InventoryItemRepository.findByIdForAllocationWrite}) makes the entry's {@code @Version} the
-   * single concurrency token for both its splits, since a slice change on the inverse collection
-   * side would not otherwise dirty the entry row.
+   * Loads an entry under a forced version increment and checks the echoed version, making the
+   * entry's {@code @Version} the concurrency token for its allocation slices.
    *
-   * @param id the inventory entry id.
-   * @param dto the write payload carrying the echoed version.
-   * @return the managed entry, ready for slice mutation.
-   * @throws NotFoundException when the entry is unknown.
+   * @param id the inventory entry id
+   * @param dto the write payload carrying the echoed version
+   * @return the managed entry
+   * @throws NotFoundException when the entry is unknown
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the echoed version
-   *     is stale.
+   *     is stale
    */
   private InventoryItem loadForAllocationWrite(UUID id, InventoryAllocationWriteDto dto) {
     InventoryItem item =
@@ -794,12 +731,11 @@ public class InventoryItemService {
   }
 
   /**
-   * Rejects an allocation write on a personal entry — personal stock is attributable solely to its
-   * owner and carries no job-order/mission assignment (the same invariant {@link
-   * #createInventoryItem} and the allocation writes enforce).
+   * Rejects an allocation write on a personal entry, which carries no job-order or mission
+   * assignment.
    *
-   * @param item the entry being written.
-   * @throws BadRequestException when the entry is personal.
+   * @param item the entry being written
+   * @throws BadRequestException when the entry is personal
    */
   private void assertNotPersonal(InventoryItem item) {
     if (Boolean.TRUE.equals(item.getPersonal())) {
@@ -808,17 +744,14 @@ public class InventoryItemService {
   }
 
   /**
-   * Validates and normalizes an add/change amount: present, strictly positive, whole for a {@code
-   * PIECE} material <em>or</em> a game-item row (item stock is always whole-unit, REQ-INV-029),
-   * then SCU-rounded to storage precision. The catalog kind is read off the already managed entry
-   * rather than a separate lookup; a material dereference is null-guarded because item rows carry
-   * no material.
+   * Validates an add/change amount (present, positive, whole for a {@code PIECE} material or
+   * game-item row) and rounds it to SCU precision.
    *
-   * @param dto the write payload.
-   * @param item the entry (for its catalog kind / material quantity type).
-   * @return the validated, SCU-rounded amount.
-   * @throws BadRequestException when the amount is missing, non-positive, or fractional for a PIECE
-   *     material or game-item row.
+   * @param dto the write payload
+   * @param item the entry, for its catalog kind and quantity type
+   * @return the validated, SCU-rounded amount
+   * @throws BadRequestException when the amount is missing, non-positive, or fractional for a
+   *     whole-unit entry
    */
   private double requireWriteAmount(@NotNull InventoryAllocationWriteDto dto, InventoryItem item) {
     Double raw = dto.amount();
@@ -843,14 +776,13 @@ public class InventoryItemService {
   }
 
   /**
-   * Enforces rule R5: a dimension's proposed Σ must not exceed the entry's own amount. Both
-   * operands are SCU-rounded so floating-point noise near equality does not spuriously trip the
-   * guard.
+   * Ensures a dimension's proposed total does not exceed the entry's amount, comparing SCU-rounded
+   * values.
    *
-   * @param proposedSum the dimension's Σ after the write.
-   * @param capacity the entry's amount (the shared budget for the dimension).
+   * @param proposedSum the dimension's total after the write
+   * @param capacity the entry's amount
    * @throws OverAllocationException when {@code proposedSum} exceeds {@code capacity} beyond {@link
-   *     #OVER_ALLOCATION_EPSILON}.
+   *     #OVER_ALLOCATION_EPSILON}
    */
   private void assertFits(double proposedSum, double capacity) {
     if (InventoryItem.roundToScuScale(proposedSum) - capacity > OVER_ALLOCATION_EPSILON) {
@@ -859,13 +791,11 @@ public class InventoryItemService {
   }
 
   /**
-   * Sums the job-order dimension's currently allocated amount, optionally excluding one target's
-   * slice (used by the change path so the slice being edited does not count against its own new
-   * amount).
+   * Sums the entry's job-order allocations, optionally excluding one target's slice.
    *
-   * @param item the entry.
-   * @param excludeTargetId the job-order id whose slice to exclude, or {@code null} to sum all.
-   * @return the Σ of the (non-excluded) job-order slice amounts.
+   * @param item the entry
+   * @param excludeTargetId the job-order id to exclude, or {@code null} to sum all
+   * @return the total of the included job-order slices
    */
   private double sumJobOrderAllocated(@NotNull InventoryItem item, UUID excludeTargetId) {
     return item.getJobOrderAllocations().stream()
@@ -891,12 +821,11 @@ public class InventoryItemService {
   }
 
   /**
-   * Finds the entry's job-order slice for a target order, or {@code null} when the order is not
-   * allocated on the entry.
+   * Finds the entry's allocation slice for a job order.
    *
-   * @param item the entry.
-   * @param targetId the job-order id.
-   * @return the matching slice, or {@code null}.
+   * @param item the entry
+   * @param targetId the job-order id
+   * @return the matching slice, or {@code null} when the order is not allocated
    */
   private InventoryJobOrderAllocation findJobOrderSlice(
       @NotNull InventoryItem item, UUID targetId) {
@@ -921,16 +850,14 @@ public class InventoryItemService {
   }
 
   /**
-   * Records the REQ-AUDIT-001 event for an allocation add/change/remove. The details carry only
-   * PII-free tokens: the dimension, the target reference ({@code #<displayId>} for an order, the
-   * mission name — the same non-PII reference the entry-level create/update audit already emits)
-   * and the amount (omitted for a removal).
+   * Records the audit event for an allocation add, change or remove (REQ-AUDIT-001) with PII-free
+   * details only.
    *
-   * @param type the allocation event type.
-   * @param item the entry the slice belongs to.
-   * @param field the dimension written.
-   * @param ref the target reference token (order display id or mission name).
-   * @param amount the slice amount, or {@code null} for a removal.
+   * @param type the allocation event type
+   * @param item the entry the slice belongs to
+   * @param field the dimension written
+   * @param ref the target reference (order display id or mission name)
+   * @param amount the slice amount, or {@code null} for a removal
    */
   private void recordAllocation(
       AuditEventType type,
@@ -947,19 +874,12 @@ public class InventoryItemService {
   }
 
   /**
-   * Rejects linking an inventory item to a job order whose requirements do not include the item's
-   * material (REQ-ORDERS-018). An order's material view is built solely from its requirements
-   * (material lines for a MATERIAL order, blueprint-derived materials for an ITEM order) with
-   * linked stock matched onto those rows; a link for a non-required material therefore never
-   * surfaces in the order — it would bind stock to the order while staying invisible (an orphaned
-   * link). The authoritative required-material set is {@link
-   * JobOrderItemService#requiredMaterialIds(JobOrder)}, which covers both order kinds. Both call
-   * sites are {@code @Transactional}, so the helper's lazy walk of the order's item/material
-   * collections is safe.
+   * Rejects linking an item to a job order that does not require its material, since such stock
+   * would never appear in the order (REQ-ORDERS-018). Must run inside a transaction.
    *
-   * @param material the inventory item's material.
-   * @param jobOrder the order the item is being linked to.
-   * @throws BadRequestException when the order does not require the material.
+   * @param material the inventory item's material
+   * @param jobOrder the order the item is being linked to
+   * @throws BadRequestException when the order does not require the material
    */
   private void assertMaterialRequiredByJobOrder(Material material, JobOrder jobOrder) {
     if (!jobOrderItemService.requiredMaterialIds(jobOrder).contains(material.getId())) {
@@ -973,17 +893,12 @@ public class InventoryItemService {
   }
 
   /**
-   * Rejects linking a game-item stock row to a job order that does not request the game item
-   * (REQ-INV-031, the item sibling of {@link #assertMaterialRequiredByJobOrder}). The authoritative
-   * requested-game-item set is {@link JobOrderItemService#requiredGameItemIds(JobOrder)}, which is
-   * empty for a MATERIAL order — so a material order can never accept an item-stock link, and an
-   * ITEM order only for game items one of its lines orders. Both call sites (the check-in slice
-   * loop and the {@code addAllocation} JOB_ORDER branch) are {@code @Transactional}, so the
-   * helper's lazy walk of the order's item lines is safe.
+   * Rejects linking a game-item row to a job order that does not request that game item; a MATERIAL
+   * order never accepts item stock (REQ-INV-031). Must run inside a transaction.
    *
-   * @param gameItem the inventory row's game item.
-   * @param jobOrder the order the row is being linked to.
-   * @throws BadRequestException when the order does not request the game item.
+   * @param gameItem the inventory row's game item
+   * @param jobOrder the order the row is being linked to
+   * @throws BadRequestException when the order does not request the game item
    */
   private void assertGameItemRequiredByJobOrder(GameItem gameItem, JobOrder jobOrder) {
     if (!jobOrderItemService.requiredGameItemIds(jobOrder).contains(gameItem.getId())) {
@@ -998,12 +913,11 @@ public class InventoryItemService {
   }
 
   /**
-   * Rejects the mission dimension on a game-item stock row (REQ-INV-031): item stock is allocatable
-   * only to ITEM job orders, never to missions. Enforced on the {@code addAllocation} and {@code
-   * changeAllocation} MISSION branches; a material row passes unchanged.
+   * Rejects a mission allocation on a game-item row, which may be allocated only to ITEM job orders
+   * (REQ-INV-031).
    *
-   * @param item the entry being written.
-   * @throws BadRequestException when the entry is a game-item row.
+   * @param item the entry being written
+   * @throws BadRequestException when the entry is a game-item row
    */
   private void assertMissionDimensionAllowed(InventoryItem item) {
     if (item.getGameItem() != null) {
@@ -1012,15 +926,13 @@ public class InventoryItemService {
   }
 
   /**
-   * Resolves the effective split-at-check-in allocations for one dimension (Variante C,
-   * REQ-INV-027, R4): the caller-supplied {@code explicit} list when it carries any entry;
-   * otherwise, for backward compatibility, a single full-amount allocation from the legacy scalar
-   * {@code singleId}; otherwise none.
+   * Resolves the check-in allocations for one dimension (REQ-INV-027): the explicit list when
+   * non-empty, else a single full-amount allocation for {@code singleId}, else none.
    *
-   * @param explicit the per-target split list from the create payload; may be {@code null}/empty.
-   * @param singleId the legacy single job-order / mission id; may be {@code null}.
-   * @param fullAmount the entry's amount, used when falling back to the single id.
-   * @return the effective allocations to write for this dimension; never {@code null}.
+   * @param explicit the per-target split list; may be {@code null} or empty
+   * @param singleId the single job-order or mission id; may be {@code null}
+   * @param fullAmount the entry's amount, used for the single-id fallback
+   * @return the allocations to write; never {@code null}
    */
   private static List<InventoryAllocationInput> effectiveAllocations(
       List<InventoryAllocationInput> explicit, UUID singleId, double fullAmount) {
@@ -1034,15 +946,13 @@ public class InventoryItemService {
   }
 
   /**
-   * Rejects a fractional allocation amount for a whole-unit entry — a {@code PIECE} material or a
-   * game-item row (item stock is always whole-unit, REQ-INV-029) — mirroring the entry-amount rule
-   * and the per-allocation write endpoints. The problem detail names the entry's actual catalog
-   * kind ("PIECE materials" would be misleading on an item row, which carries no material).
+   * Rejects a fractional allocation amount on a whole-unit entry ({@code PIECE} material or
+   * game-item row).
    *
-   * @param wholeUnits whether the entry's catalog kind restricts amounts to whole units.
-   * @param itemRow whether the entry is a game-item row (drives the message wording only).
-   * @param amount the allocation amount to check.
-   * @throws BadRequestException when {@code wholeUnits} and {@code amount} is not a whole number.
+   * @param wholeUnits whether the entry only allows whole units
+   * @param itemRow whether the entry is a game-item row (affects the message only)
+   * @param amount the allocation amount to check
+   * @throws BadRequestException when {@code wholeUnits} and {@code amount} is not whole
    */
   private static void requireWholeUnits(boolean wholeUnits, boolean itemRow, double amount) {
     if (wholeUnits && amount % 1 != 0) {
@@ -1054,19 +964,9 @@ public class InventoryItemService {
   }
 
   /**
-   * Sets, updates or removes the free-text note of an inventory item.
-   *
-   * <p>Access rules:
-   *
-   * <ul>
-   *   <li>The owner of the item may always modify its note.
-   *   <li>A non-owner may only modify the note when {@code isLogistician} is {@code true} (i.e.
-   *       they hold {@code ROLE_LOGISTICIAN} or a role that inherits it such as {@code
-   *       ROLE_OFFICER}/{@code ROLE_ADMIN}).
-   * </ul>
-   *
-   * <p>A blank or empty note is normalized to {@code null} and thus effectively removes the note.
-   * Optimistic locking is enforced via the supplied {@code version}.
+   * Sets, updates or removes an inventory item's note. The owner may always edit it; others only
+   * when {@code isLogistician}. A blank note is stored as {@code null}; the supplied {@code
+   * version} is checked.
    *
    * @throws NotFoundException when the item is unknown
    */
@@ -1101,24 +1001,17 @@ public class InventoryItemService {
   }
 
   /**
-   * Consumes or transfers an inventory item — delegates to {@link
-   * InventoryCheckoutService#bookOutInventoryItem}.
-   *
-   * <p>The {@code type} discriminator selects DISCARD (just decrement), TRANSFER (append-only move
-   * to the target location/owner) or SELL (decrement plus a mission finance entry). When the
-   * post-decrement quantity is floating-point-zero the row is removed entirely. An explicit {@code
-   * TRANSFER} carrying neither a target user nor a target location is rejected up front
-   * (REQ-INV-025).
+   * Books out an inventory item as DISCARD, TRANSFER or SELL; delegates to {@link
+   * InventoryCheckoutService#bookOutInventoryItem}. A depleted row is deleted.
    *
    * @param id the source inventory row id
-   * @param dto the book-out payload (type, amount, version, transfer/sell fields)
-   * @param currentUserId the authenticated caller's user id
-   * @param isAdmin whether the caller holds an admin role (bypasses the owner check)
-   * @return the reduced source (or new target) row DTO, or {@code null} when the row is depleted
+   * @param dto type, amount, version and transfer/sell fields
+   * @param currentUserId the caller's user id
+   * @param isAdmin whether the caller is an admin (bypasses the owner check)
+   * @return the reduced source or new target row, or {@code null} when the row is depleted
    * @throws NotFoundException when the item is unknown
-   * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when the requested
-   *     amount exceeds the available quantity, when a SELL is missing its terminal or a valid sell
-   *     amount, or when a {@code TRANSFER} carries neither a target user nor a target location
+   * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when the amount
+   *     exceeds stock, a SELL lacks terminal or amount, or a TRANSFER has no target (REQ-INV-025)
    */
   @Transactional
   public InventoryItemDto bookOutInventoryItem(
@@ -1127,18 +1020,16 @@ public class InventoryItemService {
   }
 
   /**
-   * Rebooks (Umbuchung) part or all of an inventory row between the owner's personal pool and the
-   * shared squadron pool by toggling its {@code personal} marker (REQ-INV-007) — delegates to
-   * {@link InventoryCheckoutService#rebookPersonal}.
+   * Moves part or all of a row between the owner's personal pool and the shared pool (REQ-INV-007);
+   * delegates to {@link InventoryCheckoutService#rebookPersonal}.
    *
    * @param id the source inventory row id
-   * @param dto the rebooking payload (amount, version, target org-unit pool)
-   * @param currentUserId the authenticated caller's user id
-   * @param isAdmin whether the caller holds an admin role (bypasses the owner check)
-   * @return the persisted new-row DTO (the moved quantity in its new pool)
+   * @param dto amount, version and target org-unit pool
+   * @param currentUserId the caller's user id
+   * @param isAdmin whether the caller is an admin (bypasses the owner check)
+   * @return the new row holding the moved quantity
    * @throws NotFoundException when the source row or the picked org unit is unknown
-   * @throws BadRequestException when the amount is non-positive, exceeds the available quantity, or
-   *     a personalize would violate the personal/association invariant
+   * @throws BadRequestException when the amount is invalid or the personal invariant would break
    */
   @Transactional
   public InventoryItemDto rebookPersonal(
@@ -1147,11 +1038,10 @@ public class InventoryItemService {
   }
 
   /**
-   * Removes every non-personal inventory item from the database — the admin "globales Lager leeren"
-   * action. Personal entries are kept on purpose. Delegates to {@link
+   * Deletes every non-personal inventory item ("globales Lager leeren"); delegates to {@link
    * InventoryCheckoutService#deleteAllGlobalInventory}.
    *
-   * @return number of inventory rows deleted (0 if the global inventory was already empty)
+   * @return number of rows deleted
    */
   @Transactional
   public int deleteAllGlobalInventory() {
@@ -1171,14 +1061,13 @@ public class InventoryItemService {
   }
 
   /**
-   * Bulk rebooking (Massen-Umbuchen, REQ-INV-036): moves every listed row of the caller's own
-   * inventory to another location/owner or across the personal marker in one action. Rows already
-   * sitting in the requested target state are skipped and counted; any other obstacle aborts the
-   * whole action. Delegates to {@link InventoryCheckoutService#bulkRebook}.
+   * Rebooks the listed rows of the caller's own inventory in one action (REQ-INV-036); rows already
+   * at the target are skipped, any other obstacle aborts. Delegates to {@link
+   * InventoryCheckoutService#bulkRebook}.
    *
-   * @param request the selection, the mode and the mode's target fields
-   * @param currentUserId the UUID of the authenticated user (JWT sub)
-   * @return how many rows moved and how many were skipped as already-at-target
+   * @param request the selection, mode and target fields
+   * @param currentUserId the caller's user id
+   * @return the moved and skipped counts
    */
   @Transactional
   public BulkRebookResultDto bulkRebook(BulkRebookRequest request, UUID currentUserId) {
@@ -1186,11 +1075,10 @@ public class InventoryItemService {
   }
 
   /**
-   * Returns all inventory items linked to the given job order, sorted server-side by owner name,
-   * location, material name, quality (desc), quantity (desc). Delegates to {@link
-   * InventoryAggregationService#getMaterialCollection}.
+   * Returns all inventory items linked to a job order, sorted by owner, location, material, quality
+   * and quantity; delegates to {@link InventoryAggregationService#getMaterialCollection}.
    *
-   * @param jobOrderId the UUID of the job order
+   * @param jobOrderId the job order id
    * @return sorted list of {@link MaterialCollectionEntryDto}
    * @throws NotFoundException when the job order is unknown
    */
@@ -1199,13 +1087,11 @@ public class InventoryItemService {
   }
 
   /**
-   * Returns the game-item stock earmarked to the given job order, grouped per game item for the
-   * order-detail Item-Bestand panel (REQ-ORDERS-028). Delegates to {@link
-   * InventoryAggregationService#getItemStockForJobOrder}.
+   * Returns the game-item stock earmarked to a job order, grouped per game item (REQ-ORDERS-028);
+   * delegates to {@link InventoryAggregationService#getItemStockForJobOrder}.
    *
-   * @param jobOrderId the UUID of the job order
-   * @return name-sorted list of {@link JobOrderItemStockGroupDto}; empty when no game-item stock is
-   *     earmarked to the order
+   * @param jobOrderId the job order id
+   * @return name-sorted list of {@link JobOrderItemStockGroupDto}; empty when none
    * @throws NotFoundException when the job order is unknown
    */
   public List<JobOrderItemStockGroupDto> getItemStockForJobOrder(UUID jobOrderId) {
@@ -1213,14 +1099,14 @@ public class InventoryItemService {
   }
 
   /**
-   * Updates the delivered status of an inventory item. Delegates to {@link
+   * Updates an inventory item's delivered flag; delegates to {@link
    * InventoryCheckoutService#updateDelivered}.
    *
-   * @param id the UUID of the inventory item
-   * @param request the update request containing delivered flag and version
-   * @param currentUserId the UUID of the authenticated user
-   * @param isLogistician whether the user has logistician or higher role
-   * @return updated {@link InventoryItemDto}
+   * @param id the inventory item id
+   * @param request delivered flag and version
+   * @param currentUserId the caller's user id
+   * @param isLogistician whether the caller has logistician rights or higher
+   * @return the updated {@link InventoryItemDto}
    * @throws NotFoundException when the item is unknown
    */
   @Transactional

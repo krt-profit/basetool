@@ -20,10 +20,8 @@
 package de.greluc.krt.profit.basetool.frontend.model.dto;
 
 /**
- * Create payload for the Organisationsleitung, posted by the admin org-structure page and relayed
- * to the backend {@code POST /api/v1/org-hierarchy/organisationsleitung} (epic #692, REQ-ORG-014).
- * The OL is a singleton — a second create is rejected by the backend with 409. Its JSON shape is a
- * subset of the backend {@code OrganisationsleitungDto} (server-stamped id/active/version omitted).
+ * Create payload for the singleton Organisationsleitung, relayed to the backend {@code POST
+ * /api/v1/org-hierarchy/organisationsleitung} (REQ-ORG-014); a second create is rejected with 409.
  *
  * @param name the OL's display name; required, unique across all org units.
  * @param shorthand the OL's short tag; required.

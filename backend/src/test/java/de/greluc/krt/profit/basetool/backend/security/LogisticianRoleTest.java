@@ -107,9 +107,8 @@ class LogisticianRoleTest {
   }
 
   /**
-   * R6.d / Post-R9 D3 — happy path of the membership-driven authority resolution: a user whose
-   * Staffel membership row carries {@code is_logistician = true} gets the flat {@code
-   * ROLE_LOGISTICIAN}. The legacy {@code User.isLogistician} column was dropped in V101.
+   * A user whose Staffel membership has {@code is_logistician = true} gets the flat {@code
+   * ROLE_LOGISTICIAN}.
    */
   @Test
   void converterPromotesLogistician_whenMembershipFlagSet() {
@@ -138,9 +137,7 @@ class LogisticianRoleTest {
   }
 
   /**
-   * R6.d / Post-R9 D3 — inverse case: a user whose Staffel membership exists but carries {@code
-   * is_logistician = false} does NOT get the flat role. The membership table is the single source
-   * of truth (the legacy {@code app_user.is_logistician} column was dropped in V101).
+   * A user whose Staffel membership has {@code is_logistician = false} does not get the flat role.
    */
   @Test
   void converterDoesNotPromote_whenMembershipFlagFalse() {
@@ -169,12 +166,9 @@ class LogisticianRoleTest {
   }
 
   /**
-   * #344 — an SK <b>lead</b> ({@code is_lead = true}) is automatically both a logistician and a
-   * mission manager of its SK: the converter grants the flat {@code ROLE_LOGISTICIAN} / {@code
-   * ROLE_MISSION_MANAGER} and the contextual {@code LOGISTICIAN@skId} / {@code
-   * MISSION_MANAGER@skId}, even when both membership flags are {@code false}. This mirrors how an
-   * Officer is logistician + mission manager of their own squadron and an admin outranks every
-   * role.
+   * An SK lead gets the flat {@code ROLE_LOGISTICIAN} / {@code ROLE_MISSION_MANAGER} and the
+   * contextual {@code LOGISTICIAN@skId} / {@code MISSION_MANAGER@skId}, even with both membership
+   * flags {@code false}.
    */
   @Test
   void converterPromotesSkLead_asSkLogisticianAndMissionManager() {
@@ -297,11 +291,7 @@ class LogisticianRoleTest {
         .andExpect(status().isOk());
   }
 
-  /**
-   * Post-R9 D3 (V101): the Logistician flag lives on the Staffel membership row only — the legacy
-   * app_user.is_logistician column was dropped. This helper anchors the test user to IRIDIUM with
-   * the supplied flag value.
-   */
+  /** Saves an IRIDIUM membership for the test user carrying the given Logistician flag. */
   private void saveLogisticianMembership(UUID userId, User user, boolean isLogistician) {
     OrgUnitMembership membership = new OrgUnitMembership();
     membership.setId(new OrgUnitMembershipId(userId, Squadron.IRIDIUM_ID));

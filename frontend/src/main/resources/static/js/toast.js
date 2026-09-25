@@ -18,24 +18,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * Shared toast + confirmation-modal utilities, extracted verbatim from the former inline script of
- * fragments/toast.html (ADR-0069, follow-up to #924). Loaded on every page via the toast fragment.
- *
- * Defines the auto-dismiss toast initialiser (initToasts) plus the three window globals the rest of
- * the app calls: window.showFrontendErrorToast / window.showFrontendSuccessToast build and show a
- * transient toast, and window.showKrtConfirm is the KRT-styled Promise<boolean> replacement for the
- * native window.confirm().
- *
- * The Thymeleaf-interpolated toast/confirm labels (window.krtToastI18n) stay inline in the fragment
- * bootstrap this module reads.
- *
- * Toasts and the confirm are appended to window.krtModal.layerRoot(), not blindly to the body: while
- * a dialog is open with showModal() (FE-SIMP-04b) everything outside it is inert and painted below
- * the top layer, so a toast in the body would be invisible and a confirm unclickable. krtModal.close
- * moves a toast left inside a closing dialog back to the body, so it outlives the dialog.
- */
-
 /**
  * Where a transient overlay must go to be seen and usable.
  *
@@ -49,12 +31,10 @@ function initToasts() {
     const toasts = document.querySelectorAll('.notification-toast:not(.initialized)');
     toasts.forEach((toast) => {
         toast.classList.add('initialized');
-        // Show shortly after load
         setTimeout(() => {
             toast.classList.add('visible');
         }, 100);
 
-        // Hide after duration
         const duration = parseInt(toast.getAttribute('data-duration') || '', 10) || 5000;
         setTimeout(() => {
             toast.classList.remove('visible');
@@ -101,13 +81,6 @@ window.showFrontendSuccessToast = function (message) {
 
 document.addEventListener('DOMContentLoaded', initToasts);
 
-/*
- * KRT-styled confirmation modal (replaces native window.confirm()).
- * Returns a Promise<boolean> that resolves to true if the user
- * confirmed, false otherwise. Safe to call when the optional KRT
- * confirm fragment is not rendered on the page: falls back to a
- * minimal on-the-fly modal so no native confirm() is required.
- */
 window.showKrtConfirm = function (title, message, confirmLabel, cancelLabel) {
     return new Promise((resolve) => {
         const overlay = document.createElement('div');
@@ -146,8 +119,6 @@ window.showKrtConfirm = function (title, message, confirmLabel, cancelLabel) {
         }
         function onKey(e) {
             if (e.key === 'Escape') {
-                // Cancelled here, so an open modal dialog underneath does not also take the Escape
-                // as its own `cancel` and close.
                 e.preventDefault();
                 e.stopPropagation();
                 close(false);

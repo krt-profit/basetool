@@ -56,9 +56,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The bank-local holder registry (epic #556, REQ-BANK-003): registration via the user lookup with a
- * deletion-proof handle snapshot, activity toggling, and the registry listing enriched with
- * batch-computed custody totals. Holders are never hard-deleted — the ledger references them.
+ * The bank-local holder registry (REQ-BANK-003): registration with a deletion-proof handle
+ * snapshot, activity toggling, and a listing with custody totals. Holders are never hard-deleted.
  */
 @Service
 @RequiredArgsConstructor
@@ -74,12 +73,8 @@ public class BankHolderService {
   private final BankAuditService bankAuditService;
 
   /**
-   * The full registry, ordered by the holders' live display name, with the global custody totals
-   * joined in from one grouped statement over the holder ledger (W1 "Halter" tab, no N+1,
-   * ADR-0039). The linked users are fetch-joined so the mapper resolves each holder's current
-   * display name (display name preferred, username fallback, REQ-BANK-003) without a per-row user
-   * load; the result is sorted on that live name (the stored {@code handle} snapshot order would
-   * drift from what is shown once a user renamed themselves).
+   * Lists all holders with their global custody totals from one grouped query (ADR-0039), sorted
+   * case-insensitively by the live display name (REQ-BANK-003).
    *
    * @return every holder row as DTO, ordered case-insensitively by the shown display name
    */
@@ -111,11 +106,8 @@ public class BankHolderService {
   }
 
   /**
-   * Pages over one holder's custody history (REQ-BANK-032, ADR-0039): each holder ledger leg with
-   * the account it moved on resolved from the account ledger and — for a {@code HOLDER_TRANSFER} —
-   * the counter holder resolved from the holder ledger, both in batched IN-queries (no per-row
-   * lookups). Symmetric to {@code BankAccountService.getBookings}, which annotates the account
-   * history with the holder.
+   * Pages over one holder's custody history (REQ-BANK-032, ADR-0039), resolving each leg's account
+   * and, for a {@code HOLDER_TRANSFER}, the counter holder in batched queries.
    *
    * @param holderId the holder
    * @param pageable page, size and whitelisted sort (default newest first)

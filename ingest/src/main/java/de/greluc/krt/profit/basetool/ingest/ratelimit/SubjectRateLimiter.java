@@ -32,19 +32,11 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
 
 /**
- * Per-authenticated-subject token-bucket rate limiter for the ingest endpoints (REQ-INGEST-005).
+ * Per-subject token-bucket rate limiter for the ingest endpoints, keyed on the authenticated JWT
+ * {@code sub} (REQ-INGEST-005).
  *
- * <p>This is the gateway's <em>enforceable</em> throttle. The complementary per-IP {@link
- * de.greluc.krt.profit.basetool.ingest.filter.RateLimitingFilter} runs before the security filter
- * chain and keys on a client IP that a caller can rotate via a spoofed {@code X-Forwarded-For}
- * header, so it can only ever be a coarse front line. This limiter keys on the JWT {@code sub},
- * which is bound to a Keycloak identity and cannot be forged by the client, so it reliably bounds
- * how hard a single authenticated caller can drive the backend's import endpoints (security audit
- * INGEST-RATELIMIT-1). It is invoked from {@code IngestService} — i.e. after Spring Security has
- * authenticated the request — so the subject is always available.
- *
- * <p>The bucket map is bounded ({@link RateLimitBuckets#boundedLru(int)}) so a flood of distinct
- * subjects cannot grow it without limit.
+ * <p>Invoked after authentication, so the subject is always available. The bucket map is bounded by
+ * {@link RateLimitBuckets#boundedLru(int)}.
  */
 @Slf4j
 @Component
@@ -59,9 +51,7 @@ public class SubjectRateLimiter {
   private final Map<String, Bucket> buckets = RateLimitBuckets.boundedLru(MAX_TRACKED_SUBJECTS);
 
   /**
-   * Consumes one token from the calling subject's bucket, throwing when the budget is exhausted. A
-   * no-op when rate limiting is disabled (e.g. the e2e stack sets {@code app.rate-limit.enabled=
-   * false}).
+   * Consumes one token from the subject's bucket; a no-op when rate limiting is disabled.
    *
    * @param sub the authenticated caller's JWT subject; never {@code null}.
    * @throws RateLimitedException when the subject has no token left, carrying the suggested {@code

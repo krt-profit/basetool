@@ -31,21 +31,10 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
 /**
- * Supplies the version of the Terms of Use currently in force (REQ-SEC-028).
+ * Supplies the version of the Terms of Use currently in force (REQ-SEC-028): a build-time content
+ * digest of the {@code terms.*} wording, read from {@code terms-version.properties}.
  *
- * <p>The value is a content digest of the terms wording, produced at build time by the root Gradle
- * task {@code generateTermsVersion} from the {@code terms.*} entries of the frontend's German
- * message bundle and delivered here as {@code terms-version.properties} on the classpath. Deriving
- * it from the text is what makes "re-prompt whenever the terms change" impossible to forget: there
- * is no number a human has to remember to bump. An operator who edited the wording purely
- * cosmetically can pin the value for one build with {@code -PtermsVersion=<value>}, which leaves
- * every existing acceptance valid.
- *
- * <p><strong>Fails startup when the resource is absent or blank.</strong> The alternatives are both
- * silent and both wrong: an empty version compared against stored acceptances would either block
- * every user out of the whole API or — if the comparison were made lenient — wave everyone through
- * a gate that looks armed. A refusal to start is loud, happens before any traffic, and points at
- * the one thing that went wrong (the generated resource did not reach the jar).
+ * <p>Startup fails when the resource is absent or blank.
  */
 @Slf4j
 @Component
@@ -67,8 +56,7 @@ public class TermsVersionProvider {
   /**
    * Reads and validates the generated version resource.
    *
-   * @throws IllegalStateException if the resource is missing, unreadable, or carries a blank
-   *     version — see the class comment for why this is fatal rather than defaulted
+   * @throws IllegalStateException if the resource is missing, unreadable or carries a blank version
    */
   public TermsVersionProvider() {
     this.currentVersion = readVersion();

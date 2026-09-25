@@ -28,16 +28,9 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Class-level Jakarta Bean Validation constraint for DTOs that implement {@link QuantityAware}.
- *
- * <p>Looks up the referenced material's {@link
- * de.greluc.krt.profit.basetool.backend.model.QuantityType} and enforces {@code amount > 0} for
- * both types and integer amounts for {@code PIECE}. {@code SCU} amounts are <em>not</em> rejected
- * for excess precision — more than three decimals is commercially rounded (HALF_UP) to three places
- * at the persistence boundary, mirroring the frontend. {@code null} fields are intentionally
- * accepted here — the {@code @NotNull} annotations on the underlying DTO fields are responsible for
- * their own reporting. Annotate at the type level rather than per field so the validator can see
- * {@code materialId} and {@code amount} together.
+ * Class-level constraint for {@link QuantityAware} DTOs: {@code amount > 0}, and a whole number for
+ * {@code PIECE} materials and game items. {@code SCU} precision is not rejected (it is rounded on
+ * persist); {@code null} fields are left to {@code @NotNull}.
  */
 @Documented
 @Constraint(validatedBy = ValidQuantityAmountValidator.class)

@@ -20,21 +20,13 @@
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
 /**
- * Which Android builds the server still serves (REQ-API-010).
+ * Which Android builds the server still serves (REQ-API-010). An app below {@link
+ * #minimumVersionCode} shows the non-dismissible update screen; {@link #latestVersionCode}
+ * separately signals that a newer build exists.
  *
- * <p>The app compares its own {@code versionCode} against {@link #minimumVersionCode} and, when it
- * falls below, shows the non-dismissible „Update erforderlich" screen of design chapter 14. The
- * decision is the client's to act on, but the number is the server's to state — nothing else knows
- * when a contract stopped being served.
- *
- * <p>{@link #latestVersionCode} is carried separately and on purpose. Collapsing the two into one
- * number would make every release a forced one: the app could no longer tell "your build is no
- * longer served" from "a newer build exists", and the only screen it has for the first is a wall.
- *
- * @param minimumVersionCode the oldest {@code versionCode} still served; {@code 0} means no floor
- * @param latestVersionCode the newest {@code versionCode} published, or {@code 0} when unknown
- * @param releasesUrl where the member gets the new build — the GitHub release page, since
- *     distribution is Releases plus Obtainium rather than a store
+ * @param minimumVersionCode oldest {@code versionCode} still served; {@code 0} means no floor
+ * @param latestVersionCode newest published {@code versionCode}, or {@code 0} when unknown
+ * @param releasesUrl the GitHub release page to get the new build from
  */
 public record AppVersionPolicyDto(
     int minimumVersionCode, int latestVersionCode, String releasesUrl) {}

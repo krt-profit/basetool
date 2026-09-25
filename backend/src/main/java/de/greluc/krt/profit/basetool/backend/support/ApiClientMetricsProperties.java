@@ -26,18 +26,10 @@ import org.springframework.validation.annotation.Validated;
 
 /**
  * The client ids {@code basetool_api_client_requests_total} may carry verbatim as its {@code
- * client_id} label (A8, REQ-OBS-018).
+ * client_id} label (REQ-OBS-018).
  *
- * <p>The list exists to <em>bound the label</em>, not to authorise anyone: nothing here grants or
- * refuses anything, and a client absent from it is counted all the same — under the literal {@code
- * other}, which is precisely the series {@code ApiUnknownClient} watches. Authorisation of client
- * software is a separate concern and lives on the token's audience and roles.
- *
- * <p>Defaulted rather than empty, unlike {@link IngestGatewayProperties}: an empty allowlist there
- * fails closed and refuses, an empty list here would only collapse every caller into {@code other}
- * and make the metric useless while looking healthy. The default names the two first-party clients
- * that exist in the realm; a deployment that renames them overrides the key rather than losing the
- * attribution silently. An immutable record (BE-MOD-04).
+ * <p>Bounds the label only and authorizes nothing: unlisted clients are counted as {@code other}.
+ * Defaults to the realm's first-party clients.
  *
  * @param knownClientIds the client ids whose {@code azp} is safe to use as a metric label verbatim
  */
@@ -47,10 +39,8 @@ public record ApiClientMetricsProperties(
     @DefaultValue({"basetool-frontend", "basetool-android"}) List<String> knownClientIds) {
 
   /**
-   * Whether {@code azp} names a client this deployment knows by name.
-   *
-   * <p>Deliberately does not consult {@link IngestGatewayProperties}: the caller merges the two, so
-   * this record keeps one job and the gateway list keeps its single, security-relevant meaning.
+   * Whether {@code azp} names a client listed in this configuration. Does not consult {@link
+   * IngestGatewayProperties}.
    *
    * @param azp the authorized-party claim from the caller's token, may be {@code null}
    * @return {@code true} when the claim may be used as a label value as-is

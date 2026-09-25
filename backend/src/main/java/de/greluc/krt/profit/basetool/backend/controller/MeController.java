@@ -44,19 +44,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Read-only echo of the org-unit context that the backend currently applies to staffel-scoped
- * queries. The active org-unit preference is owned by the frontend (Redis-backed Spring Session via
- * {@code MeFrontendController}); the backend learns about the caller's choice on every API call
- * through the {@code X-Active-Org-Unit-Id} header relayed by the frontend's WebClient.
+ * Read-only surface for the caller's own context: the effective org unit, the capability flags, the
+ * pinnable org units and the combined layout answer.
  *
- * <p>This controller used to expose {@code PUT}/{@code DELETE} mutators that stored the selection
- * in the backend's {@code HttpSession}, but that was effectively a no-op: REST calls from the
- * frontend do not relay session cookies (only the OAuth2 bearer token), so each call created a
- * fresh backend session and the attribute was lost between requests. The mutators are gone; the
- * only remaining surface is read-only: {@code GET /active-org-unit} which reflects what the header
- * for the current request says, the per-principal {@code GET /capabilities} UI flags, the pinnable
- * {@code GET /org-units}, and {@code GET /layout}, which answers the three together with the
- * unread-notification count in one transaction.
+ * <p>The active org unit is chosen in the frontend and relayed on every call via the {@code
+ * X-Active-Org-Unit-Id} header.
  */
 @RestController
 @RequestMapping("/api/v1/me")
@@ -77,14 +69,13 @@ public class MeController {
   private final NotificationService notificationService;
 
   /**
-   * Returns the org-unit context that the backend currently applies to staffel-scoped queries for
-   * this request. For admins this is the {@code X-Active-Org-Unit-Id} header value relayed by the
-   * frontend; for non-admins with a pinned context the header is honoured iff the pin matches one
-   * of their memberships; otherwise this is the user's persistent home Staffel. The {@code
-   * orgUnitId} is {@code null} when the admin is in "all OrgUnits" mode or the user has no assigned
-   * home Staffel.
+   * Returns the org-unit context applied to staffel-scoped queries for this request.
    *
-   * @return current effective org-unit context for the calling request; never {@code null}.
+   * <p>Admins get the relayed header value; non-admins get the header only if it matches one of
+   * their memberships, otherwise their home Staffel. {@code orgUnitId} is {@code null} for admin
+   * "all OrgUnits" mode or a user without a home Staffel.
+   *
+   * @return current effective org-unit context; never {@code null}.
    */
   @NotNull
   @GetMapping("/active-org-unit")
@@ -93,31 +84,12 @@ public class MeController {
   }
 
   /**
-   * Per-principal UI capability flags the frontend uses to decide which optional menu entries to
-   * show and which pages to redirect away from. Three flags today:
+   * Returns the caller's UI capability flags, which decide the visible menu entries and page
+   * redirects.
    *
-   * <ul>
-   *   <li>{@code canSeeBlueprintOverview} — whether the caller may open the org-unit blueprint
-   *       availability overview (#364): {@code true} for admins, officers, and Spezialkommando
-   *       leads. Reuses the exact gate the {@code /api/v1/personal-blueprints/overview} endpoints
-   *       are class-gated by.
-   *   <li>{@code canViewJobOrders} — whether the caller may enter the Job-Order area: {@code true}
-   *       for admins and members of any profit-eligible org unit. Mirrors the backend gate folded
-   *       into {@code OwnerScopeService.canSeeJobOrder} + the order-list short-circuit, so the
-   *       hidden menu / redirect and the empty-list / 403 API stay in lockstep.
-   *   <li>{@code canViewOwnJobOrders} — whether the caller may view the orders their own org unit
-   *       requested (the "Meine Auftr&auml;ge" requester capability, REQ-ORDERS-023): {@code true}
-   *       for admins and any member of at least one org unit, independent of profit eligibility. It
-   *       lets a non-profit ordering-squad member reach their own placed orders instead of being
-   *       redirected to the create form.
-   *   <li>{@code isLogisticianOrAbove} / {@code isMissionManagerOrAbove} / {@code isAdmin} &mdash;
-   *       the caller's <em>authorisation</em> standing, resolved through the role hierarchy. They
-   *       exist because {@code UserDto}'s {@code isLogistician} / {@code isMissionManager} answer a
-   *       different question: those are Staffel-membership projections and are {@code false} for an
-   *       admin, who holds no Staffel membership by design. A client that gates on the membership
-   *       flag therefore hides Lager, Auftrag and payout actions from admins and officers that the
-   *       server would permit &mdash; which is exactly what happened (REQ-SEC-030).
-   * </ul>
+   * <p>The {@code isLogisticianOrAbove} / {@code isMissionManagerOrAbove} / {@code isAdmin} flags
+   * reflect authorisation through the role hierarchy, unlike {@code UserDto}'s Staffel-membership
+   * flags, which are {@code false} for admins (REQ-SEC-030).
    *
    * @return the caller's UI capability flags; never {@code null}.
    */
@@ -138,29 +110,11 @@ public class MeController {
   }
 
   /**
-   * Returns the org units the caller may pin as their active context.
+   * Returns the org units the caller may pin as their active context, sorted OL, Bereich, Staffel,
+   * SK, then by name.
    *
-   * <p><strong>One endpoint instead of one branch per client.</strong> The rule has two halves: an
-   * admin may pin <em>any</em> active org unit, while everyone else may pin the units they belong
-   * to <em>or reach through a Bereich or OL leadership seat</em>. Both clients had to know that,
-   * and only one of them did — the web frontend branched on {@code isAdmin()} and the Android app
-   * did not, so an admin (who by design holds no Staffel membership) was offered nothing but „Alle
-   * Org-Einheiten" and could not narrow the app to a unit at all. Encapsulating the branch here
-   * means a client asks one question and gets the right answer without reproducing the rule.
-   *
-   * <p><strong>All four kinds, not just Staffel and SK.</strong> A member may hold a seat on a
-   * Bereich or on the Organisationsleitung and on nothing else, and those units own aggregates in
-   * their own right (REQ-ORG-016: the create-time stamping applies no kind filter). Listing only
-   * Staffeln and SKs left exactly those members with an empty switcher — the same shape of defect
-   * as the admin one above, one tier up. The membership branch therefore reuses the drill-down
-   * picker's reach, which resolves a leadership seat to the concrete units below it (REQ-ORG-015 —
-   * never an admin-all marker), and the admin branch lists every active unit of every kind so an
-   * admin can still reach at least as far as an OL member.
-   *
-   * <p>Both branches sort top-down (OL &rarr; Bereich &rarr; Staffel &rarr; SK, then by name), so
-   * the two clients and the two branches render one order.
-   *
-   * <p>Carries no PII — org-unit names, shorthands and kinds only.
+   * <p>Admins get every active unit of every kind; others get their member units plus the units
+   * reached through a Bereich or OL leadership seat (REQ-ORG-015).
    *
    * @param jwt the caller's JWT; never {@code null} thanks to the {@code @PreAuthorize}.
    * @return the pinnable options; never {@code null}, possibly empty for a membership-less
@@ -185,21 +139,11 @@ public class MeController {
   }
 
   /**
-   * Everything the page layout needs to know about the caller, in one call and one read-only
-   * transaction (BE-PERF-07): the effective org-unit context ({@link #getActiveOrgUnit()}), the
-   * pinnable org units ({@link #getPinnableOrgUnits(Jwt)}), the capability flags ({@link
-   * #getCapabilities()}) and the unread-notification count ({@code GET
-   * /api/v1/notifications/unread-count}).
+   * Returns everything the page layout needs in one read-only transaction: {@link
+   * #getActiveOrgUnit()}, {@link #getPinnableOrgUnits(Jwt)}, {@link #getCapabilities()} and the
+   * unread-notification count.
    *
-   * <p>The four answers are the same ones the individual endpoints give — this method calls the
-   * same resolvers — so a client may switch between them freely. What it saves is the fan-out: the
-   * web layout used to issue three or four backend calls before every page handler, each in its own
-   * transaction, re-resolving the caller's memberships each time; here they share one transaction
-   * and the request-scoped membership memos.
-   *
-   * <p>ADR-0151's fail-closed rule is unchanged and stays the client's: the endpoint either answers
-   * all four parts or fails as a whole, and a client that gets no answer treats every capability as
-   * {@code false}, exactly as it does when {@code /capabilities} fails.
+   * <p>Answers match the individual endpoints; the call succeeds or fails as a whole (ADR-0151).
    *
    * @param jwt the caller's JWT; never {@code null} thanks to the class-level {@code @PreAuthorize}
    * @param callerId the caller's id as the notification endpoints resolve it
@@ -239,29 +183,19 @@ public class MeController {
   /**
    * Response for {@code GET /api/v1/me/capabilities}: per-principal UI capability flags.
    *
-   * @param canSeeBlueprintOverview {@code true} iff the caller may open the org-unit blueprint
-   *     availability overview (admin, officer, or Spezialkommando lead).
-   * @param canViewJobOrders {@code true} iff the caller may enter the Job-Order area (admin, or
-   *     member of at least one profit-eligible org unit).
-   * @param canViewOwnJobOrders {@code true} iff the caller may view the orders their own org unit
-   *     requested (admin, or member of at least one org unit), independent of profit eligibility
-   *     (REQ-ORDERS-023).
-   * @param canViewBankStaff {@code true} iff the caller may reach the bank's staff surface at all
-   *     &mdash; {@code BANK_EMPLOYEE} or anything above it in the role hierarchy.
-   * @param canManageBank {@code true} iff the caller additionally holds {@code BANK_MANAGEMENT},
-   *     which is what gates the account lifecycle and the grants matrix.
-   * @param isLogisticianOrAbove {@code true} iff the caller reaches {@code LOGISTICIAN} through the
-   *     role hierarchy &mdash; so {@code LOGISTICIAN}, {@code OFFICER} and {@code ADMIN} alike.
-   *     This is the flag a client gates the Lager and the Auftrag write paths on. It is
-   *     deliberately <em>not</em> {@code UserDto.isLogistician()}, which is a Staffel-membership
-   *     projection and is {@code false} for an admin.
-   * @param isMissionManagerOrAbove {@code true} iff the caller reaches {@code MISSION_MANAGER}
-   *     through the hierarchy &mdash; {@code MISSION_MANAGER}, {@code OFFICER}, {@code ADMIN}. The
-   *     flag behind the Operation's payout confirmation; the same membership-versus-authorisation
-   *     distinction applies as above.
-   * @param isAdmin {@code true} iff the caller holds {@code ADMIN}. Clients use it for the surfaces
-   *     where admin is not merely "above" a role but a different scope altogether &mdash; an admin
-   *     sees every org unit rather than their own memberships.
+   * @param canSeeBlueprintOverview whether the caller may open the org-unit blueprint overview
+   *     (admin, officer or Spezialkommando lead)
+   * @param canViewJobOrders whether the caller may enter the Job-Order area (admin or member of a
+   *     profit-eligible org unit)
+   * @param canViewOwnJobOrders whether the caller may view orders their own org unit requested
+   *     (admin or any org-unit member; REQ-ORDERS-023)
+   * @param canViewBankStaff whether the caller holds {@code BANK_EMPLOYEE} or above
+   * @param canManageBank whether the caller holds {@code BANK_MANAGEMENT}
+   * @param isLogisticianOrAbove whether the caller reaches {@code LOGISTICIAN} through the role
+   *     hierarchy; gates the Lager and Auftrag write paths
+   * @param isMissionManagerOrAbove whether the caller reaches {@code MISSION_MANAGER} through the
+   *     role hierarchy; gates the payout confirmation
+   * @param isAdmin whether the caller holds {@code ADMIN}
    */
   public record CapabilitiesResponse(
       boolean canSeeBlueprintOverview,
@@ -276,14 +210,11 @@ public class MeController {
   /**
    * Response for {@code GET /api/v1/me/layout}: the four layout answers in one payload.
    *
-   * @param activeOrgUnitId the effective org-unit context, as {@link ActiveOrgUnitResponse} carries
-   *     it; {@code null} for admin "all org units" or no home Staffel.
-   * @param orgUnits the org units the caller may pin, as {@code GET /api/v1/me/org-units} returns
-   *     them; never {@code null}, possibly empty.
-   * @param capabilities the caller's capability flags, as {@code GET /api/v1/me/capabilities}
-   *     returns them; never {@code null}.
-   * @param unreadNotifications the caller's unread-notification count, as {@code GET
-   *     /api/v1/notifications/unread-count} returns it.
+   * @param activeOrgUnitId the effective org-unit context; {@code null} for admin "all org units"
+   *     or no home Staffel
+   * @param orgUnits the pinnable org units; never {@code null}, possibly empty
+   * @param capabilities the caller's capability flags; never {@code null}
+   * @param unreadNotifications the caller's unread-notification count
    */
   public record LayoutResponse(
       @Nullable UUID activeOrgUnitId,

@@ -24,14 +24,8 @@ import java.util.UUID;
 
 /**
  * Request body of the manager-only add-by-id endpoint ({@code POST
- * /api/v1/missions/{id}/participants/by-id/slim}, REQ-MISSION-020): the registered member to put on
- * the roster, and nothing else.
- *
- * <p>Deliberately narrower than {@link AddExternalParticipantRequest}: no free-text name, no
- * org-unit affiliations, no comment, no sign-up answers. The endpoint exists for the Android app's
- * manager action "Teilnehmer hinzufügen" on the public API vhost, where ADR-0170 keeps the
- * add-anybody endpoints off the edge; a body that can only name one member by id is what makes this
- * one admissible there.
+ * /api/v1/missions/{id}/participants/by-id/slim}, REQ-MISSION-020): only the registered member to
+ * add, which keeps it admissible on the public API vhost.
  *
  * @param userId the {@code app_user} id of the member to add; required
  */

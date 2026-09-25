@@ -37,20 +37,12 @@ import lombok.Setter;
 import lombok.ToString;
 
 /**
- * Dedicated aggregate for tracking ownership of a {@link Mission} with its own optimistic lock
- * version.
+ * 1:1 companion of a {@link Mission} that carries its ownership under its own optimistic-lock
+ * version, so an owner change neither bumps {@code Mission.version} nor loses a concurrent owner
+ * change.
  *
- * <p>Rationale (Option A / multi-user concurrency on the mission detail page):
- *
- * <ul>
- *   <li>{@code Mission.owner} itself is marked with {@code @OptimisticLock(excluded = true)} so
- *       that changing the owner does NOT bump the parent {@code Mission.version} and therefore does
- *       not invalidate other users' open forms on the same mission.
- *   <li>To still prevent lost updates on concurrent owner changes, this entity maintains an own
- *       {@code @Version} counter on a 1:1 companion row keyed by {@code mission_id}.
- *   <li>Callers (service layer) change the owner transactionally via this entity and mirror the
- *       result into {@code Mission.owner} for backward-compatible reads.
- * </ul>
+ * <p>The service layer changes the owner through this entity and mirrors the result into {@code
+ * Mission.owner}.
  */
 @Entity
 @Table(

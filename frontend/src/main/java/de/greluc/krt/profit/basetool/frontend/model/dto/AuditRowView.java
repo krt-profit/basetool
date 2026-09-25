@@ -23,21 +23,16 @@ import java.time.Instant;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Uniform view-model for one audit row on the unified admin audit page (REQ-AUDIT-001). The page
- * adapts both the bank trail ({@link BankAuditEventDto}) and the generic trail ({@link
- * AuditEventDto}) into this shape so a single template renders every tab. {@link #eventLabelKey} is
- * the fully-qualified message key (bank vs generic bundles differ), resolved dynamically in the
- * template.
+ * View model for one row of the unified admin audit page (REQ-AUDIT-001), adapted from both {@link
+ * BankAuditEventDto} and {@link AuditEventDto}.
  *
  * @param occurredAt the mutation instant (UTC), rendered locally by the {@code .utc-time} script
  * @param actorHandle the acting user's handle snapshot
  * @param eventLabelKey the fully-qualified i18n key for the event-type label
- * @param subject the affected subject label (account number / inventory label / order title), or a
- *     dash when the event has no subject
+ * @param subject the affected subject label, or a dash when the event has no subject
  * @param details the compact details payload
- * @param clientId which client the mutation came through (REQ-AUDIT-005) — a bounded label such as
- *     {@code basetool-android}, or {@code null} on rows written before either trail gained the
- *     column
+ * @param clientId the bounded label of the client the mutation came through (REQ-AUDIT-005), e.g.
+ *     {@code basetool-android}, or {@code null} when not recorded
  */
 public record AuditRowView(
     Instant occurredAt,

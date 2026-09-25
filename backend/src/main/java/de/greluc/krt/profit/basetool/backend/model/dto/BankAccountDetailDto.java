@@ -22,19 +22,14 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import java.math.BigDecimal;
 
 /**
- * Response payload for the account detail page (K1 mockup): the account with its facts-strip
- * numbers and the calling user's booking capabilities on this account — the UI renders the action
- * buttons from exactly these flags (REQ-BANK-009), so the server stays the single source of
- * capability truth. Since ADR-0039 holders are decoupled from accounts, so an account carries no
- * per-account holder distribution — holder balances are global and live in the holder menu
- * (REQ-BANK-003).
+ * Account detail page payload: the account, its facts-strip figures and the caller's booking
+ * capabilities, from which the UI renders its action buttons (REQ-BANK-009).
  *
  * @param account the account incl. its compute-on-read balance
  * @param delta30d net change over the last 30 days (signed whole aUEC)
  * @param bookingCount total number of account ledger legs on the account
  * @param capabilities the caller's evaluated capabilities on this account
- * @param approvalLimits the account's per-tier approval limits (REQ-BANK-041) for display, with the
- *     bank-surface edit affordance ({@code canEdit} = bank management / admin)
+ * @param approvalLimits the account's per-tier approval limits (REQ-BANK-041) for display
  */
 public record BankAccountDetailDto(
     BankAccountDto account,

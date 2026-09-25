@@ -36,22 +36,12 @@ import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * A member's <em>fulfilment signal</em> on a {@link MaterialExchangeRequest} — "Ich kann liefern"
- * (REQ-MARKET-019). It records that a member can supply what the requester is looking for, so the
- * requester can open the negotiation; the actual trade happens off-tool. It is the request-side
- * inverse of {@link MaterialExchangeInterest}: there the interested party <em>wants</em> the offer,
- * here they can <em>supply</em> the request.
+ * A member's fulfilment signal ("Ich kann liefern") on a {@link MaterialExchangeRequest}
+ * (REQ-MARKET-019); the trade itself happens off-tool.
  *
- * <p>Like {@link MaterialExchangeInterest}, this is a <b>signal-only, independent aggregate</b>: no
- * mapped collection lives on the request, so signalling or withdrawing never bumps the request's
- * {@code @Version}. A unique constraint on {@code (request_id, interested_user_id)} (V224) makes
- * the signal an idempotent upsert (the service treats a duplicate-key race as success); withdrawing
- * deletes the row.
- *
- * <p><b>Anonymity (REQ-MARKET-019, mirroring REQ-MARKET-006):</b> the supplier names are visible
- * only to the request's owner. Every other viewer receives just the count — the redaction is
- * applied in the service, never by exposing this entity or a name-carrying projection to
- * non-owners.
+ * <p>Signal-only, independent aggregate: signalling never bumps the request's {@code @Version}.
+ * Unique per {@code (request_id, interested_user_id)}; withdrawing deletes the row. Names are shown
+ * only to the request's owner, redacted in the service.
  */
 @Entity
 @Getter
@@ -81,13 +71,10 @@ public class MaterialExchangeRequestInterest extends AbstractEntity<UUID> {
   private User interestedUser;
 
   /**
-   * Renders the signal using only safe scalar identifiers — its own id and the (null-safe)
-   * foreign-key ids of the request and the interested user. Deliberately does <b>not</b> call
-   * {@code toString()} on the {@code @ManyToOne} associations: those are {@code FetchType.LAZY},
-   * and the {@link #interestedUser} must never surface as a name/email in a log line. Reading only
-   * the foreign-key id off a lazy proxy does not initialise it.
+   * Renders the signal from its id and the associated ids only, so logging it never triggers a lazy
+   * load or exposes a user's name or e-mail.
    *
-   * @return a stable, PII-free single-line representation of this fulfilment signal.
+   * @return a PII-free single-line representation
    */
   @NotNull
   @Override

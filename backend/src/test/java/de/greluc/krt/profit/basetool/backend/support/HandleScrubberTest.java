@@ -27,18 +27,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
 /**
- * Unit tests for {@link HandleScrubber} — removing other members' handles from the free text that
- * goes into a data export (REQ-SEC-058).
- *
- * <p>The properties worth pinning down are the two that are easy to get wrong and hard to notice:
- * the <b>longest match wins</b> (or a shorter handle leaves a fragment of a longer one behind,
- * which is both a leak and a corruption), and <b>case is ignored</b> (whoever wrote the note was
- * typing, not copying from a roster).
- *
- * <p>The last three tests are regressions for defects this class did not catch the first time, and
- * each of them was reachable by any member from their own profile: a handle that is a substring of
- * the replacement token, and a single character in their own note. They are the reason the
- * implementation is one forward pass over the original text rather than a loop over the handles.
+ * Unit tests for {@link HandleScrubber}, which removes other members' handles from the free text of
+ * a data export (REQ-SEC-058). Pins that the longest match wins and that case is ignored.
  */
 class HandleScrubberTest {
 

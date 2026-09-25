@@ -61,11 +61,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
- * Admin-only counterpart of {@link PersonalBlueprintController} (#327, Phase 7): lets
- * administrators manage any user's acquired blueprints and run the import on their behalf. The
- * target user is taken from the URL path ({@code /{userId}}) instead of from the JWT; the {@code
- * ADMIN} role is enforced at this boundary while the delegated services stay {@code
- * sub}-parameterised.
+ * Admin-only counterpart of {@link PersonalBlueprintController}: manages any user's acquired
+ * blueprints and runs the import on their behalf, with the target user taken from the path.
  */
 @RestController
 @RequestMapping("/api/v1/admin/personal-blueprints")
@@ -195,11 +192,8 @@ public class AdminPersonalBlueprintController {
   }
 
   /**
-   * Admin global purge: clears the <em>removable</em> owned blueprints of <strong>all</strong>
-   * users in one call — the "delete all users' blueprints" action (REQ-INV-024). The auto-granted,
-   * non-removable default blueprints (REQ-INV-016) are preserved. The UI guards this with a
-   * type-to-confirm warning; ADMIN is enforced at the class boundary. Returns the number of
-   * blueprints removed across all users.
+   * Removes the removable owned blueprints of all users (REQ-INV-024), preserving the auto-granted
+   * default blueprints (REQ-INV-016).
    *
    * @return the count of removed blueprints across all users
    */

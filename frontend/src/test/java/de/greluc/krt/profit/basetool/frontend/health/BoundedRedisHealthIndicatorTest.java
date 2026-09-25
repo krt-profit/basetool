@@ -31,12 +31,9 @@ import org.springframework.boot.health.contributor.Status;
 import reactor.core.publisher.Mono;
 
 /**
- * Unit guard for {@link BoundedRedisHealthIndicator}'s wall-clock bound (ADR-0114 follow-up). The
- * 2026-07-22 incident proved the Lettuce command timeout alone cannot bound the reactive health
- * {@code PING} — checks queued behind a wedged shared-connection acquisition for up to 836 seconds
- * on a build that already carried {@code spring.data.redis.timeout=2s}. These tests script the
- * delegate directly: a never-completing delegate must be cut off as {@code DOWN} within the bound,
- * and a healthy delegate's result must pass through untouched.
+ * Unit tests for the wall-clock bound of {@link BoundedRedisHealthIndicator}: a never-completing
+ * delegate is cut off as {@code DOWN} within the bound, and a healthy result passes through
+ * (ADR-0114).
  */
 class BoundedRedisHealthIndicatorTest {
 

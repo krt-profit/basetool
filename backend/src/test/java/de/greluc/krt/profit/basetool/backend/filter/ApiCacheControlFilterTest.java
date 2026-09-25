@@ -68,12 +68,9 @@ class ApiCacheControlFilterTest {
   }
 
   /**
-   * A percent-encoded API path still gets the headers.
+   * A percent-encoded API path still gets the revalidation headers.
    *
-   * <p>{@code getRequestURI()} is raw while Spring MVC routes on the decoded path, so the raw
-   * {@code startsWith("/api/")} test this replaced let {@code /%61pi/v1/users} reach the API
-   * handler with no revalidation headers at all — the one response class that must never be served
-   * stale from an intermediary. Must be a direct filter test: MockMvc normalises the path first.
+   * <p>Tested on the filter directly because MockMvc normalises the path first.
    */
   @Test
   void percentEncodedApiGet_stillGetsRevalidationHeaders() throws Exception {
@@ -95,19 +92,8 @@ class ApiCacheControlFilterTest {
   }
 
   /**
-   * REQ-SEC-031: the member-facing financial and personal families a shipped client reads over the
-   * public vhost.
-   *
-   * <p>These were served {@code no-cache, must-revalidate} — storable at rest by any intermediary
-   * per RFC&nbsp;9111 §3.5, which permits a shared cache to keep an {@code Authorization}-bearing
-   * response precisely when {@code must-revalidate} is present and {@code no-store} is not. The
-   * member bank surface is the sharpest case: it lives under {@code /api/v1/org-units/bank/**}, a
-   * different path from the bank-employee {@code /api/v1/bank/**} that was on the list, and its
-   * transaction rows carry a {@code holderHandle}.
-   *
-   * <p>Each family is asserted at its bare collection path as well as a child, because the bare
-   * path is itself an endpoint the app calls and a pattern that only matched children would leave
-   * it on the weaker directive.
+   * The member-facing financial and personal API families are served {@code no-store}, at the bare
+   * collection path as well as a child (REQ-SEC-031).
    */
   @ParameterizedTest
   @ValueSource(

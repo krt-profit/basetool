@@ -44,20 +44,12 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataIntegrityViolationException;
 
 /**
- * Unit tests for {@link UexManufacturerService}.
+ * Unit tests for {@link UexManufacturerService} (REQ-DATA-004): duplicate UEX companies of one
+ * brand merge onto one manufacturer, owned by the lowest company id, with the others registered as
+ * aliases; matching is alias id, then name, then abbreviation.
  *
- * <p>The sync merges the duplicate UEX company records of one brand onto a single manufacturer row
- * (ADR-0023 / REQ-DATA-004): the canonical company — the lowest {@code uex_company_id}, processed
- * first because the feed is sorted ascending — owns the row's identity, while every other company
- * of the brand resolves to that row, registers its id in the {@code manufacturer_uex_company} alias
- * table and only ORs the manufacturer-surface flags. Match chain: alias-by-id → name →
- * abbreviation.
- *
- * <p>Each company is upserted through the {@link #self} proxy so its write runs in a dedicated
- * {@code REQUIRES_NEW} transaction (REQ-DATA-004). The proxy is stubbed to return the
- * service-under-test so the real upsert logic executes; the transaction boundary itself is a no-op
- * under plain Mockito, which is exactly why the per-company {@code catch} resilience is
- * unit-testable here.
+ * <p>The {@link #self} proxy is stubbed to return the service under test, so per-company failure
+ * isolation is testable without transactions.
  */
 @ExtendWith(MockitoExtension.class)
 class UexManufacturerServiceTest {

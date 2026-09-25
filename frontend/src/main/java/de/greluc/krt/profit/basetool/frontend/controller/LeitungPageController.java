@@ -46,27 +46,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
- * Spring MVC controller for the delegated Leitung page ({@code /organisation/leitung}, epic #800
- * REQ-ROLE-004). The page lists the org units the caller may appoint into (resolved server-side by
- * the backend, which returns only manageable units), and lets a leader appoint / change / remove
- * the ranks their tier delegates to them: a Bereichsleiter manages their Bereich's Koordinatoren /
- * Operatoren and their child Staffeln's / SKs' leads, a Staffelleiter manages their Staffel's
- * Kommandoleiter / Stellvertreter / Ensigns and Kommandogruppen, the OL appoints Bereichsleiter,
- * and admin does everything. An SK lead sees their own SK here with its roster read-only and a link
- * to the SK member page ({@code /organisation/special-commands/{id}}, {@link
- * SpecialCommandMembersPageController}), where they add and remove members and set the Logistiker /
- * Einsatzmanager flags; the SK-lead toggle itself stays with the tier above.
+ * Controller for the Leitung page ({@code /organisation/leitung}, REQ-ROLE-004), where leaders
+ * appoint, change and remove the ranks their tier delegates to them in the org units the backend
+ * returns as manageable.
  *
- * <p>The page and its write proxies are gated to {@code ADMIN} / {@code OFFICER} only ({@link
- * Roles#ADMIN_OR_OFFICER}): every functional leader carries the operative {@code OFFICER} grant
- * (see {@code ROLES_AND_PERMISSIONS.md}), so no delegated leader is locked out, while a
- * capability-only Logistician / Mission-Manager (no appointment reach, empty page) is kept out.
- * Per-unit authorisation is still enforced by the backend appointment endpoints, which the write
- * methods below proxy verbatim, relaying any RFC-7807 failure as its original status + a slim
- * {@code {code, detail}} body so the page JS can toast the backend's localised message (and
- * recognise {@code OPTIMISTIC_LOCK} to prompt a reload). On success the page re-swaps the {@code
- * leitungSections} fragment rather than patching individual rows, so derived state (rank chips,
- * group tiles, capability buttons) never desyncs.
+ * <p>Gated to {@link Roles#ADMIN_OR_OFFICER}; per-unit authorisation is enforced by the backend.
+ * Write proxies relay backend failures as status plus {@code {code, detail}}.
  */
 @Controller
 @UsesLayoutModel
@@ -78,13 +63,9 @@ public class LeitungPageController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Renders the Leitung page (or just its {@code leitungSections} fragment for an in-place
-   * re-swap). Loads the caller's manageable view; the appointment pickers are server-side
-   * searchable comboboxes (remote-users, #1193) that fetch matches from {@code /users/search} on
-   * demand, so the roster is no longer preloaded.
+   * Renders the Leitung page, or only its {@code leitungSections} fragment for an in-place swap.
    *
-   * @param fragment when {@code "leitungSections"}, only the sections fragment is rendered for an
-   *     AJAX swap; otherwise the full page.
+   * @param fragment {@code "leitungSections"} for the fragment only; otherwise the full page.
    * @param model the Thymeleaf model, populated with {@code leitung}.
    * @return the view name, or its {@code leitungSections} selector for the fragment path.
    */

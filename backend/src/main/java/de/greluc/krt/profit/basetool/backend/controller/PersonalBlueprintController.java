@@ -64,9 +64,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
- * REST endpoints for the user-facing personal-blueprint set (#327). Every method derives the owner
- * from the JWT {@code sub} and never accepts it from the request, enforcing per-user data
- * isolation.
+ * REST endpoints for the caller's personal-blueprint set. The owner always comes from the JWT
+ * {@code sub}, never from the request.
  */
 @RestController
 @RequestMapping("/api/v1/personal-blueprints")
@@ -195,13 +194,11 @@ public class PersonalBlueprintController {
   }
 
   /**
-   * Clears the caller's entire <em>removable</em> owned-blueprint set in one call — the "delete all
-   * my blueprints" action (REQ-INV-023). The auto-granted, non-removable default blueprints
-   * (REQ-INV-016) are preserved. Returns the number of blueprints removed so the UI can confirm the
-   * outcome; a set that held only defaults (or was already empty) yields {@code 0}.
+   * Removes all of the caller's removable owned blueprints (REQ-INV-023), keeping the auto-granted
+   * default blueprints (REQ-INV-016).
    *
    * @param ownerUserId the caller's {@code app_user.id}
-   * @return the count of removed blueprints
+   * @return the count of removed blueprints; {@code 0} when only defaults remained
    */
   @NotNull
   @DeleteMapping
@@ -219,8 +216,7 @@ public class PersonalBlueprintController {
 
   /**
    * Returns the SC Wiki recipe graph (ingredients + per-quality stat contributions) of one of the
-   * caller's owned blueprints, backing the Personal Inventory blueprint view's expandable "Zutaten
-   * &amp; Stats" detail (#327). Owner-scoped: a foreign or unknown id yields 404.
+   * caller's owned blueprints. A foreign or unknown id yields 404.
    *
    * @param id owned-blueprint entry id
    * @param ownerUserId the caller's {@code app_user.id}
@@ -241,17 +237,13 @@ public class PersonalBlueprintController {
   }
 
   /**
-   * Returns, for every blueprint the caller owns, whether and how many times it can be crafted from
-   * the caller's own "My Inventory" stock — the craftability annotation of the Personal Inventory
-   * blueprint view (#781, REQ-INV-048). Strictly owner-scoped: owned blueprints, stock and refinery
-   * yield all come from the caller. Read-only; RESOURCE ingredients and the PIECE-material-bridged
-   * ITEM ingredients (hand-mined gems, ADR-0046) are evaluated, craftable sub-assemblies and
-   * unresolved items are not.
+   * Returns, per owned blueprint, whether and how often it can be crafted from the caller's own
+   * stock (REQ-INV-048). Evaluates RESOURCE ingredients and PIECE-material-bridged ITEM ingredients
+   * (ADR-0046); craftable sub-assemblies and unresolved items are not evaluated.
    *
-   * @param includeRefinery whether to fold the caller's {@code OPEN}/{@code IN_PROGRESS} refinery
-   *     yield into the {@code *WithRefinery} figures (default {@code false})
-   * @param userId the caller's {@code app_user.id}, scoping both the owned blueprints and the stock
-   *     and refinery yield they are measured against
+   * @param includeRefinery whether to add the caller's {@code OPEN}/{@code IN_PROGRESS} refinery
+   *     yield to the {@code *WithRefinery} figures (default {@code false})
+   * @param userId the caller's {@code app_user.id}, scoping blueprints, stock and refinery yield
    * @return one craftability entry per owned blueprint
    */
   @GetMapping("/craftability")

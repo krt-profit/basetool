@@ -26,9 +26,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Unit tests for {@link ActiveSessionsTracker}, which backs the {@code basetool_active_sessions}
- * gauge (#1158). The behaviour that matters for the {@code SsePushChannelDead} alert is that the
- * count is finite, never negative, and idempotent under the duplicate / out-of-order lifecycle
- * events the Redis-backed session store can deliver.
+ * gauge: the count stays finite, non-negative and idempotent under duplicate or out-of-order
+ * session events.
  */
 class ActiveSessionsTrackerTest {
 

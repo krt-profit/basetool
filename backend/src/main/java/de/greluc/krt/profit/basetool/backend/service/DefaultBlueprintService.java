@@ -39,15 +39,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Admin-facing curation of the default-blueprint set (REQ-INV-017): the small list of blueprint
- * products that every user is granted automatically (REQ-INV-016).
+ * Admin curation of the default-blueprint set (REQ-INV-017), the products granted to every user
+ * automatically (REQ-INV-016).
  *
- * <p>Adding a default resolves the chosen product against the live blueprint catalog (the same
- * resolution the personal-blueprint add uses), stamps the canonical key / name / output item,
- * refreshes the non-removable key cache, and immediately grants the new default to every existing
- * user. Removing a default deletes the curated row and refreshes the cache, but intentionally
- * leaves users' already-materialised rows in place — those simply become ordinary, now-removable
- * owned blueprints rather than being revoked.
+ * <p>Adding a default resolves it against the live catalog, refreshes the key cache and grants it
+ * to every user. Removing one leaves users' existing rows in place as ordinary, removable
+ * blueprints.
  */
 @Service
 @RequiredArgsConstructor

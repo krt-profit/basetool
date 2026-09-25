@@ -197,12 +197,7 @@ class NotificationCreationServiceTest {
   }
 
   /**
-   * Every recipient the call reached, whatever they were told.
-   *
-   * <p>The result is keyed by signal now, because one event can raise different notification types
-   * for different audiences. These assertions are about *who* was reached, which is the question
-   * they were always asking; the signal itself is asserted where it matters, in {@code
-   * NotificationEventListenerTest}.
+   * Unions every recipient reached by the call, regardless of signal.
    *
    * @param bySignal the call's result
    * @return the union of its recipient sets

@@ -58,14 +58,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
  * Unit tests for the write-time stock merge {@link InventoryCheckoutService#mergeStockIfRequested}
- * (REQ-INV-026): a {@code PIECE} write folds matching rows automatically, an {@code SCU} write only
- * on the per-action opt-in, and a row backing a Materialbörse offer is never merged.
+ * (REQ-INV-026): a {@code PIECE} write merges matching rows automatically, an {@code SCU} write
+ * only on opt-in, and a row backing a Materialbörse offer never.
  *
- * <p>Under the Variante-C model (REQ-INV-027) the merge key is the physical identity alone (owner ·
- * material · location · quality · personal · owning org unit), so rows that differ only in their
- * job-order / mission earmark now fold together; the survivor unions the victims' {@link
- * InventoryJobOrderAllocation} / mission slices — summing per target id and OR-combining a
- * job-order slice's delivered marker — rather than being reset to a scalar not-delivered.
+ * <p>The merge key is the physical identity alone (REQ-INV-027); the survivor unions the victims'
+ * {@link InventoryJobOrderAllocation} and mission slices, summing per target and OR-combining the
+ * delivered marker.
  */
 @ExtendWith(MockitoExtension.class)
 class InventoryStockMergeTest {
@@ -239,8 +237,8 @@ class InventoryStockMergeTest {
   }
 
   /**
-   * Builds a game-item stock row sharing the fixed identity dimensions of {@link #row}, but with
-   * the item catalog shape (V220, REQ-INV-029): gameItem set, material and quality {@code null}.
+   * Builds a game-item stock row with the fixed identity of {@link #row}, but in the item catalog
+   * shape (REQ-INV-029): game item set, material and quality {@code null}.
    *
    * @param id the row id.
    * @param gameItem the stocked game item.

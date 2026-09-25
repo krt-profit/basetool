@@ -50,11 +50,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC-level render test for {@link AdminBlueprintsPageController}: proves the AJAX swap fragment
- * (REQ-FE-002) actually resolves and renders. A pure unit test only pins the {@code
- * admin/blueprints :: results} view-name string; this test fails if that fragment selector is
- * misspelled or the {@code <th:block th:fragment="results">} block is malformed, which a unit test
- * cannot catch.
+ * MVC render test for {@link AdminBlueprintsPageController}: the {@code admin/blueprints ::
+ * results} AJAX swap fragment resolves and renders (REQ-FE-002).
  */
 @SpringBootTest
 class AdminBlueprintsPageControllerMvcTest {

@@ -49,7 +49,7 @@ import org.springframework.security.access.AccessDeniedException;
 @ExtendWith(MockitoExtension.class)
 class MemberEvaluationServiceTest {
 
-  /** Stand-in {@code app_user.id}s; the column is a UUID foreign key since V235. */
+  /** Stand-in {@code app_user.id} values for the UUID foreign-key column. */
   private static final UUID USER_A = UUID.fromString("00000000-0000-4000-8000-0000000000aa");
 
   private static final UUID USER_B = UUID.fromString("00000000-0000-4000-8000-0000000000bb");

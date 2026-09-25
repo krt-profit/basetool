@@ -49,13 +49,8 @@ import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 /**
- * Behaviour of the frontend consent gate (REQ-SEC-028).
- *
- * <p>{@link #neverBlocksTheDocumentsAUserMustBeAbleToRead} is the one that matters most. A gate
- * that redirects the terms, the privacy policy or the imprint back to itself asks a person to agree
- * to something it simultaneously prevents them from reading — which is both a bad experience and
- * self-defeating for the consent it is trying to obtain. That group is exactly what a carelessly
- * trimmed allowlist drops, and nothing else in the suite would notice.
+ * Behaviour of the frontend consent gate (REQ-SEC-028), including that it never blocks the terms,
+ * privacy policy or imprint.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -91,14 +86,7 @@ class TermsAcceptanceGateFilterTest {
     verify(filterChain, never()).doFilter(any(), any());
   }
 
-  /**
-   * An AJAX caller gets a status plus a header it can act on, never a 302.
-   *
-   * <p>This is the tab that was already open when a new wording deployed — the moment the feature
-   * first affects anyone. A redirect fails <em>silently</em> there: a fragment swap bails on {@code
-   * res.redirected} with only a dev warning and the section stops updating, while a write follows
-   * the redirect, receives the consent page as 200 HTML and shows a generic error toast.
-   */
+  /** An AJAX caller gets a status plus a header it can act on, never a 302. */
   @Test
   void signalsTheGateToAnAjaxCallerInsteadOfRedirecting() throws Exception {
     stubStatus(false);
@@ -117,15 +105,8 @@ class TermsAcceptanceGateFilterTest {
   }
 
   /**
-   * An SSE subscription is handed off on the channel, never redirected and never failed.
-   *
-   * <p>An {@code EventSource} can read neither a status nor a header, so both of the branches above
-   * are invisible to it: a 302 delivers the consent page as {@code text/html}, the stream fails to
-   * parse it, and {@code notifications.js} reconnects on its own jittered timer indefinitely —
-   * measured in production on 2026-08-03 as 491 stream attempts against 483 consent-page loads in
-   * ten minutes, from open tabs alone. A single well-formed {@code terms-gate} event is the only
-   * answer the client can act on instead of retrying, so this pins the status, the content type and
-   * the event framing together; any one of them wrong puts the loop back.
+   * An SSE subscription gets a single well-formed {@code terms-gate} event, never a redirect or an
+   * error, so the client does not reconnect in a loop.
    */
   @Test
   void handsAnSseStreamOffOnTheChannelInsteadOfLettingItRetry() throws Exception {
@@ -168,13 +149,6 @@ class TermsAcceptanceGateFilterTest {
   /**
    * A fresh negative verdict is reused, so a gated session does not re-read the backend per
    * request.
-   *
-   * <p>Storing the verdict but reading back only the positive side turned every gated request into
-   * a blocking backend round trip. Measured during the 2026-08-03 rollout: 491 stream attempts
-   * drove 491 reads of {@code /api/v1/terms/status}, and the consent-page renders they triggered
-   * drove 483 more — 973 against a population of one looping tab. That amplification is what made a
-   * client-side reconnect loop expensive on the server, so it is pinned here rather than left to
-   * the loop fix.
    */
   @Test
   void reusesAFreshNegativeVerdictInsteadOfReReadingTheBackend() throws Exception {
@@ -246,15 +220,8 @@ class TermsAcceptanceGateFilterTest {
   }
 
   /**
-   * Public documents skip the gate too, and this is the case that was wrong.
-   *
-   * <p>All three are {@code permitAll} in {@code SecurityConfig}, but {@code permitAll} does not
-   * stop a later filter in the chain from redirecting an <em>authenticated</em> caller — and this
-   * gate did. {@code /.well-known/assetlinks.json} shipped that way: the Android App Links
-   * descriptor answered a signed-in member with the consent page, and each hit paid a backend read
-   * for a document whose bytes are the same for everyone. They share one list with {@link
-   * BackendRoleSyncFilter} now ({@code PublicPaths}), so the next public path cannot land in one
-   * gate and not the other.
+   * Public documents skip the gate, sharing the {@code PublicPaths} list with {@link
+   * BackendRoleSyncFilter}.
    */
   @Test
   void skipsPublicDocuments() throws Exception {
@@ -356,15 +323,7 @@ class TermsAcceptanceGateFilterTest {
     assertThat(TermsAcceptanceGateFilter.consentKnownMissing(request)).isFalse();
   }
 
-  /**
-   * A WebSocket handshake is let through and marked, never redirected.
-   *
-   * <p>The three assertions belong together and each one alone would let the defect back in. A 302
-   * reaches a WebSocket as a bare {@code 1006} — the client cannot tell it from a dropped
-   * connection, so it reconnects, and consent cannot be given from a background socket: the loop
-   * has no exit. Letting the upgrade through without the mark is no better in the other direction —
-   * the socket would simply live on, and nothing would ever tell this tab to go and consent.
-   */
+  /** A WebSocket handshake is let through and marked, never redirected. */
   @Test
   void marksAWebSocketHandshakeInsteadOfRedirectingIt() throws Exception {
     stubStatus(false);
@@ -427,16 +386,8 @@ class TermsAcceptanceGateFilterTest {
   }
 
   /**
-   * A navigation whose token can no longer be refreshed goes to the login, not to a 500.
-   *
-   * <p>This is the ADR-0166 cutover, reproduced. Every session created before identity moved to
-   * {@code /auth} carries an {@code OAuth2AuthorizedClient} whose SERIALISED {@code
-   * ClientRegistration} still names the retired token endpoint, so the refresh this gate triggers
-   * on its own {@code /api/v1/terms/status} read fails — and an exception thrown from a servlet
-   * FILTER never reaches {@code GlobalExceptionHandler}, whose whole job is to turn this exception
-   * into the redirect below. Production answered 500 on the first page load after the cutover and
-   * stayed there: an authenticated session idles out after 720h, so nothing healed it, and the only
-   * escape a member found was clearing the site data.
+   * A navigation whose token can no longer be refreshed is redirected to the login, not answered
+   * with a 500.
    */
   @Test
   void redirectsToTheLoginWhenTheTokenCannotBeRefreshed() throws Exception {
@@ -451,12 +402,8 @@ class TermsAcceptanceGateFilterTest {
   }
 
   /**
-   * An AJAX caller in the same state gets the established 401-plus-header contract, never a 302.
-   *
-   * <p>Same reasoning as the consent gate's own AJAX branch: {@code krtFetch} sees {@code
-   * res.redirected} and stalls with only a dev-console warning, so a redirect here is a section
-   * that silently stops updating. The header name is the one {@code GlobalExceptionHandler} already
-   * writes, so no client-side listener has to learn anything new.
+   * An AJAX caller whose token cannot be refreshed gets the 401-plus-header contract of {@code
+   * GlobalExceptionHandler}, never a 302.
    */
   @Test
   void signalsReauthenticationToAnAjaxCallerInsteadOfRedirecting() throws Exception {
@@ -477,12 +424,8 @@ class TermsAcceptanceGateFilterTest {
   }
 
   /**
-   * An SSE subscription is handed off on its own channel, for the same reason the consent path is.
-   *
-   * <p>An {@code EventSource} reads neither status nor header, so both branches above are invisible
-   * to it and any error status is an opaque {@code onerror} it answers by reconnecting. The event
-   * name is the one {@code NotificationPageController} already writes when the stream itself loses
-   * its token, so {@code notifications.js} needs no new listener.
+   * An SSE subscription whose token cannot be refreshed gets the same event {@code
+   * NotificationPageController} writes when the stream loses its token.
    */
   @Test
   void handsTheSseStreamOffToTheLoginWhenTheTokenCannotBeRefreshed() throws Exception {
@@ -503,15 +446,7 @@ class TermsAcceptanceGateFilterTest {
     verify(filterChain, never()).doFilter(any(), any());
   }
 
-  /**
-   * An exempt path is decided by the path alone — no consent read, and so no token refresh that
-   * could fail.
-   *
-   * <p>Pins the early-exit guard that answers CodeQL alert #1126: the exemption is checked before,
-   * and independently of, the identity and consent questions. A member whose session can no longer
-   * refresh its token must still be able to read the imprint and the terms, exactly as before the
-   * guard was split out of the single boolean expression.
-   */
+  /** An exempt path is decided by the path alone, before any consent read or token refresh. */
   @Test
   void anExemptPathPassesWithoutAskingTheBackendEvenWhenTheTokenIsGone() throws Exception {
     when(backendApiClient.get(any(String.class), eq(TermsStatusDto.class)))
@@ -527,12 +462,8 @@ class TermsAcceptanceGateFilterTest {
   }
 
   /**
-   * The exemption guard does not widen under an encoded spelling: {@code /css%2f../missions} is a
-   * gated page, not a stylesheet, and still meets the consent redirect.
-   *
-   * <p>The path the guard reads is request-controlled, which is what CodeQL flagged; this is the
-   * property that makes that safe — the shared {@code PublicPaths} predicates decode per segment
-   * (REQ-SEC-029), so a crafted path cannot talk its way into the exempt set.
+   * The exemption does not widen under an encoded spelling: {@code /css%2f../missions} is still
+   * gated (REQ-SEC-029).
    */
   @Test
   void anEncodedSpellingOfAGatedPathIsNotExempt() throws Exception {

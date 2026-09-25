@@ -38,13 +38,8 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
- * Build-time enforcement of the REQ-FE-015 three-mirror-points rule for live-sync section maps: the
- * server-side {@link LiveSyncTopicClass} whitelist and the page's JS seam map must name exactly the
- * same section keys. A key added on one side without the other silently strands peers stale
- * (REQ-FE-010) — this test turns that drift into a red build.
- *
- * <p>Reads the shipped JS module from the classpath ({@code src/main/resources} is on the test
- * runtime classpath), extracts the seam-map keys, and asserts set-equality with the registry.
+ * Enforces the REQ-FE-015 mirror rule: the {@link LiveSyncTopicClass} whitelists and the pages' JS
+ * seam maps name exactly the same section keys.
  */
 class LiveSyncSectionMapParityTest {
 
@@ -148,13 +143,11 @@ class LiveSyncSectionMapParityTest {
   }
 
   /**
-   * Asserts every section key of each {@code sendChanged(<topicExpression>, [...])} call in {@code
-   * js} is inside {@code whitelist}, and that at least one such call exists (so a silent rename of
-   * the call site fails the build rather than quietly disabling the check).
+   * Asserts that every section key of each {@code sendChanged(<topicExpression>, [...])} call in
+   * {@code js} is whitelisted, and that at least one such call exists.
    *
    * @param js the module source to scan
-   * @param topicExpressionRegex the regex matching the call's topic argument as written in the
-   *     source
+   * @param topicExpressionRegex the regex matching the call's topic argument as written
    * @param whitelist the topic class's accepted section keys
    */
   private static void assertSendChangedKeysWhitelisted(
@@ -393,13 +386,8 @@ class LiveSyncSectionMapParityTest {
   }
 
   /**
-   * The Materialbörse board uses {@code subscribe(topic, {onChanged})} + {@code swapList} rather
-   * than a {@code {container}} seam map, so the generic seam-map parity tests do not cover it (F4).
-   * Pin its <em>broadcast</em> side directly: every {@code
-   * krtLiveSync.sendChanged('materialboard'|MATERIALBOARD_TOPIC, [...])} call across the three
-   * materialboerse modules must send only keys in {@link LiveSyncTopicClass#MATERIALBOARD}'s
-   * whitelist — so a stray out-of-whitelist key (silently dropped by the relay → stale peer) fails
-   * the build instead.
+   * Verifies that every Materialbörse {@code sendChanged} call sends only keys in {@link
+   * LiveSyncTopicClass#MATERIALBOARD}'s whitelist.
    */
   @Test
   void materialboardBroadcasts_onlyEverSendWhitelistedKeys() throws IOException {
@@ -436,12 +424,8 @@ class LiveSyncSectionMapParityTest {
   }
 
   /**
-   * Build-enforces the <em>broadcast</em> side of the three-mirror-points rule for the bank surface
-   * (F5). Unlike the JS {@code *_SECTIONS} receiver maps (covered above), the bank publish side is
-   * driven by {@code data-livesync="topic/sec,sec …"} HTML attributes evaluated in {@code
-   * publishBankLiveSync} — so a stray out-of-whitelist section there is silently dropped by the
-   * server with no red build. This scans every template for those attributes and asserts each
-   * section key is inside its topic class's whitelist.
+   * Verifies that every section key in a template's {@code data-livesync="topic/sec,…"} attribute
+   * is inside its topic class's whitelist.
    *
    * @throws IOException if a template cannot be read
    * @throws URISyntaxException if the templates classpath root cannot be resolved
@@ -497,10 +481,9 @@ class LiveSyncSectionMapParityTest {
   }
 
   /**
-   * Resolves a {@code data-livesync} topic token (its account-id placeholder stripped) to its
-   * {@link LiveSyncTopicClass} by prefix and whether it carries an id segment — so {@code
-   * bank:@account} resolves to the scoped {@link LiveSyncTopicClass#BANK_ACCOUNT} while the bare
-   * {@code bank} resolves to {@link LiveSyncTopicClass#BANK_STAFF}.
+   * Resolves a {@code data-livesync} topic token to its {@link LiveSyncTopicClass} by prefix and
+   * whether it carries an id segment, e.g. {@code bank:@account} to {@link
+   * LiveSyncTopicClass#BANK_ACCOUNT} and {@code bank} to {@link LiveSyncTopicClass#BANK_STAFF}.
    *
    * @param topic the topic token (e.g. {@code bank:@account}, {@code bank}, {@code orgunit-bank})
    * @return the matching class, or {@code null} if none matches
@@ -543,14 +526,8 @@ class LiveSyncSectionMapParityTest {
   }
 
   /**
-   * Returns the brace-balanced object-literal body assigned to {@code variableName} (excluding the
-   * outer braces), so nested objects do not terminate the scan early.
-   *
-   * <p>Anchored on the <em>assignment</em> — the first {@code <NAME> = &#123;} — not on the first
-   * bare occurrence of the name (F6). The seam-map name typically appears first in a preceding
-   * comment; a plain {@code indexOf(name)} then {@code indexOf('{')} would silently mis-scan the
-   * wrong span if that comment ever contained a brace (e.g. an {@code operation:&#123;id&#125;}
-   * example), extracting garbage instead of failing loudly.
+   * Returns the brace-balanced object-literal body assigned to {@code variableName}, excluding the
+   * outer braces, anchored on the {@code <NAME> = &#123;} assignment.
    *
    * @param js the full module source
    * @param variableName the seam-map variable name

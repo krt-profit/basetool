@@ -29,21 +29,10 @@ import lombok.ToString;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Organisationsleitung (OL) tenant — the top of the Kartell hierarchy, above every {@link Bereich}
- * (epic #692, REQ-ORG-014, ADR-0025). Concrete {@link OrgUnit} subclass discriminated by {@code
- * kind = 'ORGANISATIONSLEITUNG'} on the {@code org_unit} table.
+ * The Organisationsleitung (OL) tenant at the top of the Kartell hierarchy (REQ-ORG-014).
  *
- * <p>The OL consists of several people, modelled as memberships carrying the {@code is_ol_member}
- * flag on {@link OrgUnitMembership}. Per REQ-ORG-015 an OL member's reach cascades over
- * <em>every</em> org unit (all Bereiche and their Staffeln/SKs) as a concrete scope union computed
- * in {@code OwnerScopeService} — explicitly <b>not</b> via the admin all-scope branch, so OL
- * membership grants officer-equivalent reach but no admin rights. The OL row has no parent ({@code
- * chk_org_unit_ol_has_no_parent}).
- *
- * <p><b>Promotion is permanently disabled for the OL row</b>, exactly as for {@link Bereich} and
- * {@link SpecialCommand}: the {@code chk_org_unit_promotion_only_squadron} CHECK forces {@code
- * is_promotion_enabled = false} on every non-{@code SQUADRON} row, so the no-arg constructor sets
- * the inherited flag to {@code false} up front. The entity adds no fields beyond {@link OrgUnit}.
+ * <p>OL members reach every org unit as a concrete scope union, without admin rights (REQ-ORG-015).
+ * The OL has no parent and promotion is always disabled.
  */
 @Entity
 @DiscriminatorValue("ORGANISATIONSLEITUNG")
@@ -51,14 +40,9 @@ import org.jetbrains.annotations.NotNull;
 public class Organisationsleitung extends OrgUnit {
 
   /**
-   * The account id of the OL member currently holding the <b>Grand Admiral</b> post (REQ-ORG-021),
-   * or {@code null} when the post is vacant. The Grand Admiral is one of the OL members — the
-   * holder keeps the {@code OL_MEMBER} rank and its rights are unchanged; this pointer only records
-   * who the org chart renders at the very top of the Organisationsleitung. Because the OL is a
-   * singleton tier, this single column is the org-wide "at most one Grand Admiral" guarantee. A
-   * subclass-only column on the single-table {@code org_unit} hierarchy (nullable for every non-OL
-   * row, enforced by {@code chk_org_unit_grand_admiral_only_ol}, V215), with a {@code SET NULL} FK
-   * to {@code app_user} so deleting the account vacates the post.
+   * The account id of the OL member holding the Grand Admiral post (REQ-ORG-021), or {@code null}
+   * when vacant. Records only who the org chart renders at the top; grants no extra rights, and
+   * deleting the account vacates the post.
    */
   @Getter
   @Setter
@@ -66,12 +50,8 @@ public class Organisationsleitung extends OrgUnit {
   private UUID grandAdmiralUserId;
 
   /**
-   * The free-text name of the OL member holding the Grand Admiral post when that member has no
-   * Basetool account yet (REQ-ORG-020/-021), or {@code null}. Mutually exclusive with {@link
-   * #grandAdmiralUserId} (a Grand Admiral is either an account or a typed name, never both —
-   * enforced by {@code chk_org_unit_grand_admiral_holder}, V215): set in the chart editor and, like
-   * every free-text holder, grants nothing. Cleared when an account Grand Admiral is designated
-   * under Leitung.
+   * Free-text name of a Grand Admiral without a Basetool account (REQ-ORG-021), or {@code null}.
+   * Mutually exclusive with {@link #grandAdmiralUserId}; grants nothing.
    */
   @Getter
   @Setter
@@ -113,12 +93,10 @@ public class Organisationsleitung extends OrgUnit {
   }
 
   /**
-   * Refuses to enable promotion on the Organisationsleitung. Surfaces a buggy {@code
-   * setPromotionEnabled(true)} call at the call site rather than at flush time.
+   * Refuses to enable promotion on the Organisationsleitung.
    *
    * @param value the requested flag value; must be {@code false}.
-   * @throws IllegalArgumentException when {@code value} is {@code true} — the OL must never expose
-   *     the promotion subsystem.
+   * @throws IllegalArgumentException when {@code value} is {@code true}.
    */
   @Override
   public void setPromotionEnabled(boolean value) {

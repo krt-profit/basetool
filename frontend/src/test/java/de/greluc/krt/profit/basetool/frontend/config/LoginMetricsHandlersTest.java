@@ -47,11 +47,9 @@ import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 
 /**
- * Unit tests for the login-outcome metric handlers ({@link LoginSuccessMetricsHandler} / {@link
- * LoginFailureMetricsHandler}, #1041 item 18): the success/failure counters must be bumped with the
- * right bounded tags and the wrapped navigation/redirect must still run. The failure-reason mapping
- * is exercised directly to pin that only the bounded OAuth2 error code — not the raw description —
- * decides the bucket.
+ * Unit tests for {@link LoginSuccessMetricsHandler} and {@link LoginFailureMetricsHandler}: the
+ * counters carry the right bounded tags, the wrapped redirect still runs, and only the OAuth2 error
+ * code decides the failure reason.
  */
 class LoginMetricsHandlersTest {
 
@@ -73,8 +71,7 @@ class LoginMetricsHandlersTest {
   }
 
   /**
-   * Drives one failure through the handler with a stubbed request/response so the superclass
-   * redirect does not blow up, and returns the registry it counted into.
+   * Drives one failure through the handler with a stubbed request and response.
    *
    * @param exception the failure to report
    * @return the registry the counter was bumped against
@@ -122,12 +119,8 @@ class LoginMetricsHandlersTest {
   }
 
   /**
-   * The OIDC {@code prompt=none} error set must land in the benign bucket.
-   * SsoReAuthenticationEntryPoint probes Keycloak with {@code prompt=none} on every unauthenticated
-   * top-level navigation, and Keycloak answers {@code login_required} whenever the browser carries
-   * no live SSO cookie — an authorization-response error raised before any token exchange. Counting
-   * those as provider_error made a path-scanning bot trip FrontendLoginBroken overnight with login
-   * perfectly healthy (2026-07-28).
+   * Verifies that the OIDC {@code prompt=none} errors, such as {@code login_required}, land in the
+   * benign bucket rather than {@code provider_error}.
    */
   @Test
   void reasonFor_mapsPromptNoneSilentSsoErrorsToInvalidState() {
@@ -154,12 +147,8 @@ class LoginMetricsHandlersTest {
   }
 
   /**
-   * An {@link OAuth2AuthenticationException} carrying no {@link OAuth2Error} must map to
-   * provider_error without throwing. This pins a real hazard of the set-based lookup: {@code
-   * Set.of(…).contains(null)} throws {@link NullPointerException}, so the null guard in {@code
-   * isStateError} is load-bearing (the superseded chain of {@code "literal".equals(code)} calls was
-   * null-safe by construction). {@code new OAuth2Error(null)} is rejected by Spring, so the null
-   * error can only be reached through a stub.
+   * Verifies that an {@link OAuth2AuthenticationException} without an {@link OAuth2Error} maps to
+   * {@code provider_error} without throwing.
    */
   @Test
   void reasonFor_mapsMissingErrorToProviderErrorWithoutThrowing() {
@@ -212,10 +201,8 @@ class LoginMetricsHandlersTest {
   }
 
   /**
-   * The bucket {@code FrontendLoginBroken} fires on must reach the log at WARN and must carry the
-   * two fields that make it triageable: the bounded OAuth2 error code and the root cause's type.
-   * Before audit finding H3 the handler had no logger at all, so the alert's own "check the
-   * frontend logs" instruction pointed at nothing.
+   * Verifies that a {@code provider_error} failure is logged at WARN with the OAuth2 error code and
+   * the root cause's type.
    */
   @Test
   void onAuthenticationFailure_logsProviderErrorAtWarnWithCodeAndRootCause() throws Exception {

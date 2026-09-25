@@ -48,8 +48,8 @@ public interface ShipTypeRepository extends LookupTableRepository<ShipType, UUID
   Optional<ShipType> findByExternalUuid(UUID externalUuid);
 
   /**
-   * Resolution-chain step 2 (R2): match by UEX's integer vehicle id. Used when the UEX payload
-   * carries no UUID but the row was previously created.
+   * Finds a ship type by UEX's integer vehicle id, the fallback when the UEX payload carries no
+   * UUID.
    *
    * @param uexVehicleId UEX integer vehicle id
    * @return matching {@link ShipType} if present
@@ -89,16 +89,12 @@ public interface ShipTypeRepository extends LookupTableRepository<ShipType, UUID
       @Param("seenIds") Collection<Integer> seenIds, @Param("now") Instant now);
 
   /**
-   * Soft-deletes SC Wiki ownership of every ship_type row the Wiki has actually written ({@code
-   * scwiki_synced_at IS NOT NULL}) that is NOT in {@code seenExternalUuids} and not already marked
-   * (R4 §8.6 / §8.7). Gated by the caller on a non-empty seen set so a failed / empty Wiki fetch
-   * never wipes the Wiki-side merge state.
+   * Soft-deletes SC Wiki ownership of every ship type the Wiki has written ({@code scwiki_synced_at
+   * IS NOT NULL}) that is not in {@code seenExternalUuids} and not already marked. Callers pass a
+   * non-empty seen set so a failed Wiki fetch never wipes the merge state.
    *
-   * <p>Gating on {@code scwiki_synced_at} (not merely {@code external_uuid IS NOT NULL}) is
-   * deliberate and matches {@code GameItemRepository.markScwikiDeletedExcept}: a UEX-only vehicle
-   * also carries an {@code external_uuid} (stamped by the UEX vehicle sync), so the looser
-   * predicate would spuriously stamp {@code scwiki_deleted_at} — "missing from Wiki since …" — on a
-   * row the Wiki has never described (e.g. UEX-only capital ships like Idris-M / Polaris, §8.3.3).
+   * <p>Gated on {@code scwiki_synced_at} rather than {@code external_uuid}, because UEX-only
+   * vehicles carry an {@code external_uuid} too.
    *
    * @param seenExternalUuids the external UUIDs the Wiki vehicle sync touched this run
    * @param now timestamp to stamp on the soft-deleted rows
@@ -116,12 +112,9 @@ public interface ShipTypeRepository extends LookupTableRepository<ShipType, UUID
       @Param("seenExternalUuids") Collection<UUID> seenExternalUuids, @Param("now") Instant now);
 
   /**
-   * Counts the live SC Wiki-written ship types: every row the Wiki has actually written ({@code
-   * scwiki_synced_at IS NOT NULL}) and not tombstoned ({@code scwiki_deleted_at IS NULL}) — the
-   * same {@code scwiki_synced_at} gate {@link #markScwikiDeletedExcept} uses, so the two agree on
-   * what "Wiki-linked" means. The R4 vehicle sync reports this as the representative non-zero count
-   * when the Wiki vehicle catalogue comes back {@code 304 Not Modified}, so a fully-cached healthy
-   * run is not read as a zero-item outage by {@code SyncZeroItems} (#1182).
+   * Counts the live Wiki-written ship types ({@code scwiki_synced_at IS NOT NULL}, not tombstoned),
+   * using the same gate as {@link #markScwikiDeletedExcept}. Reported by the vehicle sync on a
+   * {@code 304 Not Modified} so a cached run is not read as a zero-item outage.
    *
    * @return the number of non-tombstoned ship types the SC Wiki sync has written
    */

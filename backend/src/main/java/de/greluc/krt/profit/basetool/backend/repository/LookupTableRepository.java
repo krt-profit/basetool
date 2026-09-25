@@ -23,25 +23,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.repository.NoRepositoryBean;
 
 /**
- * Shared base for lookup-table repositories that enforce a case-insensitive-unique {@code name}
- * column (S5, #911): every implementor's admin create/rename flow needs to surface a 409 Conflict
- * before the SQL UNIQUE constraint trips, so it pre-checks with {@link
- * #existsByNameIgnoreCase(String)} (create) or {@link #existsByNameIgnoreCaseAndIdNot(String,
- * Object)} (rename — excludes the row being renamed so keeping the existing name is not a
- * self-collision).
- *
- * <p>{@code @NoRepositoryBean} — Spring Data does not instantiate this interface directly; each
- * extending repository (e.g. {@code SquadronRepository extends LookupTableRepository<Squadron,
- * UUID>}) gets its own proxy, and Spring Data resolves {@link #existsByNameIgnoreCase(String)} /
- * {@link #existsByNameIgnoreCaseAndIdNot(String, Object)} as a derived query against <em>that</em>
- * entity's {@code name} column — the method declarations are shared, the generated SQL is not.
- *
- * <p><b>Why only the exists-pair, not {@code findByNameIgnoreCase} too.</b> The finder's return
- * type diverges across implementors: most lookup tables have a unique {@code name} and return
- * {@code Optional<T>}, but {@code GameItem.name} is not unique (multiple items can share a display
- * name), so {@code GameItemRepository.findByNameIgnoreCase} returns {@code List<GameItem>}. A base
- * method can only declare one return type, so the finder stays declared per-repository; only the
- * boolean exists-pair — whose return type never varies — lifts cleanly into this base.
+ * Shared base for lookup-table repositories with a case-insensitive-unique {@code name} column,
+ * providing the existence checks that let create and rename flows return 409 before the UNIQUE
+ * constraint trips.
  *
  * @param <T> the entity type, which must expose a case-insensitive-unique {@code name} column
  * @param <IdT> the entity's identifier type
@@ -59,12 +43,12 @@ public interface LookupTableRepository<T, IdT> extends JpaRepository<T, IdT> {
   boolean existsByNameIgnoreCase(String name);
 
   /**
-   * Derived Spring-Data check - returns {@code true} iff at least one row matches {@code
-   * NameIgnoreCaseAndIdNot}.
+   * Checks whether another row, other than {@code id}, already carries {@code name}
+   * case-insensitively.
    *
    * @param name the proposed name; never {@code null}
-   * @param id the id of the row currently being renamed; never {@code null}
-   * @return {@code true} iff at least one OTHER row already carries this name (case-insensitive)
+   * @param id the id of the row being renamed; never {@code null}
+   * @return {@code true} iff at least one other row already carries this name
    */
   boolean existsByNameIgnoreCaseAndIdNot(String name, IdT id);
 }

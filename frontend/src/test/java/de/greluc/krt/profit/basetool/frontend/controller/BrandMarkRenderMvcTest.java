@@ -47,20 +47,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Pins the Profit Basetool app mark and its favicon set to every rendered page (REQ-UI-019).
- *
- * <p>The app used to wear the DAS KARTELL org mark ({@code logos/krt.webp}) in the header and the
- * padded org favicon ({@code logos/krt-favicon.webp}) in the browser tab. Both were replaced by the
- * dedicated Basetool logo family, so two regressions are now possible and neither would fail any
- * other test: a template could drift back to the org mark, and a favicon {@code <link>} could be
- * dropped while the page keeps rendering perfectly. Since FE-PERF-04 (2026-09-22) the two org files
- * no longer ship from the frontend at all — the org-branded PDF exports read the backend's own
- * {@code krt.png} — so a template that drifted back would now 404 in the browser, which no
- * server-side render sees either; the negative match below is still the guard.
- *
- * <p>The {@code krt.*} assertions are therefore written as *negative* matches on the rendered HTML
- * rather than as a grep over the template sources: only the rendered output proves that no fragment
- * in the include chain put the org mark back.
+ * Pins the Profit Basetool app mark and its favicon set on every rendered page (REQ-UI-019),
+ * asserting on the rendered HTML that the DAS KARTELL org mark does not appear.
  */
 @SpringBootTest
 class BrandMarkRenderMvcTest {
@@ -112,12 +100,7 @@ class BrandMarkRenderMvcTest {
         .andExpect(content().string(containsString("logos/basetool-appicon-512.png")));
   }
 
-  /**
-   * The org mark and the org favicon must not reappear on an app page. The generated PDF exports
-   * are org documents and carry the org mark from the backend's {@code krt.png}; the frontend
-   * copies were unreferenced and are deleted (FE-PERF-04), so a copy-paste of an old header would
-   * render a broken image that only a browser notices.
-   */
+  /** The org mark and the org favicon do not appear on an app page. */
   @Test
   void homePage_ShouldNotFallBackToTheOrgMarkOrOrgFavicon() throws Exception {
     mockMvc
@@ -128,9 +111,7 @@ class BrandMarkRenderMvcTest {
   }
 
   /**
-   * A {@code th:src} that points at a missing file renders a perfectly valid {@code <img>} tag and
-   * fails only in the browser, where no server-side test looks. This pins the actual bytes onto the
-   * classpath under the path the templates request.
+   * Each logo asset the templates reference exists on the classpath.
    *
    * @param asset file name inside {@code META-INF/resources/logos/}, as referenced from {@code
    *     fragments/head.html} and the page headers
@@ -153,10 +134,7 @@ class BrandMarkRenderMvcTest {
   }
 
   /**
-   * Everything under {@code /logos/**} is public and cacheable, so an unreferenced file there is
-   * dead weight every deploy ships and every crawler can fetch. FE-PERF-04 deleted seven of them
-   * (about 570 KB, a 515 KB {@code sc.png} among them); only the Basetool logo family is left, and
-   * a file outside it has to be added here deliberately rather than slip in.
+   * The {@code /logos} directory ships only the Basetool logo family.
    *
    * @throws IOException if the classpath cannot be scanned
    */

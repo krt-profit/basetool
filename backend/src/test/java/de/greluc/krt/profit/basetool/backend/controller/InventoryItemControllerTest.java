@@ -67,28 +67,17 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 /**
- * Pure-Mockito unit tests for {@link InventoryItemController}. The controller is otherwise a
- * delegating thin shell, but five behaviours need an explicit pin because regressing them is silent
- * at the type level:
+ * Pure-Mockito unit tests for {@link InventoryItemController}.
  *
  * <ul>
- *   <li>{@code /my-inventory*} derives the owner id from the JWT via {@link
- *       UserService#getUserIdFromJwt} — never a URL parameter. This is the personal-inventory
- *       data-isolation guarantee from CLAUDE.md.
- *   <li>{@code create}, {@code book-out}, {@code update-delivered} and {@code update-note} read
- *       {@code authHelperService.isLogisticianOrAbove()} at the HTTP boundary and pass the boolean
- *       down so the service stays free of {@code SecurityContextHolder} (ArchUnit rule). The
- *       role-driven branch is exercised for both {@code true} and {@code false}.
- *   <li>{@code POST /{id}/book-out} returns {@code 200 OK} when the service yields a DTO and {@code
- *       204 No Content} when the row was removed entirely (service returns {@code null}). The
- *       branch decision lives in the controller, not the service.
- *   <li>{@code POST /bulk-checkout} forwards only the calling user's id — never an {@code
- *       isLogistician} flag — because the service deliberately refuses to remove items owned by
- *       another user, regardless of role. The test confirms the boundary helper is NEVER consulted
- *       for bulk checkout.
- *   <li>{@code POST /bulk-rebook} (REQ-INV-036) carries the same owner-only contract: it forwards
- *       the calling user's id and never consults {@code isLogisticianOrAbove()}, so an admin cannot
- *       bulk-move another member's stock through it.
+ *   <li>{@code /my-inventory*} takes the owner id from the JWT via {@link
+ *       UserService#getUserIdFromJwt}, never from the URL.
+ *   <li>{@code create}, {@code book-out}, {@code update-delivered} and {@code update-note} pass the
+ *       boundary's {@code isLogisticianOrAbove()} result to the service.
+ *   <li>{@code POST /{id}/book-out} answers {@code 200} with a DTO and {@code 204} when the row was
+ *       removed.
+ *   <li>{@code POST /bulk-checkout} and {@code POST /bulk-rebook} (REQ-INV-036) forward only the
+ *       caller's id and never consult the role check.
  * </ul>
  */
 @ExtendWith(MockitoExtension.class)

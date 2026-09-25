@@ -55,12 +55,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Verifies the slim sub-resource endpoints introduced for multi-user concurrency on the mission
- * detail page (Option A, Paket 2). Their MissionDto-returning predecessors were deprecated with a
- * sunset of 2026-10-20 and deleted on 2026-09-22 (BE-SIMP-02), so these are now the only write
- * paths for units, crew, participants, frequencies and managers: they must be reachable under the
- * role gates, they must return slim sub-DTOs (not the full MissionDto), and DELETE variants must
- * return 204 No Content.
+ * Verifies the slim mission sub-resource write endpoints: reachable under their role gates,
+ * returning slim sub-DTOs, and 204 on DELETE.
  */
 @SpringBootTest
 class MissionControllerSlimEndpointsTest {
@@ -460,11 +456,8 @@ class MissionControllerSlimEndpointsTest {
   }
 
   /**
-   * The row this used to be about survives; its author changed. It was written as the reproducer
-   * for "anonymous guest cannot sign up to a mission" (401 on POST .../participants/slim for
-   * `[anonymous]`), and the fix was a permit rule on the URL. REQ-SEC-052 took that rule away, so
-   * the same row — a named person with no account — is now recorded by a member who can see the
-   * Einsatz (ADR-0159, decision D4). Same shape, different hand.
+   * Verifies that a member who can see the Einsatz may record an external participant without an
+   * account (ADR-0159).
    */
   @Test
   void addParticipantSlim_memberRecordsAnExternalParticipant_isAllowed() throws Exception {

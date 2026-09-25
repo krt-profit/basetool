@@ -23,28 +23,11 @@ import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import java.util.UUID;
 
 /**
- * Optional body of {@code POST /api/v1/missions/{id}/join} — the two answers a sign-up sheet
- * collects beyond the bare fact of signing up.
+ * Optional body of {@code POST /api/v1/missions/{id}/join} carrying the caller's sign-up answers.
  *
- * <p><b>The whole body is optional and so is every field in it.</b> {@code POST …/join} carried no
- * body at all until 2026-09-02 and must keep working without one: a shipped client that sends
- * nothing is not a client to break (REQ-API-009 freezes this operation, and a new <em>required</em>
- * request field would be exactly the break that freeze forbids). Both fields therefore mean "no
- * answer given", never "clear it":
- *
- * <ul>
- *   <li>{@code desiredJobTypeId} — the Funktion the member would like to fill. {@code null} leaves
- *       the participant without a desired function, which is what a bodyless join has always done.
- *   <li>{@code payoutPreference} — fixes the per-mission payout choice at sign-up time. {@code
- *       null} keeps the existing default chain: the registered user's profile default
- *       (REQ-MISSION-002), falling back to the entity default {@code PAYOUT}. A non-null value wins
- *       over the profile default, matching {@code AddExternalParticipantRequest}.
- * </ul>
- *
- * <p>Deliberately <b>not</b> a copy of {@code AddExternalParticipantRequest}: that record can name
- * somebody else ({@code userId}, {@code guestName}, {@code orgUnitIds}) and needs a self-vs-manager
- * check to be safe. {@code join} derives the member from the JWT and can only ever enrol the
- * caller, so the narrower body is the point rather than an omission.
+ * <p>The body and each field are optional (REQ-API-009); {@code null} means "no answer given",
+ * never "clear it". A {@code null} {@code payoutPreference} falls back to the profile default
+ * (REQ-MISSION-002), then to {@code PAYOUT}.
  *
  * @param desiredJobTypeId the Funktion the caller asks to fill, or {@code null} for no preference
  * @param payoutPreference the per-mission payout choice, or {@code null} to keep the default chain

@@ -56,11 +56,7 @@ import org.springframework.web.cors.CorsConfiguration;
  */
 class SecurityConfigTest {
 
-  /**
-   * The gateway's real audience (ADR-0018 amendment 1). This constant used to be the backend's
-   * {@code basetool-backend}, which made the suite assert — and document — exactly the wrong
-   * configuration.
-   */
+  /** The gateway's own token audience (ADR-0018). */
   private static final List<String> EXPECTED = List.of("basetool-ingest");
 
   private static Jwt jwtWithAudience(List<String> audience) {

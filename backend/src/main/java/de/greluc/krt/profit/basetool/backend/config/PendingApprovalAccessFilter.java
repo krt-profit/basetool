@@ -52,53 +52,12 @@ import org.springframework.web.util.pattern.PathPatternParser;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Backend enforcement of the two states that authenticate but do not admit: a PENDING/REJECTED
- * registration (REQ-SEC-017) and an approved account holding no application role (REQ-SEC-053).
+ * Refuses every {@code /api/**} request with 403 for an authenticated caller who is pending
+ * approval (REQ-SEC-017) or holds no application role (REQ-SEC-053).
  *
- * <p>{@link CustomJwtGrantedAuthoritiesConverter} already short-circuits both to a single marker
- * authority — {@code ROLE_PENDING_APPROVAL} or {@code ROLE_NO_ROLE} — but such a caller is still
- * <em>authenticated</em>, so the many writes gated only on
- * {@code @PreAuthorize("isAuthenticated()")} (e.g. personal-inventory create/delete) would
- * otherwise be reachable by calling the API directly, bypassing the frontend's waiting-page
- * redirect (which is UX, not the access boundary). This filter closes that gap: an authenticated
- * caller carrying either marker is refused with {@code 403} on every {@code /api/**} endpoint, with
- * three deliberate exceptions — the registration-status endpoint the frontend reads to route them
- * to the waiting page, and the two reads REQ-SEC-052 serves without any token at all.
- *
- * <p><strong>The two refusals carry different codes and different words, on purpose.</strong> Until
- * ADR-0159 a role-less account was mapped onto the authority-less {@code GUEST} role and simply
- * used the anonymous surface; with that surface gone it needed a state of its own rather than an
- * empty authority set that passes every {@code isAuthenticated()} gate and fails only the ones
- * naming a role. Answering it with {@code PENDING_APPROVAL} would have been worse than generic: it
- * tells a member who has already been approved to wait for an approval, which is a wait with no
- * end.
- *
- * <p>Runs after {@link ActingMemberFilter}, which itself sits after the bearer-token authentication
- * filter — so the authorities are already assembled, and an ingest-gateway request has already had
- * the member it acts for substituted as its security identity (ADR-0129). That substitution is why
- * this gate also covers the desktop extractor: the gateway authenticates with its own service
- * account and only names the member in an on-behalf-of header, so without it the filter would judge
- * a service account instead of the person sending. The acting member's authorities are assembled by
- * the same converter the login path uses, so a member who is still PENDING carries the marker here
- * too and is refused. The filter is a no-op for every approved/role-bearing user, so it adds no
- * risk to the normal path.
- *
- * <p>The 403 body is a full RFC&nbsp;7807 problem document mirroring {@code GlobalExceptionHandler}
- * (RFC-7807 hardening, REQ-API-004): {@code type} built off {@link AppProblemProperties}, localized
- * {@code title}/{@code detail}, the stable {@code code} {@code PENDING_APPROVAL}, and a {@code
- * correlationId}. Because this filter runs before {@code CorrelationIdFilter}, no request-scoped id
- * exists yet, so a fresh one is minted, echoed as the {@code X-Correlation-Id} response header and
- * logged. Serialization goes through the shared {@link ObjectMapper} so every field is safely
- * JSON-escaped (the request URI in {@code instance} is attacker-controlled).
- *
- * <p>Running that early also means the {@code userId} MDC key is still unset — {@code
- * CorrelationIdFilter} is its only writer in the backend and it never runs on a request this filter
- * rejects. The block line would therefore claim {@code anonymous} (the logback pattern's default)
- * for a caller who is demonstrably authenticated, which is worse than no value at all: an identical
- * controller-level denial renders the real {@code sub}. {@link #writeForbidden} therefore stamps
- * the JWT {@code sub} for the duration of the rejection write and removes it again, mirroring the
- * ownership discipline the minted correlation id follows. Only the {@code sub} — never the callsign
- * or e-mail (REQ-OBS-004).
+ * <p>Exempt are the registration-status endpoint and the two anonymous reads of REQ-SEC-052. Runs
+ * after {@link ActingMemberFilter}, so ingest requests are judged on the acting member. The body is
+ * an RFC&nbsp;7807 problem document with a freshly minted correlation id.
  */
 @Slf4j
 @RequiredArgsConstructor
@@ -120,53 +79,28 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
   static final String SELF_STATUS_PATH = "/api/v1/users/me/registration-status";
 
   /**
-   * The two reads that answer without any token at all (REQ-SEC-052).
-   *
-   * <p>They are exempt here for the same reason they are {@code permitAll} in the matrix: an app
-   * too old to log in must still learn that it is too old, and a document everyone must be able to
-   * read before agreeing to anything cannot require having agreed. The Android app attaches its
-   * bearer to <em>every</em> call once a session exists (D2/D3 of ADR-0159), so without this
-   * exemption a pending or role-less member would be refused the version policy and the terms text
-   * purely because they happened to be signed in — the one caller group most likely to need both.
+   * The two reads served without any token (REQ-SEC-052), exempt so a signed-in pending or
+   * role-less member can still read them.
    */
   static final List<String> ANONYMOUS_READ_PATHS =
       List.of("/api/v1/app/version-policy", "/api/v1/terms/document");
 
-  /** Parses the two patterns below once; matching is per request and allocation-light. */
+  /** Shared parser for this filter's path patterns. */
   private static final PathPatternParser PATH_PARSER = PathPatternParser.defaultInstance;
 
   /**
-   * The surface this filter guards.
-   *
-   * <p>Matched as a parsed {@link PathPattern} rather than with {@code
-   * requestUri.startsWith("/api/")}, because {@code getRequestURI()} is the <em>raw</em>
-   * percent-encoded URI while Spring MVC routes on the <em>decoded</em> path. A request for {@code
-   * /%61pi/v1/missions} fails a raw prefix test, so the gate would wave it through, and {@code
-   * RequestMappingHandlerMapping} would then decode {@code %61pi} to {@code api} and dispatch it —
-   * handing a PENDING/REJECTED account exactly the {@code isAuthenticated()}-only writes this
-   * filter exists to deny. The default {@code StrictHttpFirewall} blocks {@code %2e}, {@code %2f},
-   * {@code %25} and friends, but not {@code %61}.
-   *
-   * <p>{@link PathPattern} matches on {@code PathSegment#valueToMatch()}, which is decoded, so
-   * filter and routing agree. Note that {@code ServletRequestPathUtils} does <em>not</em> solve
-   * this: {@code PathContainer.Element#value()} is contractually the unmodified original.
-   *
-   * <p>Precedent: {@code filter.RateLimitingFilter} matches its configured paths the same way, and
-   * {@link TermsAcceptanceAccessFilter} guards this same surface with the same construct — the two
-   * gates must agree on what {@code /api} means, so neither may drift back to a raw prefix test.
+   * The guarded surface {@code /api/**}, matched against the decoded path so percent-encoded
+   * spellings cannot bypass the filter.
    */
   private static final PathPattern API_SCOPE = PATH_PARSER.parse("/api/**");
 
   /**
-   * {@link #SELF_STATUS_PATH} as a parsed pattern, so the one exemption is decided on the same
-   * decoded path as the scope above — an encoded spelling of the status endpoint must stay
-   * reachable or a client that happens to percent-encode loses its only route to the waiting page.
-   * Being a literal pattern (no wildcard), it keeps the exact-match semantics of the {@code equals}
-   * test it replaced: a future {@code /api/v1/users/me/registration-status-export} is not exempt.
+   * {@link #SELF_STATUS_PATH} as a literal pattern, matched on the decoded path with exact-match
+   * semantics.
    */
   private static final PathPattern SELF_STATUS_PATTERN = PATH_PARSER.parse(SELF_STATUS_PATH);
 
-  /** {@link #ANONYMOUS_READ_PATHS} parsed once, matched on the same decoded path as the scope. */
+  /** {@link #ANONYMOUS_READ_PATHS} parsed once, matched on the decoded path. */
   private static final List<PathPattern> ANONYMOUS_READ_PATTERNS =
       ANONYMOUS_READ_PATHS.stream().map(PATH_PARSER::parse).toList();
 
@@ -179,13 +113,7 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
   /** App-wide correlation-id response header, mirroring {@code LoggingProperties} default. */
   static final String CORRELATION_ID_HEADER = "X-Correlation-Id";
 
-  /**
-   * SLF4J MDC key the logback pattern renders as {@code [<userId>]}, mirroring {@code
-   * LoggingProperties}' default. Hardcoded like {@link #CORRELATION_ID_HEADER}: it is a wire
-   * constant shared with the logback pattern, not a per-deployment override, and reading it from
-   * {@code LoggingProperties} here would make this filter depend on a bean it is constructed
-   * without.
-   */
+  /** MDC key of the caller's subject, matching the logback pattern's {@code userId} placeholder. */
   static final String MDC_USER_ID = "userId";
 
   private final MessageSource messageSource;
@@ -220,13 +148,7 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
   }
 
   /**
-   * One of the two states this filter refuses, with the wording and the code that belong to it.
-   *
-   * <p>Named rather than expressed as a boolean pair because the two are answered on the same
-   * status with different instructions: a pending member is waiting for a decision that has been
-   * asked for, a role-less one has already been approved and is waiting for a role nobody has been
-   * asked to grant. Telling the second to wait for approval points them at an administrator who has
-   * already acted.
+   * One of the two refusal states, with its code and wording.
    *
    * @param code the stable machine-readable code on the problem body
    * @param titleKey message key for the localized title
@@ -264,18 +186,12 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
           "Role-less user");
 
   /**
-   * Decides whether this request must be refused, and on which of the two grounds.
+   * Decides whether the request must be refused, and on which ground.
    *
-   * <p>An {@code /api} call — other than the self-status exemption and the two anonymous reads —
-   * made by an authenticated caller carrying one of the two markers. The pending marker wins when
-   * both are somehow present: it is the state the member can act on.
-   *
-   * <p>The path is parsed into a {@link PathContainer} and matched against {@link #API_SCOPE} /
-   * {@link #SELF_STATUS_PATTERN} rather than string-compared, so the gate sees the same decoded
-   * path the dispatcher will route on (see {@link #API_SCOPE}).
+   * <p>The pending marker wins when both markers are present.
    *
    * @param request the current request
-   * @return the refusal to write, or {@code null} when the request may proceed down the chain
+   * @return the refusal to write, or {@code null} when the request may proceed
    */
   @Nullable
   private Refusal refusalFor(@NotNull HttpServletRequest request) {
@@ -312,22 +228,12 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Writes the RFC&nbsp;7807 403 body with a minted, logged and header-echoed {@code
-   * correlationId}. Localizes {@code title}/{@code detail} from the request's {@code
-   * Accept-Language} ({@code LocaleContextHolder} is not yet populated this early in the filter
-   * chain, so {@code request.getLocale()} is the authoritative source), serializing via the shared
-   * {@link ObjectMapper} for uniform JSON escaping.
+   * Writes the localized RFC&nbsp;7807 403 body, stamping the caller's {@code sub} into the MDC for
+   * the duration of the write and removing it afterwards.
    *
-   * <p>Owns the {@code userId} MDC key for the duration of the write (see {@link
-   * #stampAuthenticatedSub()}) and removes it again in a {@code finally}, so the DEBUG line names
-   * the blocked caller's {@code sub} without the value bleeding into the next request on a pooled
-   * or virtual thread.
-   *
-   * @param request the rejected request (its URI becomes the {@code instance})
+   * @param request the rejected request; its URI becomes the {@code instance}
    * @param response the response to write the problem body into
-   * @param refusal which of the two refusals to write — the pending-approval one or the role-less
-   *     one; they answer on the same status with different instructions, so this is the argument
-   *     that decides what the caller is told to do
+   * @param refusal which refusal to write
    * @throws IOException if serialization or writing the body fails
    */
   private void writeForbidden(
@@ -360,22 +266,10 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Puts the authenticated caller's subject into the {@code userId} MDC key, unless something
-   * already populated that key (the existing value then wins) or the caller has no readable subject
-   * (the key then stays unset, so the logback pattern's {@code anonymous} default stays truthful).
+   * Puts the authenticated caller's subject into the {@code userId} MDC key unless the key is
+   * already set or no readable subject exists.
    *
-   * <p>"No readable subject" is not the same as "no token". A pending caller acting through the
-   * ingest gateway carries a subject and no token (ADR-0129) and IS stamped; a username/password
-   * caller is not, because its name is a callsign and REQ-OBS-004 keeps that out of the log. The
-   * distinction lives in {@code AuthenticatedSubject}, not here.
-   *
-   * <p>Deliberately duplicated in {@code SecurityProblemResponseHandler} instead of extracted into
-   * the {@code logging} package: {@code logging.CorrelationIdFilter} already depends on {@code
-   * config.LoggingProperties}, so a {@code config -> logging} helper call would close a package
-   * cycle (ADR-0047).
-   *
-   * @return {@code true} when this call stamped the key and must therefore remove it again, {@code
-   *     false} when nothing was stamped
+   * @return {@code true} when this call stamped the key and must remove it again
    */
   private static boolean stampAuthenticatedSub() {
     String existing = MDC.get(MDC_USER_ID);
@@ -393,13 +287,12 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Builds and writes the 403 problem document itself — correlation id, DEBUG log line, {@code
-   * basetool_http_error_total} increment, status, headers and the serialized body — with the {@code
-   * userId} MDC key already stamped by the caller.
+   * Writes the 403 problem document: correlation id, DEBUG log line, {@code
+   * basetool_http_error_total} increment, status, headers and body.
    *
-   * @param request the rejected request (its URI becomes the {@code instance})
+   * @param request the rejected request; its URI becomes the {@code instance}
    * @param response the response to write the problem body into
-   * @param refusal the refusal whose code, title, detail and problem type are written
+   * @param refusal the refusal whose code, title, detail and type are written
    * @throws IOException if serialization or writing the body fails
    */
   private void writeForbiddenBody(

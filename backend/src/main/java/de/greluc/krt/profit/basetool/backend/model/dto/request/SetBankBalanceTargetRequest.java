@@ -27,16 +27,9 @@ import java.math.BigDecimal;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Write payload for setting (or clearing) a bank account's balance target ("Kontostandsziel",
- * REQ-BANK-036). A {@code null} target clears the goal; a present target must be a whole-aUEC
- * amount of at least 1 (the {@code @DecimalMin}/{@code @DecimalMax}/{@code @WholeNumber}
- * constraints skip a {@code null} value by Bean-Validation semantics, so clearing stays valid).
- *
- * <p>Intentionally a separate, field-identical sibling of {@code OrgUnitBalanceTargetRequest}: this
- * is the body of the bank-staff {@code PATCH /api/v1/bank/accounts/{id}/balance-target} while that
- * one backs the org-unit-facing {@code PUT /api/v1/org-units/bank/accounts/{id}/balance-target}.
- * Kept distinct per API surface (REQ-API) so either can evolve without coupling the two endpoints'
- * contracts; the duplication is deliberate, not an oversight.
+ * Write payload for bank staff setting or clearing a bank account's balance target
+ * ("Kontostandsziel", REQ-BANK-036). A {@code null} target clears it; otherwise it is a whole-aUEC
+ * amount of at least 1. The org-unit-facing endpoint uses {@code OrgUnitBalanceTargetRequest}.
  *
  * @param target the new balance target, or {@code null} to clear it
  * @param version optimistic-locking version the client read (REQ-BANK-018); a mismatch surfaces as

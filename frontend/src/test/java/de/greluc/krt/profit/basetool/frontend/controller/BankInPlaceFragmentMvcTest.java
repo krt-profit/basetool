@@ -58,13 +58,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Renders the three in-place swap fragments introduced for #579 (no-reload Bank conversion,
- * REQ-FE-005) so a Thymeleaf error in the {@code th:fragment} / {@code th:block} wrapping is caught
- * at build time (the pure-Mockito controller tests only assert the returned view name, not that the
- * fragment renders). Each test also pins the swap BOUNDARY: the manage/grants fragments must
- * exclude their creation modals (which stay outside the swapped region), while the account-detail
- * {@code accountBody} fragment must INCLUDE the booking modals (their distribution-derived holder
- * selects refresh with the money region).
+ * Renders the three Bank in-place swap fragments (REQ-FE-005) and pins their boundaries: the
+ * manage/grants fragments exclude their creation modals, the {@code accountBody} fragment includes
+ * the booking modals.
  */
 @SpringBootTest
 class BankInPlaceFragmentMvcTest {

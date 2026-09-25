@@ -71,11 +71,10 @@ class PendingRegistrationMailServiceTest {
   }
 
   /**
-   * Builds an admin {@link User} carrying the given display name and e-mail, exercising the
-   * name/e-mail fields the service reads.
+   * Builds an admin {@link User} with the given display name and e-mail.
    *
-   * @param displayName the admin's display name (drives the greeting via {@code getEffectiveName})
-   * @param email the admin's e-mail address, or {@code null}/blank to model "no address on file"
+   * @param displayName the admin's display name, used in the greeting
+   * @param email the admin's e-mail address, or {@code null}/blank for none
    * @return a minimally populated admin user
    */
   private static User admin(String displayName, String email) {

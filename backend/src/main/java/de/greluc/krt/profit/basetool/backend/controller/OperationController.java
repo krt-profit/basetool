@@ -65,15 +65,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST surface over the Operation aggregate. CRUD + aggregated finance/payout endpoints. Mutations
- * require MISSION_MANAGER (which the JWT-to-authorities converter also grants users with {@code
- * app_user.is_mission_manager=true}, even without the Keycloak realm role). Delete is ADMIN-only.
+ * REST surface over the Operation aggregate: CRUD plus aggregated finance and payout endpoints.
+ * Mutations require MISSION_MANAGER; delete is ADMIN-only.
  *
- * <p>The status transitions follow the {@code OperationStatus.canTransitionTo} state machine:
- * {@code PLANNED → {ACTIVE, CANCELED}}, {@code ACTIVE → {COMPLETED, CANCELED}}, terminal states are
- * sticky. Admins can bypass the gate — {@link #updateOperation} resolves the role at the HTTP
- * boundary and hands a boolean to the service to keep {@code SecurityContextHolder} out of the
- * service layer (the ArchUnit rule).
+ * <p>Status changes follow {@code OperationStatus.canTransitionTo}; admins may bypass it, resolved
+ * here and passed to the service as a boolean.
  */
 @RestController
 @RequestMapping("/api/v1/operations")
@@ -126,14 +122,9 @@ public class OperationController {
   }
 
   /**
-   * Filtered + paged operation search. Mirrors {@link
-   * de.greluc.krt.profit.basetool.backend.controller.MissionController#searchMissions} within the
-   * limits of the operation aggregate: free-text query, status list and a time range. Operations
-   * have no {@code plannedStartTime} of their own (that field lives on the underlying missions), so
-   * the {@code start}/{@code end} bounds filter on the operation's derived span — {@code start}
-   * against the planned start of the earliest linked mission, {@code end} against the planned end
-   * of the latest linked mission. Empty {@code status} from the caller is forwarded as-is and the
-   * service falls back to every {@code OperationStatus}; an explicit list narrows the result.
+   * Filtered, paged operation search by text, status and time range. {@code start} and {@code end}
+   * bound the planned start of the earliest and the planned end of the latest linked mission; an
+   * empty {@code status} means every status.
    *
    * @param query free-text name/description fragment
    * @param start inclusive lower bound on the earliest linked mission's planned start (ISO-8601)
@@ -181,10 +172,8 @@ public class OperationController {
   }
 
   /**
-   * Slim id + name projection of every operation visible to the caller, sorted by name. Drives the
-   * mission-detail page's operation-picker dropdown — replaces the previous {@code
-   * /api/v1/operations?page=0&size=1000} call that pulled the full {@code OperationDto} payload for
-   * every option on every mission page render.
+   * Slim id + name projection of every operation visible to the caller, sorted by name, for the
+   * mission-detail operation picker.
    *
    * @return slim reference DTOs for the operation picker
    */
@@ -233,14 +222,9 @@ public class OperationController {
   }
 
   /**
-   * Aggregated finance roll-up across all missions of the operation, with the full per-entry /
-   * per-refinery-order breakdown embedded per mission.
-   *
-   * <p>This is the heavy full-detail variant: it materializes every finance entry and refinery
-   * order across every child mission in one shot. The operation-detail render no longer uses it —
-   * it reads the cheap {@link #getOperationFinanceSummary} roll-up and lazy-loads each mission's
-   * breakdown via {@link #getMissionFinanceDetail} instead (#1121). Kept for API consumers that
-   * want the whole operation ledger in a single call.
+   * Full finance roll-up across all missions of the operation, with every finance entry and
+   * refinery order embedded per mission. For the lightweight variant see {@link
+   * #getOperationFinanceSummary}.
    *
    * @param id operation id
    * @return finance summary DTO with the full per-mission breakdown
@@ -267,11 +251,9 @@ public class OperationController {
   }
 
   /**
-   * Lightweight finance roll-up: the operation-wide total plus one total line per mission, computed
-   * from grouped SQL aggregates rather than the {@link #getOperationFinances} ledger load-all.
-   * Drives the operation-detail "Ergebnis je Einsatz" bars and the Gesamtergebnis; each mission's
-   * per-entry breakdown loads on demand via {@link #getMissionFinanceDetail}. The operation-side
-   * mirror of the mission finance summary aggregate (ADR-0078, #1121).
+   * Lightweight finance roll-up: the operation-wide total plus one total line per mission, from
+   * grouped SQL aggregates (ADR-0078). Per-mission detail loads via {@link
+   * #getMissionFinanceDetail}.
    *
    * @param id operation id
    * @return the operation-wide total plus the capped per-mission roll-up lines
@@ -297,10 +279,8 @@ public class OperationController {
   }
 
   /**
-   * One mission's full finance detail (its finance entries + refinery orders), for the lazy
-   * per-mission breakdown of the operation finance panel. Authorized at the operation scope ({@code
-   * canSeeOperation}) and validated to belong to the operation, so a viewer of the operation can
-   * expand any of its missions' breakdowns without a separate mission-scope gate (#1121).
+   * One mission's full finance detail (entries + refinery orders) for the operation finance panel.
+   * Authorized at the operation scope; the mission must belong to the operation.
    *
    * @param id operation id (authorization scope)
    * @param missionId the mission whose finance detail to load; must belong to the operation
@@ -329,9 +309,8 @@ public class OperationController {
   }
 
   /**
-   * Per-participant payout breakdown: time-share percentage, the actual money number (expense
-   * reimbursement + share-of-pool), and the mission-manager-set paid-out audit flag (DONATE in any
-   * sub-mission is sticky for the whole operation).
+   * Per-participant payout breakdown: time share, payout amount (expense reimbursement + pool
+   * share) and the paid-out flag. DONATE in any sub-mission applies to the whole operation.
    *
    * @param id operation id
    * @return payout rows sorted by participant name
@@ -370,13 +349,11 @@ public class OperationController {
   }
 
   /**
-   * Toggles the per-participant paid-out flag on the operation. Reserved for mission managers
-   * (which the role hierarchy widens to admins and officers).
+   * Toggles a participant's paid-out flag on the operation; mission managers and above only.
    *
    * @param id operation id
-   * @param dto request body with the participant key and new paid-out value
-   * @return the refreshed paid-out status block for the participant, so the caller can patch the
-   *     single "Bezahlt" cell without re-fetching (or the backend re-computing) the whole breakdown
+   * @param dto participant key and new paid-out value
+   * @return the participant's refreshed paid-out status block
    */
   @PutMapping("/{id}/payouts/paid-out")
   @PreAuthorize(
@@ -445,9 +422,8 @@ public class OperationController {
   }
 
   /**
-   * Updates an existing operation with optimistic-lock + state-machine validation. Admin role is
-   * resolved at the HTTP boundary and forwarded as a boolean so the service stays free of {@code
-   * SecurityContextHolder} reads (ArchUnit rule).
+   * Updates an operation with optimistic-lock and state-machine validation; the admin role is
+   * resolved here and passed to the service as a boolean.
    *
    * @param id operation id
    * @param updateDto update payload (carries expected version + new status)

@@ -50,12 +50,10 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Isolated integration tests for the fee-bearing holder→holder Umbuchung (REQ-BANK-031, #998): the
- * in-game transfer fee is borne by, and directly debited from, the KRT ({@code CARTEL}) account,
- * while the source holder's custody is reduced by the fee. Unlike the shared-state {@link
- * BankLedgerServiceTest}, this class is {@link Transactional} (rolled back per test) so each test
- * can create the <strong>singleton</strong> CARTEL account in a clean slate without colliding with
- * the {@code uq_bank_account_singleton_cartel} index across tests.
+ * Integration tests for the fee-bearing holder-to-holder Umbuchung (REQ-BANK-031): the fee is
+ * debited from the {@code CARTEL} account and reduces the source holder's custody.
+ *
+ * <p>Each test rolls back, so it can create the singleton CARTEL account.
  */
 @SpringBootTest
 @ActiveProfiles("test")

@@ -42,11 +42,8 @@ public interface ManufacturerRepository extends LookupTableRepository<Manufactur
   Page<Manufacturer> findByHiddenFalse(Pageable pageable);
 
   /**
-   * Resolution-chain step 1 for the R5 Wiki item backfill: match an inbound Wiki item's nested
-   * manufacturer by the Wiki manufacturer UUID stored on the local row. Used only to attach a
-   * manufacturer to a freshly created {@code WIKI_ONLY} {@code game_item}; existing rows keep their
-   * (sticky) UEX manufacturer. Never creates a row — an unmatched manufacturer is left {@code null}
-   * for the dedicated R6 reconciliation.
+   * Finds a manufacturer by its SC Wiki UUID, used to attach a manufacturer to a newly created
+   * {@code WIKI_ONLY} game item. Never creates a row.
    *
    * @param scwikiUuid Wiki manufacturer UUID (from the item payload's {@code manufacturer.uuid})
    * @return matching manufacturer if present
@@ -54,17 +51,9 @@ public interface ManufacturerRepository extends LookupTableRepository<Manufactur
   Optional<Manufacturer> findByScwikiUuid(UUID scwikiUuid);
 
   /**
-   * Resolution-chain fallback used by the R6 manufacturer reconciliation and the P4K import: match
-   * a Wiki/P4K manufacturer by its short {@code code} (e.g. {@code "AEGS"}) against the local
-   * {@code abbreviation} when the case-insensitive name match missed (UEX and Wiki occasionally
-   * spell the full name differently while sharing the code).
-   *
-   * <p>{@code abbreviation} is not UNIQUE (see {@code V158} / REQ-DATA-004). The UEX sync now
-   * merges duplicate companies of one brand onto a single row (ADR-0023), but a P4K- or hand-seeded
-   * row can still share a code with a UEX row, so this deliberately returns the
-   * <em>oldest-created</em> match via {@code findFirst … OrderBy createdAt asc} instead of a bare
-   * {@code findBy …} that would throw {@code IncorrectResultSizeDataAccessException} the moment two
-   * rows share the code.
+   * Finds a manufacturer by short code against the local {@code abbreviation} (case-insensitive),
+   * the fallback when the name match misses. {@code abbreviation} is not unique, so the
+   * oldest-created match is returned.
    *
    * @param abbreviation manufacturer short code / abbreviation
    * @return the oldest matching manufacturer if any
@@ -72,11 +61,9 @@ public interface ManufacturerRepository extends LookupTableRepository<Manufactur
   Optional<Manufacturer> findFirstByAbbreviationIgnoreCaseOrderByCreatedAtAsc(String abbreviation);
 
   /**
-   * Soft-deletes SC Wiki ownership of every <em>Wiki-linked</em> manufacturer ({@code
-   * scwiki_synced_at IS NOT NULL}) whose {@code scwiki_uuid} is NOT in {@code seenScwikiUuids} and
-   * that is not already marked. Drives the R6 orphan sweep (SC_WIKI_SYNC_PLAN.md §8.7); the caller
-   * gates it on a non-empty seen set so an empty / failed Wiki fetch never wipes the reconciliation
-   * state. The UEX-canonical columns are untouched — only the soft-delete marker is set.
+   * Marks every Wiki-linked manufacturer whose {@code scwiki_uuid} is not in {@code
+   * seenScwikiUuids} as SC Wiki-deleted, unless already marked. Callers must pass a non-empty set;
+   * UEX-canonical columns are untouched.
    *
    * @param seenScwikiUuids the Wiki manufacturer UUIDs reconciled this run
    * @param now timestamp to stamp on the soft-deleted rows
@@ -94,12 +81,8 @@ public interface ManufacturerRepository extends LookupTableRepository<Manufactur
       @Param("seenScwikiUuids") Collection<UUID> seenScwikiUuids, @Param("now") Instant now);
 
   /**
-   * Counts the live SC Wiki-reconciled manufacturers: every row the Wiki reconciliation has written
-   * ({@code scwiki_synced_at IS NOT NULL}) and not tombstoned ({@code scwiki_deleted_at IS NULL}) —
-   * the same {@code scwiki_synced_at} gate {@link #markScwikiDeletedExcept} uses. The R6
-   * manufacturer reconciliation reports this as the representative non-zero count when the Wiki
-   * manufacturer catalogue comes back {@code 304 Not Modified}, so a fully-cached healthy run is
-   * not read as a zero-item outage by {@code SyncZeroItems} (#1182).
+   * Counts the manufacturers linked by the SC Wiki reconciliation and not tombstoned, reported as
+   * the run's item count when the Wiki catalogue returns {@code 304 Not Modified}.
    *
    * @return the number of non-tombstoned manufacturers the SC Wiki reconciliation has linked
    */

@@ -26,24 +26,19 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
 /**
- * MapStruct mapper from {@link OrgChartPosition} entities to the two wire shapes: {@link
- * OrgChartNodeDto} (the per-person node nested inside the chart read model) and {@link
- * OrgChartPositionDto} (the flat write response). The tree itself — grouping nodes by scope, type
- * and parent — is assembled in {@code OrgChartService}; this mapper only flattens one row.
+ * Maps {@link OrgChartPosition} entities to {@link OrgChartNodeDto} (a chart node) and {@link
+ * OrgChartPositionDto} (the write response).
  *
- * <p>Both methods dereference the (lazy) {@code user} association, so they must be invoked inside
- * the same read/write transaction that loaded the position with its user fetched.
+ * <p>Both methods read the lazy {@code user} association and must run in the loading transaction.
  */
 @Mapper(config = CentralMapperConfig.class)
 public interface OrgChartPositionMapper {
 
   /**
-   * Maps one position to a chart node, projecting the holder's id and effective name. The OrgUnit
-   * and parent are intentionally not surfaced here — the node lives at a place in the nested tree
-   * that already encodes both.
+   * Maps a position to a chart node with the holder's id and effective name.
    *
-   * @param position the persisted position with its {@code user} fetched; never {@code null}.
-   * @return the node DTO; never {@code null}.
+   * @param position the position with its {@code user} fetched; never {@code null}
+   * @return the node DTO; never {@code null}
    */
   @Mapping(target = "positionId", source = "id")
   @Mapping(target = "userId", source = "user.id")

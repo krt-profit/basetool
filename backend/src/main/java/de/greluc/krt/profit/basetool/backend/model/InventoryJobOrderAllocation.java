@@ -41,17 +41,11 @@ import lombok.Setter;
 import lombok.ToString;
 
 /**
- * A single job-order slice of an {@link InventoryItem}'s quantity — one row of the "getrennte
- * Mengen-Aufteilung" (Variante C, REQ-INV-027): an entry may earmark part of its stock to several
- * job orders at once, each with its own {@link #amount}. Independent of the mission split; the two
- * dimensions are validated separately (each dimension's Σ amount must stay ≤ the owning entry's
- * amount). The owning {@link InventoryItem}'s {@code @Version} is the concurrency token for the
- * whole split — this child carries a {@code @Version} of its own only via {@link AbstractEntity}
- * and it is never echoed to the client.
+ * One job-order slice of an {@link InventoryItem}'s quantity (REQ-INV-027), independent of the
+ * mission split; each dimension's total must stay at or below the entry's amount.
  *
- * <p>Both foreign keys are {@code ON DELETE CASCADE} (V217): deleting the entry removes its
- * allocations, and deleting the job order removes the allocation while the entry survives as
- * (partially) unassigned stock — the successor to the former {@code unlinkJobOrder} null-out.
+ * <p>The owning entry's {@code @Version} is the concurrency token for the whole split. Deleting the
+ * entry or the job order removes the slice; the entry survives a job-order deletion.
  */
 @Entity
 @Table(
@@ -88,11 +82,8 @@ public class InventoryJobOrderAllocation extends AbstractEntity<UUID> {
   private Double amount;
 
   /**
-   * Whether the stock earmarked to this job order has been delivered (Variante A, REQ-INV-027) —
-   * the per-order successor to the former entry-level {@code InventoryItem.delivered}. An entry
-   * that serves several orders can be delivered for one and still open for another, which one
-   * entry-level flag could not express. Mission slices carry no delivered marker (a mission has no
-   * "delivery").
+   * Whether the stock earmarked to this job order has been delivered (REQ-INV-027), tracked per
+   * order so one entry can be delivered for one order and open for another.
    */
   @Builder.Default
   @Column(nullable = false)

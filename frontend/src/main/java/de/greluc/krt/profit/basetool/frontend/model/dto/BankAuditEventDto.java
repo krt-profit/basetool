@@ -24,8 +24,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Frontend mirror of one bank audit-trail row (REQ-BANK-012) for the admin-only viewer (A2 mockup).
- * The actor renders from the deletion-proof handle snapshot.
+ * Frontend mirror of one bank audit-trail row (REQ-BANK-012) for the admin-only viewer.
  *
  * @param id the audit row's id
  * @param occurredAt the mutation instant (UTC)
@@ -36,8 +35,8 @@ import org.jetbrains.annotations.Nullable;
  * @param transactionId the created ledger transaction for booking events
  * @param targetUserId the affected user for grant/holder events
  * @param details compact human-readable details payload
- * @param clientId which client the mutation came through (REQ-AUDIT-005) — a bounded label, {@code
- *     null} on rows written before the column existed, where it means "not recorded"
+ * @param clientId the bounded label of the client the mutation came through (REQ-AUDIT-005), or
+ *     {@code null} when not recorded
  */
 public record BankAuditEventDto(
     UUID id,

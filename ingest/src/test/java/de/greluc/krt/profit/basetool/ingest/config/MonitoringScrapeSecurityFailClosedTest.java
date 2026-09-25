@@ -35,14 +35,10 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Integration tests for the fail-closed default of the {@code /actuator/prometheus} scrape chain on
- * the ingest gateway (REQ-OBS-005): with {@code MONITORING_SCRAPE_USER}/{@code
- * MONITORING_SCRAPE_PASSWORD} unset (the state of dev, test, e2e and prod before the monitoring
- * rollout) the endpoint denies every request — there is no unauthenticated fallback, and presented
- * credentials are not even evaluated because no authentication mechanism is wired. The blank
- * credentials are pinned as test properties (which outrank the OS environment) so the class stays
- * hermetic even on a machine that exports the {@code MONITORING_SCRAPE_*} variables, e.g. for a
- * local monitoring stack.
+ * Integration tests for the fail-closed default of the {@code /actuator/prometheus} scrape chain
+ * (REQ-OBS-005): with {@code MONITORING_SCRAPE_USER}/{@code MONITORING_SCRAPE_PASSWORD} unset,
+ * every request is denied. The blank credentials are set as test properties so an exported
+ * environment variable cannot interfere.
  */
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.MOCK,

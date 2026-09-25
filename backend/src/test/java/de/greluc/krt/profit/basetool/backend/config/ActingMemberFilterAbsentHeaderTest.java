@@ -52,14 +52,9 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * The "no acting member" early exit of {@link ActingMemberFilter}, driven directly.
- *
- * <p>Pins the one guard that CodeQL alert #1125 ({@code java/user-controlled-bypass}) read as a
- * request-controlled skip of the acting-member lookup. Skipping it IS the design when the header is
- * absent: the request then runs under the caller's own identity, untouched, and every later check
- * still applies to that identity. What must hold, and is asserted here, is that an absent or blank
- * header neither refuses, nor looks anybody up, nor replaces the security context — and that a
- * present header never takes this exit.
+ * Tests the "no acting member" early exit of {@link ActingMemberFilter}: an absent or blank header
+ * neither refuses, looks anybody up nor replaces the security context, and a present header never
+ * takes this exit.
  */
 class ActingMemberFilterAbsentHeaderTest {
 

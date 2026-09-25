@@ -34,20 +34,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
- * Guards ADR-0142 point 3 in the live schema: <b>every column holding an {@code app_user.id}
- * carries a foreign key to {@code app_user(id)}</b>.
- *
- * <p>Five columns did not (issue #1638), which is how each of them outlived the accounts they
- * belonged to: nothing cascaded, no retention job reached them, they became undiscoverable once
- * every lookup key had left the roster, and a returning Keycloak subject silently re-adopted them.
- * V227 purged what earlier deletions had already leaked and V235 added the constraints — but a
- * migration only fixes the columns that existed when it was written. This test is what stops the
- * sixth from appearing: a new {@code *_user_id} or {@code *_sub} column without a foreign key fails
- * the build, at the point the column is added rather than at the deletion that leaks because of it.
- *
- * <p>Detection is by <b>name</b>, not by type or by content, because that is the only signal
- * available before a row exists. A column that holds a user id under some other name is invisible
- * here — which is itself an argument for the naming ADR-0142 point 1 settles.
+ * Enforces ADR-0142 point 3 in the live schema: every column named as a user identifier carries a
+ * foreign key to {@code app_user(id)}. Detection is by column name only.
  */
 @SpringBootTest
 class UserIdentityColumnForeignKeyTest {
@@ -59,45 +47,21 @@ class UserIdentityColumnForeignKeyTest {
   @Autowired private DataSource dataSource;
 
   /**
-   * Columns matching the naming rule that deliberately carry <b>no</b> foreign key, each for a
-   * reason recorded in the schema itself via {@code COMMENT ON COLUMN} (V235).
-   *
-   * <p>The audit trail must outlive the account it is about (REQ-AUDIT-001): a foreign key would
-   * either delete the evidence with the member or block the deletion outright. Both tables snapshot
-   * a NOT NULL handle beside the id, so a dangling target still renders.
-   *
-   * <p>Adding an entry here is a deliberate act that needs the same justification in the migration.
-   * It is not the way to make this test pass.
+   * User-identity columns that deliberately carry no foreign key, each justified by a {@code
+   * COMMENT ON COLUMN}: the audit targets, which must outlive the account (REQ-AUDIT-001).
    */
   private static final Set<String> EXEMPT_COLUMNS =
       Set.of("audit_event.target_user_id", "bank_audit_event.target_user_id");
 
   /**
-   * Columns the naming rule matches that do not hold an {@code app_user.id} at all, and so are not
-   * exemptions from anything -- they are outside the rule's subject.
-   *
-   * <p>{@code app_user.discord_user_id} holds the <b>Discord</b> account's snowflake id (V173,
-   * REQ-SEC-017). A foreign key to {@code app_user(id)} would be nonsense there, and the column
-   * carries its own uniqueness constraint.
-   *
-   * <p>Kept separate from {@link #EXEMPT_COLUMNS} deliberately: conflating "this is not a user id"
-   * with "this is a user id we chose not to constrain" is how a real leak would end up filed as a
-   * false positive.
+   * Columns matching the naming rule that hold no {@code app_user.id}: {@code
+   * app_user.discord_user_id} holds a Discord snowflake id (REQ-SEC-017).
    */
   private static final Set<String> FOREIGN_SYSTEM_ID_COLUMNS = Set.of("app_user.discord_user_id");
 
   /**
-   * Fails when a column whose name marks it as a user identifier has no foreign key to {@code
-   * app_user(id)}.
-   *
-   * <p>The name rule is {@code user_id}, {@code *_user_id} and {@code *_sub} — the three shapes the
-   * schema actually uses for this. {@code *_sub} is matched because four such columns still exist
-   * (they are renamed to {@code *_user_id} by #1640); keeping the pattern after that rename costs
-   * nothing and catches a relapse.
-   *
-   * <p>A lower bound on the number of inspected columns guards against the query silently matching
-   * nothing — a rename of {@code app_user} or a schema-name change would otherwise turn this test
-   * green by inspecting an empty set.
+   * Fails when a column named {@code user_id}, {@code *_user_id} or {@code *_sub} has no foreign
+   * key to {@code app_user(id)}; a minimum inspected-column count guards against an empty match.
    */
   @Test
   @DisplayName("every user-identity column has a foreign key to app_user(id)")
@@ -161,15 +125,7 @@ class UserIdentityColumnForeignKeyTest {
                     .isTrue());
   }
 
-  /**
-   * Pins the five constraints V235 added, by name and by {@code ON DELETE} action.
-   *
-   * <p>The sweep above only proves <em>a</em> foreign key exists. These five were the defect, and
-   * what makes them a fix rather than a formality is {@code CASCADE}: {@code NO ACTION} would turn
-   * every user deletion into a {@code 23503} instead, and {@code SET NULL} would keep the rows and
-   * orphan them by a different route — including the notification rule selectors, which would go on
-   * matching and minting notifications for a member that no longer exists.
-   */
+  /** Verifies the five V235 foreign keys by name and that each uses {@code ON DELETE CASCADE}. */
   @Test
   @DisplayName("the five V235 foreign keys exist and cascade")
   void v235ForeignKeysCascadeOnDelete() {

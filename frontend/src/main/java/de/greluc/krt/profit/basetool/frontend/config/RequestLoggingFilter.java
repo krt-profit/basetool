@@ -34,36 +34,13 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Emits a single structured access-log line per request on INFO (or WARN for slow requests) in the
- * frontend module. Correlation id and user id are rendered via the MDC pattern in {@code
- * logback-spring.xml} and therefore not duplicated in the message body.
+ * Emits one structured access-log line per frontend request, on INFO or on WARN for slow requests;
+ * static resources, actuator and swagger assets are skipped (REQ-OBS-001).
  *
- * <p>Static resources, the actuator and swagger assets are skipped to keep the access log focused
- * on real user traffic.
- *
- * <p>The notification SSE relay ({@value #STREAM_PATH}) is never escalated to the "Slow request"
- * WARN branch: Spring MVC books the async request's whole lifetime as the elapsed duration, so a
- * relay held open for up to 30 minutes ({@code NotificationPageController.STREAM_TIMEOUT_MS}) would
- * cross the slow-request threshold on every close and flood the access log with false-positive WARN
- * lines. It still gets its one INFO access-log line. This is the access-log mirror of {@link
- * NotificationStreamObservationPredicate} dropping the same endpoint from {@code
- * http.server.requests} (REQ-OBS-001/-009).
- *
- * <p><b>Why the line carries an AJAX marker.</b> {@link HttpServletRequest#getRequestURI()} drops
- * the query string, so a {@code ?fragment=…} live-update refresh used to be logged byte-for-byte
- * identically to a full page load of the same path. That made the commonest live-update report —
- * "the list did not refresh after booking" — unanswerable from the logs: nothing said whether the
- * refresh request was even sent. {@code http.server.requests} cannot answer it either; it is keyed
- * on the URI template and collapses the {@code ?fragment=} refresh into the same page-load bucket.
- * The access line therefore appends the whitelisted {@value #FRAGMENT_PARAM} parameter value and an
- * {@code ajax} flag derived from the {@value #AJAX_HEADER} header — as a suffix on the existing
- * line, never a second line.
- *
- * <p>The query string is emphatically <b>not</b> logged wholesale: {@code /users/search?query=} and
- * the free-text {@code q} filters carry callsigns, which REQ-OBS-004 forbids outright. Only
- * parameter names on the explicit whitelist are read, and their values still go through {@link
- * LogSafe} — a query parameter is client-supplied free text whatever its name, so it is stripped of
- * control characters and truncated before it reaches the logger (log forging, CWE-117).
+ * <p>The notification SSE relay ({@value #STREAM_PATH}) is never logged as slow. The line appends
+ * the whitelisted {@value #FRAGMENT_PARAM} value and an {@code ajax} flag from {@value
+ * #AJAX_HEADER}; the query string is otherwise never logged, and values pass through {@link
+ * LogSafe} (REQ-OBS-004).
  */
 @Slf4j
 @Component
@@ -120,12 +97,11 @@ public class RequestLoggingFilter extends OncePerRequestFilter implements Ordere
   }
 
   /**
-   * Builds the suffix that distinguishes a live-update refresh from a full page load of the same
-   * path: {@code " [fragment=results ajax=true]"}, either half omitted when it does not apply, and
-   * the empty string for a plain navigation so those lines keep their previous shape.
+   * Builds the suffix that marks a live-update refresh, e.g. {@code " [fragment=results
+   * ajax=true]"}, omitting either half when it does not apply.
    *
    * @param request the request being logged
-   * @return the marker to append after the path, possibly empty, never {@code null}
+   * @return the marker to append after the path, empty for a plain navigation, never {@code null}
    */
   @NotNull
   private static String ajaxMarker(@NotNull HttpServletRequest request) {
@@ -148,22 +124,13 @@ public class RequestLoggingFilter extends OncePerRequestFilter implements Ordere
   }
 
   /**
-   * Picks one named parameter out of the raw query string, or {@code null} when it is not present.
+   * Picks one named parameter out of the raw query string without triggering body parsing.
    *
-   * <p>Scans {@code queryString} directly rather than calling {@code request.getParameter(...)} for
-   * two reasons. First, this runs in the filter's {@code finally} block: on a form POST that never
-   * reached a controller, {@code getParameter} would trigger body parsing after the response is
-   * already committed. Second, reading the raw query string makes the whitelist literal — only the
-   * named parameter is ever looked at, so a {@code query=} or {@code q=} carrying a callsign cannot
-   * reach a log line by accident (REQ-OBS-004).
-   *
-   * <p>The value is returned percent-encoded, undecoded on purpose: a fragment name is a plain
-   * identifier that needs no decoding, decoding client input here can throw on a malformed escape,
-   * and leaving {@code %0A} literal is one less way to smuggle a line break past {@link LogSafe}.
+   * <p>The value is returned still percent-encoded.
    *
    * @param queryString the raw query string, or {@code null} when the request has none
    * @param name the whitelisted parameter name to extract
-   * @return the raw (still percent-encoded) value, or {@code null} if the parameter is not present
+   * @return the raw value, or {@code null} if the parameter is not present
    */
   @Nullable
   private static String whitelistedQueryParam(@Nullable String queryString, @NotNull String name) {

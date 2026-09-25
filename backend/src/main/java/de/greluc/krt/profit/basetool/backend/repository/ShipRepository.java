@@ -49,11 +49,8 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
   void resetAllFitted();
 
   /**
-   * OrgUnit-scoped variant of {@link #resetAllFitted()}. Used by the admin/officer "reset fitted"
-   * action so a focused-mode caller only wipes the {@code fitted} flag on ships of their own
-   * OrgUnit (MULTI_SQUADRON_PLAN.md section 1: Hangar = strict eigene Staffel). Uses the R6.c
-   * scope-predicate triple: admin all-scope resets every ship; pinned active OrgUnit resets only
-   * that one; non-admin path resets the union of memberships.
+   * OrgUnit-scoped variant of {@link #resetAllFitted()}: clears the {@code fitted} flag only on
+   * ships within the caller's scope triple.
    *
    * @param isAdminAllScope {@code true} iff the caller is admin without an active selection
    * @param activeOrgUnitId pinned OrgUnit id, or {@code null}
@@ -67,12 +64,11 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
 
   /**
-   * Bulk-sets the location of every ship owned by {@code ownerId} to {@code location}; backs the
-   * hangar "set home location" action. A single atomic JPQL update — it does NOT touch the
-   * {@code @Version} column, so it never triggers an optimistic-lock storm; the caller reloads the
-   * page afterwards to resync the displayed location. {@code clearAutomatically = true} flushes the
-   * persistence context so any later read in the same transaction sees the new state. The {@code
-   * owner.id} predicate enforces per-user isolation — never touches another user's ships.
+   * Bulk-sets the location of every ship owned by {@code ownerId}, backing the hangar "set home
+   * location" action.
+   *
+   * <p>Does not bump {@code @Version}; clears the persistence context so later reads in the same
+   * transaction see the new state.
    *
    * @param ownerId the owning user id whose ships are updated
    * @param location the location to set on every matching ship
@@ -84,16 +80,13 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
 
   /**
    * Deletes the whole hangar of the given owner as part of the hard account deletion
-   * (REQ-DATA-008). A ship is purely personal property — it carries no squadron-shared state — so a
-   * departing member's fleet is removed rather than reassigned to a fallback admin, which used to
-   * leave admins owning dozens of ex-members' ships.
+   * (REQ-DATA-008).
    *
-   * <p>Set-based on purpose: {@code Ship.owner} is a non-optional {@code @ManyToOne}, so loading
-   * the ships as managed entities before the owning {@code app_user} row is removed would abort the
-   * flush with {@code TransientPropertyValueException}. Keep this a bulk {@code DELETE}.
+   * <p>Must stay a bulk {@code DELETE}: loading the ships as managed entities before the owner row
+   * is removed aborts the flush.
    *
-   * @param ownerId the owner whose ships are removed; never {@code null}.
-   * @return the number of deleted ships, for the audit summary event.
+   * @param ownerId the owner whose ships are removed; never {@code null}
+   * @return the number of deleted ships, for the audit summary event
    */
   @Modifying
   @Query("DELETE FROM Ship s WHERE s.owner.id = :ownerId")
@@ -118,10 +111,8 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
   boolean existsByOwnerIdAndShipTypeId(UUID ownerId, UUID shipTypeId);
 
   /**
-   * Counts one owner's ships per ship type in a single grouped statement — the hangar import's "how
-   * many of this type does the member already have" check for every type in the upload at once,
-   * instead of one {@code COUNT} per distinct type (REQ-DATA-003, BE-PERF-15). Types the owner has
-   * no ship of are absent from the result.
+   * Counts one owner's ships per ship type in a single grouped statement, for the hangar import
+   * (REQ-DATA-003). Types the owner has no ship of are absent from the result.
    *
    * @param ownerId the hangar owner
    * @return one row per ship type the owner holds, with its ship count
@@ -167,37 +158,16 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
   Page<Ship> findByOwnerId(UUID ownerId, Pageable pageable);
 
   /**
-   * One page of the calling user's own ships, server-side ordered by the rich multi-key comparator
-   * the personal hangar relies on and optionally narrowed by a case-insensitive search term
-   * (REQ-HANGAR-002). This replaces the former {@code size=1000} fetch-all + client-side {@code
-   * SHIP_SORT}: the ordering and the filter now span <em>all</em> the user's ships, not just the
-   * rows of the current page.
+   * One page of the calling user's own ships, ordered server-side by the hangar's multi-key
+   * comparator and optionally filtered by a case-insensitive search term (REQ-HANGAR-002).
    *
-   * <p>The {@code ORDER BY} replays the comparator verbatim: manufacturer name, ship-type name, the
-   * computed insurance tier (LTI &lt; numeric &lt; unset — a bucket, not a column), insurance
-   * amount descending within the numeric tier, location name, fitted-first, ship name, and finally
-   * the id as a stable tiebreaker so pages never interleave. The amount key casts {@code insurance}
-   * to an integer, which is safe because the {@code Ship.insurance} {@code @Pattern} constrains
-   * every persisted value to {@code 0}, {@code 1}–{@code 120} or {@code LTI}, and the {@code CASE}
-   * guards the cast against the three non-numeric cases ({@code null} / {@code LTI} / {@code 0});
-   * the matching branch is never the cast on those rows.
+   * <p>Order: manufacturer, ship type, insurance tier (LTI, then numeric by amount descending, then
+   * unset), location, fitted first, ship name, id.
    *
-   * <p>{@code search} matches the ship-type name or the manufacturer name (parity with the former
-   * client-side filter and the squadron overview); a {@code null}/blank term means "no filter". The
-   * {@code cast(:search as string)} null-guard is the proven Postgres-safe idiom (an untyped {@code
-   * IS NULL} bind would otherwise resolve to {@code bytea} and break the {@code LIKE}). The value
-   * query {@code LEFT JOIN FETCH}es the to-one relations the DTO projection needs (so the page is
-   * mapped without N+1) and reuses those fetch-join aliases in the WHERE/ORDER BY; a separate
-   * {@code countQuery} is therefore mandatory because a derived count cannot strip a {@code JOIN
-   * FETCH}. All fetches are single-valued, so the page limit is applied in SQL (no in-memory
-   * pagination).
-   *
-   * @param ownerId the owning user id; only this user's ships are returned (per-user isolation)
+   * @param ownerId the owning user id; only this user's ships are returned
    * @param search optional case-insensitive ship-type/manufacturer name filter; {@code null}/blank
    *     returns every ship the user owns
-   * @param pageable page request — pass it <em>unsorted</em> (page+size only); the ordering lives
-   *     in the query's {@code ORDER BY}, so any caller-supplied {@code Sort} would only append
-   *     noise
+   * @param pageable page and size only; the ordering lives in the query, so pass it unsorted
    * @return one ordered page of the user's ships
    */
   @Query(
@@ -275,16 +245,10 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
       Pageable pageable);
 
   /**
-   * Aggregates ships by type for the squadron-overview page: tuple of {@code (shipType, totalCount,
-   * fittedCount)} ordered alphabetically by ship-type name. Returns raw {@code Object[]} - the
-   * service projects it into the squadron-overview DTO. When {@code isAdminAllScope} is {@code
-   * true} the aggregation spans every org unit (admin "all squadrons" mode); otherwise the row set
-   * is pre-filtered through the scope-predicate triple. The optional {@code query} narrows the
-   * grouped types to those whose ship-type name or manufacturer name contains the term
-   * (case-insensitive) — manufacturer is LEFT-joined so types without one still match on their own
-   * name. The explicit {@code countQuery} counts distinct ship types: the derived count of a
-   * GROUP-BY query would tally ships instead of groups, breaking the page metadata
-   * (totalElements/totalPages) this endpoint's pagination UI relies on.
+   * Aggregates the ships in scope by type for the squadron overview: rows of {@code [ShipType,
+   * totalCount, fittedCount]} ordered by ship-type name.
+   *
+   * <p>The count query counts distinct ship types, so the page metadata reflects groups.
    *
    * @param isAdminAllScope {@code true} iff the caller is an admin without an active selection
    * @param activeOrgUnitId the pinned OrgUnit id, or {@code null} when no pin is active
@@ -325,25 +289,16 @@ public interface ShipRepository extends JpaRepository<Ship, UUID> {
       Pageable pageable);
 
   /**
-   * OrgUnit-scoped owner-detail lookup for the squadron-overview drill-down: returns the ships of
-   * the given types that ALSO fall within the caller's scope, using the same R6.c scope-predicate
-   * triple as {@link #countShipsByType} so the per-owner detail rows exactly match the aggregated
-   * counts shown next to them. Without the scope clause the owner breakdown leaked rows of ships
-   * owned by a foreign OrgUnit that merely shared a ship type with the scoped set — e.g. an admin
-   * pinned to a squadron seeing an SK-only member's ship in the overview. The {@code shipType IN}
-   * filter narrows the result to the current overview page's types (derived from {@link
-   * #countShipsByType}); the scope clause then drops any of those ships that belong to a different
-   * OrgUnit. Eagerly fetches {@code owner}, {@code location} and {@code owningOrgUnit} via
-   * {@code @EntityGraph}.
+   * Returns the ships of the given types within the caller's scope, for the squadron-overview
+   * drill-down; uses the same scope triple as {@link #countShipsByType} so the detail rows match
+   * the aggregated counts.
    *
-   * @param shipTypes the ship types to include (the current overview page's already-scoped types);
-   *     an empty collection yields an empty list.
-   * @param isAdminAllScope {@code true} iff the caller is an admin without an active selection —
-   *     returns every ship of the given types.
-   * @param activeOrgUnitId the pinned OrgUnit id, or {@code null} when no pin is active.
+   * @param shipTypes the ship types to include; an empty collection yields an empty list
+   * @param isAdminAllScope {@code true} iff the caller is an admin without an active selection
+   * @param activeOrgUnitId the pinned OrgUnit id, or {@code null} when no pin is active
    * @param memberOrgUnitIds the union of OrgUnits the caller belongs to, consulted only on the
-   *     non-admin, no-pin path.
-   * @return the scoped ships of those types.
+   *     non-admin, no-pin path
+   * @return the scoped ships of those types
    */
   @EntityGraph(attributePaths = {"owner", "location", "owningOrgUnit"})
   @Query(

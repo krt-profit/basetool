@@ -29,25 +29,15 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * Domain event published right after a member signals they can supply a Materialbörse request /
- * Gesuch ("Ich kann liefern", REQ-MARKET-020). It is directed at the request's owner (the Suchende)
- * so they learn about the would-be supplier without having to poll the board: the {@code
- * EVENT_RECIPIENT} selector resolves to {@link #contextRecipientUserId()} (the requester), while
- * the signalling member is the {@link #actorSub()} (excluded when the rule sets {@code
- * excludeActor} — harmless here since a member can never signal fulfilment on their own request, so
- * actor and recipient are always distinct).
+ * Domain event published when a member signals they can supply a Materialbörse request (Gesuch,
+ * REQ-MARKET-020), directed at the request's owner via {@link #contextRecipientUserId()}.
  *
- * <p>Carries only immutable scalars (ids and pre-resolved display strings) so the after-commit
- * listener never touches the managed request/interest entities. The supplier's name is carried as a
- * render parameter: this is a permitted disclosure because the notification reaches only the owner
- * (REQ-MARKET-019's supplier anonymity is owner-only), and only the opaque {@code type} + {@code
- * params} — never a rendered string — are stored (REQ-NOTIF-001).
+ * <p>Carries only immutable scalars; the supplier's name is disclosed to the owner only.
  *
- * @param requestId the request whose fulfilment was signalled (also the notification's loose entity
- *     id)
+ * @param requestId the request (also the notification's loose entity id)
  * @param subjectName the requested material's or item's name, for rendering
  * @param fulfillerName the signalling member's effective name, for rendering (owner-only)
- * @param requesterSub the request owner's sub — the directed recipient
+ * @param requesterSub the request owner's sub; the directed recipient
  * @param actorSub the signalling member's sub
  */
 public record MaterialRequestFulfillmentSignalledEvent(

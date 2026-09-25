@@ -50,21 +50,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
- * Real-contention proof that the DB-enforced mission section counters (#1112/#1114/#1147) serialise
- * same-section writers into exactly one winner while leaving disjoint-section writers independent.
- * Each worker runs its own transaction (no outer {@code @Transactional}); a {@code go} latch fires
- * them in lockstep so the atomic conditional bumps genuinely race at the database.
- *
- * <ul>
- *   <li>Same-section: N threads append an Ablauf step / reassign the party lead against the same
- *       start version — the conditional {@code UPDATE … WHERE xVersion = ?} row-locks the mission,
- *       so exactly one commits and the rest get {@link ObjectOptimisticLockingFailureException}
- *       (HTTP 409). Before #1147/#1112 they all silently committed, duplicating the step
- *       order-index or losing a party-lead assignment.
- *   <li>Cross-section: a core edit and a schedule edit racing on the same mission BOTH succeed —
- *       the row lock briefly serialises them but neither touches the other's counter or the row
- *       {@code @Version}, so no spurious 409 (the #1114 cross-section-collision fix).
- * </ul>
+ * Proves under real contention that same-section writers to a mission produce exactly one winner
+ * and 409s for the rest, while writers to different sections both succeed.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -198,14 +185,13 @@ class MissionSectionLockConcurrencyTest {
   }
 
   /**
-   * Runs {@code action} on {@code threads} workers released simultaneously by a shared latch,
-   * counting successes, {@link ObjectOptimisticLockingFailureException} conflicts (409) and any
-   * other error.
+   * Runs {@code action} on {@code threads} workers released together, counting successes, {@link
+   * ObjectOptimisticLockingFailureException} conflicts and other errors.
    *
-   * @param threads the number of concurrent workers.
-   * @param action the work each worker performs, given its 0-based index.
-   * @return the tallied outcome of the race.
-   * @throws Exception if the workers do not all reach the start line, or a worker hangs.
+   * @param threads the number of concurrent workers
+   * @param action the work of each worker, given its 0-based index
+   * @return the tallied outcome
+   * @throws Exception if the workers do not all start or a worker hangs
    */
   private RaceResult race(int threads, IntConsumer action) throws Exception {
     CountDownLatch ready = new CountDownLatch(threads);
@@ -257,11 +243,11 @@ class MissionSectionLockConcurrencyTest {
   /**
    * Tally of a concurrent race.
    *
-   * @param successes the number of workers whose action committed.
-   * @param conflicts the number of workers that got a 409 ({@link
-   *     ObjectOptimisticLockingFailureException}).
-   * @param otherErrors the number of workers that failed for any other reason.
-   * @param errors the collected unexpected throwables, for diagnostics.
+   * @param successes the number of workers whose action committed
+   * @param conflicts the number of workers that got an {@link
+   *     ObjectOptimisticLockingFailureException}
+   * @param otherErrors the number of workers that failed otherwise
+   * @param errors the unexpected throwables, for diagnostics
    */
   private record RaceResult(
       int successes, int conflicts, int otherErrors, List<Throwable> errors) {}

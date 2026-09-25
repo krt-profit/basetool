@@ -26,9 +26,8 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins the {@link KeycloakSyncProperties} record (BE-MOD-04): the defaults the sync relies on, and
- * a {@code toString()} that never prints the Admin-API client secret — the former Lombok
- * {@code @Data} class did.
+ * Pins the {@link KeycloakSyncProperties} defaults and that its {@code toString()} never prints the
+ * client secret.
  */
 class KeycloakSyncPropertiesTest {
 

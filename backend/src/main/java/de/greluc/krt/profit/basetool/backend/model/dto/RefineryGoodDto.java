@@ -24,15 +24,10 @@ import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 
 /**
- * Data transfer record carrying Refinery Good payload.
+ * Refinery good of a refinery order.
  *
- * <p>{@code yieldBonusPercent} is a UEX-derived, read-only enrichment: it carries the percentage
- * bonus or malus the chosen refinery applies to {@code inputMaterial} (positive = bonus, negative =
- * malus, {@code null} = no yield row known for this refinery/material pair, e.g. when the order has
- * no location resolvable to a UEX terminal yet). The backend populates the field on read; inbound
- * write payloads ignore it and the database persists nothing for it — see {@code
- * RefineryOrderMapper.toDto(RefineryOrder, Map)} and {@code
- * RefineryOrderService.getYieldBonusByMaterialForLocation(Location)}.
+ * <p>{@code yieldBonusPercent} is a read-only UEX enrichment: the refinery's bonus (positive) or
+ * malus (negative) for {@code inputMaterial}, or {@code null} when unknown. Ignored on write.
  */
 public record RefineryGoodDto(
     UUID id,

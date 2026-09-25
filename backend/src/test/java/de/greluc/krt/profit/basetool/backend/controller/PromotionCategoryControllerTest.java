@@ -44,12 +44,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
 /**
- * Pure-Mockito unit tests for {@link PromotionCategoryController}. Symmetric to {@link
- * PromotionTopicControllerTest} — the controller is a thin pass-through, but it adds two
- * topic-scoped endpoints ({@code /by-topic/{topicId}} and {@code /by-topic/{topicId}/all}) whose
- * path-variable plumbing must reach the service untouched. The tests also cover the {@link
- * PageResponse} wrapping for the unscoped {@code list} endpoint so the frontend never sees a Spring
- * {@link Page} accidentally serialised in its raw form.
+ * Unit tests for {@link PromotionCategoryController}: path-variable forwarding of the topic-scoped
+ * endpoints and {@link PageResponse} wrapping instead of a raw {@link Page}.
  */
 @ExtendWith(MockitoExtension.class)
 class PromotionCategoryControllerTest {

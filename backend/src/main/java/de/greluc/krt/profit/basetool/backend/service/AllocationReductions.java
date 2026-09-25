@@ -34,18 +34,9 @@ import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * The Variante-C "deduct from" plan resolver (REQ-INV-027): given a quantity {@code totalX} leaving
- * an entry in one dimension (job-order or mission), it turns a client-supplied — or auto-derived —
- * plan into a validated {@code targetId → SCU} map naming how much of {@code totalX} comes out of
- * each earmark slice, with whatever is left over coming from that dimension's not-yet-assigned
- * rest.
- *
- * <p>Shared by every amount-lowering write that must keep the R5 invariant (Σ per dimension ≤ the
- * entry amount): the book-out / transfer deduct-from ({@code InventoryCheckoutService}) and the
- * job-order handover's mission clamp ({@code JobOrderHandoverService}) — a handover of {@code X} to
- * an order consumes {@code X} physical SCU that leave the mission earmark too, so the mission
- * dimension is reduced by exactly the same plan. Kept out of {@link InventoryAllocations} so that
- * class stays free of the web-mapped validation exceptions this one throws.
+ * Resolves "deduct from" plans for amount-lowering inventory writes (REQ-INV-027): how much of a
+ * deducted quantity comes out of each job-order or mission earmark slice, the rest coming from the
+ * dimension's unassigned remainder.
  */
 public final class AllocationReductions {
 
@@ -59,24 +50,21 @@ public final class AllocationReductions {
   private AllocationReductions() {}
 
   /**
-   * Resolves a single dimension's "deduct from" plan for a deduction of {@code totalX} from {@code
-   * item}, validating it against the entry's pre-decrement slices. Returns an insertion-ordered
-   * {@code targetId → SCU} map (empty = take it all from the dimension's not-yet-assigned rest).
+   * Resolves and validates one dimension's "deduct from" plan for deducting {@code totalX} from
+   * {@code item}.
    *
-   * <p>A {@code null} list means "use the default": take from the rest first, then spread whatever
-   * the rest cannot cover across the tags proportionally to their size — so the default never fails
-   * and a caller that omits the plan keeps the legacy semantics. An explicit list is validated
-   * exactly as given.
+   * <p>A {@code null} list derives the default plan (unassigned rest first, then proportionally
+   * across the tags), which never fails.
    *
-   * @param item the entry whose slices back the plan (loaded within the tx); never {@code null}
-   * @param reductions the requested reductions, or {@code null} to auto-derive the default plan
-   * @param totalX the total quantity being deducted from the entry in this dimension
+   * @param item the entry whose slices back the plan, loaded within the transaction; never {@code
+   *     null}
+   * @param reductions the requested reductions, or {@code null} for the default plan
+   * @param totalX the total quantity being deducted in this dimension
    * @param jobOrderDimension {@code true} for the job-order dimension, {@code false} for mission
-   * @return the validated {@code targetId → amount} plan for this dimension
+   * @return the insertion-ordered {@code targetId → amount} plan; empty means all from the rest
    * @throws BadRequestException when a reduction targets a non-earmarked slice, duplicates a
-   *     target, exceeds its slice, or the reductions sum to more than {@code totalX}
-   * @throws OverAllocationException when the plan under-assigns so much that the not-yet-assigned
-   *     rest cannot absorb the remainder (the R5 422)
+   *     target, exceeds its slice, or the reductions exceed {@code totalX}
+   * @throws OverAllocationException when the unassigned rest cannot absorb the remainder
    */
   @NotNull
   public static Map<UUID, Double> resolveReductionPlan(
@@ -120,9 +108,7 @@ public final class AllocationReductions {
   }
 
   /**
-   * Applies a resolved single-dimension plan to the entry's slices, shrinking (and removing when
-   * they hit zero) each tagged slice by its planned amount. Whatever the plan did not cover comes
-   * from the dimension's rest once the caller lowers the entry amount.
+   * Shrinks each tagged slice of the entry by its planned amount, removing slices that reach zero.
    *
    * @param item the entry whose slices to shrink; never {@code null}
    * @param plan the resolved {@code targetId → SCU} plan for one dimension
@@ -141,17 +127,14 @@ public final class AllocationReductions {
   }
 
   /**
-   * Auto-derives a dimension's plan when the caller omitted one: take {@code totalX} from the
-   * not-yet-assigned rest first, then spread the remainder across the entry's tags in proportion to
-   * their current amount (the last tag absorbs the rounding residue so the plan sums exactly).
-   * Always yields an applyable plan.
+   * Derives the default plan: {@code totalX} from the unassigned rest first, the remainder spread
+   * across the tags in proportion to their amount, with the last tag absorbing rounding.
    *
    * @param item the entry whose slices to spend against; never {@code null}
    * @param totalX the total quantity being deducted
-   * @param rest the dimension's not-yet-assigned rest (already SCU-rounded)
+   * @param rest the dimension's unassigned rest, already SCU-rounded
    * @param jobOrderDimension {@code true} for job-order slices, {@code false} for mission slices
-   * @return the derived {@code targetId → amount} plan (empty when the rest already covers {@code
-   *     totalX})
+   * @return the derived {@code targetId → amount} plan; empty when the rest covers {@code totalX}
    */
   @NotNull
   private static Map<UUID, Double> defaultReductionPlan(

@@ -34,13 +34,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Thin REST proxy that forwards material-related read requests from the browser to the backend.
- *
- * <p>Browser-side JS calls land here under {@code /api/proxy/materials/**}; the controller adds the
- * bearer token via {@link BackendApiClient} and forwards to the corresponding {@code
- * /api/v1/materials/**} backend endpoint. Authentication is enforced at this seam
- * ({@code @PreAuthorize("isAuthenticated()")}) so an unauthenticated browser can never hit the
- * proxy and the backend never sees an unauthenticated request via this path.
+ * Authenticated REST proxy from {@code /api/proxy/materials/**} to the backend's {@code
+ * /api/v1/materials/**} read endpoints.
  */
 @RestController
 @RequestMapping("/api/proxy/materials")
@@ -58,9 +53,7 @@ public class MaterialProxyController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Returns the list of terminals where the given material is traded. Empty list on backend failure
-   * or missing payload — the frontend renders an "unavailable" placeholder rather than propagating
-   * the error.
+   * Returns the terminals trading the given material; empty on backend failure.
    *
    * @param id material id
    * @return list of terminal records (raw JSON maps), never {@code null}
@@ -74,27 +67,9 @@ public class MaterialProxyController {
   }
 
   /**
-   * Forwards the profit-calculation query to the backend, appending each star-system name as a
-   * repeated {@code starSystemNames} query parameter (Spring's default list-binding form). The
-   * star-system filter is optional — omitting it returns the calculation across all systems.
-   *
-   * <p>Each selected system is relayed as its own {@code {fN}} URI-template variable, so the {@code
-   * WebClient} encodes it per RFC 3986 (REQ-SEC-051). A star-system name is free text out of the
-   * UEX catalogue rather than a closed vocabulary the backend declares a type for, so it is escaped
-   * exactly once across the hop instead of narrowed — the same treatment {@code
-   * MaterialsPageController#filteredMatrixTemplate} gives the identical values on the materials
-   * matrix. {@code shipId} binds as a {@link UUID}, which cannot express URI syntax, so it is safe
-   * to concatenate.
-   *
-   * <p><b>Corrected 2026-09-04</b> (CodeQL {@code java/ssrf}, alert 877). This method previously
-   * built the URI with {@link org.springframework.web.util.UriComponentsBuilder} and called {@code
-   * builder.build().toUriString()} under a comment asserting that each query value "gets
-   * URL-encoded". It did not: {@code UriComponentsBuilder#toUriString()} is {@code
-   * build().encode().toUriString()} and does encode, but {@code build()} alone returns {@code
-   * UriComponents} in the RAW encode state and {@code UriComponents#toUriString()} emits it
-   * verbatim. A star-system name carrying {@code &} or {@code =} therefore injected additional
-   * query parameters into the backend call — the same one-call-apart defect REQ-SEC-051's warning
-   * callout was written for, in its third spelling.
+   * Forwards the profit-calculation query to the backend, passing each star-system name as a
+   * separately encoded {@code starSystemNames} parameter (REQ-SEC-051). Without star systems the
+   * calculation spans all systems.
    *
    * @param shipId chosen ship's id (defines capacity)
    * @param starSystemNames optional list of star-system names to constrain the source terminals

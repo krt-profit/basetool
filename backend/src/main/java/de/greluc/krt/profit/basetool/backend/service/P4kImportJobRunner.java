@@ -33,19 +33,13 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Runs an enqueued {@link de.greluc.krt.profit.basetool.backend.model.P4kImportJob} on the
- * single-thread {@code @Async} import executor, off the request thread, so the upload returns
- * immediately and the admin page polls the job for progress. It only orchestrates: every state
- * change and the heavy parse-and-reconcile live behind transactional proxies ({@link
- * P4kImportJobService} and {@link P4kImportService}) and are invoked here cross-bean so those
- * proxies actually apply.
+ * single-thread {@code @Async} import executor, delegating every state change and the
+ * parse-and-reconcile work to the transactional {@link P4kImportJobService} and {@link
+ * P4kImportService}.
  *
- * <p>Flow per run: mark {@code RUNNING} (own transaction, so polling sees it at once), parse and
- * reconcile in {@link P4kImportService} (its own transaction; for APPLY an all-or-nothing
- * read-write one), then mark {@code SUCCEEDED} with the serialized result, or {@code FAILED} with
- * the reason if anything threw. The reconcile transaction is separate from the status writes so
- * that a rolled-back apply does not also revert the {@code RUNNING} / {@code FAILED} bookkeeping.
- * In the {@code finally} block an APPLY reclaims its (now-consumed) payload and every run prunes
- * the job history; housekeeping failures are logged, never allowed to mask the run's own outcome.
+ * <p>Each run marks the job {@code RUNNING}, reconciles in a separate transaction, then marks it
+ * {@code SUCCEEDED} or {@code FAILED}. Afterwards an APPLY reclaims its payload and every run
+ * prunes the job history; housekeeping failures are only logged.
  */
 @Component
 @RequiredArgsConstructor

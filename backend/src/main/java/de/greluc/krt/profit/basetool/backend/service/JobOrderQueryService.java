@@ -56,19 +56,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Read-only query/projection half of the job-order domain, split out of {@link JobOrderService}
- * (audit Thema 7, #14). It owns every caller-visible read — the scoped paged list, the
- * requester-side "Meine Auftr\u00e4ge" list, the reference typeahead, the single-order detail and
- * the two link-inventory pickers — while the create / update / status / assignee / delete writes,
- * the priority reorder and the {@code completeJobOrderWithinTransaction} MANDATORY hop stay in
- * {@link JobOrderService}.
+ * Read-only query side of the job-order domain: the scoped list, the requester-side "Meine
+ * Aufträge" list, the reference typeahead, the order detail and the link-inventory pickers.
  *
- * <p>Job Orders are a <em>conditionally</em> staffel-scoped aggregate (SK-responsible orders are
- * public, squadron-responsible orders private); every read here pushes {@link
- * OwnerScopeService#currentScopePredicate()} / {@code canViewJobOrders} / {@code canSeeJobOrder}
- * into the query so a caller can never page or drill past their visibility. This is the sole reason
- * the service is on the {@code staffelScopedServicesMustWireOwnerScopeOrAuthHelper} whitelist (it
- * took over that role from {@link JobOrderService}).
+ * <p>Every read applies the caller's visibility scope ({@link OwnerScopeService}) in the query.
  */
 @Service
 @RequiredArgsConstructor
@@ -87,11 +78,7 @@ public class JobOrderQueryService {
   private final InventoryItemMapper inventoryItemMapper;
 
   /**
-   * Paged list with optional status filter. Status is the primary discriminator the UI offers as a
-   * filter; without it the call returns every status.
-   *
-   * <p>Delegates to the squadron-filtered overload with a {@code null} squadron display filter —
-   * the visibility scope (Phase 3, #343) is always applied regardless.
+   * Paged list with an optional status filter, always constrained to the caller's visibility scope.
    *
    * @param statuses optional status filter; null/empty means "all"
    * @param pageable page request
@@ -102,29 +89,16 @@ public class JobOrderQueryService {
   }
 
   /**
-   * Paged list with optional status filter and an optional squadron display filter, always
-   * constrained to the caller's visibility scope (Phase 3, #343).
+   * Paged list with optional status and squadron display filters, always constrained to the
+   * caller's visibility scope.
    *
-   * <p>Job Orders are a <em>conditionally</em> staffel-scoped aggregate: an SK-responsible order is
-   * public to every squadron, a squadron-responsible order is private to that squadron + admins
-   * (the requester does not grant visibility). The scope is resolved from {@link
-   * OwnerScopeService#currentScopePredicate()} and pushed into the repository query so a caller can
-   * never page past their visibility — admins without a pin see everything, an admin pinned to a
-   * squadron (or any non-admin member) sees that scope's private orders plus all SK orders.
-   *
-   * <p>Layered on top is the viewer-side profit gate ({@link
-   * OwnerScopeService#canViewJobOrders()}): a caller who belongs to no profit-eligible org unit
-   * (and is not an admin) is not part of the order workflow and receives an empty page — the
-   * SK-public union is suppressed for them too.
-   *
-   * <p>The {@code squadronIds} parameter is a pure UI display preference layered on top of the
-   * scope (the orders-index multi-squadron picker, matching responsible OR requesting side); it can
-   * only narrow the already-scoped result, never widen it. Null/empty means "no display
-   * restriction".
+   * <p>SK-responsible orders are public, squadron-responsible orders private to that squadron and
+   * admins; a caller outside the order workflow ({@link OwnerScopeService#canViewJobOrders()}) gets
+   * an empty page. {@code squadronIds} can only narrow the result.
    *
    * @param statuses optional status filter; null/empty means "all"
-   * @param squadronIds optional display filter (matches responsible OR requesting); null/empty
-   *     means "no display restriction" (all scoped orders)
+   * @param squadronIds optional display filter matching the responsible or requesting side;
+   *     null/empty means no restriction
    * @param pageable page request
    * @return paged job orders as DTOs, scoped to the caller's visibility
    */
@@ -153,16 +127,12 @@ public class JobOrderQueryService {
   }
 
   /**
-   * Paged list of the orders the caller's own org unit(s) <em>requested</em> — the requester-side
-   * "Meine Auftr&auml;ge" list (REQ-ORDERS-023). Returns every order whose requesting org unit is
-   * one the caller is a <em>direct</em> member of, regardless of profit eligibility and independent
-   * of the responsible-scoped main queue (which never grants the requester side visibility). Each
-   * returned DTO is redacted for the requester at the controller boundary (no Bearbeiter, no
-   * materials summary). An anonymous / memberless caller gets an empty page.
+   * Paged list of the orders requested by org units the caller is a direct member of, the "Meine
+   * Auftr&auml;ge" list (REQ-ORDERS-023). A memberless caller gets an empty page.
    *
    * @param statuses optional status filter; null/empty means "all"
    * @param pageable page request
-   * @return paged job orders the caller's org unit(s) requested, scoped to direct membership
+   * @return paged job orders requested by the caller's org units
    */
   public Page<JobOrderDto> getRequestedJobOrders(List<JobOrderStatus> statuses, Pageable pageable) {
     Set<UUID> requesterOrgUnitIds = ownerScopeService.currentDirectMembershipOrgUnitIds();
@@ -177,15 +147,10 @@ public class JobOrderQueryService {
   }
 
   /**
-   * Lightweight reference projection used by typeaheads and refinery-order pickers (only id +
-   * display-id + summary). Filtered to active (non-completed/-rejected) orders and, like the main
-   * list endpoint, to the caller's visibility: a non-profit member (no {@code canViewJobOrders()})
-   * gets an empty list, and squadron-private orders of other squadrons are filtered out so the
-   * typeahead cannot enumerate a foreign squadron's order handle + materials (audit M-2).
+   * Lightweight reference projection of the active orders the caller may see, for typeaheads and
+   * pickers.
    *
-   * @param withNeeds whether to fold each order's outstanding per-material need into the projection
-   *     (REQ-INV-039). Opt-in because an ITEM order's needs come from its blueprint-derived
-   *     aggregation, a cost the pickers that render no figure must not pay.
+   * @param withNeeds whether to include each order's outstanding per-material need (REQ-INV-039)
    * @return active job orders the caller may see, as reference DTOs
    */
   public List<JobOrderReferenceDto> findAllActiveReference(boolean withNeeds) {
@@ -221,14 +186,8 @@ public class JobOrderQueryService {
   }
 
   /**
-   * Folds one order's outstanding per-bucket need for the allocation pickers (REQ-INV-039).
-   *
-   * <p>Every figure comes from the shared seams rather than a second derivation: the requirement
-   * from {@link JobOrderMaterialRequirementResolver} (which reduces both order kinds to the same
-   * buckets and has already excluded handed-over and manufactured shares), the linked stock from
-   * the batched {@link OrderLinkedStockIndex} at the bucket's own quality floor. The gap ignores
-   * material claims on purpose — a claim is a promise that moved no stock (REQ-ORDERS-024) and must
-   * not shrink what is still to be gathered.
+   * Folds one order's outstanding per-bucket need for the allocation pickers (REQ-INV-039): the
+   * requirement minus the order-linked stock at the bucket's quality. Material claims are ignored.
    *
    * @param order the managed order to fold.
    * @param stockIndex the batched order-linked stock lookup.
@@ -284,18 +243,9 @@ public class JobOrderQueryService {
   }
 
   /**
-   * Folds one ITEM order's outstanding per-game-item need for the item-mode allocation pickers
-   * (REQ-INV-039).
-   *
-   * <p>An order may carry several lines for the same game item (a sub-assembly adopted beside its
-   * parent, REQ-ORDERS-031), so the counts are summed per game item exactly as the order-detail
-   * Item-Bestand panel sums them — a per-line figure would contradict the panel a member can open
-   * next to this picker.
-   *
-   * <p>The gap is {@code ordered − delivered − earmarked}. It does not use {@code
-   * manufacturedAmount}: production books its output in earmarked to the order, so those units are
-   * already in the earmark sum, and counting both would hide a real need behind units that exist
-   * only once. See {@link de.greluc.krt.profit.basetool.backend.model.dto.JobOrderGameItemNeedDto}.
+   * Folds one ITEM order's outstanding need per game item for the item-mode allocation pickers
+   * (REQ-INV-039), summed over all lines of the same game item as {@code ordered - delivered -
+   * earmarked}.
    *
    * @param order the managed order to fold; a MATERIAL order yields an empty list.
    * @param itemStockByOrder the batched earmark sums.
@@ -349,10 +299,8 @@ public class JobOrderQueryService {
   }
 
   /**
-   * Returns the inventory items eligible for linking to a job order's given material. Used by the
-   * order-detail page's "link inventory" picker. The eligibility check filters by material and
-   * minimum quality declared on the order's material row, and excludes items already linked to
-   * another order.
+   * Returns the inventory items that may be linked to a job order's material: matching material and
+   * minimum quality, and not linked to another order.
    *
    * @param jobOrderId target job order
    * @param materialId target material on that order
@@ -388,22 +336,12 @@ public class JobOrderQueryService {
   }
 
   /**
-   * Returns the inventory items linked to the order whose catalog entry the order does <em>not</em>
-   * require — "orphaned" links (REQ-ORDERS-019). Because an order's material view is built only
-   * from its requirements, such a link binds stock to the order while staying invisible in every
-   * material row; surfacing it lets a logistician spot and undo a mis-assignment (e.g. a material
-   * linked from the Lager before the link gate of REQ-ORDERS-018 existed). Material rows are
-   * compared against the kind-agnostic required-material set ({@link
-   * JobOrderItemService#requiredMaterialIds(JobOrder)}), so it is correct for ITEM orders too;
-   * game-item rows (V220, REQ-INV-029) are compared against the requested-game-item set ({@link
-   * JobOrderItemService#requiredGameItemIds(JobOrder)}), so an item earmark whose ITEM order no
-   * longer requests the game item is flagged as well — the two kinds load through their own
-   * dedicated seams because the material seam deliberately excludes item rows.
+   * Returns the inventory linked to the order whose material or game item the order does not
+   * require (REQ-ORDERS-019), so a mis-assignment can be spotted and undone.
    *
    * @param jobOrderId the order to inspect.
-   * @return the orphaned linked inventory items as DTOs — material rows (ordered like the
-   *     per-material drill-down) followed by game-item rows; empty when every linked item matches a
-   *     requirement.
+   * @return the orphaned linked items, material rows followed by game-item rows; empty when every
+   *     link matches a requirement.
    * @throws NotFoundException when the order does not exist.
    */
   public List<InventoryItemDto> getOrphanedLinkedInventory(UUID jobOrderId) {

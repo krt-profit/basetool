@@ -46,12 +46,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Guard-branch coverage for {@link MissionParticipantService}: the {@code
- * updateParticipantAttributes} input-validation rejections (pre-start guard, start-after-end guard,
- * non-{@code MISSION}-archetype desired/planned job type) and the {@code addParticipant} hard
- * roster cap (Audit finding M-4). All happy paths and the concurrency writeback semantics are
- * covered elsewhere ({@code MissionTimeTest}, {@code MissionServicePayoutTest}); this class asserts
- * only that each guard actually throws and that no participant row is persisted when it does.
+ * Guard tests for {@link MissionParticipantService}: the input validation of {@code
+ * updateParticipantAttributes} and the roster cap of {@code addParticipant}, each throwing without
+ * persisting a row.
  */
 @ExtendWith(MockitoExtension.class)
 class MissionParticipantServiceValidationTest {
@@ -255,12 +252,8 @@ class MissionParticipantServiceValidationTest {
   }
 
   /**
-   * REQ-MISSION-013 / audit MEDIUM-9: the planned mission job type is the organisation's assignment
-   * - it carries the Einsatzleiter designation - and is not part of a guest's payload.
-   *
-   * <p>Before this gate the block had no caller distinction at all, so a guest presenting their
-   * row's capability token could designate themselves Einsatzleiter; the single-lead rule then
-   * blocked the real leader with a 409 until somebody cleared the guest row.
+   * A caller who cannot manage the mission may not set the planned job type, which carries the
+   * Einsatzleiter designation (REQ-MISSION-013).
    */
   @Test
   void updateParticipantAttributes_refusesPlannedJobTypeFromACallerWhoCannotManageTheMission() {
@@ -295,9 +288,8 @@ class MissionParticipantServiceValidationTest {
   }
 
   /**
-   * The symmetric half, which matters just as much: a {@code null} used to CLEAR the designation,
-   * so an ordinary guest edit silently undid a manager's assignment. A caller who may not manage
-   * the mission must leave the field exactly as it was.
+   * A caller who cannot manage the mission leaves the planned job type unchanged, including when
+   * sending {@code null}.
    */
   @Test
   void updateParticipantAttributes_doesNotClearThePlannedJobTypeForANonManagingCaller() {

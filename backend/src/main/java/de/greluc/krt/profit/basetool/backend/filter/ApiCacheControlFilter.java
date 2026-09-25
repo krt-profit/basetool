@@ -35,31 +35,12 @@ import org.springframework.web.util.pattern.PathPattern;
 import org.springframework.web.util.pattern.PathPatternParser;
 
 /**
- * Adds Cache-Control headers to API GET responses: revalidation for ordinary data, and outright
- * {@code no-store} for the families whose bodies must never be written down anywhere (REQ-SEC-031).
+ * Adds Cache-Control headers to API GET responses: {@code no-cache, must-revalidate} for ordinary
+ * data and {@code private, no-store} for the families listed in {@link NoStoreApiScopes}
+ * (REQ-SEC-031).
  *
- * <p><b>Why two levels.</b> {@code no-cache, must-revalidate} permits an intermediary to
- * <em>store</em> the body as long as it revalidates before reuse. That is the right trade for
- * master data and mission lists, and the wrong one for a bank ledger, a member's personal data or
- * someone's notifications: those must not sit in any store at all. While the backend was reachable
- * only from the frontend over an internal network there was no intermediary to worry about; a
- * public API vhost makes proxies, corporate middleboxes and browser disk caches plausible, and the
- * header is the only thing that tells them no.
- *
- * <p>{@code no-store} makes the ETag on these paths inert rather than contradictory — a client that
- * honours it keeps no copy, so it never sends {@code If-None-Match} and never gets a 304. Nothing
- * relies on conditional requests for these families. Spring agrees: {@code
- * ShallowEtagHeaderFilter#isEligibleForEtag} refuses to generate an ETag once {@code Cache-Control}
- * carries {@code no-store}, so on these families the header genuinely does not exist. That is why
- * {@link NoStoreApiScopes} — the list this filter used to own privately — now also drives {@code
- * StreamAwareShallowEtagHeaderFilter}: a response that provably cannot carry an ETag has no reason
- * to be buffered for one.
- *
- * <p>The {@code /api} scope is a parsed {@link PathPattern} matched against the decoded path rather
- * than a raw {@code getRequestURI().startsWith("/api/")} test: {@code getRequestURI()} is the raw
- * percent-encoded URI while Spring MVC routes on the decoded path, so an encoded spelling such as
- * {@code /%61pi/v1/users} reached the API handler with no revalidation headers at all — the one
- * response class that must never be served stale from an intermediary.
+ * <p>The {@code /api} scope is a {@link PathPattern} matched against the decoded path, so a
+ * percent-encoded spelling cannot bypass it.
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 20)
@@ -89,14 +70,11 @@ public class ApiCacheControlFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Chooses the directive for a request path.
+   * Chooses the Cache-Control directive for a request path, matched against the decoded path
+   * (REQ-SEC-029).
    *
-   * <p>Matched against the decoded path for the same reason the {@code /api} scope is
-   * (REQ-SEC-029): {@code getRequestURI()} is percent-encoded, and a spelling such as {@code
-   * /api/v1/%62ank/accounts} must not slip out of the stricter bucket.
-   *
-   * @param uri the raw request URI; never {@code null} here, {@code shouldNotFilter} rejects null.
-   * @return {@link #NO_STORE} for a sensitive family, {@link #REVALIDATE} otherwise.
+   * @param uri the raw request URI; never {@code null} here
+   * @return {@link #NO_STORE} for a sensitive family, {@link #REVALIDATE} otherwise
    */
   @NotNull
   private static String cacheControlFor(String uri) {

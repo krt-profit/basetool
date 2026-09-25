@@ -61,15 +61,10 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Security configuration for the ingest gateway: a pure JWT-bearer resource server. There is no
- * session and no HTML, so the posture is deliberately minimal — stateless sessions, CSRF kept
- * enabled but ignored for the bearer-only {@code /v1/**} endpoints (no weaker than the backend),
- * empty CORS, and a {@code default-src 'none'} CSP (REQ-INGEST-001/-002).
+ * Security configuration for the ingest gateway: a stateless JWT-bearer resource server with CSRF
+ * ignored for {@code /v1/**}, empty CORS and a {@code default-src 'none'} CSP (REQ-INGEST-001).
  *
- * <p>Authorization is intentionally coarse: every ingest endpoint requires only an authenticated
- * caller ({@code isAuthenticated()}, enforced both here and by method-level {@code @PreAuthorize}),
- * mirroring the backend's import endpoints (REQ-REFINERY-011). The optional {@code aud} check below
- * is the resource-server defence-in-depth knob.
+ * <p>Every ingest endpoint requires only an authenticated caller.
  */
 @Configuration
 @EnableWebSecurity
@@ -77,9 +72,8 @@ import tools.jackson.databind.ObjectMapper;
 public class SecurityConfig {
 
   /**
-   * Reduces the configured {@code app.security.jwt.expected-audiences} to its non-blank entries —
-   * the list the audience validator enforces, and the one the gate-posture gauge reports on. An
-   * empty result means the audience check is off.
+   * Reduces {@code app.security.jwt.expected-audiences} to its non-blank entries; an empty result
+   * disables the audience check.
    *
    * @param configured the raw bound list, possibly {@code null} or holding blank entries
    * @return the effective audiences, never {@code null}
@@ -92,33 +86,16 @@ public class SecurityConfig {
   }
 
   /**
-   * Custom resource-server {@link JwtDecoder}, created ONLY when at least one hardening knob is
-   * set: {@code app.security.jwt.expected-audiences} (opt-in {@code aud} enforcement) and/or {@code
-   * app.security.jwt.jwk-set-uri} (opt-in: fetch the JWKS from the INTERNAL Keycloak so token
-   * validation no longer hairpins through the public edge — REQ-SEC-024). When neither is set the
-   * bean is absent and Spring Boot's auto-configured, lazily-fetching decoder is used unchanged, so
-   * the default behaviour — including the {@code test} profile's placeholder issuer — is untouched.
+   * Custom resource-server {@link JwtDecoder}, created only when expected audiences and/or an
+   * internal {@code jwk-set-uri} are configured (REQ-SEC-024); otherwise Boot's decoder applies.
    *
-   * <p>The validator chain is identical to the auto-config default plus the optional audience
-   * check: signature + issuer + timestamp via {@link JwtValidators#createDefaultWithIssuer(String)}
-   * — the {@code iss} claim is still validated against the PUBLIC issuer Keycloak stamps into
-   * tokens, so split-horizon JWKS (public {@code iss}, internal key fetch) is transparent — and the
-   * {@code aud} validator only when non-blank audiences are configured.
-   *
-   * <p><strong>The audience is {@code basetool-ingest}, deliberately NOT the backend's {@code
-   * basetool-backend}.</strong> Every {@code basetool-frontend} session token carries {@code
-   * basetool-backend}, so checking it here would admit exactly the tokens this interface exists to
-   * refuse (ADR-0018 amendment 1, REQ-INGEST-011). Set it only once the realm's {@code
-   * extractor-ingest-only} scope actually stamps {@code basetool-ingest} (see {@code
-   * docs/INGEST_KEYCLOAK_SETUP.md} step 7a). The two modules checking different values is the
-   * point; it is not a copy-paste omission. Nor does the gateway inherit the backend's value by
-   * forwarding anything: since ADR-0129 the caller's token stops here and the backend is called
-   * with the gateway's own.
+   * <p>Validates signature, the public issuer and timestamps, plus {@code aud} when audiences are
+   * set. The expected audience is {@code basetool-ingest}, not the backend's (REQ-INGEST-011).
    *
    * @param issuerUri the configured Keycloak issuer location (used for {@code iss} validation)
    * @param jwkSetUri the internal JWKS URL, or blank to derive keys from the issuer location
-   * @param expectedAudiences the configured {@code app.security.jwt.expected-audiences}; blank
-   *     entries are ignored and an empty list leaves the audience unchecked
+   * @param expectedAudiences the configured expected audiences; blank entries are ignored and an
+   *     empty list leaves the audience unchecked
    * @param sslBundles the registered SSL bundles, consulted for the {@code keycloak-trust} pin when
    *     an internal {@code jwkSetUri} is used
    * @return a Nimbus decoder wired for the configured hardening knobs
@@ -144,12 +121,9 @@ public class SecurityConfig {
   }
 
   /**
-   * Builds the underlying {@link NimbusJwtDecoder} for {@link #resourceServerJwtDecoder}. With a
-   * blank {@code jwkSetUri} it reproduces the auto-config exactly ({@link
-   * NimbusJwtDecoder#withIssuerLocation(String)}). With an internal {@code jwkSetUri} it fetches
-   * keys from that URL over a {@link KeycloakTrustSupport}-pinned client so the self-signed
-   * internal Keycloak certificate is trusted; when no {@code keycloak-trust} bundle is registered
-   * (dev/test) it falls back to the default client.
+   * Builds the {@link NimbusJwtDecoder} for {@link #resourceServerJwtDecoder}: issuer-location
+   * discovery for a blank {@code jwkSetUri}, otherwise keys fetched from that URL over a {@link
+   * KeycloakTrustSupport}-pinned client.
    *
    * @param issuerUri the Keycloak issuer location
    * @param jwkSetUri the internal JWKS URL, or blank for issuer-location discovery
@@ -174,9 +148,8 @@ public class SecurityConfig {
   }
 
   /**
-   * Builds the {@code aud}-claim validator: a token passes only when its {@code aud} list
-   * intersects {@code expectedAudiences}. Package-private + static so it is unit-testable without a
-   * Spring context.
+   * Builds the {@code aud}-claim validator: a token passes only when its {@code aud} intersects
+   * {@code expectedAudiences}.
    *
    * @param expectedAudiences the accepted audience values; an empty set matches no token
    * @return a validator that errors unless the JWT's {@code aud} intersects the expected set
@@ -188,20 +161,17 @@ public class SecurityConfig {
   }
 
   /**
-   * The single {@link SecurityFilterChain}: CSRF enabled but ignored for the bearer-only {@code
-   * /v1/**} endpoints, empty CORS, locked-down response headers, the authorization matrix, JWT
-   * resource-server activation, the identity-provider-unavailable 503 re-map and a stateless
-   * session policy.
+   * The single {@link SecurityFilterChain}: CSRF ignored for {@code /v1/**}, empty CORS,
+   * locked-down headers, the authorization matrix, JWT resource server, the
+   * identity-provider-unavailable 503 and stateless sessions.
    *
    * @param http the Spring Security builder
    * @param objectMapper serializes the {@link IdentityProviderUnavailableFilter}'s 503 problem body
-   * @param meterRegistry counts the identity-provider-unavailable 503 on {@code
-   *     basetool_http_error_total} (REQ-OBS-011)
-   * @param loggingProperties supplies the MDC key the {@link UserIdMdcFilter} writes the
-   *     authenticated subject to
+   * @param meterRegistry counts the identity-provider-unavailable 503 (REQ-OBS-011)
+   * @param loggingProperties supplies the MDC key the {@link UserIdMdcFilter} writes the subject to
    * @param clientIdentityProperties the configured client-identity gate (REQ-INGEST-011)
-   * @param ingestProperties supplies the gateway's public origin, used as the DPoP {@code htu}
-   *     comparison target so it does not depend on the reverse proxy's forwarded headers
+   * @param ingestProperties supplies the gateway's public origin, the DPoP {@code htu} comparison
+   *     target
    * @return the configured filter chain
    * @throws Exception propagated from {@link HttpSecurity#build()}
    */
@@ -278,10 +248,8 @@ public class SecurityConfig {
   }
 
   /**
-   * CORS source: empty allowlist, {@code allowCredentials=false}. The gateway is called by a native
-   * desktop app (no browser origin) and by no browser directly, so cross-origin browser traffic is
-   * rejected outright — combined with the bearer-only model this closes the open-CORS-with-creds
-   * failure mode.
+   * CORS source with an empty allowlist and {@code allowCredentials=false}, rejecting all
+   * cross-origin browser traffic.
    *
    * @return a CORS source applied to all paths
    */

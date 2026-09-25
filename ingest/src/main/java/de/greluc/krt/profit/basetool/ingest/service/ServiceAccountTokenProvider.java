@@ -40,38 +40,12 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 
 /**
- * Obtains and caches the gateway's own access token for the backend hop (ADR-0129).
+ * Obtains and caches the gateway's own client-credentials access token for the backend hop
+ * (ADR-0129).
  *
- * <p>Since the gateway stopped relaying the caller's token it needs an identity of its own. This is
- * a plain RFC 6749 client-credentials grant against Keycloak, cached in memory until shortly before
- * expiry.
- *
- * <p><strong>Deliberately unbound.</strong> No DPoP proof is presented here, so the issued token
- * carries no {@code cnf} and crosses to the backend as an ordinary bearer. That is the whole point
- * of the split: the sender-constrained token is validated at the internet-facing hop and stops
- * there, while this second hop uses a credential that belongs to the party actually making the
- * call.
- *
- * <p>The token is a process-wide singleton because it identifies the <em>gateway</em>, not a user —
- * the caller is named separately, in the on-behalf-of header. Caching it per request would ask
- * Keycloak for a token on every upload for no gain.
- *
- * <p><b>Three properties of the cache, each fixing a failure mode the first version had:</b>
- *
- * <ul>
- *   <li><b>Token and expiry are one value.</b> They used to be two separate {@code volatile}
- *       fields, so a reader racing a mint could pair the new token with the old expiry or the
- *       reverse — a fresh token treated as expired (a needless grant) or, worse, a stale token
- *       served against a fresh expiry. One immutable {@link CachedToken} behind one {@code
- *       volatile} reference makes the pair atomic.
- *   <li><b>It can be invalidated.</b> When the backend refuses the token ({@code 401}/{@code 403},
- *       see {@code GlobalExceptionHandler}) the cache is dropped via {@link #invalidate()}, so the
- *       next upload mints a fresh one instead of replaying the refused token until it expires.
- *   <li><b>A failed grant backs off.</b> For {@link #FAILURE_BACKOFF} after a failure the provider
- *       refuses immediately instead of calling Keycloak again, so a burst of uploads against a
- *       broken or unreachable token endpoint costs one grant attempt per window rather than one per
- *       upload, each blocking its request thread for up to the configured timeout.
- * </ul>
+ * <p>The token is not DPoP-bound and is shared process-wide. Token and expiry are cached as one
+ * atomic value, the cache can be dropped via {@link #invalidate()}, and a failed grant suppresses
+ * further attempts for {@link #FAILURE_BACKOFF}.
  */
 @Slf4j
 @Service
@@ -197,21 +171,15 @@ public class ServiceAccountTokenProvider {
   }
 
   /**
-   * Drops the cached token, so the next {@link #currentToken()} mints a fresh one.
-   *
-   * <p>Called when the backend refuses the gateway's token ({@code 401}/{@code 403}). Without it a
-   * revoked or otherwise refused token would be replayed on every upload until its natural expiry,
-   * minutes of guaranteed failures after the cause may already be fixed. Deliberately does
-   * <em>not</em> open a backoff window: the grant itself did not fail, and the very next upload
-   * should try a fresh token.
+   * Drops the cached token, so the next {@link #currentToken()} mints a fresh one; opens no backoff
+   * window.
    */
   public void invalidate() {
     cached = null;
   }
 
   /**
-   * Reads the cache once and returns its token when it is still inside its usable window, counting
-   * the cache hit.
+   * Returns the cached token while it is inside its usable window, counting the cache hit.
    *
    * @return the cached token, or {@code null} when the cache is cold or the token is about to
    *     expire
@@ -288,8 +256,7 @@ public class ServiceAccountTokenProvider {
   }
 
   /**
-   * One cached grant: the token and the instant until which it may be handed out. Immutable, so a
-   * reader always sees a token together with its own expiry.
+   * One cached grant: the token and the instant until which it may be handed out.
    *
    * @param token the compact access token
    * @param until the instant after which the token must be replaced (expiry minus the refresh skew)

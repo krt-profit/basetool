@@ -29,11 +29,9 @@ import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 /**
- * Audit L-1: pins the opt-in {@code aud}-claim validator built by {@link
- * SecurityConfig#audienceValidator(List)}. The resource server otherwise accepts any token the
- * realm signed (issuer/signature/expiry only); once an operator sets {@code
- * app.security.jwt.expected-audiences}, a token whose {@code aud} does not intersect the expected
- * set must be rejected (token-confusion hardening).
+ * Pins the opt-in {@code aud}-claim validator from {@link SecurityConfig#audienceValidator(List)}:
+ * once {@code app.security.jwt.expected-audiences} is set, a token whose {@code aud} does not
+ * intersect it is rejected.
  */
 class SecurityConfigAudienceValidatorTest {
 

@@ -82,21 +82,11 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
- * Spring MVC controller for the state-mutating job-order endpoints under {@code /orders}: order and
- * item-order create/update/delete, the priority and status mutations, the blueprint-variant
- * counting toggle, material claims, assignee management (add/remove plus per-assignee notes), the
- * material and item handover flows, and the unlink endpoints for materials and inventory items.
+ * Spring MVC controller for the state-mutating job-order endpoints under {@code /orders}: create,
+ * update, delete, priority and status, claims, assignees, handovers, production and unlinks.
  *
- * <p>Split out of {@link JobOrderPageController} in the #924 L5 read/write controller split; every
- * route, security annotation, view name and response contract moved over unchanged, so the page
- * templates and the order-detail AJAX layer keep working against the exact same surface. The small
- * leaf helpers shared with the read side ({@code getCurrentUserId} and {@code isLogistician}) are
- * duplicated verbatim per the campaign precedent instead of introducing a new shared type.
- *
- * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor. Every
- * handler here used to sit under a {@code permitAll} URL rule, and thirteen of them across this
- * package carried no gate of their own at all — protected by a matcher two folders away rather than
- * by anything next to the code. A method-level gate still wins where one is present.
+ * <p>The class-level {@code isAuthenticated()} gate is the floor; method-level gates take
+ * precedence (REQ-SEC-052).
  */
 @Controller
 @UsesLayoutModel
@@ -123,12 +113,8 @@ public class JobOrderWriteController {
   private final MutationResponseHelper mutationResponseHelper;
 
   /**
-   * Server-side live-sync publish seam (REQ-FE-015, ADR-0094). An order create pokes the staff
-   * {@code orders} queue room from here rather than from the client. The seam was introduced for
-   * the anonymous guest create, which had no {@code /ws/sync} socket at all and which ADR-0159
-   * removed; what keeps it is that <b>the creator is not necessarily in the room</b> — a member who
-   * may not browse the queue is not subscribed to it — while every viewer who is must still see the
-   * new order appear in place.
+   * Server-side live-sync publisher that announces a new order to the {@code orders} queue room,
+   * whose viewers may not include the creator (REQ-FE-015).
    */
   private final LiveSyncLocalBus liveSyncLocalBus;
 
@@ -136,9 +122,7 @@ public class JobOrderWriteController {
   private static final List<String> ORDERS_QUEUE_SECTION = List.of("queue");
 
   /**
-   * Persists a new item order. Builds the backend item-order payload from the dynamically-bound
-   * item editor (lines that lack an item, blueprint, or positive amount are dropped) and posts it
-   * to the backend. Mirrors {@link #createOrder} for redirect / flash behaviour.
+   * Persists a new item order, dropping lines without an item, blueprint or positive amount.
    *
    * @param form the bound item-order form
    * @param redirectAttributes flash carrier for toasts / re-render
@@ -189,15 +173,10 @@ public class JobOrderWriteController {
   }
 
   /**
-   * Builds the validated {@link CreateJobOrderItemLineDto} list from an item-order form, dropping
-   * lines without a game item, blueprint or positive amount, and per-line materials without a
-   * material id or quality. Shared by all four item create + edit handlers (classic + AJAX twins)
-   * so they map the form identically.
+   * Builds the item-line DTOs from an item-order form, dropping incomplete lines and materials.
    *
-   * <p>The line's persistent {@code id} is passed straight through when the editor rendered one:
-   * that is what lets the backend update an existing line in place rather than recreating it, so
-   * its booked production survives the edit (REQ-ORDERS-032). It is {@code null} on create and for
-   * newly-added rows.
+   * <p>A line's persistent {@code id} is passed through so an edit updates it in place
+   * (REQ-ORDERS-032).
    *
    * @param form the bound item-order form
    * @return the filtered item-line DTOs (preserving the persistent, client line + parent ids)
@@ -230,9 +209,8 @@ public class JobOrderWriteController {
   }
 
   /**
-   * AJAX twin of {@link #createItemOrder} (#575): creates an item order from the form-encoded body
-   * and returns the post-create navigation target as JSON. Routed by the {@code X-Requested-With}
-   * header; the classic handler stays the no-JS fallback. Empty lines → 400.
+   * AJAX twin of {@link #createItemOrder}: creates an item order and returns the navigation target
+   * as JSON; empty lines yield 400.
    *
    * @param form the bound item-order form
    * @param canViewJobOrders whether the caller may browse the order queue
@@ -270,9 +248,8 @@ public class JobOrderWriteController {
   }
 
   /**
-   * Persists an edit to an item order's lines + metadata. Mirrors {@link #createItemOrder}'s
-   * payload build but relays to the backend item-edit endpoint ({@code PUT
-   * /api/v1/orders/{id}/items}) and redirects back to the detail page.
+   * Persists an edit to an item order's lines and metadata via {@code PUT
+   * /api/v1/orders/{id}/items}.
    *
    * @param id the item-order id
    * @param form the bound item-order form (lines rebuilt client-side)
@@ -313,9 +290,8 @@ public class JobOrderWriteController {
   }
 
   /**
-   * AJAX twin of {@link #updateItemOrder} (#575): saves an item-order edit and returns the detail-
-   * page URL as JSON so the editor navigates itself. Routed by the {@code X-Requested-With} header;
-   * the classic handler stays the no-JS fallback. Empty lines → 400.
+   * AJAX twin of {@link #updateItemOrder}: saves an item-order edit and returns the detail URL as
+   * JSON; empty lines yield 400.
    *
    * @param id the item-order id
    * @param form the bound item-order form
@@ -409,13 +385,10 @@ public class JobOrderWriteController {
   }
 
   /**
-   * Shared post-create navigation target (#575): viewers go to the order list, members who may not
-   * browse the queue stay on the create form (mirrors the classic {@link #createOrder} / {@link
-   * #createItemOrder} redirects).
+   * Returns the post-create navigation target: the order list for queue viewers, otherwise the
+   * create form.
    *
-   * @param principal the caller. Since ADR-0159 this cannot be {@code null} — the whole surface is
-   *     authenticated — and the null branch survives only as the fail-closed default: an
-   *     unidentifiable caller is sent to the form, never to the queue
+   * @param principal the caller; {@code null} is treated as a non-viewer
    * @param canViewJobOrders whether the caller may browse the order queue
    * @param source the create-page source param to carry on the stay-on-create target
    * @return the URL the AJAX caller should navigate to on success
@@ -445,11 +418,8 @@ public class JobOrderWriteController {
   }
 
   /**
-   * AJAX twin of {@link #createOrder} (#575): creates a material order from the form-encoded body
-   * and returns the post-create navigation target as JSON, so the create page navigates itself
-   * instead of a server redirect (and stays put with an inline toast on a validation/backend
-   * failure). Routed by the {@code X-Requested-With} header so the classic form-POST handler stays
-   * the no-JS fallback. Empty materials → 400 (the page also pre-validates).
+   * AJAX twin of {@link #createOrder}: creates a material order and returns the navigation target
+   * as JSON; empty materials yield 400.
    *
    * @param form the bound material-order form
    * @param canViewJobOrders whether the caller may browse the order queue (decides the target)
@@ -511,13 +481,11 @@ public class JobOrderWriteController {
   }
 
   /**
-   * AJAX twin of {@link #updatePriority}: persists a drag-drop reorder without a full-page reload
-   * (epic #571 / #575). Returns the dragged order so the caller can confirm success; the
-   * order-index JS then re-renders the whole queue via a {@code ?fragment=results} swap, because
-   * the backend reshuffles <em>every</em> active order's priority slot (not just this one), so
-   * sibling rows' {@code data-priority} attributes must refresh or the next drag computes a stale
-   * target slot. The gate is tightened to {@code LOGISTICIAN} to match the backend so a
-   * non-logistician gets a clean propagated 403 toast instead of a redirect.
+   * AJAX twin of {@link #updatePriority}: persists a drag-and-drop reorder and returns the moved
+   * order.
+   *
+   * <p>The backend reassigns every active order's slot, so the caller must re-render the whole
+   * queue.
    *
    * @param id the order whose priority slot changed
    * @param priority the new 1-based target slot
@@ -563,16 +531,12 @@ public class JobOrderWriteController {
   }
 
   /**
-   * AJAX toggle for the item-order blueprint-coverage variant counting (issue #822). Relays the
-   * requested mode + version to the backend's PATCH endpoint and propagates its status code (400
-   * not an item order, 403 forbidden, 409 optimistic-lock conflict) so the order-detail JS can show
-   * a clean toast and re-render the coverage panel in place. The coarse {@code
-   * hasRole('LOGISTICIAN')} gate here mirrors the backend; the fine per-order edit scope is
-   * enforced backend-side.
+   * AJAX toggle for an item order's blueprint-variant counting mode, relaying the backend status
+   * (400, 403, 409) verbatim.
    *
-   * @param id the order id.
-   * @param dto the requested counting mode + the order's expected version.
-   * @return the updated order on success, or the propagated backend error status.
+   * @param id the order id
+   * @param dto the requested counting mode + the order's expected version
+   * @return the updated order on success, or the propagated backend error status
    */
   @PostMapping("/{id}/blueprint-variant-counting")
   @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
@@ -591,25 +555,13 @@ public class JobOrderWriteController {
   }
 
   /**
-   * AJAX create-or-update of a material claim ("Eintragung") on a public SK order (Phase 6, #346).
-   * Relays the payload to the backend's claim upsert and propagates its status code so the
-   * order-detail JS can show a clean toast — 400 (not an open SK order / unknown bucket /
-   * overclaim), 403 (may not act for the claiming squadron), 409 (concurrent claim modification) —
-   * instead of a stack trace. The coarse {@code hasRole('LOGISTICIAN')} gate here is the same one
-   * the backend carries; the fine per-squadron / responsible-SK matrix is enforced backend-side.
+   * AJAX create-or-update of a material claim on a public SK order, relaying the backend status and
+   * RFC 7807 {@code code} verbatim (400, 403, 409).
    *
-   * <p>The 409 branch is load-bearing: the backend upsert is a bounded-retry orchestrator over a
-   * find-or-create on a {@code @Version}ed, uniquely-indexed row, so a concurrent same-squadron
-   * first-claim race that outlasts the retry bound surfaces a truthful 409 ({@code OPTIMISTIC_LOCK}
-   * on the UPDATE race, {@code DATA_INTEGRITY_VIOLATION} on the INSERT race). {@link
-   * #propagateBackendError} mirrors that status <em>and</em> its RFC 7807 {@code code} verbatim —
-   * so {@code krt-fetch.js} still decides "stale data, reload?" vs. plain-toast from the code —
-   * rather than collapsing the conflict into a 500 (the trap the payout-toggle proxy hit in #1111).
-   *
-   * @param id the order id.
-   * @param dto the claim payload (material, quality bucket, claiming squadron, amount).
+   * @param id the order id
+   * @param dto the claim payload (material, quality bucket, claiming squadron, amount)
    * @return the persisted claim on success, or the propagated backend error status (incl. a 409 on
-   *     a surviving claim race).
+   *     a surviving claim race)
    */
   @PostMapping("/{id}/claims")
   @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
@@ -629,13 +581,11 @@ public class JobOrderWriteController {
   }
 
   /**
-   * AJAX withdrawal of a material claim (Phase 6, #346). Relays to the backend's claim delete and
-   * propagates the status code (404 unknown claim, 400 terminal/non-SK order, 403 forbidden) for a
-   * clean toast.
+   * AJAX withdrawal of a material claim, relaying the backend status (404, 400, 403).
    *
-   * @param id the order id.
-   * @param claimId the claim to withdraw.
-   * @return 204 on success, or the propagated backend error status.
+   * @param id the order id
+   * @param claimId the claim to withdraw
+   * @return 204 on success, or the propagated backend error status
    */
   @PostMapping("/{id}/claims/{claimId}/withdraw")
   @PreAuthorize("hasRole('" + Roles.LOGISTICIAN + "')")
@@ -701,11 +651,8 @@ public class JobOrderWriteController {
   }
 
   /**
-   * AJAX twin of {@link #updateOrder} (#575): edits a MATERIAL order's requesting unit / handle /
-   * comment / materials and returns the updated order so the detail page can re-render the header +
-   * material sections in place (and pick up the bumped {@code @Version}) instead of a full reload.
-   * Distinguished from the classic form-POST handler by {@code consumes=application/json}; that one
-   * stays the no-JS fallback. An empty material list is a 400 (the client also pre-validates).
+   * AJAX twin of {@link #updateOrder}: edits a MATERIAL order and returns the updated order for an
+   * in-place re-render; an empty material list yields 400.
    *
    * @param id the order to update
    * @param form the edit payload (requestingOrgUnitId, handle, comment, version, materials[])
@@ -748,11 +695,8 @@ public class JobOrderWriteController {
   }
 
   /**
-   * Classic no-JS fallback for the requester-side MATERIAL edit (REQ-ORDERS-023): a member of the
-   * order's requesting org unit changes quantities, adds/removes not-yet-delivered materials and
-   * edits the comment. Relays to {@code PUT /api/v1/orders/{id}/requested}; only the comment +
-   * materials + version reach the backend (handle / org unit / status / priority are ignored
-   * server-side). No {@code hasRole('LOGISTICIAN')} — authorisation is the backend requester gate.
+   * Requester-side MATERIAL edit (REQ-ORDERS-023): relays comment, materials and version to {@code
+   * PUT /api/v1/orders/{id}/requested}, which enforces the requester gate.
    *
    * @param id the order to update
    * @param form the edit payload (comment, version, materials[])
@@ -793,12 +737,8 @@ public class JobOrderWriteController {
   }
 
   /**
-   * AJAX twin of {@link #updateOrderAsRequester}: the requester-side MATERIAL edit that returns the
-   * updated (redacted) order so the detail page re-renders the header + material sections in place
-   * (REQ-FE) and picks up the bumped {@code @Version}. Relays to {@code PUT
-   * /api/v1/orders/{id}/requested}; an empty material list is a 400. The RFC 7807 backend error
-   * (incl. 409 optimistic-lock, 400 frozen-after-delivery) is propagated so the page shows a toast
-   * / conflict confirm and stays put.
+   * AJAX twin of {@link #updateOrderAsRequester}: returns the updated redacted order for an
+   * in-place re-render; an empty material list yields 400.
    *
    * @param id the order to update
    * @param form the edit payload (comment, version, materials[])
@@ -851,11 +791,7 @@ public class JobOrderWriteController {
   }
 
   /**
-   * AJAX twin of {@link #deleteOrder} (#575): cancels (soft-deletes) the order without a server
-   * redirect, so the order-detail JS can confirm via the KRT dialog and then navigate to the list
-   * itself. On a backend rejection (e.g. the order still has linked inventory) the RFC 7807 error
-   * is propagated so the page shows a toast and stays put instead of redirect-reflashing. The
-   * classic {@code POST}→redirect above stays the no-JS fallback.
+   * AJAX twin of {@link #deleteOrder}: cancels (soft-deletes) the order without a redirect.
    *
    * @param id the order to cancel
    * @return 204 on success, or the propagated RFC 7807 backend error
@@ -873,8 +809,7 @@ public class JobOrderWriteController {
   }
 
   /**
-   * Adds an assignee to the job order and re-renders the Bearbeiter section as an AJAX fragment (no
-   * full-page reload). The user-picker is fed by {@link UserProxyController}'s search endpoint.
+   * Adds an assignee to the job order and re-renders the Bearbeiter section fragment.
    *
    * @param id job-order id
    * @param userId the user to add
@@ -901,12 +836,6 @@ public class JobOrderWriteController {
 
   /**
    * Creates a material handover for the job order.
-   *
-   * <p>The backend service uses the {@code …WithinTransaction} concurrency pattern (see CLAUDE.md):
-   * it iterates the order's materials, collects ids that need a bulk clearing update, runs the bulk
-   * update exactly once after the loop, and re-fetches the aggregate root before the completion
-   * check — without that pattern a second {@code save()} on a detached child would silently merge
-   * and bump {@code @Version} a second time, triggering 409s for clean callers.
    *
    * @return redirect to the order detail page
    */
@@ -983,11 +912,10 @@ public class JobOrderWriteController {
   }
 
   /**
-   * Records an item handover for an item order: relays the per-line delivered whole-unit quantities
-   * to the Phase 3 backend endpoint, which decrements outstanding amounts and auto-completes the
-   * order once every line is fully delivered. Rows with a null or non-positive amount are dropped;
-   * an empty result short-circuits with an error toast. On success the page redirects (a full
-   * reload), so the refreshed {@code @Version} is picked up and no stale-version 409 can follow.
+   * Records an item handover by relaying the per-line delivered quantities to the backend, which
+   * auto-completes a fully delivered order.
+   *
+   * <p>Rows without a positive amount are dropped; an empty result yields an error toast.
    *
    * @param id the item order's id
    * @param form the bound item-handover form (per-line amounts + recipient + time)
@@ -1063,10 +991,8 @@ public class JobOrderWriteController {
   }
 
   /**
-   * Parses the client-supplied handover time (a UTC ISO-Instant produced by datetime-splitter.js),
-   * falling back to local-datetime parsing and finally {@code now()} so a malformed value never
-   * blocks the handover. Extracted so the AJAX handover twins share the classic handlers' exact
-   * timezone handling.
+   * Parses the client-supplied handover time as a UTC instant, then as a local date-time, falling
+   * back to now.
    *
    * @param raw the raw {@code handoverTime} form value (may be null/blank)
    * @return the parsed instant, or {@code Instant.now()} when absent/unparseable
@@ -1089,12 +1015,8 @@ public class JobOrderWriteController {
   }
 
   /**
-   * AJAX twin of {@link #createHandover} (#575): records a material handover and returns the
-   * refreshed order so the detail page can re-render the material requirement table, the handover
-   * history and the header (status + bumped {@code @Version}) in place instead of a full reload.
-   * The backend's {@code …WithinTransaction} bulk-update pattern is unchanged (one proxied call).
-   * Empty items → 400 (the client pre-validates); other failures propagate RFC 7807. Classic POST
-   * kept.
+   * AJAX twin of {@link #createHandover}: records a material handover and returns the refreshed
+   * order for an in-place re-render; empty items yield 400.
    *
    * @param id the order id
    * @param form the handover payload (handoverTime, recipientHandle, recipientSquadron, items[])
@@ -1152,11 +1074,8 @@ public class JobOrderWriteController {
   }
 
   /**
-   * AJAX twin of {@link #createItemHandover} (#575): records an item handover and returns the
-   * refreshed order so the detail page can re-render the ordered-items table
-   * (delivered/outstanding), the item-handover history, the modal (rows for the still-outstanding
-   * lines) and the header in place. Empty entries → 400; other failures propagate RFC 7807. Classic
-   * POST kept as the no-JS fallback.
+   * AJAX twin of {@link #createItemHandover}: records an item handover and returns the refreshed
+   * order for an in-place re-render; empty entries yield 400.
    *
    * @param id the item order id
    * @param form the item-handover payload (handoverTime, recipientHandle, entries[])
@@ -1206,12 +1125,8 @@ public class JobOrderWriteController {
   }
 
   /**
-   * AJAX relay for booking a production run ("Herstellung", REQ-ORDERS-025) against one ordered
-   * item line: forwards the payload to the backend, then re-fetches and returns the refreshed order
-   * so {@code orders-detail.js} can swap the items / aggregated / header / kpi / item-handovers
-   * sections in place (the Herstellung surface lives in the items section). A 409 (OPTIMISTIC_LOCK)
-   * or 422 (PRODUCTION_ALLOCATION) is relayed verbatim via {@link #propagateBackendError} so the
-   * client can distinguish a reload-and-retry from an inline hint.
+   * AJAX relay for booking a production run against one item line (REQ-ORDERS-025), returning the
+   * refreshed order; 409 and 422 are relayed verbatim.
    *
    * @param id job-order id
    * @param itemId ordered item-line id
@@ -1311,11 +1226,8 @@ public class JobOrderWriteController {
   }
 
   /**
-   * AJAX twin of {@link #unlinkInventoryItem} (#575): detaches the inventory item and returns the
-   * refreshed order so the detail page can re-render the material section in place AND pick up the
-   * bumped order {@code @Version} (the detach mutates the aggregate, so a subsequent status/
-   * handover write would otherwise 409). The classic {@code POST}→redirect above stays the no-JS
-   * fallback.
+   * AJAX twin of {@link #unlinkInventoryItem}: detaches the inventory item and returns the
+   * refreshed order with its new version.
    *
    * @param id the order id
    * @param inventoryItemId the inventory item to detach
@@ -1339,8 +1251,7 @@ public class JobOrderWriteController {
   }
 
   /**
-   * Removes an assignee from the job order and re-renders the Bearbeiter section as an AJAX
-   * fragment (no full-page reload).
+   * Removes an assignee from the job order and re-renders the Bearbeiter section fragment.
    *
    * @param id job-order id
    * @param userId the user to remove
@@ -1366,10 +1277,8 @@ public class JobOrderWriteController {
   }
 
   /**
-   * Sets (creates or replaces) the current user's — or, for a Logistician+, any assignee's — note
-   * on the order, then re-renders the Bearbeiter section as an AJAX fragment. The backend enforces
-   * the self-or-logistician rule and the optimistic lock on the assignee edge (HTTP 409 on stale
-   * input, relayed here so the page JS can prompt a reload).
+   * Sets an assignee's note and re-renders the Bearbeiter section fragment; the backend allows only
+   * the assignee or a Logistician and returns 409 on a stale version.
    *
    * @param id job-order id
    * @param userId the assignee whose note is changed
@@ -1399,8 +1308,8 @@ public class JobOrderWriteController {
   }
 
   /**
-   * Clears an assignee's note and re-renders the Bearbeiter section as an AJAX fragment. Same
-   * self-or-logistician + optimistic-lock semantics as {@link #setAssigneeNote}.
+   * Clears an assignee's note and re-renders the Bearbeiter section fragment, with the same rules
+   * as {@link #setAssigneeNote}.
    *
    * @param id job-order id
    * @param userId the assignee whose note is cleared
@@ -1430,10 +1339,8 @@ public class JobOrderWriteController {
   }
 
   /**
-   * Runs an assignee-section mutation against the backend and translates a backend failure into the
-   * matching HTTP status so the order-detail page JS can react (409 → reload prompt, 403 →
-   * forbidden toast, else generic error). Keeps the four AJAX endpoints free of duplicated
-   * try/catch.
+   * Runs an assignee mutation and maps a backend failure to the matching HTTP status (409, 403, or
+   * a generic error).
    *
    * @param action short action label for the log line
    * @param call the backend call returning the updated order
@@ -1455,15 +1362,8 @@ public class JobOrderWriteController {
   }
 
   /**
-   * Populates the model attributes the {@code assigneesSection} fragment reads — the updated order,
-   * the caller's user id and the Logistician flag. Shared by the four assignee AJAX endpoints and
-   * mirrors what {@link JobOrderPageController#viewOrderDetail} sets for the initial full-page
-   * render.
-   *
-   * <p>No user list: the add-assignee picker searches the roster on demand ({@code
-   * data-krt-combobox="remote-users"}, #1193), so the {@code GET /api/v1/users?size=1000} this
-   * method used to issue on every assignee mutation fetched up to a thousand full user DTOs that
-   * the fragment never read (BE-PERF-05, removed 2026-09-22).
+   * Populates the model attributes the {@code assigneesSection} fragment reads: the order, the
+   * caller's user id and the Logistician flag.
    *
    * @param model the view model to populate
    * @param principal the authenticated caller
@@ -1486,9 +1386,8 @@ public class JobOrderWriteController {
   public record AssigneeNoteRequest(String note, Long version) {}
 
   /**
-   * Resolves the caller's user id from the OIDC subject, falling back to a {@code /api/v1/users/me}
-   * lookup when the subject is not a UUID. Verbatim duplicate of the read-side {@code
-   * JobOrderPageController#getCurrentUserId} original (#924 split precedent).
+   * Resolves the caller's user id from the OIDC subject, falling back to {@code /api/v1/users/me}
+   * when the subject is not a UUID.
    *
    * @param principal the authenticated caller, or {@code null} for a guest
    * @return the caller's user id, or {@code null} when unresolvable
@@ -1513,9 +1412,7 @@ public class JobOrderWriteController {
   }
 
   /**
-   * Checks whether the caller reaches the LOGISTICIAN, ADMIN or OFFICER authority through the role
-   * hierarchy, gating the assignee-picker rendering. Verbatim duplicate of the read-side {@code
-   * JobOrderPageController#isLogistician} original (#924 split precedent).
+   * Checks whether the caller reaches LOGISTICIAN, ADMIN or OFFICER through the role hierarchy.
    *
    * @param principal the authenticated caller, or {@code null} for a guest
    * @return {@code true} when the caller holds one of the three authorities

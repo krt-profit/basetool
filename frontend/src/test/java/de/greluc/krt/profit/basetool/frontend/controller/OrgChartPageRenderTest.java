@@ -49,16 +49,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Full Thymeleaf render tests for the org-chart page. Renders {@code org-chart.html} together with
- * the {@code ocNode} person-node fragment through the real template engine, so a broken node
- * expression fails the build instead of only surfacing as a 500 at runtime (the pure-method {@link
- * OrgChartPageControllerTest} never touches the template).
- *
- * <p>Pins the empty-chart path: an unfilled Bereichsleiter or Staffelleiter seat must render its
- * vacant placeholder rather than invoking {@code ocNode} with a {@code null} node. That null-node
- * invocation is exactly what threw {@code EL1011E: ... positionType() on null context object} when
- * the {@code th:if} guard sat on the same element as {@code th:replace} (fragment inclusion runs
- * before the conditional, so the guard was dead code).
+ * Full Thymeleaf render tests for the org-chart page and its {@code ocNode} fragment, so a broken
+ * node expression fails the build. An unfilled Bereichsleiter or Staffelleiter seat must render its
+ * vacant placeholder instead of calling {@code ocNode} with a {@code null} node.
  */
 @SpringBootTest
 class OrgChartPageRenderTest {
@@ -587,13 +580,12 @@ class OrgChartPageRenderTest {
   }
 
   /**
-   * Builds a chart node for a Stab seat, account-held so it renders as an ordinary node rather than
-   * a free-text placeholder.
+   * Builds an account-held chart node for a Stab seat.
    *
    * @param positionType the chart position type ({@code BEREICHSKOORDINATOR} / {@code
-   *     BEREICHSOPERATOR}).
-   * @param name the holder's effective name, asserted on by the callers.
-   * @return the node.
+   *     BEREICHSOPERATOR})
+   * @param name the holder's effective name
+   * @return the node
    */
   private static OrgChartNodeDto stabNode(String positionType, String name) {
     return new OrgChartNodeDto(
@@ -601,14 +593,12 @@ class OrgChartPageRenderTest {
   }
 
   /**
-   * Builds a single PROFIT Bereich carrying the given Stab and nothing else — no Staffel, no SK, no
-   * Kommando. That emptiness is load-bearing for {@link
-   * #bereichStab_rendersOneRowPerRank_peersSideBySide()}: it leaves the Stab as the only possible
-   * source of a {@code .oc-v} connector in the rendered page.
+   * Builds a single PROFIT Bereich carrying only the given Stab, so the Stab is the only source of
+   * a {@code .oc-v} connector on the page.
    *
-   * @param coordinators the Bereichskoordinatoren.
-   * @param operators the Bereichsoperatoren.
-   * @return the Bereich.
+   * @param coordinators the Bereichskoordinatoren
+   * @param operators the Bereichsoperatoren
+   * @return the Bereich
    */
   private static BereichChartDto bereichWithStab(
       List<OrgChartNodeDto> coordinators, List<OrgChartNodeDto> operators) {
@@ -626,12 +616,11 @@ class OrgChartPageRenderTest {
   }
 
   /**
-   * Renders {@code /org-chart} for a chart holding exactly {@code bereich} — no OL and an empty
-   * legacy area tier, so the Bereich subtree is the only thing on the page.
+   * Renders {@code /org-chart} for a chart holding only {@code bereich}.
    *
-   * @param bereich the single Bereich to render.
-   * @return the rendered HTML.
-   * @throws Exception if the request fails.
+   * @param bereich the single Bereich to render
+   * @return the rendered HTML
+   * @throws Exception if the request fails
    */
   private String renderChartWith(BereichChartDto bereich) throws Exception {
     when(backendApiClient.get("/api/v1/org-chart", OrgChartDto.class))
@@ -653,13 +642,11 @@ class OrgChartPageRenderTest {
   }
 
   /**
-   * Counts non-overlapping occurrences of {@code needle} in {@code haystack} — the peer rows are
-   * asserted by count, because "rendered side by side" is a statement about how many rows exist,
-   * not about any one of them being present.
+   * Counts non-overlapping occurrences of {@code needle} in {@code haystack}.
    *
-   * @param haystack the rendered HTML.
-   * @param needle the literal to count.
-   * @return the number of occurrences.
+   * @param haystack the rendered HTML
+   * @param needle the literal to count
+   * @return the number of occurrences
    */
   private static int countOf(String haystack, String needle) {
     int count = 0;

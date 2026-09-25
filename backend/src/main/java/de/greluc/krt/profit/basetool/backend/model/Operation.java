@@ -69,19 +69,11 @@ public class Operation extends AbstractEntity<UUID> {
   private Set<Mission> missions = new HashSet<>();
 
   /**
-   * Org-unit owner of this operation, or {@code null} for an <em>ownerless leadership
-   * operation</em>. After R9 Step 2 dropped the legacy {@code owningSquadron} mirror field together
-   * with the {@code syncOwnerFields()} lifecycle hook, callers stamp this field directly via {@code
-   * OwnerScopeService.resolveOrgUnitForPickerOutputNullable}; V100 drops the matching {@code
-   * owning_squadron_id} column.
+   * Org-unit owner of this operation, stamped by the caller via {@code
+   * OwnerScopeService.resolveOrgUnitForPickerOutputNullable}.
    *
-   * <p>{@code null} is a legitimate value since V145 (#500): organisation leadership
-   * ("Bereichsleitung") belongs to no OrgUnit but may plan org-wide operations, so a membershipless
-   * creator yields a {@code null} owner instead of a 400. Unlike {@code Mission}, an operation has
-   * no per-user owner column, so an ownerless operation is attributable only as an
-   * organisation-wide leadership operation; and operations carry no {@code is_internal} flag, so an
-   * ownerless operation is visible to organisation members-or-above only (never anonymous). See
-   * REQ-ORG-009 and {@code OwnerScopeService.canSeeOperation}.
+   * <p>{@code null} marks an organisation-wide leadership operation, visible to organisation
+   * members and above only (REQ-ORG-009).
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "owning_org_unit_id")

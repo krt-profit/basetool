@@ -53,11 +53,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC tests for the item-order edit wiring (item-edit follow-up): the create form reused in edit
- * mode ({@code GET /orders/{id}/items/edit}, on {@link JobOrderPageController}) and the update
- * relay ({@code POST /orders/{id}/items/update} → backend {@code PUT /api/v1/orders/{id}/items},
- * since the #924 split in {@link JobOrderWriteController}). Covers the two block cases (non-item
- * order, order with deliveries) and the happy edit-page render + relay.
+ * MVC tests for editing an item order: the edit form ({@code GET /orders/{id}/items/edit} on {@link
+ * JobOrderPageController}) and the update relay in {@link JobOrderWriteController}, including the
+ * blocked cases (non-item order, order with deliveries).
  */
 @SpringBootTest
 class JobOrderPageControllerItemEditMvcTest {

@@ -20,16 +20,12 @@
 package de.greluc.krt.profit.basetool.backend.model;
 
 /**
- * Discriminator for the two kinds of {@link MaterialExchangeOffer} on the Materialbörse
- * (REQ-MARKET-002 / REQ-MARKET-012).
+ * Discriminator for the two kinds of {@link MaterialExchangeOffer} (REQ-MARKET-002 /
+ * REQ-MARKET-012).
  *
- * <p>A {@link #MATERIAL} offer is a thin overlay on a Lager row ({@code inventory_item}): its
- * material, quality and amount are read <b>live</b> from the linked item, the client never sets
- * them (ADR-0082 D1). An {@link #ITEM} offer has no backing stock row — it references a blueprint
- * product (an "item for which a blueprint exists", #1185) by its normalized {@code product_key},
- * and the offering player <b>states the quantity</b> at release time (there is no live source to
- * read it from). An item offer carries no quality and no location. The exactly-one-branch integrity
- * is enforced at the DB level (V213 {@code CHECK}) and mirrored by the entity's nullability.
+ * <p>A {@link #MATERIAL} offer reads material, quality and amount live from its Lager row. An
+ * {@link #ITEM} offer names a blueprint product by {@code product_key} with an owner-stated
+ * quantity and carries no quality or location.
  */
 public enum MaterialExchangeOfferKind {
 

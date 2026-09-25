@@ -40,30 +40,13 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Guards the <b>external contract set</b> (REQ-API-009, ADR-0136): the operations a shipped client
- * depends on, which may no longer change shape in place.
+ * Guards the external contract set (REQ-API-009, ADR-0136): operations a shipped client depends on,
+ * which may not change shape in place.
  *
- * <p>REQ-API-001's carve-out lets an endpoint consumed only by the in-repo frontend change its
- * response shape without an {@code /api/v2} bump, because frontend and backend deploy atomically. A
- * released Android build breaks that premise: it sits on devices for months, and a field the server
- * stops sending is a crash or a blank screen in a version nobody can redeploy. For the operations
- * listed here the carve-out therefore does not apply.
- *
- * <p><b>What this test can and cannot prove.</b> It reads the committed {@code openapi.json} — the
- * artifact REQ-API-007 already keeps in sync with the controllers — and fails when a contract
- * operation disappears, changes its verb, loses a recorded response field, gains a required request
- * field, changes a required enum's constants, or renames or retypes a query parameter the app
- * addresses it by. Those are the breaks that silently reach a device.
- *
- * <p>It still does <em>not</em> compare response field types, nullability, or a parameter's default
- * value — the last of which is a real gap, since a list whose {@code sort} default flips reorders a
- * shipped screen with every name and type intact. Catching that needs a schema diff against the
- * previous release, which ADR-0136 records as the next step rather than pretending this covers it.
- *
- * <p><b>Adding to the set is a deliberate act.</b> The list grows one app phase at a time, together
- * with the vhost allow-list that exposes those paths. Removing an entry is not a way to make this
- * test pass: it means retiring a contract, which is an {@code /api/v2} plus {@code @ApiDeprecation}
- * question and needs the sunset the shipped clients get to live through.
+ * <p>Reads the committed {@code openapi.json} and fails when a contract operation disappears,
+ * changes its verb, loses a recorded response field, gains a required request field, changes a
+ * frozen enum, or changes a recorded query parameter. Removing an entry means retiring a contract
+ * via {@code /api/v2}.
  */
 class ExternalContractTest {
 
@@ -79,27 +62,16 @@ class ExternalContractTest {
   private static final int MAX_NESTING = 2;
 
   /**
-   * One frozen operation: path, verb, the response fields a shipped client may rely on, the query
-   * parameters it addresses the operation by, and — for a write — the request fields the server may
-   * demand of it.
-   *
-   * <p><b>Why the query parameters sit here and not in a list of their own.</b> They were held in a
-   * side map keyed by {@code "method path"}, and the shape of that map was the defect: adding an
-   * operation to {@code CONTRACT} did not oblige anyone to say how the app addresses it. Five
-   * operations that take query parameters therefore reached the set with none recorded — a paged
-   * Finanzen tab, the paged Hangar org overview, the offer sheet's picker, an optimistic lock
-   * riding a {@code DELETE} as a query parameter, and one whose honest answer turned out to be
-   * "none at all". As a component the slot travels with the entry, and the coverage guard fails the
-   * build when it is left unanswered.
+   * One frozen operation: path, verb, response fields a shipped client relies on, query parameters
+   * it sends, and for a write the request fields the server may require.
    *
    * @param path the {@code /api/v1} path exactly as it appears in the document
-   * @param method the HTTP verb, lower case, as OpenAPI spells it
-   * @param responseFields response properties that must keep existing; additive change is fine
-   * @param requiredRequestFields the request body's {@code required} list, frozen exactly. Empty
-   *     for an operation with no request body, and for one whose body is entirely optional
-   * @param queryParams query parameters the app sends, as {@code name:type}, frozen as a subset so
-   *     the server may still add optional ones. Empty for an operation the app addresses by path
-   *     alone
+   * @param method the HTTP verb, lower case
+   * @param responseFields response properties that must keep existing; additions are fine
+   * @param requiredRequestFields the request body's {@code required} list, frozen exactly; empty
+   *     without a body or when nothing is required
+   * @param queryParams query parameters the app sends, as {@code name:type}, frozen as a subset;
+   *     empty for an operation addressed by path alone
    */
   private record ContractOperation(
       String path,
@@ -120,7 +92,7 @@ class ExternalContractTest {
     }
 
     /**
-     * A write whose request body has a {@code required} list to freeze.
+     * Creates a write operation whose request body has a {@code required} list to freeze.
      *
      * @param path the {@code /api/v1} path
      * @param method the HTTP verb, lower case
@@ -135,13 +107,8 @@ class ExternalContractTest {
     /**
      * Records the query parameters a shipped client addresses this operation by.
      *
-     * <p>Written as a builder step rather than a fifth argument so the seventy-odd entries the app
-     * reaches by path alone stay as they are, and the ones that take parameters name them where a
-     * reviewer reads the entry.
-     *
-     * @param frozen the parameters as {@code name:type}, using the schema type the document
-     *     declares; an array's element type is left out, since a client sends the same repeated
-     *     parameter either way
+     * @param frozen the parameters as {@code name:type} using the document's schema type; an
+     *     array's element type is omitted
      * @return a copy of this operation carrying the frozen parameters
      */
     ContractOperation addressedBy(Set<String> frozen) {
@@ -150,16 +117,11 @@ class ExternalContractTest {
   }
 
   /**
-   * The contract set: the app's phase 1 (auth, terms gate, pending-approval screen, settings) plus
-   * what each later phase adds as it is actually consumed — exactly the paths the API vhost
-   * allow-lists.
-   *
-   * <p>Recorded from the generated document rather than hand-written, so the baseline is what the
-   * server actually serves and not what someone believed it served.
+   * The contract set: every operation the Android app consumes, matching the paths the API vhost
+   * allow-lists, recorded from the generated document.
    */
   /**
-   * The nginx include that decides what the internet can reach through the API vhost — the source
-   * of truth since 2026-09-12 (ADR-0162), applied by the deploy reconcile.
+   * The nginx include that decides what the internet can reach through the API vhost (ADR-0162).
    */
   private static final String ALLOW_LIST = "docker/edge/include/api-allowlist.conf";
 
@@ -192,19 +154,9 @@ class ExternalContractTest {
           "job_order.age_yellow_days");
 
   /**
-   * What an org-unit bank account's settings response promises, for <b>all seven</b> operations
-   * that answer with one.
-   *
-   * <p>Named once because they share a mapper. {@code settings}, {@code balance-target}, both
-   * {@code visibility} pairs and the four {@code approval-limit} leaves all funnel their answer
-   * through the app's single {@code mapped(...)} → {@code toModel()}, so a field the read needs is
-   * a field every write's response needs too. Six of the seven had a narrower set of their own
-   * until 2026-09-03 — {@code approvalLimits} and {@code canConfigureApprovalLimits} were on none
-   * of them, and the whole Freigabe-Limits section is drawn from the first.
-   *
-   * <p>The nested names are the ones {@code BankApprovalLimitsDto.toModel} reads. They are here for
-   * the same reason the top-level ones are: the guard walks nested properties, and a rename inside
-   * that object empties a control rather than failing anything.
+   * Response fields promised by all seven operations that answer with an org-unit bank account's
+   * settings, since the app maps them through one shared mapper. Includes the nested approval-limit
+   * names {@code BankApprovalLimitsDto.toModel} reads.
    */
   private static final Set<String> BANK_ACCOUNT_SETTINGS =
       Set.of(
@@ -232,17 +184,8 @@ class ExternalContractTest {
           "limitAmount");
 
   /**
-   * What a {@code JobOrderDto} answer promises, for every operation that returns one.
-   *
-   * <p>Named once because they share a mapper: the detail read, the edit and the priority change
-   * all fold their answer back through the app's single {@code JobOrderDto.toModel()}, so a field
-   * one of them needs is a field all of them need. It was written out three times before phase T
-   * added the third consumer, which is one copy past the point where they drift.
-   *
-   * <p>{@code effectiveName} is the only name an assignee row can show, and {@code version} is what
-   * a note edit echoes -- lose it and every note edit 409s. {@code user} and {@code assignees} are
-   * the containers they arrive in; without them the app cannot tell whose edge it is holding, which
-   * is what decides "assign me" from "unassign me".
+   * Response fields promised by every operation returning a {@code JobOrderDto}, since the app maps
+   * them through one shared mapper. {@code version} is required for assignee note edits.
    */
   private static final Set<String> JOB_ORDER_DETAIL =
       Set.of(
@@ -267,17 +210,9 @@ class ExternalContractTest {
           "responsibleOrgUnit");
 
   /**
-   * What an {@code InventoryItemDto} answer promises, for all three allocation verbs.
-   *
-   * <p>Named once because they share a mapper: {@code POST}, {@code PATCH} and {@code DELETE} on
-   * {@code …/allocation} all fold their answer through the app's single {@code toEntry()}, so a
-   * field one needs is a field all three need.
-   *
-   * <p>{@code jobOrderRest} and {@code missionRest} are what the sheet caps a new earmark against —
-   * how much of the row is still unspoken for — and losing either turns a bounded control into one
-   * that lets a member allocate stock twice. The nested allocation names are read field by field to
-   * label each existing earmark; a row whose target id is gone is dropped rather than drawn, so it
-   * disappears instead of showing blank.
+   * Response fields promised by the three allocation operations returning an {@code
+   * InventoryItemDto}, since the app maps them through one shared mapper. {@code jobOrderRest} and
+   * {@code missionRest} bound new earmarks.
    */
   private static final Set<String> INVENTORY_ROW =
       Set.of(
@@ -306,15 +241,8 @@ class ExternalContractTest {
           "missionRest");
 
   /**
-   * What a {@code MissionDto} answer promises, for every operation that returns one.
-   *
-   * <p>Named once because they share a mapper: the detail read and the five planning writes that
-   * still answer with the whole Einsatz all fold through the app's single {@code toModel()}.
-   *
-   * <p>Phase 3 widened this set: the app acts on the caller's OWN participant row, and {@code user}
-   * is the only thing that says which row that is. A name cannot decide it — the server sends
-   * {@code displayName} when a member set one and {@code username} otherwise — and {@code
-   * startTime} is what "checked in" means on the wire.
+   * Response fields promised by every operation returning a {@code MissionDto}, since the app maps
+   * them through one shared mapper. {@code user} identifies the caller's own participant row.
    */
   /**
    * What a step row promises, for all five writes that answer with the Ablauf.
@@ -1796,19 +1724,8 @@ class ExternalContractTest {
           new ContractOperation("/api/v1/settings/{key}", "get", Set.of("value")));
 
   /**
-   * Contract operations the app addresses by <strong>no</strong> query parameter, although the
-   * document declares one.
-   *
-   * <p>An exemption ledger, not a second freeze list. The coverage guard below refuses an operation
-   * that takes query parameters and records none, because that silence is indistinguishable from
-   * forgetting — which is exactly how five of them slipped in. Naming one here is the way to say
-   * "considered, and the app sends nothing", and it costs a line in a diff a reviewer sees.
-   *
-   * <p>{@code GET /api/v1/users/me/memberships} declares {@code allKinds}, and the app relies on
-   * its <em>default</em> rather than sending it: {@code false} is the Staffel/SK-only shape the
-   * org-unit switcher renders, and the {@code kind} field frozen on its response is that pair. The
-   * house rule — freeze only what the app sends — keeps it out, for the same reason {@code sort} is
-   * absent from the paged lists whose server-side default order the app takes as it comes.
+   * Contract operations the app deliberately addresses with no query parameter although the
+   * document declares one, exempting them from the query-parameter coverage guard.
    */
   private static final Set<String> ADDRESSED_BY_NO_QUERY_PARAMETER =
       Set.of(
@@ -1883,12 +1800,11 @@ class ExternalContractTest {
   }
 
   /**
-   * The query parameters an operation declares, as {@code name:type}.
+   * Returns the query parameters an operation declares, as {@code name:type}.
    *
    * @param document the parsed API document
    * @param operation the contract operation to resolve
-   * @return the declared query parameters; an array's element type is not part of the key, since a
-   *     client sends the same repeated parameter either way
+   * @return the declared query parameters; an array's element type is omitted
    */
   private static Set<String> queryParameters(JsonNode document, ContractOperation operation) {
     JsonNode node = document.get("paths").path(operation.path()).path(operation.method());
@@ -1911,34 +1827,12 @@ class ExternalContractTest {
   }
 
   /**
-   * Enum constants a shipped client cannot survive a change to, keyed {@code Schema.property}.
+   * Constants of required enum properties reachable from the contract, keyed {@code
+   * Schema.property}.
    *
-   * <p><strong>Only REQUIRED enum properties are here, and that is the whole point.</strong> The
-   * Android client parses with kotlinx.serialization and {@code coerceInputValues}, which turns an
-   * unrecognised constant into {@code null} — but only where the property is nullable. A required
-   * one has nowhere to go, so an unknown value fails the **entire response**, not the field.
-   *
-   * <p>Measured on the app before this guard existed: a single unknown {@code JobTypeDto.archetype}
-   * made the whole mission-detail response unparseable. The list endpoint has no nested enums and
-   * kept working, so the member would have seen a list whose every row failed to open — on an APK
-   * in the field that cannot be redeployed. The client cannot defend itself either:
-   * openapi-generator's {@code enumUnknownDefaultCase} is a no-op for kotlinx_serialization, and
-   * the app does not even read this field. It is required purely to parse.
-   *
-   * <p>So the defence has to be here, and it is a release-ordering one: adding a constant fails
-   * this build, which forces the app to ship a build that knows it <em>before</em> the server
-   * starts sending it.
-   *
-   * <p>Nullable enums are deliberately absent. They degrade to {@code null} — an objective loses
-   * its kind badge, not its screen — and freezing them would make this fire on harmless additions,
-   * which is how a guard gets widened until it means nothing.
-   *
-   * <p><strong>Requests count as well as responses.</strong> A shipped build sends {@code
-   * type=TRANSFER} and {@code status=IN_PROGRESS} as literal strings; renaming a constant
-   * server-side turns every one of those writes into a 400 that the member reads as "the app is
-   * broken". The failure is quieter than the response one — the screen still loads — and it is just
-   * as unfixable without a new APK, so the same release ordering applies: ship a build that sends
-   * the new constant first.
+   * <p>The Android client fails the whole response on an unknown constant in a required enum, and a
+   * renamed request constant causes a 400, so changing one requires shipping an app build first.
+   * Nullable enums are excluded because they degrade to {@code null}.
    */
   private static final Map<String, Set<String>> FROZEN_REQUIRED_ENUMS =
       Map.ofEntries(
@@ -1982,16 +1876,8 @@ class ExternalContractTest {
   }
 
   /**
-   * Collects every required enum property reachable from the contract set's schemas.
-   *
-   * <p>Walks the schema graph transitively, because a client parses the whole payload and not just
-   * the fields it reads: an enum four levels down inside a participant's job type is as fatal as
-   * one on the root object. Array properties are followed through their {@code items}, since the
-   * item's own {@code required} list is what decides whether an element can be parsed at all.
-   *
-   * <p>Request bodies are walked alongside responses. The direction of the break differs — a
-   * response enum fails the parse, a request enum fails the write with a 400 — but both are
-   * unfixable on an installed build.
+   * Collects every required enum property reachable from the contract's request and response
+   * schemas, walking the schema graph transitively including array items.
    *
    * @param document the parsed API document
    * @return {@code Schema.property} to its sorted constants; empty when nothing qualifies
@@ -2106,18 +1992,9 @@ class ExternalContractTest {
   }
 
   /**
-   * The one traversal both frozen records are built from.
-   *
-   * <p>The enum guard and the type record used to carry a near-verbatim copy each, which meant
-   * every fix to the walk had to be found twice and applied twice \u2014 and the {@code
-   * additionalProperties} gap proves the point: it was fixed in the type record and would have
-   * stayed open in the enum one, where a required enum used as a map's VALUE type is exactly as
-   * fatal to a strict parser.
-   *
-   * <p>Transitive and cycle-guarded by the caller's {@code visited} set, because a client parses
-   * the whole payload: a type four levels down inside a participant's job type breaks it as surely
-   * as one on the root object. Descends through an array's {@code items} and a map's {@code
-   * additionalProperties} as well as a plain {@code $ref}.
+   * Walks a schema and everything it references transitively, via {@code $ref}, array {@code items}
+   * and map {@code additionalProperties}, calling the visitor for each property. Shared by the enum
+   * guard and the type record.
    *
    * @param schemas the document's {@code components.schemas} node
    * @param name the schema to walk; {@code null} and already-visited names are no-ops
@@ -2178,30 +2055,17 @@ class ExternalContractTest {
   private static final String FROZEN_TYPES_RESOURCE = "/api/frozen-contract-types.txt";
 
   /**
-   * System property naming a previous release's {@code openapi.json} to diff against.
-   *
-   * <p>Set by CI, absent locally. See {@link #theContractTypesMatchThePreviousRelease()} for why
-   * both halves of §8.4 exist rather than one.
+   * System property naming a previous release's {@code openapi.json} to diff against; set by CI,
+   * absent locally.
    */
   private static final String BASELINE_PROPERTY = "contract.baseline";
 
   /**
-   * REQ-API-009's last open acceptance box: type and nullability changes are caught.
+   * Verifies that no field reachable from the contract changed its type, format or {@code required}
+   * status against the frozen record (REQ-API-009).
    *
-   * <p>ADR-0136 states the gap in its own words — {@code ExternalContractTest} <em>"does not
-   * compare types, nullability or enum values. A field that turns from string to object, or an enum
-   * that loses a constant, passes it and still breaks an old build."</em> The enum half was closed
-   * by {@link #theContractRequiredEnumsAreFrozen()}. This is the rest of it, and it closes the box.
-   *
-   * <p>The reachability is {@code walkSchema}'s, deliberately: from every contract operation's
-   * response and request schemas, transitively, cycle-guarded by a shared visited set. A client
-   * parses the whole payload, so a type four levels down inside a participant's job type breaks it
-   * exactly as one on the root object does.
-   *
-   * <p><b>Nullability here means {@code required}.</b> The document carries no {@code nullable}
-   * keyword and no {@code ["string","null"]} union — springdoc emits neither at OpenAPI 3.1 — so a
-   * schema's {@code required} list is the entire signal, and a property leaving it is a field that
-   * may now be absent on a build that assumed it never would be.
+   * <p>Nullability is expressed only by {@code required}, as the document carries no {@code
+   * nullable} keyword.
    *
    * @throws IOException if the committed document or the frozen record cannot be read
    */
@@ -2254,23 +2118,8 @@ class ExternalContractTest {
   }
 
   /**
-   * The same comparison, against the previous release rather than against a recorded intent.
-   *
-   * <p>Two halves, because they fail on different things. The frozen record above catches a change
-   * against what somebody wrote down and reviewed; it stays green if the record and the document
-   * are edited together in one PR, which is exactly what a careless "make the build pass" looks
-   * like. This one has no such hole: the baseline is a released artefact nobody in the pull request
-   * can edit. It is also the literal wording of ADR-0136 — <em>"a schema diff of the contract
-   * subset against the previous release tag"</em>.
-   *
-   * <p>Its weakness is the mirror image: it needs a baseline, so it <b>skips</b> when the file is
-   * absent. That is why it is not the only half. CI writes {@code
-   * build/contract-baseline/openapi.json} from the previous release tag and passes {@code
-   * -Dcontract.baseline}; a developer machine has neither and runs the frozen record instead.
-   *
-   * <p>Only properties present in <em>both</em> documents are compared. A field added since the
-   * release is not a break for a client that never knew it, and a removed one is already the
-   * subject of {@link #theContractResponsesKeepTheirFields()}.
+   * Verifies that no contract field changed shape since the previous release, comparing only
+   * properties present in both documents (ADR-0136). Skipped when no baseline is configured.
    *
    * @throws IOException if either document cannot be read
    */
@@ -2342,22 +2191,8 @@ class ExternalContractTest {
   }
 
   /**
-   * Freezes the body shapes that resolve to no named schema at all.
-   *
-   * <p>Two gaps closed together, because they are the same gap seen from the two ends of a request.
-   *
-   * <p><b>Multipart requests.</b> {@code requestSchemaName} reads only {@code application/json}, so
-   * {@code POST /api/v1/personal-blueprints/import/preview} — a contract operation whose body is
-   * {@code multipart/form-data} with {@code required: ["file"]} — resolved to {@code null} and
-   * every guard over it became a no-op. Renaming the part to {@code csv} would 400 every shipped
-   * Android build's blueprint import with the whole suite green.
-   *
-   * <p><b>Inline responses.</b> A 2xx schema that is an inline array of primitives, such as {@code
-   * GET /api/v1/material-exchange/released-item-ids} answering {@code array<string/uuid>}, names no
-   * schema either, so its element type could flip unnoticed.
-   *
-   * <p>Keyed by operation and media type rather than by schema name, because these shapes have no
-   * name to be keyed by — which is precisely why they were invisible.
+   * Freezes body shapes that resolve to no named schema: multipart request bodies and inline 2xx
+   * response schemas, keyed by operation and media type.
    *
    * @param document the parsed API document
    * @param operation the contract operation
@@ -2535,15 +2370,12 @@ class ExternalContractTest {
   }
 
   /**
-   * Reads the {@code required} list of an operation's request body schema.
-   *
-   * <p>Follows the {@code $ref} of the first media type declared, which is how springdoc emits a
-   * single-body operation. An operation with no request body answers an empty set, so a read entry
-   * needs no special case.
+   * Reads the {@code required} list of an operation's request body schema, following the first
+   * media type's {@code $ref}.
    *
    * @param document the parsed API document
    * @param operation the contract operation to resolve
-   * @return the required property names, empty when there is no body or nothing is required
+   * @return the required property names; empty when there is no body or nothing is required
    */
   private static Set<String> requiredRequestFields(JsonNode document, ContractOperation operation) {
     JsonNode body =
@@ -2572,21 +2404,13 @@ class ExternalContractTest {
   }
 
   /**
-   * Collects the property names of an operation's 2xx response body schema.
-   *
-   * <p>Follows the schema's {@code $ref}, or — for a list endpoint — the {@code $ref} of its {@code
-   * items}. Without the second case every array-returning operation resolves to nothing, and an
-   * entry recording no fields would then pass this guard while proving nothing.
-   *
-   * <p>It additionally descends into the item schema of <strong>every array property</strong>, so
-   * the recorded set spans the envelope and the rows it carries. That covers a paged response's
-   * {@code content} — stopping at the envelope would freeze {@code totalElements} and leave every
-   * field a member actually reads unguarded — and equally an embedded list such as an operation's
-   * {@code payouts}, whose rows are parsed one by one exactly like a page's are.
+   * Collects the property names of an operation's 2xx response schema, following its {@code $ref}
+   * or its array items' {@code $ref}, plus the properties of schemas referenced by array
+   * properties.
    *
    * @param document the parsed API document
    * @param operation the contract operation to resolve
-   * @return the property names, or an empty set when the response carries no body schema
+   * @return the property names, or an empty set when the response has no body schema
    */
   private static Set<String> responseProperties(JsonNode document, ContractOperation operation) {
     JsonNode responses =
@@ -2622,27 +2446,8 @@ class ExternalContractTest {
   }
 
   /**
-   * Collects the property names of the schemas a response's properties reference.
-   *
-   * <p>Descends **two levels** into the schemas a response references — an array's items and a
-   * plain nested object alike. Two, because a paged response spends the first on its own rows: the
-   * envelope references the row, and the row references the object whose field the screen shows. A
-   * {@code PageResponse} carries its rows under {@code content}, a roll-up carries its
-   * per-participant rows under a named list, and a ship carries its {@code shipType} as an object
-   * whose {@code name} is the whole point of the row. All three are invisible to a resolver that
-   * stops at the top-level object: an entry that froze only {@code payouts} would freeze the *list*
-   * and nothing in it, and a renamed {@code shareAmount} would reach a device with this guard
-   * green.
-   *
-   * <p>Two levels, not the whole graph. The deeper the walk, the more a recorded name could be
-   * satisfied by an unrelated schema somewhere far from the field it was recorded for, and the
-   * guard would read as stronger than it is.
-   *
-   * <p>The names land in one flat set together with the envelope's, which is the shape this guard
-   * has always had. That makes a recorded field satisfiable by a same-named field on another schema
-   * in the same response — accepted, because the alternative is a per-schema contract record and
-   * the failure it would add precision to (two schemas in one response sharing a field name where
-   * only one of them keeps it) is not the break this guard exists for.
+   * Collects the property names of schemas referenced by a response's properties, two levels deep,
+   * into one flat set.
    *
    * @param document the parsed API document
    * @param objectProperties the properties of the already-resolved response schema
@@ -2686,22 +2491,8 @@ class ExternalContractTest {
   }
 
   /**
-   * Every frozen operation is actually reachable from the internet.
-   *
-   * <p>Freezing an operation's shape and admitting its path are the same decision seen from two
-   * sides — the allow-list says so itself — and they are kept in two files that nothing compared
-   * until now. The asymmetry is not hypothetical: an audit on 2026-09-03 found <b>75 paths the
-   * Android app calls that no allow-list rule admits</b>, every one of them refused at the edge
-   * with a 404 the app renders as „Konnte nicht gespeichert werden.". None of those 75 was in this
-   * contract set, which is exactly why this test cannot see them.
-   *
-   * <p>What it <em>can</em> see is the other direction, and that is the half this repository owns:
-   * a promise made here that the edge does not let through. That was true for 0 of 90 operations
-   * when this test was written, and this pins it — the next `ContractOperation` added without its
-   * allow-list line fails the build instead of shipping a promise nobody can call.
-   *
-   * <p>The allow-list is parsed out of the nginx include rather than mirrored into a fixture on
-   * purpose: a copy is a third thing to keep in sync, and the include is the file the edge serves.
+   * Verifies that every frozen operation is admitted by the API vhost allow-list, parsed from the
+   * nginx include.
    *
    * @throws IOException if the allow-list cannot be read
    */
@@ -2732,11 +2523,8 @@ class ExternalContractTest {
   }
 
   /**
-   * The allow-list, as predicates over a concrete URI.
-   *
-   * <p>Two rule shapes appear in the allow-list and both are honoured: {@code $uri = "…"} is an
-   * exact comparison, {@code $uri ~ "…"} a regular expression. Anything else on a {@code
-   * krt_api_allowed 1} line is ignored rather than guessed at.
+   * Parses the allow-list into predicates over a concrete URI: {@code $uri = "…"} as an exact
+   * match, {@code $uri ~ "…"} as a regular expression; other lines are ignored.
    *
    * @return one predicate per parsed rule
    * @throws IOException if the allow-list cannot be read
@@ -2766,15 +2554,11 @@ class ExternalContractTest {
   }
 
   /**
-   * Turns a contract path into a concrete URI the allow-list can be asked about.
-   *
-   * <p>A placeholder stands for a real segment, and the rules match on its <em>shape</em> — a UUID
-   * character class, or a literal alternation such as {@code (true|false)}. Substituting a UUID for
-   * everything would silently fail against the latter, so the few non-UUID placeholders are named
-   * in {@link #PLACEHOLDERS} instead of guessed.
+   * Replaces each placeholder in a contract path with a representative value: a UUID by default, or
+   * the value named in {@link #PLACEHOLDERS}.
    *
    * @param path the contract path, possibly containing {@code {name}} segments
-   * @return the path with every placeholder replaced by a representative value
+   * @return the path with every placeholder replaced
    */
   private static String probePath(String path) {
     String probe = path;
@@ -2804,23 +2588,8 @@ class ExternalContractTest {
   }
 
   /**
-   * No frozen operation demands a header a shipped build does not send.
-   *
-   * <p>The request guard beside this one freezes required <em>body</em> fields, and the parameter
-   * guard freezes query parameters. A header was caught by neither, and it is the same break in a
-   * different envelope: a build already on a member's phone sends the headers it was written
-   * against, so a newly <b>required</b> one is a 400 on every call it makes — while the screen
-   * still opens and still looks fine.
-   *
-   * <p>Two frozen operations declare a header today ({@code X-User-Time-Zone}, on the bank
-   * statement and the three-month export) and both are optional, which is why this asserts a
-   * property rather than keeping a list: there is nothing to record while nothing is required, and
-   * the day something is, the build says so.
-   *
-   * <p>A header the app genuinely sends on <em>every</em> call could be made required safely —
-   * {@code Authorization}, the active org unit, the correlation id. None is declared as a parameter
-   * in the document, so none reaches this assertion; if one ever is, the right answer is a named
-   * exemption with the reason, not a wider rule.
+   * Verifies that no frozen operation declares a required header, which an installed app build may
+   * not send.
    *
    * @throws IOException if the document cannot be read
    */

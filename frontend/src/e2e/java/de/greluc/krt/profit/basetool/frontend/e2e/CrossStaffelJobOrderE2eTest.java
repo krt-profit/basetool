@@ -35,14 +35,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Cross-Staffel job-order flow (UC-08): Staffel A creates a job order, and a member of Staffel B
- * links B-owned inventory to it. The linked item must surface in A's order context (so A can fulfil
- * the order) but must NOT leak into A's org-scoped Lager-View — the {@code findByJobOrderIdOrdered}
- * (ungated) vs {@code findByMaterialAndPersonalFalseScoped} (org-scoped) repository split.
- *
- * <p>Multi-user: an Officer homed in IRIDIUM (Staffel A) drives the UI; the B-owned item is seeded
- * via the REST API as {@code test-member} homed in a freshly created Staffel B, so the resolver
- * stamps the item's owner as B.
+ * Cross-Staffel job-order flow (UC-08): inventory Staffel B links to Staffel A's order appears in
+ * A's order context but not in A's org-scoped Lager view.
  */
 @Tag("e2e")
 class CrossStaffelJobOrderE2eTest {

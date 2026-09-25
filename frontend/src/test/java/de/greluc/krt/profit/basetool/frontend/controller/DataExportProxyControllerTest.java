@@ -45,23 +45,11 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Unit tests for {@link DataExportProxyController} (REQ-SEC-058, ADR-0185).
+ * Unit tests for {@link DataExportProxyController} (REQ-SEC-058, ADR-0185) against a {@link
+ * MockWebServer} backend.
  *
- * <p>{@link MockWebServer} stands in for the backend so the real WebClient chain and the real
- * attachment headers are exercised rather than mocked.
- *
- * <p>Three properties are asserted, and each of them is a leak if it stops holding.
- *
- * <p><b>The member's own endpoints relay no user id.</b> The backend derives the subject from the
- * token; an id appearing in the relayed URI would turn "my data" into "anyone's data".
- *
- * <p><b>No download filename carries a handle.</b> A filename reaches the browser's download list,
- * a shell, a mail client and any screen being shared. The member's own export needs no identifier;
- * the admin variant carries the subject's <em>id</em>, because an admin working through several
- * requests has to tell the files apart, and an id is not a name.
- *
- * <p><b>A backend status is relayed, not flattened.</b> A 404 for a member who has no export must
- * not reach the browser as a 500.
+ * <p>Asserts that the member's own endpoints relay no user id, that no download filename carries a
+ * handle (the admin variant carries the subject id), and that backend statuses are relayed.
  */
 class DataExportProxyControllerTest {
 

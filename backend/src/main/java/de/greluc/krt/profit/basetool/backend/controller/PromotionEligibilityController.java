@@ -77,8 +77,7 @@ public class PromotionEligibilityController {
   }
 
   /**
-   * Returns the eligibility outcome for one specific rank transition for the calling user. Useful
-   * for the "next promotion" widget which only cares about the user's current rank.
+   * Evaluates the calling user's eligibility for one specific rank transition.
    *
    * @param fromRank the rank the caller currently holds
    * @param toRank the rank the caller would be promoted to

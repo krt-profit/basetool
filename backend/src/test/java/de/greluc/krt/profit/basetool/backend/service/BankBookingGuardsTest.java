@@ -49,14 +49,8 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 /**
- * Unit tests for the pre-persist validation guards {@link BankBookingGuards} extracted from {@code
- * BankLedgerService} (#1253) — the KRT-account direct-booking cap {@code
- * exceedsCartelDirectBookingCeiling} (REQ-BANK-047, ADR-0109) and the fee-inclusive {@code amount -
- * fee <= 0} guard {@code requireAmountExceedsFee} (REQ-BANK-033, #999). Pure Mockito — these are
- * pre-persist branch decisions driven by the role hierarchy, the {@code CARTEL} type/ceiling and
- * the fee, so no database is needed. The overdraft, closed-account and holder-activity guards stay
- * covered by the Testcontainers booking suites that drive them end-to-end ({@code
- * BankLedgerServiceTest}, {@code BankLedgerSplitDepositTest}, {@code BankHolderTransferFeeTest}).
+ * Unit tests for {@link BankBookingGuards}: the KRT-account direct-booking cap (REQ-BANK-047) and
+ * the {@code amount - fee <= 0} guard (REQ-BANK-033).
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)

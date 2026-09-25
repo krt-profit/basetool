@@ -20,26 +20,14 @@
 package de.greluc.krt.profit.basetool.backend.support;
 
 /**
- * The check a caller has to pass before a live-sync room is opened for them (ADR-0143).
+ * The check a caller must pass before a live-sync room is opened for them (ADR-0143).
  *
- * <p>Each constant names <em>which</em> question is asked, not the answer; {@code
- * LiveSyncSubscriptionAuthorizer} in the service layer runs it, because the answers come from
- * {@code OwnerScopeService} and this package is a dependency leaf. Keeping the kinds here lets
- * {@link LiveSyncTopicClass} declare its gate beside its section whitelist, so a new room cannot be
- * added without stating who may enter it.
- *
- * <p>The questions are the same ones the equivalent read already asks, deliberately: a room that
- * admitted someone the underlying {@code GET} would refuse would leak the fact that a resource
- * changed, which is the only thing a {@code changed} frame carries.
+ * <p>Each constant names the same question the equivalent read asks; {@code
+ * LiveSyncSubscriptionAuthorizer} evaluates it.
  */
 public enum LiveSyncAuthorization {
 
-  /**
-   * Any real member. Used for the global rooms whose page gate is the member role itself — the
-   * Einsatz list, the shared Lager, the Materialbörse, the Raffinerie queue and the org-unit bank
-   * overview. Every one of those re-fetches through a scoped read on the receiving side, so a peer
-   * outside the scope refreshes into the same view they had.
-   */
+  /** Any member; used for the global rooms whose page is gated by the member role. */
   MEMBER,
 
   /** {@code ownerScopeService.canSeeMission(id)} — the gate of the Einsatz detail read. */

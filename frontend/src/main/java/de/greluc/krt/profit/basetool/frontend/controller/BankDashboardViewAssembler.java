@@ -32,13 +32,9 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Assembles the bank-dashboard view shapes (REQ-BANK-016) that {@code BankPageController} renders:
- * the per-account {@link BankDashboardCardView} (backend payload plus its pre-computed sparkline)
- * and the by-Bereich chunking into {@link BankDashboardGroupView}s. Extracted verbatim from the
- * 684-line {@code BankPageController} (audit L-tier controller de-bloat) into a small static
- * view-helper, co-located with the sibling bank view helpers {@code BankAccountOrder} and {@code
- * BankSparkline} and using the latter for the sparkline. Pure, stateless transforms — no backend
- * call or model mutation — so the controller keeps orchestration and this holds the view shaping.
+ * Builds the bank dashboard view shapes (REQ-BANK-016): per-account {@link BankDashboardCardView}s
+ * with their sparkline and the by-Bereich {@link BankDashboardGroupView}s. Pure, stateless
+ * transforms.
  */
 public final class BankDashboardViewAssembler {
 
@@ -56,17 +52,14 @@ public final class BankDashboardViewAssembler {
       BankDashboardAccountDto account, String sparklinePoints, boolean flat) {}
 
   /**
-   * One vertical group of the by-Bereich dashboard view (REQ-BANK-016): a coloured header plus the
-   * cards that belong to it. Fixed groups (KRT rubric, Sonderkonten, Ohne Bereich, Geschlossen)
-   * carry an i18n {@code titleKey}; a Bereich group carries the live {@code bereichName} and a
-   * {@code deptClass} (its Bereichsfarbe token class), both {@code null} for the fixed groups.
+   * One group of the by-Bereich dashboard view (REQ-BANK-016). Fixed groups carry an i18n {@code
+   * titleKey}; a Bereich group carries its {@code bereichName} and {@code deptClass}.
    *
    * @param key stable DOM/testing key ({@code krt} / {@code bereich:<id>} / {@code special} /
    *     {@code ungrouped} / {@code closed})
-   * @param titleKey the i18n key for a fixed group's heading, or {@code null} for a Bereich group
-   * @param bereichName the Bereich's display name for a Bereich group, or {@code null}
-   * @param deptClass the Bereich department colour class ({@code bank-dept--<dept>}), or {@code
-   *     null}
+   * @param titleKey the i18n heading key of a fixed group, or {@code null}
+   * @param bereichName the Bereich's display name, or {@code null}
+   * @param deptClass the Bereich colour class ({@code bank-dept--<dept>}), or {@code null}
    * @param cards the group's cards, ordered
    */
   public record BankDashboardGroupView(
@@ -90,15 +83,12 @@ public final class BankDashboardViewAssembler {
   }
 
   /**
-   * Chunks the A→Z card list into the by-Bereich groups (REQ-BANK-016), in display order: the KRT
-   * rubric (CARTEL + KRT-bank), one group per Bereich (A→Z by Bereich name, each holding its AREA
-   * account first then its Staffel/SK accounts A→Z), the Sonderkonten, the "Ohne Bereich" bucket
-   * for org-unit accounts with no Bereich, and finally every closed account. Only non-empty groups
-   * are emitted. The input order (A→Z by account name) is preserved within the KRT / Sonderkonten /
-   * closed buckets.
+   * Splits the A→Z card list into the by-Bereich groups in display order: KRT rubric, one group per
+   * Bereich (its AREA account first), Sonderkonten, "Ohne Bereich", then closed accounts. Only
+   * non-empty groups are returned.
    *
-   * @param cards the account cards, already ordered A→Z by name
-   * @return the ordered, non-empty groups for the by-Bereich view
+   * @param cards the account cards, ordered A→Z by name
+   * @return the ordered, non-empty groups
    */
   @NotNull
   public static List<BankDashboardGroupView> buildGroups(List<BankDashboardCardView> cards) {
@@ -182,9 +172,7 @@ public final class BankDashboardViewAssembler {
   }
 
   /**
-   * Maps a Bereich department enum name to its design-system colour class ({@code
-   * bank-dept--<dept>} over the {@code --color-dept-*} tokens), mirroring the org chart's {@code
-   * oc-dept--*} convention.
+   * Maps a Bereich department enum name to its colour class {@code bank-dept--<dept>}.
    *
    * @param department the Bereich's department enum name, or {@code null}
    * @return the colour class, or {@code null} when the Bereich has no department

@@ -53,10 +53,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Renders the bank-staff confirmation queue (epic #666 F2) to pin that the request table, the
- * confirm modal (with its holder selector) and the reject modal render without a Thymeleaf error,
- * that the page is gated to {@code BANK_EMPLOYEE}, and that the {@code requestQueue} fragment view
- * resolves for the in-place swap.
+ * Renders the bank-staff confirmation queue: the request table and the confirm and reject modals
+ * render, the page is gated to {@code BANK_EMPLOYEE}, and the {@code requestQueue} fragment
+ * resolves.
  */
 @SpringBootTest
 class BankRequestQueuePageControllerMvcTest {
@@ -189,10 +188,8 @@ class BankRequestQueuePageControllerMvcTest {
   }
 
   /**
-   * With at least one active account, the direct-booking "Kontobewegung" CTA and the unified
-   * movement modal render (REQ-BANK-017/-023, #997): the type selector, the source-account picker
-   * (this page is not account-scoped) and the inline "?" field-hint markers are present, and the
-   * whole page still resolves without a Thymeleaf error.
+   * With an active account, the Kontobewegung CTA and the movement modal render with type selector,
+   * source-account picker and field hints (REQ-BANK-017/-023).
    */
   @Test
   @WithMockUser(roles = {"BANK_EMPLOYEE"})
@@ -239,10 +236,8 @@ class BankRequestQueuePageControllerMvcTest {
   }
 
   /**
-   * With no active account, {@code canBook} is false, so the direct-booking movement modal (and its
-   * CTA) must NOT render. Regression guard for the Thymeleaf attribute-precedence trap: {@code
-   * th:if="${canBook}"} shared its element with {@code th:replace}, so the modal rendered
-   * unconditionally even though the CTA that opens it was correctly hidden.
+   * With no active account, {@code canBook} is false and neither the movement modal nor its CTA
+   * renders.
    */
   @Test
   @WithMockUser(roles = {"BANK_EMPLOYEE"})

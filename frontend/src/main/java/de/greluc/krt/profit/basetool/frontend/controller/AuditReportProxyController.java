@@ -45,12 +45,10 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 /**
- * Frontend proxy for the unified audit-log PDF exports (REQ-AUDIT-001, ADR-0037). One seam for
- * every tab: {@code BANK} routes to the bank admin export, the generic areas to {@code
- * /api/v1/audit/{domain}/export}. Streams the backend's PDF bytes back to the browser via the
- * authenticated {@link WebClient} (OAuth2 token attached automatically) and forwards the caller's
- * IANA time zone so the documents render local timestamps. Authorization (ADMIN) is decided by the
- * backend gates; this seam only requires authentication.
+ * Frontend proxy for the unified audit-log exports and purges (REQ-AUDIT-001): {@code BANK} routes
+ * to the bank admin endpoints, the other areas to {@code /api/v1/audit/{domain}}. Forwards the
+ * caller's IANA time zone; authorization is decided by the backend, this seam only requires
+ * authentication.
  */
 @RestController
 @RequestMapping("/api/proxy/audit")
@@ -59,14 +57,8 @@ import org.springframework.web.util.UriComponentsBuilder;
 public class AuditReportProxyController {
 
   /**
-   * The known audit tabs. The raw {@code domain} path segment is validated against this allowlist
-   * before it is concatenated into the backend URI, so an unknown or crafted value (e.g. one
-   * containing {@code ..}) never reaches the URI builder. Defense-in-depth: the backend also
-   * re-authorizes every path and rejects unknown {@code AuditDomain} enums with 400.
-   *
-   * <p>Shared with the page controller through {@link AuditDomains} rather than duplicated. The
-   * duplicate had drifted: it never gained {@code MARKET}, so the Materialbörse tab rendered but
-   * its export and purge buttons answered {@code 400}.
+   * The known audit tabs, shared via {@link AuditDomains}. The {@code domain} path segment is
+   * checked against this allowlist before it is put into the backend URI.
    */
   private static final List<String> ALLOWED_DOMAINS = AuditDomains.ALL;
 
@@ -145,13 +137,11 @@ public class AuditReportProxyController {
   }
 
   /**
-   * Proxies one area's audit-log retention purge (REQ-AUDIT-004): deletes the backend's audit rows
-   * older than the cutoff and relays the JSON result ({@code {deletedCount}}) back to the page so
-   * it can report how many entries were removed. {@code BANK} routes to the bank admin purge.
+   * Proxies one area's audit-log retention purge (REQ-AUDIT-004), relaying the backend's {@code
+   * {deletedCount}} result; {@code BANK} routes to the bank admin purge.
    *
    * @param domain the area tab ({@code BANK} or a generic {@code AuditDomain} name)
-   * @param before the exclusive cutoff; bound as an instant so the relayed value cannot carry URI
-   *     syntax
+   * @param before the exclusive cutoff; bound as an instant so it cannot carry URI syntax
    * @return the backend's JSON purge result
    */
   @DeleteMapping("/{domain}")

@@ -51,18 +51,9 @@ import org.springframework.security.oauth2.core.OAuth2RefreshToken;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AccessTokenResponse;
 
 /**
- * End-to-end guard for the pool-hardened OAuth2 token-response clients (ADR-0115). The Keycloak
- * hairpin fix swaps <b>only</b> the transport under Spring Security's default token client — a
- * dedicated, idle-evicting reactor-netty pool — by replacing the whole {@code RestClient} via
- * {@code setRestClient}. That replacement is only correct if the substituted {@code RestClient}
- * still carries the form-encoding request converter, the token-response converter and the OAuth2
- * error handler; drop any of them and a real refresh grant fails to encode or parse.
- *
- * <p>This test drives {@link WebClientConfig#oauthRefreshTokenResponseClient()} against a {@link
- * MockWebServer} standing in for Keycloak's token endpoint and asserts a real {@code refresh_token}
- * grant round-trips: the request is a {@code POST} carrying {@code grant_type=refresh_token}, and
- * the JSON token response is parsed back into an {@link OAuth2AccessTokenResponse}. So a regression
- * that clears the converter list without re-adding both converters can no longer compile-and-pass.
+ * Verifies that the pool-hardened OAuth2 token client (ADR-0115) still round-trips a real {@code
+ * refresh_token} grant against a {@link MockWebServer}, parsing the response into an {@link
+ * OAuth2AccessTokenResponse}.
  */
 class WebClientConfigOauthTokenPoolTest {
 
@@ -97,12 +88,9 @@ class WebClientConfigOauthTokenPoolTest {
   }
 
   /**
-   * Builds the real {@link WebClientConfig} with light test doubles for its collaborators and the
-   * given HTTP timeout knobs, letting individual tests pick timeout constellations that make one
-   * specific transport bound observable (see {@link
-   * #stalledTokenEndpointFailsWithinTheClientSideBound()}).
+   * Builds the real {@link WebClientConfig} with light test doubles and the given HTTP timeouts.
    *
-   * @param httpProperties the timeout constellation the config under test should run with
+   * @param httpProperties the timeout settings the config under test runs with
    */
   private static WebClientConfig buildConfig(AppHttpProperties httpProperties) {
     Environment environment = mock(Environment.class);

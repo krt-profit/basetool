@@ -65,10 +65,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
- * Concurrency-sensitive coverage for {@link JobOrderService} priority/status transitions and the
- * priority-normalisation loop. CLAUDE.md flags these exact methods as bug-prone (optimistic locking
- * + bulk updates inside loops + {@code …WithinTransaction} pattern). Class-level coverage was 77%
- * line / 67% branch with the methods below at 0-50%.
+ * Unit tests for the priority and status transitions of {@link JobOrderService} and its priority
+ * normalisation loop.
  */
 @ExtendWith(MockitoExtension.class)
 class JobOrderServicePriorityAndStatusTest {

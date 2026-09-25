@@ -65,15 +65,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * The org-unit-facing slice of the bank, living at {@code /api/v1/org-units/bank} — deliberately
- * <em>outside</em> the {@code /api/v1/bank/**} space that URL-gates {@code BANK_EMPLOYEE}. It
- * serves the officers and leads who oversee an org unit, never the bank staff: an officer or lead
- * may read the balance of their own org unit's account (F1, REQ-BANK-021) and, in later phases,
- * raise confirm-before-post booking requests against it (F2, REQ-BANK-022). All org-unit logic
- * lives in {@link OrgUnitBankAccessService}; this controller only relays. Authorization is
- * coarse-gated to any authenticated caller and finely scoped in the service via the oversight
- * scope, so a caller who oversees nothing receives an empty result rather than another caller's
- * data.
+ * Org-unit-facing slice of the bank at {@code /api/v1/org-units/bank}, outside the {@code
+ * BANK_EMPLOYEE}-gated {@code /api/v1/bank/**} space, for the officers and leads who oversee an org
+ * unit (REQ-BANK-021, REQ-BANK-022).
+ *
+ * <p>Only relays to {@link OrgUnitBankAccessService}, which scopes every call to the caller's
+ * oversight; a caller who oversees nothing gets an empty result.
  */
 @RestController
 @RequestMapping("/api/v1/org-units/bank")
@@ -88,13 +85,11 @@ public class OrgUnitBankController {
   private final OrgUnitBankAccessService orgUnitBankAccessService;
 
   /**
-   * Returns the balance-only view of every org-unit account the caller oversees (REQ-BANK-021, F1).
-   * {@code isAuthenticated}: the fine-grained scope is decided in the service from the caller's
-   * oversight scope (officer → own Staffel, SK lead → led SK(s), admin → all/pinned), so a plain
-   * member gets an empty list and the endpoint never reveals accounts outside the caller's scope.
+   * Returns the balance-only view of every org-unit account the caller oversees (REQ-BANK-021); a
+   * plain member gets an empty list.
    *
-   * @return the overseen org-unit balances, ordered by account number; empty when the caller
-   *     oversees no org unit that owns an account
+   * @return the overseen balances ordered by account number; empty when the caller oversees no
+   *     account-owning org unit
    */
   @GetMapping("/balances")
   @PreAuthorize("isAuthenticated()")
@@ -112,10 +107,8 @@ public class OrgUnitBankController {
   }
 
   /**
-   * Returns the read-only account detail an org-unit viewer sees when they open an account from the
-   * card list (REQ-BANK-038): the same shape as the bank-staff detail but with all-false
-   * capabilities, plus the org-unit affordances (export statement, manage settings, request). The
-   * seam authorizes that the caller may view the account.
+   * Returns the read-only account detail for an org-unit viewer (REQ-BANK-038): all capabilities
+   * false, plus the org-unit affordances. The caller must be allowed to view the account.
    *
    * @param id the account
    * @return the read-only detail
@@ -162,10 +155,8 @@ public class OrgUnitBankController {
   }
 
   /**
-   * Returns the balance-over-time series of an org-unit account the caller may view (REQ-BANK-049)
-   * — the data behind the detail page's balance chart. The org-unit view authorization is enforced
-   * in the service; the series is pure balance math, so nothing is redacted and every viewer of the
-   * account may read it. Read-only, non-audited.
+   * Returns the balance-over-time series of an org-unit account the caller may view (REQ-BANK-049);
+   * nothing is redacted. Read-only, not audited.
    *
    * @param id the account
    * @param from inclusive period start (ISO-8601 instant)
@@ -466,10 +457,9 @@ public class OrgUnitBankController {
   }
 
   /**
-   * Raises a confirm-before-post booking request (REQ-BANK-022/-039/-042, F2). The request is
-   * recorded as {@code PENDING} and audited, but moves no money until a bank employee confirms it.
-   * A <em>deposit</em> may target any active account (REQ-BANK-042); a <em>withdrawal /
-   * transfer</em> is gated by view eligibility on the source account (REQ-BANK-039).
+   * Raises a confirm-before-post booking request (REQ-BANK-022): recorded as {@code PENDING} and
+   * audited, moving no money until a bank employee confirms it. A deposit may target any active
+   * account; a withdrawal or transfer requires view eligibility on the source (REQ-BANK-039).
    *
    * @param request the create payload (source account, type, amount, optional destination, note)
    * @return the created pending request
@@ -522,12 +512,9 @@ public class OrgUnitBankController {
   }
 
   /**
-   * Corrects one of the caller's own booking requests while it is still {@code PENDING} and not yet
-   * owner-approved (REQ-BANK-056). A request that is not the caller's is reported as not found; one
-   * that is already decided or already approved is a 409.
-   *
-   * <p>The source account and the movement kind are deliberately not editable — see {@link
-   * UpdateBankBookingRequest}.
+   * Corrects one of the caller's own booking requests while it is {@code PENDING} and not yet
+   * owner-approved (REQ-BANK-056). Another user's request is 404; a decided or approved one is 409.
+   * Source account and movement kind are not editable.
    *
    * @param id the request to correct
    * @param request the corrected values plus the echoed optimistic-locking version

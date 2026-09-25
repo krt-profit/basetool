@@ -35,12 +35,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * TestContainers-backed migration test for {@code V127__create_blueprint_external_alias.sql}.
- * Asserts the table exists with its columns and the {@code source_system} CHECK, and that
- * uniqueness is enforced. The original V127 case-sensitive {@code (source_system, external_name)}
- * UNIQUE constraint is gone, superseded by the {@code V176} case-insensitive unique index on {@code
- * (source_system, LOWER(external_name))} (covers REQ-INV-020), so a duplicate — including a
- * case-only variant — is rejected and an unknown source system is rejected by the CHECK.
+ * Migration test for {@code V127__create_blueprint_external_alias.sql}: table shape, the {@code
+ * source_system} CHECK, and case-insensitive uniqueness of {@code (source_system, external_name)}
+ * (REQ-INV-020).
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -63,10 +60,9 @@ class V127MigrationTest {
   }
 
   /**
-   * The V127 case-sensitive UNIQUE constraint was dropped by {@code
-   * V176__make_blueprint_alias_uniqueness_case_insensitive.sql} in favour of a unique index on
-   * {@code (source_system, LOWER(external_name))} — covers REQ-INV-020. This test pins both sides
-   * of that supersession plus the (unchanged) source-system CHECK constraint.
+   * Verifies that the case-sensitive V127 unique constraint is replaced by the V176 unique index on
+   * {@code (source_system, LOWER(external_name))} and that the source-system CHECK remains
+   * (REQ-INV-020).
    */
   @Test
   void v127UniqueConstraintSupersededByV176CaseInsensitiveIndex() {

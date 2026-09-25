@@ -23,21 +23,14 @@ import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 
 /**
- * Write payload for the three per-allocation endpoints of an inventory entry (Variante C,
- * REQ-INV-027): {@code POST} adds a slice, {@code PATCH} changes a slice's amount, {@code DELETE}
- * removes a slice. One record serves all three verbs, so the amount is only required (and only
- * validated) by the add/change paths — the service enforces its presence and positivity there —
- * while delete ignores it.
+ * Write payload for adding, changing or removing one allocation slice of an inventory entry
+ * (REQ-INV-027).
  *
- * @param field which quantity split — the job-order or the mission dimension — the write targets;
- *     required.
- * @param targetId the earmarked job order (for {@link InventoryAllocationDimension#JOB_ORDER}) or
- *     mission (for {@link InventoryAllocationDimension#MISSION}); required.
+ * @param field the split dimension (job order or mission) the write targets; required
+ * @param targetId the earmarked job order or mission; required
  * @param amount the slice amount in the material's unit; required and positive for add/change,
- *     unused for delete. Whole numbers for a {@code PIECE} material, up to three decimals for
- *     {@code SCU} — enforced in the service, which has the resolved material at hand.
- * @param version the owning entry's optimistic-lock {@code @Version}, echoed back for the 409
- *     check; the entry's version is the single concurrency token for both its splits.
+ *     ignored for delete
+ * @param version the owning entry's optimistic-lock version, shared by both splits
  */
 public record InventoryAllocationWriteDto(
     @NotNull InventoryAllocationDimension field,

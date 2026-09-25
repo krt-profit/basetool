@@ -32,16 +32,8 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins that every Playwright class launches its browser through the single {@code
- * E2eSupport.launchBrowser} seam (ADR-0200).
- *
- * <p>Since 2026-09-22 {@code playwrightInstall} honours {@code -Pe2e.browser}, so a Firefox or
- * WebKit matrix cell of {@code .github/workflows/e2e.yml} installs only that engine. A class that
- * launches an engine of its own — {@code playwright.chromium().launch(...)} — then fails with a
- * {@code DriverException} in ten of the fifteen cells, which is exactly how the four ad-hoc mockup
- * harnesses turned main's E2E suite red. The label-gated E2E run is the first place that shows up;
- * this test moves it into the ordinary unit-test run. The sources are read as text from the
- * repository, the way {@link E2ePrebuiltImageParityTest} pins the prebuilt image names.
+ * Verifies that every Playwright class launches its browser through {@code
+ * E2eSupport.launchBrowser} (ADR-0200), reading the sources as text.
  */
 class E2eBrowserLaunchSeamTest {
 

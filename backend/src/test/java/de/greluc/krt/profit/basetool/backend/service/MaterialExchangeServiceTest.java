@@ -85,13 +85,9 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 
 /**
- * Unit coverage for the material-exchange domain's security-critical behaviour across the
- * read/write split (#14): the interessenten anonymity redaction (names only for the owner) lives in
- * {@link MaterialExchangeBoardService} and is exercised via that co-wired subject, while the
- * owner-only write gates, the item-ownership check on release, the self-interest block and the
- * optimistic-lock guard on a remark edit live in {@link MaterialExchangeService}. The write service
- * is co-wired to the real board service so a mutation's redacted response goes through the
- * identical projection.
+ * Unit tests for the material exchange: interessent redaction in {@link
+ * MaterialExchangeBoardService}, and owner-only writes, release ownership, the self-interest block
+ * and optimistic locking in {@link MaterialExchangeService}.
  */
 @ExtendWith(MockitoExtension.class)
 class MaterialExchangeServiceTest {
@@ -311,9 +307,8 @@ class MaterialExchangeServiceTest {
   }
 
   /**
-   * A genuinely new interest registration publishes a {@link
-   * MaterialExchangeInterestRegisteredEvent} directed at the offer owner, carrying the interessent
-   * and material render params (#1187, REQ-MARKET-011).
+   * A new interest registration publishes a {@link MaterialExchangeInterestRegisteredEvent} to the
+   * offer owner (REQ-MARKET-011).
    */
   @Test
   void registerInterest_newRegistration_publishesOwnerNotification() {
@@ -445,9 +440,8 @@ class MaterialExchangeServiceTest {
   }
 
   /**
-   * The "Material anbieten" picker carries each item's material quantity type, so the release
-   * dialog renders the amount in the material's own unit (Stück for PIECE) instead of always SCU
-   * (#1182).
+   * The release picker carries each item's material quantity type, so amounts render in the
+   * material's own unit.
    */
   @Test
   void myReleasableItems_carriesMaterialQuantityType() {
@@ -467,11 +461,8 @@ class MaterialExchangeServiceTest {
   }
 
   /**
-   * The release picker's Material/Item radio narrows the query by kind (REQ-MARKET-002): {@code
-   * MATERIAL} asks the repository for material rows only ({@code includeMaterial=true,
-   * includeItem=false}), {@code ITEM} for game-item rows only, and {@code null} for both. The gate
-   * is pushed into the repository call — before its row cap — so a row of the wanted kind past the
-   * cap is never hidden by a post-query filter.
+   * The release picker's kind filter maps to the repository's include flags before the row cap
+   * (REQ-MARKET-002).
    */
   @Test
   void myReleasableItems_kindFilterMapsToRepositoryFlags() {
@@ -490,9 +481,8 @@ class MaterialExchangeServiceTest {
   }
 
   /**
-   * Listing a craftable item (#1185, REQ-MARKET-012) persists an ITEM offer carrying the resolved
-   * product key/name and the user-stated quantity, with no Lager row and no quality — and the
-   * returned DTO reflects the same (null material/quality/amount).
+   * Listing a craftable item persists an ITEM offer with product key, name and quantity but no
+   * Lager row and no quality (REQ-MARKET-012).
    */
   @Test
   void releaseItem_validProduct_persistsItemOfferWithQuantityAndNullQuality() {
@@ -619,11 +609,8 @@ class MaterialExchangeServiceTest {
   }
 
   /**
-   * A concurrent duplicate interest registration is swallowed as an idempotent success (Gap 2):
-   * when the {@code REQUIRES_NEW} inner insert throws a {@link DataIntegrityViolationException}
-   * (the unique {@code (offer, user)} constraint losing a race), the orchestrator catches it and
-   * still returns the re-read offer detail instead of propagating a 500 (CLAUDE.md find-or-create
-   * rule).
+   * A concurrent duplicate interest registration losing the unique constraint is treated as an
+   * idempotent success.
    */
   @Test
   void registerInterest_concurrentDuplicate_isIdempotent() {
@@ -642,8 +629,8 @@ class MaterialExchangeServiceTest {
   }
 
   /**
-   * A real withdrawal (a registration was removed) records exactly one {@code
-   * MARKET_INTEREST_WITHDRAWN} audit event (Gap 3).
+   * Withdrawing an existing registration records exactly one {@code MARKET_INTEREST_WITHDRAWN}
+   * audit event.
    */
   @Test
   void withdrawInterest_removed_recordsAudit() {
@@ -719,11 +706,8 @@ class MaterialExchangeServiceTest {
   }
 
   /**
-   * Releasing a game-item Lager row creates a <b>stock-backed</b> ITEM offer (REQ-MARKET-014): the
-   * offer carries the Lager row (bound to physical stock), stores the whole-unit quantity, derives
-   * its product key / display name from the row's game item via {@code resolveByGameItem}, and
-   * carries no {@code offeredAmount} — while the owner still sees the row's stock as {@code
-   * availableAmount}.
+   * Releasing a game-item Lager row creates a stock-backed ITEM offer with whole-unit quantity and
+   * no {@code offeredAmount} (REQ-MARKET-014).
    */
   @Test
   void release_gameItemRow_createsStockBackedItemOffer() {
@@ -859,10 +843,8 @@ class MaterialExchangeServiceTest {
   }
 
   /**
-   * Editing a <b>stock-backed</b> item offer changes its whole-unit quantity — this was impossible
-   * before REQ-MARKET-014: the pre-fix {@code updateOffer} unconditionally validated {@code
-   * offeredAmount} against {@code offer.getInventoryItem()}, but read the wrong field on an item
-   * offer. The new quantity is re-validated against the backing row's current stock.
+   * Editing a stock-backed item offer changes its quantity, validated against the backing row's
+   * stock (REQ-MARKET-014).
    */
   @Test
   void updateOffer_stockBackedItemOffer_editsQuantity() {
@@ -902,9 +884,8 @@ class MaterialExchangeServiceTest {
   }
 
   /**
-   * Editing a <b>free-stated</b> item offer (no backing Lager row) changes its quantity with no
-   * stock cap — and, crucially, no longer NPEs on the null {@code inventoryItem} (the kind-aware
-   * {@code updateOffer} fix, REQ-MARKET-014).
+   * Editing a free-stated item offer changes its quantity without a stock cap and without a null
+   * {@code inventoryItem} failure (REQ-MARKET-014).
    */
   @Test
   void updateOffer_freeStatedItemOffer_editsQuantityWithoutNpe() {

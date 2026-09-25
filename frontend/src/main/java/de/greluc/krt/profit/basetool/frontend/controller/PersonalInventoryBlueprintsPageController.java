@@ -58,14 +58,9 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
- * Page controller for the Blueprints sub-page of the personal inventory area (#327, Phase 5).
- * Renders the owned-blueprint list and proxies the type-ahead product search, the multi-select
- * batch add, and the per-row note edit / remove to the backend via {@link BackendApiClient}.
- *
- * <p>The owner is always the authenticated caller — derived from the bearer-relayed JWT on the
- * backend side, never accepted from the request — so a user can only ever see or mutate their own
- * blueprints. Edit / remove use a full redirect so the optimistic-lock {@code version} re-syncs on
- * every related row without per-node DOM patching.
+ * Page controller for the Blueprints sub-page of the personal inventory: the owned-blueprint list
+ * plus proxies for product search, batch add, note edit and removal. The owner is always the
+ * authenticated caller, derived by the backend from the relayed JWT.
  */
 @Controller
 @UsesLayoutModel
@@ -75,11 +70,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @Slf4j
 public class PersonalInventoryBlueprintsPageController {
 
-  /**
-   * Per-request page size used while pulling the caller's <em>complete</em> owned-blueprint set
-   * page by page (issue #823). One row per product, so a generous chunk keeps the common case to a
-   * single round-trip while still bounding each backend query.
-   */
+  /** Page size used when fetching the caller's complete owned-blueprint set page by page. */
   private static final int FETCH_PAGE_SIZE = 500;
 
   /**
@@ -104,8 +95,8 @@ public class PersonalInventoryBlueprintsPageController {
       BLUEPRINT_PRODUCT_LIST = new ParameterizedTypeReference<>() {};
 
   /**
-   * Response type for the per-blueprint craftability annotation ({@code
-   * /api/v1/personal-blueprints/craftability}, #781).
+   * Response type of the per-blueprint craftability endpoint ({@code
+   * /api/v1/personal-blueprints/craftability}).
    */
   private static final ParameterizedTypeReference<List<BlueprintCraftabilityDto>>
       BLUEPRINT_CRAFTABILITY_LIST = new ParameterizedTypeReference<>() {};
@@ -124,8 +115,7 @@ public class PersonalInventoryBlueprintsPageController {
    *
    * @param q optional case-insensitive product-name filter, echoed into the search input
    * @param fragment when {@code "list"}, only the collection card fragment is rendered for an
-   *     in-place AJAX swap after a batch add / import / remove (epic #571 / REQ-FE-005); otherwise
-   *     the full page
+   *     in-place AJAX swap (REQ-FE-005); otherwise the full page
    * @param model Thymeleaf model populated with the blueprint list and the filter query
    * @return the {@code personal-inventory-blueprints} view name, or its {@code blueprintList}
    *     fragment selector
@@ -197,12 +187,8 @@ public class PersonalInventoryBlueprintsPageController {
   }
 
   /**
-   * Craftability proxy backing the blueprint view's craftability annotation (#781). Relays to the
-   * backend craftability endpoint and returns, per owned blueprint, the craftable counts, effective
-   * quality and missing materials as JSON. The frontend requests it once with {@code
-   * includeRefinery=true} so both the inventory-only and refinery-included figures are present and
-   * the toggle switches client-side. Failures collapse to an empty list so the list/detail simply
-   * render without craftability badges rather than a stack trace.
+   * Proxies the backend craftability endpoint: per owned blueprint, the craftable counts, effective
+   * quality and missing materials.
    *
    * @param includeRefinery whether the backend folds the caller's open refinery yield into the
    *     {@code *WithRefinery} figures
@@ -323,10 +309,8 @@ public class PersonalInventoryBlueprintsPageController {
   }
 
   /**
-   * Clears the caller's entire removable owned-blueprint set — the "delete all my blueprints"
-   * action (REQ-INV-023). Auto-granted defaults (REQ-INV-016) are preserved by the backend. No-JS
-   * fallback: flashes a countless success toast and redirects (the AJAX twin below shows the
-   * removed count).
+   * No-JS handler that clears the caller's removable owned blueprints (REQ-INV-023); auto-granted
+   * defaults (REQ-INV-016) are kept by the backend.
    *
    * @param redirectAttributes flash attributes carrier
    * @return redirect to the Blueprints page
@@ -348,12 +332,9 @@ public class PersonalInventoryBlueprintsPageController {
   }
 
   /**
-   * Header-gated AJAX twin of {@link #updateNote}: updates an owned blueprint's note and returns
-   * the fresh {@link PersonalBlueprintDto} so {@code personal-inventory-blueprints.html} patches
-   * the master-row's note + version and the detail pane in place (keeping the current selection and
-   * the already-loaded recipe) instead of the classic POST→redirect reload. The optimistic-lock
-   * {@code version} travels in the JSON payload; a concurrent edit surfaces as a {@code 409} {@code
-   * problem+json} carrying {@code OPTIMISTIC_LOCK}. The classic handler stays the no-JS fallback.
+   * AJAX twin of {@link #updateNote}, selected by the {@code X-Requested-With} header: updates the
+   * note and returns the fresh {@link PersonalBlueprintDto}. A concurrent edit yields a {@code 409}
+   * carrying {@code OPTIMISTIC_LOCK}.
    *
    * @param id blueprint entry id
    * @param request the note payload submitted as JSON ({@code acquiredAt}, {@code note}, {@code
@@ -429,13 +410,8 @@ public class PersonalInventoryBlueprintsPageController {
   }
 
   /**
-   * Fetches the caller's <em>complete</em> owned-blueprint set — every page, not a capped first
-   * page — so the "Meine Blueprints" list shows all blueprints, the facts subtitle and the tab
-   * count are accurate, and the client-side filter searches the whole set (issue #823). Pages are
-   * pulled in {@link #FETCH_PAGE_SIZE}-sized chunks and concatenated until the last page. A backend
-   * failure collapses to whatever was gathered so far (empty on the first call) rather than a 500.
-   * Heavy per-row work (recipe + craftability) stays lazy / bulk-async on the client, so loading
-   * the full list never blocks the page render.
+   * Fetches the caller's complete owned-blueprint set in {@link #FETCH_PAGE_SIZE}-sized pages. A
+   * backend failure returns what was gathered so far.
    *
    * @param q optional case-insensitive product-name filter applied server-side
    * @return the caller's owned blueprints across all pages, alphabetically by product name

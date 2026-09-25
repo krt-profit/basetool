@@ -23,10 +23,8 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Data transfer record carrying Mission Crew payload. {@code version} is the crew's optimistic-lock
- * {@code @Version}, surfaced so the crew edit form can echo it back on the next save and a stale
- * job-type overwrite is rejected (#1131). Mirrors the backend {@code MissionCrewDto}
- * field-for-field (DtoMirrorConsistencyTest).
+ * Frontend mirror of the backend {@code MissionCrewDto}: a participant's crew assignment with its
+ * job types. {@code version} is echoed back by the crew edit form for optimistic locking.
  */
 public record MissionCrewDto(
     UUID id, UUID participantId, String participantName, Long version, Set<JobTypeDto> jobTypes) {}

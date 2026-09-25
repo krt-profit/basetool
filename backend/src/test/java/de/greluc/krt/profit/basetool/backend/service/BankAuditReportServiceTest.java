@@ -53,12 +53,10 @@ import org.openpdf.text.pdf.parser.PdfTextExtractor;
 import org.springframework.context.MessageSource;
 
 /**
- * Unit tests for {@link BankAuditReportService} (REQ-AUDIT-003 — the bank tab's period export). The
- * bank keeps its own {@code bank_audit_event} table, so this is the bank sibling of {@link
- * AuditReportServiceTest}: the PDF carries the raw event code + actor handle (asserted via {@code
- * PdfTextExtractor}); the JSON maps the events; each export records a {@code AUDIT_LOG_EXPORTED}
- * bank audit event; an inverted period and an over-cap period are both rejected, and exactly the
- * cap is accepted.
+ * Unit tests for {@link BankAuditReportService}, the bank tab's period export (REQ-AUDIT-003).
+ *
+ * <p>Covers PDF and JSON content, the {@code AUDIT_LOG_EXPORTED} event, and period validation up to
+ * the cap.
  */
 @ExtendWith(MockitoExtension.class)
 class BankAuditReportServiceTest {

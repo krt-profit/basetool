@@ -31,11 +31,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * TestContainers-backed migration test for {@code V120__add_blueprint_requirement_groups.sql}.
- * Asserts the three new requirement-group tables exist with their columns and that the {@code
- * blueprint} / {@code blueprint_ingredient} column additions landed. Booting the full context also
- * exercises Hibernate {@code ddl-auto=validate}, so a mismatch between the new entities and this
- * migration fails the test.
+ * Migration test for {@code V120__add_blueprint_requirement_groups.sql}: the requirement-group
+ * tables and blueprint column additions exist and validate against the entities.
  */
 @SpringBootTest
 @ActiveProfiles("test")

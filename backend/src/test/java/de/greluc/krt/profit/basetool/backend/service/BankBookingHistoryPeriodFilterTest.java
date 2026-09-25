@@ -41,14 +41,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * Pins the period-filtered booking-history query (REQ-BANK-051) against the real Testcontainers
- * PostgreSQL. The {@code (:from IS NULL OR ...)} guard on the temporal bounds must be {@code
- * CAST(:from AS timestamp)}-wrapped: PostgreSQL cannot infer the data type of a bare bind parameter
- * in an {@code IS NULL} position, so an uncast form fails at query-plan time with <em>"could not
- * determine data type of parameter"</em> — a 500 on <b>every</b> detail-page history load
- * regardless of the runtime bound values, which the mock-based service unit tests could not see.
- * This test executes the query on Postgres with concrete non-null bounds so a regression throws
- * here instead of only in the e2e suite.
+ * Integration test for the period-filtered booking-history query against real Postgres
+ * (REQ-BANK-051), verifying the cast temporal bounds plan with non-null values.
  */
 @SpringBootTest
 @ActiveProfiles("test")

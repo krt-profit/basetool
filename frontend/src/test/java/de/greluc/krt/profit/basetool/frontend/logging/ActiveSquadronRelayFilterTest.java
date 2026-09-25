@@ -40,9 +40,8 @@ import org.springframework.web.reactive.function.client.ExchangeFunction;
 import reactor.core.publisher.Mono;
 
 /**
- * Unit tests for {@link ActiveSquadronRelayFilter} (audit finding M1): the pin is relayed as {@code
- * X-Active-Org-Unit-Id} when one is bound, and the drop branch — which used to be completely silent
- * and is the exact shape of "the user sees another Staffel's rows" — leaves a DEBUG line.
+ * Unit tests for {@link ActiveSquadronRelayFilter}: a bound pin is relayed as {@code
+ * X-Active-Org-Unit-Id}, and dropping it logs a DEBUG line.
  */
 class ActiveSquadronRelayFilterTest {
 

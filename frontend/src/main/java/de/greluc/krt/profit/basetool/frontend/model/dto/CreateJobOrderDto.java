@@ -24,12 +24,9 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Frontend mirror of the backend's {@code CreateJobOrderDto}. Carries the picker output for the Job
- * Order create form: {@link #responsibleOrgUnitId} is the profit-eligible org unit that processes
- * the order (required for authenticated callers, ignored for guests who are routed to the intake
- * SK) and only ever a Staffel/SK, and {@link #requestingOrgUnitId} is the customer/Auftraggeber —
- * any org unit, including a Bereich or the Organisationsleitung for an authenticated caller (epic
- * #692), or a Staffel/SK.
+ * Frontend mirror of the backend's {@code CreateJobOrderDto}. {@link #responsibleOrgUnitId} is the
+ * profit-eligible Staffel or SK that processes the order; {@link #requestingOrgUnitId} is the
+ * customer, which may be any org unit.
  */
 public record CreateJobOrderDto(
     @Nullable UUID responsibleOrgUnitId,

@@ -35,10 +35,8 @@ public class UserRepositoryPlainLookupFragmentImpl implements UserRepositoryPlai
   @PersistenceContext private EntityManager entityManager;
 
   /**
-   * Resolves the user through {@link EntityManager#find(Class, Object)} — a first-level-cache
-   * lookup that applies no {@code @EntityGraph} (the {@code roles} collection stays lazy) and never
-   * auto-flushes the persistence context. See {@link
-   * UserRepositoryPlainLookupFragment#findPlainById(UUID)}.
+   * Resolves the user via {@link EntityManager#find(Class, Object)}, without an entity graph and
+   * without auto-flushing.
    *
    * @param id the user id; must not be {@code null}
    * @return the user, or empty when none exists

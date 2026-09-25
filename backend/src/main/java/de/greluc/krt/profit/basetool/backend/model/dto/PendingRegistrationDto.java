@@ -23,25 +23,16 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * One row in the admin registration-approval queue (epic #720, Track 1). Carries only what the
- * admin needs to decide and the optimistic-lock version to echo back — no Discord id or other PII.
+ * One row of the admin registration-approval queue; carries no Discord id.
  *
  * @param id the pending user's id
  * @param username the user's effective display name
- * @param serverNickname the user's per-guild Discord server nickname (REQ-DATA-018), or {@code
- *     null} when none was captured; shown alongside the name to anchor the decision to an in-server
- *     identity. This admin-only queue is the only DTO that carries it
- * @param registeredAt when the registration first appeared (the user row's creation time)
- * @param decidedAt when an admin last decided this registration, i.e. the rejection time for a row
- *     in the rejected list (REQ-SEC-034); {@code null} for a row awaiting a decision, including one
- *     just reopened — reopening clears the stale decision stamp
- * @param callsignCollision whether another account already holds this registration's callsign
- *     (case-insensitively). Since #1639 a login whose subject matches no row never adopts an
- *     account found by name, so the caller arrives here as a new registration instead — and this
- *     flag is what tells the admin that approving it creates a <b>second</b> account for a callsign
- *     rather than admitting a new member. The remedy is the explicit merge, never an implicit
- *     inheritance
- * @param version optimistic-lock version, echoed back on approve/reject
+ * @param serverNickname the Discord server nickname (REQ-DATA-018), or {@code null}
+ * @param registeredAt when the registration first appeared
+ * @param decidedAt the last decision time (REQ-SEC-034), or {@code null} while awaiting a decision
+ * @param callsignCollision whether another account already holds this callsign, case-insensitively,
+ *     so approving would create a second account
+ * @param version optimistic-lock version, echoed back on approve or reject
  */
 public record PendingRegistrationDto(
     UUID id,

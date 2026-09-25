@@ -43,37 +43,13 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
 /**
- * Routes Spring Security's filter-level {@code 401}/{@code 403} rejections through the same {@code
- * GlobalExceptionHandler} the rest of the API uses, so they carry an RFC&nbsp;7807 {@code
- * application/problem+json} body with a stable {@code code} and a {@code correlationId} instead of
- * Spring's default bare {@code WWW-Authenticate}-only 401 / empty-body 403 (RFC-7807 hardening,
- * REQ-API-004 / REQ-SEC).
+ * Renders Spring Security's filter-level {@code 401}/{@code 403} rejections as RFC&nbsp;7807
+ * problem bodies by handing them to {@code GlobalExceptionHandler} (REQ-API-004).
  *
- * <p>A missing/invalid bearer token or an access-denied verdict raised inside the security filter
- * chain never reaches the {@code DispatcherServlet}, so the {@code @ControllerAdvice} handler would
- * otherwise not see it. Wired as both the {@link AuthenticationEntryPoint} and the {@link
- * AccessDeniedHandler} (globally via {@code HttpSecurity.exceptionHandling(...)} for the
- * no-token/anonymous case and on the resource server for the bearer-token case), this component
- * hands the exception to the MVC {@code handlerExceptionResolver}. That resolver dispatches it to
- * {@code GlobalExceptionHandler.handleAuthentication} (401, code {@code UNAUTHENTICATED}) or {@code
- * handleAccessDenied} (403, code {@code ACCESS_DENIED}), reusing the exact problem-body shape,
- * i18n, {@code correlationId} minting and structured WARN logging already contracted there — no
- * duplicated body-building.
- *
- * <p>Because the security chain runs before {@code CorrelationIdFilter}, no request-scoped
- * correlation id exists yet; {@code GlobalExceptionHandler} mints a fresh one for the body and the
- * log line, so a client-reported 401/403 is still traceable to a single server log entry.
- *
- * <p>The same ordering also leaves the {@code userId} MDC key unset, and {@code
- * CorrelationIdFilter} is its only writer in the backend. A filter-level 403 (URL-matrix denial)
- * would therefore render as the logback pattern's {@code anonymous} default even though the {@link
- * SecurityContextHolder} already holds the caller's authentication — while a controller-thrown
- * {@code AccessDeniedException} renders the real {@code sub} in a byte-identical line. That makes
- * the value actively misleading, so {@link #delegate} stamps the {@code sub} for the duration of
- * the rejection write using the same own-then-remove discipline as the correlation id. It stays
- * unset when there is no authenticated subject, so a genuine anonymous 401 still reads {@code
- * anonymous} truthfully. Only the {@code sub} is stamped, never the callsign or e-mail
- * (REQ-OBS-004).
+ * <p>Serves as both {@link AuthenticationEntryPoint} and {@link AccessDeniedHandler}. While writing
+ * a rejection it stamps a correlation id and the authenticated {@code sub} into the MDC when absent
+ * (never the callsign or e-mail, REQ-OBS-004), and uses the {@link SecurityContextHolder} for the
+ * subject.
  */
 @Slf4j
 @Component
@@ -98,14 +74,11 @@ public class SecurityProblemResponseHandler
   private final MeterRegistry meterRegistry;
 
   /**
-   * Injects the composite MVC exception resolver that fronts the {@code @ControllerAdvice} handler
-   * methods, and the registry the bearer-error breakdown is counted on.
+   * Creates the handler.
    *
-   * @param resolver the {@code handlerExceptionResolver} bean (the {@code
-   *     HandlerExceptionResolverComposite} that includes the {@code
-   *     ExceptionHandlerExceptionResolver} processing {@code GlobalExceptionHandler}); qualified by
-   *     name because several {@link HandlerExceptionResolver} beans exist in the context
-   * @param meterRegistry carries {@code basetool_auth_failures_total} (A8, REQ-OBS-018)
+   * @param resolver the {@code handlerExceptionResolver} composite that fronts {@code
+   *     GlobalExceptionHandler}
+   * @param meterRegistry carries {@code basetool_auth_failures_total}
    */
   public SecurityProblemResponseHandler(
       @Qualifier("handlerExceptionResolver") @NotNull HandlerExceptionResolver resolver,
@@ -137,26 +110,14 @@ public class SecurityProblemResponseHandler
   }
 
   /**
-   * Maps an authentication failure onto its RFC 6750 bearer error code, kept to the fixed set the
-   * spec defines so the metric label stays bounded (REQ-OBS-006), with one deliberate addition
-   * below the RFC set for the request that presented no credential at all.
+   * Maps an authentication failure onto a bounded metric value: its RFC 6750 bearer error code,
+   * {@link MetricNames#AUTH_NO_CREDENTIALS} when no credential was presented, else {@link
+   * MetricNames#AUTH_OTHER}.
    *
-   * <p>Only the code is taken, never {@code OAuth2Error#getDescription()}: Spring puts the raw
-   * decode failure in there ("An error occurred while attempting to decode the Jwt: …"), which can
-   * quote fragments of the presented token and must never reach a label or an appender
-   * (REQ-OBS-004).
-   *
-   * <p><b>The no-credential case is the common one and has no RFC code.</b> A request with no
-   * {@code Authorization} header never reaches {@code BearerTokenAuthenticationFilter}'s failure
-   * path; {@code ExceptionTranslationFilter} raises a plain {@link
-   * InsufficientAuthenticationException} instead, and method security raises {@link
-   * AuthenticationCredentialsNotFoundException}. Neither is an {@link
-   * OAuth2AuthenticationException} and RFC 6750 §3.1 says to omit the error code entirely for them,
-   * so both once collapsed into {@link MetricNames#AUTH_OTHER} — which on production meant
-   * <em>every single</em> 401 did: 6&nbsp;618 of 6&nbsp;618 on 2026-09-13, 8.5&nbsp;% of all
-   * backend traffic, with the counter that exists to answer "why" answering nothing. They now carry
-   * {@link MetricNames#AUTH_NO_CREDENTIALS}, which leaves {@link MetricNames#AUTH_INVALID_TOKEN} —
-   * a token that was presented and rejected — as a series quiet enough to alert on (REQ-OBS-018).
+   * <p>Never reads the error description, which can quote token fragments (REQ-OBS-004). The
+   * no-credential case covers {@link InsufficientAuthenticationException} and {@link
+   * AuthenticationCredentialsNotFoundException}; a non-{@link OAuth2AuthenticationException}
+   * failure never yields {@link MetricNames#AUTH_INVALID_TOKEN}.
    *
    * @param authException the failure Spring Security raised
    * @return one of the bounded {@code MetricNames.AUTH_*} values
@@ -198,20 +159,18 @@ public class SecurityProblemResponseHandler
   }
 
   /**
-   * Hands {@code ex} to the MVC exception resolver so the matching {@code @ExceptionHandler}
-   * produces the problem body, falling back to a plain {@code sendError} only if no handler matched
-   * (never expected: {@code GlobalExceptionHandler} covers both {@link AuthenticationException} and
-   * {@link AccessDeniedException}) or the response is already committed.
+   * Hands {@code ex} to the MVC exception resolver so the matching {@code @ExceptionHandler} writes
+   * the problem body, falling back to {@code sendError} when no handler matched or the response is
+   * committed.
    *
-   * <p>Owns the {@code correlationId} and {@code userId} MDC keys for the duration of the write —
-   * minting the former and stamping the JWT {@code sub} into the latter when nothing populated them
-   * yet — and removes exactly the keys it added, so nothing bleeds into the next request on a
-   * pooled or virtual thread.
+   * <p>Sets the {@code correlationId} and {@code userId} MDC keys when absent and removes exactly
+   * the keys it added. Both {@link AuthenticationException} and {@link AccessDeniedException} are
+   * expected.
    *
    * @param request the rejected request
    * @param response the response to write into
-   * @param ex the security exception to map to a problem response
-   * @param fallbackStatus the status to {@code sendError} with if the resolver does not handle it
+   * @param ex the security exception to map
+   * @param fallbackStatus the status for the fallback {@code sendError}
    * @throws IOException if the fallback {@code sendError} fails
    */
   private void delegate(
@@ -250,22 +209,13 @@ public class SecurityProblemResponseHandler
   }
 
   /**
-   * Puts the authenticated caller's subject into the {@code userId} MDC key, unless something
-   * already populated that key (then the existing value wins, exactly as the correlation id above)
-   * or the caller has no readable subject (then the key stays unset so the logback pattern's {@code
-   * anonymous} default is the truth rather than a cover-up).
+   * Puts the authenticated caller's subject into the {@code userId} MDC key, unless the key is
+   * already set or the caller has no readable subject.
    *
-   * <p>A token-less acting member (ADR-0129) has a readable subject and is stamped, so a refusal of
-   * one is attributable; a username/password caller is not, because its name is a callsign that
-   * REQ-OBS-004 keeps out of the log.
+   * <p>A token-less acting member (ADR-0129) is stamped; a username/password caller is not, because
+   * its name is a callsign (REQ-OBS-004).
    *
-   * <p>Deliberately duplicated in {@code PendingApprovalAccessFilter} instead of extracted into the
-   * {@code logging} package: {@code logging.CorrelationIdFilter} already depends on {@code
-   * config.LoggingProperties}, so a {@code config -> logging} helper call would close a package
-   * cycle (ADR-0047).
-   *
-   * @return {@code true} when this call stamped the key and must therefore remove it again, {@code
-   *     false} when nothing was stamped
+   * @return {@code true} when this call stamped the key and must remove it again
    */
   private static boolean stampAuthenticatedSub() {
     String existing = MDC.get(MDC_USER_ID);

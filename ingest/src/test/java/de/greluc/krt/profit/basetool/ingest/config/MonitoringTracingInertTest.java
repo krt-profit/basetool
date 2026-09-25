@@ -31,11 +31,8 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
- * Pins the inert default of the tracing instrumentation on the ingest gateway (REQ-OBS-009, epic
- * #936 Phase 1b): with {@code MONITORING_TRACING_ENABLED} unset, {@code management.tracing.enabled}
- * is {@code false} and the OpenTelemetry starter on the classpath must contribute nothing — no
- * tracer, no span exporter, and therefore no network export attempts or exporter errors in
- * dev/test/e2e or a prod host without the monitoring stack.
+ * Integration tests asserting that with {@code MONITORING_TRACING_ENABLED} unset the tracing
+ * instrumentation contributes no tracer and no span exporter (REQ-OBS-009).
  */
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.MOCK,

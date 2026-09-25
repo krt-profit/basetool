@@ -29,17 +29,12 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * The preloaded id maps a UEX matrix sync — commodity prices, item prices, refinery yields —
- * resolves every row against, each read with one query (BE-PERF-09): the catalogue parent's local
- * id by its UEX id, the terminal's local id by its UEX id, and the existing matrix row's id by the
- * (parent, terminal) pair.
+ * Preloaded id maps a UEX matrix sync resolves every row against: parent and terminal ids by UEX
+ * id, and existing matrix-row ids by (parent, terminal) pair.
  *
- * <p>Ids only, so the maps may outlive the transaction that read them and serve every chunk
- * transaction of the run. They are mutable on purpose: a parent or matrix row created during the
- * run is {@link #rememberParent recorded} / {@link #rememberRow recorded}, so a later chunk — or
- * the row-by-row replay of a failed one — updates it instead of inserting a duplicate. A row id
- * recorded by a chunk that then rolled back simply finds nothing when loaded, and the row is
- * created afresh.
+ * <p>Holds ids only, so it serves every chunk transaction of a run. Rows created during the run are
+ * recorded via {@link #rememberParent} / {@link #rememberRow}, so later chunks and replays update
+ * rather than duplicate them.
  */
 final class UexMatrixLookups {
 

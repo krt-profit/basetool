@@ -40,35 +40,13 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Central correlation / MDC enrichment filter for the frontend module.
+ * Frontend correlation and MDC filter: reads the {@code correlationId} from the inbound header or
+ * generates one, echoes it in the response, and binds it and the user's {@code sub} to the MDC for
+ * the request.
  *
- * <p>Mirrors the backend {@code CorrelationIdFilter}: on every request a {@code correlationId} is
- * either read from the inbound header (configurable) or generated as UUID and echoed back in the
- * response. The resolved id plus the user id ({@code OidcUser.subject} for OAuth2 login users or
- * {@code sub} claim for JWT) is placed into the MDC for the duration of the request and removed in
- * the {@code finally} block to avoid thread-pool bleed-through.
- *
- * <p>Intentionally limited to {@code sub} – never emails/names/tokens – to avoid PII in logs.
- *
- * <p>The third correlation field REQ-OBS-001 mandates, {@code orgUnitId}, is deliberately
- * <b>not</b> bound here: this filter is ordered {@link Ordered#LOWEST_PRECEDENCE} − 100 and runs
- * before {@link ActiveSquadronContextFilter} ({@link Ordered#LOWEST_PRECEDENCE} − 99) has read the
- * caller's pin out of the session, so reading it at this point would only ever yield {@code null}.
- * That filter owns the key and clears it again on the way out.
- *
- * <p><b>Async dispatches re-bind what the initial dispatch resolved (2026-09-25).</b> A request
- * whose handler returns an {@code SseEmitter}, a {@code DeferredResult} or a {@code Callable} is
- * dispatched a second time — {@code DispatcherType.ASYNC}, on a different container thread — when
- * its async result arrives, and everything logged on that pass (the stream's completion, an async
- * error resolved by {@code GlobalExceptionHandler}) used to carry no {@code correlationId} and the
- * logback fallback {@code userId=anonymous}, because a {@link OncePerRequestFilter} skips async
- * dispatches by default. That made an authenticated member's stream failures read as anonymous
- * traffic. The initial dispatch therefore stashes both resolved values as request attributes, and
- * the async dispatch binds them again for its own duration and removes them in its own {@code
- * finally}. The async pass <b>never</b> resolves anything afresh: it mints no new id, reads no
- * header (the request's headers are the client's, a request attribute is not) and does not consult
- * the security context. It also leaves the response header alone — the initial dispatch already set
- * it, and a streaming response is committed by then.
+ * <p>Never logs e-mails, names or tokens. {@code orgUnitId} is bound by {@link
+ * ActiveSquadronContextFilter} instead. Async dispatches re-bind the values the initial dispatch
+ * stored as request attributes, without resolving anything afresh.
  */
 @Slf4j
 @Component
@@ -134,14 +112,9 @@ public class CorrelationIdFilter extends OncePerRequestFilter implements Ordered
   }
 
   /**
-   * Runs the async dispatch of a request with the correlation id and user id its initial dispatch
-   * resolved bound to the MDC — and the id to {@link CorrelationContext}, so a backend call made on
-   * this pass carries the same id outbound (REQ-OBS-002) — and removes exactly what it bound once
-   * the chain returns, so nothing survives on the container thread.
-   *
-   * <p>A value the initial dispatch did not stash — possible only when that dispatch never passed
-   * this filter — stays unbound: the line then renders the empty slot, which is the truthful
-   * answer, rather than a freshly minted id that no other line of the request carries.
+   * Runs an async dispatch with the correlation id and user id stored by the initial dispatch bound
+   * to the MDC and the id to {@link CorrelationContext} (REQ-OBS-002), and removes them afterwards.
+   * A value that was not stored stays unbound.
    *
    * @param request the request being dispatched asynchronously
    * @param response the response of the same request

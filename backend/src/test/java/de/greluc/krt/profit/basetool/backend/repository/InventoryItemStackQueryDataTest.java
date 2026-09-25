@@ -45,30 +45,9 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Data-level regression coverage for the group-on-read stack queries ({@link
- * InventoryItemRepository#findGlobalStacks} / {@link InventoryItemRepository#findUserStacks},
- * ADR-0003, REQ-INV-002) against the real Postgres test schema (Testcontainers + Flyway via the
- * {@code test} profile).
- *
- * <p>The sibling {@code InventoryItemStackQueryTest} only smoke-tests these queries against an
- * empty table, so it cannot catch the trap this test pins down: the projection groups the
- * <em>nullable</em> {@code owningOrgUnit} association as a whole entity. A naive
- * constructor-expression projection over a nullable to-one renders an implicit INNER JOIN, which
- * silently drops every row where that association is {@code null} — the ownerless-personal stock a
- * user with no Staffel/SK records, and (before Variante C, REQ-INV-027, dropped the scalar {@code
- * jobOrder} / {@code mission} columns off the row) the vast majority of real Lager stock that
- * belongs to no job order and no mission. That made {@code /inventory/all} and {@code
- * /inventory/my} show "no entries" even though the aggregated overview listed the very same
- * material, which is why the query LEFT JOINs {@code owningOrgUnit}. Under the current model the
- * earmarks live in side tables and are no longer part of the stock identity, so an unearmarked
- * entry must also aggregate and surface; these tests seed exactly such rows — a non-personal item
- * earmarked to nothing and a personal item with a {@code null} owning org unit — and assert they
- * still surface.
- *
- * <p>The class is {@link Transactional} so each method rolls back: the seeded rows must never
- * commit to the shared Testcontainers database, otherwise the sibling empty-table smoke test (and
- * any other unscoped query) would observe this fixture. The query still sees the rows because they
- * are flushed within the test transaction before the read.
+ * Verifies against PostgreSQL that {@link InventoryItemRepository#findGlobalStacks} and {@link
+ * InventoryItemRepository#findUserStacks} include rows with a {@code null} owning org unit and
+ * unearmarked rows (REQ-INV-002). Each test rolls back.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -84,13 +63,7 @@ class InventoryItemStackQueryDataTest {
 
   @PersistenceContext private EntityManager entityManager;
 
-  /**
-   * A squadron-owned, non-personal item that is earmarked to neither a job order nor a mission (the
-   * common case: both allocation collections are empty) must surface in the global stack view.
-   * Since Variante C (REQ-INV-027) keeps the earmarks in side tables and out of the stock identity,
-   * this pins the grouped read down to the physical stock — an unearmarked entry must still
-   * aggregate and appear rather than be silently dropped.
-   */
+  /** A non-personal item earmarked to no job order or mission surfaces in the global stack view. */
   @Test
   void findGlobalStacks_includesNonPersonalItemWithoutJobOrderOrMission() {
     User user = new User();
@@ -143,13 +116,7 @@ class InventoryItemStackQueryDataTest {
     assertThat(stacks.get(0).totalAmount()).isEqualTo(100.0);
   }
 
-  /**
-   * A personal item is, by the inventory invariants, never earmarked to a job order or mission and
-   * may have a {@code null} owning org unit (ownerless personal). It must still surface in the
-   * owner's grouped "my inventory" view; the implicit-join trap on the nullable {@code
-   * owningOrgUnit} would otherwise hide every ownerless-personal stack, which is why the projection
-   * LEFT JOINs it.
-   */
+  /** A personal item with a {@code null} owning org unit surfaces in the owner's stack view. */
   @Test
   void findUserStacks_includesPersonalItemWithoutAssociations() {
     User user = new User();
@@ -191,11 +158,8 @@ class InventoryItemStackQueryDataTest {
   }
 
   /**
-   * The mutually exclusive "Mein Lager" personal- / non-personal-entries-only filters narrow the
-   * owner's grouped view: {@code personalOnly = true} returns only the caller's private stock
-   * ({@code personal = true}), {@code nonPersonalOnly = true} returns only the shared stock ({@code
-   * personal = false}), and both {@code false} keeps every stack. Seeds one personal and one shared
-   * contribution at the same location/material and asserts each toggle keeps only its side.
+   * The personal-only and non-personal-only filters each keep only their side of the owner's stock;
+   * with both off every stack is kept.
    */
   @Test
   void findUserStacks_personalAndNonPersonalOnly_narrowToMatchingStock() {
@@ -259,12 +223,8 @@ class InventoryItemStackQueryDataTest {
   }
 
   /**
-   * With {@code material_id} nullable since V220, the material stack projections must exclude
-   * game-item rows explicitly ({@code i.material IS NOT NULL}): an item row surfacing as a
-   * null-material group would NPE the grouped assembly in {@code InventoryAggregationService}
-   * (design §4.4). The item stack siblings serve those rows instead, keyed without the quality
-   * dimension. Seeds one material and one game-item row for the same owner/location and pins each
-   * projection to exactly its own catalog population.
+   * The material stack projections exclude game-item rows and the item stack projections serve
+   * them, each returning only its own catalog population.
    */
   @Test
   void materialAndItemStackProjections_splitByCatalog_withAnItemRowPresent() {
@@ -334,16 +294,8 @@ class InventoryItemStackQueryDataTest {
   }
 
   /**
-   * Executes {@link InventoryItemRepository#getAggregatedItemInventory} against real Postgres under
-   * the exact multi-key sort the controller drives it with ({@code gameItem.name,asc;amount,desc},
-   * REQ-INV-028/029). Spring Data appends that sort to the GROUP-BY query at render time; the query
-   * deliberately keeps the implicit {@code i.gameItem} root path because an explicit join alias
-   * would make the appended {@code gameItem.name} key spawn a second, ungrouped join and fail
-   * PostgreSQL's functional-dependency check — a regression only a real database catches (the
-   * mocked unit never renders the appended ORDER BY). Seeds two rows of one game item (must
-   * collapse into a single SUM tuple), one row of a second item, and one material row (must be
-   * excluded by {@code i.gameItem IS NOT NULL} — surfacing as a null-gameItem tuple would NPE the
-   * grouped assembly downstream).
+   * {@link InventoryItemRepository#getAggregatedItemInventory} aggregates per game item under the
+   * controller's multi-key sort, sorts by name and excludes material rows (REQ-INV-028/029).
    */
   @Test
   void getAggregatedItemInventory_aggregatesPerItem_sortsByName_andExcludesMaterialRows() {
@@ -437,14 +389,8 @@ class InventoryItemStackQueryDataTest {
   }
 
   /**
-   * The material select-all id query ({@link InventoryItemRepository#findUserEntryIds}) returns the
-   * raw ids of <em>every</em> matching material entry the owner holds — the flat companion of
-   * {@link InventoryItemRepository#findUserStacks} — never rolled up per stack. It must be
-   * owner-scoped (no other user's rows), exclude game-item rows (the {@code i.material IS NOT NULL}
-   * guard, V220), and return separate ids for two entries that share one stack (so a bulk check-out
-   * can span the whole stack, not just its grouped row). Seeds two material entries at the same
-   * location for the owner, one item entry for the owner (must be excluded) and one material entry
-   * for another user (must be excluded).
+   * {@link InventoryItemRepository#findUserEntryIds} returns every own material entry id,
+   * separately per entry, excluding other users' rows and game-item rows.
    */
   @Test
   void findUserEntryIds_returnsAllOwnMaterialEntries_excludesOtherUsersAndItemRows() {
@@ -671,11 +617,8 @@ class InventoryItemStackQueryDataTest {
   }
 
   /**
-   * The Lager location filter (REQ-INV-040) narrows the owner's grouped view to the picked storage
-   * locations. Seeds the same material at two locations and asserts that filtering on one returns
-   * only that location's stack, that the unfiltered read still returns both, and that the gate flag
-   * is what decides: {@code hasLocations = false} must ignore a stale id list rather than narrow by
-   * it.
+   * The location filter narrows the owner's stack view to the picked locations, and {@code
+   * hasLocations = false} ignores the id list (REQ-INV-040).
    */
   @Test
   void findUserStacks_locationIds_narrowToThePickedLocation() {
@@ -762,9 +705,8 @@ class InventoryItemStackQueryDataTest {
   }
 
   /**
-   * The location filter is catalog-agnostic (REQ-INV-040): a game-item stack carries a location
-   * just like a material stack, so the item tree narrows the same way. This is the half that would
-   * break if the parameter were folded into the material-only rejection set of REQ-INV-029/031.
+   * The location filter narrows the game-item stack view the same way as the material one
+   * (REQ-INV-040).
    */
   @Test
   void findUserItemStacks_locationIds_narrowToThePickedLocation() {

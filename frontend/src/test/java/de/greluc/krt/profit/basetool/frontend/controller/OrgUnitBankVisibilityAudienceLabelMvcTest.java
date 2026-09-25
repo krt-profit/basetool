@@ -56,16 +56,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC render test for the audience label of the {@code ALL_MEMBERS} bucket in the Sichtbarkeit
- * settings of the org-unit account drill-in (REQ-BANK-035/-041).
- *
- * <p>The bucket admits a different audience per account type, and the label has to say which: on an
- * {@code ORG_UNIT} / {@code AREA} account the grant matches only a member of the account's
- * <em>owning</em> org unit, so it must read "Alle Mitglieder der Org-Einheit" — the same wording
- * the approval-limit tier already carries; on a {@code SPECIAL} Sonderkonto (no owning unit) the
- * very same bucket admits every KRT member, so it must keep the org-wide "Alle Mitglieder". The two
- * cases therefore resolve two different keys, and asserting the rendered German text (not the key)
- * also catches a missing bundle entry, which Thymeleaf would render as {@code ??key_de??}.
+ * MVC render test for the {@code ALL_MEMBERS} visibility label on the org-unit account drill-in
+ * (REQ-BANK-035/-041): "Alle Mitglieder der Org-Einheit" on {@code ORG_UNIT} and {@code AREA}
+ * accounts, "Alle Mitglieder" on a {@code SPECIAL} account.
  */
 @SpringBootTest
 class OrgUnitBankVisibilityAudienceLabelMvcTest {
@@ -89,14 +82,12 @@ class OrgUnitBankVisibilityAudienceLabelMvcTest {
   }
 
   /**
-   * Stubs the account drill-in and its settings region for an account of the given type, with the
-   * visibility settings open to the caller (so the Sichtbarkeit tile renders) and the all-members
-   * bucket supported. Approval limits stay empty and non-editable — this test is about the
-   * visibility label alone.
+   * Stubs the account drill-in and its settings for an account of the given type, with visibility
+   * settings open to the caller and empty, non-editable approval limits.
    *
    * @param accountId the account id used in every backend URI
    * @param accountType the account-type enum name ({@code ORG_UNIT} / {@code AREA} / {@code
-   *     SPECIAL}), which selects the audience the label has to name
+   *     SPECIAL})
    * @param orgUnitKind the owning org-unit kind enum name, or {@code null} for a Sonderkonto
    */
   private void stubSettings(UUID accountId, String accountType, @Nullable String orgUnitKind) {

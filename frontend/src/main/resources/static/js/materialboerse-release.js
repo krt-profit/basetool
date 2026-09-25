@@ -20,8 +20,6 @@
     }
 
     const SERIALIZE_KEY = 'materialboerse';
-    // REQ-FE-015 (ADR-0094): the global live-sync room a release/edit publishes to over the shared
-    // multiplexed /ws/sync socket (window.krtLiveSync), so board viewers re-pull the list.
     const MATERIALBOARD_TOPIC = 'materialboard';
     let state = {
         mode: null,
@@ -37,26 +35,13 @@
     let pickerItems = [];
     let productItems = [];
     let lastFocused = null;
-    // Server-side picker search: the input debounces a fresh /releasable-items query rather than
-    // filtering a once-loaded, alphabetically-capped snapshot in the client — otherwise a material
-    // past the server's row cap (e.g. late-alphabet "Savrilium") is unreachable and the release
-    // silently no-ops. pickerSeq drops stale responses so the last-typed query always wins. The item
-    // (blueprint-product) picker has its own sequence/timer for the same reason (REQ-MARKET-012).
     let pickerSeq = 0;
     let pickerSearchTimer = null;
     let itemPickerSeq = 0;
     let itemPickerSearchTimer = null;
     const PICKER_SEARCH_DEBOUNCE_MS = 200;
-    // The two picker dropdowns start CLOSED and open only on an explicit user gesture (clicking into
-    // or typing in the combobox), so the floating, absolutely-positioned listbox never covers the
-    // fields below it the moment the modal opens — the modal auto-focuses the picker input, and a
-    // programmatic focus must not pop the list. renderPicker / renderItemPicker honour these flags
-    // instead of force-showing the list on every render (incl. the modal-open prefetch).
     let pickerListOpen = false;
     let itemPickerListOpen = false;
-    // The Material/Item radio above the release picker (REQ-MARKET-002): which row kind the
-    // /releasable-items query is narrowed to ('MATERIAL' | 'ITEM'). A server-side filter, so a row
-    // past the picker's row cap is never hidden. Reset to 'MATERIAL' on every open of 'new' mode.
     let pickerKind = 'MATERIAL';
 
     function fmt(template, value) {
@@ -68,10 +53,7 @@
     }
 
     /**
-     * Whether the modal is currently on screen. Per the design-system contract the
-     * .krt-modal-overlay default is display:none and a modal is opened by setting an
-     * inline display:flex (styles.css), so visibility is read off the inline display,
-     * not the hidden attribute.
+     * Whether the modal is currently on screen, read off its computed display.
      */
     function isModalOpen() {
         return (
@@ -96,9 +78,7 @@
 
     /**
      * Formats an amount in the material's own unit: an integer count + the piece unit for a PIECE
-     * material, otherwise the up-to-3-decimal SCU rendering. Fixes issue #1182, where every offer
-     * was shown as SCU regardless of the material's quantity type. The unit labels come from
-     * window.materialboerseI18n (localized), with ASCII fallbacks only if the bootstrap is absent.
+     * material, otherwise the up-to-3-decimal SCU rendering, with localized unit labels.
      */
     function formatAmount(amount, quantityType) {
         const n = Number(amount);
@@ -126,12 +106,10 @@
     }
 
     /**
-     * Sets the editable offered-amount field: its current value, the max the owner may offer (the
-     * item's current stock, kept in state.available for validation), the unit label + step for the
-     * material's quantity type (SCU vs PIECE, #1199/#1182), and the "max. X verfügbar" hint. A null
-     * max disables the input (release-new mode before an item is picked).
+     * Sets the offered-amount field: value, max (kept in state.available), unit label and step for
+     * the quantity type, and the max hint. A null max disables the input.
      * @param value the initial offered amount, or '' / null for empty.
-     * @param max the item's current stock as the ceiling, or null for "unknown / disabled".
+     * @param max the item's current stock as the ceiling, or null when unknown.
      */
     function setAmountField(value, max) {
         const input = q('[data-mb-amount]');
@@ -184,7 +162,6 @@
             showError(i18n.amountInvalid);
             return null;
         }
-        // Tolerate float noise so offering the whole row (value === max) is never rejected.
         if (state.available != null && amount > state.available + 1e-6) {
             showError(i18n.amountExceeds);
             return null;
@@ -241,7 +218,6 @@
             onDone,
             onCancel,
         };
-        // Every open starts with both picker dropdowns closed; the user opens the relevant one.
         pickerListOpen = false;
         itemPickerListOpen = false;
         const isNew = mode === 'new';
@@ -253,9 +229,6 @@
         );
         setText('[data-mb-submit-label]', isEdit ? i18n.submitSave : i18n.submitRelease);
         toggle('[data-mb-picker]', isNew);
-        // Item mode (REQ-MARKET-012): show the blueprint-product picker + quantity input, hide the
-        // material facts strip + offered-amount block (a craftable item has no live stock, so the
-        // picker input alone carries the chosen item's name).
         toggle('[data-mb-item-picker]', isItem);
         toggle('[data-mb-facts]', !isItem);
         toggle('[data-mb-amount-block]', !isItem);
@@ -266,21 +239,12 @@
             qtyInput.value = '';
         }
         if (!isItem) {
-            // A stock-backed item row (REQ-MARKET-014), whether an 'edit' of its offer or a fresh
-            // 'lager' release from the Mein-Lager item leaf toggle: the amount block edits the
-            // whole-unit item quantity (ctx.quantityType === 'PIECE', ctx.available = the backing
-            // row's stock) and there is no quality — the facts show the item name only. A material
-            // row (ctx.kind absent) keeps its quality fact.
             const isStockItem = ctx.kind === 'ITEM';
             setFacts(ctx.material, isStockItem ? null : ctx.quality);
             toggleQualityFact(!isStockItem);
             if (isNew) {
-                // No row picked yet: disable the amount field until the picker selection sets its max
-                // (and pickItem decides whether the picked row carries a quality fact).
                 setAmountField('', null);
             } else {
-                // 'edit': value = current offered amount/quantity, ceiling = item's total stock
-                // (ctx.available). 'lager': value = ceiling = the item's stock (whole row by default).
                 const max = isEdit ? ctx.available : ctx.amount;
                 setAmountField(ctx.amount, max);
             }
@@ -291,7 +255,6 @@
         updateCharCount();
 
         if (isNew) {
-            // Reset the Material/Item radio to Material and prefetch that kind (the user re-picks).
             pickerKind = 'MATERIAL';
             const materialRadio = modal.querySelector('[data-mb-kind-radio][value="MATERIAL"]');
             if (materialRadio) {
@@ -307,9 +270,6 @@
         }
 
         lastFocused = document.activeElement;
-        // .krt-modal-overlay is display:none by default; it opens through window.krtModal, NOT by
-        // clearing a hidden attribute — that left the CSS display:none in place, so the modal
-        // opened invisibly (REQ-MARKET-002/007).
         window.krtModal.open(modal);
         const first = isNew
             ? q('[data-mb-picker-input]')
@@ -377,7 +337,7 @@
             })
             .then(function (items) {
                 if (seq !== pickerSeq) {
-                    return; // a newer search superseded this response
+                    return;
                 }
                 pickerItems = Array.isArray(items) ? items : [];
                 renderPicker();
@@ -402,9 +362,7 @@
     }
 
     /**
-     * Opens the material picker dropdown (a user clicked into or typed in the combobox). The rows
-     * are already rendered from the modal-open prefetch, so this just reveals them; a still-in-flight
-     * fetch fills them in via renderPicker, which respects pickerListOpen.
+     * Reveals the already rendered material picker dropdown.
      */
     function openPickerList() {
         pickerListOpen = true;
@@ -424,10 +382,8 @@
     }
 
     /**
-     * Applies the Material/Item radio selection (REQ-MARKET-002): narrows the picker to the chosen
-     * kind and clears any row already picked (the two kinds carry different facts + units), then
-     * reloads the picker from the server filtered to that kind. The list is left closed — the user
-     * opens the combobox to pick from the newly filtered set.
+     * Applies the Material/Item radio selection (REQ-MARKET-002): clears any picked row and reloads
+     * the picker, still closed, filtered to that kind.
      * @param kind the chosen row kind ('MATERIAL' or 'ITEM'); anything else falls back to 'MATERIAL'.
      */
     function setPickerKind(kind) {
@@ -456,13 +412,8 @@
             list.hidden = !pickerListOpen;
             return;
         }
-        // Accumulated from literals and escapeHtml / escapeAttr calls only, so the innerHTML sink
-        // provably sees escaped values (FE-SEC-05).
         let html = '';
         pickerItems.forEach(function (it) {
-            // The picker carries both material rows and game-item rows (stock-backed item
-            // offers, REQ-MARKET-014). An item row has no quality — omit the "Q x ·" prefix and
-            // render a blank data-quality so picking it hides the quality fact.
             const isItem = it.kind === 'ITEM';
             let meta = escapeHtml(
                 (isItem ? '' : 'Q ' + it.quality + ' · ') +
@@ -507,13 +458,8 @@
         state.quantityType = li.getAttribute('data-quantity-type');
         const isItem = li.getAttribute('data-kind') === 'ITEM';
         const amount = li.getAttribute('data-amount');
-        // An item row has no quality; a material row shows it. Releasing an item row posts the same
-        // /offers/ajax payload — the backend detects the game-item row and creates a stock-backed
-        // item offer (REQ-MARKET-014).
         setFacts(li.getAttribute('data-material'), isItem ? null : li.getAttribute('data-quality'));
         toggleQualityFact(!isItem);
-        // Offer the whole picked row by default; its stock is the ceiling. setAmountField reads
-        // state.quantityType (just set) to render the SCU/PIECE unit + step (PIECE for item rows).
         setAmountField(amount, amount);
         const input = q('[data-mb-picker-input]');
         if (input) {
@@ -521,8 +467,6 @@
         }
         closePickerList();
     }
-
-    // -------- item (blueprint-product) picker (item offers, REQ-MARKET-012) --------
 
     function loadItemPicker(query) {
         const seq = ++itemPickerSeq;
@@ -537,7 +481,7 @@
             })
             .then(function (items) {
                 if (seq !== itemPickerSeq) {
-                    return; // a newer search superseded this response
+                    return;
                 }
                 productItems = Array.isArray(items) ? items : [];
                 renderItemPicker();
@@ -592,7 +536,6 @@
             list.hidden = !itemPickerListOpen;
             return;
         }
-        // Accumulated from literals and escapeHtml / escapeAttr calls only (FE-SEC-05).
         let html = '';
         productItems.forEach(function (it) {
             html +=
@@ -651,7 +594,6 @@
             submitItem(remark);
             return;
         }
-        // 'new' / 'lager': an item must be chosen first (the amount field stays disabled until then).
         if (!state.itemId) {
             return;
         }
@@ -678,9 +620,8 @@
     }
 
     /**
-     * Submits an item offer (#1185): requires a picked blueprint product and a whole quantity ≥ 1
-     * (validated client-side; the backend re-validates the product and the quantity). POSTs to the
-     * item-offer proxy and, on success, notifies peers and closes the modal like a material release.
+     * Submits an item offer for the picked blueprint product and a whole quantity ≥ 1; on success
+     * notifies peers and closes the modal.
      */
     function submitItem(remark) {
         if (!state.productKey) {
@@ -716,8 +657,6 @@
         }
     }
 
-    // -------- events (scoped to the modal DOM) --------
-
     document.addEventListener('click', function (e) {
         if (!isModalOpen()) {
             if (
@@ -727,10 +666,6 @@
                 return;
             }
         }
-        // A click outside either combobox (its input or its listbox) dismisses an open dropdown, so
-        // the floating list never lingers over the other inputs. Clicks on the input / an option
-        // stay inside the .krt-combobox wrapper (data-mb-combobox / data-mb-item-combobox) and are
-        // handled by the dedicated branches below.
         if (
             !e.target.closest('[data-mb-combobox]') &&
             !e.target.closest('[data-mb-item-combobox]')
@@ -747,7 +682,6 @@
             return;
         }
         if (e.target.closest('[data-mb-amount-max]')) {
-            // "Alles": fill the offered amount with the item's full available stock.
             if (state.available != null) {
                 const input = q('[data-mb-amount]');
                 if (input) {
@@ -756,8 +690,6 @@
             }
             return;
         }
-        // Clicking into a picker input opens its dropdown. The modal-open auto-focus is a
-        // programmatic focus() with no click, so the list stays closed until the user reaches for it.
         if (e.target.closest('[data-mb-picker-input]')) {
             openPickerList();
             return;
@@ -802,8 +734,6 @@
             return;
         }
         if (e.key === 'Escape') {
-            // Escape first dismisses an open picker dropdown; only when none is open does it close
-            // the whole modal (mirrors the shared combobox's escape-closes-the-list-first behaviour).
             if (pickerListOpen || itemPickerListOpen) {
                 e.preventDefault();
                 closePickerList();

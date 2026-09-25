@@ -33,17 +33,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Read-only existence check backing the Discord first-broker-login collision gate (REQ-SEC-022).
+ * Read-only check whether a Basetool account already matches an incoming Discord identity, backing
+ * the first-broker-login collision gate (REQ-SEC-022).
  *
- * <p>Answers a single question for the Keycloak SPI: <em>does a Basetool account already exist that
- * matches an incoming Discord identity?</em> The two name candidates (Discord username + per-guild
- * server nickname) are matched case-insensitively against existing accounts' login {@code username}
- * and in-app {@code displayName}; the Discord e-mail is matched against existing accounts' e-mail.
- * Only the boolean fact is returned — the SPI uses it to reject the registration and point the user
- * at linking their existing account, never to link or inherit anything.
- *
- * <p>No PII ever leaves this service or reaches a log line: the candidate names/e-mail are never
- * logged, and the repository returns a count predicate rather than a row.
+ * <p>Name candidates are matched case-insensitively against {@code username} and {@code
+ * displayName}, the e-mail against the account e-mail. Only a boolean is returned and no candidate
+ * value is logged.
  */
 @Service
 @RequiredArgsConstructor
@@ -53,13 +48,8 @@ public class DiscordAccountExistenceService {
   private final UserRepository userRepository;
 
   /**
-   * Decides whether an existing account collides with the supplied Discord identity.
-   *
-   * <p>Inputs are trimmed and lower-cased before matching; blank/{@code null} candidates are
-   * ignored. The two name candidates are unioned into a set and matched against {@code username}
-   * and {@code displayName} in one query; the e-mail is matched separately. The name query runs
-   * only for a non-empty candidate set (so the JPQL {@code IN} never degenerates to {@code IN ()});
-   * the e-mail query runs only for a non-blank e-mail.
+   * Decides whether an existing account collides with the supplied Discord identity. Inputs are
+   * trimmed and lower-cased; blank or {@code null} candidates are ignored.
    *
    * @param username the incoming Discord username; may be {@code null}/blank
    * @param email the incoming Discord e-mail; may be {@code null}/blank

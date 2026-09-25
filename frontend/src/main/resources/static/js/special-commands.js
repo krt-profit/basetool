@@ -17,20 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * Special-commands admin page module (/admin/special-commands), extracted verbatim from the former
- * inline script of admin/special-commands.html (ADR-0069, follow-up to #924).
- *
- * The create/edit modal, the soft-deactivate delete-confirm modal (#587) and the include-inactive
- * filter, plus the in-place CRUD (#582): create/edit/delete/activate save via the krtFetch AJAX twins
- * and re-swap the #sc-results fragment, so the page never reloads; the classic POST->redirect forms
- * stay the no-JS fallback. Edit/Delete/activate buttons live inside the swap target, so they are
- * document-delegated to survive the include-inactive swap. The whole page logic is one IIFE.
- *
- * The Thymeleaf-interpolated toast + conflict strings (SC_MSG, SC_CONFLICT) stay inline in the page
- * bootstrap this module reads.
- */
-
 /* global SC_MSG, SC_CONFLICT */
 
 (function () {
@@ -66,7 +52,6 @@
         window.krtModal.close(modal);
     }
 
-    // --- Delete (soft-deactivate) confirmation (#587) ---
     const deleteModal = document.getElementById('sc-delete-modal');
     const deleteForm = document.getElementById('sc-delete-form');
     const deleteNameEl = document.getElementById('sc-delete-name');
@@ -85,9 +70,6 @@
         if (deleteModal) window.krtModal.close(deleteModal);
     }
 
-    // The Edit and Delete buttons live INSIDE the AJAX swap target (#sc-results), so they are bound
-    // via ONE document-delegated click listener (e.target.closest) that survives the include-inactive
-    // filter swap with zero re-init. The add button + modal close live outside the swap (bound once).
     document.getElementById('add-sc-btn').addEventListener('click', openCreate);
     document.addEventListener('click', function (e) {
         const editBtn = e.target.closest('.edit-sc-btn');
@@ -113,11 +95,6 @@
         });
     }
 
-    // Include-inactive toggle -> in-place swap of the SK list (REQ-FE-002), with the URL kept in
-    // sync so a refresh re-renders the same filter. Edit/Delete are document-delegated above, so the
-    // swapped-in rows need no re-init. The toggle is persisted per browser (REQ-UI-017): an
-    // explicit ?includeInactive= in the address bar wins and is re-persisted; a bare load replays
-    // a differing saved value through the existing change handler (one #sc-results swap).
     const SC_FILTER_PREF_KEY = 'admin_special_commands_filter';
     const includeInactive = document.getElementById('includeInactive');
     if (includeInactive && window.krtFetch) {
@@ -127,9 +104,7 @@
                     SC_FILTER_PREF_KEY,
                     JSON.stringify({ includeInactive: includeInactive.checked }),
                 );
-            } catch (_e) {
-                /* storage unavailable */
-            }
+            } catch (_e) {}
         };
         includeInactive.addEventListener('change', function () {
             persistScFilter();
@@ -140,7 +115,6 @@
         });
 
         if (/[?&]includeInactive=/.test(window.location.search)) {
-            // Deep link / refresh: the server pre-checked the box; adopt + re-persist.
             persistScFilter();
         } else {
             let saved;
@@ -159,9 +133,6 @@
         }
     }
 
-    // ---- In-place CRUD (#582): create/edit/delete/activate save via the AJAX twins and re-swap
-    // the SK-list fragment, so the page never reloads. -------------------------------------------
-
     function reswapScResults() {
         if (!window.krtFetch) return;
         const url =
@@ -170,15 +141,6 @@
         window.krtFetch.swap({ url, container: '#sc-results', history: false });
     }
 
-    // FormData POST to an SK AJAX twin (keeps the @ModelAttribute / @RequestParam binding) with
-    // X-Requested-With + CSRF + retry-once-on-403. On success runs onSuccess and re-swaps the list;
-    // on failure delegates to krtFetch.handleProblem for the conflict UX.
-    // Migrated to krtFetch.submitForm (S10, REQ-FE-009): the shared foundation owns the CSRF header
-    // (no Content-Type so the browser sets the multipart boundary), the bare-403 refresh-and-retry,
-    // X-Reauthenticate, the success toast and the !ok handleProblem (duplicate-name / in-use toast or
-    // OPTIMISTIC_LOCK reload-confirm). This helper keeps only its page behaviour: run onSuccess and
-    // re-swap the SK list in place. Callers guard with if (!window.krtFetch) form.submit() so the
-    // classic POST->redirect stays the no-JS fallback.
     function scWrite(theForm, successMessage, onSuccess) {
         window.krtFetch.submitForm({
             form: theForm,
@@ -214,7 +176,6 @@
             scWrite(deleteForm, SC_MSG.deleted, closeDelete);
         });
     }
-    // Activate forms live inside the swappable #sc-results, so they are document-delegated.
     document.addEventListener('submit', function (e) {
         const actForm = e.target.closest('form[action*="/activate"]');
         if (!actForm) {

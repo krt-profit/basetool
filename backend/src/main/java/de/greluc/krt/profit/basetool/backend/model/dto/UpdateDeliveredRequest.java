@@ -23,10 +23,8 @@ import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 
 /**
- * Request DTO for updating the delivered status of an inventory entry. Since Variante C
- * (REQ-INV-027) {@code delivered} lives on the per-order job-order slice, so the toggle is (entry,
- * order)-scoped: {@code jobOrderId} names the earmarked order whose slice to flip. {@code version}
- * is the owning entry's optimistic-locking token.
+ * Request DTO toggling the delivered state of one job order's slice of an inventory entry
+ * (REQ-INV-027).
  *
  * @param delivered the new delivered state of the order's slice
  * @param jobOrderId the earmarked job order whose slice to toggle

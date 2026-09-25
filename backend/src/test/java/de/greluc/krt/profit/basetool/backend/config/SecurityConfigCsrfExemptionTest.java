@@ -33,24 +33,9 @@ import org.springframework.security.web.util.matcher.OrRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 
 /**
- * Pins which paths cookie-based CSRF must not refuse.
- *
- * <p>This test exists because nothing else in the suite can see the rule at all. The {@code test}
- * profile disables CSRF outright so MockMvc can post without first fetching a token, so every
- * {@code @SpringBootTest} here runs the branch that has no CSRF — and the production branch, the
- * one that shipped a defect, is exercised by no test in the repository.
- *
- * <p>What shipped: {@code ignoringRequestMatchers} named five paths, so every other write under
- * {@code /api/v1} answered {@code 403 MissingCsrfToken} to a caller with no CSRF cookie. Every
- * bearer client is such a caller, which is the entire native app. Booking stock out of the Lager,
- * taking an Auftrag and moving its status, and setting a bank account's balance target were all
- * refused in production, while the two families that happened to be on the list worked. The nightly
- * {@code edge-deny-probe} had been red on exactly those four paths for two days: it asserts {@code
- * 401} for an anonymous write, and the CSRF filter runs ahead of authorization and answered {@code
- * 403} first.
- *
- * <p>The chain is stateless and bearer-only, so there is no ambient credential a cross-site request
- * could ride and the check could never have protected anything on this surface.
+ * Pins which paths cookie-based CSRF must not refuse. The chain is stateless and bearer-only, so
+ * CSRF protects nothing there and must not block bearer clients' writes under {@code /api/v1}.
+ * Needed because the {@code test} profile disables CSRF for every other test.
  */
 @DisplayName("CSRF exemptions")
 class SecurityConfigCsrfExemptionTest {

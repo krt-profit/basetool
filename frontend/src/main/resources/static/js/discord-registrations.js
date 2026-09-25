@@ -17,27 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * Discord-registrations admin page module (/admin/discord-registrations), extracted verbatim from the
- * former inline script of admin/discord-registrations.html (ADR-0069, follow-up to #924).
- *
- * Approve / reject / link pending Discord registrations in place: each button goes through
- * window.krtFetch, removes the row on success (and re-inserts an empty-state row when the last one is
- * gone), and drives three modals (open/cancel/confirm, backdrop + Escape close) — the reject-reason
- * modal, the link-to-existing-account modal (a server-searched remote-users account picker,
- * REQ-SEC-026) and the reopen-confirmation modal. Requires window.krtFetch; without it the handler
- * returns early (the server-rendered rows stay as the no-JS state).
- *
- * The page carries two tables: the pending queue and the rejected registrations. Reopening moves a
- * row out of the second and into the first without a reload (REQ-SEC-034). The inserted queue row is
- * rebuilt from the server's response rather than cloned from the rejected row, so its version and
- * fields are the backend's rather than a stale copy of what the page was rendered with.
- *
- * The Thymeleaf-interpolated toast/empty strings stay inline in the page bootstrap as the DISCORD_MSG
- * global this module reads (renamed from the original in-handler 'MSG' const to avoid a generic
- * top-level global name).
- */
-
 /* global DISCORD_MSG */
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -57,9 +36,6 @@ document.addEventListener('DOMContentLoaded', function () {
     let mergeTarget = null;
     let reopenTarget = null;
 
-    // The account picker's <select> is progressively enhanced by krt-searchable-select.js, which
-    // moves the id onto a hidden input — so it is looked up lazily on open/confirm, never cached at
-    // load time (the cached reference would point at the removed original <select>).
     function linkPicker() {
         return document.getElementById('link-target');
     }
@@ -68,9 +44,6 @@ document.addEventListener('DOMContentLoaded', function () {
         return document.getElementById('merge-source');
     }
 
-    // Table-agnostic: the pending queue and the rejected table differ only in their tbody, their
-    // empty-state row id and text, and their column count (the rejected table carries an extra
-    // "rejected at" column), so one helper drives both.
     function removeRowFrom(row, tbody, emptyId, colSpan, emptyText) {
         row.remove();
         if (!tbody || tbody.querySelector('tr[data-id]')) {
@@ -97,9 +70,6 @@ document.addEventListener('DOMContentLoaded', function () {
         return String(value).padStart(2, '0');
     }
 
-    // Mirrors the server-side #temporals.format(..., 'dd.MM.yyyy HH:mm', 'UTC') so a row inserted by
-    // JS reads identically to a server-rendered one. An unparsable value renders empty rather than
-    // a string of NaNs.
     function formatUtc(iso) {
         if (!iso) {
             return '';
@@ -130,8 +100,6 @@ document.addEventListener('DOMContentLoaded', function () {
         return button;
     }
 
-    // Builds a queue row matching the server-rendered markup so the delegated click handler and the
-    // empty-state bookkeeping keep working on it unchanged.
     function insertPendingRow(reg) {
         if (!body || !reg || !reg.id) {
             return;
@@ -396,9 +364,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (window.showFrontendSuccessToast) {
                         window.showFrontendSuccessToast(DISCORD_MSG.merged);
                     }
-                    // The row STAYS: merging repairs the data, approving admits the member, and
-                    // the second decision is still the admin's to make. Only the optimistic-lock
-                    // version moves on, so the next action on this row does not 409.
                     if (data && data.version != null) {
                         row.setAttribute('data-version', String(data.version));
                     }

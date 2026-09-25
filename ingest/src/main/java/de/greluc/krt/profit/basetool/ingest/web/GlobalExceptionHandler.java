@@ -51,18 +51,11 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Translates gateway failures into RFC 7807 {@code application/problem+json} (REQ-INGEST-001,
- * REQ-API-*). Validation and malformed bodies are 400s; a backend 4xx keeps the backend status and
- * relays only the backend problem's {@code detail} (content-type-checked + length-capped, so the
- * envelope-reject message reaches the extractor without echoing a raw response body —
- * REQ-REFINERY-001/003) — except a backend 401/403, which refuses the gateway's own identity and
- * becomes 502; a backend 5xx, a connection failure, or an open circuit becomes 502; anything else
- * is a generic 500. The handler never echoes a token or PII into the response (REQ-OBS-*).
+ * Translates gateway failures into RFC 7807 {@code application/problem+json} (REQ-INGEST-001).
  *
- * <p>Extends {@link ResponseEntityExceptionHandler} so the framework's standard MVC exceptions (and
- * therefore Spring Boot's auto-configured problem-details advice, which is conditional on no
- * user-provided handler) are owned here — the {@code code} extension is then attached consistently
- * to validation and body-parse problems too.
+ * <p>Validation and malformed bodies are 400; a backend 4xx keeps its status with only the
+ * sanitized {@code detail}; a backend 401/403 or 5xx, a transport failure or an open circuit is
+ * 502; anything else is 500. Never echoes a token or PII.
  */
 @Slf4j
 @RequiredArgsConstructor
@@ -112,10 +105,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
   /**
    * Increments {@code basetool_ingest_handoff_errors_total} for a failed backend relay, tagged by
-   * the bounded {@code reason} (REQ-OBS-011). Only genuine relay failures are counted here; the
-   * pre-relay rejections (validation, malformed body, rate limit) are not handoff failures. The
-   * {@link de.greluc.krt.profit.basetool.ingest.model.dto.HandoffKind} is unavailable once the
-   * controller stack has unwound, so this failure counter carries no {@code kind}.
+   * the bounded {@code reason} (REQ-OBS-011).
    *
    * @param reason the bounded failure reason ({@code MetricNames.REASON_*})
    */
@@ -172,17 +162,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   }
 
   /**
-   * The caller's client software is not approved for the ingest path (REQ-INGEST-011) — the
-   * payload-level provenance reject raised by {@code ProvenanceGuard}. Answered {@code 403} with
-   * the same {@code CLIENT_NOT_ALLOWED} code the token-level gate writes from {@code
-   * ClientIdentityFilter}, so a client sees one coherent answer regardless of which half refused
-   * it.
-   *
-   * <p>No log line is emitted here: the guard already logged the reject at {@code WARN} with the
-   * declared provenance, which is the whole diagnostic value, and REQ-OBS-001 allows exactly one
-   * line per failure. The {@code basetool_ingest_client_rejected_total} counter is likewise the
-   * guard's; this adds only the shared {@code basetool_http_error_total} tally so the 403 shows up
-   * alongside every other error code on the dashboard.
+   * Answers a rejected client software (REQ-INGEST-011) with a {@code 403} and the code {@code
+   * CLIENT_NOT_ALLOWED}; logs nothing, since the guard already did.
    *
    * @param ex the provenance rejection, carrying the detail sent to the caller
    * @return a 403 problem naming the approved-clients-only rule
@@ -200,25 +181,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   }
 
   /**
-   * The backend returned an error status. A 4xx keeps the backend status and relays only the
-   * backend problem's sanitised {@code detail} (see {@link #backendDetail}, which
-   * content-type-checks and caps it — never the raw body); a 5xx is collapsed to 502 so the gateway
-   * never surfaces backend internals.
+   * Handles an error status from the backend: a 4xx keeps its status and relays only the sanitized
+   * {@link #backendDetail}; a 5xx becomes 502.
    *
-   * <p><b>Except a backend {@code 401} or {@code 403}: those become a {@code 502}.</b> Since
-   * ADR-0129 the backend hop is authenticated with the <em>gateway's own</em> service-account
-   * token, not the caller's, so a backend auth refusal says something about the gateway — an
-   * expired or revoked service-account token, a rotated secret, a broken on-behalf-of allowlist —
-   * and nothing about the member. Relaying it verbatim told the extractor "you are not signed in"
-   * or "you are not allowed", sending the member to re-login for a fault they cannot fix, and it
-   * left the refused token in the cache so every following upload failed the same way until it
-   * expired. It is therefore answered as the relay failure it is, logged at {@code WARN} (this one
-   * the backend cannot have logged on the gateway's behalf), and the cached token is invalidated so
-   * the next upload mints a fresh one.
+   * <p>A backend 401 or 403 refuses the gateway's own token (ADR-0129), so it becomes a 502, is
+   * logged at WARN and invalidates the cached service-account token.
    *
-   * @param ex the relay's response exception ({@code HttpClientErrorException}, {@code
-   *     HttpServerErrorException} or {@code UnknownHttpStatusCodeException}, all of which extend
-   *     {@link RestClientResponseException})
+   * @param ex the relay's response exception
    * @return a relayed 4xx problem, or a 502 for a backend auth refusal or a backend 5xx
    */
   @ExceptionHandler(RestClientResponseException.class)
@@ -255,9 +224,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   }
 
   /**
-   * The authenticated caller exhausted their per-subject ingest budget → 429 with {@code
-   * Retry-After} (REQ-INGEST-005). Returned as a {@link ResponseEntity} rather than a bare {@link
-   * ProblemDetail} so the {@code Retry-After} header can be attached.
+   * Answers an exhausted per-subject ingest budget with 429 and a {@code Retry-After} header
+   * (REQ-INGEST-005).
    *
    * @param ex the rate-limit exception carrying the suggested retry delay
    * @return a 429 problem with a {@code Retry-After} header
@@ -277,16 +245,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   }
 
   /**
-   * A genuine transport failure reaching the backend (connection refused, timeout) → 502. This is
-   * the signal the backend is down and is what opens the circuit breaker, so it is logged at WARN.
-   *
-   * <p>Mapped on {@link RestClientException}, the parent of {@code RestClient}'s {@code
-   * ResourceAccessException} (connect or read failure) and of the plain exception it raises when a
-   * response body cannot be read — a connection torn down mid-body, a body past the payload cap.
-   * Both are a relay that did not complete, not a defect in the gateway. A backend answer with an
-   * error status is the more specific {@link RestClientResponseException} and goes to {@link
-   * #handleBackendResponse} instead; the token grant's own failures never reach here, because the
-   * provider turns them into a {@code ServiceAccountTokenException}.
+   * Answers a transport failure reaching the backend (connection refused, timeout, unreadable body)
+   * with 502, logged at WARN.
    *
    * @param ex the request exception
    * @return a 502 problem
@@ -298,12 +258,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   }
 
   /**
-   * A call short-circuited by the already-open {@code backend} circuit breaker → 502. Logged at
-   * DEBUG, not WARN (REQ-OBS-001): the open breaker rejects every {@code /v1} call for its whole
-   * wait-duration-in-open-state window, so at WARN a routine backend restart would flood the log
-   * (the ingest analogue of issue #1203). The one-time state-transition WARN (the {@code
-   * BackendImportClient} listener) plus the {@code resilience4j_circuitbreaker_state} gauge are the
-   * health signal; nothing depends on this per-call line.
+   * Answers a call rejected by the open {@code backend} circuit breaker with 502, logged at DEBUG
+   * (REQ-OBS-001).
    *
    * @param ex the circuit-open exception
    * @return a 502 problem
@@ -330,20 +286,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   }
 
   /**
-   * The Redis handoff staging was unreachable → retryable {@code 503} with {@code Retry-After}
-   * (REQ-INGEST-003), rather than the generic {@code 500} this used to fall through to.
-   *
-   * <p>Redis is the gateway's only data store, so any {@link DataAccessException} here means the
-   * relayed draft could not be parked for browser pickup. Two things were wrong with letting that
-   * land in {@link #handleUnexpected}: the caller was handed a non-retryable {@code 500} for an
-   * outage that self-heals in seconds, and the operator saw {@code ERROR "Unexpected ingest
-   * failure"} with a stack trace — indistinguishable from a genuine code defect, and it inflates
-   * {@code logback_events_total{level="error"}} enough to trip {@code LogbackErrorSpike}
-   * (REQ-OBS-013). This is the same treatment {@code IdentityProviderUnavailableFilter} gives an
-   * unreachable Keycloak: an availability event is a {@code WARN} and a {@code 503}.
-   *
-   * <p>Note the ordering guarantee this relies on: Spring picks the most specific
-   * {@code @ExceptionHandler}, so this method wins over the {@link Exception} catch-all.
+   * Answers an unreachable Redis handoff store with a retryable {@code 503} and {@code
+   * Retry-After}, logged at WARN (REQ-INGEST-003).
    *
    * @param ex the data-access failure raised by the Redis staging write
    * @return a 503 problem carrying {@code Retry-After}
@@ -368,20 +312,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   }
 
   /**
-   * The gateway cannot obtain its own identity for the backend hop → 503 with a named cause.
-   *
-   * <p>Since ADR-0129 this grant sits on the critical path of every upload, and it fails in a hop
-   * no client can see. Left to the catch-all below it surfaced as "An unexpected error occurred." —
-   * which is what a member actually saw on 2026-08-04, with nothing to act on and nothing to tell
-   * an operator where to look. It is a configuration or connectivity fault at the gateway, not
-   * something the caller did, so it gets its own code and a retry hint.
-   *
-   * <p>Covers both shapes — no identity configured, and a grant that failed — because the provider
-   * raises one type for both. To the sender they are the same situation: the gateway cannot act.
-   * The distinction lives in the log and in {@code basetool_ingest_service_account_token_total},
-   * where an operator can use it. Catching {@code IllegalStateException} here instead would have
-   * been broader and worse: any unrelated state fault in the ingest path would report itself as a
-   * login-server problem.
+   * Answers a gateway that cannot obtain its own backend identity, whether unconfigured or after a
+   * failed grant, with 503 and a dedicated code.
    *
    * @param ex the identity failure
    * @return a 503 problem naming the gateway, not the caller
@@ -424,9 +356,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   }
 
   /**
-   * Builds a {@link ProblemDetail} with the stable {@code code} and the current correlation id
-   * (when present in the MDC under the configured key) attached as extension members, via the
-   * shared {@link Problems#of} builder.
+   * Builds a {@link ProblemDetail} with the stable {@code code} and the current correlation id via
+   * {@link Problems#of}.
    *
    * @param status the HTTP status
    * @param title a short, stable title
@@ -443,11 +374,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   }
 
   /**
-   * Extracts a safe detail string from a backend response error (security audit gap-fill). Only an
-   * RFC 7807 {@code application/problem+json} body is consulted, and only its {@code detail} (or
-   * {@code title}) field is relayed — never the raw body, which could be a non-JSON error page or
-   * carry internal context — capped at {@value #MAX_RELAYED_DETAIL} characters. Falls back to a
-   * generic phrase when the body is missing, not problem+json, or cannot be decoded.
+   * Extracts a safe detail from a backend error: only the {@code detail} or {@code title} of an
+   * {@code application/problem+json} body, capped at {@value #MAX_RELAYED_DETAIL} characters.
    *
    * @param ex the backend response exception
    * @return the backend problem's detail/title (capped), or a generic fallback

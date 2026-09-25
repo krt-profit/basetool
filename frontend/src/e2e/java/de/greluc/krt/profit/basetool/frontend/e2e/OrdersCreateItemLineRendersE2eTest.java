@@ -38,23 +38,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Regression for the item-order editor's dynamically-added lines after the CSP hardening of
- * ADR-0093 ("eliminate inline {@code style=""} attributes so the CSP can pin {@code style-src-attr
- * 'none'}"). {@code orders-create.js} builds each item line via {@code innerHTML}, and the row's
- * flex layout, the SCU hint, and the derived-materials rows carried inline {@code style=""}
- * attributes. Under {@code style-src-attr 'none'} those inline styles are blocked, so the row lost
- * its flex layout and the SCU hint could no longer be hidden/revealed. The fix moves the layout to
- * the {@code oc-*} classes plus the global {@code flex-1}/{@code flex-2}/{@code nowrap} utilities
- * and toggles the runtime {@code krtm-hidden} class instead of clearing an inline style.
+ * Verifies that an item line added in the {@code /orders/create} item-order editor is visible and
+ * logs no {@code style-src-attr} CSP violation (ADR-0093).
  *
- * <p>This test opens {@code /orders/create}, switches to item-order mode, adds an item line,
- * asserts the client-built {@code oc-line-fields} row is visible, and asserts no {@code
- * style-src-attr} CSP violation was logged — the pre-fix frontend logs one for every inline style
- * it injects into the row.
- *
- * <p>Read-only: it builds a line in the browser but never submits the form, so it mutates no server
- * state and is safe against a shared deployment. The actor is {@code test-admin}, who may create
- * orders.
+ * <p>Read-only: never submits the form; runs as {@code test-admin}.
  */
 @Tag("e2e")
 class OrdersCreateItemLineRendersE2eTest {

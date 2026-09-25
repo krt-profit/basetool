@@ -46,13 +46,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Read-mostly REST surface over the terminal catalog. UEX owns the table; the PUT endpoint is
- * intentionally narrow — only the {@code hidden} flag flows through, every other field passed in
- * the body is ignored.
+ * Read-mostly REST surface over the UEX-owned terminal catalog; the PUT endpoint applies only the
+ * {@code hidden} flag.
  *
- * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor, not the
- * ceiling — it is stated here so an endpoint added later inherits it rather than relying on a URL
- * matcher elsewhere being right, and a method-level gate still wins where one is present.
+ * <p>The class-level {@code isAuthenticated()} gate is the floor for every endpoint; a method-level
+ * gate still wins (REQ-SEC-052).
  */
 @RestController
 @RequestMapping("/api/v1/terminals")

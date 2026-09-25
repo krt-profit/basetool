@@ -34,11 +34,9 @@ import lombok.Setter;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Append-only audit row of a single admin approval decision on a registration (epic #720, Track 1).
- *
- * <p>One row is written per approve/reject/link action: it records which user was decided on, the
- * {@link ApprovalDecision}, the deciding admin, and an optional free-text reason (typically on
- * rejection). Never updated after creation — the {@code created_at} timestamp is the decision time.
+ * Append-only audit row of one admin approve / reject / link decision on a registration, with the
+ * {@link ApprovalDecision}, the deciding admin and an optional reason; {@code created_at} is the
+ * decision time.
  */
 @Entity
 @Table(name = "user_approval_event")

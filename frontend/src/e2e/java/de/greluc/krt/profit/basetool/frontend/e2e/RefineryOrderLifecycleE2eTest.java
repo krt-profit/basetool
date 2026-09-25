@@ -37,19 +37,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Refinery-order lifecycle beyond create + store (UC-20): editing and cancelling through the UI,
- * the status filter on the list, and the create/update validation + optimistic-locking edges.
- * Together with {@code RefineryOrderCreateE2eTest} (create) and {@code RefineryOrderStoreE2eTest}
- * (store) this rounds out the full set of refinery functions.
+ * Refinery-order lifecycle beyond create and store (UC-20): edit and cancel through the UI, the
+ * list's status filter, and the validation and optimistic-locking edges.
  *
- * <p><b>Drive via UI, verify via API.</b> The edit and cancel flows are exercised in the real
- * browser (the order-detail form and the list filter); the persisted effect (the new money value,
- * the {@code CANCELED} status) is asserted through {@link BackendSeeder}. The validation and 409
- * edges run purely through the API because they assert HTTP status codes the UI deliberately hides
- * behind a generic toast.
- *
- * <p>{@code test-admin} (ADMIN, IRIDIUM member) owns every order. Each test seeds its own order so
- * the mutations stay isolated.
+ * <p>UI flows are verified through the API via {@link BackendSeeder}; the validation and 409 edges
+ * run purely through the API. Each test seeds its own order owned by {@code test-admin}.
  */
 @Tag("e2e")
 class RefineryOrderLifecycleE2eTest {
@@ -170,13 +162,10 @@ class RefineryOrderLifecycleE2eTest {
   }
 
   /**
-   * The list's status filter hides a {@code CANCELED} order under the default {@code OPEN}+{@code
-   * IN_PROGRESS} view and shows it under an explicit {@code CANCELED} filter.
+   * Verifies that the status filter hides a {@code CANCELED} order under the default {@code
+   * OPEN}+{@code IN_PROGRESS} view and shows it under an explicit {@code CANCELED} filter.
    *
-   * <p>The filter is driven through its {@code ?status=…} URL contract — the form the visible
-   * status checkboxes belong to is GET-submitted to exactly that query, and its manual "Filtern"
-   * button is JS-hidden (progressive enhancement) so it cannot be clicked in the harness.
-   * Navigating the URL exercises the same backend filter the UI invokes.
+   * <p>Driven through the {@code ?status=…} URL, since the filter button is hidden by JS.
    */
   @Test
   void statusFilterRevealsCanceledOrders() {

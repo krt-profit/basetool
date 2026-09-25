@@ -26,21 +26,12 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Data transfer record carrying User payload.
+ * Wire shape of a user.
  *
- * <p>{@code squadron} is the user's <em>primary</em> Staffel (the first by name) and is retained
- * for API stability; {@code squadrons} carries the user's <em>complete</em> Staffel membership set
- * — REQ-ORG-017 allows up to two — so callers that must render every membership (the admin member
- * list badge, the member-edit form) read {@code squadrons}, while legacy single-Staffel consumers
- * keep reading {@code squadron}. Both are {@code null} / empty for a user with no Staffel
- * membership.
- *
- * <p>{@code discordLinked} is a privacy-safe, read-only indicator derived from {@code
- * app_user.discord_user_id} (see {@code UserMapper#toDto}): {@code true} when the user has a
- * Discord account federated to their Basetool account, {@code false} otherwise. The raw Discord id
- * (a snowflake) is never carried in any DTO — only the boolean fact of the link, surfaced as the
- * Discord column on the admin member-management page (REQ-SEC-019). Peer/guest redaction shapes
- * leave it {@code null} so the link status never reaches non-admins.
+ * <p>{@code squadron} is the user's primary Staffel (first by name) and {@code squadrons} the
+ * complete membership set (REQ-ORG-017); both are {@code null} / empty without a membership. {@code
+ * discordLinked} tells whether a Discord account is federated, never the Discord id itself, and is
+ * {@code null} in peer and guest redactions (REQ-SEC-019).
  */
 public record UserDto(
     UUID id,

@@ -29,23 +29,11 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
- * Single seam that blanks the inventory <em>owner identity and location</em> of the stock linked to
- * a job order before those projections leave the API to a caller who is not entitled to the order's
- * responsible (processing) side (REQ-ORDERS-029, ADR-0107). It is applied by the four
- * order-inventory read endpoints whenever {@code
- * OwnerScopeService.canSeeJobOrderInventoryOwners(jobOrderId)} is {@code false} — i.e. a
- * requesting-side viewer of an SK-public order: they keep seeing the order and its stock
- * <em>progress</em> (amounts, delivered marker, ordered/manufactured context), but the fulfilling
- * side's owner and Standort are hidden. For a squadron-responsible order the gate coincides with
- * {@code canSeeJobOrder}, so this redactor is never applied there.
+ * Blanks owner identity and location of a job order's linked stock for a caller who may not see the
+ * order's responsible side (REQ-ORDERS-029, ADR-0107).
  *
- * <p><b>The explicit full-field {@code new …Dto(...)} reconstruction is deliberate — do not
- * "simplify" it into pass-through withers.</b> Every component of each record is listed out here,
- * so adding an owner- or location-bearing field to any of these DTOs is a compile error until a
- * human decides, field by field, whether a requesting-side viewer may see it. That
- * compiler-enforced exhaustiveness is the load-bearing safety net that keeps a newly added identity
- * field from silently leaking; a wither ({@code dto.withOwner(null)}) would default a new field to
- * <em>pass-through</em>, the dangerous default for a redactor. Mirrors {@code MissionPeerRedactor}.
+ * <p>Each DTO is rebuilt field by field so that a new field fails compilation until someone decides
+ * whether it may be shown; do not replace this with withers.
  */
 @Component
 public class JobOrderInventoryOwnerRedactor {
@@ -76,12 +64,11 @@ public class JobOrderInventoryOwnerRedactor {
   }
 
   /**
-   * Blanks the owner ({@code ownerName}, {@code ownerId}) and location ({@code location}, {@code
-   * locationId}) of a single Item-Bestand entry, keeping the entry id, version, whole-unit amounts
-   * and delivered marker.
+   * Blanks the owner and location of one Item-Bestand entry, keeping id, version, amounts and
+   * delivered marker.
    *
-   * @param entry the entry to redact.
-   * @return a copy with owner/location nulled.
+   * @param entry the entry to redact
+   * @return a copy with owner and location nulled
    */
   @NotNull
   private JobOrderItemStockEntryDto redactItemStockEntry(@NotNull JobOrderItemStockEntryDto entry) {
@@ -98,13 +85,10 @@ public class JobOrderInventoryOwnerRedactor {
   }
 
   /**
-   * Returns a copy of the material-collection entries with owner ({@code ownerName}, {@code
-   * ownerId}) and location ({@code location}, {@code locationId}) blanked; material, quality,
-   * quantities and the delivered marker are kept.
+   * Returns the material-collection entries with owner and location blanked.
    *
-   * @param entries the material-collection entries to redact; a {@code null} input is returned
-   *     unchanged.
-   * @return the entries with owner/location nulled.
+   * @param entries the entries to redact; {@code null} is returned unchanged
+   * @return the entries with owner and location nulled
    */
   @Nullable
   public List<MaterialCollectionEntryDto> redactMaterialCollection(
@@ -131,14 +115,11 @@ public class JobOrderInventoryOwnerRedactor {
   }
 
   /**
-   * Returns a copy of the inventory-item projections (the per-material drill-down / orphaned-link
-   * pickers) with the owner ({@code user}, {@code owningSquadron}) and {@code location} blanked;
-   * the catalog reference, quality, amounts, allocations, note, version and creation instant are
-   * kept.
+   * Returns the inventory-item projections with owner ({@code user}, {@code owningSquadron}) and
+   * {@code location} blanked.
    *
-   * @param items the inventory-item projections to redact; a {@code null} input is returned
-   *     unchanged.
-   * @return the items with owner/location nulled.
+   * @param items the projections to redact; {@code null} is returned unchanged
+   * @return the items with owner and location nulled
    */
   @Nullable
   public List<InventoryItemDto> redactInventoryItems(List<InventoryItemDto> items) {

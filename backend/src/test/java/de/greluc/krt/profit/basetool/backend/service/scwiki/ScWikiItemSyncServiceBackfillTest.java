@@ -62,10 +62,9 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
- * Unit tests for {@link ScWikiItemSyncService} Mode B — the R5 full Wiki item backfill
- * (SC_WIKI_SYNC_PLAN.md §8.4). Covers mode selection, per-endpoint kind derivation, {@code
- * WIKI_ONLY} creation, the {@code UEX_ONLY → BOTH} flip, the more-specific-wins kind tie-breaker,
- * the §3.4 sanity-cap guard, the junk-name guard, manufacturer resolution and the cross-kind
+ * Unit tests for the full Wiki item backfill (Mode B) of {@link ScWikiItemSyncService}: mode
+ * selection, per-endpoint kind derivation, {@code WIKI_ONLY} creation, the {@code UEX_ONLY → BOTH}
+ * flip, the kind tie-breaker, the sanity cap, the junk-name guard, manufacturer resolution and
  * orphan-sweep gating.
  */
 @ExtendWith(MockitoExtension.class)
@@ -670,8 +669,8 @@ class ScWikiItemSyncServiceBackfillTest {
   }
 
   /**
-   * Builds a detached uuid-less {@code UEX_ONLY} game item — the Weg-2 reconciliation target — with
-   * the given id, canonical name and {@code uex_slug}.
+   * Builds a detached uuid-less {@code UEX_ONLY} game item, the target of the name/slug
+   * reconciliation, with the given id, canonical name and {@code uex_slug}.
    *
    * @param id the row id (matched back via {@code findById})
    * @param name the UEX-canonical name used for the name index

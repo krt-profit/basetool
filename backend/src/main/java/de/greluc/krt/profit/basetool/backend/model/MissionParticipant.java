@@ -77,29 +77,11 @@ public class MissionParticipant extends AbstractEntity<UUID> {
 
   /**
    * The org units (Staffel and/or Spezialkommandos) this participant is affiliated with for this
-   * mission, stamped at sign-up time. For a registered user this is auto-derived from their
-   * memberships (empty when they belong to none, the Staffel or SK when they belong to one, both
-   * when they belong to both); for an external participant it is the caller-submitted selection,
-   * stored <b>as submitted</b> — {@code MissionParticipantService.resolveSubmittedOrgUnits} applies
-   * no per-org-unit authorization filter, and says so itself. Replaces the former single {@code
-   * squadron_id} FK so a member of both a Staffel and an SK no longer loses one of the two
-   * affiliations.
+   * mission, stamped at sign-up time.
    *
-   * <p>Mapped EAGER (matching the eager fetch of the former {@code @ManyToOne squadron}) because
-   * the slim participant endpoints map the entity to its DTO after the service transaction has
-   * closed and {@code open-in-view} is disabled — a lazy collection would raise {@code
-   * LazyInitializationException} at mapping time. {@code @BatchSize} keeps the eager load from
-   * degenerating into one SELECT per participant when a roster is rendered.
-   *
-   * <p><i>Corrected 2026-09-23:</i> the premise above no longer holds — {@code MissionController}
-   * is class-level {@code @Transactional}, so the slim endpoints map inside the transaction, and
-   * this participant's own to-one associations ({@code mission}, {@code user} and both job types)
-   * became LAZY with BE-PERF-11 on exactly that basis. This collection kept EAGER only because
-   * BE-PERF-11 was scoped to to-one associations; making it lazy is a separate, measured change.
-   *
-   * <p>{@code @OptimisticLock(excluded = true)} would be inappropriate here: unlike the parent
-   * mission's participant collection, mutating a participant's own affiliations is a genuine edit
-   * of that participant row and is covered by the participant's own {@code @Version}.
+   * <p>For a registered user it is derived from their memberships; for an external participant it
+   * is the caller-submitted selection, stored as submitted. Covered by the participant's own
+   * {@code @Version}.
    */
   @ManyToMany(fetch = FetchType.EAGER)
   @JoinTable(
@@ -122,14 +104,9 @@ public class MissionParticipant extends AbstractEntity<UUID> {
   private JobType plannedMissionJobType;
 
   /**
-   * Derived flag: {@code true} exactly when {@link #plannedMissionJobType} is the designated
-   * mission-lead ("Einsatzleiter") job type ({@code JobType.isMissionLead}). Maintained by the
-   * service wherever the planned job type changes and backed by a partial unique index ({@code
-   * uq_mission_participant_single_lead}, V206) on {@code (mission_id) WHERE
-   * is_mission_lead_participant} so two managers cannot concurrently make two different
-   * participants of the same mission the Einsatzleiter (REQ-MISSION-013, #1113). Stored (not
-   * computed) because the partial unique index needs a column and the invariant depends on a join
-   * to {@code job_type}.
+   * Derived flag: {@code true} exactly when {@link #plannedMissionJobType} is the mission-lead
+   * ("Einsatzleiter") job type. Maintained by the service and backed by a partial unique index so a
+   * mission has at most one Einsatzleiter (REQ-MISSION-013).
    */
   @Column(name = "is_mission_lead_participant", nullable = false)
   private boolean missionLeadParticipant = false;
@@ -144,12 +121,10 @@ public class MissionParticipant extends AbstractEntity<UUID> {
   private PayoutPreference payoutPreference = PayoutPreference.PAYOUT;
 
   /**
-   * Returns an unmodifiable view of this participant's org-unit affiliations. The Lombok getter is
-   * suppressed for {@code orgUnits} so callers cannot mutate the entity-owned set through the
-   * accessor (CWE-374); use {@link #setOrgUnits(Collection)} to replace the affiliations.
+   * Returns an unmodifiable view of this participant's org-unit affiliations; use {@link
+   * #setOrgUnits(Collection)} to replace them.
    *
-   * @return an unmodifiable snapshot of the affiliated org units; never {@code null}, possibly
-   *     empty.
+   * @return the affiliated org units; never {@code null}, possibly empty.
    */
   @NotNull
   @UnmodifiableView

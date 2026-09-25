@@ -22,9 +22,8 @@ package de.greluc.krt.profit.basetool.backend.model.dto.request;
 import jakarta.validation.constraints.NotNull;
 
 /**
- * Write payload for the close/reopen lifecycle endpoints (REQ-BANK-002). The transition itself is
- * encoded in the URL; the body only echoes the optimistic-locking version so a stale UI cannot
- * close an account it has not seen the latest state of.
+ * Write payload for the close/reopen lifecycle endpoints (REQ-BANK-002); the transition is in the
+ * URL and the body only echoes the version.
  *
  * @param version optimistic-locking version the client read; a mismatch surfaces as 409 {@code
  *     OPTIMISTIC_LOCK}

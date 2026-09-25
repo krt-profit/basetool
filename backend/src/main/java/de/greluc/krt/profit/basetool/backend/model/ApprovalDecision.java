@@ -20,15 +20,11 @@
 package de.greluc.krt.profit.basetool.backend.model;
 
 /**
- * The admin decision recorded on a {@link UserApprovalEvent} audit row (epic #720, Track 1).
+ * The immutable admin decision recorded on a {@link UserApprovalEvent} audit row.
  *
- * <p>Distinct from {@link ApprovalStatus} (the current account state): a decision is the immutable
- * audit of a single admin action. {@link #APPROVED} / {@link #REJECTED} move the decided account
- * into {@link ApprovalStatus#ACTIVE} / {@link ApprovalStatus#REJECTED}; {@link #LINKED} is recorded
- * on the surviving <em>existing</em> account and does not change its status (it was already {@link
- * ApprovalStatus#ACTIVE}) — it captures that a Discord registration was linked into it
- * (REQ-SEC-026); {@link #REOPENED} undoes a rejection by returning the account to {@link
- * ApprovalStatus#PENDING} (REQ-SEC-034).
+ * <p>{@link #APPROVED} / {@link #REJECTED} move the account to {@link ApprovalStatus#ACTIVE} /
+ * {@link ApprovalStatus#REJECTED}; {@link #LINKED} leaves the surviving account's status unchanged;
+ * {@link #REOPENED} returns a rejected account to {@link ApprovalStatus#PENDING}.
  */
 public enum ApprovalDecision {
 
@@ -46,14 +42,9 @@ public enum ApprovalDecision {
   LINKED,
 
   /**
-   * An admin reopened a rejected registration: the account moved back from {@link
-   * ApprovalStatus#REJECTED} to {@link ApprovalStatus#PENDING} so it re-enters the approval queue
-   * and can be decided again through the normal approve/reject path (REQ-SEC-034).
-   *
-   * <p>Deliberately its own value rather than a reuse of {@link #APPROVED}: a reopen grants no
-   * access — the account is pending, not active — so recording it as an approval would make the
-   * audit trail claim an access grant that never happened. The reversal and the subsequent
-   * re-decision are two separate rows.
+   * An admin reopened a rejected registration, moving it from {@link ApprovalStatus#REJECTED} back
+   * to {@link ApprovalStatus#PENDING} so it can be decided again (REQ-SEC-034). It grants no
+   * access.
    */
   REOPENED
 }

@@ -44,20 +44,11 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 /**
- * The session write path and the poison repair, against a real Redis and the real {@link
- * RedisIndexedSessionRepository} — the layer that had no test and where both 2026-09-03 alerts
- * actually lived.
+ * Verifies against a real Redis and {@link RedisIndexedSessionRepository} that session attributes
+ * are written through the configured serializer and that a stored value in the old, unreadable
+ * shape is repaired.
  *
- * <p><strong>Why this exists beside {@code SessionSerializerRoundTripTest}.</strong> That test
- * round-trips values through the serializer <em>in isolation</em>, and it was green throughout the
- * whole incident: it proved the mix-in works, and could not say whether Spring Session's repository
- * writes the attribute through that serializer, nor what happens to a value already sitting in
- * Redis in the pre-fix shape. Both alerts turned on exactly those two questions, and answering them
- * cost a production investigation each time. This test answers them from CI instead.
- *
- * <p>The pre-fix bytes are pinned as a literal rather than produced by a stripped-down mapper: what
- * is in production's Redis is a fixed string written by a release that no longer exists, and a
- * fixture that re-derives it would drift with the code it is supposed to be independent of.
+ * <p>The old-shape bytes are pinned as a literal.
  */
 @Testcontainers
 class SessionAttributeRepairIntegrationTest {

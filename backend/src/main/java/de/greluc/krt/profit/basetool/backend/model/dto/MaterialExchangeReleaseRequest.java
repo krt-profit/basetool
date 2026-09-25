@@ -25,18 +25,15 @@ import jakarta.validation.constraints.Size;
 import java.util.UUID;
 
 /**
- * Write payload for releasing one of the caller's own Lager rows to the Materialbörse
- * (REQ-MARKET-002). The caller supplies the source item, the offered quantity and the trade remark;
- * material, quality, owner and squadron are all derived server-side from the item (the client never
- * sets them, and the item's location is never read). The offered quantity may be the whole row or
- * only a part of it (ADR-0086); the service additionally rejects an amount exceeding the item's
- * current stock. If an active offer already exists for the item, the release re-activates it and
- * updates its offered amount and remark rather than creating a duplicate.
+ * Payload for releasing one of the caller's own Lager rows to the Materialbörse (REQ-MARKET-002).
+ *
+ * <p>Material, quality, owner and squadron are derived from the item. An existing active offer for
+ * the item is updated instead of duplicated.
  *
  * @param inventoryItemId the caller's Lager row to release; must belong to the caller.
- * @param offeredAmount the SCU quantity to offer; must be positive and at most the item's current
- *     amount (checked server-side against the live item).
- * @param remark the free-form Markdown trade remark, at most 20 000 characters (may be blank).
+ * @param offeredAmount the SCU quantity to offer; positive and at most the item's current amount
+ *     (ADR-0086).
+ * @param remark the Markdown trade remark, at most 20 000 characters (may be blank).
  */
 public record MaterialExchangeReleaseRequest(
     @NotNull UUID inventoryItemId,

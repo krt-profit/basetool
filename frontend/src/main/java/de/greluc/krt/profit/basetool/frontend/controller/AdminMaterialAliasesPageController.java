@@ -49,14 +49,9 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
- * Spring MVC controller backing {@code /admin/material-aliases}. The page renders the curated
- * cross-reference list (Wiki / UEX commodity names → local materials) plus three forms — add / edit
- * / delete — that round-trip through the backend's {@code /api/v1/material-external-aliases} REST
- * surface.
- *
- * <p>The page is admin-only. Class-level {@code @PreAuthorize("hasRole('ADMIN')")} matches the
- * backend gate. Mutations use full-page redirects with flash toasts (the backend already enforces
- * its own validation + 409 / 404 mapping, so a per-field inline AJAX flow is overkill for R1).
+ * Admin-only controller for {@code /admin/material-aliases}: lists the curated mappings from Wiki
+ * and UEX commodity names to local materials and relays add, edit and delete to {@code
+ * /api/v1/material-external-aliases}.
  */
 @Controller
 @UsesLayoutModel
@@ -75,10 +70,7 @@ public class AdminMaterialAliasesPageController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Renders the alias list plus the add form. The material pickers are remote-search comboboxes
-   * backed by {@code /catalog/material-search}, so no material catalogue is fetched here. Failures
-   * (backend 500, network) collapse to an error banner shown in the page header so the operator
-   * sees the alias data is stale.
+   * Renders the alias list and the add form; a backend failure shows an error banner.
    *
    * @param model Thymeleaf model populated with the alias list
    * @return the {@code admin/material-aliases} view name
@@ -98,12 +90,11 @@ public class AdminMaterialAliasesPageController {
   }
 
   /**
-   * Loads a single alias for the edit form. The alias DTO's denormalised {@code materialName} seeds
-   * the remote material combobox's single pre-selected option.
+   * Loads one alias for the edit form, seeding the material combobox from its {@code materialName}.
    *
    * @param id alias UUID
    * @param model Thymeleaf model populated with the alias under edit
-   * @return the {@code admin/material-aliases} view name (the edit form lives on the same page)
+   * @return the {@code admin/material-aliases} view name
    */
   @NotNull
   @GetMapping("/{id}")
@@ -120,9 +111,7 @@ public class AdminMaterialAliasesPageController {
   }
 
   /**
-   * Creates a new alias. Validation failures bubble back as a generic error toast — the inline form
-   * does not surface field-level violations in R1 (a full inline edit experience is deferred to a
-   * follow-up).
+   * Creates a new alias; a validation failure shows a generic error toast.
    *
    * @param materialId linked material UUID
    * @param sourceSystem catalogue identifier
@@ -169,8 +158,7 @@ public class AdminMaterialAliasesPageController {
   }
 
   /**
-   * Updates an existing alias. Mirrors {@link #create} but carries the optimistic-lock {@code
-   * version} from the edit form's hidden input.
+   * Updates an existing alias like {@link #create}, carrying the optimistic-lock {@code version}.
    *
    * @param id alias UUID to update
    * @param materialId linked material UUID
@@ -244,13 +232,11 @@ public class AdminMaterialAliasesPageController {
   }
 
   /**
-   * In-place (AJAX) twin of {@link #create} — routed here ahead of the classic handler by the
-   * {@code X-Requested-With} header so the no-JS form keeps its redirect fallback. Binds the form
-   * as JSON and returns the created {@link MaterialExternalAliasDto} so the page can append a row
-   * without reloading. Optional string fields are normalised exactly like the classic flow.
+   * In-place twin of {@link #create}: returns the created {@link MaterialExternalAliasDto} so the
+   * page can append a row.
    *
-   * @param request the JSON-bound create payload
-   * @return the created alias on success, the relayed backend status on failure, {@code 500} on an
+   * @param request the create payload
+   * @return the created alias, the relayed backend status on failure, or {@code 500} on an
    *     unexpected error
    */
   @ResponseBody
@@ -276,15 +262,13 @@ public class AdminMaterialAliasesPageController {
   }
 
   /**
-   * In-place (AJAX) twin of {@link #update}. Carries the optimistic-lock {@code version}; a backend
-   * conflict is relayed as {@code application/problem+json} so the client surfaces the
-   * reload-confirm instead of reloading, and the fresh version is returned so the edit form can
-   * keep saving.
+   * In-place twin of {@link #update}; conflicts are relayed as {@code application/problem+json},
+   * and the returned alias carries the fresh version.
    *
    * @param id alias UUID to update
-   * @param request the JSON-bound update payload (incl. {@code version})
-   * @return the updated alias on success, the relayed backend status on conflict/failure, {@code
-   *     500} on an unexpected error
+   * @param request the update payload, including {@code version}
+   * @return the updated alias, the relayed backend status on conflict or failure, or {@code 500} on
+   *     an unexpected error
    */
   @ResponseBody
   @PostMapping(value = "/{id}", headers = "X-Requested-With=XMLHttpRequest")

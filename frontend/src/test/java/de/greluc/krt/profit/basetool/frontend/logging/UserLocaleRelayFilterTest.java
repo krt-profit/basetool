@@ -35,9 +35,8 @@ import org.springframework.web.reactive.function.client.ExchangeFunction;
 import reactor.core.publisher.Mono;
 
 /**
- * Unit tests for {@link UserLocaleRelayFilter}: the {@code Accept-Language} header must carry the
- * user's resolved locale on outbound backend calls (so backend-localized RFC 7807 problem details
- * arrive in the user's language, #435) and must be absent when no locale context is bound.
+ * Unit tests for {@link UserLocaleRelayFilter}: outbound backend calls carry the user's resolved
+ * locale as {@code Accept-Language}, and no header when no locale context is bound.
  */
 class UserLocaleRelayFilterTest {
 

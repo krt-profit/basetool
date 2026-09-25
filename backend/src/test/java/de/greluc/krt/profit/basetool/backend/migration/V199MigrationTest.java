@@ -33,12 +33,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * TestContainers-backed migration test for {@code V199__add_mission_objectives.sql}. Asserts the
- * new {@code mission_objective} table and its columns, the {@code mission.objectives_version}
- * section counter, the foreign-key index, and that the legacy {@code mission.objective} column is
- * gone (replaced by the structured goals). Booting the full context also exercises Hibernate {@code
- * ddl-auto=validate}, so a mismatch between the {@code MissionObjective} entity / the {@code
- * Mission.objectives} mapping and this migration fails the test.
+ * Migration test for {@code V199__add_mission_objectives.sql}: the {@code mission_objective} table,
+ * the {@code mission.objectives_version} counter and FK index exist, {@code mission.objective} is
+ * gone, and the mapping validates.
  */
 @SpringBootTest
 @ActiveProfiles("test")

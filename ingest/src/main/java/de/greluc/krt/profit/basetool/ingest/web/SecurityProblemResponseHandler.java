@@ -40,28 +40,12 @@ import org.springframework.security.web.access.AccessDeniedHandler;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Gives the gateway's filter-level {@code 401} / {@code 403} the same RFC 7807 shape as every other
- * ingest error (REQ-API-004). Spring Security's defaults answer a rejected bearer request with an
- * <em>empty body</em> — no {@code code}, no {@code correlationId}, nothing the desktop extractor
- * could branch on or a user could quote in a bug report — and log nothing at all, so an expired
- * token produced a completely silent 401.
+ * Writes the gateway's filter-level {@code 401} and {@code 403} as RFC 7807 problem bodies like
+ * every other ingest error (REQ-API-004), keeping the {@code WWW-Authenticate} challenge of {@link
+ * BearerTokenAuthenticationEntryPoint}.
  *
- * <p>The {@code WWW-Authenticate} challenge is preserved by delegating to {@link
- * BearerTokenAuthenticationEntryPoint} first: it only sets that header and the status (via {@code
- * setStatus}, so the response stays uncommitted), after which the problem body is written on top.
- * That keeps the RFC 6750 contract the extractor's OAuth client relies on while adding the body.
- *
- * <p>Unlike the backend's handler of the same name, no correlation id has to be minted here: the
- * gateway's {@code CorrelationIdFilter} runs <em>outside</em> the security chain, so the MDC is
- * already populated and the {@code X-Correlation-Id} response header already echoed by the time a
- * rejection happens. {@link ProblemResponseWriter} therefore picks the id straight out of the MDC,
- * and body, log line and header share it.
- *
- * <p>Log levels follow REQ-OBS-001: a {@code 401} is {@code DEBUG} — it is the expected answer for
- * every unauthenticated caller, and on an internet-facing surface scanners and probes would
- * otherwise flood the log — while a {@code 403} is {@code WARN}, because "authenticated but not
- * allowed" is the security-relevant case. Both are counted on {@code basetool_http_error_total}, so
- * the signal survives the demotion (REQ-OBS-011).
+ * <p>The correlation id is taken from the MDC. A {@code 401} is logged at DEBUG and a {@code 403}
+ * at WARN (REQ-OBS-001); both are counted on {@code basetool_http_error_total} (REQ-OBS-011).
  */
 @Slf4j
 @RequiredArgsConstructor
@@ -119,20 +103,10 @@ public class SecurityProblemResponseHandler
   }
 
   /**
-   * Maps an authentication failure to its RFC 6750 bearer error code, kept to the fixed set the
-   * spec defines so the metric label stays bounded (REQ-OBS-011), plus one literal below that set
-   * for the request that presented no credential at all.
-   *
-   * <p>Only the code is taken, never {@code OAuth2Error#getDescription()} — Spring puts the raw
-   * decode failure in there, which can echo fragments of the presented token.
-   *
-   * <p>A request with no {@code Authorization} header is rejected by {@code
-   * ExceptionTranslationFilter} with a plain {@link InsufficientAuthenticationException} (method
-   * security uses {@link AuthenticationCredentialsNotFoundException}), neither of which is an
-   * {@link OAuth2AuthenticationException}. Both used to collapse into {@link
-   * MetricNames#AUTH_OTHER} and, on production, so did everything else: 4&nbsp;927 of 4&nbsp;927
-   * failures sat on that one series. They now carry {@link MetricNames#AUTH_NO_CREDENTIALS}
-   * (REQ-OBS-018).
+   * Maps an authentication failure to its RFC 6750 bearer error code, or to {@link
+   * MetricNames#AUTH_NO_CREDENTIALS} for a request without a credential (REQ-OBS-018), keeping the
+   * metric label bounded (REQ-OBS-011). The error description is never read, as it can echo token
+   * fragments.
    *
    * @param authException the failure Spring Security raised
    * @return one of the bounded {@code MetricNames.AUTH_*} values

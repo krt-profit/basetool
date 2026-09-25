@@ -22,111 +22,86 @@ package de.greluc.krt.profit.basetool.backend.model;
 /**
  * Machine identifier of a {@link Notification}'s kind.
  *
- * <p>The constant name is persisted verbatim (via {@code @Enumerated(STRING)}) and is the key the
- * frontend resolves to an i18n message under {@code notifications.type.*}. The set is intentionally
- * open-ended: a new producer adds a constant here (and the matching i18n keys + an optional default
- * rule) without a schema migration, because the {@code notification.type} column carries no CHECK
- * constraint. The data-driven recipient rules and the rendered text stay configurable; only the
- * stable type token is code.
+ * <p>Persisted by name and resolved by the frontend to the i18n key {@code notifications.type.*};
+ * the column has no CHECK constraint, so a new constant needs no migration.
  */
 public enum NotificationType {
 
   /**
-   * A new job order ("Auftrag") was created. Recipients are resolved per the seeded default rule
-   * (officers of the responsible squadron / leads of the responsible special command, plus the
-   * logisticians of that unit and the global admins; the creating actor is excluded).
+   * A new job order ("Auftrag") was created. The default rule notifies the leadership and
+   * logisticians of the responsible org unit plus the global admins, excluding the actor.
    */
   JOB_ORDER_CREATED,
 
   /**
-   * The requesting owner (Auftraggeber) edited one of their own job orders (REQ-ORDERS-023).
-   * Recipients are resolved per the seeded default rule (the officers and leads of the processing
-   * (responsible) org unit; the editing actor is excluded). The frontend renders it under {@code
-   * notifications.type.JOB_ORDER_UPDATED_BY_REQUESTER} with the {@code displayId}, {@code orgUnit}
-   * (responsible shorthand) and {@code requester} (requesting shorthand) render parameters.
+   * The requester (Auftraggeber) edited one of their own job orders (REQ-ORDERS-023). The default
+   * rule notifies the officers and leads of the processing org unit, excluding the actor; rendered
+   * with {@code displayId}, {@code orgUnit} and {@code requester}.
    */
   JOB_ORDER_UPDATED_BY_REQUESTER,
 
   /**
-   * An org-unit officer/lead raised a confirm-before-post bank deposit/withdrawal request (epic
-   * #666 F2, REQ-BANK-026). Recipients are resolved per the seeded default rule (the bank
-   * management plus every employee granted on the target account; the requester is excluded).
+   * An org-unit officer/lead raised a confirm-before-post bank booking request (REQ-BANK-026). The
+   * default rule notifies the bank management and every employee granted on the target account,
+   * excluding the requester.
    */
   BANK_BOOKING_REQUEST_CREATED,
 
   /**
-   * A bank employee confirmed the requester's booking request (epic #666 F2, REQ-BANK-026). The
-   * seeded default rule notifies the requesting officer/lead.
+   * A bank employee confirmed the requester's booking request (REQ-BANK-026). The default rule
+   * notifies the requester.
    */
   BANK_BOOKING_REQUEST_CONFIRMED,
 
   /**
-   * A bank employee rejected the requester's booking request (epic #666 F2, REQ-BANK-026). The
-   * seeded default rule notifies the requesting officer/lead (the reason is rendered in the text).
+   * A bank employee rejected the requester's booking request (REQ-BANK-026). The default rule
+   * notifies the requester; the reason is rendered in the text.
    */
   BANK_BOOKING_REQUEST_REJECTED,
 
   /**
-   * A bank employee confirmed a booking request raised against an account the recipient is the
-   * <em>responsible holder</em> of (Kontoverantwortliche, REQ-BANK-026/-034). Distinct from {@link
-   * #BANK_BOOKING_REQUEST_CONFIRMED} so the responsible holder gets account-centric text ("a
-   * request on your account was confirmed") rather than the requester-directed text; the seeded
-   * rule resolves the responsible holder via the {@code ACCOUNT_RESPONSIBLE} selector.
+   * A bank employee confirmed a booking request on an account the recipient is the responsible
+   * holder of (REQ-BANK-034). Resolved via the {@code ACCOUNT_RESPONSIBLE} selector; unlike {@link
+   * #BANK_BOOKING_REQUEST_CONFIRMED} it renders account-centric text.
    */
   BANK_BOOKING_REQUEST_RESPONSIBLE_CONFIRMED,
 
   /**
-   * A bank employee rejected a booking request raised against an account the recipient is the
-   * <em>responsible holder</em> of (Kontoverantwortliche, REQ-BANK-026/-034). Distinct from {@link
-   * #BANK_BOOKING_REQUEST_REJECTED} so the responsible holder gets account-centric text (the reason
-   * is rendered); the seeded rule resolves the responsible holder via the {@code
-   * ACCOUNT_RESPONSIBLE} selector.
+   * A bank employee rejected a booking request on an account the recipient is the responsible
+   * holder of (REQ-BANK-034). Resolved via the {@code ACCOUNT_RESPONSIBLE} selector; unlike {@link
+   * #BANK_BOOKING_REQUEST_REJECTED} it renders account-centric text.
    */
   BANK_BOOKING_REQUEST_RESPONSIBLE_REJECTED,
 
   /**
-   * A new Discord user registered and is awaiting admin approval (epic #720, Track 1). The seeded
-   * default rule notifies every admin; the frontend renders it under {@code
-   * notifications.type.DISCORD_REGISTRATION_PENDING} with the {@code username} render parameter.
+   * A new Discord user registered and awaits admin approval. The default rule notifies every admin;
+   * rendered with the {@code username} parameter.
    */
   DISCORD_REGISTRATION_PENDING,
 
   /**
-   * A member registered interest in a Materialbörse offer (#1187, REQ-MARKET-011). The seeded
-   * default rule notifies the offer's owner (the Anbieter); the frontend renders it under {@code
-   * notifications.type.MATERIAL_EXCHANGE_INTEREST_REGISTERED} with the {@code interessent} and
-   * {@code material} render parameters. Disclosing the interessent's name to the owner is permitted
-   * because the notification is delivered only to the owner (REQ-MARKET-006 anonymity is
-   * owner-only).
+   * A member registered interest in a Materialbörse offer (REQ-MARKET-011). The default rule
+   * notifies only the offer's owner, rendered with the {@code interessent} and {@code material}
+   * parameters.
    */
   MATERIAL_EXCHANGE_INTEREST_REGISTERED,
 
   /**
-   * A member signalled they can supply a Materialbörse request (Gesuch) — "Ich kann liefern"
-   * (REQ-MARKET-020). The seeded default rule notifies the request's owner (the Suchende); the
-   * frontend renders it under {@code notifications.type.MATERIAL_REQUEST_FULFILLMENT_SIGNALLED}
-   * with the {@code lieferant} and {@code material} render parameters. Disclosing the supplier's
-   * name to the owner is permitted because the notification is delivered only to the owner
-   * (REQ-MARKET-019 anonymity is owner-only).
+   * A member signalled "Ich kann liefern" for a Materialbörse request (REQ-MARKET-020). The default
+   * rule notifies only the request's owner, rendered with the {@code lieferant} and {@code
+   * material} parameters.
    */
   MATERIAL_REQUEST_FULFILLMENT_SIGNALLED,
 
   /**
-   * A member raised an Art. 17 erasure request (REQ-SEC-061). The seeded default rule notifies
-   * every admin; the frontend renders it under {@code
-   * notifications.type.ACCOUNT_DELETION_REQUESTED} with the {@code handle} render parameter. Naming
-   * the member is the point — an admin cannot act on an anonymous request — and the recipients are
-   * admins, who already see the member list.
+   * A member raised an erasure request (REQ-SEC-061). The default rule notifies every admin,
+   * rendered with the {@code handle} parameter.
    */
   ACCOUNT_DELETION_REQUESTED,
 
   /**
-   * An admin refused a member's erasure request (REQ-SEC-061). The seeded default rule notifies the
-   * requesting member; the frontend renders it under {@code
-   * notifications.type.ACCOUNT_DELETION_REQUEST_DECLINED} with <b>no</b> parameters. The admin's
-   * reasoning is deliberately not a render parameter: a notification message is a bounded template,
-   * and free text in one would put an admin's prose into the inbox payload. The member reads the
-   * reason on their profile page.
+   * An admin refused a member's erasure request (REQ-SEC-061). The default rule notifies the
+   * requesting member; rendered without parameters, the reason is shown on the profile page.
    */
   ACCOUNT_DELETION_REQUEST_DECLINED
 }

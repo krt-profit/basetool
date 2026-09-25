@@ -31,28 +31,11 @@ import org.springframework.security.oauth2.client.registration.ClientRegistratio
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
 
 /**
- * Keeps the client registration <em>out</em> of the stored authorized client and puts the
- * <em>current</em> one back on every read (REQ-SEC-069, ADR-0001).
+ * Authorized-client repository that stores clients without their registration's secret and restores
+ * the current {@link ClientRegistration} on every read (REQ-SEC-069, ADR-0001).
  *
- * <p>The session-backed repository stores the whole {@link OAuth2AuthorizedClient} in Redis, and
- * that object embeds the {@link ClientRegistration} it was issued under — client secret and
- * authentication method included. Two things follow, and this class exists for both:
- *
- * <ol>
- *   <li><strong>The secret would sit in every session.</strong> A confidential client's secret, in
- *       clear text, in every member's session hash and in every Redis snapshot. On save the
- *       registration is stored with an empty secret instead.
- *   <li><strong>A session outlives the registration it was stored with.</strong> Spring Security
- *       refreshes a token with the registration <em>inside</em> the stored client. A session
- *       created while the frontend was public would therefore refresh as a public client for its
- *       whole 30-day life — against a Keycloak that, after the rollout, requires the secret: {@code
- *       invalid_client} at the next refresh, and every member sent back through the login. On load
- *       the stored registration is replaced by the one the application runs with now, so a switch
- *       of client type, or a rotated secret, applies to existing sessions at once.
- * </ol>
- *
- * <p>Only the registration is swapped. Principal, access token and refresh token are the stored
- * ones, and a registration id the repository no longer knows is returned as stored.
+ * <p>This keeps the client secret out of Redis sessions and makes a changed client type or rotated
+ * secret apply to existing sessions immediately. Principal and tokens are returned as stored.
  */
 @RequiredArgsConstructor
 public class CurrentRegistrationAuthorizedClientRepository
@@ -67,13 +50,12 @@ public class CurrentRegistrationAuthorizedClientRepository
   /**
    * Loads the stored client and gives it the current registration.
    *
-   * @param clientRegistrationId the registration id.
-   * @param principal the authenticated principal.
-   * @param request the current request.
-   * @param <T> the client type the caller expects; this repository only ever stores plain {@link
-   *     OAuth2AuthorizedClient}s.
-   * @return the stored client carrying the current registration, the stored client unchanged when
-   *     the registration id is unknown now, or {@code null} when nothing is stored.
+   * @param clientRegistrationId the registration id
+   * @param principal the authenticated principal
+   * @param request the current request
+   * @param <T> the expected client type; only plain {@link OAuth2AuthorizedClient}s are stored
+   * @return the stored client with the current registration, unchanged when the registration id is
+   *     unknown, or {@code null} when nothing is stored
    */
   @Override
   public <T extends OAuth2AuthorizedClient> @Nullable T loadAuthorizedClient(

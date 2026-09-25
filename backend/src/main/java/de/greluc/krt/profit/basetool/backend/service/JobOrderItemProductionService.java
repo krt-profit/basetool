@@ -64,29 +64,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Books production ("Herstellung", REQ-ORDERS-025) against an ordered item line: records how many
- * whole units have been manufactured, atomically reduces the linked inventory the manufacture
- * consumed and — when the payload names a book-in target — books the produced units into the Lager
- * as game-item stock (REQ-INV-032, {@link #bookProducedStockIn}).
+ * Books production ("Herstellung", REQ-ORDERS-025) against an ordered item line: records the
+ * manufactured units, reduces the consumed linked inventory under a pessimistic lock and books the
+ * produced units into the Lager (REQ-INV-032).
  *
- * <p>The flow is a hybrid of the two handover services. Like {@link JobOrderItemHandoverService} it
- * bumps a per-line integer counter ({@code manufacturedAmount}) via Hibernate dirty checking (no
- * explicit {@code save}) and never issues a {@code @Modifying(clearAutomatically = true)} bulk
- * update, so the persistence context is never detached mid-operation. Like {@link
- * JobOrderHandoverService} it reduces each consumed inventory entry — deleting the row when
- * depleted or decrementing it (and shrinking this order's earmark slice plus, epsilon-safe, any
- * mission earmark) otherwise — under a pessimistic write lock, and emits the same cross-domain
- * audit trail.
- *
- * <p>Unlike a handover, a production booking does <b>not</b> complete the order (only full delivery
- * does) and, for item orders, touches no {@code JobOrderMaterial} requirement row (item orders have
- * none — their requirements are the per-line snapshots), so there is no fulfilled-material bulk
- * unlink to defer. The material demand for {@code N} units of a line is the line's snapshotted
- * per-unit recipe scaled to {@code N} ({@code requiredQuantity × N / lineAmount}, per-material,
- * rounded for the material's quantity type) — the same snapshot that feeds the aggregated-materials
- * view. The consumption plan must cover that demand for every required material exactly, except for
- * materials the operator opted out of via {@code skippedMaterialIds}: those are dropped from the
- * demand map, so the plan neither requires nor may name them and their linked stock is untouched.
+ * <p>The consumption must exactly cover the line's snapshotted per-unit recipe scaled to the
+ * amount, except for materials listed in {@code skippedMaterialIds}. A production booking never
+ * completes the order.
  */
 @Service
 @RequiredArgsConstructor
@@ -114,15 +98,14 @@ public class JobOrderItemProductionService {
   private final AuthHelperService authHelperService;
 
   /**
-   * One consumed inventory row's scalar snapshot, captured before the row is decremented/deleted so
-   * the {@code INVENTORY_CONSUMED_BY_PRODUCTION} audit events can be emitted from stable data
-   * (mirrors {@link JobOrderHandoverService}'s {@code HandedItem}).
+   * Snapshot of one consumed inventory row, captured before it is decremented or deleted so the
+   * {@code INVENTORY_CONSUMED_BY_PRODUCTION} audit events can be emitted afterwards.
    *
    * @param itemId the source inventory row id
-   * @param label the {@code material @ location} label snapshot
-   * @param material the material name snapshot
+   * @param label the {@code material @ location} label
+   * @param material the material name
    * @param amount the consumed amount
-   * @param remaining the post-decrement amount (0 when depleted)
+   * @param remaining the amount left afterwards (0 when depleted)
    * @param depleted whether the source row was removed
    */
   private record ConsumedItem(
@@ -134,33 +117,22 @@ public class JobOrderItemProductionService {
       boolean depleted) {}
 
   /**
-   * Books a production run against one item line: validates the amount against the line's
-   * remaining-to-manufacture and the consumption against the required per-material demand, reduces
-   * the consumed linked inventory, increments {@code manufacturedAmount}, audits the JOB_ORDER
-   * booking plus each cross-domain INVENTORY reduction, and finally books the produced units into
-   * the Lager as game-item stock at the payload's {@code bookIn} target (REQ-INV-032; required —
-   * validated {@code @NotNull} at the API boundary, see {@link #bookProducedStockIn}). Materials
-   * the operator listed in {@code dto.skippedMaterialIds} are excluded from the demand-coverage
-   * check and left un-booked-out — no inventory is consumed for them.
+   * Books a production run against one item line: validates amount and consumption, reduces the
+   * consumed inventory, increments {@code manufacturedAmount}, audits the booking and books the
+   * produced units in at the {@code bookIn} target (REQ-INV-032). Materials in {@code
+   * dto.skippedMaterialIds} are neither required nor consumed.
    *
    * @param jobOrderId the item order that owns the line
-   * @param jobOrderItemId the ordered item line being produced
-   * @param dto the production payload (amount, line version, per-entry consumption, skipped
-   *     materials, book-in target)
-   * @return the refreshed ordered-item line DTO (with the advanced {@code manufacturedAmount} and
-   *     version)
-   * @throws NotFoundException when the order, the line, a consumed inventory entry, or the book-in
-   *     owner / location is unknown
-   * @throws BadRequestException when the order is not an item order, a consumed entry is not linked
-   *     to the order / does not hold the claimed material / breaks the PIECE whole-number rule, or
-   *     the book-in target is invalid (personal combined with the order earmark, or an org-unit
-   *     picker output outside the owner's memberships)
-   * @throws ProductionAllocationException when the amount exceeds the line's
-   *     remaining-to-manufacture, or the consumption does not exactly cover every required
-   *     material's demand (a well-formed 422, distinct from a stale-version 409)
-   * @throws AccessDeniedException when the book-in names another member whose inventory the caller
-   *     may not write, or a personal book-in on behalf of another member (see {@link
-   *     #assertMayBookInFor}); raised before anything is loaded or consumed
+   * @param jobOrderItemId the item line being produced
+   * @param dto the production payload
+   * @return the refreshed item line with its new {@code manufacturedAmount} and version
+   * @throws NotFoundException when the order, line, a consumed entry or the book-in owner or
+   *     location is unknown
+   * @throws BadRequestException when the order is not an item order, a consumed entry is invalid,
+   *     or the book-in target is invalid
+   * @throws ProductionAllocationException when the amount exceeds the remaining quantity or the
+   *     consumption does not exactly cover the demand (422)
+   * @throws AccessDeniedException when the caller may not book into the named member's inventory
    */
   @Transactional
   public JobOrderItemDto bookProduction(
@@ -332,28 +304,15 @@ public class JobOrderItemProductionService {
   }
 
   /**
-   * Refuses a book-in into another member's ledger that the caller may not write (REQ-INV-032,
-   * REQ-SEC-005, REQ-ORG-016). The same two gates the Einbuchen endpoint applies in {@link
-   * InventoryItemService#createInventoryItem}:
+   * Refuses a book-in into another member's inventory the caller may not write (REQ-INV-032,
+   * REQ-SEC-005): a foreign {@code ownerUserId} requires {@link
+   * OwnerScopeService#canManageUserInventory(UUID)}, and a {@code personal} book-in for someone
+   * else is always refused.
    *
-   * <ul>
-   *   <li>an explicit {@code ownerUserId} other than the caller requires {@link
-   *       OwnerScopeService#canManageUserInventory(UUID)} — the endpoint's own gate ({@code
-   *       canEditJobOrder}) answers for the <em>order</em>, not for the member whose stock is
-   *       written, so without this a logistician could book produced stock into any member's
-   *       ledger, another Staffel's included;
-   *   <li>a {@code personal} book-in on behalf of someone else is refused outright: the private
-   *       pool is the owner's own, and the write-time stock merge would otherwise fold their
-   *       private rows into the response.
-   * </ul>
+   * <p>Checked on the requested id before any lookup; an absent {@code ownerUserId} means the
+   * caller.
    *
-   * <p>Evaluated on the <em>requested</em> id before any user lookup, so an unauthorised caller
-   * cannot tell "user does not exist" from "access denied". An absent {@code ownerUserId} means the
-   * caller themselves and needs no check. A caller whose id cannot be read is treated as "someone
-   * else", which fails closed.
-   *
-   * @param bookIn the book-in target of the production payload; never {@code null} (validated at
-   *     the API boundary)
+   * @param bookIn the book-in target; never {@code null}
    * @throws AccessDeniedException when the caller may not write the named owner's inventory, or
    *     asks for a personal book-in on behalf of another member
    */
@@ -374,40 +333,22 @@ public class JobOrderItemProductionService {
   }
 
   /**
-   * Books the produced units into the Lager as one fresh game-item stock row (REQ-INV-032, design
-   * §5.6), appended to the production transaction after the consumption bookkeeping. The {@code
-   * bookIn} target is required — {@code @NotNull} on the DTO rejects a missing block as a 400 at
-   * the API boundary, so this method never sees {@code null} (the transitional null-tolerant
-   * rollout window closed with the production modal's book-in section).
+   * Books the produced units into the Lager as one fresh game-item stock row (REQ-INV-032).
    *
-   * <p>Flow: resolve the owner ({@code ownerUserId}, defaulting to the acting user), stamp the
-   * owning org unit through the same create-on-behalf resolution the Einbuchen flow uses ({@link
-   * OwnerScopeService#resolveOrgUnitForPickerOutputNullable} — validates the picker output against
-   * the <em>owner's</em> memberships and auto-stamps on a single membership, REQ-ORG-004/016), then
-   * create the row ({@code gameItem = line.gameItem}, whole amount, no quality — REQ-INV-029).
-   * Unless {@code personal}, the row is auto-earmarked to the producing order by adding the {@code
-   * InventoryJobOrderAllocation} slice to the cascade list with its back-reference <em>before</em>
-   * the single {@code save(...)} (never a separate pre-save). The saved row is folded through
-   * {@link InventoryCheckoutService#mergeStockIfRequested} — slice-first-then-merge, so {@code
-   * InventoryAllocations.unionInto} folds a same-order slice of an absorbed sibling correctly; item
-   * rows always auto-merge (PIECE rule, REQ-INV-026) — and audited as {@code
-   * INVENTORY_RECEIVED_FROM_PRODUCTION} with PII-free details (the order's {@code #displayId} ref —
-   * matching the sibling consumption events of this flow — plus raw ids, REQ-AUDIT-001).
+   * <p>The owner defaults to the acting user and the owning org unit is resolved through {@link
+   * OwnerScopeService#resolveOrgUnitForPickerOutputNullable}. Unless {@code personal}, the row is
+   * earmarked to the producing order; it is then merged via {@link
+   * InventoryCheckoutService#mergeStockIfRequested} and audited as {@code
+   * INVENTORY_RECEIVED_FROM_PRODUCTION}.
    *
-   * <p>Concurrency (CLAUDE.md landmines): the fresh row is transient, so {@code save()} dispatches
-   * to {@code persist()} — no merge, no double {@code @Version} bump; the merge helper joins this
-   * transaction ({@code MANDATORY}) and locks its group {@code FOR UPDATE}; and no
-   * {@code @Modifying(clearAutomatically = true)} query runs anywhere in this flow.
-   *
-   * @param jobOrder the producing order (managed within the production transaction)
-   * @param line the produced item line whose {@code gameItem} becomes the stock row's catalog
-   *     reference
-   * @param amount the produced whole units to book in
-   * @param bookIn the book-in target; never {@code null} (validated at the API boundary)
+   * @param jobOrder the producing order, managed in the current transaction
+   * @param line the produced item line supplying the stock row's game item
+   * @param amount the produced whole units
+   * @param bookIn the book-in target; never {@code null}
    * @throws NotFoundException when the book-in owner or location is unknown
    * @throws BadRequestException when {@code personal} is combined with the order earmark, the
-   *     acting user cannot be resolved for a defaulted owner, the line carries no game item, or the
-   *     org-unit picker output is invalid for the owner (see the resolver)
+   *     acting user cannot be resolved, the line has no game item, or the org-unit picker output is
+   *     invalid
    */
   private void bookProducedStockIn(
       JobOrder jobOrder,

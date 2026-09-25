@@ -27,25 +27,17 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.method.HandlerMethod;
 
 /**
- * SpringDoc customizer that mirrors the project's {@link ApiDeprecation} + {@code @Deprecated}
- * metadata into the generated OpenAPI document.
- *
- * <p>The {@link de.greluc.krt.profit.basetool.backend.interceptor.DeprecationInterceptor} already
- * emits the runtime headers; this customizer keeps the static spec in sync so the generated {@code
- * openapi.json} marks the operation {@code deprecated} and adds a {@code **DEPRECATED**} block to
- * the description with the sunset date and the recommended replacement path.
+ * SpringDoc customizer that marks operations carrying {@link ApiDeprecation} or {@code @Deprecated}
+ * as deprecated in the OpenAPI document, with sunset date and replacement path.
  */
 @Configuration
 public class OpenApiDeprecationConfig {
 
   /**
-   * Returns SpringDoc operation customizer that annotates deprecated endpoints in the OpenAPI doc,
-   * respecting both the project-specific {@link ApiDeprecation} and the JDK {@code @Deprecated} on
-   * the handler method or its declaring class.
+   * Creates the operation customizer that marks endpoints deprecated by {@link ApiDeprecation} or
+   * {@code @Deprecated} on the handler method or its class.
    *
-   * @return SpringDoc operation customizer that annotates deprecated endpoints in the OpenAPI doc,
-   *     respecting both the project-specific {@link ApiDeprecation} and the JDK {@code @Deprecated}
-   *     on the handler method or its declaring class
+   * @return the deprecation-annotating operation customizer
    */
   @Bean
   public OperationCustomizer deprecationCustomizer() {

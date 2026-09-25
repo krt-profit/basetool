@@ -54,14 +54,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Manages the personal hangar (ship inventory per user) plus the squadron-wide ship overview.
+ * Manages the personal hangar (ships per user) and the squadron-wide ship overview.
  *
- * <p>The owner check on update/delete is enforced here rather than via {@code @PreAuthorize}
- * because the rule is "must be the owner of the ship" — not expressible as a role check on the
- * authentication alone. Mission-unit references to a deleted ship are first nulled (the unit keeps
- * its name but loses the ship binding) before the ship itself is removed; an explicit {@code
- * entityManager.flush()} forces those updates to run before the delete so the FK constraint never
- * fires.
+ * <p>Update and delete require the caller to own the ship. Deleting a ship first detaches it from
+ * mission units, which keep their name.
  */
 @Slf4j
 @Service
@@ -79,9 +75,8 @@ public class HangarService {
   private final OwnerScopeService ownerScopeService;
 
   /**
-   * Returns the paged ship list scoped to the caller's squadron context: admin without an active
-   * squadron selection sees every ship; everyone else (including admins in switcher mode) sees only
-   * ships of their effective squadron.
+   * Returns the paged ship list in the caller's squadron scope; an admin without an active squadron
+   * pin sees every ship.
    *
    * @param pageable page request
    * @return paged list of ships in the caller's squadron context
@@ -93,12 +88,9 @@ public class HangarService {
   }
 
   /**
-   * Adds a ship to a user's hangar. The ship's owning org unit is derived from the user's
-   * membership (honouring the optional picker output) at the time of the call - subsequent org-unit
-   * moves do NOT cascade to existing ships (a ship physically belongs to whichever org unit it was
-   * added in). A user with no org-unit membership and no explicit picker output produces an
-   * ownerless personal ship ({@code owningOrgUnit == null}), visible only to that user (see {@link
-   * OwnerScopeService#resolveOrgUnitForPickerOutputNullable}).
+   * Adds a ship to a user's hangar, stamping the owning org unit from the user's membership or the
+   * picker output at creation; later membership changes do not move it. A user without membership
+   * gets an ownerless personal ship visible only to them.
    *
    * @param userId owning user's id
    * @param dto ship payload (name, type, insurance, fitted, location)
@@ -142,16 +134,13 @@ public class HangarService {
   }
 
   /**
-   * One page of the user's own ships, server-side ordered by the personal-hangar multi-key
-   * comparator and optionally narrowed by a search term (REQ-HANGAR-002). Backs the paginated
-   * {@code /hangar} page: the rich ordering (manufacturer, type, insurance tier/amount, location,
-   * fitted, name) and the case-insensitive ship-type/manufacturer filter are applied in the
-   * repository so they span the user's whole fleet rather than a single client-fetched page. Blank
-   * input is normalised to "no filter".
+   * Returns one page of the user's own ships in the personal-hangar order, optionally filtered by
+   * ship-type or manufacturer name (REQ-HANGAR-002). Ordering and filtering run in the repository
+   * across the whole fleet.
    *
    * @param userId owner id; only this user's ships are returned
    * @param search optional ship-type/manufacturer name filter; {@code null}/blank means no filter
-   * @param pageable page request (pass it unsorted — the ordering lives in the repository query)
+   * @param pageable page request, unsorted (the query defines the order)
    * @return one ordered, optionally filtered page of the user's ships
    */
   public Page<Ship> getMyShipsFiltered(
@@ -162,31 +151,15 @@ public class HangarService {
   }
 
   /**
-   * Returns the per-ship-type squadron overview. When {@code includeOwnerDetails} is {@code true}
-   * the returned DTOs carry the per-ship owner/location/fitted breakdown; when {@code false} only
-   * the aggregated counts are exposed. The optional {@code query} filters the ship types
-   * server-side (case-insensitive contains on ship-type or manufacturer name) so the filter spans
-   * the whole scoped fleet, not just the rows of the current page — blank input is normalised to
-   * "no filter".
-   *
-   * <p>The role-based decision (only ADMIN/OFFICER see the owner breakdown) lives in {@code
-   * HangarController} so this method stays pure business logic and the service layer keeps its
-   * hands off {@link org.springframework.security.core.context.SecurityContextHolder} — see the
-   * architecture rule enforced by {@code ArchitectureTest}.
-   *
-   * <p>Both the aggregated counts ({@code countShipsByType}) and the owner-detail rows ({@code
-   * findByShipTypeInScoped}) are filtered through the <em>same</em> {@link ScopePredicate} — the
-   * unit-overview scope ({@link OwnerScopeService#currentUnitOverviewScope()}, REQ-HANGAR-003) — so
-   * the breakdown can never surface a ship from an org unit the caller is not scoped to. Without an
-   * active pin a member sees every org unit they belong to, a Bereichsleitung the Staffeln/SKs of
-   * their Bereich, and the OL <em>every</em> ship including ownerless personal ones (the owner-
-   * approved widening of REQ-ORG-015, ADR-0048); an active pin still narrows the overview to the
-   * pinned unit, and an admin keeps the unchanged admin-all / admin-pin reach.
+   * Returns the per-ship-type unit overview in the caller's unit-overview scope (REQ-HANGAR-003),
+   * optionally with the per-ship owner, location and fitted breakdown. Counts and breakdown use the
+   * same {@link ScopePredicate}, so no ship outside the caller's scope is surfaced; whether the
+   * caller may see owner details is decided by the controller.
    *
    * @param pageable page request (sortable by {@code shipType.name})
    * @param includeOwnerDetails whether to load the per-ship owner/location/fitted breakdown
    * @param query optional ship-type/manufacturer name filter; {@code null} or blank means no filter
-   * @return one page of per-ship-type aggregates, REQ-HANGAR-001 / REQ-HANGAR-003
+   * @return one page of per-ship-type aggregates
    */
   public Page<SquadronShipOverviewDto> getSquadronOverview(
       Pageable pageable, boolean includeOwnerDetails, String query) {
@@ -239,8 +212,8 @@ public class HangarService {
   }
 
   /**
-   * Updates a ship owned by {@code userId}. Enforces "must be the owner" explicitly because the
-   * rule is per-resource. Optimistic-lock check is explicit when {@code dto.version()} is non-null.
+   * Updates a ship owned by {@code userId}, checking the optimistic-lock version when {@code
+   * dto.version()} is non-null.
    *
    * @param userId calling user's id
    * @param shipId ship primary key
@@ -286,9 +259,7 @@ public class HangarService {
   }
 
   /**
-   * Deletes a ship after detaching any mission-unit references. Owner check identical to {@link
-   * #updateShip}. The explicit {@code flush()} guarantees the unit detach SQL runs before the ship
-   * DELETE so the FK constraint never fires.
+   * Deletes a ship owned by {@code userId} after detaching it from any mission units.
    *
    * @param userId calling user's id
    * @param shipId ship primary key
@@ -346,11 +317,8 @@ public class HangarService {
   }
 
   /**
-   * Squadron-scoped bulk reset of the {@code fitted} flag on every ship. Used by admins/officers
-   * after a major event (patch wipe etc.) so members re-fit their ships instead of carrying stale
-   * state. In focused mode only ships of the caller's squadron are reset; admin "all squadrons"
-   * mode falls back to the cross-staffel reset (MULTI_SQUADRON_PLAN.md section 1: Hangar = strict
-   * eigene Staffel).
+   * Clears the {@code fitted} flag on every ship in the caller's squadron scope; in the admin
+   * all-squadrons mode on every ship.
    */
   @Transactional
   public void resetAllFittedStatus() {
@@ -360,12 +328,8 @@ public class HangarService {
   }
 
   /**
-   * Bulk-sets the location on every ship owned by {@code userId} to the chosen home location. Backs
-   * the hangar "set home location" button. Validates that {@code locationId} resolves to a
-   * selectable home location (curated {@code is_home_location = true} and not hidden) before
-   * applying — defense in depth on top of the already-filtered picker. Operates strictly on the
-   * caller's own ships (per-user isolation enforced by the repository query's {@code owner.id}
-   * predicate), across every OrgUnit, mirroring {@link #getMyShips}.
+   * Sets the location of every ship owned by {@code userId}, across all org units, to the chosen
+   * home location.
    *
    * @param userId the calling user's id; only their ships are updated
    * @param locationId the curated home location to assign to every owned ship

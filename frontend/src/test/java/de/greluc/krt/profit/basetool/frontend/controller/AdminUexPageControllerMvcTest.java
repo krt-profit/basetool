@@ -45,12 +45,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC-level test for {@link AdminUexPageController}'s in-place AJAX twins (epic #571 / #582).
- * Proves the {@code X-Requested-With} header routing: the terminal toggle-visibility and the
- * loading-dock override twins are {@code @ResponseBody} and return {@code 200} on success, an
- * unknown action is rejected with {@code 400}, and the same loading-dock URL without the header
- * still hits the classic redirect handler. Fails if the header gating or the action whitelist
- * breaks.
+ * MVC test for {@link AdminUexPageController}'s AJAX twins: toggle-visibility and loading-dock
+ * override return {@code 200}, an unknown action returns {@code 400}, and without {@code
+ * X-Requested-With} the loading-dock URL still redirects.
  */
 @SpringBootTest
 class AdminUexPageControllerMvcTest {

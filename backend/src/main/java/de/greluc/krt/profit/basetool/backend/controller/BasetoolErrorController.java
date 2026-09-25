@@ -40,24 +40,12 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 /**
- * Replaces Spring Boot's default {@code BasicErrorController} so that servlet-container error
- * dispatches (an error escaping a filter before the {@code DispatcherServlet}, a {@code
- * response.sendError(...)}, a status that never reaches a {@code @ControllerAdvice} handler) still
- * render an RFC&nbsp;7807 {@code application/problem+json} body instead of Boot's default
- * plain-JSON error map (RFC-7807 hardening, REQ-API-004).
+ * Replaces Boot's {@code BasicErrorController} so container-level error dispatches also render an
+ * RFC 7807 {@code application/problem+json} body (REQ-API-004).
  *
- * <p>Defining an {@link org.springframework.boot.web.servlet.error.ErrorController} bean makes Boot
- * back off its {@code BasicErrorController}. The {@code /error} path is {@code permitAll} in {@code
- * SecurityConfig}, so this handler is reachable on an {@code ERROR} dispatch for anonymous callers
- * too. The body mirrors {@code GlobalExceptionHandler}'s contract: {@code type} built off {@link
- * AppProblemProperties}, localized {@code title}/{@code detail}, a stable {@code code} derived from
- * the status, the original request URI as {@code instance}, and a {@code correlationId} (reused
- * from the {@code MDC} when present, otherwise minted) that is also echoed as the {@code
- * X-Correlation-Id} response header and logged, so a container-level error stays traceable.
- *
- * <p>Declared as a plain {@code @Controller} (not {@code @RestController}): {@code /error} is
- * infrastructure that must never itself run an authorization gate, and the {@code ResponseEntity}
- * return type is serialized to the body without needing method security.
+ * <p>The body matches {@code GlobalExceptionHandler}'s contract, including a {@code correlationId}
+ * reused from the MDC or minted, echoed as {@code X-Correlation-Id} and logged. {@code /error} is
+ * {@code permitAll}, so anonymous callers get the same shape.
  */
 @Slf4j
 @Controller
@@ -133,11 +121,9 @@ public class BasetoolErrorController implements ErrorController {
   }
 
   /**
-   * Maps an HTTP status to the localized {@code title}/{@code detail} keys, problem-type suffix and
-   * stable machine-readable {@code code} — reusing the same {@code problem.*} bundle keys and codes
-   * as {@code GlobalExceptionHandler} so a container-level error is indistinguishable on the wire
-   * from the {@code @ControllerAdvice} equivalent. Unmapped statuses collapse to a generic 4xx
-   * ({@code BAD_REQUEST}) or 5xx ({@code INTERNAL_ERROR}) shape.
+   * Maps an HTTP status to the same {@code problem.*} keys, type suffix and stable code as {@code
+   * GlobalExceptionHandler}; unmapped statuses collapse to {@code BAD_REQUEST} (4xx) or {@code
+   * INTERNAL_ERROR} (5xx).
    *
    * @param status the resolved response status
    * @return the problem mapping for {@code status}

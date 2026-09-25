@@ -40,46 +40,15 @@ import lombok.ToString;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * A confirm-before-post deposit / withdrawal / transfer request raised by any caller who may view a
- * bank account (epic #666 F2, REQ-BANK-022/-023/-039/-040/-041), persisted in the {@code
- * bank_booking_request} table (Flyway V159, extended by V193).
+ * A confirm-before-post deposit, withdrawal or transfer request against a bank account
+ * (REQ-BANK-022, REQ-BANK-041).
  *
- * <p>This is the deliberate counterpart to the append-only ledger: unlike {@link BankTransaction} /
- * {@link BankPosting}, a booking request is a <strong>mutable</strong> off-ledger aggregate (it
- * carries the optimistic-locking {@code @Version} from {@link AbstractEntity}) and moves no money
- * while {@code PENDING} (ADR-0021). Only when a bank employee confirms it does the request name the
- * {@link #holder} (deposit → who received the money; withdrawal → who paid it out; transfer → the
- * source holder), book a real {@link BankTransaction} through {@link BankAccount}'s ledger, link
- * that transaction in {@link #resultingTransaction}, and flip to {@code CONFIRMED}. A {@code
- * REJECTED} / {@code CANCELLED} / {@code PENDING} request never carries a holder or resulting
- * transaction — V159's {@code chk_bank_booking_request_confirmed_refs} constraint pins that
- * invariant.
- *
- * <p>For a {@code TRANSFER} request the requester also names the {@link #targetAccount} (any active
- * account, REQ-BANK-040); the destination holder is recorded only on the resulting ledger
- * transaction at confirmation.
- *
- * <p><strong>What a requester may still edit (REQ-BANK-056).</strong> While the request is {@code
- * PENDING} <em>and</em> not yet owner-approved, the requester may correct {@link #amount}, {@link
- * #note}, {@link #justification}, {@link #targetAccount} and the Empf&auml;nger columns — those are
- * deliberately not {@code updatable = false}. {@link #account} and {@link #type} stay immutable:
- * the source account decides the approval limit, the Begr&uuml;ndung requirement and view
- * eligibility, and the type decides the whole field shape, so changing either makes it a different
- * request rather than a correction — cancel and re-raise instead. {@link #requiredApprover} is
- * mutable only because an amount edit must be able to re-route the approval band.
- *
- * <p><strong>Two-step owner approval (REQ-BANK-041).</strong> {@link #requiresOwnerApproval} and
- * {@link #applicableLimit} are <em>snapshotted at creation</em> by the org-unit-aware seam (it
- * resolves the requester's applicable approval limit); the org-unit-blind confirm path only reads
- * the boolean to decide whether the bank employee's confirmation checkbox is mandatory. {@link
- * #ownerApprovalGranted} (with {@link #ownerApprovalGrantedBy} / handle / instant) records the
- * account's responsible holder granting that approval in-app from the "Fremde Anträge" tab, which
- * pre-fills the bank employee's checkbox.
- *
- * <p>The requester, decider and approving holder are stored as plain {@code app_user} ids ({@code
- * ON DELETE SET NULL}) plus a denormalized effective-name snapshot, mirroring {@link
- * BankAuditEvent} so the row — and the bank-staff queue rendered from it — survives a user
- * deletion.
+ * <p>A mutable, off-ledger aggregate: it moves no money while {@code PENDING}. Only on confirmation
+ * does it name the {@link #holder}, book a real {@link BankTransaction} and link it in {@link
+ * #resultingTransaction}; any other status carries neither. {@link #account} and {@link #type} are
+ * immutable; the requester may correct the remaining request fields while it is pending and not yet
+ * owner-approved. Requester, decider and approver are loose {@code app_user} ids plus a name
+ * snapshot, so the row survives user deletion.
  */
 @Entity
 @Table(name = "bank_booking_request")
@@ -146,32 +115,22 @@ public class BankBookingRequest extends AbstractEntity<UUID> {
   private String justification;
 
   /**
-   * The confirming bank employee's own note ("Notiz Bankmitarbeiter", REQ-BANK-054), snapshotted
-   * here so the staff queue and the approval tab can render it without joining the resulting
-   * transaction per row, and copied onto {@link BankTransaction#getStaffNote()} of the booking the
-   * confirmation produces.
+   * The confirming bank employee's own note (REQ-BANK-054), written at confirmation and copied onto
+   * {@link BankTransaction#getStaffNote()} of the resulting booking.
    *
-   * <p>Deliberately <strong>not</strong> {@code updatable = false} — unlike {@link #note} / {@link
-   * #justification}, which the requester supplies at creation, this is written at
-   * <strong>confirmation</strong>. Stays {@code null} while the request is {@code PENDING}, on a
-   * rejected/cancelled request, and when the employee recorded none.
+   * <p>{@code null} while pending, on a rejected or cancelled request, and when none was recorded.
    */
   @Nullable
   @Column(length = 500)
   private String staffNote;
 
   /**
-   * The <strong>Empf&auml;nger</strong> the requester named on a {@code WITHDRAWAL} request
-   * (REQ-BANK-055) — the member who receives the payout, as opposed to the {@link #holder}, the
-   * bank custodian who hands it over. {@code null} on a {@code DEPOSIT} / {@code TRANSFER} request
-   * and on any withdrawal request that named none.
+   * The payout recipient (Empf&auml;nger) named on a {@code WITHDRAWAL} request (REQ-BANK-055), as
+   * opposed to the {@link #holder} who hands the money over.
    *
-   * <p>At confirmation this <em>wins</em> over the requester-derived counterparty {@code
-   * BankBookingRequestService#confirm} otherwise computes (REQ-BANK-044): a {@code null} here means
-   * "requester", which is both the historical behaviour and the pre-filled default, so every row
-   * predating V232 keeps its meaning. Kept as a plain UUID (no JPA relation) exactly like {@link
-   * BankTransaction#getCounterpartyUserId()}; the database FK is {@code ON DELETE SET NULL} and
-   * {@link #counterpartyHandle} keeps the row attributable afterwards.
+   * <p>At confirmation it overrides the requester-derived counterparty; {@code null} means the
+   * requester and is always the case for deposits and transfers. Loose reference ({@code ON DELETE
+   * SET NULL}); {@link #counterpartyHandle} keeps the row attributable.
    */
   @Nullable
   @Column(name = "counterparty_user_id")
@@ -179,9 +138,7 @@ public class BankBookingRequest extends AbstractEntity<UUID> {
 
   /**
    * Deletion-proof handle snapshot of {@link #counterpartyUserId}, taken when the request is
-   * raised, so the confirmation can copy it straight onto the ledger row even if the named user was
-   * deleted in between. {@code null} exactly when {@link #counterpartyUserId} is {@code null} (V232
-   * CHECK).
+   * raised. {@code null} exactly when {@link #counterpartyUserId} is {@code null}.
    */
   @Nullable
   @Column(name = "counterparty_handle", length = 255)
@@ -304,14 +261,9 @@ public class BankBookingRequest extends AbstractEntity<UUID> {
   private BigDecimal applicableLimit;
 
   /**
-   * Snapshot at creation (REQ-BANK-041/-046): which class of approver must approve this request
-   * before a bank employee may confirm it; {@code null} unless {@link #requiresOwnerApproval} is
-   * set. For every request-capable account except the KRT account this is {@link
-   * BankRequestApprover#RESPONSIBLE_HOLDER}; for a KRT (CARTEL) withdrawal/transfer it is the
-   * amount-band approver ({@link BankRequestApprover#BANK_MANAGEMENT} / {@link
-   * BankRequestApprover#ORGANISATIONSLEITUNG}). The org-unit-aware seam resolves the band and, on
-   * the "Fremde Anträge" surface, who may act on it; the org-unit-blind confirm path never reads
-   * this. Immutable.
+   * The class of approver that must approve this request before a bank employee may confirm it,
+   * snapshotted at creation (REQ-BANK-046). {@code null} unless {@link #requiresOwnerApproval} is
+   * set; immutable.
    */
   @Nullable
   @Enumerated(EnumType.STRING)

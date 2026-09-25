@@ -48,10 +48,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Web-layer tests for {@link RefineryImportController} (#434): the {@code isAuthenticated()} gate
- * (401 anonymous, 200 any authenticated role), the envelope-level 400s with their i18n problem
- * detail, and the bean-validation 400 on a contract-cap violation. The service is
- * {@code @MockitoBean}-stubbed — matching logic is covered by {@code RefineryImportServiceTest}.
+ * Web-layer tests for {@link RefineryImportController}: the {@code isAuthenticated()} gate, the
+ * envelope-level 400s with their problem detail, and the bean-validation 400.
  */
 @SpringBootTest
 @ActiveProfiles("test")

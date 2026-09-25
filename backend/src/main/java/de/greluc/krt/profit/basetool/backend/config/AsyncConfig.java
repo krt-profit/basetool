@@ -31,16 +31,10 @@ import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 /**
- * Dedicated bounded executors for {@code @Async} workloads.
+ * Enables {@code @Async} and provides the dedicated bounded executors for asynchronous workloads.
  *
- * <p>Also the one place {@code @EnableAsync} is declared. It used to sit on {@link UexProperties},
- * the historic owner of the UEX sync timing, until that became an immutable record (BE-MOD-04) — a
- * record cannot be a configuration class. Without an explicit {@link Executor} bean Spring falls
- * back to the unbounded {@code SimpleAsyncTaskExecutor}, which spawns a new thread per
- * {@code @Async} call and never reuses or caps them — under a slow UEX upstream that latches into a
- * thread leak. This class publishes {@link #uexExecutor()} as a fixed pool with an abort policy so
- * a stuck sync surfaces as a {@link java.util.concurrent.RejectedExecutionException} in the logs
- * instead of accumulating thread state silently.
+ * <p>Each pool rejects with a {@link java.util.concurrent.RejectedExecutionException} when full
+ * instead of growing without bound.
  */
 @Configuration
 @EnableAsync
@@ -63,53 +57,23 @@ public class AsyncConfig {
   public static final String IMPORT_EXECUTOR = "importExecutor";
 
   /**
-   * Spring-bean name of the notification executor, referenced from
-   * {@code @Async("notificationExecutor")}. Carries the after-commit notification-creation work off
-   * the request thread so producing notifications never adds latency to (or fails) the originating
-   * business transaction. Kept distinct from the sync pools so a notification burst cannot starve
-   * the UEX / Wiki / import sweeps and vice-versa.
+   * Bean name of the executor for after-commit notification creation, referenced from
+   * {@code @Async("notificationExecutor")}.
    */
   public static final String NOTIFICATION_EXECUTOR = "notificationExecutor";
 
   /**
-   * Spring-bean name of the mail executor, referenced from {@code @Async("mailExecutor")}. Carries
-   * the after-commit transactional-mail work (account approval/rejection notices — REQ-NOTIF-014)
-   * off the request thread so SMTP latency never adds to (or fails) the originating business
-   * transaction. Kept distinct from the notification pool so a slow/unreachable SMTP relay cannot
-   * starve in-app notification creation, and vice-versa.
+   * Bean name of the executor for after-commit transactional mail (REQ-NOTIF-014), referenced from
+   * {@code @Async("mailExecutor")}.
    */
   public static final String MAIL_EXECUTOR = "mailExecutor";
 
   /**
-   * Bounded executor for the periodic UEX sync sweep dispatched by {@link
+   * Bounded executor for the UEX sync dispatched by {@link
    * de.greluc.krt.profit.basetool.backend.service.UexScheduler}.
    *
-   * <p>Sizing rationale: the sweep runs at most once an hour and is a serial chain of HTTP calls
-   * against UEX — there is no fan-out inside a single tick. A core pool of two threads covers the
-   * normal single-active-sync case plus one head-room slot if a tick overlaps with a manually
-   * triggered sync; a hard cap of four prevents thread accumulation if the upstream stalls and
-   * multiple ticks pile up. The 100-slot queue absorbs short bursts (admin-triggered re-sync while
-   * the scheduler runs) without engaging the rejection handler.
-   *
-   * <p>{@link ThreadPoolExecutor.AbortPolicy} (Spring default) is preserved deliberately: a
-   * rejection means the queue is full AND the pool is at max threads, which only happens when UEX
-   * is so unhealthy that swallowing more work would mask the outage. A loud {@link
-   * java.util.concurrent.RejectedExecutionException} in the logs is the desired signal.
-   *
-   * <p>{@code setWaitForTasksToCompleteOnShutdown(true)} + {@code setAwaitTerminationSeconds(20)}
-   * align with the application-wide {@code server.shutdown=graceful} window so an in-flight sync is
-   * given a chance to finish before the JVM exits.
-   *
-   * <p><b>MDC propagation</b> via {@link MdcPropagatingTaskDecorator}: classic {@link ThreadLocal}
-   * holders (including SLF4J's {@code MDC}) do not flow across thread boundaries automatically.
-   * Without a decorator, every UEX-sync log line would emit empty {@code correlationId} / {@code
-   * userId} / {@code orgUnitId} MDC fields because the {@code @Scheduled}-triggered task picks a
-   * fresh thread from this pool that never ran the request filter chain. The decorator snapshots
-   * the submitting thread's MDC map and restores it on the worker before the runnable runs, then
-   * clears MDC afterwards so two consecutive tasks on the same pool thread cannot bleed fields into
-   * each other. Scheduled-only triggers carry no inbound request so the captured map is typically
-   * empty — but admin-triggered re-syncs and tests do submit from a request thread, and those
-   * should keep their correlation id in the resulting log lines.
+   * <p>Two core threads, at most four, a 100-slot queue, abort on overflow; waits up to 20 s for
+   * in-flight tasks on shutdown and propagates the submitter's MDC.
    *
    * @return configured UEX async executor
    */
@@ -120,21 +84,10 @@ public class AsyncConfig {
   }
 
   /**
-   * Bounded executor for the periodic SC Wiki sync dispatched by {@code ScWikiScheduler}.
+   * Bounded executor for the SC Wiki sync dispatched by {@code ScWikiScheduler}.
    *
-   * <p>Sizing rationale: the Wiki tick fires at most once every 24 hours (default {@code
-   * krt.scwiki.scheduler-delay = 86 400 000 ms}) and chains a small fan-out of paginated HTTP calls
-   * against the Wiki API. A core pool of two threads covers the normal single-active-sync case plus
-   * head-room for an admin-triggered re-sync overlapping with the scheduler; the queue is
-   * intentionally narrow (size 0) so an unhealthy Wiki backend cannot pile up multiple ticks
-   * waiting silently — instead, the second submission is rejected and surfaces in logs as a {@link
-   * java.util.concurrent.RejectedExecutionException}.
-   *
-   * <p>{@link #MdcPropagatingTaskDecorator} mirrors the UEX executor: classic {@code ThreadLocal}
-   * holders (including SLF4J's MDC) do not flow across thread boundaries automatically. Without the
-   * decorator, every Wiki-sync log line would lose its correlation id / user id / org-unit id
-   * because the {@code @Scheduled}-triggered task hands off to a fresh thread that has never seen
-   * the request filter chain.
+   * <p>Two core threads and no queue, so an overlapping submission beyond the pool is rejected
+   * rather than left waiting; propagates the submitter's MDC.
    *
    * @return configured SC Wiki async executor
    */
@@ -145,22 +98,11 @@ public class AsyncConfig {
   }
 
   /**
-   * Single-thread executor for the asynchronous P4K catalog import dispatched by {@code
-   * P4kImportJobRunner}.
+   * Single-thread executor for the P4K catalog import dispatched by {@code P4kImportJobRunner}, so
+   * import runs never overlap.
    *
-   * <p>Sizing rationale: a core and max pool of <b>one</b> serializes every import run (preview and
-   * apply) so two heavy imports never overlap — the apply path rewrites master-data rows under a
-   * transaction, and a second concurrent apply would only add lock contention for no benefit (an
-   * admin triggers these by hand, rarely). The 20-slot queue lets a burst of uploads line up behind
-   * the active run rather than being rejected; {@link ThreadPoolExecutor.AbortPolicy} only engages
-   * once even that backlog is exhausted, surfacing loudly as a {@link
-   * java.util.concurrent.RejectedExecutionException}.
-   *
-   * <p>{@code setAwaitTerminationSeconds(60)} is more generous than the sync executors because an
-   * import can legitimately run for minutes; a job still in flight when the JVM exits is left
-   * {@code RUNNING} and reconciled to {@code FAILED} on next startup. {@link
-   * MdcPropagatingTaskDecorator} keeps the correlation / user / org-unit MDC fields on the worker
-   * thread, as for the other executors.
+   * <p>Queues up to 20 runs and waits up to 60 s on shutdown; a job still running at exit is
+   * reconciled to {@code FAILED} on next startup. Propagates the submitter's MDC.
    *
    * @return configured P4K import async executor
    */
@@ -171,19 +113,10 @@ public class AsyncConfig {
   }
 
   /**
-   * Bounded executor for after-commit notification creation dispatched by the notification event
-   * listener.
+   * Bounded executor for after-commit notification creation.
    *
-   * <p>Sizing rationale: each task resolves a handful of recipients and writes a small batch of
-   * rows — short, IO-light work. A core pool of two with head-room to four absorbs bursts (e.g.
-   * several job orders created back-to-back) without unbounded thread growth; the 200-slot queue
-   * tolerates a spike before {@link ThreadPoolExecutor.AbortPolicy} engages and surfaces a {@link
-   * java.util.concurrent.RejectedExecutionException} in the logs. Dropping a notification task is
-   * non-fatal (the business transaction already committed), but a loud rejection is still the
-   * desired signal that something is wrong upstream.
-   *
-   * <p>{@link MdcPropagatingTaskDecorator} keeps the correlation / user / org-unit MDC fields of
-   * the publishing request on the worker thread, exactly as for the other executors.
+   * <p>Two core threads, at most four, a 200-slot queue, abort on overflow; propagates the
+   * publishing request's MDC.
    *
    * @return configured notification async executor
    */
@@ -194,19 +127,11 @@ public class AsyncConfig {
   }
 
   /**
-   * Bounded executor for after-commit transactional mail dispatched by the mail event listener.
+   * Bounded executor for after-commit transactional mail, separate from {@link
+   * #notificationExecutor()} so a stalled SMTP relay cannot block notifications.
    *
-   * <p>Sizing rationale: each task composes one localized message and makes a single blocking SMTP
-   * call — a handful of seconds at worst against a healthy relay. A core pool of two with head-room
-   * to four absorbs a small burst of approvals/rejections without unbounded thread growth; the
-   * 200-slot queue tolerates a spike before {@link ThreadPoolExecutor.AbortPolicy} engages and
-   * surfaces a {@link java.util.concurrent.RejectedExecutionException} in the logs. Dropping a mail
-   * task is non-fatal (the decision already committed and delivery is best-effort), but a loud
-   * rejection is still the desired signal. Kept separate from {@link #notificationExecutor()} so a
-   * stalled SMTP relay cannot block in-app notification creation.
-   *
-   * <p>{@link MdcPropagatingTaskDecorator} keeps the correlation/user/org-unit MDC fields of the
-   * deciding request on the worker thread, exactly as for the other executors.
+   * <p>Two core threads, at most four, a 200-slot queue, abort on overflow; propagates the deciding
+   * request's MDC.
    *
    * @return configured mail async executor
    */
@@ -217,17 +142,14 @@ public class AsyncConfig {
   }
 
   /**
-   * Builds a bounded {@link ThreadPoolTaskExecutor} carrying the abort-policy, graceful-shutdown
-   * and MDC-propagation configuration common to every {@code @Async} pool in this class; only the
-   * sizing, thread-name prefix and shutdown-await window vary per pool. Extracted so the four bean
-   * factories share one construction path instead of repeating the nine setter calls.
+   * Builds a bounded {@link ThreadPoolTaskExecutor} with abort policy, graceful shutdown and MDC
+   * propagation.
    *
    * @param corePoolSize the number of always-alive worker threads
-   * @param maxPoolSize the hard ceiling on worker threads before a full queue triggers rejection
-   * @param queueCapacity the bounded work-queue depth ({@code 0} hands off directly and rejects at
-   *     max threads)
-   * @param threadNamePrefix the prefix applied to this pool's worker thread names
-   * @param awaitTerminationSeconds the graceful-shutdown window granted to in-flight tasks
+   * @param maxPoolSize the maximum number of worker threads
+   * @param queueCapacity the work-queue depth; {@code 0} hands off directly
+   * @param threadNamePrefix the prefix of the worker thread names
+   * @param awaitTerminationSeconds the shutdown wait for in-flight tasks
    * @return an initialised executor ready to accept work
    */
   @NotNull
@@ -251,20 +173,11 @@ public class AsyncConfig {
   }
 
   /**
-   * {@link TaskDecorator} that snapshots the submitting thread's SLF4J {@link MDC} context map and
-   * restores it on the worker thread before the wrapped runnable runs. Used by {@link
-   * #uexExecutor()} so {@code @Async}-dispatched UEX-sync log lines keep the correlation id, user
-   * id and org-unit id of the request (or scheduled trigger) that submitted them.
+   * {@link TaskDecorator} that copies the submitting thread's {@link MDC} context onto the worker
+   * thread for the task's duration.
    *
-   * <p>The decorator clears MDC in the {@code finally} block to prevent a fresh task picked up by
-   * the same pool thread from inheriting the previous task's MDC fields — the executor reuses
-   * worker threads, and a missing clear here would bleed correlation ids across unrelated
-   * submissions.
-   *
-   * <p>A {@code null} snapshot (no MDC on the submitting thread — typical for scheduler-triggered
-   * runs at JVM startup) is handled explicitly: the worker starts with an empty MDC and clears it
-   * the same way at the end. This avoids an NPE inside {@code MDC.setContextMap(null)} which some
-   * SLF4J bindings throw.
+   * <p>MDC is cleared afterwards so reused pool threads never inherit a previous task's fields; a
+   * missing snapshot starts the task with an empty MDC.
    */
   static class MdcPropagatingTaskDecorator implements TaskDecorator {
 

@@ -35,23 +35,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Two-context live-sync coverage for the mission → operation cross-publish (#1241, REQ-FE-015 /
- * ADR-0094): a child mission's core edit made on the mission detail page must refresh the parent
- * operation's embedded missions table on another viewer of the <em>operation</em> page — without a
- * manual reload.
+ * Verifies the mission-to-operation cross-publish (REQ-FE-015, ADR-0094): renaming a child mission
+ * on its detail page refreshes the parent operation's missions table for another viewer without a
+ * reload.
  *
- * <p>This is the one cross-<em>surface</em> live-sync case: the {@code missions}/{@code finance}
- * sections of {@code operation:{id}} are never broadcast from the operation page itself; they are
- * cross-published from the mission page, which maps mission {@code overview → operation missions}
- * (and {@code finance → finance}) and publishes to {@code operation:{id}} without subscribing to
- * it. Context A (the mission page) is the publisher; context B (the operation page, subscribed to
- * {@code operation:{id}}) is the receiver whose missions table must update in place.
- *
- * <p>The deterministic pre-mutation wait is context B's {@code
- * window.krtLiveSync.subscribedTopics()} becoming non-empty — B is registered with the relay once
- * its {@code operation:{id}} subscribe is acked, so A's cross-published change frame cannot race
- * past it. Renaming the mission is the mutation chosen because the operation missions table renders
- * the mission's name, so the propagation is directly observable.
+ * <p>Waits for the operation page's {@code operation:{id}} subscription before mutating.
  */
 @Tag("e2e")
 class OperationMissionCrossPublishLiveSyncE2eTest {

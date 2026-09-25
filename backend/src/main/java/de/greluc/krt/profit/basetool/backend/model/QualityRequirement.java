@@ -20,11 +20,9 @@
 package de.greluc.krt.profit.basetool.backend.model;
 
 /**
- * Quality a derived material requirement of an item order must be satisfied with. Chosen by the
- * requester per material at order-creation time (defaulting from the blueprint ingredient's {@code
- * minQuality}), so the same item can be ordered with different quality demands in different orders.
- * Deliberately binary — the item-order flow does not expose arbitrary quality floors, only the
- * refining-grade threshold versus "no floor".
+ * Quality floor a derived material requirement of an item order must meet: the refining-grade
+ * threshold or no floor. Chosen per material at order creation, defaulting from the blueprint
+ * ingredient's {@code minQuality}.
  */
 public enum QualityRequirement {
 

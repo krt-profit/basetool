@@ -35,12 +35,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Unit tests for {@link TerminalService}'s admin-override mutators. The visibility flip is already
- * covered indirectly by {@code TerminalControllerTest}; these tests pin the more delicate contract
- * that "set" mutators write both the value and the {@code *Overridden} flag, and that "clear"
- * mutators flip the flag back AND revert the value column to the last UEX-reported state stored in
- * the {@code uex*} mirror columns (so the materials-overview filter and the UEX-source chip do not
- * keep seeing the stale admin-pinned value until the next UEX sweep runs).
+ * Unit tests for {@link TerminalService}'s override mutators: "set" writes the value and the {@code
+ * *Overridden} flag, "clear" resets the flag and restores the value from the {@code uex*} mirror
+ * columns.
  */
 @ExtendWith(MockitoExtension.class)
 class TerminalServiceTest {

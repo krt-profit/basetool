@@ -23,10 +23,8 @@ import java.util.List;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * JSON body of the in-place add on the admin default-blueprints page (REQ-INV-017, REQ-FE-001): the
- * product keys the admin staged in the type-ahead, sent in one request and relayed to the backend
- * one add per key. Frontend-only — the backend takes a single {@link DefaultBlueprintCreateRequest}
- * per call.
+ * JSON body of the in-place add on the admin default-blueprints page (REQ-INV-017): the staged
+ * product keys, relayed to the backend as one {@link DefaultBlueprintCreateRequest} per key.
  *
  * @param productKeys the staged normalized product keys; {@code null} or blank entries are skipped
  */

@@ -22,32 +22,19 @@ package de.greluc.krt.profit.basetool.backend.dto.scwiki;
 import java.util.UUID;
 
 /**
- * Row identity every payload of a paginated SC Wiki list endpoint carries.
+ * Row identity of a paginated SC Wiki list payload, letting the {@code ScWikiClient} page walk
+ * count distinct rows.
  *
- * <p>Exists so the {@code ScWikiClient} page walk can answer one question without knowing the
- * concrete payload type: <em>did this walk see the same row twice?</em> A re-served row is the
- * signature of a pagination window that shifted while the walk ran (a row inserted or deleted
- * upstream moves every later row across the page boundaries), and it means some other row was
- * pushed out of the window and never fetched. The merged list then has the right shape and the
- * wrong content — which matters because that list drives the tombstone sweeps: every catalogue row
- * missing from it is marked {@code scwiki_deleted}.
- *
- * <p>Counting <em>distinct</em> {@link #uuid()} values rather than rows is what separates "the walk
- * enumerated the feed" from "the walk saw 12 331 rows, 48 of them twice". {@code
- * ScWikiClient.fetchAllPagesResult} therefore bounds its type parameter on this interface instead
- * of accepting any payload and trusting the caller to have deduplicated — a paginated endpoint
- * whose rows carry no identity cannot be census-checked at all, and the compiler now says so.
+ * <p>A row served twice means the pagination window shifted and another row was missed; because the
+ * merged list drives the tombstone sweeps, the census counts distinct {@link #uuid()} values.
  */
 public interface ScWikiRow {
 
   /**
-   * The Wiki's stable identifier for this row — the same key the {@code game_item} / {@code
-   * manufacturer} cross-references and the tombstone sweeps' seen-sets are keyed on, which is why
-   * it is also the right identity for the census cross-check.
+   * The Wiki's stable identifier for this row, also the key of the cross-references and tombstone
+   * sweeps.
    *
-   * @return the row's Wiki UUID, or {@code null} for a payload the upstream served without one
-   *     (counted as its own non-deduplicable row rather than collapsed with every other id-less
-   *     row)
+   * @return the row's Wiki UUID, or {@code null} when upstream served none (counted as its own row)
    */
   UUID uuid();
 }

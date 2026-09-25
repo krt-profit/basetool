@@ -26,24 +26,11 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Configuration properties under {@code krt.uex.*}.
+ * Configuration properties under {@code krt.uex.*}: the UEX (uexcorp.space) base URL, every
+ * endpoint path used by {@link de.greluc.krt.profit.basetool.backend.integration.UexClient}, and
+ * the sync scheduler switches.
  *
- * <p>Holds the UEX (uexcorp.space) base URL and every endpoint path used by {@link
- * de.greluc.krt.profit.basetool.backend.integration.UexClient}. Endpoints are kept here, not
- * hardcoded in the client, so a UEX schema rename (e.g. {@code /commodities_prices_all} to a new
- * path) is a one-line config change.
- *
- * <p>{@code schedulerEnabled} toggles the periodic background sync; {@code schedulerDelay} is the
- * fixed-delay between successive sync runs in milliseconds. Defaults to once a day (24 h) — UEX
- * commodity prices and the catalogue move slowly enough that a daily refresh keeps the data fresh
- * without hammering the upstream API.
- *
- * <p>An immutable record bound by {@code @ConfigurationPropertiesScan} (BE-MOD-04). It used to be a
- * {@code @Configuration} that also carried {@code @EnableScheduling} and {@code @EnableAsync}; a
- * record cannot be a configuration class, so {@code @EnableAsync} moved to {@link AsyncConfig} and
- * {@code @EnableScheduling} is the one {@code BackendApplication} already declares.
- *
- * @param apiUrl the UEX API base URL every endpoint path below is appended to
+ * @param apiUrl the UEX API base URL the endpoint paths are appended to
  * @param commoditiesEndpoint the commodity catalogue path
  * @param commoditiesPricesEndpoint the all-terminals commodity price path
  * @param starSystemsEndpoint the star-system reference path
@@ -61,19 +48,16 @@ import org.springframework.validation.annotation.Validated;
  * @param terminalsEndpoint the terminal reference path
  * @param refineriesMethodsEndpoint the refining-method reference path
  * @param refineriesYieldsEndpoint the per-refinery yield-bonus path
- * @param itemsEndpoint the R2 item-catalogue path, called filtered as {@code
- *     /items?id_category=<n>} by {@code UexItemSyncService}; walking every category takes 98+
- *     round-trips, paced at the same cadence as the rest of the UEX sync
- * @param itemsPricesEndpoint the R7 item-price path (~1 MB+ payload, shaped like {@code
- *     /commodities_prices_all}), used only while {@code itemPriceSyncEnabled} is on
- * @param categoriesEndpoint the R2 category reference path that drives the item walk through {@code
- *     UexCategoryRefService}; its 98 (or more) {@code (id, type, section, name)} tuples map each
- *     item and vehicle to its grouping
+ * @param itemsEndpoint the item-catalogue path, called per category as {@code
+ *     /items?id_category=<n>}
+ * @param itemsPricesEndpoint the item-price path, used only while {@code itemPriceSyncEnabled} is
+ *     on
+ * @param categoriesEndpoint the category reference path that drives the item walk
  * @param itemPriceSyncEnabled the master switch for {@code UexItemPriceSyncService}; {@code false}
- *     by default, so an accidental flip on a build without it is a no-op
+ *     by default
  * @param schedulerEnabled whether the periodic UEX sync runs at all
- * @param schedulerDelay the fixed delay between two sync runs, in milliseconds as a string (read by
- *     {@code @Scheduled(fixedDelayString = …)}); {@code 86400000}, one day, by default
+ * @param schedulerDelay the fixed delay between two sync runs in milliseconds, as a string; {@code
+ *     86400000} (one day) by default
  */
 @Validated
 @ConfigurationProperties(prefix = "krt.uex")

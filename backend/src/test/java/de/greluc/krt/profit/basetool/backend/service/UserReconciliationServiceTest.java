@@ -73,19 +73,16 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 /**
- * Unit tests for {@link UserReconciliationService} — the Keycloak&nbsp;-&gt;&nbsp;local sync seam
- * extracted out of {@code UserService} (audit Thema&nbsp;7, #1252): {@link
- * UserReconciliationService#syncUser(Jwt)} (the per-login hot path), {@link
- * UserReconciliationService#syncUser(KeycloakUserDto)} (the scheduled Admin-API sync), {@link
+ * Unit tests for {@link UserReconciliationService}, the Keycloak-to-local sync: {@link
+ * UserReconciliationService#syncUser(Jwt)}, {@link
+ * UserReconciliationService#syncUser(KeycloakUserDto)}, {@link
  * UserReconciliationService#markMissingUsers}, the role mapping ({@link
  * UserReconciliationService#extractRolesFromJwt}) and the sync-input catalogs ({@link
  * UserReconciliationService#getMappableRoleNames} / {@link
  * UserReconciliationService#getKnownDiscordLinkedUserIds}).
  *
- * <p>The subject is a real {@link UserReconciliationService} wired to a real {@link
- * UserRegistrationService} (so the shared fail-safe PENDING stamping runs for real) and a mock
- * {@link UserService} whose {@code getUserIdFromJwt} is stubbed to parse the token subject (the
- * identity seam stays in {@code UserService}).
+ * <p>Uses a real {@link UserRegistrationService} and a mock {@link UserService} whose {@code
+ * getUserIdFromJwt} parses the token subject.
  */
 @ExtendWith(MockitoExtension.class)
 class UserReconciliationServiceTest {
@@ -110,10 +107,8 @@ class UserReconciliationServiceTest {
   private final List<String> partialScopeClientIds = new ArrayList<>();
 
   /**
-   * A real instance rather than a mock: it holds a list and answers one pure predicate, so stubbing
-   * it would only restate the production logic under test. Left empty by default so every
-   * pre-existing case keeps the complete-claim behaviour it was written for; the REQ-SEC-036 cases
-   * populate it explicitly.
+   * A real instance, empty by default so tests see complete-claim behaviour; the REQ-SEC-036 cases
+   * populate it.
    */
   private final PartialRoleScopeProperties partialRoleScopeProperties =
       new PartialRoleScopeProperties(partialScopeClientIds);
@@ -147,12 +142,8 @@ class UserReconciliationServiceTest {
   }
 
   /**
-   * The roster sync persists the Keycloak {@code enabled} flag (V230, ADR-0129).
-   *
-   * <p>The Admin API always returned it and the sync always dropped it, so deactivating a member
-   * refused them nothing: with a token that is bounded by expiry, but the ingest gateway can
-   * <em>name</em> a subject, and a name does not expire. This is what makes revocation take effect
-   * at the next sync pass instead of never.
+   * Verifies that the roster sync persists the Keycloak {@code enabled} flag, so deactivating a
+   * member takes effect at the next sync (ADR-0129).
    */
   @Test
   void persistsTheKeycloakEnabledFlag() {
@@ -214,17 +205,8 @@ class UserReconciliationServiceTest {
     }
 
     /**
-     * The core guarantee of #1639 / ADR-0142 point 5: an unknown subject is a <b>new</b>
-     * registration, never an account matched by callsign.
-     *
-     * <p>Until this release the login adopted that row, and both consequences were silent. From
-     * then on {@code app_user.id} was not the caller's subject for that one row — the invariant 39
-     * foreign keys, the frontend's own comparisons and the audit trail all rest on — and since a
-     * Keycloak username is neither immutable nor unique after a deletion, a recreated account with
-     * a previous member's callsign inherited their inventory, bank grants and notifications.
-     *
-     * <p>The assertion is deliberately on identity, not on a field: a returned row that <em>is</em>
-     * the pre-existing one is the defect, whatever its contents look like afterwards.
+     * Verifies that an unknown subject becomes a new registration and never adopts an account
+     * matched by callsign (ADR-0142). The assertion is on row identity, not on field values.
      */
     @Test
     void neverAdoptsAnAccountMatchedByCallsign_whenTheSubjectIsUnknown() {
@@ -245,7 +227,7 @@ class UserReconciliationServiceTest {
       verify(userRepository, never()).findByUsername(any());
     }
 
-    /** The collision is counted, so a case the fallback used to hide has a signal at all. */
+    /** Verifies that a callsign collision increments its counter. */
     @Test
     void countsTheCallsignCollision_soTheHiddenCaseHasASignal() {
       Jwt jwt = newJwt(USER_ID.toString(), Map.of("preferred_username", "alice"));
@@ -263,13 +245,8 @@ class UserReconciliationServiceTest {
     }
 
     /**
-     * A brand-new row that is ACTIVE on arrival has to be counted.
-     *
-     * <p>{@code stampNewPendingRegistration} carves ADMIN-realm-role holders out of the approval
-     * gate for bootstrap safety (REQ-SEC-017), which is the one way an account gains full authority
-     * with no admin decision behind it \u2014 and it used to leave no trace at all. It is also the
-     * tail of a failed erasure: the recreated row of an ADMIN-realm-role holder is ACTIVE
-     * immediately rather than a refusable PENDING registration (REQ-SEC-061).
+     * Verifies that a new row which is ACTIVE on arrival, an ADMIN realm-role holder carved out of
+     * the approval gate (REQ-SEC-017), is counted.
      */
     @Test
     void countsTheAutoActivatedAdmin_soTheCarveOutIsNotSilent() {
@@ -470,13 +447,9 @@ class UserReconciliationServiceTest {
     }
 
     /**
-     * Security hardening (PR #740 review): a new Discord login MUST NOT be matched onto a
-     * pre-existing row by {@code preferred_username}. The brokered Discord username is
-     * attacker-influenced, so the legacy username fallback is suppressed for a Discord login —
-     * otherwise a verified guild member could link their Discord identity to someone else's
-     * (possibly privileged, already-ACTIVE) account and bypass the PENDING gate. The Discord
-     * identity is a brand-new PENDING registration keyed by its own subject, and {@code
-     * findIdsByUsername} is consulted only to log and count the collision -- never to pick a row.
+     * Verifies that a new Discord login is never matched onto an existing row by {@code
+     * preferred_username}, which is attacker-influenced: it lands as a new PENDING registration,
+     * and the username collision is only logged and counted.
      */
     @Test
     void newDiscordLogin_ignoresMatchingCredentialUsername_landsPending() {
@@ -581,11 +554,8 @@ class UserReconciliationServiceTest {
     }
 
     /**
-     * #1826: {@code app_user.discord_user_id} is UNIQUE (V172), so writing a snowflake another row
-     * already holds does not merely lose the column -- it fails the flush and takes the whole
-     * per-user reconciliation with it. The link is display-only (REQ-SEC-019 exposes a boolean), so
-     * the proportionate answer is to skip the write, count it and let a human consolidate the two
-     * accounts.
+     * Verifies that a Discord login whose snowflake is already held by another account skips the
+     * UNIQUE {@code discord_user_id} write and counts it instead of failing the reconciliation.
      */
     @Test
     void discordLogin_whenAnotherAccountHoldsTheSnowflake_skipsTheLinkAndCountsIt() {
@@ -608,11 +578,7 @@ class UserReconciliationServiceTest {
           "the collision is counted so an alert can watch it");
     }
 
-    /**
-     * The unclaimed case still writes, so the guard above narrows the write rather than disabling
-     * it -- and once the duplicate row is gone the very next run links normally, with no manual
-     * repair.
-     */
+    /** Verifies that a Discord login with an unclaimed snowflake writes the link. */
     @Test
     void discordLogin_whenTheSnowflakeIsUnclaimed_writesTheLink() {
       User existing = newUser(USER_ID, "discorduser");
@@ -644,20 +610,11 @@ class UserReconciliationServiceTest {
   }
 
   /**
-   * The mobile client runs with {@code fullScopeAllowed: false} and a scope naming five of the
-   * realm's eight roles (REQ-SEC-035), so its tokens describe a deliberately smaller member than
-   * the real one. Since this reconciliation REPLACES the stored role set rather than merging into
-   * it, persisting that description would let whichever client a member used last decide what the
-   * database says they are.
+   * Tests for tokens from a partial-scope client such as the mobile app (REQ-SEC-035), whose role
+   * claim omits roles the member holds.
    *
-   * <p>The omitted role these cases are written around was {@code Admin} until the 2026-09-02
-   * reversal, and {@code Admin} is still the sharpest illustration — which is why the fixtures keep
-   * using it. It is now a stand-in for {@code Logistician} / {@code Mission Manager} rather than
-   * the live case, and the rule under test is unchanged either way: what matters is that the claim
-   * is *partial*, not which role is missing from it.
-   *
-   * <p>These cases pin both halves, because either alone is a defect: the row must survive the
-   * partial claim, and the request must still be authorised by it.
+   * <p>The stored role set must survive such a claim, and the request must still be authorised by
+   * it. The fixtures use {@code Admin} as the omitted role.
    */
   @Nested
   class PartialRoleScopeTests {
@@ -690,14 +647,8 @@ class UserReconciliationServiceTest {
     }
 
     /**
-     * An administrator opening the app keeps {@code Admin} in the database.
-     *
-     * <p>This is the regression that motivated the requirement. Measured on the test stack before
-     * the guard existed, an account holding Admin + Officer + KRT Member was left holding the
-     * {@code Guest} fallback alone after one app login (the role {@code V239} has since deleted) -
-     * and the same mechanism, once the client's scope carried the member roles, still stripped
-     * {@code Admin} specifically. Since REQ-SEC-053 the same bug would lock the account out
-     * outright rather than reduce it to a guest view.
+     * Verifies that a partial-scope claim does not overwrite the stored roles, so an administrator
+     * logging in through the app keeps {@code Admin}.
      */
     @Test
     void doesNotOverwriteTheStoredRoles_whenTheClaimComesFromAPartialScopeClient() {
@@ -770,11 +721,8 @@ class UserReconciliationServiceTest {
     }
 
     /**
-     * A first-ever login through the app does persist its roles.
-     *
-     * <p>There is no stored set to protect on a brand-new row, and the alternative is writing a
-     * member with no roles at all - which since REQ-SEC-053 is an account refused with {@code
-     * NO_ROLE} until something widens it. The next complete-claim login or Admin-API pass does.
+     * Verifies that a partial-scope claim does persist its roles when it creates the row, since
+     * there is no stored set to protect and an empty one would refuse the account (REQ-SEC-053).
      */
     @Test
     void persistsTheRoles_whenThePartialClaimCreatesTheRow() {
@@ -841,12 +789,8 @@ class UserReconciliationServiceTest {
   class SyncKeycloakUserTests {
 
     /**
-     * #1826, the scheduled half. The Admin-API back-fill is where the collision actually bites in
-     * production: it runs for every roster user without a local link, so once one Discord identity
-     * is reachable from two Keycloak users it retries the same failing write every single night.
-     * Skipping keeps the rest of that user's reconciliation intact -- which matters more than the
-     * icon, because a thrown reconciliation used to take the account out of the roster entirely
-     * (#1825).
+     * Verifies that the scheduled Admin-API backfill skips and counts a snowflake another account
+     * already holds, keeping the rest of that user's reconciliation intact.
      */
     @Test
     void scheduledBackfill_whenAnotherAccountHoldsTheSnowflake_skipsTheLinkAndCountsIt() {
@@ -1057,15 +1001,8 @@ class UserReconciliationServiceTest {
   }
 
   /**
-   * REQ-SEC-053 / ADR-0159: a token whose realm roles resolve to nothing produces an account with
-   * NO roles, not one holding the {@code Guest} fallback.
-   *
-   * <p>The fallback existed so that "no role" still had somewhere to sit, and the URL matrix's
-   * anonymous families then let {@code GUEST} through — which made "no role" quietly mean "the
-   * guest surface". {@code V239} deleted the role; the empty set is what the sync now writes, and
-   * {@code CustomJwtGrantedAuthoritiesConverter} turns it into {@code ROLE_NO_ROLE}, which {@code
-   * PendingApprovalAccessFilter} refuses with {@code 403 NO_ROLE}. Writing a role the account does
-   * not hold was the thing that hid this state for years.
+   * Verifies that a token whose realm roles map to nothing yields an account with no roles, which
+   * is then refused as {@code NO_ROLE} (REQ-SEC-053, ADR-0159).
    */
   @Test
   void mapRoles_writesNoRole_whenNoKeycloakRoleMatchesLocal() {

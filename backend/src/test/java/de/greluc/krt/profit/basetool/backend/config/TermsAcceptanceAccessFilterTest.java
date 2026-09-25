@@ -53,12 +53,8 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Behaviour of the backend consent boundary (REQ-SEC-028).
- *
- * <p>The exemption tests carry the most weight. If the consent endpoints were ever refused, the
- * block would be permanent for everyone — there would be no request left that could record consent
- * — and that failure is invisible until a terms change puts the whole squadron behind the gate at
- * once.
+ * Behaviour of the backend consent boundary (REQ-SEC-028); the exemptions for the consent endpoints
+ * are critical, since refusing them would block everyone permanently.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -123,12 +119,8 @@ class TermsAcceptanceAccessFilterTest {
   }
 
   /**
-   * A refusal counts the caller as a distinct subject, and repeats do not inflate that count.
-   *
-   * <p>This is the whole point of {@code basetool_terms_refused_subjects}: the refusal
-   * <em>rate</em> cannot separate "the membership is locked out" from "one client is retrying", so
-   * {@code TermsConsentRolloutStalled} used to fire on a single looping browser tab with nobody
-   * awake (2026-08-03). Ten refusals of one subject must read as one.
+   * A refused caller counts once in {@code basetool_terms_refused_subjects}, however often they
+   * retry.
    */
   @Test
   void countsARefusedCallerOnceHoweverOftenTheyRetry() throws Exception {
@@ -181,14 +173,8 @@ class TermsAcceptanceAccessFilterTest {
   }
 
   /**
-   * A percent-encoded path prefix does not slip past the gate.
-   *
-   * <p>{@code getRequestURI()} is the raw, still-encoded URI while Spring MVC routes on the decoded
-   * path, so a naive {@code startsWith("/api/")} lets {@code /%61pi/v1/missions} through — and
-   * {@code RequestMappingHandlerMapping} then decodes {@code %61pi} to {@code api} and dispatches
-   * it. The default {@code StrictHttpFirewall} blocks {@code %2e}/{@code %2f}/{@code %25} but not
-   * {@code %61}. Must be a direct filter test: MockMvc normalises the path before the filter sees
-   * it, so it cannot reproduce this.
+   * A percent-encoded path prefix such as {@code /%61pi/v1/missions} does not slip past the gate.
+   * Tested on the filter directly because MockMvc normalises the path first.
    */
   @Test
   void isNotSkippableByPercentEncodingThePathPrefix() throws Exception {

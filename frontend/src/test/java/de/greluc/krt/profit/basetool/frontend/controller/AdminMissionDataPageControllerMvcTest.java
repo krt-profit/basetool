@@ -52,11 +52,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC-level render test for {@link AdminMissionDataPageController}: pins the three per-section AJAX
- * swap fragments (REQ-FE-002) of the include-inactive filters. The full page renders all three
- * swap-target wrappers; each {@code ?fragment=<section>-results} request renders only that
- * section's table (the other two sections, the modals and the toolbar buttons live outside it).
- * Fails if any section fragment selector breaks.
+ * MVC render test for {@link AdminMissionDataPageController}: the full page renders all three swap
+ * targets, and each {@code ?fragment=<section>-results} request renders only that section's table
+ * (REQ-FE-002).
  */
 @SpringBootTest
 class AdminMissionDataPageControllerMvcTest {

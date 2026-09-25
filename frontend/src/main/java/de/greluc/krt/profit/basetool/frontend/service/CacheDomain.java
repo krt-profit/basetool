@@ -24,24 +24,12 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
 /**
- * Invalidation domain of a cached backend catalogue (FE-CACHE-2). Each domain owns its own named
- * Caffeine cache so a mutation of one catalogue evicts only that catalogue — a squadron toggle no
- * longer cold-starts the (10&nbsp;000-row) terminal list, the material lists or the location lists
- * it never touched. The previous design kept every catalogue in one {@code STATIC_DATA_CACHE} that
- * any admin mutation dropped wholesale.
+ * Invalidation domain of a cached backend catalogue, each with its own named Caffeine cache so a
+ * mutation evicts only its own catalogue.
  *
- * <p>Each domain also carries its own TTL. The TTL is only a <b>backstop</b> — cacheability is
- * gated on eviction (every mutation evicts; REQ-DATA-007), so the data is fresh after any change
- * regardless of TTL, and the TTL merely bounds staleness if an evict is ever missed. Pure reference
- * catalogues that change only on an admin edit or the periodic UEX / SC Wiki sync (both of which
- * evict) use a long <b>6-hour</b> TTL; the org-structure catalogues (squadrons, org-unit pickers)
- * and the global settings use a shorter <b>2-hour</b> TTL because their eviction surface is
- * broader.
- *
- * <p>The cache name is the {@code Prometheus} {@code cache} label (REQ-OBS-006 — bounded), so it is
- * a fixed literal, never derived from user input. Every domain's cache is registered in {@code
- * CacheConfig} with {@code recordStats()} so the hit-ratio / eviction / size panels light up per
- * domain automatically.
+ * <p>Each domain's TTL is only a backstop, since every mutation evicts (REQ-DATA-007): 6 hours for
+ * pure reference catalogues, 2 hours for the org-structure catalogues and global settings. The
+ * cache name is the bounded Prometheus {@code cache} label (REQ-OBS-006).
  */
 @Getter
 @RequiredArgsConstructor

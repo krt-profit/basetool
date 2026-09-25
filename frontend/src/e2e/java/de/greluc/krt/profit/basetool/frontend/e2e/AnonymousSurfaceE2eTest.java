@@ -40,23 +40,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * REQ-SEC-052 in a real browser: <b>nobody without a login reads anything.</b>
- *
- * <p>The in-process sweeps ({@code AnonymousSurfaceSweepTest}, {@code
- * AnonymousSurfaceSweepMvcTest}) enumerate every mapping and are the exhaustive half of this
- * guarantee. They run against MockMvc, which is exactly what they cannot cover: a real browser
- * follows the OAuth2 redirect, runs the silent-SSO probe, keeps a cookie jar, and replays a deep
- * link after signing in. Each of those is a place the members-only cut-over could be undone without
- * a single unit test noticing.
- *
- * <p>Four things are pinned here, in the order a visitor meets them:
+ * REQ-SEC-052 in a real browser: nobody without a login reads anything.
  *
  * <ol>
- *   <li>the former public pages send an anonymous visitor into the login and never render;
+ *   <li>protected pages send an anonymous visitor into the login and never render;
  *   <li>the landing page carries the two login entries and no data;
  *   <li>a background call answers {@code 401 REAUTH_REQUIRED} rather than the payload;
- *   <li>a deep link survives the login — the WP-F 11 request cache, without which a member
- *       following a Discord link lands on the dashboard and has to navigate again.
+ *   <li>a deep link is replayed after the login.
  * </ol>
  */
 @Tag("e2e")
@@ -71,25 +61,11 @@ class AnonymousSurfaceE2eTest {
   /** What a background call must get instead of the payload (REQ-SEC-012). */
   private static final int UNAUTHORIZED = 401;
 
-  /**
-   * The pages that answered anonymously until ADR-0159.
-   *
-   * <p>{@code /orders} and {@code /operations} were whole families; {@code /missions} carried the
-   * seven-day grid and the roster. They are listed one by one rather than swept — the sweep is the
-   * MockMvc test's job — because what is asserted here is the browser's experience of each.
-   */
+  /** The pages ADR-0159 closed to anonymous visitors. */
   private static final List<String> FORMER_PUBLIC_PAGES =
       List.of("/missions", "/operations", "/orders", "/orders/create");
 
-  /**
-   * Pages that were <b>never</b> public, swept in the same shape.
-   *
-   * <p>The rule is not "the pages the members-only change closed" but "every page", and a gate that
-   * only holds where somebody remembered to look is the failure mode this whole PR is about. These
-   * two also carry the coverage of the cases {@code AnonymousSurfaceE2eTest} replaces: {@code
-   * InventoryTenancyE2eTest.guestIsRedirectedToLoginFromLager} asserted exactly this shape for the
-   * Lager.
-   */
+  /** Pages that were never public, swept the same way. */
   private static final List<String> NEVER_PUBLIC_PAGES = List.of("/inventory/all", "/hangar");
 
   private static Playwright playwright;
@@ -112,15 +88,8 @@ class AnonymousSurfaceE2eTest {
   }
 
   /**
-   * Every former public page sends a visitor with no session into the login, and renders none of
-   * its own markup on the way.
-   *
-   * <p>Asserted as "not this page, and none of its content" rather than as a status: the silent-SSO
-   * probe ({@code prompt=none} → {@code login_required}) means the browser can end up back on the
-   * landing page at {@code /?error} rather than on a Keycloak form, and which of the two it is
-   * depends on the SSO session, not on this rule. What must hold either way is that the protected
-   * markup never appears — which is also why the "no form" half only applies while the browser is
-   * still on this host: being handed a login form on Keycloak's is the rule working.
+   * Every protected page sends a visitor with no session into the login and renders none of its own
+   * markup on the way.
    */
   @Test
   void everyFormerPublicPageSendsAnAnonymousVisitorAway() {
@@ -161,7 +130,7 @@ class AnonymousSurfaceE2eTest {
   }
 
   /**
-   * Joins two path lists, so the sweep above reads as one loop over "every page".
+   * Joins two path lists into the list of every page to sweep.
    *
    * @param first the former public pages
    * @param second the pages that were never public
@@ -172,12 +141,8 @@ class AnonymousSurfaceE2eTest {
   }
 
   /**
-   * The landing page is the whole of what an anonymous visitor gets: two login entries, the legal
-   * links, and no data.
-   *
-   * <p>The seven-day mission grid used to render here for anyone who asked — unit, status, meeting
-   * point and times. That it is gone is the visible half of decision D7, and a template edit could
-   * put it back without failing anything else.
+   * The landing page offers an anonymous visitor two login entries and the legal links, and no data
+   * such as the mission grid.
    */
   @Test
   void theLandingPageOffersTheLoginAndNoData() {
@@ -226,13 +191,8 @@ class AnonymousSurfaceE2eTest {
   }
 
   /**
-   * A background call answers {@code 401 REAUTH_REQUIRED} — never the payload, and never a redirect
-   * a fetch cannot follow usefully.
-   *
-   * <p>{@code /catalog/**} was one of the widest anonymous reads the frontend served, and it is the
-   * shape {@code krtFetch} uses, so this is the exact request a logged-out tab keeps making. The
-   * distinction from the navigation case above is REQ-SEC-012's whole point: a page must be able to
-   * re-authenticate in place instead of having a half-filled form replaced by a login screen.
+   * A background {@code /catalog/**} call answers {@code 401 REAUTH_REQUIRED}, never the payload or
+   * a redirect (REQ-SEC-012).
    */
   @Test
   void aBackgroundCatalogueCallIsRefusedWithReauthRequired() {
@@ -264,18 +224,8 @@ class AnonymousSurfaceE2eTest {
   }
 
   /**
-   * A deep link survives the login: after signing in the member lands on the page they asked for,
-   * not on the dashboard.
-   *
-   * <p>This is WP-F 11's request cache seen from the outside, and it is the half of that change
-   * that would fail silently — the matcher (save only real navigations) and the "one shared cache"
-   * wiring are both invisible until somebody follows a Discord link and ends up somewhere else.
-   * {@code /hangar} is deliberately a page that was <em>never</em> public: the replay must work for
-   * every authenticated page, not only for the ones the members-only cut-over closed.
-   *
-   * <p>The consent gate is passed once up front, in a throwaway context, because it consumes the
-   * saved request on a member's very first login — which would make this assertion depend on
-   * whichever test happened to log this user in first.
+   * A deep link to {@code /hangar} survives the login: the member lands on the requested page, not
+   * the dashboard. The consent gate is passed first in a throwaway context.
    */
   @Test
   void aDeepLinkIsReplayedAfterTheLogin() {

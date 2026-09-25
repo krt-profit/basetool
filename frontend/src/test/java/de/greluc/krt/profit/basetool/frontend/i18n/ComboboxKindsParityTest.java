@@ -32,17 +32,9 @@ import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 /**
- * Build-time enforcement of the REQ-FE-011/REQ-FE-016 kind-specific combobox wording: every remote
- * source registered on {@code window.krtComboboxRemoteSources} (krt-user-search.js /
- * krt-catalog-search.js / krt-bank-account-search.js) must have a matching entry in the {@code
- * krtComboboxI18n.kinds} map rendered by {@code fragments/head.html} — and vice versa. A source
- * registered without its wording would silently fall back to the user-picker default (the exact
- * defect this map fixed: "Nutzer suchen oder wählen…" on the book-in material field), and an
- * orphaned kinds key would hide a marker rename; this test turns both drifts into a red build.
- *
- * <p>Reads the shipped JS registries and the head fragment from the test runtime classpath ({@code
- * src/main/resources} is on it), extracts the marker keys on both sides via anchored regexes, and
- * asserts set-equality — the same technique as {@code LiveSyncSectionMapParityTest}.
+ * Tests that every remote combobox source registered on {@code window.krtComboboxRemoteSources} has
+ * a {@code krtComboboxI18n.kinds} entry in {@code fragments/head.html}, and vice versa (REQ-FE-011,
+ * REQ-FE-016).
  */
 class ComboboxKindsParityTest {
 
@@ -68,10 +60,8 @@ class ComboboxKindsParityTest {
   private static final Pattern KINDS_ENTRY = Pattern.compile("'([\\w-]+)':\\s*\\{\\s*placeholder");
 
   /**
-   * Asserts set-equality between the markers registered in the three JS registry modules and the
-   * {@code krtComboboxI18n.kinds} keys in {@code fragments/head.html}, so a remote source can
-   * neither ship without its kind-specific placeholder/no-results wording nor leave an orphaned
-   * wording entry behind after a rename.
+   * Asserts set equality between the markers of the three JS registry modules and the {@code
+   * krtComboboxI18n.kinds} keys.
    *
    * @throws IOException if a classpath resource cannot be read
    */
@@ -102,11 +92,10 @@ class ComboboxKindsParityTest {
   }
 
   /**
-   * Reads a classpath resource as UTF-8 text, failing the test if it is missing (a moved or renamed
-   * registry module must break this gate loudly, not silently empty the scanned set).
+   * Reads a classpath resource as UTF-8 text, failing the test when it is missing.
    *
    * @param resource the absolute classpath resource path
-   * @return the resource content as a UTF-8 string
+   * @return the resource content
    * @throws IOException if the resource stream cannot be read
    */
   private static String readResource(String resource) throws IOException {

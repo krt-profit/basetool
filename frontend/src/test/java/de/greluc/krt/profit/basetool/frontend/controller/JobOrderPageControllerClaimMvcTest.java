@@ -51,11 +51,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC tests for the AJAX claim ("Eintragung") relay endpoints in {@link JobOrderWriteController}
- * (Phase 6, #346): create/update via {@code POST /orders/{id}/claims} and withdrawal via {@code
- * POST /orders/{id}/claims/{claimId}/withdraw}. Verifies the success path, the backend-status
- * propagation (409 conflict, 400 overclaim) that the detail-page JS turns into a clean toast, and
- * the role gate that returns 403 for a plain member without ever calling the backend.
+ * MVC tests for the AJAX claim endpoints of {@link JobOrderWriteController}: create/update and
+ * withdraw succeed, backend 409 and 400 statuses are relayed, and a plain member gets 403 without a
+ * backend call.
  */
 @SpringBootTest
 class JobOrderPageControllerClaimMvcTest {

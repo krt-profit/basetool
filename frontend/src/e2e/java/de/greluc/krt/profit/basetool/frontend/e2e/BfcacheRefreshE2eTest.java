@@ -33,27 +33,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Regression for the back/forward-cache (bfcache) staleness bug class (spec REQ-FE-008, ADR-0013):
- * a document the browser replays from its bfcache reinstates the in-memory DOM snapshot taken when
- * the user navigated away — it does NOT re-run the GET — so a server-rendered aggregate (a bank
- * account-card balance, a list count) shows its pre-edit value after the user edits the entity on a
- * forward page and navigates back. The in-place mutation foundation (REQ-FE-001..007) keeps only
- * the active document fresh; the global {@code pageshow} handler in {@code common-handlers.js}
- * closes the gap by reloading when {@code event.persisted} is true.
+ * Asserts that a page restored from the back/forward cache is reloaded by the global {@code
+ * pageshow} handler (REQ-FE-008).
  *
- * <p><b>Why a synthetic event.</b> A genuine bfcache restore is not reliably reproducible under
- * Playwright across all three engines (whether the engine bfcaches a given page is timing- and
- * heuristic-dependent). The signal the handler keys on — {@code PageTransitionEvent.persisted} — is
- * settable from the constructor, so dispatching {@code new PageTransitionEvent('pageshow',
- * {persisted: true})} drives the exact production code path deterministically on Chromium, Firefox
- * and WebKit.
- *
- * <p>The page under test is the neutral home page ({@code /}), which loads {@code
- * common-handlers.js} via the shared head fragment like every page; the behaviour is global, so the
- * assertion does not depend on the bank seeding it originally surfaced from. A marker stamped on
- * the live document proves the reload ran: the handler's {@code location.reload()} produces a fresh
- * document where the marker is gone, whereas a missing handler would leave the snapshot — and the
- * marker — in place, timing the wait out.
+ * <p>Dispatches a synthetic {@code pageshow} event with {@code persisted: true}, because a real
+ * bfcache restore is not reproducible across engines.
  */
 @Tag("e2e")
 class BfcacheRefreshE2eTest {
@@ -94,12 +78,8 @@ class BfcacheRefreshE2eTest {
   }
 
   /**
-   * Loads a page, stamps a marker on the live document, then dispatches a {@code
-   * pageshow{persisted:true}} — the exact signal a bfcache restore carries. The global handler must
-   * react with a full {@code location.reload()}, producing a fresh document where the marker is
-   * gone; its disappearance (awaited via {@code waitForFunction}, which survives the navigation) is
-   * the discriminator. A build missing the handler would leave the marker in place and time the
-   * wait out.
+   * Stamps a marker on the live document, dispatches {@code pageshow{persisted:true}} and waits for
+   * the marker to disappear through the handler's reload.
    */
   @Test
   void bfcacheRestoreForcesAFreshServerRender() {

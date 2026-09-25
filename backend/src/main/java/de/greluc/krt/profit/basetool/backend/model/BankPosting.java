@@ -39,14 +39,10 @@ import lombok.Setter;
 import lombok.ToString;
 
 /**
- * One signed leg of a {@link BankTransaction} (epic #556, REQ-BANK-004, ADR-0010), persisted in the
- * {@code bank_posting} table created by Flyway V153.
+ * One signed leg of a {@link BankTransaction} on the account dimension (REQ-BANK-004, ADR-0010).
  *
- * <p>Insert-only like its header — no {@code @Version}, never updated or deleted. The account
- * balance is {@code SUM(amount)} over its postings. Since ADR-0039 a posting carries
- * <strong>only</strong> the account dimension — the holder dimension lives in its own ledger
- * ({@link BankHolderPosting}); the legacy {@code holder_id} column was dropped in V181. Amounts are
- * signed whole-aUEC {@code NUMERIC(19,4)} values (ADR-0002) and never zero (V153 CHECK).
+ * <p>Insert-only, never updated or deleted. An account balance is {@code SUM(amount)} over its
+ * postings; amounts are signed, whole-aUEC and never zero.
  */
 @Entity
 @Table(name = "bank_posting")

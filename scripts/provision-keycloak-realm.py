@@ -4,118 +4,6 @@
 # Copyright (C) 2026 Lucas Greuloch
 #
 # SPDX-License-Identifier: GPL-3.0-only
-#
-# Brings a Keycloak realm to the PRODUCTION shape for everything the Basetool owns: its clients,
-# its two audience scopes and their mappers, the client-scope assignments, the mobile client's
-# DPoP client policy, the service-account roles, and the realm's token and session settings.
-#
-# WHY THIS EXISTS
-# ---------------
-# The production realm was built by hand, step by step, over four months (INGEST_KEYCLOAK_SETUP.md
-# steps 1-9, the mobile provisioner, the WP-K2 hardening). Nothing rebuilt the same shape anywhere
-# else, so the testing realm fell behind without anybody deciding it should: on 2026-09-22 it had
-# no audience mapper at all, no extractor, gateway or Android client, and no DPoP policy — which is
-# why the backend's audience gate (fail-closed at startup since APPSEC-08) could not be enabled
-# there. A realm that is only ever edited by hand drifts; this script is the shape written down
-# once, and re-applied.
-#
-# THE DESIRED STATE IS THE PRODUCTION SNAPSHOT OF 2026-09-22
-# ----------------------------------------------------------
-# Every value below was read off production with scripts/keycloak-config-snapshot.sql (read-only,
-# secret-free). Where production carries something that looks unintended, it is reproduced anyway
-# and marked `PROD-AS-IS` — the job is to make other realms match production, and a provisioner
-# that quietly "improves" on it would make the two disagree in exactly the places nobody looks.
-# Changing one of those is an owner decision for production first, then a one-line change here.
-#
-# THREE SUCH DECISIONS WERE TAKEN ON 2026-09-22 (ADR-0202 amendment). The desired state is
-# therefore production's shape MINUS three entries the owner retired, and each of them converges
-# away wherever it is found — production included, on its next apply:
-#   - `basetool-sc-extractor`: the unused authorization-code flow is off and its two loopback
-#     wildcard redirect URIs are gone (the extractor uses the device grant only; the hardening
-#     runbook's thirteenth finding);
-#   - `basetool-android`: `extractor-ingest` and `extractor-ingest-only` are not assigned (the app
-#     requests neither and never calls ingest; they only made an app token look like an ingest
-#     token to every gate except the `azp` allowlist);
-#   - `basetool-frontend`: the compose-internal `http://frontend:18081` redirect URI and web origin
-#     are gone (the frontend serves HTTPS only on 18081, so no real login could match them).
-#
-# ONE FIELD IS ADDED RATHER THAN RETIRED (2026-09-25, ADR-0202 amendment 3, REQ-SEC-071):
-# `basetool-frontend` gets `baseUrl` = `<public origin>/`. Production has none, so every Keycloak
-# error page for this client — above all `cookie_not_found` after a Discord login — renders without
-# the "back to application" link its own message tells the member to click. It converges onto
-# production on the owner's next apply.
-#
-# Environment-specific values — the public origin in redirect URIs, web origins and the
-# post-logout list, and Grafana's origin — come from arguments. Nothing production-specific is
-# hard-coded, so running it against testing never writes a production hostname.
-#
-# WHAT IT CHANGES, AND WHAT IT NEVER DOES
-# ---------------------------------------
-# * Additive and converging: missing objects are created, managed fields are set to the production
-#   value, missing list entries (redirect URIs, web origins, scope assignments) are added.
-# * Never deletes what it did not create. A client, mapper, redirect URI or scope assignment that
-#   exists only on the target realm is REPORTED and left alone. The deliberate exceptions are
-#   decisions, each named in a spec's `withheld_*` list or in REQ-SEC-035, never a general rule:
-#     - the Android client's realm-role scope is converged in BOTH directions, because REQ-SEC-035
-#       says a role added by hand must not survive the next provisioning run (the same rule the
-#       mobile provisioner applies);
-#     - the `withheld_*` entries: `offline_access` on the Android client (ADR-0131, as the mobile
-#       provisioner), and the three retirements of 2026-09-22 above;
-#     - a client this run CREATED gets exactly its production scope lists: Keycloak attaches the
-#       realm's default scopes on creation, and those are this run's own side effect, not
-#       somebody's configuration.
-# * Built-in Keycloak objects (account, admin-cli, the built-in scopes and their mappers, ...) are
-#   never touched. Their differences between two realms are Keycloak-version artefacts.
-# * Client secrets are never printed, logged or sent back. A confidential client this run creates
-#   gets a secret Keycloak generates; the script says where the operator reads it and which `.env`
-#   variables need it. One deliberate exception, and it is a WRITE, never a read: switching
-#   `basetool-frontend` to confidential (`--frontend-client confidential`, ADR-0001) sends the
-#   secret from $KEYCLOAK_FRONTEND_CLIENT_SECRET in this process's environment, over kcadm's stdin,
-#   so Keycloak and the frontend share the value the operator generated on the host. It is refused
-#   when the variable is unset, and never printed.
-#
-# THE FRONTEND'S CLIENT TYPE IS AN EXPLICIT CHOICE
-# ------------------------------------------------
-# ADR-0001 makes `basetool-frontend` confidential, and the switch is an owner rollout. Until and
-# after it, a run must neither undo it nor anticipate it by accident, so the type is managed only
-# when `--frontend-client public|confidential` says which; without the flag `publicClient` and
-# `clientAuthenticatorType` of an existing frontend client are left exactly as they are (a new one
-# is created public, production's shape before the rollout). Everything else about the client is
-# converged either way.
-#
-# THE ORDER IS LOAD-BEARING FOR ONE CLIENT
-# ----------------------------------------
-# While the DPoP policy is attached, Keycloak refuses every admin update to `basetool-android`
-# (ADR-0131, REQ-SEC-030, experiment E1). So when anything about that client (or the DPoP profile)
-# has to change, the policy is detached first, the client is written, the profile is merged and the
-# policy is re-attached last — the mobile provisioner's verified order. Both client-policy endpoints
-# replace realm-global lists wholesale, so every write merges by name and carries every other
-# policy and profile forward (merge_by_name, shared with the mobile provisioner).
-#
-# REUSE
-# -----
-# The Android client's definition, the DPoP profile and policy, the kcadm wrapper and the merge
-# helper are imported from scripts/provision-keycloak-mobile-client.py rather than copied, so the
-# mobile client has exactly one definition. That script stays the focused tool for the mobile client
-# alone; this one reconciles the whole Basetool-owned part of the realm and is diff-based, so a run
-# against a realm already in shape writes nothing.
-#
-# USAGE
-# -----
-# Same kcadm reach as the mobile provisioner: authenticate kcadm inside the container first
-# (docs/keycloak/README.md, "Runbook — provisioning the mobile client", steps 1-2), then
-#
-#   python3 provision-keycloak-realm.py --public-origin https://basetool.example \
-#       --kcadm-command "$KCADM"             # dry run
-#   python3 provision-keycloak-realm.py --public-origin https://basetool.example \
-#       --kcadm-command "$KCADM" --apply     # write
-#
-# Default is a dry run: it prints every planned change and writes nothing. `--apply` writes, then
-# re-plans and fails unless the second plan is empty — that is the idempotency check.
-#
-# Exit codes: 0 in shape (or applied and re-verified clean), 1 error or a problem that blocks the
-# shape, 2 dry run found changes to make, 3 applied except the service-account role grants, which
-# need an identity with `manage-users` — the script prints what to grant by hand.
 
 from __future__ import annotations
 
@@ -145,20 +33,13 @@ def _load_mobile_provisioner():
 mobile = _load_mobile_provisioner()
 KcadmError = mobile.KcadmError
 
-# Keycloak's own clients. Never touched and never reported as "only on this realm".
 BUILTIN_CLIENTS = frozenset({
     "account", "account-console", "admin-cli", "broker", "realm-management",
     "security-admin-console",
 })
 
-# The two scopes that stamp the audiences every resource server checks. Neither may be a realm
-# DEFAULT scope (hardening step 9a): a realm default is attached to every client created later.
 AUDIENCE_SCOPES = ("extractor-ingest", "extractor-ingest-only")
 
-# Realm token and session settings, as production has them (realm row + realm attributes of the
-# 2026-09-22 snapshot). Seconds throughout. revokeRefreshToken stays off realm-wide: rotation broke
-# the server-rendered frontend's sessions (REQ-SEC-012, INGEST_KEYCLOAK_SETUP.md step 4), which is
-# why refreshTokenMaxReuse is inert.
 REALM_SETTINGS: dict[str, bool | int] = {
     "revokeRefreshToken": False,
     "refreshTokenMaxReuse": 5,
@@ -174,7 +55,6 @@ REALM_SETTINGS: dict[str, bool | int] = {
     "oauth2DeviceCodeLifespan": 600,
 }
 
-# The shape both audience mappers share: access token and introspection only, never the ID token.
 AUDIENCE_MAPPER_CONFIG = {
     "access.token.claim": "true",
     "id.token.claim": "false",
@@ -182,9 +62,6 @@ AUDIENCE_MAPPER_CONFIG = {
     "lightweight.claim": "false",
 }
 
-# Scope attributes both audience scopes share. The empty strings are console artefacts; an empty
-# desired value also matches an absent one, so a Keycloak that drops empty attributes stays in
-# shape.
 _SCOPE_ATTRIBUTES_COMMON = {
     "consent.screen.text": "",
     "display.on.consent.screen": "true",
@@ -202,11 +79,6 @@ class ScopeSpec:
     mappers: list[dict]
 
 
-# extractor-ingest: aud=basetool-backend for the frontend's relayed token and the extractor's
-# (INGEST_KEYCLOAK_SETUP.md steps 2-3). Not in the `scope` claim.
-# extractor-ingest-only: aud=basetool-ingest, and its name IS in the `scope` claim — that is what
-# lets the gateway tell an extractor token from a browser session (step 7a, REQ-INGEST-011). The
-# two must never be merged.
 SCOPES = [
     ScopeSpec(
         name="extractor-ingest",
@@ -233,11 +105,9 @@ SCOPES = [
 class ClientSpec:
     """The production shape of one Basetool client.
 
-    `fields` are converged on every run; `create_only` (name, description) is written when the
-    client is created and never compared afterwards, because the snapshot does not record them.
-    List fields are unions: missing entries are added, extra ones are reported — except the
-    `withheld_*` entries, which are removed wherever they are found. Each of those is an owner
-    decision with its reason next to it, never a default.
+    `fields` are converged on every run; `create_only` is written only on creation. List fields
+    are unions: missing entries are added, extra ones reported, and `withheld_*` entries removed
+    wherever found.
     """
 
     client_id: str
@@ -260,10 +130,7 @@ class ClientSpec:
     env_vars_to_fill: list[str] = field(default_factory=list)
     env_doc_hint: str = ""
     frozen_by_dpop_policy: bool = False
-    # Fields written when the client is created but never compared or converged afterwards.
     unmanaged_fields: set[str] = field(default_factory=set)
-    # The environment variable whose value becomes the client secret when this run switches an
-    # existing public client to confidential (or creates it). Read at write time, never printed.
     secret_env: str | None = None
 
 
@@ -277,7 +144,6 @@ def _flags(*, public: bool, standard: bool, service_accounts: bool, full_scope: 
         "bearerOnly": False,
         "standardFlowEnabled": standard,
         "implicitFlowEnabled": False,
-        # No Basetool client uses the password grant. The e2e realm does, and must stay separate.
         "directAccessGrantsEnabled": False,
         "serviceAccountsEnabled": service_accounts,
         "consentRequired": False,
@@ -307,11 +173,9 @@ def _user_attribute_mapper(name: str, json_type: str, *, introspection: bool,
     return {"name": name, "protocolMapper": "oidc-usermodel-attribute-mapper", "config": config}
 
 
-# The built-in scopes every client created through the console carries, split as Keycloak does.
 _STANDARD_DEFAULT = ["acr", "basic", "email", "profile", "roles", "web-origins"]
 _STANDARD_OPTIONAL = ["address", "microprofile-jwt", "offline_access", "organization", "phone"]
 
-# Attributes the console writes on a confidential client and production therefore carries.
 _CONFIDENTIAL_ATTRIBUTES = {
     "backchannel.logout.revoke.offline.tokens": "false",
     "backchannel.logout.session.required": "true",
@@ -323,11 +187,7 @@ _CONFIDENTIAL_ATTRIBUTES = {
 
 
 def validate_origin(value: str, flag: str) -> str:
-    """Accept `scheme://host[:port]` exactly as a browser sends it in `Origin`, or fail loudly.
-
-    A trailing slash or a path would turn every derived redirect URI into a near-miss that Keycloak
-    rejects at login with `invalid_redirect_uri`, long after this script reported success.
-    """
+    """Accept a bare `scheme://host[:port]` origin (no path, no trailing slash), or exit."""
     if not re.fullmatch(r"https?://[a-z0-9.-]+(:[0-9]{1,5})?", value):
         raise SystemExit(
             f"{flag} must be a bare origin such as https://basetool.example — lower-case "
@@ -339,11 +199,8 @@ def client_specs(realm: str, public_origin: str, grafana_origin: str | None,
                  frontend_client: str | None = None) -> list[ClientSpec]:
     """Every Basetool client in its production shape, with the environment's origins filled in.
 
-    The Android client is not the last entry by accident: it is the only one the DPoP policy
-    freezes, and `plan` writes it inside the detached window.
-
-    `frontend_client` is `public`, `confidential` or None: None leaves an existing frontend
-    client's type as it is (ADR-0001's rollout is the owner's, not a side effect of a run).
+    The Android client comes last. `frontend_client` is `public`, `confidential` or None; None
+    leaves an existing frontend client's type unmanaged (ADR-0001).
     """
     frontend_confidential = frontend_client == "confidential"
     if frontend_client is None:
@@ -359,10 +216,6 @@ def client_specs(realm: str, public_origin: str, grafana_origin: str | None,
             fields={
                 **_flags(public=not frontend_confidential, standard=True,
                          service_accounts=False, full_scope=True, frontchannel_logout=False),
-                # ADR-0202 amendment 3 (2026-09-25): production has no baseUrl, so Keycloak's error pages for this client render no
-                # "back to application" link. The `cookie_not_found` page of a Discord login that
-                # returns without Keycloak's cookies tells the member to click exactly that link,
-                # so without it the page is a dead end (REQ-SEC-071).
                 "baseUrl": f"{public_origin}/",
             },
             unmanaged_fields=(set() if frontend_client
@@ -386,8 +239,6 @@ def client_specs(realm: str, public_origin: str, grafana_origin: str | None,
                 "pkce.code.challenge.method": "S256",
                 "post.logout.redirect.uris": f"{public_origin}/*##{public_origin}",
                 "standard.token.exchange.enabled": "false",
-                # PROD-AS-IS: inert SAML leftovers on an OIDC client. Mirrored only so a snapshot
-                # diff of the two realms stays clean.
                 "saml.assertion.signature": "false",
                 "saml.authnstatement": "false",
                 "saml.client.signature": "false",
@@ -400,14 +251,9 @@ def client_specs(realm: str, public_origin: str, grafana_origin: str | None,
             },
             redirect_uris=[f"{public_origin}/*", f"{public_origin}/login/oauth2/code/keycloak"],
             web_origins=[public_origin],
-            # Owner decision 2026-09-22 (hardening step 7's leftover): the frontend serves HTTPS
-            # only on 18081, and its redirect URI is built from the forwarded public origin, so no
-            # real login can arrive from `http://frontend:18081`. The e2e realm is separate.
             withheld_redirect_uris=["http://frontend:18081/*"],
             withheld_web_origins=["http://frontend:18081"],
             withheld_reason="compose-internal origin retired 2026-09-22",
-            # No `acr`, `basic` or `organization`: the client predates them, which is why it
-            # carries its own `sub` mapper below.
             default_scopes=["email", "extractor-ingest", "profile", "roles", "web-origins"],
             optional_scopes=["address", "microprofile-jwt", "offline_access", "phone"],
             mappers=[
@@ -416,7 +262,6 @@ def client_specs(realm: str, public_origin: str, grafana_origin: str | None,
                 _user_attribute_mapper("discord_guild_nickname", "String", introspection=True,
                                        lightweight=True),
                 {
-                    # Provided by the keycloak-spi provider JAR (ADR-0030).
                     "name": "discord_user_id",
                     "protocolMapper": "discord-federated-identity-mapper",
                     "config": {
@@ -457,8 +302,6 @@ def client_specs(realm: str, public_origin: str, grafana_origin: str | None,
             web_origins=[],
             default_scopes=[*_STANDARD_DEFAULT, "service_account"],
             optional_scopes=list(_STANDARD_OPTIONAL),
-            # view-users + view-realm for the user sync (docs/keycloak/README.md); manage-users for
-            # the admin-side account writes (merge, Discord link).
             service_account_roles={
                 "<realm>": [f"default-roles-{realm}"],
                 "realm-management": ["manage-users", "view-realm", "view-users"],
@@ -476,8 +319,6 @@ def client_specs(realm: str, public_origin: str, grafana_origin: str | None,
                         "oauth2.jwt.authorization.grant.enabled": "false"},
             redirect_uris=[],
             web_origins=[],
-            # PROD-AS-IS: both ingest scopes, inherited from the realm defaults at creation
-            # (hardening step 9b left them to the gateway's own audience needs).
             default_scopes=[*_STANDARD_DEFAULT, "extractor-ingest", "extractor-ingest-only",
                             "service_account"],
             optional_scopes=list(_STANDARD_OPTIONAL),
@@ -493,10 +334,6 @@ def client_specs(realm: str, public_origin: str, grafana_origin: str | None,
         ClientSpec(
             client_id="basetool-sc-extractor",
             kind="public, device grant (the desktop SC Extractor)",
-            # Owner decision 2026-09-22 (the hardening runbook's thirteenth finding): the extractor
-            # uses the device grant only (`DeviceGrantClient` sends `device_code` and
-            # `refresh_token` grants and nothing else), so the authorization-code flow and its
-            # two loopback wildcard redirect URIs are off. The device grant needs no redirect URI.
             fields=_flags(public=True, standard=False, service_accounts=False, full_scope=False,
                           frontchannel_logout=True),
             create_only={"name": "Basetool SC Extractor"},
@@ -508,8 +345,6 @@ def client_specs(realm: str, public_origin: str, grafana_origin: str | None,
                 "client.introspection.response.allow.jwt.claim.enabled": "false",
                 "client.use.lightweight.access.token.enabled": "false",
                 "display.on.consent.screen": "false",
-                # Stays false: DPoP binds whenever the extractor sends a proof (step 8); this
-                # switch would only ENFORCE it and break an older extractor.
                 "dpop.bound.access.tokens": "false",
                 "frontchannel.logout.session.required": "true",
                 "id.token.as.detached.signature": "false",
@@ -572,8 +407,7 @@ def client_specs(realm: str, public_origin: str, grafana_origin: str | None,
 def android_spec(public_origin: str) -> ClientSpec:
     """`basetool-android`, built from the mobile provisioner's own definition.
 
-    The session bounds are the realm's SSO values this script sets (30 d / 180 d), which are
-    exactly the mobile provisioner's intended bounds — so no clamping is needed here.
+    Session bounds are capped at this script's realm SSO settings.
     """
     idle = min(mobile.SESSION_IDLE_SECONDS, int(REALM_SETTINGS["ssoSessionIdleTimeout"]))
     maximum = min(mobile.SESSION_MAX_SECONDS, int(REALM_SETTINGS["ssoSessionMaxLifespan"]))
@@ -594,12 +428,6 @@ def android_spec(public_origin: str) -> ClientSpec:
         web_origins=rep["webOrigins"],
         default_scopes=list(_STANDARD_DEFAULT),
         optional_scopes=[s for s in _STANDARD_OPTIONAL if s != "offline_access"],
-        # offline_access: ADR-0131 — an offline token outlives every session bound of this client.
-        # The two ingest scopes: owner decision 2026-09-22. They were inherited from the realm
-        # defaults when the client was provisioned; the app requests only `openid profile email
-        # roles`, never calls ingest, and takes its `aud=basetool-backend` from its own
-        # `backend-audience` mapper — so all they did was make an app token pass the gateway's
-        # audience and scope gates, leaving the `azp` allowlist as the only thing in the way.
         withheld_scopes=["offline_access", "extractor-ingest", "extractor-ingest-only"],
         withheld_reason="ADR-0131 / ingest scopes retired 2026-09-22",
         mappers=[{
@@ -617,7 +445,7 @@ def android_spec(public_origin: str) -> ClientSpec:
 
 
 class RealmKcadm(mobile.Kcadm):
-    """The mobile provisioner's kcadm wrapper plus the two call shapes it never needed."""
+    """The mobile provisioner's kcadm wrapper plus realm updates and link PUTs."""
 
     def update_realm(self, payload: dict, what: str) -> None:
         """Partial update of the realm representation, which lives above the `-r` paths."""
@@ -628,8 +456,7 @@ class RealmKcadm(mobile.Kcadm):
     def link(self, path: str, what: str) -> None:
         """PUT a link resource (a client-scope assignment).
 
-        These paths answer PUT and DELETE but not GET, so kcadm's default GET-then-merge fails on
-        them; `-n` skips the merge (hardening runbook step 9). The body is an empty object.
+        These paths answer no GET, so `-n` skips kcadm's merge; the body is an empty object.
         """
         self._run(["update", path, "-r", self.realm, "-n", "-f", "-"], stdin="{}")
         print(f"  update {path} — {what}")
@@ -646,7 +473,7 @@ class Change:
 
 
 def _normalise(value):
-    """Keycloak returns booleans and numbers as JSON values in one place and strings in another."""
+    """Normalise a value to a string: booleans lower-case, ``None`` empty."""
     if isinstance(value, bool):
         return str(value).lower()
     return "" if value is None else str(value)
@@ -660,11 +487,7 @@ def _equal(desired, live) -> bool:
 
 
 def _matches(desired, live) -> bool:
-    """True when `live` carries every key of `desired` with an equal value, recursively.
-
-    Used for the client profile and policy: Keycloak may add keys of its own on read, and those
-    must not make an unchanged policy look drifted, or every run would detach and re-attach it.
-    """
+    """True when `live` carries every key of `desired` with an equal value, recursively; extra keys are ignored."""
     if isinstance(desired, dict):
         return isinstance(live, dict) and all(_matches(v, live.get(k)) for k, v in desired.items())
     if isinstance(desired, list):
@@ -674,11 +497,7 @@ def _matches(desired, live) -> bool:
 
 
 def _redact(payload: dict) -> dict:
-    """A client representation with nothing credential-shaped in it, for an update PUT.
-
-    Keycloak keeps the stored secret when the field is absent, so leaving it out changes nothing
-    and means the secret never passes through this process on its way back.
-    """
+    """A client representation without `secret` and `registrationAccessToken`; Keycloak keeps the stored secret."""
     return {key: value for key, value in payload.items()
             if key not in {"secret", "registrationAccessToken"}}
 
@@ -686,9 +505,7 @@ def _redact(payload: dict) -> dict:
 class Planner:
     """Reads the live realm, compares it with the production shape, and lists what to write.
 
-    Nothing is written while planning. Every closure resolves ids when it RUNS, not when it is
-    planned, so a change planned for a client that does not exist yet finds the id the earlier
-    `create` produced.
+    Nothing is written while planning; each closure resolves ids when it runs.
     """
 
     def __init__(self, kc: RealmKcadm, realm: str, specs: list[ClientSpec]):
@@ -702,7 +519,6 @@ class Planner:
         self.followup_notes: list[str] = []
         self._scope_cache: dict[str, dict] | None = None
 
-    # -- live lookups (read at execution time as well as at plan time) -------------------------
 
     def find_client(self, client_id: str) -> dict | None:
         found = self.kc.get("clients", {"clientId": client_id}) or []
@@ -728,7 +544,6 @@ class Planner:
             raise KcadmError(f"client scope '{name}' does not exist in realm '{self.realm}'")
         return scope["id"]
 
-    # -- planning ---------------------------------------------------------------------------
 
     def section(self, title: str) -> list[Change]:
         changes: list[Change] = []
@@ -742,7 +557,6 @@ class Planner:
         self.plan_scopes()
         for spec in (s for s in self.specs if not s.frozen_by_dpop_policy):
             self.plan_client(spec)
-        # Everything from here on is written while the DPoP policy is detached, if it has to be.
         frozen_index = len(self.sections)
         frozen_changes: list[Change] = []
         for spec in (s for s in self.specs if s.frozen_by_dpop_policy):
@@ -759,7 +573,6 @@ class Planner:
             changes.append(Change(f"~ {key}: {_normalise(live.get(key)) or '<absent>'} -> "
                                   f"{_normalise(value)}", lambda: None))
         if diff:
-            # One write for all of them; the per-field lines above carry no action of their own.
             changes.append(Change("  (one partial update of the realm)",
                                   lambda d=dict(diff): self.kc.update_realm(d, "token settings")))
 
@@ -879,7 +692,6 @@ class Planner:
                       if k not in spec.unmanaged_fields and not _equal(v, live.get(k))}
         if spec.secret_env and "publicClient" in field_diff and _normalise(
                 live.get("publicClient")) == "true":
-            # The switch to confidential: Keycloak must hold the secret the frontend already sends.
             if not os.environ.get(spec.secret_env):
                 self.problems.append(
                     f"{spec.client_id}: switching it to confidential needs ${spec.secret_env} in "
@@ -1008,7 +820,6 @@ class Planner:
             print(f"  NOTE: {self._confidential_client_note(spec)}")
 
     def _update_client(self, spec: ClientSpec, planned_live: dict) -> None:
-        # Re-read: an earlier change in this run may have touched the client.
         live = self.find_client(spec.client_id) or planned_live
         switching_to_confidential = (spec.secret_env is not None
                                      and _normalise(live.get("publicClient")) == "true"
@@ -1016,7 +827,6 @@ class Planner:
         payload = dict(live)
         payload.update({k: v for k, v in spec.fields.items() if k not in spec.unmanaged_fields})
         payload["attributes"] = {**(live.get("attributes") or {}), **spec.attributes}
-        # Union with what the realm has (a target-only entry stays), minus the withheld entries.
         payload["redirectUris"] = [
             u for u in list(live.get("redirectUris") or []) + [
                 u for u in spec.redirect_uris if u not in (live.get("redirectUris") or [])]
@@ -1027,7 +837,6 @@ class Planner:
             if o not in spec.withheld_web_origins]
         payload = _redact(payload)
         if switching_to_confidential:
-            # The one secret this script ever sends, and only on the switch (header, ADR-0001).
             payload["secret"] = os.environ[spec.secret_env]
         self.kc.write("update", f"clients/{live['id']}", payload,
                       f"client '{spec.client_id}' updated")
@@ -1080,7 +889,6 @@ class Planner:
                         f"without it predates the Keycloak version production runs.")
                     continue
                 if name in other:
-                    # Assigned with the other type: move it. Not a deletion of anybody's object.
                     changes.append(Change(
                         f"~ scope '{name}': {'optional' if kind == 'default' else 'default'} "
                         f"-> {kind}",
@@ -1293,7 +1101,6 @@ class Planner:
                     f"on inherits its audience. Production removed it (hardening step 9a); remove "
                     f"it here by hand: Client scopes -> {name} -> Assigned type: None")
 
-    # -- output -----------------------------------------------------------------------------
 
     def change_count(self) -> int:
         """The differences the plan lists — detail and bookkeeping lines are not counted."""
@@ -1403,10 +1210,8 @@ def main() -> int:
         print("\n[verify] re-planning against the realm as it is now")
         check = Planner(kc, args.realm, specs)
         check.plan()
-        check.manual = []  # reported below, from the run that tried to grant them
+        check.manual = []
         check.print_tail()
-        # A service-account grant this identity may not make is already on the manual list; it
-        # is not a failure of the apply.
         remaining = [(title, change) for title, section in check.sections for change in section
                      if not (change.service_account and planner.manual)]
         if remaining or check.problems:

@@ -39,8 +39,8 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Unit tests for the one-click ingest handoff reader (epic #639): single-use consume, per-subject
- * scoping, kind matching, and graceful degradation (REQ-INGEST-003/-004).
+ * Unit tests for the one-click ingest handoff reader: single-use consume, per-subject scoping, kind
+ * matching and graceful degradation (REQ-INGEST-003, REQ-INGEST-004).
  */
 class IngestHandoffServiceTest {
 

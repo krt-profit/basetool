@@ -46,21 +46,9 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Data-level coverage for {@link InventoryItemRepository#findMergeGroupForUpdate} against the real
- * Postgres test schema (Testcontainers + Flyway via the {@code test} profile) — the runtime
- * stock-merge grouping query (REQ-INV-026, ADR-0097). The query's risky shape (the NULL-as-equal
- * predicate on the nullable {@code owningOrgUnit} dimension, the correlated {@code NOT EXISTS}
- * offer exclusion, and {@code @Lock(PESSIMISTIC_WRITE)} + {@code ORDER BY}) can only be validated
- * against a real database — a mock cannot catch a mis-generated join that silently drops NULL rows.
- * The {@link InventoryStockMergeTest} sibling only mocks this call, so its correctness is pinned
- * here.
- *
- * <p>Since Variante C (REQ-INV-027) the merge-group key is the row's <em>physical</em> identity
- * only — user · material · location · quality · personal · owningOrgUnit; the former {@code
- * jobOrder} / {@code mission} earmark dimensions are no longer part of it (they moved onto the
- * allocation tables). {@code owningOrgUnit} is the sole nullable dimension, matched with the {@code
- * ((:x IS NULL AND i.y IS NULL) OR i.y.id = :x)} JPQL predicate, so exercising the NULL-vs-set
- * matching on it covers that predicate's shape.
+ * Verifies {@link InventoryItemRepository#findMergeGroupForUpdate} against PostgreSQL
+ * (REQ-INV-026): the physical merge key, NULL-vs-set matching on {@code owningOrgUnit}, offer
+ * exclusion and locking.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -235,8 +223,8 @@ class InventoryMergeGroupDataTest {
   }
 
   /**
-   * Persists one game-item stock row sharing the fixture user / location, with {@code material} and
-   * {@code quality} {@code NULL} (the V220 catalog shape) and no owning org unit.
+   * Persists a game-item stock row for the fixture user and location, without material, quality or
+   * owning org unit.
    *
    * @param gameItem the stocked game item.
    * @param amount the row's quantity.
@@ -254,10 +242,7 @@ class InventoryMergeGroupDataTest {
   }
 
   /**
-   * Persists one inventory row sharing the fixture user / material / location, with the given
-   * amount, quality, personal flag and (nullable) owning org unit. The row carries no job-order or
-   * mission allocations, so its earmark dimensions play no part in the merge-group key, which since
-   * Variante C is the row's physical identity only.
+   * Persists an unallocated inventory row for the fixture user, material and location.
    *
    * @param amount the row's quantity.
    * @param quality the quality grade.

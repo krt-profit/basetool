@@ -24,10 +24,8 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Data transfer record carrying Mission Frequency payload.
- *
- * <p>Exactly one of {@code frequencyType} (a global type) or {@code name} (a custom,
- * mission-specific label) is populated, mirroring the dual-mode backend entity (REQ-MISSION-014).
+ * One radio frequency of a mission: exactly one of {@code frequencyType} (a global type) or {@code
+ * name} (a custom label) is set (REQ-MISSION-014).
  *
  * @param id the frequency row id.
  * @param frequencyType the referenced global frequency type, or {@code null} for a custom channel.

@@ -34,15 +34,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Functional flow: the personal hangar paginates and filters server-side (REQ-HANGAR-002). Seeds
- * enough ships to span more than one page, then drives the UI to verify the shared pagination
- * component renders, that a page click re-swaps the table <em>in place</em> (no full reload), and
- * that the server-side search box narrows the list without a navigation.
- *
- * <p>Assertions are deliberately structural (a full page caps at the chosen size, the page
- * indicator advances, a no-match search empties the table) rather than asserting exact per-page
- * contents, so the test stays robust regardless of how many other ships already exist in the seeded
- * stack.
+ * Verifies server-side pagination and search of the personal hangar (REQ-HANGAR-002): a page click
+ * and a search both re-render the table in place. Assertions are structural, so other ships in the
+ * stack do not affect them.
  */
 @Tag("e2e")
 class HangarPaginationE2eTest {

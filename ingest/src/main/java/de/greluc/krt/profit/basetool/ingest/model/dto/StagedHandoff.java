@@ -21,10 +21,7 @@ package de.greluc.krt.profit.basetool.ingest.model.dto;
 
 /**
  * The value staged in Redis for a one-time browser handoff: the draft kind plus the backend's draft
- * response verbatim as a JSON string (the gateway never interprets the draft — REQ-INGEST-001). The
- * frontend reads this under the {@code (sub, handoffId)} key, deserialises {@code draftJson} into
- * its own mirror DTO, and pre-fills the review form (REQ-INGEST-004). This record is the shared
- * wire shape the frontend mirrors.
+ * response verbatim (REQ-INGEST-004).
  *
  * @param kind which draft this is ({@code REFINERY} / {@code BLUEPRINT})
  * @param draftJson the backend draft response, stored verbatim as JSON text

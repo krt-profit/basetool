@@ -22,20 +22,17 @@ package de.greluc.krt.profit.basetool.backend.dto.p4k;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 /**
- * One manufacturer record from the P4K catalog ({@code SCItemManufacturer}). Reconciled against the
- * local {@code manufacturer} table by {@link #guid} (= {@code scwiki_uuid}) first, then {@link
- * #code} (= {@code abbreviation}), then {@link #name} (= display {@code name}).
+ * One manufacturer record from the P4K catalog, matched to {@code manufacturer} by {@link #guid}
+ * ({@code scwiki_uuid}) first, then {@link #code} ({@code abbreviation}), then {@link #name}.
  *
- * <p>{@code @JsonIgnoreProperties(ignoreUnknown = true)} keeps the parse tolerant of catalog
- * additions. Any field may be {@code null} when the source DCB / localization did not resolve it.
+ * <p>Any field may be {@code null} when the source did not resolve it.
  *
  * @param guid DataForge {@code __ref} GUID (string form of {@code manufacturer.scwiki_uuid})
  * @param code short manufacturer code (e.g. {@code "UPS"}); matches {@code
  *     manufacturer.abbreviation}
  * @param name English display name (e.g. {@code "Upsiders"}); matches {@code manufacturer.name}
  * @param nameDe German display name, or {@code null}
- * @param desc English description, enriched into {@code manufacturer.description} when currently
- *     null
+ * @param desc English description, filled into {@code manufacturer.description} when null
  * @param descDe German description, or {@code null}
  * @param nameKey raw {@code @LOC} name localization key (forensic; not persisted)
  * @param descKey raw {@code @LOC} description localization key (forensic; not persisted)

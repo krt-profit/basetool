@@ -35,17 +35,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.Authentication;
 
 /**
- * Unit tests for {@link MissionViewerAccessService}, the {@code MissionViewerAccess} adapter the
- * {@code MissionMapper} consults for guest field redaction and manager-management-button
- * visibility.
- *
- * <p>Because this class is a pure delegation seam, the tests assert the wiring rather than any
- * behaviour: {@link MissionViewerAccessService#isAuthenticated()} must route to {@link
- * AuthHelperService}, and both mission checks must fold the {@code (missionId)} call shape into the
- * {@code (missionId, Authentication)} shape of {@link MissionSecurityService} using the raw
- * authentication from {@link AuthHelperService}. In particular {@code canManageManagers} must hit
- * {@link MissionSecurityService#canManageManagers} and never {@code canManageMission} — a mis-wire
- * there would silently over- or under-expose mission-management controls with no other guard.
+ * Unit tests for {@link MissionViewerAccessService}, verifying its delegation to {@link
+ * AuthHelperService} and {@link MissionSecurityService}, in particular that {@code
+ * canManageManagers} calls {@link MissionSecurityService#canManageManagers}.
  */
 @ExtendWith(MockitoExtension.class)
 class MissionViewerAccessServiceTest {

@@ -33,18 +33,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Pins the refinery-location picker source (REQ-REFINERY-020): eligibility follows the derived
- * {@code hasRefineryTerminal} flag, never UEX's parent-level {@code hasRefinery} claim.
- *
- * <p>The two disagreement cases are the reported bug. UEX reports {@code has_refinery = 0} for
- * MIC-L5 Modern Icarus Station, ARC-L4 Faint Glen Station and Patch City while listing a live
- * refinery terminal at each, and reports {@code has_refinery = 1} for four People's Service
- * Stations that host no refinery terminal at all. How the flag itself is recomputed from the
- * terminal table is pinned by {@code UexUniverseSyncRefineryFlagTest}.
- *
- * <p>Eligibility carries a second condition: the location must not be hidden. This query was once
- * the only Location lookup that ignored the admin's {@code hidden} flag, which let a hidden
- * refinery stay selectable here while disappearing from the storage pickers on the very same page.
+ * Verifies that the refinery-location picker uses the derived {@code hasRefineryTerminal} flag, not
+ * UEX's {@code hasRefinery} claim, and excludes hidden locations (REQ-REFINERY-020).
  */
 @SpringBootTest
 @ActiveProfiles("test")

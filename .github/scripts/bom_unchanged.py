@@ -1,19 +1,8 @@
 #!/usr/bin/env python3
 """Exit 0 when two CycloneDX JSON SBOMs are equal ignoring volatile fields.
 
-The cyclonedx-gradle plugin rotates ``serialNumber`` and ``metadata.timestamp``
-on every run (``includeBomSerialNumber = true`` in every shipped module's build
-script -- backend, frontend, ingest and keycloak-spi, see REQ-OPS-025),
-so a regeneration that did *not* actually change the dependency graph still
-yields a textual diff. This helper strips exactly those two volatile fields and
-compares the rest, letting the release workflow tell a real component change
-(worth committing) from pure churn (discard it). That is the deliberate handling
-of the serial-number flap called out in issue #416.
-
-Everything else -- the component list, their versions, licenses, the plugin
-version under ``metadata.tools``, the project component -- is compared as-is, so
-a genuine dependency change (e.g. asciidoctorj disappearing after #414, or a
-version bump) is still detected and surfaced as "changed".
+The volatile fields are ``serialNumber`` and ``metadata.timestamp``; everything else
+is compared as-is (REQ-OPS-025).
 
 Exit codes:
   0  -> semantically identical (only serialNumber / timestamp differ) -> churn.
@@ -30,11 +19,7 @@ import sys
 
 
 def normalised(path: str) -> dict:
-    """Load a CycloneDX JSON SBOM with the per-run volatile fields stripped.
-
-    Removes the top-level ``serialNumber`` and ``metadata.timestamp`` so two BOMs
-    built from the same dependency graph compare equal despite the plugin
-    rotating those on every run.
+    """Load a CycloneDX JSON SBOM without ``serialNumber`` and ``metadata.timestamp``.
 
     :param path: filesystem path to a CycloneDX JSON document.
     :return: the parsed BOM mapping without its volatile fields.
@@ -58,7 +43,7 @@ def main() -> None:
     try:
         old = normalised(old_path)
     except (OSError, ValueError):
-        sys.exit(1)  # no readable committed baseline -> treat as changed
+        sys.exit(1)
     try:
         new = normalised(new_path)
     except (OSError, ValueError):

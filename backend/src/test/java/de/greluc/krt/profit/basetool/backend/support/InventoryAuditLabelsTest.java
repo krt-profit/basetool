@@ -29,11 +29,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit tests for {@link InventoryAuditLabels#label(InventoryItem)} — the deletion-proof audit
- * subject snapshot. Since V220 the row is catalog-discriminated (REQ-INV-029), so the label's
- * catalog branch must render the game-item name for an item row; without it every reused audit
- * event on item stock would log the em-dash fallback ({@code — @ <location>}) and the audit trail
- * would lose the affected item's identity.
+ * Unit tests for {@link InventoryAuditLabels#label(InventoryItem)}, the audit subject snapshot,
+ * including the game-item name for an item-catalog row (REQ-INV-029).
  */
 class InventoryAuditLabelsTest {
 

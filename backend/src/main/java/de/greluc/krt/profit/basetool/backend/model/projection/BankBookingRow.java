@@ -25,32 +25,27 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * JPQL constructor projection of one booking-history row on the account detail page: the account
- * posting joined with its transaction header in a single statement (no N+1, REQ-BANK-018). Since
- * ADR-0039 the posting carries no holder; the holder annotation and — for {@code TRANSFER} rows —
- * the counter account/holder are resolved by batched IN-queries over the page's transaction ids
- * (see {@code BankAccountService}).
+ * JPQL projection of one booking-history row on the account detail page: the account posting joined
+ * with its transaction header (REQ-BANK-018). Holder and counter account are resolved separately in
+ * batch.
  *
  * @param postingId the leg's id (stable row identity for the page)
  * @param transactionId the owning transaction's id (reversal target, counter-leg lookup key)
  * @param type the transaction type driving the row's chip rendering
- * @param amount the signed amount of THIS account's leg
+ * @param amount the signed amount of this account's leg
  * @param note the transaction's free-text note, may be {@code null}
- * @param justification the transaction's free-text justification (Begr&uuml;ndung) — only a {@code
- *     WITHDRAWAL} / {@code TRANSFER} carries one (REQ-BANK-045), {@code null} otherwise
- * @param staffNote the booking bank employee's own free-text note ("Notiz Bankmitarbeiter",
- *     REQ-BANK-054); {@code null} when none was recorded, and always {@code null} on an org-unit
- *     member-facing row, where it is redacted like the Halter columns (REQ-BANK-038)
+ * @param justification the Begr&uuml;ndung of a {@code WITHDRAWAL} / {@code TRANSFER}
+ *     (REQ-BANK-045), {@code null} otherwise
+ * @param staffNote the booking bank employee's note (REQ-BANK-054); {@code null} when none, and
+ *     always {@code null} on an org-unit member-facing row (REQ-BANK-038)
  * @param createdAt the booking instant (UTC)
  * @param reversedTransactionId for {@code REVERSAL} rows the corrected transaction's id, else
  *     {@code null}
- * @param transferFee the in-game transfer fee added on top of this transaction's entered amount and
- *     borne by the debited source (ADR-0052, REQ-BANK-033); {@code 0} for non-fee transactions and
- *     same-holder transfers
- * @param counterpartyHandle for a {@code DEPOSIT}/{@code WITHDRAWAL} the recorded counterparty's
- *     handle snapshot (REQ-BANK-044), else {@code null}
- * @param counterpartyOrgUnitName the counterparty's org-unit name snapshot, or {@code null} when no
- *     counterparty or no org unit was recorded
+ * @param transferFee the in-game transfer fee borne by the debited source (REQ-BANK-033); {@code 0}
+ *     for non-fee transactions and same-holder transfers
+ * @param counterpartyHandle for a {@code DEPOSIT}/{@code WITHDRAWAL} the counterparty's handle
+ *     snapshot (REQ-BANK-044), else {@code null}
+ * @param counterpartyOrgUnitName the counterparty's org-unit name snapshot, or {@code null}
  */
 public record BankBookingRow(
     UUID postingId,

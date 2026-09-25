@@ -42,33 +42,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * SpEL-level authorisation for the delegated appointment ladder (epic #800, REQ-ROLE-004). It
- * answers "may this <em>non-admin</em> caller appoint / change / revoke rank R on org unit X?".
- * Admin is handled separately by the {@code hasRole('ADMIN')
- * or @orgRoleManagementSecurityService.canX(...)} shape at each endpoint — so the verdicts here
- * deliberately <strong>never</strong> consult {@code isAdmin()}; an admin never reaches these
- * methods for the deciding answer.
+ * SpEL authorization for the delegated appointment ladder: may a non-admin caller appoint, change
+ * or revoke a rank on an org unit (REQ-ROLE-004).
  *
- * <p>The ladder is a strictly-higher-tier rule, which makes self-promotion structurally impossible
- * (to grant rank R you must hold a strictly-higher rank, which you cannot grant yourself):
- *
- * <ul>
- *   <li>pure {@code OL_MEMBER} → appoints / removes a Bereichsleiter (any Bereich);
- *   <li>{@code BEREICHSLEITER} of a Bereich → appoints Koordinator / Operator on <em>that</em>
- *       Bereich, and the Staffelleiter / SK-Lead of its child Staffeln / SKs;
- *   <li>{@code STAFFELLEITER} of a squadron → appoints Kommandoleiter / stellv. / Ensign and
- *       manages the Kommandogruppen of <em>that</em> squadron;
- *   <li>appointing an {@code OL_MEMBER} has no rung — it is admin-only (no method here).
- * </ul>
- *
- * <p>The verdict is computed from the caller's own membership ranks only (resolved via {@link
- * AuthHelperService#currentUserId()}); it never reads the admin-pin header, contextual authorities,
- * or {@link OwnerScopeService}. The parent Bereich of a Staffel/SK is always derived from the
- * target unit's persisted {@code parent} edge — never a request-supplied id — closing the
- * cross-Bereich escalation hole. The absence of an {@code OwnerScopeService} dependency is
- * ArchUnit-pinned.
- *
- * <p>Class-level {@code @Transactional(readOnly = true)} matches the other authorisation beans.
+ * <p>Granting a rank requires a strictly higher rank, decided only from the caller's own
+ * memberships; the parent Bereich of a Staffel or SK is always read from its persisted edge. Admin
+ * access is decided at the endpoint, never here.
  */
 @Service
 @RequiredArgsConstructor
@@ -86,15 +65,13 @@ public class OrgRoleManagementSecurityService {
   private final KommandoGroupRepository kommandoGroupRepository;
 
   /**
-   * Whether the caller may assign the given squadron rank on the squadron: a {@code STAFFELLEITER}
-   * appointment needs the Bereichsleiter of the squadron's parent Bereich; a Kommandoleiter /
-   * stellv. / Ensign appointment needs the Staffelleiter of the squadron itself (no
-   * self-promotion).
+   * Whether the caller may assign the rank on the squadron: a Staffelleiter needs the parent
+   * Bereich's Bereichsleiter, the lower ranks need the squadron's Staffelleiter.
    *
-   * @param squadronId the squadron whose rank is being assigned; never {@code null}.
-   * @param rank the squadron rank to assign; non-squadron ranks always deny.
-   * @param authentication the current authentication; anonymous / {@code null} denies.
-   * @return {@code true} iff the delegated caller may make this assignment.
+   * @param squadronId the squadron whose rank is being assigned
+   * @param rank the rank to assign; non-squadron ranks deny
+   * @param authentication the current authentication; anonymous or {@code null} denies
+   * @return {@code true} iff the caller may make this assignment
    */
   public boolean canAssignSquadronRank(
       @NotNull UUID squadronId,
@@ -113,14 +90,13 @@ public class OrgRoleManagementSecurityService {
   }
 
   /**
-   * Whether the caller may clear the target member's current squadron rank: routed by that rank —
-   * removing a Staffelleiter needs the parent Bereichsleiter, removing a Kommandoleiter / stellv. /
-   * Ensign needs the squadron's Staffelleiter.
+   * Whether the caller may clear the member's current squadron rank, routed by that rank like
+   * {@link #canAssignSquadronRank}.
    *
-   * @param squadronId the squadron; never {@code null}.
-   * @param userId the member whose rank is being cleared; never {@code null}.
-   * @param authentication the current authentication; anonymous / {@code null} denies.
-   * @return {@code true} iff the delegated caller may clear the member's rank.
+   * @param squadronId the squadron
+   * @param userId the member whose rank is being cleared
+   * @param authentication the current authentication; anonymous or {@code null} denies
+   * @return {@code true} iff the caller may clear the member's rank
    */
   public boolean canRemoveSquadronRank(
       @NotNull UUID squadronId, @NotNull UUID userId, @Nullable Authentication authentication) {
@@ -153,12 +129,12 @@ public class OrgRoleManagementSecurityService {
   }
 
   /**
-   * Whether the caller may update / delete the given Kommandogruppe — the Staffelleiter of the
-   * group's squadron (the squadron is read from the group's persisted edge, never a request value).
+   * Whether the caller is the Staffelleiter of the Kommandogruppe's persisted squadron and may thus
+   * update or delete it.
    *
-   * @param groupId the Kommandogruppe; never {@code null}.
-   * @param authentication the current authentication; anonymous / {@code null} denies.
-   * @return {@code true} iff the caller is the Staffelleiter of the group's squadron.
+   * @param groupId the Kommandogruppe
+   * @param authentication the current authentication; anonymous or {@code null} denies
+   * @return {@code true} iff the caller is the Staffelleiter of the group's squadron
    */
   public boolean canManageKommandoGroup(
       @NotNull UUID groupId, @Nullable Authentication authentication) {
@@ -172,14 +148,13 @@ public class OrgRoleManagementSecurityService {
   }
 
   /**
-   * Whether the caller may grant the given Bereich role on the Bereich: a Bereichsleiter
-   * appointment needs a pure OL member; a Koordinator / Operator appointment needs the
-   * Bereichsleiter of that Bereich (no self-promotion to Bereichsleiter).
+   * Whether the caller may grant the Bereich role: a Bereichsleiter needs a pure OL member, a
+   * Koordinator or Operator needs the Bereich's Bereichsleiter.
    *
-   * @param bereichId the Bereich; never {@code null}.
-   * @param role the Bereich role being granted; never {@code null}.
-   * @param authentication the current authentication; anonymous / {@code null} denies.
-   * @return {@code true} iff the delegated caller may grant the role.
+   * @param bereichId the Bereich
+   * @param role the Bereich role being granted
+   * @param authentication the current authentication; anonymous or {@code null} denies
+   * @return {@code true} iff the caller may grant the role
    */
   public boolean canAppointBereichRole(
       @NotNull UUID bereichId,
@@ -195,14 +170,13 @@ public class OrgRoleManagementSecurityService {
   }
 
   /**
-   * Whether the caller may remove the target member's Bereich membership: routed by the target's
-   * current rank — removing a Bereichsleiter needs a pure OL member, removing a Koordinator /
-   * Operator needs that Bereich's Bereichsleiter.
+   * Whether the caller may remove the member's Bereich membership, routed by the member's current
+   * rank like {@link #canAppointBereichRole}.
    *
-   * @param bereichId the Bereich; never {@code null}.
-   * @param userId the member to remove; never {@code null}.
-   * @param authentication the current authentication; anonymous / {@code null} denies.
-   * @return {@code true} iff the delegated caller may remove the member.
+   * @param bereichId the Bereich
+   * @param userId the member to remove
+   * @param authentication the current authentication; anonymous or {@code null} denies
+   * @return {@code true} iff the caller may remove the member
    */
   public boolean canRemoveBereichRole(
       @NotNull UUID bereichId, @NotNull UUID userId, @Nullable Authentication authentication) {
@@ -220,12 +194,12 @@ public class OrgRoleManagementSecurityService {
   }
 
   /**
-   * Whether the caller may appoint or clear the SK lead — the Bereichsleiter of the SK's parent
-   * Bereich (derived from the SK's persisted parent edge).
+   * Whether the caller is the Bereichsleiter of the SK's persisted parent Bereich and may thus
+   * appoint or clear the SK lead.
    *
-   * @param specialCommandId the Spezialkommando; never {@code null}.
-   * @param authentication the current authentication; anonymous / {@code null} denies.
-   * @return {@code true} iff the caller is the Bereichsleiter of the SK's parent Bereich.
+   * @param specialCommandId the Spezialkommando
+   * @param authentication the current authentication; anonymous or {@code null} denies
+   * @return {@code true} iff the caller leads the SK's parent Bereich
    */
   public boolean canAppointSkLead(
       @NotNull UUID specialCommandId, @Nullable Authentication authentication) {
@@ -270,15 +244,10 @@ public class OrgRoleManagementSecurityService {
   }
 
   /**
-   * The calling principal's membership rows, read once per HTTP request (REQ-DATA-003, BE-PERF-15).
-   * Every verdict here is a question about the caller's own ranks, and the Leitung view asks it for
-   * every Bereich, Staffel and Spezialkommando in turn — one {@code findAllByIdUserId} per request
-   * instead of a lookup per unit and verdict. Keyed by caller id, so a request cannot read another
-   * principal's rows. Outside an HTTP request there is no memo and the rows are read directly. Like
-   * the other request memos, it assumes the caller's own ranks do not change within the request
-   * that asks.
+   * The caller's membership rows, read once per HTTP request (REQ-DATA-003); read directly outside
+   * a request.
    *
-   * @return the caller's membership rows; empty for an anonymous caller. Never {@code null}.
+   * @return the caller's membership rows; empty for an anonymous caller
    */
   @NotNull
   private List<OrgUnitMembership> callerMemberships() {
@@ -296,13 +265,11 @@ public class OrgRoleManagementSecurityService {
   }
 
   /**
-   * {@code true} iff the caller is the {@link MembershipRole#BEREICHSLEITER} of the leaf unit's
-   * parent Bereich — derived from the persisted parent edge of {@code leafUnitId}, never a
-   * request-supplied id, so a caller cannot claim a foreign Bereich.
+   * Whether the caller is the {@link MembershipRole#BEREICHSLEITER} of the leaf unit's persisted
+   * parent Bereich.
    *
-   * @param leafUnitId the Staffel / SK whose parent Bereich gates the appointment; never {@code
-   *     null}.
-   * @return {@code true} iff the caller leads the leaf unit's parent Bereich.
+   * @param leafUnitId the Staffel or SK whose parent Bereich gates the appointment
+   * @return {@code true} iff the caller leads the leaf unit's parent Bereich
    */
   private boolean callerIsBereichsleiterOfParent(@NotNull UUID leafUnitId) {
     OrgUnit leaf = orgUnitRepository.findById(leafUnitId).orElse(null);
@@ -317,12 +284,11 @@ public class OrgRoleManagementSecurityService {
   }
 
   /**
-   * The caller-independent current rank a user holds on an org unit, or {@code null} if no
-   * membership exists.
+   * The rank a user holds on an org unit, independent of the caller.
    *
-   * @param userId the user; never {@code null}.
-   * @param orgUnitId the org unit; never {@code null}.
-   * @return the membership rank, or {@code null}.
+   * @param userId the user
+   * @param orgUnitId the org unit
+   * @return the membership rank, or {@code null} when no membership exists
    */
   @Nullable
   private MembershipRole roleOf(@NotNull UUID userId, @NotNull UUID orgUnitId) {

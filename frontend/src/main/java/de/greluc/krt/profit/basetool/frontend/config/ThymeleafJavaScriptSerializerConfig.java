@@ -42,29 +42,12 @@ import org.thymeleaf.standard.serializer.IStandardJavaScriptSerializer;
 import org.thymeleaf.standard.serializer.StandardJavaScriptSerializer;
 
 /**
- * Replaces Thymeleaf's default {@link IStandardJavaScriptSerializer} with one that knows about
- * {@code java.time} types so {@code [[${dto}]]} inline expressions on objects carrying {@link
- * java.time.Instant}, {@link java.time.OffsetDateTime} or {@link java.time.LocalDateTime} render
- * without blowing up at template-output time.
+ * Replaces Thymeleaf's default {@link IStandardJavaScriptSerializer} on every {@link
+ * StandardDialect} with one that serializes {@code java.time} types in {@code [[${dto}]]} inline
+ * expressions.
  *
- * <p><b>Why this exists.</b> Thymeleaf 3.1.x ships {@code
- * org.thymeleaf.standard.serializer.StandardJavaScriptSerializer} with an inner {@code
- * JacksonStandardJavaScriptSerializer} that instantiates a bare {@code new ObjectMapper()} — no
- * {@code JavaTimeModule} registered. Spring Boot 4 has moved its own primary {@code ObjectMapper}
- * to Jackson 3 ({@code tools.jackson.core}), so the Jackson 2 instance Thymeleaf uses for JS
- * inlining never picks up the JSR-310 module transitively either. The promotion admin pages render
- * {@code Map<UUID, List<PromotionCategoryDto>>} payloads whose DTOs carry {@code createdAt} /
- * {@code updatedAt} as {@link java.time.Instant}, so the omission surfaced as an {@code
- * InvalidDefinitionException} during template rendering and a 500 to the user. This configuration
- * plugs a custom serializer onto every {@link StandardDialect} attached to the Spring template
- * engine so the failure stops happening once and for all instead of being worked around on each
- * template.
- *
- * <p><b>Character escapes.</b> The replacement keeps Thymeleaf's HTML-safe escape set so {@code <},
- * {@code >}, {@code &}, {@code '}, {@code "}, {@code /} and the JavaScript-breaking Unicode line
- * separators {@code U+2028} / {@code U+2029} continue to be escaped — without those a string value
- * containing a stray {@code </script>} or a Twitter-style line separator could break out of the
- * surrounding {@code <script>} block and turn a benign DTO field into stored XSS.
+ * <p>Keeps Thymeleaf's HTML-safe escape set, including {@code U+2028} / {@code U+2029}, so string
+ * values cannot break out of a {@code <script>} block.
  */
 @Configuration
 @RequiredArgsConstructor
@@ -93,16 +76,9 @@ public class ThymeleafJavaScriptSerializerConfig {
   }
 
   /**
-   * Hybrid serializer that delegates to Thymeleaf's stock {@link StandardJavaScriptSerializer} for
-   * primitive values (String / Number / Boolean / null) so the byte-for-byte JS output stays
-   * unchanged for the vast majority of inline expressions (typed-out i18n keys like {@code
-   * /*[[#{...}]]*\/}), and only falls back to a JSR-310-aware Jackson {@link ObjectMapper} for
-   * complex objects where the {@link java.time.Instant} / {@link java.time.OffsetDateTime} support
-   * is actually needed. Without the delegation path the replacement mapper produced a subtly
-   * different escape output for everyday String values that caused Thymeleaf's JS-inline
-   * comment-stripper to bail out mid-render (see the regression captured by the {@code
-   * OperationPageControllerMvcTest} suite). Package-private so the dedicated unit test can drive it
-   * directly without spinning up a Spring context.
+   * Serializer that delegates primitive values to Thymeleaf's {@link StandardJavaScriptSerializer},
+   * keeping their output unchanged, and serializes complex objects with a JSR-310-aware {@link
+   * ObjectMapper}.
    */
   static final class JavaTimeAwareJavaScriptSerializer implements IStandardJavaScriptSerializer {
 
@@ -151,12 +127,8 @@ public class ThymeleafJavaScriptSerializerConfig {
   }
 
   /**
-   * Character-escape table that mirrors Thymeleaf's stock {@code JacksonThymeleafEscapes} so the
-   * replacement serializer keeps the same HTML-safety properties: HTML-relevant ASCII characters
-   * ({@code <}, {@code >}, {@code &}, {@code '}, {@code "}, {@code /}) and the two
-   * JavaScript-breaking Unicode line separators ({@code U+2028}, {@code U+2029}) are escaped as
-   * {@code \\uXXXX} / {@code \\/} so values containing a stray {@code </script>} or Twitter-style
-   * line separator cannot break out of the surrounding {@code <script>} context.
+   * Character-escape table mirroring Thymeleaf's {@code JacksonThymeleafEscapes}: {@code <}, {@code
+   * >}, {@code &}, {@code '}, {@code "}, {@code /}, {@code U+2028} and {@code U+2029} are escaped.
    */
   private static final class ThymeleafCompatibleEscapes extends CharacterEscapes {
 

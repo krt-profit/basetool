@@ -27,32 +27,11 @@ import org.springframework.web.reactive.function.client.ClientRequest;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 
 /**
- * Relays the caller's active OrgUnit selection from the frontend's Spring Session to the backend
- * via the {@code X-Active-Org-Unit-Id} request header on every outbound {@code WebClient} call.
+ * Relays the caller's active OrgUnit selection from {@link ActiveSquadronContext} to the backend as
+ * the {@code X-Active-Org-Unit-Id} header on every outbound {@code WebClient} call.
  *
- * <p>The state lives on the frontend because backend REST calls do not relay session cookies (the
- * frontend's {@code BackendApiClient} only attaches the OAuth2 bearer token), so a backend-side
- * {@code HttpSession} would be lost between calls. The active OrgUnit is snapshotted onto a
- * thread-local by {@link ActiveSquadronContextFilter} at the start of every servlet request and
- * read here on the WebClient pipeline. Reactor's automatic context propagation (enabled by Spring
- * Boot 4) carries the thread-local across the hop to the Netty reactor thread that actually issues
- * the I/O.
- *
- * <p>R5.e widening: the filter no longer special-cases admin callers — it relays a pinned selection
- * for any authenticated user with &gt;1 membership. The backend independently re-validates
- * non-admin pins against the caller's actual memberships (see {@link
- * de.greluc.krt.profit.basetool.backend.service.OwnerScopeService#currentScopePredicate()}), so a
- * spoofed thread-local cannot widen visibility past what the user's memberships permit.
- *
- * <p>Failure modes degrade silently: no thread-local bound (background task / scheduled job) and no
- * active OrgUnit set both yield "no header added" — the backend then falls through to its default
- * behaviour (admin sees all OrgUnits, members see the union of their memberships). "Silently" used
- * to be literal: the branch had no log statement at all, so a pin that was set on the servlet
- * thread but lost before the exchange (context propagation not applied on this hop, a call issued
- * from a pool thread) was indistinguishable from a caller who simply has no pin — and the
- * user-visible symptom of both is the same wrong-Staffel listing. The branch now leaves a DEBUG
- * line; DEBUG rather than anything higher because it is the normal case for every anonymous and
- * every unpinned request, i.e. the majority of outbound calls.
+ * <p>The backend re-validates the pin against the caller's memberships. Without a pin no header is
+ * added and a DEBUG line is logged; the backend then applies its default scope.
  */
 @Slf4j
 @Component

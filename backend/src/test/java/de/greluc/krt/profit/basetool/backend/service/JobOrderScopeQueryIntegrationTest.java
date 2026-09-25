@@ -45,17 +45,10 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Integration coverage for the Phase 3 (#343) visibility scope of {@link
- * JobOrderRepository#findScopedJobOrders}, exercised against the real Postgres test container so
- * the {@code TYPE(...) = SpecialCommand} discriminator predicate, the membership {@code IN} clause
- * and the SK-public escape are verified end-to-end rather than mocked.
- *
- * <p>Three orders are created — one responsible to squadron A (private), one to squadron B
- * (private), one to a Spezialkommando (public). The four caller classes from the acceptance matrix
- * are then replayed by feeding the corresponding {@link ScopePredicate} triple into the repository
- * query. The test container is shared across the suite and other tests commit job-order rows, so
- * the assertions use {@code contains} / {@code doesNotContain} on the freshly-created ids rather
- * than exact result counts.
+ * Integration tests for the visibility scope of {@link JobOrderRepository#findScopedJobOrders}
+ * against the Postgres test container: orders of two squadrons (private) and one Spezialkommando
+ * (public) are queried with each caller class's {@link ScopePredicate}. Assertions check only the
+ * freshly created ids, since the container is shared.
  */
 @SpringBootTest
 @ActiveProfiles("test")

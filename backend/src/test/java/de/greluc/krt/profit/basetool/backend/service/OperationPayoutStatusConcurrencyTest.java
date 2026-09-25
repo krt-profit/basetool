@@ -58,31 +58,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Reproduces the concurrent <em>first-toggle</em> race on the operation payout-status flag against
- * the real Postgres test container and pins its last-writer-wins guarantee: two mission managers
- * ticking the "Bezahlt" box for the <em>same</em> {@code (operation, participant)} tuple at once
- * must <b>both</b> complete without any thread seeing a 500 / propagated conflict, and the DB must
- * end up with exactly one {@link OperationPayoutStatus} row for that tuple.
+ * Races two concurrent first toggles of the payout status for the same participant against
+ * Postgres: both succeed and exactly one {@link OperationPayoutStatus} row remains.
  *
- * <p>The row carries a JPA {@code @Version} (via {@code AbstractEntity}) <em>and</em> the unique
- * index {@code uk_operation_payout_status_operation_participant} (columns {@code operation_id},
- * {@code participant_key}), so the loser of the parallel INSERT hits a {@code
- * DataIntegrityViolationException} (or, on the repeat edit, an {@code
- * ObjectOptimisticLockingFailureException}). {@link OperationPayoutService#setPayoutStatus} is a
- * non-transactional orchestrator that retries each attempt in its own {@code REQUIRES_NEW}
- * transaction (#1111), so the loser reloads the winner's committed row and UPDATEs it in place
- * instead of surfacing the conflict as an HTTP 500. This test is the dynamic regression guard for
- * that behaviour: were the unique index or the {@code @Version} ever dropped, two concurrent "mark
- * paid" clicks would each INSERT a row (duplicate payout-status rows, double audit trail) with no
- * exception — and only the {@code hasSize(1)} assertion below would catch it. The deterministic
- * retry-count contract lives in {@code OperationPayoutServiceTest.SetPayoutStatusConcurrencyTests},
- * which fakes the collision with a spy; this test proves the schema actually raises it.
- *
- * <p>Deliberately <strong>not</strong> {@code @Transactional}: each worker runs in its own session
- * so the versions actually race, and the seed rows are removed via {@code @AfterEach}. The
- * {@code @WithMockUser} context is captured on the test thread and re-applied inside each worker
- * because {@code SecurityContextHolder}'s default strategy does not inherit into a thread pool (the
- * toggle reads it to stamp the acting user).
+ * <p>Not {@code @Transactional}, so each worker runs its own session.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -106,13 +85,12 @@ class OperationPayoutStatusConcurrencyTest {
   @MockitoBean private JwtDecoder jwtDecoder;
 
   /**
-   * The seeded fixture ids for one test run — the operation, its single time-stamped mission, the
-   * one user participant and that user — captured so {@code @AfterEach} can delete the rows.
+   * Seeded fixture ids of one test run, deleted in {@code @AfterEach}.
    *
    * @param operationId the seeded operation both writers toggle
-   * @param missionId the seeded, fully time-stamped mission carrying the participant
+   * @param missionId the time-stamped mission carrying the participant
    * @param participantId the single mission participant row
-   * @param userId the participant's user (its stringified id is the payout {@code participant_key})
+   * @param userId the participant's user; its id string is the {@code participant_key}
    */
   private record Fixture(UUID operationId, UUID missionId, UUID participantId, UUID userId) {}
 
@@ -137,13 +115,10 @@ class OperationPayoutStatusConcurrencyTest {
   }
 
   /**
-   * Two threads flip the paid-out flag for the <em>same</em> participant of the same operation in
-   * lockstep. The {@code go} latch releases both workers together so their find-or-create + INSERT
-   * statements race against the unique index. The guarantee: no worker throws (the loser retries in
-   * a fresh transaction instead of surfacing a 500), both toggles report success, and the operation
-   * ends up with exactly one payout-status row carrying {@code paidOut = true} (last-writer-wins).
+   * Two threads toggle the paid-out flag of the same participant in lockstep; neither throws, and
+   * exactly one row with {@code paidOut = true} remains.
    *
-   * @throws Exception if a worker future fails to complete within the finish timeout
+   * @throws Exception if a worker future does not complete within the timeout
    */
   @Test
   void firstToggleRace_sameParticipant_lastWriterWins_noServerError() throws Exception {
@@ -222,10 +197,7 @@ class OperationPayoutStatusConcurrencyTest {
   }
 
   /**
-   * Seeds an operation with a single, fully time-stamped mission (so its participant contributes a
-   * valid attendance window and therefore a resolvable {@code participant_key}) and one registered
-   * user participant on it. Both racing writers toggle the payout status for exactly this
-   * participant.
+   * Seeds an operation with one time-stamped mission and one registered user participant.
    *
    * @return the created fixture ids
    */

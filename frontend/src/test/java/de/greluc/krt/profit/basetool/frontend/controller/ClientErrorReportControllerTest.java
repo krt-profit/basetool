@@ -49,39 +49,21 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 
 /**
- * Unit tests for {@link ClientErrorReportController}, the server half of the M12 client-error
- * beacon.
+ * Unit tests for {@link ClientErrorReportController}, the server half of the client-error beacon.
  *
- * <p>The endpoint's whole risk profile is that the payload is attacker-controllable <em>and</em>
- * self-triggerable, so the assertions here are deliberately about the guardrails rather than the
- * happy path: the level is the contract (DEBUG, because INFO/WARN would flood and the ERROR path
- * would trip {@code LogbackErrorSpike}), the {@code kind} tag must come from the server-side
- * allowlist so it can never become an unbounded label, a script URL must lose its query string
- * server-side, and control characters in the message must not survive into the log (CWE-117).
+ * <p>Asserts the guardrails for an attacker-controllable payload: logging at DEBUG, a {@code kind}
+ * tag from the server-side allowlist, script URLs stripped of their query string, and control
+ * characters removed (CWE-117).
  */
 class ClientErrorReportControllerTest {
 
   /** The shipped beacon module, read off the test classpath to pin the client/server kind set. */
   private static final String BEACON_MODULE = "/static/js/krt-client-error.js";
 
-  /**
-   * Captures the beacon's payload object literal. It has no nested braces, so the brace-excluding
-   * body class is exact, and neither of the module's {@code JSON.stringify} calls can match it.
-   *
-   * <p>Anchored on the {@code payload} declaration rather than on the {@code JSON.stringify}
-   * argument: since the CSRF-queueing retry the payload is built once and then either delivered or
-   * parked, so it is no longer an inline argument. {@link #BEACON_BODY_IS_THE_PAYLOAD} closes the
-   * gap that opens up — on its own, this pattern would no longer prove the captured literal is what
-   * actually reaches the wire.
-   */
+  /** Captures the beacon's {@code payload} object literal, which has no nested braces. */
   private static final Pattern BEACON_PAYLOAD = Pattern.compile("const payload = \\{([^}]*)\\}");
 
-  /**
-   * The beacon's request body must be the payload object <em>verbatim</em> — not a wrapper, not a
-   * spread with something merged in. Together with {@link #BEACON_PAYLOAD} this is the same
-   * guarantee the single inline-literal match used to give: exactly these five fields leave the
-   * browser.
-   */
+  /** Matches the beacon's request body being exactly the {@link #BEACON_PAYLOAD} object. */
   private static final Pattern BEACON_BODY_IS_THE_PAYLOAD =
       Pattern.compile("body: JSON\\.stringify\\(payload\\)");
 

@@ -47,11 +47,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Delegation coverage for {@link MaterialExchangeController}: each endpoint forwards its arguments
- * to its collaborator — the read endpoints to {@link MaterialExchangeBoardService}, the write
- * endpoints to {@link MaterialExchangeService} — and returns the result unchanged (the security
- * gate and validation are framework-enforced by the {@code @PreAuthorize}/{@code @Valid}
- * annotations).
+ * Verifies that each {@link MaterialExchangeController} endpoint forwards to {@link
+ * MaterialExchangeBoardService} (reads) or {@link MaterialExchangeService} (writes) and returns the
+ * result unchanged.
  */
 @ExtendWith(MockitoExtension.class)
 class MaterialExchangeControllerTest {

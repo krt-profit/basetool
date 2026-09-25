@@ -82,10 +82,8 @@ class JobOrderMaterialDemandServiceTest {
   @Mock private SquadronMapper squadronMapper;
 
   /**
-   * Real, not mocked (#1740): the two-kind normalisation moved out of this service into the shared
-   * resolver, and these cases assert exactly that a MATERIAL line and an ITEM order's
-   * blueprint-derived requirement fold into one bucket. A mocked resolver would assert only that
-   * the service delegates.
+   * Real, not mocked: these cases assert that a MATERIAL line and an ITEM order's blueprint-derived
+   * requirement fold into one bucket.
    */
   @InjectMocks private JobOrderMaterialRequirementResolver materialRequirementResolver;
 

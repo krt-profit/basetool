@@ -29,38 +29,12 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 
 /**
- * A {@link RedisMessageListenerContainer} whose <em>first</em> subscription may fail without taking
- * the application down with it.
+ * A {@link RedisMessageListenerContainer} whose initial subscription may fail without failing the
+ * application context; the failed subscription is retried in the background (ADR-0084, ADR-0143).
  *
- * <p><strong>The outage this exists to prevent (2026-09-02, 07:07:09Z).</strong> Redis was
- * recreated during a deploy. The backend, restarting into that window, logged {@code
- * ApplicationContextException: Failed to start bean 'liveSyncRedisMessageListenerContainer'} and
- * cancelled its context refresh — a crash loop of roughly one boot per minute, during which the
- * frontend had no API at all. The cause is upstream and deliberate: {@code start()} calls {@code
- * lazyListen()}, whose {@code InitialBackoffExecution} branch rethrows the connection failure
- * instead of backing off, and Spring's lifecycle processor turns any exception out of a {@link
- * org.springframework.context.SmartLifecycle#start()} into a failed refresh. A pub/sub fan-out the
- * application is designed to survive the loss of (ADR-0084, ADR-0143 — a Redis outage degrades
- * cross-replica sync to single-instance behaviour and never worse) must not be able to decide
- * whether the application exists at all.
- *
- * <p><strong>Why the retry has to stop first.</strong> Upstream {@code start()} is {@code if
- * (started.compareAndSet(false, true)) { lazyListen(); }} — the flag is set <em>before</em> the
- * throw, so a failed attempt leaves the container claiming to run while nothing is subscribed, and
- * a bare second {@code start()} is a silent no-op forever. {@code stop()} compare-and-sets the flag
- * back, and its {@code stopListening()} returns immediately because the failed attempt never
- * activated a listener. Hence the {@code super.stop(Runnable)} inside the catch rather than in the
- * retry — and {@code stop(Runnable)}, never the no-argument {@code stop()}, for the reason {@link
- * #NO_OP_CALLBACK} documents.
- *
- * <p>Only the <em>initial</em> subscription is covered here. Once the container is listening, a
- * later connection loss is handled by the container's own recovery back-off, which was never the
- * problem: the 07:05:44Z {@code ConnectionWatchdog} lines in the same export are that mechanism
- * working.
- *
- * <p>This is a safety net, not a licence. The first failure is logged at WARN and {@code
- * basetool_redis_fanout_subscribed} reads 0 for as long as the subscription is missing, so a
- * fan-out that never comes back is visible rather than merely survivable.
+ * <p>Only the initial subscription is covered; later connection losses use the container's own
+ * recovery. The first failure is logged at WARN and {@code basetool_redis_fanout_subscribed} reads
+ * 0 while no subscription is active.
  */
 @Slf4j
 public class ResilientRedisMessageListenerContainer extends RedisMessageListenerContainer {
@@ -72,12 +46,8 @@ public class ResilientRedisMessageListenerContainer extends RedisMessageListener
   private final long retryIntervalMillis;
 
   /**
-   * Handed to {@code super.stop(Runnable)} where only the superclass's own teardown is wanted.
-   *
-   * <p>{@code super.stop()} would be wrong there: upstream's no-argument {@code stop()} body is
-   * {@code stop(() -> {})}, a <em>virtual</em> call that lands back in {@link #stop(Runnable)} —
-   * which sets {@link #stopRequested} and cancels the retry that the caller is about to schedule.
-   * The first version of this class did exactly that, and retried precisely never.
+   * Callback passed to {@code super.stop(Runnable)} when only the superclass teardown is wanted;
+   * {@code super.stop()} would dispatch to {@link #stop(Runnable)} and cancel the pending retry.
    */
   private static final Runnable NO_OP_CALLBACK = () -> {};
 
@@ -114,10 +84,9 @@ public class ResilientRedisMessageListenerContainer extends RedisMessageListener
   /**
    * Creates a container that retries a failed initial subscription at the given interval.
    *
-   * @param retryIntervalMillis delay between two subscription attempts, in milliseconds; must be
-   *     positive. Tests pass a short value; production uses {@link #DEFAULT_RETRY_INTERVAL_MILLIS}.
-   * @throws IllegalArgumentException if the interval is not positive, which would busy-loop the
-   *     retry thread.
+   * @param retryIntervalMillis delay between two subscription attempts in milliseconds; must be
+   *     positive, production uses {@link #DEFAULT_RETRY_INTERVAL_MILLIS}
+   * @throws IllegalArgumentException if the interval is not positive
    */
   public ResilientRedisMessageListenerContainer(long retryIntervalMillis) {
     if (retryIntervalMillis <= 0) {

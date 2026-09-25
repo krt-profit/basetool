@@ -36,29 +36,11 @@ import org.springframework.context.annotation.ClassPathScanningCandidateComponen
 import org.springframework.core.type.filter.AssignableTypeFilter;
 
 /**
- * The hand-written mirrors, checked against the contract they mirror (ADR-0161 §8.2).
+ * Compares the property names of the hand-written {@code frontend/model/dto} mirrors with the types
+ * generated from {@code openapi.json} (ADR-0161).
  *
- * <p><b>The problem.</b> {@code frontend/model/dto} restates every backend response shape by hand.
- * Nothing made the two agree, and when they stop agreeing the symptom is a field that arrives
- * {@code null} on a rendered page — Spring Boot disables {@code FAIL_ON_UNKNOWN_PROPERTIES}, so a
- * field the backend sends and the mirror does not declare is dropped in silence. That is the
- * maintainability cost gRPC was proposed to remove, and a generator removes it without a protocol.
- *
- * <p><b>What this test is, and what it is not.</b> The generator now runs against the same {@code
- * openapi.json} the Android app generates from, and this compares its output to the mirrors field
- * by field, turning drift into a failing build <em>today</em>. It does not turn it into a
- * <em>compile</em> failure — that needs the mirrors replaced by generated types, which moves every
- * accessor call site (records against classes with getters, {@code Set} against {@code List},
- * {@code Instant} against {@code OffsetDateTime}) and discards Javadoc a schema cannot carry. §8.2
- * asks for exactly this order: prove the generator agrees before deleting anything.
- *
- * <p><b>Names, not types.</b> The comparison is on property names. Types are out of scope here
- * because the two sides make different, defensible mappings of one schema, and asserting those
- * would be asserting the generator's configuration rather than the contract. Types and nullability
- * are frozen where a shipped client cannot be redeployed away from them, by {@code
- * ExternalContractTest} (REQ-API-009). A missing or misspelled field is what this one is for.
- *
- * <p><b>It found two on the day it was written</b>, both recorded in {@link #KNOWN_DRIFT}.
+ * <p>Only names are compared; types and nullability are covered by {@code ExternalContractTest}
+ * (REQ-API-009). Existing drift is listed in {@link #KNOWN_DRIFT}.
  */
 class GeneratedDtoAgreementTest {
 
@@ -69,15 +51,7 @@ class GeneratedDtoAgreementTest {
   private static final String GENERATED_PACKAGE =
       "de.greluc.krt.profit.basetool.frontend.contract.model";
 
-  /**
-   * Mirrors whose backend schema carries a different name, and the schema each one mirrors.
-   *
-   * <p>Every entry was established by field-set comparison rather than by reading the name: each
-   * pair below shares its <em>entire</em> property set, which is not something two unrelated types
-   * do. Without this map fifteen real mirrors would be silently skipped as "frontend-only" and the
-   * guard would cover the easy 94% while missing the families most likely to drift — promotion and
-   * personal inventory, both young and both still moving.
-   */
+  /** Mirrors whose backend schema has a different name, mapped to the schema each one mirrors. */
   private static final Map<String, String> ALIASES =
       Map.ofEntries(
           Map.entry("AdminDeletionRequestDto", "DeletionRequestDto"),
@@ -100,12 +74,8 @@ class GeneratedDtoAgreementTest {
           Map.entry("UserAttributesUpdateDto", "UserAttributesRequest"));
 
   /**
-   * Types under {@code model/dto} that mirror nothing, with the reason each one is there.
-   *
-   * <p>An explicit list rather than a heuristic, because "no schema of this name" is precisely what
-   * a <em>removed</em> backend type looks like too. Anything not named here and not aliased above
-   * must have a counterpart, so a deletion on the backend surfaces as a failure rather than as one
-   * more silently-skipped entry.
+   * Types under {@code model/dto} that mirror no backend schema. Any other type without a
+   * counterpart fails the test.
    */
   private static final Set<String> FRONTEND_ONLY =
       Set.of(
@@ -123,24 +93,14 @@ class GeneratedDtoAgreementTest {
           "DefaultBlueprintAddResultDto");
 
   /**
-   * Drift that existed before this guard did, frozen so it fails on anything new.
-   *
-   * <p>Both entries are dated 2026-09-10 and were found by the first run of this test. Neither is
-   * fixed here: each needs a decision that belongs to the area it touches, not to the change that
-   * introduced the guard. Removing an entry is the fix; adding one needs the same justification.
-   *
-   * <p><b>They are recorded outside this constant as well</b>, so a test literal is not the only
-   * place they exist: {@code docs/archive/WIRE_PROTOCOL_EVALUATION.md} §8.2 names both with their
-   * consequences, and ADR-0161's consequences section carries them into the decision record.
+   * Known drift between mirror and schema, frozen so anything new fails; removing an entry is the
+   * fix.
    *
    * <ul>
-   *   <li>{@code RefineryOrderListDto} / {@code endsAt} — the backend sends it and the mirror
-   *       <em>recomputes</em> it, in {@code getEndsAt()}, as {@code startedAt + durationMinutes}.
-   *       Not a dropped field so much as a second implementation of one, and the two would diverge
-   *       silently the day the server's answer stops being that sum.
+   *   <li>{@code RefineryOrderListDto} / {@code endsAt} — sent by the backend, recomputed by the
+   *       mirror as {@code startedAt + durationMinutes}.
    *   <li>{@code PromotionTopicDto} / {@code owningSquadron} — sent by the backend, not declared by
-   *       the mirror, so the promotion UI cannot render the owning squadron of a topic even though
-   *       the data arrives. This is the failure mode in its pure form.
+   *       the mirror.
    * </ul>
    */
   private static final Map<String, Set<String>> KNOWN_DRIFT =
@@ -217,11 +177,8 @@ class GeneratedDtoAgreementTest {
   }
 
   /**
-   * Finds every concrete non-enum type in a package.
-   *
-   * <p>Restricted to the {@code main} output directory. The test source set holds classes in the
-   * same package — {@code MatrixGridDtoTest}, {@code FrontendDtoContractTest} — and a scan that
-   * picked them up would report each as a mirror with no schema, which is true and useless.
+   * Finds every concrete non-enum type in a package, restricted to the {@code main} output
+   * directory.
    *
    * @param packageName the package to scan
    * @return simple name to class, for every candidate found
@@ -249,10 +206,7 @@ class GeneratedDtoAgreementTest {
   }
 
   /**
-   * The property names a type carries, whichever shape it is written in.
-   *
-   * <p>A record answers with its components, a generated model with its instance fields. Both come
-   * out as the same set of names, which is the only thing compared.
+   * The property names of a type: a record's components or a class's instance fields.
    *
    * @param type the type to read
    * @return its property names

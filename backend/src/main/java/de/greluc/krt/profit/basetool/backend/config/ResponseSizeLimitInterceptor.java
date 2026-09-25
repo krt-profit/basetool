@@ -32,16 +32,10 @@ import org.springframework.http.client.ClientHttpRequestInterceptor;
 import org.springframework.http.client.ClientHttpResponse;
 
 /**
- * Caps how many response-body bytes a {@code RestClient} will read from one exchange.
+ * Caps how many response-body bytes a {@code RestClient} reads from one exchange.
  *
- * <p>The reactive client this replaces buffered each body in memory and refused one past its {@code
- * maxInMemorySize} (16&nbsp;MB for the UEX and SC-Wiki clients). {@code RestClient} streams the
- * body into the message converter and has no such ceiling of its own, so without this interceptor a
- * runaway or hostile upstream could make one decode allocate without bound. The contract is kept
- * exactly: reading past the cap throws an {@link IOException}, which {@code RestClient} surfaces as
- * a {@code RestClientException} and the catalogue clients swallow into their counted, empty-result
- * fallback — so an oversized page still fails loudly in the log and on {@code
- * basetool_external_fetch_errors_total} rather than being truncated silently.
+ * <p>Reading past the cap throws an {@link IOException}, surfaced by {@code RestClient} as a {@code
+ * RestClientException}.
  */
 @RequiredArgsConstructor
 public final class ResponseSizeLimitInterceptor implements ClientHttpRequestInterceptor {
@@ -50,13 +44,13 @@ public final class ResponseSizeLimitInterceptor implements ClientHttpRequestInte
   private final long maxBytes;
 
   /**
-   * Executes the request and hands back a response whose body stream fails once more than {@link
-   * #maxBytes} bytes have been read from it.
+   * Executes the request and returns a response whose body stream fails once more than {@link
+   * #maxBytes} bytes have been read.
    *
    * @param request the outbound request
    * @param body the buffered request body
    * @param execution the rest of the interceptor chain
-   * @return the response, with a size-capped body stream
+   * @return the response with a size-capped body stream
    * @throws IOException when the exchange itself fails
    */
   @Override
@@ -69,9 +63,8 @@ public final class ResponseSizeLimitInterceptor implements ClientHttpRequestInte
   }
 
   /**
-   * A response that delegates everything to the real one except {@link #getBody()}, which is
-   * wrapped in a {@link CappedInputStream} created once and reused, so repeated calls observe one
-   * shared byte count.
+   * Response delegating to the real one, except that {@link #getBody()} returns a single, reused
+   * {@link CappedInputStream}.
    */
   private static final class CappedResponse implements ClientHttpResponse {
 

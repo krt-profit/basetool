@@ -28,20 +28,14 @@ import jakarta.validation.constraints.Size;
 import java.util.List;
 
 /**
- * A client's announcement that it changed something other members may be looking at (ADR-0143).
+ * Announces that a live-sync room's regions changed, so peers re-fetch them (ADR-0143).
  *
- * <p>Carries no payload on purpose — only a room and the regions of it that moved. Every receiver
- * re-fetches through its own authorized read, which is what makes it safe for the emitter to be an
- * ordinary member rather than a trusted server path.
+ * <p>Carries no payload; every receiver re-fetches through its own authorized read.
  *
- * @param topic the room, e.g. {@code inventory} or {@code mission:8f14…}. Rejected outright if it
- *     names no room this backend serves; the app must send back the canonical string it received
- *     from the stream rather than assembling one, so a client and the server never disagree about
- *     which room they are in.
- * @param sections the regions that changed. Keys outside the topic class's whitelist are dropped
- *     rather than rejected — a newer client naming a section this build has not heard of must still
- *     get its known sections through — but a list that clips to empty is refused, because relaying
- *     it would tell every receiver "something changed" with no way to narrow the reload.
+ * @param topic the canonical room string received from the stream, e.g. {@code inventory}; an
+ *     unknown room is rejected
+ * @param sections the changed regions; unknown keys are dropped, a list that clips to empty is
+ *     refused
  */
 @Schema(description = "Announces that a live-sync room's regions changed, so peers re-fetch them.")
 public record LiveSyncChangedRequest(

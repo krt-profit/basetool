@@ -45,11 +45,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC-level test for {@link AdminAnnouncementPageController}'s in-place AJAX twins (epic #571 /
- * #582). Proves the {@code X-Requested-With} header routing: the update/delete twins are
- * {@code @ResponseBody} and return {@code 200} (the update echoing the re-fetched optimistic-lock
- * {@code version}), while the same URL POSTed without the header still hits the classic redirect
- * handler. Fails if the header gating or the version write-back breaks.
+ * MVC test for {@link AdminAnnouncementPageController}'s AJAX twins: with {@code X-Requested-With}
+ * the update and delete twins return {@code 200} (the update echoing the new {@code version});
+ * without it the classic redirect handler runs.
  */
 @SpringBootTest
 class AdminAnnouncementPageControllerMvcTest {

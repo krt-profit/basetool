@@ -25,9 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import org.junit.jupiter.api.Test;
 
 /**
- * Tests of the shared commodity-name folding (#434). The {@code canonicalCore} cases mirror the
- * historical {@code ScWikiCommoditySyncService.canonicalName} expectations bit-identically — the
- * Wiki sync delegates here, so a behaviour change would silently alter its resolution chain.
+ * Tests the shared commodity-name folding, including the {@code canonicalCore} results the SC Wiki
+ * sync relies on.
  */
 class MaterialNameCanonicalizerTest {
 

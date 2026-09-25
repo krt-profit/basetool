@@ -23,33 +23,22 @@ import java.math.BigDecimal;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * The read-only account detail an org-unit viewer sees when they open an account from the org-unit
- * bank page (REQ-BANK-038). Wraps the same {@link BankAccountDetailDto} the bank-staff detail page
- * uses — but its {@code capabilities} are always all-{@code false} (no deposit/withdraw/transfer) —
- * and adds the org-unit-side affordances the page renders: exporting a (holder-redacted) statement,
- * managing the account's visibility/target, and raising a booking request when this is the caller's
- * own-level account.
+ * The read-only account detail an org-unit viewer sees on the org-unit bank page (REQ-BANK-038):
+ * the shared {@link BankAccountDetailDto} with all-{@code false} capabilities plus the org-unit
+ * affordances.
  *
- * @param detail the shared account detail (account + balance + target + 30-day delta + booking
- *     count + all-false capabilities)
- * @param canExportStatement whether the caller may export the (Halter-redacted) Kontoauszug —
- *     always {@code true} here (every viewer may), kept explicit so the frontend renders the button
- *     uniformly
- * @param canSetTarget whether the caller may set/clear the balance target (responsible holder)
- * @param canConfigureVisibility whether the caller may manage who else may view the account
- * @param canRequest whether the caller may raise a booking request against this account
- *     (REQ-BANK-039 — any viewer of a request-capable {@code ORG_UNIT} / {@code AREA} / {@code
- *     CARTEL} account)
- * @param canConfigureApprovalLimits whether the caller may set/clear this account's approval limits
- *     (REQ-BANK-041 — responsible holder / bank management / admin)
- * @param applicableLimit the caller's resolved approval limit for this account (REQ-BANK-041), or
- *     {@code null} when no limit applies to them — which means the request needs the responsible
- *     holder's approval, <em>unless</em> {@code approvalExempt} is set; the request form warns
- *     whenever approval would be required
- * @param approvalExempt {@code true} iff the caller is this account's responsible holder and is
- *     therefore bound by no approval ceiling at all (REQ-BANK-041, owner decision): a holder
- *     disposes freely over their own account, so the form never warns. The request still has to be
- *     confirmed by a bank employee — only the holder's extra sign-off falls away.
+ * @param detail the shared account detail with all-{@code false} capabilities
+ * @param canExportStatement whether the caller may export the holder-redacted statement; always
+ *     {@code true}
+ * @param canSetTarget whether the caller may set or clear the balance target
+ * @param canConfigureVisibility whether the caller may manage the account's visibility
+ * @param canRequest whether the caller may raise a booking request (REQ-BANK-039)
+ * @param canConfigureApprovalLimits whether the caller may set or clear approval limits
+ *     (REQ-BANK-041)
+ * @param applicableLimit the caller's approval limit for this account, or {@code null} when none
+ *     applies
+ * @param approvalExempt {@code true} iff the caller is the responsible holder and needs no
+ *     approval; a bank employee still confirms the request
  */
 public record OrgUnitBankAccountDetailDto(
     BankAccountDetailDto detail,

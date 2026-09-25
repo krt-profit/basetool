@@ -116,32 +116,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST surface over the mission aggregate — the squadron's planning and execution view. The surface
- * is intentionally large because missions have many sub-aggregates (units, crew, participants,
+ * REST surface over the mission aggregate and its sub-aggregates (units, crew, participants,
  * frequencies, managers, ownership).
  *
- * <p>Two endpoint families live side-by-side:
- *
- * <ul>
- *   <li><b>Section patches</b> ({@code /core}, {@code /schedule}, {@code /flags}) split the mission
- *       header into independently versioned sections so two managers editing different sections do
- *       not collide on {@code Mission.version}.
- *   <li><b>Slim sub-resource endpoints</b> ({@code .../slim}) return only the affected sub-DTO (or
- *       204) instead of the full {@link MissionDto}. Their seventeen MissionDto-returning
- *       predecessors were deprecated (announced sunset 2026-10-20) and removed early on 2026-09-22
- *       by owner decision, once no client of this repository called them (BE-SIMP-02).
- * </ul>
- *
- * <p>Peer reads are redacted (REQ-SEC-007): for a caller below Logistician, {@link
- * MissionPeerRedactor#cleanupMissionForPeer} strips names, e-mails, internal inventory and refinery
- * orders before the DTO leaves the controller. Which missions a caller may see at all is decided
- * upstream by {@code canSeeMission}, not here. {@code addParticipant} resolves a free-text external
- * name against registered users so a member cannot record a row under someone else's callsign.
- *
- * <p>Authorisation is delegated to {@link MissionSecurityService} via SpEL ({@code
- * canManageMission}, {@code canAccessParticipant}, {@code canManageManagers}, {@code
- * canChangeOwner}). Owner changes use the dedicated {@code MissionOwnership} aggregate with its own
- * version, so they do not invalidate other users' open mission forms.
+ * <p>Section patches ({@code /core}, {@code /schedule}, {@code /flags}) are versioned
+ * independently, and {@code .../slim} endpoints return only the affected sub-DTO. Responses for
+ * callers below Logistician pass through {@link MissionPeerRedactor#cleanupMissionForPeer}
+ * (REQ-SEC-007); authorisation is delegated to {@link MissionSecurityService}.
  */
 @RestController
 @RequestMapping("/api/v1/missions")
@@ -162,13 +143,7 @@ public class MissionController {
   private final ParticipantTargetResolver participantTargetResolver;
 
   /**
-   * Paged mission list, scoped to the calling member.
-   *
-   * <p>There used to be a second branch here for mission outsiders — anonymous callers and
-   * role-less accounts — silently restricted to {@code PLANNED}+{@code ACTIVE} non-internal
-   * missions. Neither caller can reach this endpoint any more (ADR-0159): the anonymous one is
-   * refused at the entry point and the role-less one at {@code PendingApprovalAccessFilter}, so the
-   * restriction has no audience and the branch is gone.
+   * Pages the missions visible to the calling member.
    *
    * @return paged mission list DTOs
    */
@@ -220,10 +195,7 @@ public class MissionController {
   }
 
   /**
-   * Filtered + paged mission search, scoped to the calling member.
-   *
-   * <p>The outsider branch that restricted anonymous and role-less callers to {@code PLANNED}+
-   * {@code ACTIVE} non-internal missions is gone with its audience (ADR-0159).
+   * Filtered, paged mission search scoped to the calling member.
    *
    * @param query free-text name fragment
    * @param start lower bound on planned start time
@@ -260,10 +232,8 @@ public class MissionController {
   }
 
   /**
-   * Single-mission read. Visibility is decided by {@code canSeeMission}: own Staffel, or any
-   * non-internal mission organisation-wide. A caller below Logistician then reads the DTO through
-   * {@link MissionPeerRedactor#cleanupMissionForPeer} — the roster stays, its PII does not
-   * (REQ-SEC-007). Logistician and above see the full DTO.
+   * Returns a single mission, visible per {@code canSeeMission}; callers below Logistician get the
+   * peer-redacted DTO (REQ-SEC-007).
    *
    * @param id mission id
    * @return the mission DTO
@@ -279,11 +249,8 @@ public class MissionController {
   }
 
   /**
-   * Returns the next upcoming mission (or 204 when none). Only {@code PLANNED} / {@code ACTIVE}
-   * missions are eligible — a terminal ({@code COMPLETED} / {@code CANCELLED}) mission with a
-   * future planned start is never the next mission (REQ-MISSION-003). Internal missions are
-   * included for every member in scope; a member below Logistician gets the same peer redaction
-   * pass as {@link #getMissionById}.
+   * Returns the next upcoming {@code PLANNED} or {@code ACTIVE} mission, or 204 when none
+   * (REQ-MISSION-003); callers below Logistician get the peer-redacted DTO.
    *
    * @return mission DTO or 204 No Content
    */
@@ -299,10 +266,8 @@ public class MissionController {
   }
 
   /**
-   * Creates a new mission. The caller becomes the owner via {@link MissionService#createMission}.
-   * The {@link CreateMissionRequest} record structurally excludes {@code id} / {@code version} /
-   * {@code owningSquadron} / {@code parent} / {@code owner} / collections (audit finding C-3) —
-   * those are stamped server-side.
+   * Creates a new mission owned by the caller; server-managed fields are stamped by {@link
+   * MissionService#createMission}, not taken from the {@link CreateMissionRequest}.
    *
    * @param request create payload
    * @return the persisted DTO
@@ -315,10 +280,8 @@ public class MissionController {
   }
 
   /**
-   * Attaches a new sub-mission to a parent. Sub-missions are independent missions that aggregate up
-   * to the parent for finance/payout roll-ups. Uses the same {@link CreateMissionRequest} as the
-   * top-level create — {@code parent} and {@code owningSquadron} are stamped from the path-resolved
-   * parent (audit finding C-3).
+   * Attaches a new sub-mission to a parent; {@code parent} and {@code owningSquadron} are stamped
+   * from the parent.
    *
    * @param id parent mission id
    * @param request create payload for the sub-mission
@@ -333,15 +296,11 @@ public class MissionController {
   }
 
   /**
-   * Full-replace update. Bumps {@code Mission.version}, so any second user editing the mission
-   * concurrently will get a 409 on their next save. Prefer the section patches ({@link
-   * #patchMissionCore}, {@link #patchMissionSchedule}, {@link #patchMissionFlags}) for
-   * multi-user-friendly edits.
+   * Full-replace update that bumps {@code Mission.version}; prefer the section patches ({@link
+   * #patchMissionCore}, {@link #patchMissionSchedule}, {@link #patchMissionFlags}).
    *
    * @param id mission id
-   * @param request update payload (carries the expected version); structurally excludes server-
-   *     managed fields ({@code id}, {@code owningSquadron}, {@code parent}, {@code owner}, …) to
-   *     close the audit-finding-C-3 mass-assignment vector
+   * @param request update payload (carries the expected version; excludes server-managed fields)
    * @return the persisted DTO
    */
   @PutMapping("/{id}")
@@ -358,8 +317,8 @@ public class MissionController {
   }
 
   /**
-   * Patches the core header section (name, description, calendar link, status). Uses the dedicated
-   * core-section version so a parallel edit of schedule/flags does not invalidate this form.
+   * Patches the core section (name, description, calendar link, status) under its own section
+   * version.
    *
    * @param id mission id
    * @param request core patch payload (carries the expected core-section version)
@@ -390,8 +349,8 @@ public class MissionController {
   }
 
   /**
-   * Patches the schedule section (meeting/planned/actual times). All times in UTC. Schedule has its
-   * own version so participants, units and finances editing in parallel does not collide.
+   * Patches the schedule section (meeting, planned and actual times, UTC) under its own section
+   * version.
    *
    * @param id mission id
    * @param request schedule patch payload (carries the expected schedule-section version)
@@ -456,17 +415,10 @@ public class MissionController {
   }
 
   /**
-   * Self-enrolment shortcut — the caller adds themselves as participant. For adding others, use
-   * {@link #addParticipantPublic} or the slim {@code addParticipantSlim}.
+   * Enrols the caller as a participant of the mission.
    *
-   * <p><b>The body is optional</b> ({@link JoinMissionRequest}) and carries the two answers a
-   * sign-up sheet collects — the desired Funktion and the payout preference. It was added on
-   * 2026-09-02 so a client with a sign-up sheet no longer has to reach for {@code
-   * /participants/add} to carry them: that endpoint can name anybody and is deliberately not on the
-   * API vhost's allow-list, so the Android app's sign-up was refused at the edge and never reached
-   * this service at all (ADR-0170). Adding an <em>optional</em> body is the additive half of
-   * REQ-API-009, which freezes this operation — a bodyless {@code POST} keeps behaving exactly as
-   * it did, which is what every shipped build sends.
+   * <p>The optional body carries the desired Funktion and payout preference; a bodyless request
+   * behaves as before (REQ-API-009).
    *
    * @param jwt caller's JWT
    * @param id mission id
@@ -502,21 +454,11 @@ public class MissionController {
   }
 
   /**
-   * Add-participant endpoint. Accepts either an explicit {@code userId} (autocomplete pick) or a
-   * free-text {@code guestName} — an <em>external</em> participant, a named person without an
-   * account, recorded by a member who can see the Einsatz (ADR-0159). Free-text names are resolved
-   * case-insensitively against the user table:
+   * Adds a participant by {@code userId} or by free-text {@code guestName}.
    *
-   * <ul>
-   *   <li>unique match → linked as the registered participant it names;
-   *   <li>no match → recorded as an external participant under that name;
-   *   <li>multiple matches → 409 (ambiguous name).
-   * </ul>
-   *
-   * <p>Naming somebody other than yourself — whether by {@code userId} or through a resolved
-   * free-text name — requires {@code canManageMission}. That check is what keeps a member from
-   * signing a colleague up; the anonymous-spoofing branches it replaced had no audience left once
-   * the endpoint began to require a login (REQ-SEC-052).
+   * <p>A name resolves case-insensitively: a unique member match links that member, no match
+   * records an external participant, several matches are a 409. Naming anyone other than the caller
+   * requires {@code canManageMission}.
    *
    * @param id mission id
    * @param request add-participant payload (userId XOR guestName + comment + squadron)
@@ -562,9 +504,8 @@ public class MissionController {
   }
 
   /**
-   * Owner change through the dedicated {@code MissionOwnership} aggregate. The version field in the
-   * request must match the current ownership version (not {@code Mission.version}). The mission
-   * version stays untouched, so concurrent edits on other sections remain valid.
+   * Changes the mission owner via the {@code MissionOwnership} aggregate, guarded by the ownership
+   * version; {@code Mission.version} stays untouched.
    *
    * @param id mission id
    * @param request owner-change payload (new owner id + expected ownership version)
@@ -597,13 +538,11 @@ public class MissionController {
   }
 
   /**
-   * Reassigns the mission's owning org unit (REQ-ORG-018 / ADR-0050). The request body carries the
-   * target org-unit id (or {@code null} for an ownerless leadership mission) and the expected
-   * {@code owningOrgUnitVersion} (NOT the parent {@code Mission.version}). The caller passes the
-   * same {@code canChangeOwner} gate as the owner change; the service additionally validates the
-   * target against the caller's assignable-org-unit scope. Re-homing does NOT bump {@code
-   * Mission.version}, so other users' open forms on the same mission remain valid (Option A /
-   * multi-user concurrency).
+   * Reassigns the mission's owning org unit, guarded by {@code owningOrgUnitVersion} without
+   * bumping {@code Mission.version} (REQ-ORG-018).
+   *
+   * <p>The target must be within the caller's assignable-org-unit scope; {@code null} makes it an
+   * ownerless leadership mission.
    *
    * @param id mission id
    * @param request reassignment payload (target org-unit id or {@code null} + expected {@code
@@ -642,21 +581,10 @@ public class MissionController {
   }
 
   /**
-   * Assigns or clears the mission's party lead (Partyleiter). Reuses the participant-add resolution
-   * mechanic: the caller submits either an explicit {@code userId} (from the user autocomplete) or
-   * a free-text {@code guestName}. A non-blank free-text name with no {@code userId} is resolved
-   * case-insensitively against registered members:
+   * Assigns or clears the mission's party lead (Partyleiter), guarded by {@code partyLeadVersion}.
    *
-   * <ul>
-   *   <li>unique match → linked as a registered party lead;
-   *   <li>no match → stored as a free-text external handle;
-   *   <li>multiple matches → 409 (ambiguous name).
-   * </ul>
-   *
-   * <p>Submitting neither {@code userId} nor a non-blank {@code guestName} clears the party lead.
-   * Manager-gated ({@code canManageMission}), so — unlike {@link #addParticipantPublic} — naming
-   * somebody else needs no further check. The {@code version} in the request must match the
-   * mission's current {@code partyLeadVersion}.
+   * <p>A free-text name resolves like a participant add (unique match links, none stores it as
+   * external, several are a 409); neither id nor name clears the party lead.
    *
    * @param id mission id
    * @param request party-lead payload (userId XOR guestName + expected partyLeadVersion)
@@ -695,8 +623,7 @@ public class MissionController {
   }
 
   /**
-   * Locates a unit inside a mission aggregate by id, or throws {@link NotFoundException}. Used by
-   * the slim endpoints to project a single sub-aggregate without re-fetching from the database.
+   * Finds a unit inside a mission aggregate by id.
    *
    * @param mission mission aggregate
    * @param unitId unit id to find
@@ -735,8 +662,7 @@ public class MissionController {
   }
 
   /**
-   * Adds a unit and returns only the updated unit list (slim), so the {@code Mission.version} is
-   * not dragged into the round-trip.
+   * Adds a unit and returns only the updated unit list.
    *
    * @param id mission id
    * @param request unit payload
@@ -817,9 +743,8 @@ public class MissionController {
   }
 
   /**
-   * Appends an Ablauf step and returns the mission's full step list in order (slim). Guarded by the
-   * mission's {@code stepsVersion} section counter, so editing the Ablauf never collides with a
-   * concurrent core / schedule / flags edit.
+   * Appends an Ablauf step, guarded by the mission's {@code stepsVersion}, and returns the ordered
+   * step list.
    *
    * @param id mission id
    * @param request the step payload (title, optional meta, expected stepsVersion)
@@ -934,9 +859,8 @@ public class MissionController {
   }
 
   /**
-   * Appends a goal (Ziel) and returns the mission's full goal list in order (slim). Guarded by the
-   * mission's {@code objectivesVersion} section counter, so editing the goals never collides with a
-   * concurrent core / schedule / flags / Ablauf edit.
+   * Appends a goal (Ziel), guarded by the mission's {@code objectivesVersion}, and returns the
+   * ordered goal list.
    *
    * @param id mission id
    * @param request the goal payload (title, kind, expected objectivesVersion)
@@ -1031,10 +955,7 @@ public class MissionController {
 
   /**
    * Lists the ships a unit of this mission may be crewed with: ships owned by registered
-   * participants (regardless of OrgUnit, so a cross-OrgUnit participant's ship is selectable) plus
-   * ships already pinned to one of the mission's units. Used by the mission detail page to populate
-   * the unit ship pickers without exposing the caller's whole hangar scope. Gated by {@code
-   * canManageMission} so only users who may edit the mission's units see participant ship details.
+   * participants of any org unit plus ships already pinned to one of its units.
    *
    * @param id mission id
    * @return the candidate ships for this mission's unit ship pickers
@@ -1208,7 +1129,7 @@ public class MissionController {
   }
 
   /**
-   * Slim payout-preference update. {@code DONATE} stays sticky for the whole operation.
+   * Updates a participant's payout preference; {@code DONATE} stays sticky for the whole operation.
    *
    * @param id mission id
    * @param participantId participant id
@@ -1233,9 +1154,8 @@ public class MissionController {
   }
 
   /**
-   * Slim add-participant — same logic as {@link #addParticipantPublic}: a non-manager caller may
-   * always self-enroll but needs {@code canManageMission} to add anyone else (raised at the HTTP
-   * boundary, not in the service). Returns only the updated participant list.
+   * Adds a participant with the same rules as {@link #addParticipantPublic} and returns only the
+   * updated participant list.
    *
    * @param id mission id
    * @param request add-participant payload (userId XOR guestName + meta)
@@ -1273,20 +1193,11 @@ public class MissionController {
   }
 
   /**
-   * Manager-only add-by-id (REQ-MISSION-020): puts one registered member on the roster, named by
-   * their {@code app_user} id, and returns the updated participant list (slim).
+   * Adds one registered member, named by {@code app_user} id, to the roster; manager-only
+   * (REQ-MISSION-020).
    *
-   * <p>It replaces what the deleted {@code POST /missions/{id}/participants} did, with the same
-   * {@code canManageMission} gate and the same body, and exists for one caller: the Android app's
-   * manager action "Teilnehmer hinzufügen" on the public API vhost. {@link #addParticipantSlim}
-   * cannot serve it there — it also takes a free-text name, org units and a comment and admits
-   * every member who can see the Einsatz, which is the add-anybody surface ADR-0170 keeps off the
-   * edge. This one can name only a registered member, only by id, and only for a caller who may
-   * manage the Einsatz, which is why it alone is admitted (ADR-0170, amended 2026-09-22).
-   *
-   * <p>The path's literal {@code by-id} segment keeps it apart from the per-row {@code
-   * /participants/{participantId}/slim} (a participant id, PUT/DELETE) and from {@code
-   * /participants/slim} (the add-anybody POST), and says what the body carries.
+   * <p>Unlike {@link #addParticipantSlim} it accepts no free-text name, which is why it is admitted
+   * on the public API vhost (ADR-0170).
    *
    * @param id mission id
    * @param request the member to add
@@ -1390,9 +1301,7 @@ public class MissionController {
   }
 
   /**
-   * Adds a custom (mission-specific) frequency — a free-text label plus a value — and returns the
-   * updated frequency list as slim DTOs (REQ-MISSION-014). The generic {@code DELETE
-   * /{id}/frequencies/{frequencyId}/slim} above removes typed and custom rows alike.
+   * Adds a custom (mission-specific) frequency with a free-text label and value (REQ-MISSION-014).
    *
    * @param id mission id
    * @param request the custom-frequency payload (name + value)
@@ -1412,9 +1321,8 @@ public class MissionController {
   }
 
   /**
-   * Updates a custom (mission-specific) frequency's label + value and returns the updated frequency
-   * list as slim DTOs (REQ-MISSION-014). Optimistic-locked on the frequency row's own version; a
-   * stale echo surfaces as HTTP 409.
+   * Updates a custom frequency's label and value, guarded by the row's own version
+   * (REQ-MISSION-014).
    *
    * @param id mission id
    * @param frequencyId the custom frequency row id
@@ -1476,26 +1384,13 @@ public class MissionController {
   }
 
   /**
-   * Decides who a participant add names, and whether the caller may name them — the part both add
-   * endpoints ({@link #addParticipantPublic} and {@link #addParticipantSlim}) share.
-   *
-   * <p>Three steps, in this order:
+   * Resolves whom a participant add names and checks that the caller may name them.
    *
    * <ol>
-   *   <li><b>An empty form means the caller.</b> Neither an id nor a name is a self-enrolment.
-   *   <li><b>A free-text name is resolved</b> through {@link ParticipantTargetResolver}: one member
-   *       match links that member, several are a 409, none records an external person. This is what
-   *       stops a member typing their own callsign from being rejected as a duplicate stranger.
-   *   <li><b>Naming anybody else needs {@code canManageMission}</b> — whether by id or through a
-   *       name that resolved to them. An external name is nobody's account and needs no check here;
-   *       the endpoint's own {@code canSeeMission} gate already decided the caller may add one.
+   *   <li>Neither id nor name means the caller.
+   *   <li>A free-text name is resolved through {@link ParticipantTargetResolver}.
+   *   <li>Naming any registered member other than the caller requires {@code canManageMission}.
    * </ol>
-   *
-   * <p>The caller is resolved once, through the seam that answers alike for a bearer and for the
-   * token-less acting-member identity (ADR-0129). It used to be read from the JWT in one place and
-   * from nothing in the other, so the two steps disagreed about what a null JWT means: for the
-   * gateway's identity an empty body left both the id and the name null and the service answered
-   * 400, on a request that names nobody but the caller.
    *
    * @param id the mission
    * @param request the submitted id, name and sign-up answers
@@ -1528,13 +1423,8 @@ public class MissionController {
   }
 
   /**
-   * Projects a page of missions into list rows, resolving the whole page's registration counts in
-   * ONE grouped statement.
-   *
-   * <p>Every list row shows "{n} angemeldet". The figure lives in the mission's lazy {@code
-   * participants} collection, so letting the mapper read it would be a SELECT per row — the N+1
-   * REQ-DATA-003 forbids. Asking once per page keeps a 100-row page at two statements instead of
-   * 101. A mission with no participants has no count row, which is the zero.
+   * Maps a page of missions to list rows, loading all registration counts in one grouped query
+   * (REQ-DATA-003).
    *
    * @param missions the page as the service returned it.
    * @return the same page as list DTOs, each carrying its registration count.
@@ -1548,18 +1438,7 @@ public class MissionController {
   }
 
   /**
-   * Applies the REQ-SEC-007 peer pass to a mission DTO on its way out, for a caller below
-   * Logistician.
-   *
-   * <p><b>Why this is one helper and not the same four lines twenty-three times.</b> Until the
-   * 2026-09-06 review the redaction sat only on the read handlers, and every write returned the
-   * unredacted aggregate to the same caller: creating a mission makes you its owner, and {@code
-   * canManageMission} admits an owner regardless of role, so a plain {@code KRT_MEMBER} could read
-   * back every participant's roles, permissions, description, join date and Discord-link status
-   * through {@code PATCH .../core}. That was true before the members-only change as well — what the
-   * change added was the asymmetry that made it visible. The pass is a no-op for
-   * Logistician-and-above, so routing every return through it costs nothing and cannot widen
-   * anything.
+   * Applies the peer redaction to a mission DTO for callers below Logistician (REQ-SEC-007).
    *
    * @param dto the freshly mapped DTO
    * @return the same DTO for Logistician-and-above, the peer-redacted copy for everyone else
@@ -1623,13 +1502,8 @@ public class MissionController {
   }
 
   /**
-   * Peer pass for the unit ship picker.
-   *
-   * <p>{@code Ship.owner} is {@code nullable = false} and {@code UserMapper} nulls only the email,
-   * so an unredacted ship option hands over its owner's roles, permissions, description, org-unit
-   * memberships, join date and Discord-link status — the REQ-SEC-040 hole the mission read path
-   * closed, reachable here because the picker is fetched whenever {@code canEdit} is true, which
-   * for a member who owns the Einsatz it is.
+   * Applies the peer redaction to the unit ship picker's options, hiding the owners' personal data
+   * (REQ-SEC-040).
    *
    * @param ships the selectable ships
    * @return the same list for Logistician-and-above, otherwise a redacted copy

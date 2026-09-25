@@ -50,39 +50,13 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Assembles and mutates the Profit-Bereich org chart ({@link OrgChartPosition} aggregate). The
- * chart is purely descriptive — placing a user in a position grants no permission — so this service
- * is NOT org-unit-scoped: it deliberately does not inject {@code OwnerScopeService} / {@code
- * AuthHelperService} and must stay off the {@code
- * staffelScopedServicesMustWireOwnerScopeOrAuthHelper} ArchUnit whitelist. Read access is open to
- * every authenticated user; write access is gated to ADMIN at the controller.
+ * Assembles and mutates the descriptive org chart ({@link OrgChartPosition} aggregate). A position
+ * grants no permission, so the service is not org-unit-scoped.
  *
- * <p>The unit tier is every active Staffel + SK (loaded via {@link
- * OrgUnitRepository#findActiveSquadronsAndSpecialCommands()}), <strong>regardless of {@code
- * is_profit_eligible}</strong> — that flag governs Job-Order processing only, not chart visibility
- * (ADR-0029, REQ-ORG-026), so a unit wired under any Bereich renders there, not just the
- * Profit-side ones. Every such unit is rendered even when empty so an admin can fill it in.
- *
- * <p>All structural invariants the database cannot express in plain SQL — the per-Staffel limits
- * (≤{@value #MAX_COMMAND_LEADS} Kommandos, ≤{@value #MAX_ENSIGNS} Ensign), the per-SK limit
- * (≤{@value #MAX_SK_COMMANDERS} SK-Leiter), the parent/scope consistency rules, the "name only on a
- * Kommando" rule, the "holder is an account OR a free-text name, never both" rule, and "a user
- * appears at most once per scope" — are enforced here and surface as 400 problem responses. The
- * singleton rules (one Bereichsleiter, one Staffelleiter per Staffel, one Stv. per Kommando, one
- * position per user and scope) are additionally backstopped by partial unique indexes in migrations
- * {@code V136}/{@code V138}, so a concurrent double-create there fails cleanly as a 409. The count
- * caps (≤4/≤2) are service-layer only: two interleaved creates could momentarily exceed a cap by
- * one — harmless for a descriptive, ADMIN-only chart where an admin simply removes the surplus.
- *
- * <p>A {@link OrgChartPositionType#COMMAND_LEAD} row models the Kommando(gruppe) itself, carrying
- * an optional {@code name} and an optional holder (the Kommandoleiter). This lets an admin create
- * and name a Kommando, hang a Stv. Kommandoleiter and Ensigns off it, and only later assign its
- * Kommandoleiter — so a subordinate seat is fillable while its superior is still vacant.
- *
- * <p>Any position's holder may be a Basetool account or — for a Kartell member who has no account
- * yet — a free-text {@code displayName} (the two are mutually exclusive). Reassigning a free-text
- * position to an account clears the typed name in the same transaction, so the swap is
- * regression-free. A free-text holder grants nothing, as the chart is descriptive only.
+ * <p>The chart covers every active Staffel and SK regardless of profit eligibility (REQ-ORG-026).
+ * Structural rules the database cannot express — per-unit cardinality limits, parent and scope
+ * consistency, a name only on a Kommando, a holder that is an account or a free-text name but never
+ * both, and one position per user and scope — are enforced here as 400 responses.
  */
 @Service
 @RequiredArgsConstructor
@@ -121,19 +95,15 @@ public class OrgChartService {
   private final OrgChartPositionMapper mapper;
 
   /**
-   * Creates a new position, validating scope/type consistency, parent rules, cardinality limits,
-   * the name/holder rules and the one-user-per-scope rule before persisting. ADMIN-only at the
-   * controller. The holder is either an account ({@code userId}) or a free-text {@code displayName}
-   * for a member without one — supplying both is rejected. A {@code COMMAND_LEAD} create may omit
-   * both to make a still-leaderless Kommando and may carry a Kommandogruppen-{@code name}; every
-   * other rank requires a holder (account or free-text) and rejects a {@code name}.
+   * Creates a new position after validating scope, parent, cardinality, name, holder and
+   * one-user-per-scope rules. Only a {@code COMMAND_LEAD} may omit the holder or carry a {@code
+   * name}.
    *
    * @param request the assignment payload; never {@code null}.
    * @return the persisted position as a flat DTO with id + version populated.
    * @throws NotFoundException if the user, the OrgUnit, or the referenced parent does not exist.
-   * @throws BadRequestException if any scope/parent/cardinality/name/uniqueness rule is violated,
-   *     if both an account and a free-text name are supplied, or if neither is supplied for a
-   *     non-{@code COMMAND_LEAD} rank.
+   * @throws BadRequestException if a scope, parent, cardinality, name, uniqueness or holder rule is
+   *     violated
    */
   @Transactional
   public OrgChartPositionDto createPosition(@NotNull OrgChartPositionCreateRequest request) {
@@ -166,29 +136,18 @@ public class OrgChartService {
   }
 
   /**
-   * Reassigns the holder, renames a Kommando and/or reorders an existing position. The functional
-   * rank, scope and parent are immutable after creation (move = remove + re-add), so only the
-   * holder ({@code userId} or {@code displayName}), {@code name} (Kommando only) and {@code
-   * sortIndex} are honoured; a {@code null} field leaves the current value unchanged, while a blank
-   * {@code name} clears it.
-   *
-   * <p>The holder swap is the heart of the free-text feature and runs on the already-managed entity
-   * with a single {@code save()} (no second fetch, no bulk clear), so there is no optimistic-lock
-   * second-bump: supplying a {@code userId} sets the account <em>and</em> clears any free-text
-   * {@code displayName} on the same row in the same transaction — the regression-free "the member
-   * now has an account" path. Supplying a non-blank {@code displayName} (without a {@code userId})
-   * sets the typed name and clears the account holder; supplying <em>both</em> in one call is
-   * rejected as ambiguous, mirroring create. Assigning a holder to a still-leaderless Kommando is
-   * just a reassign through {@code userId} or {@code displayName}.
+   * Changes the holder, the Kommando name and/or the display order of a position; rank, scope and
+   * parent are immutable. A {@code null} field is left unchanged and a blank {@code name} clears
+   * it. Setting a {@code userId} clears any free-text {@code displayName}, and vice versa.
    *
    * @param id the position id; never {@code null}.
    * @param request the edit payload carrying the current optimistic-lock version; never {@code
    *     null}.
    * @return the updated position as a flat DTO with the bumped version.
    * @throws NotFoundException if the position or the new user does not exist.
-   * @throws BadRequestException if the new holder already occupies a position in the same scope, a
-   *     name is supplied for a non-Kommando rank, both an account and a free-text name are supplied
-   *     at once, or clearing the typed name would leave a non-Kommando rank with no holder at all.
+   * @throws BadRequestException if the new holder already holds a position in the scope, a name is
+   *     given for a non-Kommando rank, both holder kinds are given, or a non-Kommando rank would be
+   *     left without a holder
    * @throws ObjectOptimisticLockingFailureException if the supplied version is stale.
    */
   @Transactional
@@ -241,18 +200,12 @@ public class OrgChartService {
   }
 
   /**
-   * Vacates the Kommandoleiter seat of a Kommando(gruppe): clears the holder (both an account and
-   * any free-text leader name) on a {@code COMMAND_LEAD} row while leaving the row itself — its
-   * name, its Stv. Kommandoleiter and its Ensigns — intact. This is the inverse of assigning a
-   * leader through {@link #updatePosition} and the reason a Kommando outlives a departing
-   * Kommandoleiter instead of having to be deleted and rebuilt. Only a {@code COMMAND_LEAD} may be
-   * left with no holder at all (the {@code chk_org_chart_user} CHECK keeps every other rank filled
-   * by an account or a free-text name), so every other rank is rejected as a 400: removing such a
-   * person-centric position is {@link #deletePosition} instead. ADMIN-only at the controller.
+   * Vacates the Kommandoleiter seat of a {@code COMMAND_LEAD} row, clearing its account and
+   * free-text holder while keeping the Kommando, its name, deputy and Ensigns.
    *
    * @param id the Kommando position id; never {@code null}.
    * @param version the optimistic-lock version the client last saw; a mismatch surfaces as 409.
-   * @return the updated, now-leaderless Kommando as a flat DTO with the bumped version.
+   * @return the now-leaderless Kommando as a flat DTO with the bumped version.
    * @throws NotFoundException if no position matches the id.
    * @throws BadRequestException if the position is not a {@code COMMAND_LEAD} Kommando.
    * @throws ObjectOptimisticLockingFailureException if the supplied version is stale.
@@ -295,10 +248,8 @@ public class OrgChartService {
   }
 
   /**
-   * Whether the position is managed by the rank mirror (epic #800, REQ-ROLE-006) and therefore
-   * read-only in the chart editor: an account-held seat (its holder is a Basetool account,
-   * projected from a functional rank) or a kommando_group-linked Kommando node. Free-text holders
-   * and leaderless / legacy positions (no account, no group link) are not mirror-managed.
+   * Returns whether the position is managed by the rank mirror (REQ-ROLE-006) and therefore
+   * read-only in the chart editor: an account-held seat or a Kommandogruppe-linked Kommando node.
    *
    * @param position the position to classify; never {@code null}.
    * @return {@code true} iff the chart editor must not mutate the position.
@@ -373,21 +324,19 @@ public class OrgChartService {
   }
 
   /**
-   * Mirrors a squadron-rank assignment onto the chart, reconciling the appointee's single squadron
-   * seat to match the freshly-assigned rank (epic #800, REQ-ROLE-006):
+   * Mirrors a squadron-rank assignment onto the chart (REQ-ROLE-006), reconciling the appointee's
+   * single squadron seat to the new rank.
    *
    * <ul>
-   *   <li>{@code STAFFELLEITER} → the squadron's single {@code SQUADRON_LEAD} seat (reassigned, not
-   *       duplicated);
-   *   <li>{@code KOMMANDOLEITER} → the holder of the group's {@code COMMAND_LEAD} Kommando node;
-   *   <li>{@code STELLV_KOMMANDOLEITER} → the {@code DEPUTY_COMMAND_LEAD} hanging off that node;
-   *   <li>{@code ENSIGN} → an {@code ENSIGN} under that node, or a Staffelleiter-direct Ensign when
-   *       the rank carries no group.
+   *   <li>{@code STAFFELLEITER} → the squadron's single {@code SQUADRON_LEAD} seat;
+   *   <li>{@code KOMMANDOLEITER} → the holder of the group's {@code COMMAND_LEAD} node;
+   *   <li>{@code STELLV_KOMMANDOLEITER} → the {@code DEPUTY_COMMAND_LEAD} under that node;
+   *   <li>{@code ENSIGN} → an {@code ENSIGN} under that node, or a Staffelleiter-direct Ensign
+   *       without a group.
    * </ul>
    *
-   * <p>Any prior squadron seat of the appointee is first cleared: a led Kommando is
-   * <em>vacated</em> (the node survives, REQ-ORG-025), every other prior seat is removed, so the
-   * one-user-per-unit chart invariant holds.
+   * <p>Any prior squadron seat is cleared first; a led Kommando is vacated rather than removed
+   * (REQ-ORG-025).
    *
    * @param squadronId the Staffel the rank is on; never {@code null}.
    * @param userId the appointed member's account; never {@code null}.
@@ -462,8 +411,8 @@ public class OrgChartService {
   }
 
   /**
-   * Mirrors a Kommandogruppe rename / reorder onto its {@code COMMAND_LEAD} node (name + sort
-   * index). A no-op when no mirror node exists yet (a legacy group never assigned a leader).
+   * Mirrors a Kommandogruppe rename or reorder onto its {@code COMMAND_LEAD} node; a no-op when the
+   * group has no mirror node.
    *
    * @param group the updated Kommandogruppe; never {@code null}.
    */
@@ -491,9 +440,7 @@ public class OrgChartService {
   }
 
   /**
-   * Removes every chart seat the user holds in a flat-scoped unit (Bereich / OL / SK). The {@code
-   * uq_org_chart_user_per_unit} index caps this at one, but the loop is robust to a legacy
-   * duplicate.
+   * Removes every chart seat the user holds in a flat-scoped unit (Bereich / OL / SK).
    *
    * @param orgUnitId the org unit; never {@code null}.
    * @param userId the user; never {@code null}.
@@ -634,15 +581,9 @@ public class OrgChartService {
   }
 
   /**
-   * Consumes a matching free-text placeholder when an account is appointed to a multi-holder post,
-   * so an admin who typed a member's name and later appoints that member's account does not have to
-   * delete the placeholder by hand (REQ-ROLE-006): the singleton ranks already reuse their single
-   * seat, but the flat multi-holder ranks (OL member / SK-Leiter / Koordinator / Operator / Ensign)
-   * would otherwise leave the placeholder alongside a fresh account seat. Reuses the first
-   * free-text ({@code user_id}-null) seat of the given type/unit/parent whose typed name matches
-   * the appointee's effective name (trimmed, case-insensitive), converting it to the account in
-   * place; returns {@code true} when one was reused. Name-scoped, so it never touches a different
-   * member's placeholder — and a no-op (falling back to a fresh seat) when nothing matches.
+   * Converts the first free-text seat of the given type, unit and parent whose name matches the
+   * appointee's effective name (trimmed, case-insensitive) into an account-held seat
+   * (REQ-ROLE-006).
    *
    * @param orgUnitId the org unit the seat belongs to; never {@code null}.
    * @param type the rank being appointed; never {@code null}.
@@ -697,12 +638,12 @@ public class OrgChartService {
   }
 
   /**
-   * Loads the Kommando node ({@code COMMAND_LEAD}) mirroring the given group, creating a leaderless
-   * one on the fly for a legacy group that never had its node mirrored yet.
+   * Loads the {@code COMMAND_LEAD} node mirroring the given group, creating a leaderless one when
+   * none exists yet.
    *
    * @param squadronId the Staffel the group belongs to; never {@code null}.
    * @param group the Kommandogruppe; never {@code null}.
-   * @return the (managed) mirroring {@code COMMAND_LEAD} node.
+   * @return the managed mirroring {@code COMMAND_LEAD} node.
    */
   private OrgChartPosition commandLeadForGroup(
       @NotNull UUID squadronId, @NotNull KommandoGroup group) {

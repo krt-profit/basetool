@@ -67,12 +67,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
- * Mockito unit tests for {@link OrgChartService}. The real generated {@link
- * OrgChartPositionMapperImpl} is wired in (not a mock) so the nested-tree assembly is asserted on
- * concrete node values; the three repositories are mocked. Pins the read assembly (grouping by
- * scope / type / parent, the inline Kommando leader, the {@code canAdd*} flags) and every write
- * guard (scope/type consistency, parent rules, cardinality limits, the name / nullable-holder
- * rules, one-user-per-scope, optimistic lock).
+ * Unit tests for {@link OrgChartService} with the real {@link OrgChartPositionMapperImpl}: the
+ * nested tree assembly and every write guard.
  */
 @ExtendWith(MockitoExtension.class)
 class OrgChartServiceTest {

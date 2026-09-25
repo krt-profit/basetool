@@ -33,12 +33,11 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
- * Ad-hoc visual verification harness for the mission tab layout against an ALREADY RUNNING local
- * test stack ({@code E2E_BASE_URL} + {@code MISSION_ID} env). Logs in as the synthetic test admin,
- * walks all four tabs, captures full-page screenshots under {@code build/e2e/}, dumps console
- * errors, probes the chip-select computed styles, and performs two board drag&drops (pool→unit, and
- * unit→empty-space which returns the participant to the pool). Not part of CI — it requires a
- * pre-seeded mission id, and without {@code MISSION_ID} the whole class is reported as skipped.
+ * Ad-hoc visual harness for the mission tabs against an already running local stack ({@code
+ * E2E_BASE_URL}, {@code MISSION_ID}): screenshots every tab, dumps console errors, probes the
+ * chip-select styles and performs two board drag-and-drops.
+ *
+ * <p>Not part of CI; skipped without {@code MISSION_ID}.
  */
 @Tag("e2e")
 class MissionTabsMockupCheckE2eTest {
@@ -47,11 +46,9 @@ class MissionTabsMockupCheckE2eTest {
   private static Browser browser;
 
   /**
-   * Skips the class unless {@code MISSION_ID} names the mission to walk, then boots the headless
-   * browser of the configured engine ({@code -Pe2e.browser}) through {@link
-   * E2eSupport#launchBrowser}. The assumption runs <em>before</em> any browser launch: a CI matrix
-   * cell installs only its own engine, so an unconditional launch of a hard-coded one fails the
-   * whole class with a {@code DriverException} instead of skipping it.
+   * Skips the class unless {@code MISSION_ID} names the mission to walk, then launches the
+   * configured browser engine through {@link E2eSupport#launchBrowser}. The skip check runs first,
+   * so a CI cell without that engine skips instead of failing.
    */
   @BeforeAll
   static void setUp() {

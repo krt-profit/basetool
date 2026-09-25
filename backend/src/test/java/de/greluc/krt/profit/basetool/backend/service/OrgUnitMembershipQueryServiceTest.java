@@ -61,13 +61,9 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Mockito unit tests for {@link OrgUnitMembershipQueryService} — the read-only picker/option and
- * membership-accessor half split out of {@link OrgUnitMembershipService} (audit Thema 7, #14). Pins
- * the wire shapes and orderings the controllers and downstream services consume: the
- * active-org-unit and per-user option lists (Staffel-first / top-down-by-kind sorts, orphan-row
- * skips, profit-eligible flags), the descendant-expanding owning-org-unit picker, the SK roster
- * projection, the {@code …Dto} projections mapped through the real MapStruct mapper, and the
- * name-sorted Staffel accessors (REQ-ORG-017) that back the authorization gates.
+ * Unit tests for {@link OrgUnitMembershipQueryService}: option lists and their orderings, the
+ * descendant-expanding picker, the SK roster, the DTO projections through the real mapper and the
+ * name-sorted Staffel accessors (REQ-ORG-017).
  */
 @ExtendWith(MockitoExtension.class)
 class OrgUnitMembershipQueryServiceTest {

@@ -169,8 +169,7 @@ class LayoutContextLoaderTest {
   }
 
   /**
-   * A request carrying one of {@link Handlers}' methods as the matched handler, the way {@code
-   * RequestMappingHandlerMapping} leaves it before the model is built.
+   * Builds a request carrying one of {@link Handlers}' methods as the matched handler.
    *
    * @param method the name of the {@link Handlers} method to match
    * @return the request

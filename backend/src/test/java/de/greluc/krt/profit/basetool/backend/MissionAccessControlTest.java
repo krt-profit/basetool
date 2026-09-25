@@ -85,13 +85,8 @@ class MissionAccessControlTest {
   private User officerUser;
 
   /**
-   * An ordinary member who signs up for the mission - the counterpart to {@link #officerUser}.
-   *
-   * <p>Named {@code guestUser} until ADR-0159, when the tier it referred to stopped existing. It
-   * was always a real {@code User} row with an IRIDIUM membership, and its tokens now carry {@code
-   * ROLE_KRT_MEMBER} explicitly: {@code default-roles-iri} grants it to every account Keycloak
-   * creates, so a token without it models an account shape that cannot occur, and the mission gates
-   * ask for membership since REQ-SEC-007.
+   * An ordinary member who signs up for the mission, the counterpart to {@link #officerUser}. Its
+   * tokens carry {@code ROLE_KRT_MEMBER}, as every real account's do.
    */
   private User memberUser;
 
@@ -159,10 +154,7 @@ class MissionAccessControlTest {
         .andExpect(status().isUnauthorized());
   }
 
-  /**
-   * The next-mission banner used to answer an anonymous caller (with 204 on an empty database).
-   * REQ-SEC-052 closed the whole mission read surface, so it is turned away at the entry point.
-   */
+  /** Verifies that the next-mission banner refuses an anonymous caller (REQ-SEC-052). */
   @Test
   void testGetNextMission_Unauthenticated_Refused() throws Exception {
     mockMvc.perform(get("/api/v1/missions/next")).andExpect(status().isUnauthorized());
@@ -367,10 +359,8 @@ class MissionAccessControlTest {
   }
 
   /**
-   * Recording an external participant is a member's action now (ADR-0159, decision D4).
-   *
-   * <p>The endpoint kept its shape — a {@code guestName} without a {@code userId} — and any member
-   * who can see the mission may still use it. What went is the caller who had no account at all.
+   * Verifies that recording an external participant refuses an anonymous caller; it is a member
+   * action (ADR-0159).
    */
   @Test
   void testAddExternalParticipant_Unauthenticated_Refused() throws Exception {

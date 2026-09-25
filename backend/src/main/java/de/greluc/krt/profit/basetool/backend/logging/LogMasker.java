@@ -25,16 +25,10 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Utility for masking sensitive / PII values at call-sites before they are handed to a logger.
+ * Masks sensitive or PII values (e-mail, identifiers, tokens, phone numbers, Keycloak {@code sub})
+ * at call sites before they reach a logger, complementing {@link PiiMaskingPatternLayout}.
  *
- * <p>This complements {@link PiiMaskingPatternLayout}, which masks well-known patterns on the
- * logback pattern layer as a last line of defense. {@code LogMasker} is the preferred approach
- * whenever a developer explicitly logs a known-sensitive value (e-mail, identifier, token, phone
- * number, Keycloak {@code sub}), because it keeps the information redacted even if the layout is
- * ever replaced or reconfigured.
- *
- * <p>All methods are null-safe and never throw on blank / malformed input – they simply return a
- * placeholder so that log statements do not risk NPEs.
+ * <p>All methods are null-safe and return a placeholder for blank or malformed input.
  */
 public final class LogMasker {
 

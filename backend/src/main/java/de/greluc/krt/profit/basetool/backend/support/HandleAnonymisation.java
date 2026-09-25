@@ -26,43 +26,15 @@ import org.jetbrains.annotations.Nullable;
 /**
  * The sentinel that replaces a handle snapshot an Art. 17 request has erased (REQ-SEC-062).
  *
- * <p><b>Why a sentinel and not {@code NULL}.</b> Four of the six columns are {@code NOT NULL} —
- * {@code audit_event.actor_handle}, {@code bank_audit_event.actor_handle}, {@code
- * bank_booking_request.requester_handle} and the two {@code recipient_handle}s — and that
- * constraint is the guarantee that a row always says who acted (REQ-AUDIT-001). Relaxing it to make
- * room for an erasure would weaken the invariant for every row that will ever be written, so that a
- * future bug could insert {@code NULL} silently. A sentinel keeps the constraint and makes "this
- * was erased on request" a distinguishable state rather than an absence.
- *
- * <p><b>Why the value is not a word.</b> It is stored once and rendered in two languages, so it
- * cannot be German or English text without breaking the i18n rule that no user-visible string is
- * hardcoded. {@code #ANONYMISED#} is a discriminator: every human-facing surface maps it to {@code
- * general.anonymisedHandle} from the message bundles, and the hash marks make it impossible for a
- * real handle to collide with it.
- *
- * <p><b>Machine-readable exports keep the raw token.</b> A JSON audit export is evidence rather
- * than prose; a translated placeholder there would vary by the exporting admin's locale and stop
- * being comparable between two exports of the same rows.
- *
- * <p>This constant is mirrored by {@code HandleDisplay} in the frontend module, which holds no
- * backend beans. The two are a <b>mirror pair</b>: changing the token means changing both.
+ * <p>A sentinel keeps the {@code NOT NULL} handle columns valid (REQ-AUDIT-001). Human-facing
+ * surfaces render it as {@code general.anonymisedHandle}; machine-readable exports keep the raw
+ * token. The frontend's {@code HandleDisplay} mirrors the constant.
  */
 public final class HandleAnonymisation {
 
   /**
-   * The stored replacement for an erased handle snapshot. Deliberately not a word in any language,
-   * and deliberately impossible for a real handle to equal.
-   *
-   * <p>That second half is enforced, not assumed. It used to be a claim in this comment while
-   * {@code display_name} was self-service free text with only a length limit on it, so any member
-   * could set theirs to the token and have it written into the audit trail as their own actor
-   * handle. {@link #isReserved(String)} is the check and {@code UserService} applies it to both
-   * write paths; {@code UserServiceReservedNameTest} keeps it applied.
-   *
-   * <p>Forging it was never a privilege escalation — nothing branches on the value, every erasure
-   * update is matched by id, and {@code actor_user_id} still attributes the row — but a comment
-   * asserting an invariant the code does not have is worse than no comment, because the next person
-   * to touch this will build on it.
+   * The stored replacement for an erased handle snapshot; members cannot choose it as a name (see
+   * {@link #isReserved(String)}).
    */
   public static final String SENTINEL = "#ANONYMISED#";
 
@@ -70,11 +42,8 @@ public final class HandleAnonymisation {
   private HandleAnonymisation() {}
 
   /**
-   * Whether a name a member chose for themselves would collide with the erasure sentinel.
-   *
-   * <p>Compared case-insensitively and after trimming, because the point is to keep the token
-   * unambiguous to a <em>reader</em> — {@code #anonymised#} reads exactly like the real thing in
-   * the member list and in the audit viewer.
+   * Whether a name a member chose for themselves would collide with the erasure sentinel, compared
+   * case-insensitively after trimming.
    *
    * @param name the candidate display name or username, possibly {@code null}
    * @return {@code true} when it must be rejected
@@ -96,12 +65,8 @@ public final class HandleAnonymisation {
   }
 
   /**
-   * The handle as it should appear to a person, for the backend's human-facing renderings (the PDF
-   * reports).
-   *
-   * <p>Only for output a human reads. A machine-readable export keeps the raw token deliberately: a
-   * translated placeholder would vary with the exporting admin's locale and stop two exports of the
-   * same rows from being comparable.
+   * Renders a handle for human-facing backend output such as the PDF reports. Machine-readable
+   * exports keep the raw token.
    *
    * @param handle the stored handle snapshot, possibly {@code null}
    * @param anonymisedLabel the resolved {@code general.anonymisedHandle} label

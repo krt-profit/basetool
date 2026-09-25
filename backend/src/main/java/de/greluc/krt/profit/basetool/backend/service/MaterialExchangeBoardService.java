@@ -64,31 +64,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Read/projection half of the Materialbörse — the org-wide material-exchange trade board of Flotte
- * &amp; Logistik (REQ-MARKET-001…) — split out of {@link MaterialExchangeService} (audit Thema 7,
- * #14). It owns every caller-visible read (the paged board, the tab counts, the single-offer
- * detail, the Lager "Auf Börse" flags and the release-picker list) plus the interessenten-anonymity
- * redaction and the offer→DTO mapping.
+ * Read half of the Materialbörse offer board (REQ-MARKET-001): the paged board, tab counts, offer
+ * detail, Lager flags and release picker, plus the interessenten-anonymity redaction.
  *
- * <p><b>Board scope (decision D3):</b> the board is org-wide — every {@code ACTIVE} offer is
- * visible to every member regardless of the offer's owning org unit; there is no OrgUnit scope
- * filter. Only real members reach this service (the controller gates reads on {@code KRT_MEMBER}).
- *
- * <p><b>Facts (decision D1, amended by ADR-0086):</b> material and quality are read live from the
- * linked {@link InventoryItem}; the offered amount is the owner's stored choice (a whole row or a
- * part of it); the item's location is never read, so the Standort stays private.
- *
- * <p><b>Anonymity (REQ-MARKET-006):</b> the interessenten names are disclosed only to the offer's
- * owner; every other viewer sees only the count. The redaction lives here, in {@link
- * #detailDto(MaterialExchangeOffer, UUID)} — a name list is loaded only when the viewer is the
- * owner.
- *
- * <p><b>Write→read seam:</b> {@link #detailDto(MaterialExchangeOffer, UUID)} and {@link
- * #detail(UUID)} are public because the write half ({@link MaterialExchangeService}) injects this
- * service to project its own mutation results through the very same redaction — a one-way
- * write→read dependency, so no cycle. Called from inside a write transaction the projection joins
- * that transaction (propagation {@code REQUIRED}), so the class-level {@code readOnly} flag only
- * takes effect for the standalone reads that start their own transaction.
+ * <p>The board is org-wide with no OrgUnit scope filter. Interessenten names are disclosed only to
+ * the offer's owner (REQ-MARKET-006). {@link MaterialExchangeService} projects its mutation results
+ * through this service, joining its write transaction.
  */
 @Service
 @RequiredArgsConstructor
@@ -123,10 +104,8 @@ public class MaterialExchangeBoardService {
   private final UserMapper userMapper;
 
   /**
-   * Reads each offering member's badge-kind memberships ({@link #BADGE_KINDS}: {@code SQUADRON} /
-   * {@code SPECIAL_COMMAND} / {@code BEREICH}) so the board can render <b>all</b> of the Anbieter's
-   * affiliation badges after the username (REQ-MARKET-001) — batch-loaded via {@link
-   * OrgUnitMembershipRepository#findAllByIdUserIdInAndKindIn} to stay N+1-free across a board page.
+   * Batch-loads each offering member's badge-kind memberships so the board shows all of the
+   * Anbieter's affiliation badges without N+1.
    */
   private final OrgUnitMembershipRepository orgUnitMembershipRepository;
 
@@ -138,21 +117,19 @@ public class MaterialExchangeBoardService {
   private final OrgUnitRepository orgUnitRepository;
 
   /**
-   * Returns a page of the board — the "Alle Angebote" tab, or the caller's own offers for the
-   * "Meine Angebote" tab — applying the toolbar filters and sort. Interest counts and the viewer's
-   * own registrations are batch-loaded so the list has no N+1; interessenten names are never
-   * included in a list DTO.
+   * Returns a page of the board, either all offers or the caller's own, with the toolbar filters
+   * and sort applied; list DTOs never carry interessenten names.
    *
    * @param tab {@code "mein"} for the caller's own offers, anything else (incl. {@code null}) for
-   *     all offers.
-   * @param query a free-text fragment matched against the material name and the owner's handle, or
-   *     {@code null}/blank for no text filter.
-   * @param minQuality the inclusive minimum quality 0–1000 (0/{@code null} disables the filter).
-   * @param minAmount the inclusive minimum amount in SCU, or {@code null} for no amount filter.
-   * @param sort the sort key — {@code qual} (default) / {@code menge} / {@code mat} / {@code neu}.
-   * @param page the zero-based page index.
-   * @param size the page size (clamped to {@value MaterialExchangeQueryParams#MAX_PAGE_SIZE}).
-   * @return the matching page of board offers.
+   *     all offers
+   * @param query text matched against material name and owner handle, or {@code null}/blank for
+   *     none
+   * @param minQuality inclusive minimum quality 0–1000; 0/{@code null} disables the filter
+   * @param minAmount inclusive minimum amount in SCU, or {@code null} for none
+   * @param sort the sort key: {@code qual} (default) / {@code menge} / {@code mat} / {@code neu}
+   * @param page the zero-based page index
+   * @param size the page size (clamped to {@value MaterialExchangeQueryParams#MAX_PAGE_SIZE})
+   * @return the matching page of board offers
    */
   public PageResponse<MaterialExchangeOfferDto> board(
       @Nullable String tab,
@@ -201,12 +178,10 @@ public class MaterialExchangeBoardService {
   }
 
   /**
-   * Returns the board tab counts (all active offers, and the caller's own active offers). These are
-   * board totals — deliberately unaffected by the search/quality/amount filters. No stock guard is
-   * needed: a fully-booked-out row is deleted and its offer cascade-deleted (ADR-0086), so every
-   * {@code ACTIVE} offer is on the board and the badge matches the visible list.
+   * Returns the board tab counts (all active offers and the caller's own), unaffected by the board
+   * filters.
    *
-   * @return the tab counts.
+   * @return the tab counts
    */
   @NotNull
   public MaterialExchangeCountsDto counts() {
@@ -250,24 +225,14 @@ public class MaterialExchangeBoardService {
   }
 
   /**
-   * Returns the caller's own Lager rows eligible for release, for the Materialbörse release picker
-   * — <b>both</b> material rows ("Material anbieten") and game-item rows (stock-backed item offers,
-   * REQ-MARKET-014, design §8) — optionally filtered by a name fragment and by row {@code kind},
-   * and capped at {@value #PICKER_LIMIT} rows. Each entry flags whether it already carries an
-   * active offer, and is discriminated by kind so the release modal knows whether picking it
-   * releases a material or a stock-backed item offer. A game-item row renders its item name, {@code
-   * PIECE} unit and no quality; a material row keeps its material name, unit and quality.
+   * Returns the caller's own Lager rows eligible for release in the Materialbörse picker, flagged
+   * when already offered and capped at {@value #PICKER_LIMIT} rows.
    *
-   * <p>The optional {@code kind} narrows the picker to one row kind for the dialog's Material/Item
-   * radio (REQ-MARKET-002): {@code MATERIAL} returns only material rows, {@code ITEM} only
-   * game-item rows, {@code null} both. The kind gate is pushed into the repository query so it
-   * applies <em>before</em> the {@value #PICKER_LIMIT} cap — filtering the returned list would hide
-   * every row of the wanted kind past the cap.
+   * <p>The {@code kind} filter applies before the cap (REQ-MARKET-002, REQ-MARKET-014).
    *
-   * @param query a name fragment (material or item), or {@code null}/blank for the caller's whole
-   *     stock.
-   * @param kind the row kind to return, or {@code null} for both material and item rows.
-   * @return the caller's releasable rows of the selected kind(s), owner-scoped, never {@code null}.
+   * @param query a material or item name fragment, or {@code null}/blank for the whole stock
+   * @param kind the row kind to return, or {@code null} for both material and item rows
+   * @return the caller's releasable rows; never {@code null}
    */
   public List<MaterialExchangeReleasableItemDto> myReleasableItems(
       @Nullable String query, @Nullable MaterialExchangeOfferKind kind) {
@@ -289,14 +254,12 @@ public class MaterialExchangeBoardService {
   }
 
   /**
-   * Maps one of the caller's own Lager rows to a release-picker entry, branching on the row kind: a
-   * game-item row (REQ-INV-029) becomes an {@code ITEM} entry with the item name, {@code PIECE}
-   * unit and no quality (a stock-backed item offer, REQ-MARKET-014); a material row becomes a
-   * {@code MATERIAL} entry with the material name, its own unit and its quality.
+   * Maps one of the caller's Lager rows to a release-picker entry: an {@code ITEM} entry for a
+   * game-item row (PIECE unit, no quality), a {@code MATERIAL} entry otherwise.
    *
-   * @param item the Lager row (its material / game item and location are eager-loaded).
-   * @param alreadyReleased whether an active offer already backs this row.
-   * @return the picker entry.
+   * @param item the Lager row with material / game item and location loaded
+   * @param alreadyReleased whether an active offer already backs this row
+   * @return the picker entry
    */
   @NotNull
   private static MaterialExchangeReleasableItemDto toReleasableDto(
@@ -326,14 +289,12 @@ public class MaterialExchangeBoardService {
   }
 
   /**
-   * Builds the viewer-relative detail DTO, loading the interessenten names only when the viewer
-   * owns the offer (anonymity gate, REQ-MARKET-006). Public so the write half ({@link
-   * MaterialExchangeService}) can project a just-mutated offer through the identical redaction
-   * without duplicating it (write→read, no cycle).
+   * Builds the viewer-relative offer detail, loading interessenten names only when the viewer owns
+   * the offer (REQ-MARKET-006).
    *
-   * @param offer the offer to project.
-   * @param viewerId the requesting member, or {@code null} if unresolved.
-   * @return the offer detail.
+   * @param offer the offer to project
+   * @param viewerId the requesting member, or {@code null} if unresolved
+   * @return the offer detail
    */
   @NotNull
   public MaterialExchangeOfferDto detailDto(MaterialExchangeOffer offer, @Nullable UUID viewerId) {
@@ -444,18 +405,12 @@ public class MaterialExchangeBoardService {
   }
 
   /**
-   * Batch-resolves each given member's org-unit affiliation badges for the board — every {@link
-   * #BADGE_KINDS} ({@code SQUADRON} / {@code SPECIAL_COMMAND} / {@code BEREICH}) membership the
-   * member holds, ordered by {@link #ORG_UNIT_BADGE_ORDER} (Staffel(n), then Spezialkommando(s),
-   * then Bereich(e), each name-sorted). There is deliberately no "primary" Staffel: a member in
-   * several Staffeln and/or SKs and/or Bereiche surfaces <b>all</b> of their badges
-   * (REQ-MARKET-001). Two queries total regardless of page size — one membership batch, one
-   * org-unit batch — so the board stays free of the per-offer N+1 (REQ-DATA-003). A dangling
-   * membership whose org unit no longer resolves is dropped.
+   * Batch-resolves the given members' Staffel, Spezialkommando and Bereich badges in two queries,
+   * ordered by {@link #ORG_UNIT_BADGE_ORDER}; memberships whose org unit no longer resolves are
+   * dropped.
    *
-   * @param ownerIds the offering members whose affiliations to resolve; an empty set yields an
-   *     empty map.
-   * @return owner id → their ordered affiliation badges; members with no membership are absent.
+   * @param ownerIds the offering members; an empty set yields an empty map
+   * @return owner id to ordered badges; members without memberships are absent
    */
   @NotNull
   private Map<UUID, List<OrgUnitReferenceDto>> ownerOrgUnitBadges(Set<UUID> ownerIds) {
@@ -492,13 +447,11 @@ public class MaterialExchangeBoardService {
   }
 
   /**
-   * Sort rank of an org-unit kind for the affiliation-badge order: Staffel (0) before
-   * Spezialkommando (1) before Bereich (2). The Organisationsleitung (3) is never queried into a
-   * badge (it is absent from {@link #BADGE_KINDS}); it is ranked last only to keep the switch
-   * exhaustive.
+   * Sort rank of an org-unit kind for badges: Staffel, Spezialkommando, Bereich, then
+   * Organisationsleitung.
    *
-   * @param kind the org-unit kind.
-   * @return the badge sort rank (lower sorts first).
+   * @param kind the org-unit kind
+   * @return the badge sort rank (lower sorts first)
    */
   private static int badgeRank(OrgUnitKind kind) {
     return switch (kind) {
@@ -552,14 +505,11 @@ public class MaterialExchangeBoardService {
   }
 
   /**
-   * The effective offered quantity served to the board — the stored {@link
-   * MaterialExchangeOffer#getOfferedAmount() offeredAmount} clamped to the item's <em>current</em>
-   * stock ({@code min(offered, item.amount)}), so the board never advertises more than is in stock
-   * and the offer shrinks as the row is booked out (ADR-0086). This mirrors the {@code
-   * LEAST(offeredAmount, item.amount)} the board query filters and sorts on. Never negative.
+   * Returns the offered amount clamped to the item's current stock, matching the board query's
+   * {@code LEAST(offeredAmount, item.amount)}; never negative.
    *
-   * @param offer the offer, with its item loaded.
-   * @return the clamped offered quantity in SCU.
+   * @param offer the offer, with its item loaded
+   * @return the clamped offered quantity in SCU
    */
   private static double effectiveOfferedAmount(@NotNull MaterialExchangeOffer offer) {
     Double offered = offer.getOfferedAmount();
@@ -570,16 +520,11 @@ public class MaterialExchangeBoardService {
   }
 
   /**
-   * The effective item quantity served to the board for an {@link MaterialExchangeOfferKind#ITEM}
-   * offer — the stored {@link MaterialExchangeOffer#getItemQuantity() itemQuantity}, clamped to the
-   * backing row's current whole-unit stock for a <b>stock-backed</b> offer so the board never
-   * advertises more than is in stock (the item sibling of {@link
-   * #effectiveOfferedAmount(MaterialExchangeOffer)}, ADR-0086/0108, REQ-MARKET-014). A
-   * <b>free-stated</b> offer (no backing row) returns its stated quantity unchanged. Never
-   * negative.
+   * Returns the item quantity of an {@link MaterialExchangeOfferKind#ITEM} offer, clamped to the
+   * backing row's stock for a stock-backed offer; never negative.
    *
-   * @param offer the item offer.
-   * @return the clamped whole-unit quantity, or {@code null} if the offer states none.
+   * @param offer the item offer
+   * @return the clamped whole-unit quantity, or {@code null} if the offer states none
    */
   @Nullable
   private static Integer effectiveItemQuantity(@NotNull MaterialExchangeOffer offer) {

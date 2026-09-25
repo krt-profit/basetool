@@ -29,13 +29,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Tests for {@link TracingEnabledMetric}.
- *
- * <p>The gauge exists so an alert can require "tracing is on" positively before it treats a silent
- * trace pipeline as a fault, so the case that matters most is the one where tracing is OFF: the
- * series must still be there, reporting zero, rather than absent. An absent series is what a module
- * that is not being scraped looks like, and conflating the two is exactly the ambiguity this metric
- * was added to remove.
+ * Tests for {@link TracingEnabledMetric}; with tracing off the gauge must still be present,
+ * reporting zero.
  */
 class TracingEnabledMetricTest {
 

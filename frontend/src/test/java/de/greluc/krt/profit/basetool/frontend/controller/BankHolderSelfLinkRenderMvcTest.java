@@ -47,17 +47,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Pins the holder self-link rendering on the Bank management "Halter" tab (REQ-BANK-032): a plain
- * bank employee must see the link to <strong>their own</strong> holder row (so they can open their
- * own custody history) and must <strong>not</strong> see a link to any other holder.
- *
- * <p>The holder row keys the link on the OIDC {@code sub} (which equals {@code app_user.id} ==
- * {@link BankHolderDto#userId()}). The frontend deliberately exposes the {@code preferred_username}
- * as {@code Authentication#getName()} (user-name-attribute), so the {@code preferred_username} here
- * is set to a value that is NOT the {@code sub}: if the controller ever regresses to keying the
- * self-link off the authentication name instead of {@code principal.getSubject()}, the own-row link
- * disappears and this test fails. Mirrors {@code MissionSecurityRenderingTest} for the mission
- * participant self-edit carve-out.
+ * Pins the holder self-link on the Bank "Halter" tab (REQ-BANK-032): a bank employee sees a link to
+ * their own holder row only, keyed on the OIDC {@code sub} ({@link BankHolderDto#userId()}), never
+ * on the authentication name.
  */
 @SpringBootTest
 class BankHolderSelfLinkRenderMvcTest {

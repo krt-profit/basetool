@@ -52,22 +52,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC-level rendering checks for {@code /promotion/manage}.
- *
- * <p>Originally added because the category column headers in the matrix's second header row went
- * missing entirely — the rendered HTML had the topic group cell with the correct {@code colspan}
- * (e.g. {@code colspan="2"}) but the row immediately below it was empty where the two category
- * names should have been. The cause was a Thymeleaf 3.x quirk: a {@code <th:block th:each="topic"
- * th:with="topicId=...">} wrapper followed by {@code <th th:each="cat :
- * ${categoriesByTopic[topicId]}">} inside it evaluates the inner expression to zero iterations,
- * even though the same map access worked fine on the outer {@code colspan} attribute (using {@code
- * topic.id.toString()} inline). The fix iterates the flat {@code ${categories}} list instead, which
- * the body rows already use, so the column header now lines up with the column body cell-for-cell.
- *
- * <p>The same pattern broke the bulk-edit dropdown's {@code <optgroup>}: the topic label rendered
- * but the {@code <option>} elements inside it never did, leaving the officer with an empty
- * dropdown. There the fix is the explicit {@code categoriesByTopic.get(topic.id.toString())} form,
- * which sidesteps the gotcha while preserving the topic→category grouping the dropdown needs.
+ * MVC rendering checks for {@code /promotion/manage}: the matrix's category header row lines up
+ * with its body columns, and the bulk-edit dropdown lists each topic's categories as options.
  */
 @SpringBootTest
 class PromotionManagePageControllerMvcTest {

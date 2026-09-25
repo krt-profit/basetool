@@ -39,35 +39,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Functional flow: record a (MATERIAL) Job Order handover through the UI and verify both the
+ * E2E flow for MATERIAL job-order handovers: records a handover through the UI and verifies the
  * handover record and the inventory book-out it triggers.
  *
- * <p>This is the concurrency-sensitive flow — the handover decrements the linked inventory item and
- * the job-order material's open amount inside one transaction. It needs an order with a
- * handover-eligible inventory item linked to it, which the admin REST API can build end to end:
- * {@link BackendSeeder} seeds the IRIDIUM membership, a job-order material, a location, a job order
- * requesting that material, and an inventory item linked to the order. The handover modal lazily
- * fetches that linked inventory per material and snapshots it into the item dropdown when a row is
- * added, so the test waits for the cache before adding a row.
- *
- * <p>Three cases are covered:
- *
- * <ul>
- *   <li>The base flow records a handover and asserts it appears in the order's handover table.
- *   <li>The single-entry book-out asserts that handing over part of one linked inventory entry
- *       reduces exactly that entry by the handed-over amount.
- *   <li>The multi-entry book-out asserts that a single handover drawing from two linked entries
- *       reduces each entry by its own amount.
- * </ul>
- *
- * <p>Note on scope: only MATERIAL handovers book materials out of inventory. ITEM handovers (see
- * {@link JobOrderItemHandoverE2eTest}) merely increment each ordered line's {@code deliveredAmount}
- * and never touch inventory, so the book-out assertions belong here, on the material flow. The
- * book-out is verified through the order-context inventory endpoint ({@code GET
- * /api/v1/orders/{id}/materials/{matId}/inventory}, the same {@code findByJobOrderIdOrdered} source
- * the modal dropdown uses); the deduction orders request more than is handed over, so the order
- * never fully completes and the entries stay linked (a completed order unlinks its remaining
- * inventory).
+ * <p>Covers the base handover, a partial book-out from one linked entry, and a single handover
+ * drawing from two linked entries. Orders request more than is handed over so they never complete
+ * and the entries stay linked for the read-back.
  */
 @Tag("e2e")
 class JobOrderHandoverE2eTest {

@@ -50,10 +50,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC-level render test for the {@code bank-account-detail :: bookings} AJAX fragment (REQ-FE-002):
- * proves the booking-history pager fragment actually resolves and renders one booking row + its
- * page-nav through the real {@code @moneyFormat} bean. A pure unit test only pins the view-name
- * string; this fails if the fragment selector is misspelled or the booking markup breaks.
+ * MVC render test for the {@code bank-account-detail :: bookings} AJAX fragment (REQ-FE-002): one
+ * booking row and its page-nav render through the real {@code @moneyFormat} bean.
  */
 @SpringBootTest
 class BankAccountDetailFragmentMvcTest {

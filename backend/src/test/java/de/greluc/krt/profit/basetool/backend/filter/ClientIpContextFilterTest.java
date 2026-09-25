@@ -36,10 +36,6 @@ import org.springframework.security.web.util.matcher.IpAddressMatcher;
 /**
  * Tests the trusted-proxy walk that decides which address every per-IP budget is charged to
  * (REQ-SEC-011).
- *
- * <p>The chain semantics are exercised against the static resolver so a case can be written in one
- * line; the request-attribute contract and the ordering are exercised through the filter itself,
- * because those are what the rest of the chain depends on.
  */
 class ClientIpContextFilterTest {
 

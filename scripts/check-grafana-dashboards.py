@@ -4,32 +4,11 @@
 # Copyright (C) 2026 Lucas Greuloch
 #
 # SPDX-License-Identifier: GPL-3.0-only
-#
 """Validate the provisioned Grafana dashboards.
 
-WHY THIS GATE EXISTS
---------------------
-The 13 dashboards under ``monitoring/grafana/dashboards/`` are provisioned as code with
-``allowUiUpdates: false``, and until 2026-08-29 (#1708) **nothing validated them at all** -- not a
-Gradle test, not a CI job, not a lint script. That matters more here than for most config, because
-every way these files can be wrong is a *silent* failure:
-
-* Invalid JSON -- Grafana logs a provisioning error and serves the stack without that dashboard.
-  Nobody watches Grafana's own startup log, so the dashboard is simply gone.
-* A duplicate ``uid`` -- provisioning is last-writer-wins, so one of the two dashboards silently
-  replaces the other and its URL now shows someone else's panels.
-* A datasource ``uid`` that is not provisioned -- every panel on it renders "Datasource not found",
-  which reads as "no data" to anyone who is not looking closely.
-* A duplicate panel ``id`` inside one dashboard -- panel links, shared URLs and the "view panel"
-  deep links resolve to whichever Grafana finds first.
-
-None of these is true today; this gate is what keeps it that way. It is the dashboard half of the
-lesson #1707 drew for the alert rules: a monitoring surface that nothing checks drifts silently, and
-its silence is indistinguishable from health.
-
-The check is deliberately structural. It does NOT verify that a panel's metric has series -- that
-needs production and is a judgement call (an absent counter is good news, an absent gauge is a
-defect), which is why it stays a periodic review rather than a gate.
+Structural checks only: valid UTF-8 JSON, a unique dashboard ``uid`` and a title, unique and
+titled panels (collapsed rows included), and only provisioned datasource uids. Whether a panel's
+metric has series is not checked.
 
 Usage:
     python scripts/check-grafana-dashboards.py [--dashboards DIR] [--datasources FILE]
@@ -50,24 +29,14 @@ DEFAULT_DATASOURCES = pathlib.Path("monitoring/grafana/provisioning/datasources/
 
 
 def provisioned_datasource_uids(path: pathlib.Path) -> set[str]:
-    """Read the datasource uids out of the provisioning file.
-
-    Parsed with a regex rather than a YAML library on purpose: this script must run on a bare
-    ``python3`` in CI with no pip install step, and the file's ``uid:`` lines are a flat, stable
-    shape. A uid that the regex misses shows up as a false failure naming the exact uid, which is a
-    far cheaper wrong answer than adding a dependency to a lint gate.
-    """
+    """Read the datasource uids out of the provisioning file's ``uid:`` lines, without a YAML parser."""
     if not path.is_file():
         return set()
     return set(re.findall(r"^\s*uid:\s*(\S+)\s*$", path.read_text(encoding="utf-8"), re.M))
 
 
 def walk_panels(panels, path="panels"):
-    """Yield every panel, descending into collapsed rows.
-
-    A row's children live in its own ``panels`` array and are the panels most likely to rot,
-    precisely because a collapsed row is the one nobody opens.
-    """
+    """Yield ``(path, panel)`` for every panel, descending into collapsed rows."""
     for i, panel in enumerate(panels or []):
         where = "%s[%d]" % (path, i)
         if panel.get("type") == "row":
@@ -77,12 +46,7 @@ def walk_panels(panels, path="panels"):
 
 
 def datasource_uids_in(node):
-    """Collect every datasource uid referenced anywhere below ``node``.
-
-    Grafana accepts a datasource as an object, as a bare uid string, or omitted (inheriting the
-    default), and it appears on panels, on targets and inside annotations and templating variables.
-    Walking the whole subtree is simpler than enumerating those places and cannot miss a new one.
-    """
+    """Yield every datasource uid referenced anywhere below ``node``, as an object or a bare string."""
     if isinstance(node, dict):
         ds = node.get("datasource")
         if isinstance(ds, dict) and isinstance(ds.get("uid"), str):
@@ -107,7 +71,6 @@ def main() -> int:
         return 2
 
     known_uids = provisioned_datasource_uids(args.datasources)
-    # A template variable renders as ${name}; those are resolved at view time, not provisioning.
     variable_ref = re.compile(r"^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$")
 
     problems: list[str] = []

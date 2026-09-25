@@ -54,20 +54,9 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 /**
  * Spring MVC controller for mission finance-entry CRUD ({@code /missions/{id}/finance-entries/**}).
  *
- * <p>Carved out from {@link MissionPageController} so the file stays manageable. Validation
- * failures re-render the mission-detail view inline by delegating to {@code
- * missionPageController.missionDetail(...)} — that keeps the BindingResult request-scoped (avoiding
- * the Redis-FlashMap self-reference crash) and preserves the modal-open flag so the user sees the
- * form with errors instead of an empty page. The injected {@link MissionPageController} is a Spring
- * proxy, so its method-level {@code @PreAuthorize} still fires when called via this delegation.
- *
- * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor. Every
- * handler here used to sit under a {@code permitAll} URL rule, and thirteen of them across this
- * package carried no gate of their own at all — protected by a matcher two folders away rather than
- * by anything next to the code. A method-level gate still wins where one is present, which is why
- * the two {@code @PreAuthorize("permitAll()")} the guest era left on the create handlers were
- * deleted rather than left to be harmless: Spring resolves method-first and does not AND the class
- * annotation into it, so they read as a live exemption from the floor above them.
+ * <p>Validation failures re-render the mission-detail view inline through {@link
+ * MissionPageController}. The class-level {@code isAuthenticated()} gate is the floor for every
+ * handler (REQ-SEC-052).
  */
 @Slf4j
 @Controller
@@ -81,8 +70,7 @@ public class MissionFinancePageController {
   private final MissionPageController missionPageController;
 
   /**
-   * Creates a finance entry on a mission. Covered by the class-level {@code isAuthenticated()}
-   * floor; the backend re-evaluates the write permission on {@code /api/v1/finance-entries}.
+   * Creates a finance entry on a mission; the backend re-checks the write permission.
    *
    * @param id mission id
    * @param form finance-entry form
@@ -200,16 +188,13 @@ public class MissionFinancePageController {
   }
 
   /**
-   * AJAX variant of {@link #addFinanceEntry}: creates a finance entry and returns the backend
-   * payload as JSON so the mission-detail finance pane can swap in place without a full reload
-   * (#574). The classic {@code POST} above stays the no-JavaScript fallback.
+   * AJAX variant of {@link #addFinanceEntry}, returning the created entry as JSON for an in-place
+   * finance-pane update.
    *
    * @param id mission id (path)
    * @param body finance-entry JSON ({@code participantId}, {@code note}, {@code type}, {@code
-   *     amount}); {@code missionId} is stamped from the path
-   * @param principal OIDC user bound from the security context; never {@code null} below the
-   *     class-level floor. The guest-vs-authenticated routing it used to steer is gone with the
-   *     guest (ADR-0159)
+   *     amount}); {@code missionId} is taken from the path
+   * @param principal OIDC user; never {@code null} below the class-level floor
    * @return {@code 200} with the created entry, or the upstream RFC 7807 error passed through
    */
   @PostMapping(value = "/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -229,8 +214,8 @@ public class MissionFinancePageController {
   }
 
   /**
-   * AJAX variant of {@link #updateFinanceEntry}: updates a finance entry (carrying the optimistic-
-   * lock version) and returns the updated entry as JSON for an in-place finance-pane swap (#574).
+   * AJAX variant of {@link #updateFinanceEntry}, returning the updated entry as JSON for an
+   * in-place finance-pane update.
    *
    * @param id mission id (path)
    * @param entryId finance entry id (path)
@@ -254,8 +239,8 @@ public class MissionFinancePageController {
   }
 
   /**
-   * AJAX variant of {@link #deleteFinanceEntry}: deletes a finance entry and answers {@code 204} so
-   * the mission-detail finance pane can swap in place without a full reload (#574).
+   * AJAX variant of {@link #deleteFinanceEntry}, answering {@code 204} for an in-place finance-pane
+   * update.
    *
    * @param id mission id (path)
    * @param entryId finance entry id (path)

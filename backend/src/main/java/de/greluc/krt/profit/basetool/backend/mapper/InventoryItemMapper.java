@@ -57,28 +57,15 @@ public abstract class InventoryItemMapper {
   }
 
   /**
-   * Maps an {@link InventoryItem} entity to its outbound DTO. The two quantity splits ({@code
-   * jobOrderAllocations} / {@code missionAllocations}, Variante C REQ-INV-027) map element-wise
-   * through {@link #jobOrderAllocationToDto(InventoryJobOrderAllocation)} / {@link
-   * #missionAllocationToDto(InventoryMissionAllocation)}; the still-unallocated remainder per
-   * dimension is computed into {@code jobOrderRest} / {@code missionRest}. The allocation
-   * collections and their {@code jobOrder}/{@code mission} aggregates must be initialised
-   * (entity-graphed) before mapping.
+   * Maps an {@link InventoryItem} entity to its outbound DTO, including the job-order and mission
+   * allocations and their per-dimension remainders (REQ-INV-027).
    *
-   * <p>After R9 Step 2 the inventory-item entity exposes {@code owningOrgUnit} (typed {@code
-   * OrgUnit}); the DTO still publishes {@code owningSquadron} as {@code SquadronReferenceDto} for
-   * API stability. The explicit mapping routes the source through {@code
-   * SquadronMapper.orgUnitToReferenceDto}, which projects either kind — a Staffel or a
-   * Spezialkommando — into the slim owner reference (id/name/shorthand), so SK-owned stock now
-   * surfaces its SK badge instead of a blank cell.
+   * <p>The owning org unit (Staffel or Spezialkommando) is published as {@code owningSquadron}.
+   * Exactly one of {@code material} and {@code gameItem} is populated (REQ-INV-029). The allocation
+   * collections and their aggregates must be initialised before mapping.
    *
-   * <p>Catalog-discriminated rows (V220, REQ-INV-029): {@code material} and {@code quality} are
-   * {@code null} on a game-item row and map to {@code null} DTO fields without dereferencing;
-   * {@code gameItem} maps through {@link #gameItemToReferenceDto(GameItem)} and is {@code null} on
-   * a material row. Exactly one of the two catalog references is populated.
-   *
-   * @param inventoryItem the inventory-item entity to project; {@code null} returns {@code null}.
-   * @return the populated inventory-item DTO.
+   * @param inventoryItem the entity to project; {@code null} returns {@code null}
+   * @return the inventory-item DTO
    */
   @Mapping(target = "jobOrderRest", expression = "java(jobOrderRest(inventoryItem))")
   @Mapping(target = "missionRest", expression = "java(missionRest(inventoryItem))")
@@ -116,16 +103,14 @@ public abstract class InventoryItemMapper {
   public abstract LocationDto locationToDto(Location location);
 
   /**
-   * Projects a {@link GameItem} catalogue entity into the slim Lager reference DTO (REQ-INV-029):
-   * id, display name, manufacturer name and kind name. MapStruct picks this method up for the
-   * {@code gameItem} field of {@link #toDto(InventoryItem)}; it is also reused directly by the
-   * item-side aggregation and catalog-search reads so every surface renders the same reference
-   * shape. Dereferences the lazy {@code manufacturer} association — callers must have it fetched
-   * (entity graph) or be inside an open session; batch loading via the {@code Manufacturer}
-   * class-level {@code @BatchSize} keeps the grouped paths free of per-row selects.
+   * Projects a {@link GameItem} into the slim Lager reference DTO: id, display name, manufacturer
+   * name and kind name (REQ-INV-029).
    *
-   * @param gameItem the catalogue entity to project; {@code null} returns {@code null}.
-   * @return the slim reference DTO, or {@code null} for a {@code null} input.
+   * <p>Dereferences the lazy {@code manufacturer} association, so it must be fetched or the session
+   * still open.
+   *
+   * @param gameItem the catalogue entity; {@code null} returns {@code null}
+   * @return the reference DTO, or {@code null} for a {@code null} input
    */
   @Nullable
   public InventoryGameItemReferenceDto gameItemToReferenceDto(GameItem gameItem) {
@@ -140,13 +125,12 @@ public abstract class InventoryItemMapper {
   }
 
   /**
-   * The still-unallocated job-order remainder of an entry ({@code amount − Σ slice amounts}), SCU-
-   * rounded; the value the UI renders as the job-order rest-chip. Never negative in a valid state
-   * (over-allocation is server-rejected, REQ-INV-027) but returned as-is so a corrupt state
-   * surfaces as a danger chip rather than being masked.
+   * Computes the SCU-rounded job-order remainder of an entry ({@code amount − Σ slice amounts}).
    *
-   * @param item the entry whose job-order remainder to compute; never {@code null}.
-   * @return the rounded remainder.
+   * <p>A negative value is returned as-is so a corrupt state surfaces rather than being masked.
+   *
+   * @param item the entry; never {@code null}
+   * @return the rounded remainder
    */
   public Double jobOrderRest(@NotNull InventoryItem item) {
     double allocated =
@@ -172,12 +156,11 @@ public abstract class InventoryItemMapper {
   }
 
   /**
-   * Computes an entry's dimension remainder, SCU-rounded so floating-point noise near zero does not
-   * render as a spurious non-zero rest.
+   * Computes an entry's SCU-rounded remainder in one allocation dimension.
    *
-   * @param amount the entry's total amount, or {@code null} (treated as 0).
-   * @param allocated the summed slice amount already allocated in the dimension.
-   * @return {@code amount − allocated}, SCU-rounded.
+   * @param amount the entry's total amount, or {@code null} (treated as 0)
+   * @param allocated the summed slice amount already allocated
+   * @return {@code amount − allocated}, SCU-rounded
    */
   private Double rest(Double amount, double allocated) {
     double total = amount == null ? 0.0 : amount;

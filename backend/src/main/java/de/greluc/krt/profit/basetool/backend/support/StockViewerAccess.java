@@ -22,36 +22,17 @@ package de.greluc.krt.profit.basetool.backend.support;
 import java.util.UUID;
 
 /**
- * Caller-aware access seam the stock mappers use to fill the viewer-dependent {@code canEdit} field
- * of an inventory-item or job-order DTO.
+ * Caller-aware seam the stock mappers use to fill the viewer-dependent {@code canEdit} field of
+ * inventory-item and job-order DTOs.
  *
- * <p>The same dependency inversion as {@link MissionViewerAccess} and for the same reason
- * (ADR-0047, cycle cleanup): the {@code service} layer already depends on {@code mapper}, so a
- * {@code mapper} &rarr; {@code service} edge would close a package cycle. Mappers reach neither
- * {@code SecurityContextHolder} (ArchUnit {@code mapperLayerShouldNotReachIntoSecurityContext}) nor
- * the {@code service} layer; they depend on this leaf interface, whose implementation lives in
- * {@code service} and is the only thing that touches the gates.
- *
- * <p><strong>Why the DTO carries this at all.</strong> A client cannot re-derive it. The rules are
- * per-row and hierarchy-aware — an admin holds no Staffel membership yet may edit every row, and a
- * Logistician may edit their own Staffel's rows and not another's. Every attempt to reproduce that
- * in a client reproduces the role hierarchy badly and gets it wrong for exactly the people most
- * entitled to act, which is what {@code MissionDto.canEdit} already exists to prevent.
- *
- * <p>Both methods take an id rather than an entity on purpose. The implementations open with a
- * {@code findById}, which for a row the caller is already mapping is served from Hibernate's
- * first-level cache rather than a second query — so an id-taking seam keeps the {@code support}
- * package free of {@code model} types without costing a round trip per row.
+ * <p>Inverts the {@code mapper} to {@code service} dependency like {@link MissionViewerAccess}
+ * (ADR-0047); the implementation lives in {@code service}.
  */
 public interface StockViewerAccess {
 
   /**
-   * Reports whether the current caller may write to one Lager row.
-   *
-   * <p>The rule the write endpoints enforce: the caller owns the row, or holds edit rights on the
-   * row's org unit. There is no additional role gate — {@code InventoryItemController} guards its
-   * writes with {@code isAuthenticated() and @ownerScopeService.canEditInventoryItem(#id)} — so a
-   * member editing their own stock passes without any grant.
+   * Reports whether the current caller may write to one Lager row: they own it or hold edit rights
+   * on its org unit.
    *
    * @param inventoryItemId the Lager row to test.
    * @return {@code true} iff the current caller may write to it.
@@ -59,14 +40,8 @@ public interface StockViewerAccess {
   boolean canEditInventoryItem(UUID inventoryItemId);
 
   /**
-   * Reports whether the current caller may edit one job order.
-   *
-   * <p><strong>Both halves of the endpoint's rule.</strong> {@code JobOrderController} guards its
-   * writes with {@code hasRole('LOGISTICIAN') and @ownerScopeService.canEditJobOrder(#id)}. The
-   * scope half alone would admit a plain member whose own Staffel owns the order, which the
-   * endpoint does not permit; the role half alone would admit a Logistician of an unrelated
-   * Staffel. A DTO flag built on this therefore agrees with the endpoint rather than approximating
-   * it.
+   * Reports whether the current caller may edit one job order, applying both the {@code
+   * LOGISTICIAN} role and the org-unit scope check the write endpoints enforce.
    *
    * @param jobOrderId the order to test.
    * @return {@code true} iff the current caller may edit it.

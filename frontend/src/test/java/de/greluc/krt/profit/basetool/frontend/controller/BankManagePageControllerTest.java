@@ -64,9 +64,8 @@ class BankManagePageControllerTest {
   }
 
   /**
-   * An OIDC principal whose {@code sub} is the given value. The frontend deliberately exposes the
-   * username as {@link Authentication#getName()} (user-name-attribute = preferred_username), so the
-   * holder self-link must read the {@code sub} from the principal, never the authentication name.
+   * Creates an OIDC principal with the given {@code sub}, which the holder self-link must read
+   * instead of {@link Authentication#getName()}.
    *
    * @param sub the Keycloak subject (UUID) to expose via {@link OidcUser#getSubject()}
    * @return a mock OIDC user returning {@code sub} as its subject

@@ -69,17 +69,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 
 /**
- * Unit tests for the bulk rebooking (Massen-Umbuchen, REQ-INV-036) in {@link
- * InventoryCheckoutService}.
- *
- * <p>The behaviour under test is the skip-vs-abort split that separates this action from the
- * all-or-nothing {@link InventoryCheckoutService#bulkCheckout}: a row already sitting in the
- * requested target state is skipped and counted, while an unknown id, a foreign row or an earmark
- * blocking a personalize aborts the whole transaction so nothing is written.
- *
- * <p>Every row here carries an {@code SCU} material and the requests leave {@code mergeStock}
- * unset, so {@code mergeStockIfRequested} returns at its "SCU without the per-action opt-in stays
- * append-only" branch — the merge path has its own tests and is not re-exercised here.
+ * Unit tests for bulk rebooking (Massen-Umbuchen, REQ-INV-036) in {@link InventoryCheckoutService}:
+ * rows already at the target are skipped and counted, while an unknown id, a foreign row or a
+ * blocking earmark aborts the whole action.
  */
 @ExtendWith(MockitoExtension.class)
 class InventoryCheckoutServiceBulkRebookTest {

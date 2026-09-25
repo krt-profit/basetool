@@ -46,14 +46,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Regression test for the "create-account modal's Org-Einheit picker renders <code>null</code> for
- * every option" bug. The {@code /api/v1/org-units/active} endpoint returns the {@link
- * OrgUnitMembershipOptionDto} wire shape ({@code orgUnitId} / {@code orgUnitName} / {@code
- * orgUnitShorthand}); the page controller previously deserialized it into the unrelated {@code
- * OrgUnitReferenceDto} ({@code id} / {@code name} / {@code shorthand}), so Jackson left every label
- * field null and the dropdown printed {@code null} for each org unit. This test pins that an
- * org-unit option reaches the rendered create-account modal with its name (and shorthand) as the
- * visible label and its id as the option value.
+ * Tests that the create-account modal's org-unit picker, fed by the {@link
+ * OrgUnitMembershipOptionDto} wire shape, renders each org unit's name and shorthand as label and
+ * its id as value.
  */
 @SpringBootTest
 class BankManagePageControllerOrgUnitPickerMvcTest {

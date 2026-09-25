@@ -60,31 +60,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * The acting member <strong>reaches the handler</strong>, and both person-gates judge
- * <strong>them</strong> (ADR-0129).
+ * Tests that the acting member reaches the handler and that both person gates (approval and
+ * consent) judge the member, not the gateway (ADR-0129).
  *
- * <p>Separate from {@link ActingMemberFilterChainTest}, which covers the refusals. That class
- * asserts only that things are refused — and a suite of refusals cannot notice that the success
- * path never worked. Two defects hid in exactly that blind spot, and they are why this class
- * exists:
- *
- * <ul>
- *   <li>{@code CurrentUserArgumentResolver} demanded a {@code JwtAuthenticationToken} and threw for
- *       the acting member, so every gateway call was refused during argument resolution, one layer
- *       past the gate it used to fail at. Fail-closed, invisible in a test that expects a refusal.
- *   <li>{@code TermsAcceptanceAccessFilter} made the same type check and failed <em>open</em>: "no
- *       user" means "let through" there, so the consent boundary (REQ-SEC-028) silently stopped
- *       applying to the one path it had just been extended to cover.
- * </ul>
- *
- * <p>The second needs the consent gate to be live, which the {@code test} profile stands down for
- * the whole suite. This class re-arms it for itself via {@code app.security.terms.armed-in-test} —
- * without that, the gate is a no-op stub and the fail-open regression is untestable by
- * construction.
- *
- * <p>{@link RefineryImportService} is mocked so the assertions are about identity rather than
- * master data: the extract below is schema-valid (it has to survive {@code @Valid}) but matches
- * nothing, and what is asserted is the {@code callerId} the controller passed down.
+ * <p>Re-arms the consent gate via {@code app.security.terms.armed-in-test}. {@link
+ * RefineryImportService} is mocked, and the assertions target the {@code callerId} passed down.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -175,12 +155,7 @@ class ActingMemberIdentityChainTest {
   }
 
   /**
-   * The happy path: the member's identity survives to the handler.
-   *
-   * <p>The assertion that matters is the captured {@code callerId}, not the status. A 200 alone
-   * would also be produced if the controller had defaulted to the gateway's own subject — which is
-   * precisely the bug the first cut of ADR-0129 shipped, where attribution was right at two call
-   * sites and wrong everywhere else. So this pins <em>whose</em> draft was built.
+   * The member's identity, not the gateway's, reaches the handler as the draft's {@code callerId}.
    */
   @Test
   void buildsTheDraftForTheActingMemberNotTheGateway() throws Exception {
@@ -200,15 +175,8 @@ class ActingMemberIdentityChainTest {
   }
 
   /**
-   * REQ-SEC-053 / ADR-0159: the acting-member path refuses a role-less member the same way the
-   * bearer path does.
-   *
-   * <p>This is why the {@code NO_ROLE} short-circuit sits in {@code assembleFor} and not on the JWT
-   * conversion. {@code DatabaseActingMemberAuthorities} installs an authentication without
-   * inspecting it (ADR-0129), so a check on the token would have left this door open: a gateway
-   * call on behalf of an account with no roles would have been admitted with an empty authority set
-   * — a principal that passes every {@code isAuthenticated()} gate and fails only the ones that
-   * name a role.
+   * The acting-member path refuses a role-less member with {@code NO_ROLE}, like the bearer path
+   * (REQ-SEC-053).
    */
   @Test
   void refusesAnActingMemberWhoHoldsNoRole() throws Exception {
@@ -232,13 +200,7 @@ class ActingMemberIdentityChainTest {
   }
 
   /**
-   * The second bound endpoint carries the identity too.
-   *
-   * <p>ADR-0129 bounds the header to two endpoints, and the tests above cover only the refinery
-   * one. Both bind {@code @CurrentUserId} now — the String-typed {@code @CurrentUserSub} twin they
-   * once split across was removed by #1640 — so this pins the second endpoint, reached through a
-   * multipart request on a different controller, rather than leaving it for a reviewer to take on
-   * trust. The subject reaching the service is the member's, not the gateway's.
+   * The blueprint-preview endpoint, the second bound endpoint, also receives the member's identity.
    */
   @Test
   void carriesTheActingMemberToTheBlueprintPreviewEndpointToo() throws Exception {
@@ -259,18 +221,8 @@ class ActingMemberIdentityChainTest {
   }
 
   /**
-   * The gateway cannot record consent for itself, even where an {@code app_user} row exists for it.
-   *
-   * <p>Closes the one escalation the machine identity still carried. {@code /api/v1/terms/**} is
-   * exempt from the consent gate — it must be, or nobody could ever accept — and the gateway is an
-   * authenticated caller, so with a row for its own {@code sub} it could consent, clear the gate,
-   * and reach every {@code isAuthenticated()}-only read behind {@code
-   * anyRequest().authenticated()}. Production carries exactly such a row: the gateway's first call
-   * ran the registration flow on itself before the machine-identity carve-out existed.
-   *
-   * <p>Asserted here rather than left to the row's manual removal, because that removal is a
-   * per-environment step that can be forgotten — and a cleanup migration would risk aborting a
-   * deploy on one of the many non-cascading foreign keys into {@code app_user}.
+   * The gateway cannot record consent for itself, even when an {@code app_user} row exists for its
+   * subject.
    */
   @Test
   void refusesToRecordConsentForTheGatewayItself() throws Exception {
@@ -315,17 +267,8 @@ class ActingMemberIdentityChainTest {
   }
 
   /**
-   * The consent gate judges the acting member, and refuses when they have not accepted.
-   *
-   * <p>The regression test for the fail-open defect. Before the identity seam this returned
-   * <strong>200</strong>: the gate looked for a {@code JwtAuthenticationToken}, found the acting
-   * member's token-less authentication, concluded "no user" and waved the request through.
-   *
-   * <p>Asserted on the {@code code}, not on the status. Every filter in this chain answers 403, so
-   * a status assertion passes even when the wrong gate fired — and here the distinction is the
-   * whole point: {@code TERMS_NOT_ACCEPTED} proves the consent gate ran <em>and</em> that it
-   * evaluated the member, because the gateway's own subject has no acceptance row either and would
-   * have produced the same status from a different filter.
+   * The consent gate judges the acting member and refuses with {@code TERMS_NOT_ACCEPTED} when they
+   * have not accepted; asserted on the code because every gate in the chain answers 403.
    */
   @Test
   void refusesAnActingMemberWhoHasNotAcceptedTheTerms() throws Exception {
@@ -343,14 +286,7 @@ class ActingMemberIdentityChainTest {
     verify(refineryImportService, org.mockito.Mockito.never()).buildDraft(any(), any());
   }
 
-  /**
-   * The approval gate judges the acting member too.
-   *
-   * <p>{@code PendingApprovalAccessFilter} reads {@code getAuthorities()} generically, so it
-   * survived the identity swap where the consent gate did not. That asymmetry is exactly why it is
-   * pinned here: the two gates sit next to each other and only one of them was ever exercised on
-   * this path, which is what made the fail-open look fine.
-   */
+  /** The approval gate refuses an acting member whose registration is still pending. */
   @Test
   void refusesAnActingMemberWhoseRegistrationIsStillPending() throws Exception {
     User member = userRepository.findById(MEMBER).orElseThrow();
@@ -370,18 +306,7 @@ class ActingMemberIdentityChainTest {
         .andExpect(jsonPath("$.code").value("PENDING_APPROVAL"));
   }
 
-  /**
-   * A member <em>deactivated</em> in Keycloak is refused, not only one that was deleted.
-   *
-   * <p>The gap V230 closed. The roster sync always fetched {@code enabled} from the Admin API and
-   * dropped it, so deactivating a member refused them nothing here: with a token that is bounded by
-   * expiry, but the gateway can <em>name</em> a subject, and a name does not expire. This is the
-   * difference between revocation taking minutes and taking forever.
-   *
-   * <p>The refusal is byte-identical to the deleted case — only the log line separates them, which
-   * is deliberate: the endpoint must not become an oracle for which subjects exist, let alone for
-   * which of them are still active.
-   */
+  /** A member disabled in Keycloak is refused with the same response as a deleted one. */
   @Test
   void refusesAMemberWhoseKeycloakAccountIsDisabled() throws Exception {
     User member = userRepository.findById(MEMBER).orElseThrow();
@@ -404,12 +329,8 @@ class ActingMemberIdentityChainTest {
   }
 
   /**
-   * A member the last roster sync no longer found in Keycloak is refused.
-   *
-   * <p>The liveness bound, end to end. A named subject never expires the way a token does, so
-   * without this an offboarded member's still-running extractor would keep writing indefinitely.
-   * The refusal is the filter's own, and its body must stay indistinguishable from the
-   * unknown-member case so the endpoint cannot be used to enumerate subjects.
+   * A member missing from the last Keycloak roster sync is refused, with a response
+   * indistinguishable from the unknown-member case.
    */
   @Test
   void refusesAMemberTheIdentityProviderNoLongerHas() throws Exception {

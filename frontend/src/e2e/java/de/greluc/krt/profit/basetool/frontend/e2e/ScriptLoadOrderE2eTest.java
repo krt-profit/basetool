@@ -36,21 +36,13 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.FieldSource;
 
 /**
- * Guards the deferred load order of FE-PERF-05 (REQ-FE-023) on every page route: after load, the
- * shared scripts are installed, the {@code krtEvents} bootstrap stub has been replaced, no script
- * threw, and the page reported nothing to the client-error beacon.
+ * Guards the deferred script load order (REQ-FE-023) on every page route: after load, the shared
+ * scripts are installed, the {@code krtEvents} bootstrap stub has been replaced, no script threw,
+ * and nothing reached the client-error beacon.
  *
- * <p>This load order has regressed three times, always the same way: an inline script called a
- * shared global before the file defining it had run, a guard like {@code if (window.krtFetch)} made
- * the call a silent no-op, and a control simply did nothing. Deferring every external script widens
- * exactly that window — an inline script now always runs before {@code krt-fetch.js} — so the
- * structural half ({@code InlineScriptLoadOrderTest}, no top-level call in an inline script) is
- * paired with this runtime half, which asks the browser what actually got installed.
- *
- * <p>The two signals it reads are the ones the app already has for this failure in production:
- * {@code krt-client-error.js} beacons every uncaught error and every script that failed to load to
- * {@code POST /internal/client-error}, and the head stub throws — so the beacon counts it — when
- * {@code event-delegation.js} has not replaced it five seconds after load.
+ * <p>Runtime counterpart of {@code InlineScriptLoadOrderTest}. It reads the {@code POST
+ * /internal/client-error} beacon, which also counts the head stub's throw when {@code
+ * event-delegation.js} has not replaced it five seconds after load.
  */
 @Tag("smoke")
 @Tag("e2e")

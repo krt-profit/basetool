@@ -52,10 +52,9 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
 /**
- * Unit tests for {@link MissionFinancePageController}. The controller had 2% line / 0% branch
- * coverage. Three small endpoints (add / update / delete) each carry a happy-path / error-path /
- * validation-error split that all follow the same shape: success toast + redirect, failure toast +
- * redirect, or BindingResult-direct-render delegating to {@link MissionPageController}.
+ * Unit tests for {@link MissionFinancePageController}'s add, update and delete endpoints: success
+ * and failure toasts with redirect, and validation errors rendered via {@link
+ * MissionPageController}.
  */
 class MissionFinancePageControllerTest {
 

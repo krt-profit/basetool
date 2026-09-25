@@ -26,12 +26,10 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Frontend mirror of the backend {@code RefineryOrderDto} wire shape (per the {@code
- * feedback_backend_frontend_dto_mirror} memory: backend + frontend records must stay aligned
- * field-for-field, or a render-time 500 surfaces in prod).
+ * Frontend mirror of the backend {@code RefineryOrderDto}; must match it field for field.
  *
- * <p>The trailing {@code owningOrgUnitId} field is the R5.d picker output sent to the backend on
- * create; {@code null} preserves the legacy "owner's home Staffel" stamping path.
+ * <p>{@code owningOrgUnitId} is the owning-org-unit picker output sent on create; {@code null}
+ * stamps the owner's home Staffel.
  */
 public record RefineryOrderDto(
     UUID id,

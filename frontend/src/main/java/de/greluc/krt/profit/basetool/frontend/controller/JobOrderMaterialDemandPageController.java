@@ -42,13 +42,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 /**
- * Frontend controller for the cross-order material-demand overview (REQ-ORDERS-034) — the page that
- * answers "what does my unit still have to gather across every open order", as opposed to the order
- * detail's per-order material list.
- *
- * <p>Read-only: it renders one backend projection and offers no mutation, so it holds no write seam
- * and logs no audit event. The page still lives under {@code /orders} so the whole order area keeps
- * one URL stem.
+ * Frontend controller for the read-only cross-order material-demand overview (REQ-ORDERS-034): what
+ * the caller's unit still has to gather across all open orders.
  */
 @Controller
 @UsesLayoutModel
@@ -68,18 +63,11 @@ public class JobOrderMaterialDemandPageController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Renders the cross-order material demand at {@code /orders/material-demand}.
+   * Renders the cross-order material demand at {@code /orders/material-demand}, as scoped by the
+   * backend.
    *
-   * <p>The backend applies the caller's visibility scope and the profit gate, so this controller
-   * neither filters nor re-checks — it renders whatever the caller is allowed to see, which for a
-   * caller outside the order workflow is an empty overview. A {@link BackendServiceException}
-   * degrades to that same empty state with a warning, matching the partial-failure tolerance of the
-   * sibling collection pages: an unreachable backend should not turn a read-only overview into an
-   * error page.
-   *
-   * <p>Called with {@code ?fragment=results} it returns only the {@code demandResults} fragment —
-   * the live-sync receiver ({@code orders-material-demand.js}, REQ-FE-010/015) re-fetches it to
-   * swap the tables in place when a peer creates, completes or re-stocks an order.
+   * <p>A backend failure degrades to an empty overview. {@code ?fragment=results} returns only the
+   * {@code demandResults} fragment for live sync (REQ-FE-010).
    *
    * @param fragment when {@code results}, render only the {@code demandResults} fragment
    * @param model Thymeleaf model populated with {@code demand}
@@ -110,16 +98,11 @@ public class JobOrderMaterialDemandPageController {
   }
 
   /**
-   * Collects the distinct materials the overview actually shows, so the filter panel's multi-select
-   * can be rendered server-side rather than assembled from the DOM. Sorted by name
-   * (case-insensitively) because the panel lists materials alphabetically, independently of the
-   * tables' SCU-first ordering.
+   * Collects the distinct materials the overview shows, sorted case-insensitively by name, for the
+   * filter panel's multi-select.
    *
-   * <p>A material appearing in several org-unit groups, or in both quality buckets, yields exactly
-   * one option — the filter narrows by material, not by bucket.
-   *
-   * @param demand the overview being rendered; never {@code null}.
-   * @return the distinct materials, name-ordered; empty when nothing is shown.
+   * @param demand the overview being rendered; never {@code null}
+   * @return the distinct materials, name-ordered; empty when nothing is shown
    */
   @NotNull
   private static List<MaterialDto> materialOptions(@NotNull MaterialDemandOverviewDto demand) {

@@ -51,18 +51,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Regression for the Thymeleaf 3.1 JS-inline truncation bug on {@code /admin/locations}.
- *
- * <p>Pre-fix, the template called {@code /*[[${locations.![name]}]]*&#47;} inside a {@code
- * th:inline="javascript"} script, which truncated the rest of the script body. The page-local
- * {@code filterTable} function lived after that expression and therefore was never defined — the
- * filter input above the locations table did nothing. The fix replaced the inline expression with a
- * sibling {@code <datalist id="locationNames-data">}. Post-ADR-0069 the page logic lives in the
- * extracted {@code locations.js} module (loaded via {@code th:src}) and the remaining interpolation
- * (the AJAX toast/conflict strings) sits in a small inline bootstrap right before it; this test
- * pins that the module's {@code th:src} tag — emitted AFTER that bootstrap — survives in the
- * rendered HTML (so a re-introduced inline-truncation bug that ate the bootstrap and dropped the
- * module tag is still caught) and the response ends with the closing {@code </html>} tag.
+ * Regression test for the Thymeleaf JS-inline truncation on {@code /admin/locations}: the {@code
+ * locations.js} module tag, emitted after the inline bootstrap, and the closing {@code </html>} tag
+ * must be present in the rendered page.
  */
 @SpringBootTest
 class AdminLocationsPageControllerMvcTest {
@@ -83,9 +74,8 @@ class AdminLocationsPageControllerMvcTest {
   }
 
   /**
-   * Asserts the extracted {@code locations.js} module tag (emitted AFTER the datalist and the
-   * interpolated bootstrap) appears in the rendered HTML — proof that the Thymeleaf inline
-   * truncation does not strike again.
+   * Asserts the {@code locations.js} module tag appears in the rendered HTML, proving the inline
+   * script was not truncated.
    */
   @Test
   @WithMockUser(roles = "ADMIN")

@@ -17,55 +17,18 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * Variante C "Herkunft" (deduct-from) picker (REQ-INV-027) shared by the personal
- * ("Mein Lager", inventory-my.js) and global ("Lager", inventory-admin.js) pages.
- *
- * A book-out (Ausbuchen) or transfer (Umbuchen -> Ort/Nutzer) removes a quantity X from an
- * entry that is split independently across job-order and mission earmark tags. This module
- * lets the user choose how much of X comes from each tag; whatever is left over is taken from
- * that dimension's not-yet-assigned rest. It mirrors the backend contract in
- * InventoryCheckoutService.resolveReductionPlan: per dimension the sum of the tag reductions
- * must not exceed X (else 400), each reduction must fit its slice (else 400), and the rest must
- * be able to absorb whatever the tags did not cover, i.e. X - sum <= rest (else the R5 422). An
- * omitted plan (all inputs 0) makes the backend take the deduction from the rest first -- the
- * locked default "Rest zuerst, Rest leer lassen".
- *
- * One dimension shape has no choice to make: exactly one tag and no not-yet-assigned rest. Every
- * unit leaving the entry then has to come out of that one tag, so `X` is the only value the field
- * can ever hold -- typing anything else just trips the "assign at least X" gate. Such a dimension
- * is filled from the deducted amount and locked (readOnly) instead of being demanded from the
- * user, and it keeps following the amount field while the modal is open.
- *
- * The picker reads the entry's tags straight from the source leaf row's Variante-C chips
- * (.assoc-split[data-assoc-field] -> .assoc-chip[data-target-id][data-amount]), so no extra
- * server round-trip is needed. State lives per modal in `registry`, keyed by a short prefix
- * ('bookout' / 'umbuchen') that also names the section element via data-herkunft="<prefix>".
- *
- * The page code calls populate() when a modal opens, collect() + isValid() on submit, and
- * reset() on close; every value change (amount, tag inputs, sell amount, type/mode radios)
- * re-runs recompute() through the delegated input/change listeners this module installs, which
- * refresh the rest chips, the "assign at least" warning and the coupled-sale proceeds hint, and
- * enable/disable the modal's submit button.
- */
 (function () {
     'use strict';
 
-    // Matches the backend REDUCTION_EPSILON; amounts are SCU-rounded to 3 decimals first so this
-    // only absorbs floating-point noise, never a meaningful quantity.
     const EPS = 1e-6;
 
-    // Chip-display epsilon (three-decimal SCU): a |rest| within this reads as an exact zero.
     const REST_EPS = 0.0005;
 
-    // prefix -> { itemId, dims: [{ field, entryAmount, isPiece, sumAllocated, tags: [...] }] }.
     const registry = {};
 
     /**
-     * The localized strings the picker renders, injected as the page global `herkunftI18n` by the
-     * template's th:inline bootstrap block. There is no literal fallback (2026-09-23): a string the
-     * page did not declare renders as its key name and is reported as an `i18n_missing` client
-     * error (window.krtI18nText).
+     * The localized picker strings from the page global `herkunftI18n`. A missing string renders as
+     * its key name and is reported via window.krtI18nText.
      *
      * @returns {object} the active string bundle
      */
@@ -94,10 +57,8 @@
     }
 
     /**
-     * Reports whether a picker is live: shown (not krtm-hidden) and inside no display:none subtree.
-     * The Umbuchen picker sits inside #umbuchenTransferFields (hidden in PERSONAL mode) and every
-     * picker sits inside a modal that is display:none while closed, so an inactive picker neither
-     * gates its submit button nor contributes a plan.
+     * Reports whether a picker is live: not krtm-hidden and inside no display:none subtree. An
+     * inactive picker neither gates its submit button nor contributes a plan.
      *
      * @param {HTMLElement} section the picker section
      * @returns {boolean} true when the picker is visible and should be enforced
@@ -131,8 +92,8 @@
     }
 
     /**
-     * SCU-rounds a quantity to the entry's precision (whole for PIECE, three decimals for SCU),
-     * matching InventoryItem.roundToScuScale so the client validation agrees with the backend.
+     * Rounds a quantity to the entry's precision (whole for PIECE, three decimals for SCU), as the
+     * backend does.
      *
      * @param {number} n the raw amount
      * @param {boolean} isPiece whether the material is counted in whole pieces
@@ -146,8 +107,7 @@
     }
 
     /**
-     * Parses an amount field, honouring the shared SCU decimal normaliser when present so "," and
-     * "." both work regardless of browser locale.
+     * Parses an amount field, accepting "," and "." as decimal separator when krtScuInput is loaded.
      *
      * @param {string} value the raw field value
      * @returns {number} the parsed number (NaN when unparseable)
@@ -214,7 +174,7 @@
     }
 
     /**
-     * Reads one dimension's earmark tags from the source leaf row's Variante-C chips.
+     * Reads one dimension's earmark tags from the source leaf row's allocation chips.
      *
      * @param {HTMLElement} leaf the source entry's leaf row
      * @param {string} field the dimension ('JOB_ORDER' / 'MISSION')
@@ -250,10 +210,8 @@
     }
 
     /**
-     * Reports whether a dimension leaves the user no choice: the entry carries exactly one earmark
-     * tag in it and no not-yet-assigned rest, so the whole deduction must come out of that single
-     * tag (minRequired == the deducted amount, and the tag is the only place it can come from).
-     * Such a dimension is prefilled and locked rather than demanded from the user.
+     * Reports whether a dimension leaves no choice: exactly one tag and no unassigned rest, so the
+     * whole deduction comes from that tag. Such a dimension is prefilled and locked.
      *
      * @param {object} dim the dimension descriptor from readDimension
      * @returns {boolean} true when the single tag has to absorb the whole deduction
@@ -287,11 +245,9 @@
     }
 
     /**
-     * Builds the DOM for one dimension: a caption, one amount input per tag, a rest chip, an
-     * "assign at least" warning and (mission dimension of a SELL-capable picker only) a coupled
-     * proceeds hint. Names are set via textContent so a mission name never injects markup. A
-     * determined dimension (single tag, no rest) gets its input locked plus a note saying why --
-     * the value itself is written by syncDetermined, which recompute runs right after this.
+     * Builds the DOM for one dimension: a caption, one amount input per tag, a rest chip, a
+     * minimum warning and, for the mission dimension of a SELL-capable picker, a proceeds hint. A
+     * determined dimension gets a locked input and an explanatory note.
      *
      * @param {string} prefix the modal prefix
      * @param {object} dim the dimension descriptor from readDimension
@@ -376,11 +332,9 @@
     }
 
     /**
-     * Mirrors the deducted amount into a determined dimension's locked input, so the field is
-     * already filled when the modal opens and follows every later edit of the amount field. A
-     * missing / non-positive amount resets it to 0 rather than leaving a stale figure behind. The
-     * amount is written verbatim (not clamped to the slice): an over-max amount must keep tripping
-     * the picker's tagOver gate instead of being silently trimmed to a submittable plan.
+     * Mirrors the deducted amount into a determined dimension's locked input; a missing or
+     * non-positive amount writes 0. The amount is not clamped to the slice, so an excess still
+     * fails validation.
      *
      * @param {HTMLElement} section the picker section
      * @param {object} dim the dimension descriptor
@@ -396,7 +350,6 @@
         }
         const value =
             isFinite(deducted) && deducted > 0 ? String(roundAmount(deducted, dim.isPiece)) : '0';
-        // Assigning .value fires no input event, so this cannot re-enter the delegated listener.
         if (input.value !== value) {
             input.value = value;
         }
@@ -436,8 +389,6 @@
         const minRequired = roundAmount(Math.max(0, target - restDim), dim.isPiece);
         const overAssigned = assigned > target + EPS;
         const underAssigned = fromRest > restDim + EPS;
-        // A missing / zero deducted amount is the amount field's own error, not the picker's: don't
-        // block on it here, the field's required+min guard already stops the submit.
         const valid = !hasDeducted || (!tagOver && !overAssigned && !underAssigned);
 
         return {
@@ -501,10 +452,8 @@
     }
 
     /**
-     * Refreshes the coupled-sale proceeds hint under the mission dimension: each mission with a
-     * positive reduction is credited sellAmount * scu / deducted, and the unassigned remainder
-     * falls to the personal account. It is an estimate -- a mission the seller did not take part in
-     * is credited personally by the backend, which the client cannot know.
+     * Refreshes the estimated proceeds hint under the mission dimension: each mission is credited
+     * its share of the sale amount, the unassigned remainder goes to the personal account.
      *
      * @param {HTMLElement} block the mission dimension block
      * @param {object} dim the dimension descriptor
@@ -557,9 +506,8 @@
     }
 
     /**
-     * Recomputes the picker: re-fills every determined dimension's locked input from the current
-     * deducted amount, refreshes every dimension's UI and enables/disables the modal's submit
-     * button. An inactive or tag-less picker never gates the button.
+     * Recomputes the picker's dimensions and enables or disables the modal's submit button. An
+     * inactive or tag-less picker never gates the button.
      *
      * @param {string} prefix the modal prefix
      * @returns {boolean} true when the plan is valid (or the picker does not apply)
@@ -581,8 +529,6 @@
         const sell = sellContext(prefix);
         let allValid = true;
         ctx.dims.forEach(function (dim) {
-            // Determined dimensions are filled by the picker itself, so refresh them before the
-            // state is read off the inputs -- both on the initial populate and on every amount edit.
             syncDetermined(section, dim, deducted);
             const state = dimState(section, dim, deducted);
             if (!state.valid) {
@@ -597,8 +543,8 @@
     }
 
     /**
-     * Builds the picker for a modal from the source entry's leaf-row chips and shows it (hiding it
-     * when the entry carries no tags at all). Call this when the modal opens, after it is shown.
+     * Builds and shows the picker for a modal from the source entry's leaf-row chips, or hides it
+     * when the entry has no tags. Call after the modal is shown.
      *
      * @param {string} prefix the modal prefix
      * @param {string} itemId the source entry id (matches the leaf row's data-item-id)
@@ -640,11 +586,9 @@
     }
 
     /**
-     * Collects the picker's per-dimension "deduct from" plan for the submit payload. A dimension
-     * with only zero inputs contributes null -- the backend then takes that dimension's deduction
-     * from the rest first (the legacy default). An inactive / tag-less picker contributes null for
-     * both dimensions. A determined dimension always contributes its prefilled single reduction,
-     * which is exactly the plan the backend's own default would have derived for it.
+     * Collects the picker's per-dimension reduction plan for the submit payload. A dimension with
+     * only zero inputs, or an inactive picker, contributes null, so the backend deducts from the
+     * rest first.
      *
      * @param {string} prefix the modal prefix
      * @returns {{jobOrderReductions: Array|null, missionReductions: Array|null}} the plan
@@ -711,9 +655,6 @@
         },
     };
 
-    // Any value change inside an open picker's modal (tag inputs, the deducted amount, the sale
-    // amount, the type/mode radios) re-runs the affected pickers. Only an active picker does any
-    // work, so this stays cheap when no modal is open.
     function onAnyChange() {
         Object.keys(registry).forEach(function (prefix) {
             const section = sectionOf(prefix);

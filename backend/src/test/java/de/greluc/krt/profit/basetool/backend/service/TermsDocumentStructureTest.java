@@ -43,22 +43,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.context.support.ResourceBundleMessageSource;
 
 /**
- * Pins the Terms-of-Use document against its message bundle.
- *
- * <p>This carries what the frontend's {@code TermsTemplateBundleParityTest} used to, and for the
- * same reason: the terms are a contract text, so a clause that exists as a {@code terms.*} key but
- * is never shown to anybody never becomes part of the agreement. What changed is where it can go
- * missing. There is no longer a template listing every key — {@link TermsDocumentService} walks the
- * numbering and stops at the first gap — so the failure mode moved from "a key nobody referenced"
- * to "a key the walk cannot reach". Both drop a clause from a legal text with no other symptom.
- *
- * <p>A mis-numbered key is the concrete danger. Insert {@code terms.p_4_7} while {@code
- * terms.p_4_6} is absent and the walk stops at 5: the clause is in the repository, in the version
- * digest, and invisible to every reader. This test fails on exactly that.
- *
- * <p>Reads the committed bundle under {@code src/main/resources} directly rather than the classpath
- * copy, matching the frontend's bundle tests; the Gradle {@code Test} task runs with the module
- * directory as its working directory.
+ * Verifies that every {@code terms.*} key in the committed message bundle is reachable by the
+ * numbering walk of {@link TermsDocumentService}, so no clause is silently dropped.
  */
 class TermsDocumentStructureTest {
 

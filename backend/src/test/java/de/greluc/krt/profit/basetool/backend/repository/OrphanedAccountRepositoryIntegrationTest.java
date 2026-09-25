@@ -37,19 +37,11 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Integration coverage for the orphaned-account guard's two queries against the real Postgres test
- * container (REQ-SEC-059), so the V241 column validates against the entity and the bulk update that
- * stamps it behaves as written.
+ * Integration tests for the orphaned-account guard's two queries against real Postgres
+ * (REQ-SEC-059), including that the bulk update of {@code markMissingUsers} writes its stamp.
  *
- * <p>The property that needs a real database is that {@code markMissingUsers} is a <b>bulk JPQL
- * update</b>: it bypasses the entity lifecycle, which is exactly why {@code updatedAt} could not
- * have carried this fact and why the stamp had to become an explicit assignment. A Mockito test
- * cannot show that the assignment reaches the column.
- *
- * <p><b>The roster handed to {@code markMissingUsers} is always every committed id minus the one
- * under test.</b> That is not ceremony: the update flags <em>everything not in the roster</em>, so
- * a narrow list would soft-delete every user another test class has committed into this shared
- * container.
+ * <p>The roster passed to {@code markMissingUsers} is always every committed id minus the one under
+ * test, since the update flags every user not in it.
  */
 @SpringBootTest
 @ActiveProfiles("test")

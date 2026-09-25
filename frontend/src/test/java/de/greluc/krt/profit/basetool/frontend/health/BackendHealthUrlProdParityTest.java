@@ -33,21 +33,8 @@ import org.junit.jupiter.api.Test;
 import org.yaml.snakeyaml.Yaml;
 
 /**
- * Pins the one cross-module invariant behind the 2026-08-18 rollback: the port the frontend probes
- * for the backend's readiness must be the port the backend actually serves Actuator on in
- * production.
- *
- * <p>The two values live in different modules' {@code application-prod.yml} and nothing connected
- * them. ADR-0134 moved the backend's Actuator to the internal-only management port {@code 11271};
- * {@link BackendHealthIndicator} kept probing the API port, got a 404, and — because it sits in the
- * readiness group that gates the Docker HEALTHCHECK — left the frontend container permanently
- * unhealthy. The deploy loop rolled v1.5.47 back after 180 s.
- *
- * <p>Every existing test stayed green through that: {@code ManagementPortSecurityConfig} is
- * conditional on {@code management.server.port}, which only the prod profile sets, and the
- * frontend's {@code test} profile redefines the readiness group without the {@code backend}
- * indicator. The combination existed nowhere but production. Reading the two files is crude, and it
- * is the only thing that would have caught this before the deploy did.
+ * Tests that the port the frontend probes for backend readiness equals the backend's production
+ * management port, by reading both modules' {@code application-prod.yml}.
  */
 class BackendHealthUrlProdParityTest {
 
@@ -108,11 +95,7 @@ class BackendHealthUrlProdParityTest {
   }
 
   /**
-   * Reads {@code management.server.port} out of the backend's prod config.
-   *
-   * <p>Parsed rather than regex-matched: the block carries a dozen lines of ADR-0134 rationale
-   * between {@code management:} and {@code server:}, and a pattern that assumed adjacency failed on
-   * the comments — a guard that cannot read the file it guards is worse than no guard.
+   * Reads {@code management.server.port} from the backend's prod config by parsing the YAML.
    *
    * @param yaml the backend's raw prod config
    * @return the port as a string, or {@code null} when the key is absent

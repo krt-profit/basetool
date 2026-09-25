@@ -23,17 +23,8 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 /**
- * Per-mission income/expense aggregate produced by {@link
- * MissionFinanceEntryRepository#aggregateFinanceByMissionIds} via a grouped JPQL constructor
- * expression — one row per mission, {@code SUM}med by finance type in a single query.
- *
- * <p>It exists so the operation finance roll-up (the operation-detail "Ergebnis je Einsatz" bars +
- * the Gesamtergebnis) computes its per-mission totals with one grouped SQL query instead of
- * materializing every finance-entry row across every child mission: the previous {@code
- * findAllByMissionIdIn} load-all pinned a database connection across the math + DTO serialization
- * on every render and every payout toggle (the operation-side ADR-0078 gap, #1121). A SQL {@code
- * SUM} over an empty set is {@code NULL}, so either sum may be {@code null} when a mission has no
- * entry of that type; the caller coalesces to zero.
+ * Per-mission income/expense sums produced by {@link
+ * MissionFinanceEntryRepository#aggregateFinanceByMissionIds}.
  *
  * @param missionId the mission the sums belong to (the {@code GROUP BY} key)
  * @param incomeSum summed amount of the mission's {@code INCOME} entries, or {@code null} when none

@@ -37,23 +37,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * End-to-end coverage for the default-blueprint feature (REQ-INV-016/017) against the live stack.
- *
- * <p>The default blueprints are seeded into {@code default_blueprint} at backend startup (the
- * provisioning bootstrap; enabled in the {@code dev} profile the e2e stack runs) and granted to a
- * user the first time their {@code app_user} row is created — which {@link BackendSeeder#getUserId}
- * forces in {@link #setUp()}. Two flows are asserted:
- *
- * <ul>
- *   <li><b>user-facing non-removability:</b> a granted default appears in the owner's blueprint
- *       list and its detail pane offers the edit control but <em>no</em> delete control (the {@code
- *       removable=false} flag hides it), which is the exact UX the owner chose over a 409.
- *   <li><b>admin curation:</b> the admin default-blueprints page lists the seeded set, and removing
- *       one entry through the confirm modal drops it from the set in place, without a reload.
- * </ul>
- *
- * <p>Removing an entry in the admin flow does not revoke rows users already hold, so the two tests
- * are order-independent on the shared ephemeral stack.
+ * End-to-end tests of default blueprints (REQ-INV-016, REQ-INV-017): a granted default shows no
+ * delete control to its owner, and an admin can remove a default from the set in place.
  */
 @Tag("e2e")
 class DefaultBlueprintsE2eTest {

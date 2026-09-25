@@ -38,10 +38,9 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Integration tests for the multi-owner finders {@link PersonalBlueprintRepository} grew for the
- * blueprint availability overview (#364): {@link
- * PersonalBlueprintRepository#findAllByOwnerUserIdIn}, its two-column {@link
- * PersonalBlueprintRepository#findOwnerProductByOwnerUserIdIn} projection, and {@link
+ * Integration tests for the multi-owner finders of {@link PersonalBlueprintRepository}: {@link
+ * PersonalBlueprintRepository#findAllByOwnerUserIdIn}, {@link
+ * PersonalBlueprintRepository#findOwnerProductByOwnerUserIdIn} and {@link
  * PersonalBlueprintRepository#findAllByProductKeyAndOwnerUserIdIn}.
  */
 @SpringBootTest

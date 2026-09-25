@@ -77,15 +77,10 @@ public class IngestService {
   }
 
   /**
-   * Records the <em>shape</em> of an accepted extract before it is relayed: the contract version,
-   * the producing tool, and how many orders / goods rows / source images it carries. Without this
-   * line an extractor that sends a structurally odd payload (a v2 envelope, zero goods, fifty
-   * stitched images) is indistinguishable in the log from a normal send — the gateway itself
-   * interprets nothing, so the counts are the only handle on "what did the client actually push?".
+   * Logs the shape of an accepted extract: contract version, producing tool, and counts of orders,
+   * goods rows and source images.
    *
-   * <p>No screen read and no material name is logged: only counts, the numeric schema version and
-   * the provenance strings, and those go through {@link LogSafe} because they are client-supplied
-   * free text that could otherwise forge a second log line.
+   * <p>No screen read is logged; client-supplied strings go through {@link LogSafe}.
    *
    * @param extract the validated extract about to be forwarded
    */

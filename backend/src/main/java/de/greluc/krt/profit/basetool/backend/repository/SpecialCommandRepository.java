@@ -28,15 +28,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 /**
- * Spring Data repository for {@link SpecialCommand}. Mirrors the surface of {@code
- * SquadronRepository} (find-by-shorthand, case-insensitive uniqueness checks, active-only paged
- * listing) so the eventual {@code SpecialCommandService} layer in R2.b can reuse the same query
- * idioms.
- *
- * <p>Hibernate's single-table inheritance filter automatically narrows every query to {@code WHERE
- * kind = 'SPECIAL_COMMAND'} based on the {@link SpecialCommand} {@code @DiscriminatorValue}, so the
- * SQUADRON-discriminated rows that V94 copied into {@code org_unit} are invisible to this
- * repository. No explicit predicate or {@code @Query} override is needed.
+ * Spring Data repository for {@link SpecialCommand}. Hibernate's single-table discriminator narrows
+ * every query to {@code kind = 'SPECIAL_COMMAND'}.
  */
 @Repository
 public interface SpecialCommandRepository extends LookupTableRepository<SpecialCommand, UUID> {

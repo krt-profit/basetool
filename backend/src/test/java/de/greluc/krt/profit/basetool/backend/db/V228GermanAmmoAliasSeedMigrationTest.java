@@ -42,14 +42,9 @@ import org.springframework.util.StreamUtils;
 
 /**
  * Verifies the V228 seed that maps the German ammo-capacity spelling onto the English catalogue
- * product (#1485, REQ-INV-021).
+ * product (REQ-INV-021).
  *
- * <p>The test executes the <b>actual migration file</b> read from the classpath rather than a
- * transcribed copy of its statement. A seed migration is otherwise untestable: it runs once against
- * an empty catalogue when the test schema is built, long before any fixture exists, so asserting on
- * "what the seed produced" would assert on nothing. Re-running the real file against fixtures tests
- * the shipped SQL and proves its idempotency in the same step — a transcribed copy would only prove
- * that the copy works.
+ * <p>Executes the shipped migration file against fixtures, which also proves its idempotency.
  */
 @SpringBootTest
 class V228GermanAmmoAliasSeedMigrationTest {

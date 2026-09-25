@@ -27,11 +27,9 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 /**
- * Verifies the byte-equivalence contract of {@link AuditDetails}: {@code
- * AuditDetails.of(...).with(...).toString()} must produce a string character-identical to the
- * hand-written {@code "k=" + v + " k2=" + v2} concatenation it replaces (S8, #914), across every
- * value type that appears at the migrated call sites, plus the key-validation guard and the {@link
- * CharSequence} contract that lets {@code record(...)} accept the composer directly.
+ * Verifies that {@link AuditDetails} renders exactly the {@code "k=" + v + " k2=" + v2} format for
+ * every value type in use, validates its keys, and satisfies the {@link CharSequence} contract that
+ * lets {@code record(...)} accept it directly.
  */
 class AuditDetailsTest {
 

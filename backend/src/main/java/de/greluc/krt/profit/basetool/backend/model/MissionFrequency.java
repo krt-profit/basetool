@@ -39,21 +39,12 @@ import lombok.Setter;
 import lombok.ToString;
 
 /**
- * Mission Frequency JPA entity — one radio channel value scoped to a single mission.
+ * One radio channel value scoped to a single mission.
  *
- * <p>A row is <strong>dual-mode</strong> and carries its label in exactly one of two ways
- * (DB-enforced by the {@code frequency_type_id XOR name} check constraint added in V201):
- *
- * <ul>
- *   <li><b>Typed</b> — {@link #frequencyType} references a global {@link FrequencyType} (e.g.
- *       "Einsatzleitung", "Umschlagplatz") and {@link #name} is {@code null}. The mission supplies
- *       only the per-mission {@link #value} for that shared type; the {@code (mission_id,
- *       frequency_type_id)} unique constraint keeps at most one typed row per type.
- *   <li><b>Custom</b> — {@link #name} holds a free-text, mission-specific label and {@link
- *       #frequencyType} is {@code null}. These are the "weitere Frequenzen" a mission planner adds
- *       ad hoc (REQ-MISSION-014). The unique constraint does not apply (PostgreSQL treats each NULL
- *       {@code frequency_type_id} as distinct), so a mission may carry several custom channels.
- * </ul>
+ * <p>A row is either <b>typed</b> ({@link #frequencyType} set, {@link #name} {@code null}; at most
+ * one per type and mission) or <b>custom</b> ({@link #name} holds a free-text label, {@link
+ * #frequencyType} {@code null}; any number per mission, REQ-MISSION-014). A database check
+ * constraint enforces exactly one of the two.
  */
 @Entity
 @Getter
@@ -76,8 +67,8 @@ public class MissionFrequency extends AbstractEntity<UUID> {
   private Mission mission;
 
   /**
-   * The global frequency type this row supplies a value for, or {@code null} for a custom
-   * (mission-specific) channel. Nullable since V201; mutually exclusive with {@link #name}.
+   * The global frequency type this row supplies a value for, or {@code null} for a custom channel;
+   * mutually exclusive with {@link #name}.
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "frequency_type_id")

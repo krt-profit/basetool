@@ -34,17 +34,11 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 
 /**
- * Accepts a {@code changed} frame from an app client, bounds it, and relays it — locally first,
+ * Accepts a {@code changed} frame from an app client, rate-limits it and relays it, locally first,
  * then to peers (ADR-0143).
  *
- * <p>The two token buckets and their numbers are ADR-0094's, taken verbatim rather than re-derived,
- * because they bound the same thing: not the relay send, which is cheap, but the <em>re-fetch
- * herd</em> a frame triggers in a room full of viewers. The per-subject bucket bounds what one
- * client can emit; the per-topic bucket bounds a room's aggregate accepted rate across every
- * publisher, which is the bound that still holds when many clients each stay under their own limit.
- *
- * <p>Both degrade to a bounded refresh rate, never to lost data: a dropped frame means a peer
- * reloads on its own cadence, and every receiver re-fetches through its own authorized read anyway.
+ * <p>A per-subject and a per-topic token bucket bound the re-fetch load a frame triggers. A dropped
+ * frame only delays a peer's refresh; no data is lost.
  */
 @Service
 @Slf4j
@@ -66,12 +60,8 @@ public class LiveSyncRelayService {
   private static final long MAX_TRACKED_SUBJECTS = 50_000L;
 
   /**
-   * Rooms tracked before the least-recently-used are dropped.
-   *
-   * <p>Kept far smaller than the subject cache and expired aggressively: rooms are per-resource and
-   * unbounded in principle (one per Einsatz, per Auftrag, …), so the map has to be reaped down to
-   * the rooms that are actually busy. Evicting an idle room's bucket is harmless — it refills to
-   * full when it is recreated, which is where an idle room's bucket would have been anyway.
+   * Maximum number of rooms tracked before the least-recently-used bucket is evicted; an evicted
+   * bucket is recreated full.
    */
   private static final long MAX_TRACKED_TOPICS = 10_000L;
 
@@ -111,12 +101,8 @@ public class LiveSyncRelayService {
   }
 
   /**
-   * Takes one frame from a client.
-   *
-   * <p>Order matters and is deliberate: clip first (a frame naming only unknown sections is not
-   * worth a token), then the per-subject bucket, then the per-topic one, then deliver locally, then
-   * fan out. Delivering before the fan-out is what makes a Redis outage cost peer delivery and
-   * nothing more.
+   * Takes one frame from a client: clips sections, applies the per-subject and per-topic buckets,
+   * delivers locally, then fans out.
    *
    * @param sub the emitting member's Keycloak {@code sub}
    * @param topic the room, already parsed
@@ -191,13 +177,7 @@ public class LiveSyncRelayService {
     /** Relayed locally and handed to the fan-out. */
     ACCEPTED,
 
-    /**
-     * Every section named was outside the topic class's whitelist.
-     *
-     * <p>A client bug, not an attack, and worth telling the client about: relaying a frame with no
-     * sections would make every receiver reload everything, which is exactly what section keys
-     * exist to avoid.
-     */
+    /** Every section named was outside the topic class's whitelist; the frame is not relayed. */
     NO_KNOWN_SECTIONS,
 
     /** The emitting member's own bucket is empty. */

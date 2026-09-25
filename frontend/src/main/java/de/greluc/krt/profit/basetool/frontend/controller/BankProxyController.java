@@ -44,16 +44,9 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.util.UriComponentsBuilder;
 
 /**
- * Thin AJAX proxy for every bank mutation ({@code /api/proxy/bank/**}, epic #556). Browser-side JS
- * posts here with the CSRF header; the proxy forwards the raw JSON body to the corresponding {@code
- * /api/v1/bank/**} backend endpoint with the OAuth2 bearer attached by {@link BackendApiClient}.
- * Backend errors (RFC 7807, incl. the stable bank 409 codes like {@code BANK_OVERDRAFT}) propagate
- * as {@code BackendServiceException} and reach the browser as the localized JSON body built by the
- * frontend {@code GlobalExceptionHandler} — bank.js renders them as inline field errors (K1 mockup:
- * 409 never toast-only).
- *
- * <p>Authentication is enforced at this seam; every real authorization decision (roles, capability
- * flags) lives in the backend gates.
+ * AJAX proxy for every bank mutation ({@code /api/proxy/bank/**}), forwarding the JSON body to the
+ * matching {@code /api/v1/bank/**} endpoint. Backend RFC 7807 errors, including the bank 409 codes,
+ * reach the browser as localized JSON; all authorization is decided by the backend.
  */
 @RestController
 @RequestMapping("/api/proxy/bank")
@@ -69,35 +62,20 @@ public class BankProxyController {
       ACCOUNT_SEARCH_PAGE = new ParameterizedTypeReference<>() {};
 
   /**
-   * How many matches one account-picker fetch returns: one more than the combobox renders ({@link
-   * PickerSearch#PAGE_SIZE}). It used to <em>match</em> the render cap, which silenced the cap —
-   * the component shows its "keep typing" hint on {@code matches.length > maxResults}, so a page
-   * ending exactly at the cap can never trip it and the 51st account disappeared unannounced.
+   * Number of matches one account-picker fetch returns: one more than the combobox renders ({@link
+   * PickerSearch#PAGE_SIZE}), so the component can show its "keep typing" hint.
    */
   private static final int ACCOUNT_SEARCH_PAGE_SIZE = PickerSearch.PAGE_SIZE;
 
   private final BackendApiClient backendApiClient;
 
   /**
-   * Server-side account search behind the {@code remote-bank-accounts} combobox source
-   * (REQ-BANK-053, REQ-FE-017, ADR-0106 — the account analogue of {@code UserProxyController}'s
-   * user search). The combobox fetches matching <em>active</em> accounts on demand instead of
-   * preloading the whole roster, so a transfer destination / grant target stays reachable past the
-   * former 500-account cap. Forwards to the caller-scoped backend list ({@code
-   * /api/v1/bank/accounts}) — management sees all, an employee only their granted accounts
-   * (REQ-BANK-010) — narrowed to {@code status=ACTIVE} and the typed query, sorted by name, capped
-   * at one render page. The backend enforces the real bank gate; this proxy only requires an
-   * authenticated session and returns the page content as a flat list ({@code id}, {@code
-   * accountNo}, {@code name}, {@code type}, …) for the JS source to map, or an empty list on
-   * backend failure so the picker shows "no matches" rather than throwing.
+   * Server-side account search for the {@code remote-bank-accounts} combobox (REQ-BANK-053,
+   * ADR-0106): forwards to the caller-scoped {@code /api/v1/bank/accounts} list, restricted to
+   * active accounts matching the query, sorted by name. Returns an empty list on backend failure.
    *
-   * <p>The query is built with {@link UriComponentsBuilder} so a crafted {@code &} in the term
-   * cannot inject extra parameters; a {@code null} query (the browse-mode empty fetch collapsed by
-   * the {@code emptyAsNull} binder) is normalised to the empty match-all filter, exactly as the
-   * user search proxy does.
-   *
-   * @param query the free-text name/account-number filter, or {@code null}/blank to match all
-   * @return matching active-account records (raw JSON maps), never {@code null}
+   * @param query the name / account-number filter, or {@code null} / blank to match all
+   * @return matching active-account records as raw JSON maps, never {@code null}
    */
   @GetMapping("/accounts/search")
   @PreAuthorize("isAuthenticated()")
@@ -183,12 +161,11 @@ public class BankProxyController {
   }
 
   /**
-   * Forwards a bank employee's confirmation of a pending booking request (epic #666 F2): records
-   * the holder and books it onto the ledger (REQ-BANK-023). Capability/visibility 409s and
-   * overdraft conflicts surface inline.
+   * Forwards a bank employee's confirmation of a pending booking request, recording the holder and
+   * booking the ledger (REQ-BANK-023).
    *
    * @param id the request to confirm
-   * @param body the confirm payload (holderId + echoed version)
+   * @param body the confirm payload (holderId and echoed version)
    * @return the confirmed request
    */
   @PostMapping("/requests/{id}/confirm")
@@ -199,11 +176,10 @@ public class BankProxyController {
   }
 
   /**
-   * Forwards a bank employee's rejection of a pending booking request (epic #666 F2, REQ-BANK-023):
-   * records a reason and books nothing.
+   * Forwards a bank employee's rejection of a pending booking request with a reason (REQ-BANK-023).
    *
    * @param id the request to reject
-   * @param body the reject payload (reason + echoed version)
+   * @param body the reject payload (reason and echoed version)
    * @return the rejected request
    */
   @PostMapping("/requests/{id}/reject")
@@ -341,11 +317,11 @@ public class BankProxyController {
   }
 
   /**
-   * Forwards a grant flag change (the matrix toggles PATCH directly, W1/G1 mockup).
+   * Forwards a grant flag change from the matrix toggles.
    *
    * @param userId the grantee half of the composite key
    * @param accountId the account half of the composite key
-   * @param body the flag payload (three flags + echoed version)
+   * @param body the flag payload (three flags and echoed version)
    * @return the updated grant row
    */
   @PatchMapping("/grants/{userId}/{accountId}")

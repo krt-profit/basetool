@@ -31,24 +31,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
- * The deliberate-404 logger stays silent, and its siblings do not (REQ-OBS-001).
- *
- * <p><strong>Why a test for a configuration line.</strong> A {@code logging.level} entry asserts
- * nothing on its own: a typo in the logger name, a stray {@code org.springframework.web} pin that
- * swallows the whole tree, or a later edit that "tidies" the entry away all leave a green build and
- * a silently changed log stream. The last of those is the realistic one — the entry looks like dead
- * configuration to anyone who does not know what writes through that logger.
- *
- * <p>What it is guarding: Spring's {@code DispatcherServlet} writes "No mapping for GET
- * /favicon.ico" through {@code org.springframework.web.servlet.PageNotFound} at {@code WARN},
- * <em>unconditionally</em> — before {@code throwExceptionIfNoHandlerFound} is consulted, so before
- * {@code GlobalExceptionHandler.handleNotFound} renders the 404 page this application is designed
- * to render for that path. Ten such lines landed in the September production log for a 404 that is
- * the documented, intended answer ({@code WebMvcConfig#addResourceHandlers}).
- *
- * <p>The negative half is the one that would catch the over-broad fix: pinning {@code
- * org.springframework.web} instead of the leaf would also silence every other web logger, and that
- * is exactly the sort of change that reads as equivalent.
+ * Verifies that the {@code org.springframework.web.servlet.PageNotFound} logger is silenced while
+ * its sibling web loggers are not (REQ-OBS-001).
  */
 @SpringBootTest
 @ActiveProfiles("test")

@@ -46,12 +46,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST surface for the frequency-type reference table. Supports drag-and-drop reorder via the
- * dedicated {@code /reorder} endpoint; mutations are OFFICER/ADMIN.
+ * REST surface for the frequency-type reference table, including drag-and-drop reorder via {@code
+ * /reorder}; mutations are OFFICER/ADMIN.
  *
- * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor, not the
- * ceiling — it is stated here so an endpoint added later inherits it rather than relying on a URL
- * matcher elsewhere being right, and a method-level gate still wins where one is present.
+ * <p>The class-level {@code isAuthenticated()} gate is the floor for every endpoint (REQ-SEC-052).
  */
 @RestController
 @RequestMapping("/api/v1/frequency-types")

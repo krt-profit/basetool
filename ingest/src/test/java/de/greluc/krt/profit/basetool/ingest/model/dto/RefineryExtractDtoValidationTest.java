@@ -31,11 +31,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins the edge validation of the frozen {@code RefineryExtract} contract v1 (ADR-0008). The
- * gateway rejects a malformed envelope <em>before</em> the backend relay, so these constraints are
- * what keeps a hostile or buggy extractor from reaching the import endpoint at all — and the nested
- * {@code @Valid} cascade is the part that silently stops working if a wrapper annotation is
- * dropped.
+ * Pins the gateway's edge validation of the {@code RefineryExtract} contract v1 (ADR-0008),
+ * including the nested {@code @Valid} cascade.
  */
 class RefineryExtractDtoValidationTest {
 

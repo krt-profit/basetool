@@ -65,12 +65,10 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC tests for the #591 in-place screenshot-import twin {@code
- * RefineryOrderPageController.importExtractAjax}. Drives the real Thymeleaf render of the {@code
- * refinery-orders-create :: refineryImportFormBody} fragment so a render-time 500 (which pure
- * controller tests miss — it has bitten this project before) cannot slip through, and asserts that
- * every branch returns the fragment inline (never a redirect) and that the file-picker chrome stays
- * OUTSIDE the swapped fragment.
+ * MVC tests for the in-place screenshot-import twin {@code
+ * RefineryOrderPageController.importExtractAjax}, rendering the real {@code refinery-orders-create
+ * :: refineryImportFormBody} fragment: every branch returns the fragment inline, never a redirect,
+ * and the file-picker stays outside it.
  */
 @SpringBootTest
 class RefineryImportAjaxControllerTest {

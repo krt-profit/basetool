@@ -70,13 +70,9 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
- * Spring MVC controller for the squadron member-management pages ({@code /members}).
- *
- * <p>Lists, searches and edits squadron members. The member-edit page assigns up to two Staffeln
- * (REQ-ORG-017), each with its own Logistician / Mission-Manager flags (REQ-SEC-005); the flags are
- * persisted through the single membership-delta PATCH (see {@link #applyMemberUpdate}), not a
- * per-flag toggle. The flags are independent of Keycloak realm roles — the JWT converter promotes
- * them to {@code ROLE_LOGISTICIAN}/{@code ROLE_MISSION_MANAGER} on the next login.
+ * Controller for the member-management pages ({@code /members}): list, search and edit members,
+ * including up to two Staffeln with per-Staffel Logistician and Mission-Manager flags (REQ-ORG-017,
+ * REQ-SEC-005).
  */
 @Controller
 @UsesLayoutModel
@@ -99,11 +95,8 @@ public class MemberManagementController {
   private final MessageSource messageSource;
 
   /**
-   * Server-side live-sync publish seam (REQ-FE-015, ADR-0094, #1235). A member edit, delete or
-   * manual Keycloak sync pokes the ADMIN-gated global {@code members} room from here rather than
-   * from the client: the edit happens on a <em>different page</em> ({@code /members/&#123;id&#125;
-   * /edit}) than the roster it invalidates, and both the classic redirect handlers and the no-JS
-   * fallback have no client socket to publish from at that moment.
+   * Publishes live-sync pokes to the {@code members} room after a member edit, delete or Keycloak
+   * sync (REQ-FE-015).
    */
   private final LiveSyncLocalBus liveSyncLocalBus;
 
@@ -113,14 +106,11 @@ public class MemberManagementController {
   /**
    * Renders the member list, optionally filtered by free-text search and paginated.
    *
-   * @param search optional search query; switches the underlying endpoint from {@code /users} to
-   *     {@code /users/search}
+   * @param search optional search query; switches to {@code /users/search}
    * @param page zero-based page index
    * @param size page size
-   * @param fragment when {@code "results"}, only the results+pagination fragment is rendered for an
-   *     in-place AJAX swap (epic #571 / REQ-FE-005); otherwise the full page. A {@code String} (not
-   *     {@code boolean}) so it binds the {@code krtFetch.swap} helper's {@code fragment=results}
-   *     value — a {@code boolean} param cannot parse that and silently 400s the swap.
+   * @param fragment {@code "results"} renders only the results and pagination fragment; otherwise
+   *     the full page
    * @param model Thymeleaf model populated with users, page metadata and the echoed search query
    * @return the {@code members} view name, or its {@code membersTableFragment} selector
    */
@@ -214,16 +204,10 @@ public class MemberManagementController {
   }
 
   /**
-   * Renders the member edit page.
-   *
-   * <p>{@code source} threads through the form so a "Save" landing here from the profile page can
-   * redirect back to {@code /profile} on success while a save reached through the member list stays
-   * on the member list. If the model already carries a {@code MemberEditForm} (because a
-   * validation-failure rerender happened) the source is patched in but the other form fields are
-   * preserved.
+   * Renders the member edit page; a form already in the model from a failed validation is kept.
    *
    * @param id user id
-   * @param source optional origin marker ({@code "profile"} keeps the round-trip on profile)
+   * @param source optional origin marker ({@code "profile"} returns to the profile after saving)
    * @param model Thymeleaf model populated with {@code user} and {@code memberEditForm}
    * @param redirectAttributes flash attributes carrier for the error redirect
    * @return inline {@code member-edit} view, or redirect to {@code /members} on backend failure
@@ -324,9 +308,8 @@ public class MemberManagementController {
   }
 
   /**
-   * Persists member edits. Validation failure re-renders inline via {@link #editMember}. Successful
-   * save with {@code source=profile} redirects back to the profile page; everything else lands on
-   * the member list.
+   * Saves member edits; a validation failure re-renders the form, success redirects to the profile
+   * for {@code source=profile} and to the member list otherwise.
    *
    * @param id user id
    * @param form member edit form
@@ -372,19 +355,8 @@ public class MemberManagementController {
   }
 
   /**
-   * AJAX variant of {@link #updateMember}: applies the same save but answers with JSON instead of a
-   * redirect, so the member-edit page saves in place (epic #571, REQ-FE-007). Selected over the
-   * form handler only when {@code krtFetch}'s submit sends {@code X-Requested-With:
-   * XMLHttpRequest}; a script-disabled browser still posts the HTML form and lands on {@link
-   * #updateMember}, so the redirect path stays the no-JS fallback.
-   *
-   * <p>Validation failures map to a {@code 422} carrying a {@code {field: message}} object (each
-   * message resolved against the request locale exactly as Thymeleaf {@code th:errors} would) so
-   * the client paints per-field errors without a reload. On success the freshly bumped user-row
-   * {@code version} is returned so the hidden form input stays current and a second consecutive
-   * save does not 409. A backend failure is relayed with its original status plus a slim {@code
-   * {code, detail}} body so the client can recognise {@code OPTIMISTIC_LOCK} and show the localized
-   * reason.
+   * AJAX variant of {@link #updateMember}, selected by {@code X-Requested-With: XMLHttpRequest},
+   * answering with JSON instead of a redirect (REQ-FE-007).
    *
    * @param id user id
    * @param form member edit form bound from the multipart/form-encoded body
@@ -425,19 +397,9 @@ public class MemberManagementController {
   }
 
   /**
-   * Applies a member edit to the backend: persists the attributes first (the backend bumps
-   * {@code @Version} on the user row and returns an empty body), then — <em>only when the edit
-   * form's authoritative Staffel detail loaded</em> ({@link MemberEditForm#staffelDetailLoaded()})
-   * — sends the desired complete Staffel set as the {@code staffeln} half of one membership-delta
-   * PATCH. The backend reconciles that set against the user's current Staffel memberships (add /
-   * remove / per-squadron flag patch in one transaction). The reconcile is idempotent, so
-   * re-posting an unchanged set is a no-op.
-   *
-   * <p>If the Staffel-detail fetch failed when the form was rendered, the two slots are blank and
-   * sending them would be reconciled as "remove every Staffel" — so the PATCH is skipped entirely
-   * and the Staffel memberships are left untouched (REQ-ORG-017). Shared by the redirect handler
-   * and the AJAX twin; throws on a backend failure so each caller can map it to its own error
-   * shape.
+   * Saves a member's attributes and then sends the complete Staffel set as one membership-delta
+   * PATCH. The PATCH is skipped when the Staffel detail did not load, so memberships are never
+   * cleared by accident (REQ-ORG-017).
    *
    * @param id user id
    * @param form the validated member edit form
@@ -470,9 +432,7 @@ public class MemberManagementController {
   }
 
   /**
-   * Reads the user row's current {@code version} back from the backend after a write so the
-   * in-place member-edit save can sync the freshly bumped value into the hidden form input. Falls
-   * back to {@code priorVersion + 1} when the re-fetch is unavailable.
+   * Reads the user row's current version after a write, falling back to {@code priorVersion + 1}.
    *
    * @param id user id
    * @param priorVersion the version the client submitted (may be {@code null})
@@ -490,9 +450,7 @@ public class MemberManagementController {
   }
 
   /**
-   * Resolves a bound field error's message against the request locale, mirroring how Thymeleaf
-   * {@code th:errors} renders it. Degrades to the error's own default message on a missing bundle
-   * key so a translation gap never crashes the in-place save to a 500.
+   * Resolves a field error's message for the request locale, falling back to its default message.
    *
    * @param fieldError the validation error to render
    * @param locale the request locale
@@ -507,12 +465,8 @@ public class MemberManagementController {
   }
 
   /**
-   * Logs a backend AJAX failure and relays it to the caller as {@code application/problem+json} via
-   * the shared {@link de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses}, so the
-   * body carries the backend status, the stable {@code code} (e.g. {@code OPTIMISTIC_LOCK}) and the
-   * optional {@code detail}/{@code correlationId} exactly like every other AJAX write, and {@code
-   * krtFetch} branches on the conflict semantics uniformly. This replaced a divergent slim {@code
-   * {code, detail}} body that dropped the status/correlationId and the problem+json content type.
+   * Logs a backend AJAX failure and relays it as {@code application/problem+json} via {@link
+   * de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses}.
    *
    * @param logMessage context for the warn log line
    * @param e the backend service exception carrying the relayed status, problem code and detail
@@ -525,8 +479,7 @@ public class MemberManagementController {
   }
 
   /**
-   * Deletes a user. Admin-only — the OFFICER role at the class level is intentionally narrowed
-   * here.
+   * Deletes a user; admin-only.
    *
    * @param id user id
    * @param redirectAttributes flash attributes carrier
@@ -551,12 +504,7 @@ public class MemberManagementController {
   }
 
   /**
-   * AJAX variant of {@link #deleteMember}: deletes the user and answers with JSON so the member
-   * list removes the row in place (epic #571, REQ-FE-005) instead of redirecting. On success the
-   * page re-swaps the results fragment to keep pagination and the SK column coherent; a backend
-   * refusal (e.g. the user still exists in Keycloak) is relayed with its status + {@code {code,
-   * detail}} so the client shows the reason without navigating away. ADMIN-only, like the redirect
-   * handler.
+   * AJAX variant of {@link #deleteMember}: deletes the user and answers with JSON; admin-only.
    *
    * @param id user id
    * @return {@code 200} on success, or the relayed backend error status with {@code {code, detail}}
@@ -579,12 +527,7 @@ public class MemberManagementController {
   }
 
   /**
-   * AJAX handler for the "Sync now" button (ADMIN): triggers the backend's manual Keycloak user
-   * sync ({@code POST /api/v1/users/sync}) and answers with JSON so the member list re-swaps in
-   * place with the freshly reconciled roster (no full-page reload, REQ-FE-001) and a toast reports
-   * how many users were synced. A backend failure (e.g. Keycloak unreachable) is relayed with its
-   * status + {@code {code, detail}} so the client shows the reason without navigating away.
-   * ADMIN-only, like the class default; the periodic sync still runs hourly regardless.
+   * Triggers the backend's manual Keycloak user sync and answers with JSON; admin-only.
    *
    * @return {@code 200} with {@code {syncedCount}} on success, or the relayed backend error status
    */
@@ -608,15 +551,8 @@ public class MemberManagementController {
   }
 
   /**
-   * AJAX handler for the "Konten zusammenführen" action (ADMIN, REQ-SEC-055, #1828): folds the
-   * duplicate account named in the path into the account chosen in the dialog and answers with JSON
-   * so the roster re-swaps in place (REQ-FE-001) -- the duplicate's row disappears and the
-   * survivor's Discord column fills in, both without a reload.
-   *
-   * <p>A backend refusal is relayed with its status and {@code {code, detail}} rather than
-   * swallowed, because every one of them is something the admin has to read and decide on: a stale
-   * version, a target that is not active, a target carrying a different Discord identity, or two
-   * bank ledgers that cannot be merged without an accounting decision.
+   * Merges the duplicate account in the path into the chosen surviving account and answers with
+   * JSON; admin-only (REQ-SEC-055).
    *
    * @param id the duplicate account to dissolve
    * @param body the surviving account's id and the duplicate's optimistic-lock version

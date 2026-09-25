@@ -34,24 +34,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * REQ-SEC-053 / decision D5: an account that holds <b>no role</b> is told so, and reaches nothing.
+ * Verifies that an account holding no role is told so and reaches nothing (REQ-SEC-053).
  *
- * <p>Before ADR-0159 this state was invisible. A token whose realm roles matched nothing the
- * application knows was mapped onto the seeded {@code GUEST} role, whose authority set was empty —
- * and the URL matrix's anonymous families then let it through, so "no role" quietly meant "the
- * anonymous read surface". With that surface gone, an empty authority set would mean something
- * worse: a principal that passes every {@code isAuthenticated()} gate and fails only the ones that
- * name a role, which is a per-endpoint accident rather than a decision.
- *
- * <p>The realm fixture {@code test-norole} is the shape that produces it: an enabled account that
- * carries <b>no realm role at all</b> — verified against the imported realm, where its direct and
- * its effective (composite-expanded) mappings are both empty, unlike every other fixture user. That
- * is the account production's {@code default-roles-iri} composite would have made a member and did
- * not: someone whose grant was removed, or who predates the composite.
- *
- * <p>What must happen is a page that says what is wrong and who fixes it — not a 403 body, not the
- * dashboard with everything missing, and not the "Freigabe ausstehend" copy, which would send the
- * member to wait for an approval they already have.
+ * <p>Uses the realm fixture {@code test-norole}, an enabled account with no realm role at all.
  */
 @Tag("e2e")
 class NoRoleGateE2eTest {
@@ -82,13 +67,8 @@ class NoRoleGateE2eTest {
   }
 
   /**
-   * Signing in with no role lands on the no-role page — not on the dashboard, and not on the
-   * pending-approval copy.
-   *
-   * <p>The two blocks live in the same template and are chosen by one flag, so the case asserts
-   * both directions: the no-role block present and the waiting block absent. Getting that pair
-   * wrong is the defect the Android app hit first — a member with an approved account being told to
-   * wait for an approval.
+   * Asserts that signing in with no role lands on the no-role page, with the no-role block present
+   * and the pending-approval block absent.
    */
   @Test
   void aRoleLessMemberLandsOnTheNoRolePage() {
@@ -115,12 +95,7 @@ class NoRoleGateE2eTest {
   }
 
   /**
-   * And it reaches no page of the tool, however it is asked for.
-   *
-   * <p>The gate is a filter, so a deep link is refused the same way the dashboard is. Asserted on a
-   * page that carries data — the Lager — because "does not render" is the whole point: the failure
-   * mode this guards against is a role-less account passing an {@code isAuthenticated()} gate and
-   * being served a page whose own checks happen to be about something else.
+   * Asserts that a role-less account reaches no page either, checked with a deep link to the Lager.
    */
   @Test
   void aRoleLessMemberReachesNoPage() {

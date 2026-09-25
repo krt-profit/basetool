@@ -40,18 +40,11 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
- * Spring Data repository for User.
+ * Spring Data repository for {@link User}.
  *
- * <p>Post-R9 D3 (V101): the legacy {@code app_user.squadron_id} column was dropped — every Staffel
- * scope filter consults {@code org_unit_membership} instead. The squadron-scoped queries below use
- * a {@code NOT EXISTS} sub-select to detect "user has no Staffel membership" (the equivalent of the
- * pre-V101 {@code u.squadron IS NULL} branch) and an {@code EXISTS} sub-select with the {@code
- * (kind = SQUADRON AND org_unit_id IN :scopeSquadronIds)} predicate for the in-scope branch. The
- * scope parameter is a <em>collection</em> of squadron ids (REQ-ORG-017: a member may belong to up
- * to two Staffeln, so a non-admin's unpinned scope is the union of their Staffeln); {@code null}
- * still signals admin "all squadrons" mode. The collection is never empty (a caller with no Staffel
- * collapses to {@code null} in {@code OwnerScopeService#currentUserListScopeSquadronIds()}), so the
- * {@code IN} clause never degenerates to {@code IN ()}.
+ * <p>Squadron-scoped queries filter by SQUADRON memberships in {@code org_unit_membership} against
+ * a scope set of squadron ids (REQ-ORG-017); a {@code null} set means admin "all squadrons" mode,
+ * and the set is never empty.
  */
 @Repository
 public interface UserRepository
@@ -78,29 +71,17 @@ public interface UserRepository
       @Param("approvalStatus") ApprovalStatus approvalStatus);
 
   /**
-   * Returns the registrations awaiting approval (status {@link ApprovalStatus#PENDING}), oldest
-   * first, for the admin approval queue (epic #720, Track 1). Not squadron-scoped — a pending user
-   * has no org unit yet.
+   * Returns the registrations with the given approval status, oldest first, for the admin approval
+   * queue. Not squadron-scoped.
    *
-   * @param approvalStatus the status to filter on (always {@code PENDING} at the call site)
+   * @param approvalStatus the status to filter on ({@code PENDING} at the call site)
    * @return matching users, oldest registration first
    */
   List<User> findByApprovalStatusOrderByCreatedAtAsc(ApprovalStatus approvalStatus);
 
   /**
-   * Returns the ids of registrations rejected longer ago than {@code cutoff}, backing the scheduled
-   * rejected-registration retention sweep (REQ-SEC-057).
-   *
-   * <p>Anchored on {@code approvedAt} — the column {@code decide} stamps for both verdicts — rather
-   * than on {@code createdAt}: the retention clock starts when the decision was made, not when the
-   * person applied, so a registration that sat in the queue for months still gets its full window
-   * after being refused. {@code approvedAt} is non-null for every {@code REJECTED} row by
-   * construction, and {@code reopenRegistration} clears it when returning a row to {@code PENDING},
-   * so a reopened registration drops out of this result on both counts.
-   *
-   * <p>Returns ids rather than entities: each is purged in its own transaction by a caller that
-   * re-reads and re-checks the row, so hydrating a batch of {@link User} aggregates here would be
-   * work thrown away — and stale by the time it is used.
+   * Returns the ids of registrations rejected before {@code cutoff}, measured from the decision
+   * time {@code approvedAt}, for the rejected-registration retention sweep (REQ-SEC-057).
    *
    * @param cutoff return registrations rejected strictly before this instant
    * @return the matching user ids, oldest rejection first
@@ -112,15 +93,10 @@ public interface UserRepository
   List<UUID> findRejectedDecidedBefore(@Param("cutoff") Instant cutoff);
 
   /**
-   * Returns slim {@link UserReferenceDto}s for every user (id, username, displayName, effective
-   * name with username fallback, rank) ordered by display name. Used to populate user pickers
-   * without pulling the full User aggregate.
+   * Returns slim {@link UserReferenceDto}s for the user pickers, ordered by display name.
    *
-   * <p>Multi-tenant: {@code scopeSquadronIds} restricts the result to members of those squadrons
-   * (REQ-ORG-017: a non-admin's unpinned scope is the union of their up-to-two Staffeln). {@code
-   * null} signals admin "all squadrons" mode and falls back to the cross-staffel list. Users that
-   * have no squadron assigned (admins, members of no Staffel) are always included so an admin in
-   * focused mode still sees the unassigned bucket alongside the squadron members.
+   * <p>{@code scopeSquadronIds} restricts the result to members of those squadrons ({@code null}:
+   * all); users without a squadron are always included.
    */
   @Query(
       """
@@ -162,11 +138,8 @@ public interface UserRepository
   Set<UUID> findUserIdsByRoleCode(@Param("roleCode") String roleCode);
 
   /**
-   * Returns the ids of every user who has opted into sharing their blueprints globally ({@link
-   * User#isShareBlueprintsGlobally()}). The blueprint-availability aggregations union these ids
-   * into their org-unit member set so an opted-in user is counted regardless of org-unit membership
-   * (REQ-INV-018). The id equals the stored {@code PersonalBlueprint.owner_user_id} once rendered
-   * as text, so callers convert via {@link UUID#toString()}.
+   * Returns the ids of every user who shares their blueprints globally ({@link
+   * User#isShareBlueprintsGlobally()}), for the blueprint-availability aggregations (REQ-INV-018).
    *
    * @return the user ids of global blueprint sharers; never {@code null}, possibly empty
    */
@@ -174,10 +147,8 @@ public interface UserRepository
   Set<UUID> findIdsBySharingBlueprintsGlobally();
 
   /**
-   * Returns the ids ({@code sub}s) of users who both hold the global role {@code roleCode} and are
-   * members of the given org unit. Backs the notification rule engine's {@code ORG_RELATIVE_ROLE}
-   * resolution of "officers of the responsible squadron" (role {@code OFFICER} intersected with
-   * membership of that org unit).
+   * Returns the ids of users who hold the global role {@code roleCode} and are members of the given
+   * org unit, for the notification rule engine's {@code ORG_RELATIVE_ROLE} resolution.
    *
    * @param roleCode the stable role code to match (e.g. {@code OFFICER})
    * @param orgUnitId the org unit the user must be a member of
@@ -193,14 +164,8 @@ public interface UserRepository
       @Param("roleCode") String roleCode, @Param("orgUnitId") UUID orgUnitId);
 
   /**
-   * Squadron-scoped paged listing. Filters by the user's SQUADRON-kind membership(s) in {@code
-   * org_unit_membership} against the caller's scope set (REQ-ORG-017: up to two Staffeln) — users
-   * without a Staffel membership (admins, members of no Staffel) are always visible so the focused
-   * admin can manage them.
-   *
-   * <p>No {@code @EntityGraph} on this paged query: fetch-joining the {@code roles} collection
-   * would make Hibernate paginate in memory (HHH90003004) over the whole matching table. The page's
-   * roles batch-load under {@code default_batch_fetch_size} instead (REQ-DATA-003).
+   * Paged squadron-scoped user listing (REQ-ORG-017); users without a Staffel membership are always
+   * included. Roles are batch-loaded rather than fetch-joined (REQ-DATA-003).
    */
   @Query(
       """
@@ -215,9 +180,8 @@ public interface UserRepository
       @Param("scopeSquadronIds") Collection<UUID> scopeSquadronIds, Pageable pageable);
 
   /**
-   * Unpaged squadron-scoped listing. Same predicate as {@link #findAllScoped(java.util.Collection,
-   * Pageable)} without pagination — used by the legacy {@code findAll()} call sites that still
-   * expect a plain {@link List}.
+   * Unpaged variant of {@link #findAllScoped(java.util.Collection, Pageable)} with the same
+   * predicate.
    */
   @EntityGraph(attributePaths = {"roles"})
   @Query(
@@ -233,28 +197,13 @@ public interface UserRepository
       @Param("scopeSquadronIds") Collection<UUID> scopeSquadronIds, Sort sort);
 
   /**
-   * Paged squadron-scoped listing of the ordinary members a squadron may evaluate in the promotion
-   * system — the row set of the Bewertungsverwaltung matrix. The promotion system assesses only the
-   * <strong>simple members</strong> of a squadron (issue #817): both the {@code ADMIN} and the
-   * {@code OFFICER} realm role are excluded, because their holders <em>run</em> the evaluation
-   * rather than being its subject. Admins are squadron-less by design (no Staffel membership row)
-   * and must not surface even when one has focused a squadron via the switcher; officers are the
-   * squadron's leadership / evaluators and likewise do not belong in the matrix. The role-based
-   * exclusion also guards against a manually mis-assigned admin or officer row that still carries a
-   * squadron membership.
+   * Paged squadron-scoped listing of the ordinary members the promotion system evaluates; users
+   * holding {@code ADMIN} or {@code OFFICER} and users without a squadron membership are excluded.
+   * Roles are batch-loaded rather than fetch-joined (REQ-DATA-003).
    *
-   * <p>When {@code scopeSquadronIds} is {@code null} (admin "all squadrons" mode) the result spans
-   * every squadron's members. A non-null set restricts to those squadrons (REQ-ORG-017: an officer
-   * of two Staffeln evaluates both). Users without a squadron membership are excluded — they are
-   * not part of any squadron's evaluation list, which keeps the promotion system scoped to
-   * squadrons and never to other org-unit kinds.
-   *
-   * @param scopeSquadronIds squadron filter set; {@code null} = all squadrons.
-   * @param pageable Spring Data paging and sorting parameters.
-   * @return paged ordinary squadron members that an Officer / Admin may evaluate.
-   *     <p>No {@code @EntityGraph} on this paged query: fetch-joining the {@code roles} collection
-   *     would make Hibernate paginate in memory (HHH90003004) over the whole matching table. The
-   *     page's roles batch-load under {@code default_batch_fetch_size} instead (REQ-DATA-003).
+   * @param scopeSquadronIds squadron filter set; {@code null} = all squadrons
+   * @param pageable paging and sorting
+   * @return paged ordinary squadron members an officer or admin may evaluate
    */
   @Query(
       """
@@ -267,13 +216,9 @@ public interface UserRepository
       @Param("scopeSquadronIds") Collection<UUID> scopeSquadronIds, Pageable pageable);
 
   /**
-   * Squadron-scoped substring search. Mirrors {@link
-   * #findByUsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase(String, String, Pageable)}
-   * but adds the squadron-membership predicate.
-   *
-   * <p>No {@code @EntityGraph} on this paged query: fetch-joining the {@code roles} collection
-   * would make Hibernate paginate in memory (HHH90003004) over the whole matching table. The page's
-   * roles batch-load under {@code default_batch_fetch_size} instead (REQ-DATA-003).
+   * Squadron-scoped variant of {@link
+   * #findByUsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase(String, String,
+   * Pageable)}. Roles are batch-loaded rather than fetch-joined (REQ-DATA-003).
    */
   @Query(
       """
@@ -309,16 +254,13 @@ public interface UserRepository
       @Param("query") String query, @Param("scopeSquadronIds") Collection<UUID> scopeSquadronIds);
 
   /**
-   * Squadron-scoped substring search projected straight to {@link UserReferenceDto} (id, username,
-   * display name, effective name, rank), one page at a time — the backing query of the user pickers
-   * (BE-PERF-06). Same predicate as {@link #searchScoped(String, java.util.Collection, Pageable)},
-   * but no entity, no role collection and no membership lookup is loaded: a picker keystroke used
-   * to hydrate up to a thousand full {@code UserDto}s (three membership queries each) to read two
-   * fields. The projection is exactly the fields the peer view keeps, so it needs no redaction.
+   * Squadron-scoped substring search projected to {@link UserReferenceDto}, backing the user
+   * pickers; same predicate as {@link #searchScoped(String, java.util.Collection, Pageable)}
+   * without loading entities.
    *
-   * @param query the already LIKE-escaped substring to match against username or display name
+   * @param query the LIKE-escaped substring to match against username or display name
    * @param scopeSquadronIds squadron filter set; {@code null} = all squadrons
-   * @param pageable page request; its sort is applied to the {@code u} alias
+   * @param pageable page request; its sort applies to the {@code u} alias
    * @return one page of matching user references
    */
   @Query(
@@ -373,17 +315,8 @@ public interface UserRepository
   Optional<User> findByUsername(String username);
 
   /**
-   * Ids of every account holding {@code username}, without hydrating the entity or its role graph.
-   *
-   * <p>Used at login to detect a callsign collision: a subject that matches no row while another
-   * account holds the same {@code preferred_username} (ADR-0142 point 5, #1639). Only the id is
-   * ever needed -- it is what gets logged, and a username must never reach a log line (REQ-OBS-004)
-   * -- so this deliberately does not go through {@link #findByUsername(String)}, whose
-   * {@code @EntityGraph} would fetch roles and permissions for a check that reads one column.
-   *
-   * <p>Returns a list rather than an {@code Optional} because {@code app_user.username} carries no
-   * unique constraint: after this release two accounts may legitimately share a callsign until an
-   * admin merges them.
+   * Returns the ids of every account holding {@code username}, without loading the entity; used at
+   * login to detect a callsign collision (ADR-0142). A list, since the username is not unique.
    *
    * @param username the {@code preferred_username} to look for; exact match
    * @return the ids of the accounts holding it, empty when none does
@@ -392,17 +325,11 @@ public interface UserRepository
   List<UUID> findIdsByUsername(@Param("username") String username);
 
   /**
-   * Of the given usernames, the ones held by <b>more than one</b> account.
+   * Returns those of the given usernames that more than one account holds, compared
+   * case-insensitively, for the registration queue's collision marker.
    *
-   * <p>Backs the "same callsign, different account" marker on the admin registration queue: one
-   * query for the whole page rather than a lookup per row (REQ-DATA-003). Matching is
-   * case-insensitive, because Keycloak treats usernames that way and an admin comparing two rows by
-   * eye does too; the returned values are lower-cased, so callers must fold their own side of the
-   * comparison as well.
-   *
-   * @param usernames the lower-cased usernames to check; must not be empty (JPQL rejects an empty
-   *     {@code IN} list)
-   * @return the subset held by two or more accounts, lower-cased; empty when none collides
+   * @param usernames the lower-cased usernames to check; must not be empty
+   * @return the lower-cased subset held by two or more accounts
    */
   @Query(
       """
@@ -424,15 +351,11 @@ public interface UserRepository
       String username, String displayName);
 
   /**
-   * Account-existence precheck for a Discord first-broker-login (REQ-SEC-022): does any user carry
-   * one of the candidate names — already lower-cased by the caller — as their login {@code
-   * username} <em>or</em> their in-app {@code displayName}? Returns the bare existence fact; never
-   * loads a row, so no PII is materialised. The caller guarantees a non-empty set, so the {@code
-   * IN} clause never degenerates to {@code IN ()}.
+   * Checks whether any user carries one of the candidate names as username or display name, for the
+   * Discord first-broker-login precheck (REQ-SEC-022). Loads no rows.
    *
-   * @param lowerNames the lower-cased candidate names (Discord username + server nickname); never
-   *     empty
-   * @return {@code true} iff at least one user matches on username or display name
+   * @param lowerNames the lower-cased candidate names; never empty
+   * @return {@code true} iff at least one user matches
    */
   @Query(
       """
@@ -442,22 +365,10 @@ public interface UserRepository
   boolean existsByLowerUsernameOrDisplayNameIn(@Param("lowerNames") Collection<String> lowerNames);
 
   /**
-   * Whether any <em>other</em> account already carries this name, as its login {@code username} or
-   * its in-app {@code displayName} (REQ-SEC-062).
+   * Checks whether another account already uses this name as username or display name, compared
+   * case-insensitively (REQ-SEC-062). The account being edited is excluded.
    *
-   * <p>The self-service display name is what the Art. 17 erasure's text-matched statements are
-   * driven by, and those statements carry no owner predicate: they rewrite {@code
-   * job_order.handle}, both {@code recipient_handle} columns and {@code audit_event.subject_label}
-   * wherever the value equals the name. Without this check a departing member could set their
-   * display name to a victim's handle and have an admin, acting through the intended workflow,
-   * rewrite the victim's rows to the erasure sentinel — which every viewer renders as "this person
-   * requested erasure".
-   *
-   * <p>Compared lower-cased, because the erasure matches case-insensitively and a check that did
-   * not would be trivially sidestepped. The row being edited is excluded, so re-saving one's own
-   * unchanged name is not a collision.
-   *
-   * @param lowerName the candidate name, already lower-cased and trimmed by the caller
+   * @param lowerName the candidate name, lower-cased and trimmed
    * @param selfId the account being edited, excluded from the comparison
    * @return {@code true} when somebody else already answers to this name
    */
@@ -471,10 +382,8 @@ public interface UserRepository
       @Param("lowerName") String lowerName, @Param("selfId") UUID selfId);
 
   /**
-   * Account-existence precheck for a Discord first-broker-login (REQ-SEC-022): does any user carry
-   * the given e-mail (already lower-cased by the caller)? Case-insensitive counterpart to the
-   * case-sensitive {@link #findByEmail(String)}; returns the bare existence fact so no PII is
-   * materialised.
+   * Checks case-insensitively whether any user carries the given e-mail, for the Discord
+   * first-broker-login precheck (REQ-SEC-022). Loads no rows.
    *
    * @param lowerEmail the lower-cased candidate e-mail; never blank
    * @return {@code true} iff at least one user has that e-mail
@@ -492,38 +401,20 @@ public interface UserRepository
       String username, String displayName);
 
   /**
-   * Derived Spring-Data query - returns entities matching {@code
-   * UsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase}, one page at a time.
-   *
-   * <p>No {@code @EntityGraph} on this paged query: fetch-joining the {@code roles} collection
-   * would make Hibernate paginate in memory (HHH90003004) over the whole matching table. The page's
-   * roles batch-load under {@code default_batch_fetch_size} instead (REQ-DATA-003).
+   * Paged case-insensitive substring search over username or display name. Roles are batch-loaded
+   * rather than fetch-joined (REQ-DATA-003).
    */
   Page<User> findByUsernameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase(
       String username, String displayName, Pageable pageable);
 
   /**
-   * Sets {@code inKeycloak = false} on every user whose id is not in the freshly-synced Keycloak id
-   * list. Called by the periodic Keycloak sync so accounts removed upstream become flagged locally
-   * without being deleted (preserves history and FK references).
+   * Flags every user still marked {@code inKeycloak} whose id is missing from the synced Keycloak
+   * roster and stamps {@code keycloakAbsentSince}. Already-flagged rows are untouched, so the stamp
+   * records the first observation.
    *
-   * <p>The {@code inKeycloak = true} predicate restricts the UPDATE to rows that actually flip,
-   * which is what makes the returned count the number of accounts <em>newly</em> disappearing in
-   * this run rather than the running total of everyone who ever left — the difference between a
-   * usable anomaly signal (an upstream mass-deletion or a truncated roster) and a constant. Rows
-   * already flagged are unaffected either way, so the write is semantically unchanged.
-   *
-   * <p>The same predicate is what makes {@code keycloakAbsentSince} a first-observation stamp
-   * rather than a last-seen one: only the rows that flip are written, so a row already flagged
-   * keeps the instant its absence was <em>first</em> noticed instead of being pushed forward on
-   * every nightly run. Without that, the orphan-age gauge of REQ-SEC-059 would read the sync's
-   * cadence (never older than a day) rather than how long the account has actually been waiting for
-   * its second deletion step.
-   *
-   * @param ids the ids present in the current Keycloak roster; never {@code null}, never empty (the
-   *     caller short-circuits on an empty set so an outage cannot flag the whole user base)
-   * @param absentSince the instant to record as when the absence was first observed
-   * @return the number of users flagged as missing by this call (rows whose flag flipped)
+   * @param ids the ids in the current Keycloak roster; never {@code null} or empty
+   * @param absentSince the instant recorded as the first observed absence
+   * @return the number of users newly flagged by this call
    */
   @Modifying
   @Query(
@@ -534,28 +425,9 @@ public interface UserRepository
       @Param("absentSince") @NotNull Instant absentSince);
 
   /**
-   * The same count with service-account rows left out — the gauge's actual query (REQ-SEC-059).
-   *
-   * <p>A Keycloak service account is not somebody's unfinished deletion, and its row can never
-   * leave this state: an unfiltered {@code GET /users} omits service accounts, so the roster sync
-   * never reports one, {@code markMissingUsers} flags it, and {@code syncUser} — the only place
-   * that clears the flag — runs only for a user the roster reports. Production holds exactly such a
-   * row. Counted, it made the gauge permanently non-zero and {@code UserDeletionUnfinished} fire
-   * seven days after deploy and never resolve, for a machine that holds no personal data at all.
-   *
-   * <p><b>Matched on the username convention, unconditionally.</b> The first version of this
-   * excluded {@code service-account-<clientId>} for the <em>configured</em> gateway clients — and
-   * that list defaults empty, while the machine-identity carve-out in {@code
-   * CustomJwtGrantedAuthoritiesConverter} is gated on the same property. So with the property unset
-   * the carve-out does not fire, the gateway's first call provisions the row, and the exclusion is
-   * empty: it could only ever protect a deployment that would not have created the row.
-   * Lower-cased, matching the convention this file already states for usernames.
-   *
-   * <p>{@code service-account-} is a Keycloak display convention and <b>not</b> a reserved
-   * namespace — an ordinary user can be created with that name. That is why it must never carry a
-   * security decision, and {@code UserDeletionService} still asks Keycloak which user backs a
-   * configured client before it waives its delete guard. For a gauge it is proportionate: a
-   * hand-made lookalike missing from a monitoring count is a nuisance, not a hole.
+   * Counts orphaned member accounts, excluding Keycloak service-account rows matched by the {@code
+   * service-account-} username prefix (REQ-SEC-059). The prefix is a convention only and is used
+   * solely for this gauge.
    *
    * @return the number of orphaned member accounts
    */
@@ -567,14 +439,10 @@ public interface UserRepository
   long countOrphanedMemberAccounts();
 
   /**
-   * The earliest absence stamp among those same rows (REQ-SEC-059).
+   * Returns the earliest absence stamp among the rows counted by {@link
+   * #countOrphanedMemberAccounts()} (REQ-SEC-059).
    *
-   * <p>Paired with {@link #countOrphanedMemberAccounts()}: excluding a service account from the
-   * count and not from the age would leave the age gauge growing without bound from the deploy
-   * timestamp V241 backfilled, which is the half of the pair the alert compares.
-   *
-   * @return the earliest {@code keycloakAbsentSince} among the orphaned member accounts, or {@code
-   *     null} when none is waiting
+   * @return the earliest {@code keycloakAbsentSince}, or {@code null} when none is waiting
    */
   @Query(
       """
@@ -585,25 +453,17 @@ public interface UserRepository
   Instant findOldestOrphanedMemberAbsenceStamp();
 
   /**
-   * Returns the ids of every local user that already carries a Discord account link ({@code
-   * discord_user_id} is non-null). Backs the Keycloak user sync's incremental Discord back-fill:
-   * the sync reads the (expensive, per-user) federated-identity endpoint only for roster users NOT
-   * in this set, so the already-linked majority is skipped each run. A lightweight scalar
-   * projection: no rows are materialised, so no PII (the snowflake itself) is loaded.
+   * Returns the ids of every user with a Discord link, so the Keycloak sync back-fills the link
+   * only for the others.
    *
-   * @return the ids of users with a non-null Discord link; never {@code null}, possibly empty.
+   * @return the ids of users with a non-null Discord link; never {@code null}, possibly empty
    */
   @Query("SELECT u.id FROM User u WHERE u.discordUserId IS NOT NULL")
   Set<UUID> findIdsWithDiscordLink();
 
   /**
-   * Returns the id of the user currently holding {@code discordUserId}, or empty when the snowflake
-   * is unclaimed. Consulted before either reconciliation path writes the link, because {@code
-   * discord_user_id} is UNIQUE (V172) and a blind write against a snowflake another row already
-   * holds does not merely lose the column -- it fails the whole per-user reconciliation (#1826).
-   *
-   * <p>A scalar id projection on purpose: the caller only needs to know <em>whether</em> and
-   * <em>which row</em>, never the snowflake, which is unbounded personal data (REQ-OBS-004).
+   * Returns the id of the user holding {@code discordUserId}, checked before writing a link because
+   * the column is unique.
    *
    * @param discordUserId the Discord snowflake to look up; never {@code null}
    * @return the holding user's id, or {@link Optional#empty()} when nobody holds it
@@ -619,13 +479,11 @@ public interface UserRepository
   List<User> findAllAdmins();
 
   /**
-   * Bulk-nulls the denormalised {@code approved_by_id} pointer on every user approved or rejected
-   * by the given admin. Called by the user-delete flow so deleting an admin who had decided
-   * registrations is not blocked by the self-referential {@code fk_app_user_approved_by} foreign
-   * key (V173, no {@code ON DELETE} clause). Only the convenience pointer is cleared — the decision
-   * itself is preserved in {@code user_approval_event}.
+   * Bulk-nulls {@code approved_by_id} on every user decided by the given admin, so deleting that
+   * admin is not blocked by the self-referential foreign key. The decision stays in {@code
+   * user_approval_event}.
    *
-   * @param adminId the deciding admin being deleted; never {@code null}.
+   * @param adminId the deciding admin being deleted; never {@code null}
    */
   @Modifying
   @Query("UPDATE User u SET u.approvedById = null WHERE u.approvedById = :adminId")

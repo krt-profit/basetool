@@ -25,9 +25,8 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Frontend mirror of one row of a holder's custody history (REQ-BANK-032, ADR-0039): this holder's
- * ledger leg with its transaction context — the account the money moved on and, for an Umbuchung,
- * the counter holder.
+ * Frontend mirror of one row of a holder's custody history (REQ-BANK-032): the holder's ledger leg
+ * with the account it moved on and, for an Umbuchung, the counter holder.
  *
  * @param postingId the holder leg's id
  * @param transactionId the owning transaction's id (the reversal target)
@@ -41,10 +40,8 @@ import org.jetbrains.annotations.Nullable;
  *     wipe reset
  * @param counterAccountName the matching account's name
  * @param counterHolderHandle for a {@code HOLDER_TRANSFER} the other holder of the Umbuchung
- * @param transferFee the in-game transfer fee added on top of this transaction's entered amount and
- *     borne by the debited source (ADR-0052, REQ-BANK-033); {@code 0} for non-fee rows. On an
- *     outgoing leg the leg is the gross debited, so the destination received {@code |amount| −
- *     transferFee}
+ * @param transferFee the in-game transfer fee borne by the debited source (REQ-BANK-033); {@code 0}
+ *     for non-fee rows; an outgoing leg is the gross debited
  */
 public record BankHolderBookingDto(
     UUID postingId,

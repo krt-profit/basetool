@@ -258,12 +258,8 @@ class FiltersTest {
   }
 
   /**
-   * The payload cap survives a percent-encoded spelling of the ingest path.
-   *
-   * <p>{@code getRequestURI()} is raw while Spring MVC routes on the decoded path, so the {@code
-   * startsWith("/v1/")} test this replaced skipped the cap for {@code /%761/refinery-extract} —
-   * which the dispatcher then decoded and delivered to the controller, unbounded. Must be a direct
-   * filter test: MockMvc normalises the path before the filter runs.
+   * The payload cap applies to a percent-encoded spelling of the ingest path. Tested on the filter
+   * directly because MockMvc normalises the path first.
    */
   @Test
   void sizeFilterRejectsAnOversizedPayloadOnAPercentEncodedIngestPath() throws Exception {

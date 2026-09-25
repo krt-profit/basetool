@@ -25,13 +25,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
- * The {@code service}-side implementation of {@link StockViewerAccess}.
- *
- * <p>Holds no rule of its own. Both methods hand straight to {@link AccessGateService}, which is
- * the same bean the write endpoints' {@code @PreAuthorize} expressions reach through {@code
- * OwnerScopeService} — so a DTO flag and the gate that later refuses the write are computed by one
- * piece of code and cannot drift apart. That is the whole point of routing this through a seam
- * rather than letting each client decide.
+ * Implementation of {@link StockViewerAccess} that delegates entirely to {@link AccessGateService},
+ * the same gate the write endpoints use.
  */
 @Service
 @RequiredArgsConstructor

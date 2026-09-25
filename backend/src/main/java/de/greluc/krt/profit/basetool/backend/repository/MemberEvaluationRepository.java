@@ -171,14 +171,9 @@ public interface MemberEvaluationRepository extends JpaRepository<MemberEvaluati
       @Param("userId") UUID userId, @Param("owningSquadronId") UUID owningSquadronId);
 
   /**
-   * Deletes every promotion grade of the given member as part of the hard account deletion
-   * (REQ-DATA-008). Since V235 {@code member_evaluation.user_id} carries a foreign key to {@code
-   * app_user} with {@code ON DELETE CASCADE}, so the database would remove the grades too; the
-   * explicit delete stays so the purge is counted and audited inside the deletion transaction, and
-   * so the grades — an assessment of a named person — never depend on the cascade alone.
+   * Deletes every promotion grade of the given member during hard account deletion (REQ-DATA-008).
    *
-   * <p>Set-based and without {@code clearAutomatically}, because it runs inside the user-deletion
-   * transaction where evicting the persistence context would detach the {@code User} being deleted.
+   * <p>Does not clear the persistence context, since it runs inside the user-deletion transaction.
    *
    * @param userId the departing member's {@code app_user.id}
    * @return the number of grades removed, for the audit summary event

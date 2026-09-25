@@ -26,14 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/**
- * The list two filters read, tested once instead of twice.
- *
- * <p>{@link ApiCacheControlFilterTest} covers what the directive does to a response and {@code
- * StreamAwareShallowEtagHeaderFilterTest} covers what it does to the ETag buffer. What is left, and
- * belongs here, is the matching itself: which spellings of a path the list recognises, and which it
- * deliberately does not.
- */
+/** Tests which path spellings the shared no-store API scope list matches and which it does not. */
 class NoStoreApiScopesTest {
 
   @ParameterizedTest

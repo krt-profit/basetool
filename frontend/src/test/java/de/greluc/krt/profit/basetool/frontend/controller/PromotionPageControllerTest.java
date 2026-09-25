@@ -53,19 +53,9 @@ import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 
 /**
- * Pure-Mockito unit tests for {@link PromotionPageController}.
- *
- * <p>The promotion page controller is a fan-out layer: each handler triggers several {@link
- * BackendApiClient} calls (topics, categories, eligibilities, evaluations, members, the current
- * user) and assembles them into a multi-attribute Thymeleaf model. The tests below verify the
- * *assembly* logic — grouping, key-format conventions, max-reductions across collections, exception
- * swallowing — without exercising Thymeleaf rendering. Rendering itself is templated server-side
- * and indirectly verified by the manual smoke-test plan in the PR description.
- *
- * <p>Because every backend call returns through the same {@code get(uri,
- * ParameterizedTypeReference)} overload, the stubs use {@code contains(...)} on the URI fragment to
- * route each invocation to the right canned reply. This keeps the test setup local to each test and
- * avoids brittle full-URI string matching that would break the moment a query parameter changes.
+ * Mockito unit tests for {@link PromotionPageController}'s model assembly from several {@link
+ * BackendApiClient} calls: grouping, key formats, max reductions and exception swallowing, without
+ * Thymeleaf rendering. Stubs route by URI fragment via {@code contains(...)}.
  */
 @SuppressWarnings({"unchecked", "rawtypes"})
 @ExtendWith(MockitoExtension.class)

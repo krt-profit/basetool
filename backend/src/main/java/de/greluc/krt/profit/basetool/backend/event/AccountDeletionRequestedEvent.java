@@ -29,13 +29,10 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * Domain event published when a member raises an Art. 17 erasure request (REQ-SEC-061). The seeded
- * default rule notifies every admin, because the request is a legal deadline: Art. 12(3) gives the
- * controller one month to respond, and a queue nobody is told about is how that month passes.
+ * Domain event published when a member raises an Art. 17 erasure request (REQ-SEC-061); the default
+ * rule notifies every admin.
  *
- * <p>Carries the member's id (the notification's deep-link target) and their handle for rendering.
- * The handle is the same datum the admin queue shows and the one an admin needs to act; no e-mail
- * address, Discord id or the member's reasoning rides the event.
+ * <p>Carries no e-mail address, Discord id or the member's reasoning.
  *
  * @param userId the requesting member's id, also the notification's loose entity id
  * @param handle the requesting member's effective name, for rendering; may be {@code null}

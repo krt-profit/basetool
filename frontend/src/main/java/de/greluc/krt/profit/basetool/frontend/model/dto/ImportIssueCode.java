@@ -20,10 +20,9 @@
 package de.greluc.krt.profit.basetool.frontend.model.dto;
 
 /**
- * Frontend mirror of the backend {@code ImportIssueCode} enum (#434/#435): the machine-readable
- * reason of one refinery-import review finding. The create page translates each constant via the
- * {@code refineryImport.issue.<CODE>} message key — constants must stay in lockstep with the
- * backend enum (mirror-DTO rule; an unknown constant fails Jackson binding at relay time).
+ * Frontend mirror of the backend {@code ImportIssueCode}: the machine-readable reason of one
+ * refinery-import review finding, translated via {@code refineryImport.issue.<CODE>}. Must match
+ * the backend constants, or Jackson binding fails.
  */
 public enum ImportIssueCode {
 

@@ -50,16 +50,11 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC-level security test for {@link LeitungPageController} (epic #800, REQ-ROLE-004). Pins the
- * page's role gate to {@code ADMIN} / {@code OFFICER} ({@code Roles.ADMIN_OR_OFFICER}): every
- * functional leader carries the operative {@code OFFICER} grant, so an officer (and admin) reaches
- * the page and its write proxies, while the previously-accepted {@code LOGISTICIAN} / {@code
- * MISSION_MANAGER} capability roles — which have no appointment reach and only ever saw an empty
- * page — are now forbidden. The delegated per-unit authority still lives at the backend appointment
- * endpoints; this test only fixes the coarse frontend gate that used to admit them.
+ * Security tests for {@link LeitungPageController} (REQ-ROLE-004): the page and its write proxies
+ * admit only {@code ADMIN} and {@code OFFICER}, and {@code LOGISTICIAN} / {@code MISSION_MANAGER}
+ * are forbidden.
  *
- * <p>It also pins how the Spezialkommando section renders the two caps: the roster cap links to the
- * SK member page, the lead cap shows the lead toggle, and neither leaks into the other.
+ * <p>Also pins that the Spezialkommando section renders the roster and lead caps independently.
  */
 @SpringBootTest
 class LeitungPageControllerMvcTest {
@@ -108,9 +103,9 @@ class LeitungPageControllerMvcTest {
    * Stubs a view holding exactly one Spezialkommando with one member and the given capability
    * flags.
    *
-   * @param skId the SK id.
-   * @param canAppointLead the lead-appointment cap (parent Bereichsleiter / admin).
-   * @param canManageRoster the roster cap (the SK's own lead / admin).
+   * @param skId the SK id
+   * @param canAppointLead the lead-appointment cap
+   * @param canManageRoster the roster cap
    */
   private void stubSpecialCommandView(UUID skId, boolean canAppointLead, boolean canManageRoster) {
     LeitungUnitDto sk =

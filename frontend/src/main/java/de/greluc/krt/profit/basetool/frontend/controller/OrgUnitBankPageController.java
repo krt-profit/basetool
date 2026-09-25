@@ -59,14 +59,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.util.UriComponentsBuilder;
 
 /**
- * Renders the org-unit bank view (epic #666 + REQ-BANK-034..038): the balance cards of every
- * account the caller may view, the read-only account drill-in (history + Halter-redacted
- * statement), the responsible-holder/OL settings (balance target + configurable visibility), and
- * the officer/lead booking-request flow. This is the org-unit-facing surface — reachable by any KRT
- * member (the cartel account is visible to all, REQ-BANK-037, and a member may have been granted
- * access to other accounts), deliberately <em>not</em> {@code BANK_EMPLOYEE}; the backend seam
- * decides the actual data per account. Booking/settings writes are AJAX swaps via {@code
- * /api/proxy/org-units/bank/**} (no reload, REQ-FE-005).
+ * Renders the org-unit bank view (REQ-BANK-034..038) for any KRT member: balance cards of every
+ * viewable account, the read-only account drill-in, the holder/OL settings and the booking-request
+ * flow. The backend decides the data per account; writes go through {@code
+ * /api/proxy/org-units/bank/**}.
  */
 @Controller
 @UsesLayoutModel
@@ -111,19 +107,14 @@ public class OrgUnitBankPageController {
       BANK_BOOKING_PAGE_TYPE = new ParameterizedTypeReference<>() {};
 
   /**
-   * Renders the overview page (or one of its fragments for an in-place swap). The Konten list is
-   * shown as a card grid (default) or a dense table, chosen per user; the choice rides on the
-   * {@code layout} query parameter and is persisted client-side by {@code bank.js} (mirroring the
-   * dashboard, REQ-BANK-016, but without the by-Bereich grouping). An {@code orgUnitBankAccounts}
-   * fragment request re-renders just the switchable account list for the view-toggle swap
-   * (REQ-FE-005); an {@code orgUnitBank} fragment request re-renders the tabs + both request
-   * regions after a booking write.
+   * Renders the org-unit bank overview as a card grid or, with {@code layout=table}, a dense table
+   * (REQ-BANK-016), or one of its fragments for an in-place swap (REQ-FE-005).
    *
    * @param layout {@code table} for the dense table, otherwise the default card grid
-   * @param fragment when {@code "orgUnitBankAccounts"} only the switchable account list is
-   *     re-rendered (view-toggle swap); when {@code "orgUnitBank"} the tabs + own-request region
-   * @param principal the authenticated OIDC user, whose display name seeds the pre-filled
-   *     Empf&auml;nger picker of a withdrawal request (REQ-BANK-055)
+   * @param fragment {@code "orgUnitBankAccounts"} for the account list, {@code "orgUnitBank"} for
+   *     the tabs and own-request region, otherwise the full page
+   * @param principal the authenticated OIDC user, whose display name seeds the Empf&auml;nger
+   *     picker of a withdrawal request (REQ-BANK-055)
    * @param model Spring MVC model
    * @return the template, or its {@code orgUnitBankAccounts} / {@code orgUnitBank} fragment view
    */
@@ -203,13 +194,8 @@ public class OrgUnitBankPageController {
   }
 
   /**
-   * The caller's display label for the pre-filled Empf&auml;nger picker (REQ-BANK-055), read
-   * straight off the OIDC token so the page load costs no extra backend call.
-   *
-   * <p>Falls back {@code displayName} &rarr; {@code preferred_username} &rarr; the subject,
-   * matching how the backend's {@code User#getEffectiveName()} resolves the same name — the label
-   * is only cosmetic (the submitted value is the id), but a blank one would make the seeded
-   * combobox look empty and invite the requester to re-pick themselves.
+   * Returns the caller's label for the pre-filled Empf&auml;nger picker (REQ-BANK-055), read from
+   * the OIDC token: {@code displayName}, then {@code preferred_username}, then the subject.
    *
    * @param principal the authenticated OIDC user, or {@code null} outside a user context
    * @return a non-blank label, or {@code null} when nothing identifies the caller
@@ -314,13 +300,9 @@ public class OrgUnitBankPageController {
   }
 
   /**
-   * Renders the read-only account drill-in (REQ-BANK-038) — the balance chart (REQ-BANK-049) +
-   * history (Halter redacted) with its period filter (REQ-BANK-051) + the Kontoauszug export —
-   * plus, for the responsible holder / OL, the settings region (balance target + configurable
-   * visibility). The {@code orgUnitBankBookings} fragment re-renders the paginated/filtered history
-   * in place, the {@code orgUnitBalanceChart} fragment re-renders the chart on a range change, and
-   * the {@code orgUnitBankSettings} fragment re-renders the facts + settings region after a
-   * target/visibility write.
+   * Renders the read-only account drill-in (REQ-BANK-038): balance chart, redacted booking history
+   * with period filter, statement export and, for the responsible holder or OL, the settings
+   * region.
    *
    * @param id the account id
    * @param page zero-based booking-history page index

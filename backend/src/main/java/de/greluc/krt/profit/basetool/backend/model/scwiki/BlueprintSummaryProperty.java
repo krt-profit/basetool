@@ -36,10 +36,9 @@ import lombok.Setter;
 import lombok.ToString;
 
 /**
- * One aggregated stat a {@link Blueprint} affects across all its requirement groups (SC Wiki {@code
- * blueprint_summary_property}). A compact, de-duplicated roll-up of the per-group {@link
- * BlueprintRequirementModifier} property keys, used to badge a blueprint with the stats it
- * influences without expanding every slot. Owned by the {@link Blueprint} aggregate.
+ * One stat a {@link Blueprint} affects across all its requirement groups: a de-duplicated roll-up
+ * of the per-group {@link BlueprintRequirementModifier} property keys. Owned by the {@link
+ * Blueprint} aggregate.
  */
 @Entity
 @Table(name = "blueprint_summary_property")

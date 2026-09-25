@@ -41,11 +41,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Full Thymeleaf render test for the member-edit page. The in-place save (epic #571, REQ-FE-007)
- * made the displayName/description error divs always present with a GET-safe ternary so the client
- * can paint per-field validation errors; this pins that the page still renders on a plain GET (a
- * bare {@code th:errors} with no BindingResult would throw {@code EL1011E}) and that the {@code
- * data-member-edit} gate plus the {@code data-error-for} slots are emitted for the script.
+ * Full Thymeleaf render test for the member-edit page: it renders on a plain GET and emits the
+ * {@code data-member-edit} gate and the {@code data-error-for} slots for per-field errors
+ * (REQ-FE-007).
  */
 @SpringBootTest
 class MemberEditPageRenderTest {

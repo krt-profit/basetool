@@ -32,24 +32,11 @@ import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 /**
- * The backend's one source of outbound HTTP clients: a {@link RestClient.Builder} on the JDK {@link
- * HttpClient}, with bounded timeouts and the Micrometer {@link ObservationRegistry} (ADR-0204).
+ * Provides the backend's outbound HTTP clients: a {@link RestClient.Builder} on the JDK {@link
+ * HttpClient} with bounded timeouts and the Micrometer {@link ObservationRegistry} (ADR-0204).
  *
- * <p>Every outbound call the backend makes is blocking — the UEX and SC-Wiki catalogue syncs run on
- * scheduler threads, the Keycloak Admin API calls on request or scheduler threads — so the reactive
- * {@code WebClient} this class used to configure bought nothing but a second HTTP stack (WebFlux,
- * Reactor Netty) on the runtime classpath and a {@code block()} at every call site. The JDK client
- * is part of the runtime already.
- *
- * <p><b>Why a hand-built builder and not Boot's.</b> Boot 4 auto-configures a {@code
- * RestClient.Builder} only from its separate {@code spring-boot-restclient} module, which this
- * module does not ship. The builder here therefore wires the observation registry itself, exactly
- * as the {@code WebClient.Builder} it replaces did, so every call still records {@code
- * http.client.requests} (Prometheus {@code http_client_requests_seconds}) with the default {@code
- * method}, {@code uri}, {@code status}, {@code outcome}, {@code exception} and {@code client.name}
- * key values, and a client span when tracing is on (REQ-OBS-009). The {@code
- * ObservationPrivacyFilter} is registered on the registry, not on a client, so it keeps scrubbing
- * these observations unchanged.
+ * <p>Every call is observed as {@code http.client.requests} with the default key values, plus a
+ * client span when tracing is on (REQ-OBS-009).
  */
 @Configuration
 public class RestClientConfig {
@@ -61,10 +48,8 @@ public class RestClientConfig {
   static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
 
   /**
-   * Upper bound on one exchange once the connection is up: Spring's {@link
-   * JdkClientHttpRequestFactory} applies it as the JDK request timeout (until the response headers
-   * arrive) and to the body read. 30&nbsp;s is what the replaced client used as its per-call
-   * timeout for the UEX and SC-Wiki fetches, whose largest pages are several megabytes.
+   * Upper bound on one exchange once connected, applied as the JDK request timeout and to the body
+   * read.
    */
   static final Duration READ_TIMEOUT = Duration.ofSeconds(30);
 
@@ -77,17 +62,13 @@ public class RestClientConfig {
       jdkRequestFactory(CONNECT_TIMEOUT, READ_TIMEOUT);
 
   /**
-   * A fresh {@link RestClient.Builder} per injection point, pre-wired with the shared JDK request
-   * factory and the observation registry.
+   * Creates a fresh {@link RestClient.Builder} per injection point, pre-wired with the shared JDK
+   * request factory and the observation registry.
    *
-   * <p>Prototype-scoped because a builder is mutable: {@code UexClient} and {@code ScWikiClient}
-   * each set their own base URL, and a shared singleton builder would hand one caller's base URL,
-   * interceptors or request factory to the next. Boot scopes its own auto-configured builder the
-   * same way.
+   * <p>Prototype-scoped because a builder is mutable and each client sets its own base URL.
    *
-   * @param observationRegistry the Micrometer observation registry auto-configured by Boot
-   * @return a new builder whose clients are observed and bounded by {@link #CONNECT_TIMEOUT} and
-   *     {@link #READ_TIMEOUT}
+   * @param observationRegistry the Micrometer observation registry
+   * @return a new builder bounded by {@link #CONNECT_TIMEOUT} and {@link #READ_TIMEOUT}
    */
   @Bean
   @Scope(ConfigurableBeanFactory.SCOPE_PROTOTYPE)
@@ -98,13 +79,8 @@ public class RestClientConfig {
   }
 
   /**
-   * Builds a {@link JdkClientHttpRequestFactory} over a JDK {@link HttpClient} with the given
-   * timeouts.
-   *
-   * <p>The client is pinned to HTTP/1.1. The JDK client defaults to HTTP/2, which over plain {@code
-   * http://} means an {@code Upgrade: h2c} offer on every request and over TLS an ALPN negotiation
-   * the replaced Reactor Netty client never made; pinning keeps the wire behaviour of the migration
-   * identical. Package-private so a test can build one with a short read timeout.
+   * Builds a {@link JdkClientHttpRequestFactory} over a JDK {@link HttpClient} pinned to HTTP/1.1
+   * with the given timeouts.
    *
    * @param connectTimeout the bound on establishing a connection
    * @param readTimeout the bound on one exchange once connected

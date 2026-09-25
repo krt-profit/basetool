@@ -37,12 +37,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Pure-method unit tests for {@link JobOrderItemStockController} (REQ-ORDERS-028/029). The
- * controller is a thin delegation layer mirroring {@link MaterialCollectionControllerTest}; the
- * grouping / slice logic lives in {@code InventoryAggregationService.getItemStockForJobOrder(...)}
- * and is covered there. Here we guarantee delegation and the owner/location redaction wiring
- * (REQ-ORDERS-029): a responsible-side viewer gets the list unmodified, a requesting-side viewer
- * ({@code canSeeJobOrderInventoryOwners == false}) gets the redactor's output.
+ * Unit tests for {@link JobOrderItemStockController} (REQ-ORDERS-028/029): delegation and the
+ * owner/location redaction for a requesting-side viewer.
  */
 @ExtendWith(MockitoExtension.class)
 class JobOrderItemStockControllerTest {

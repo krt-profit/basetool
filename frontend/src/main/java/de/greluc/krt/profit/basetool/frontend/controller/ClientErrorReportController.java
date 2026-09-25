@@ -40,54 +40,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Receives the browser-side error beacon posted by {@code static/js/krt-client-error.js} (audit
- * finding M12) and turns it into the two server-side signals a browser failure otherwise leaves
- * behind: a DEBUG log line and the {@code basetool_client_error_total{kind}} counter.
+ * Receives the browser error beacon from {@code krt-client-error.js} and records it as the {@code
+ * basetool_client_error_total{kind}} counter plus a DEBUG log line.
  *
- * <p><b>What this actually covers.</b> Not "a JS error reached production" in general — {@code
- * :frontend:lintJs} and the Playwright suite already catch the syntax-error half of that, since a
- * file that does not parse fails the gate or breaks every end-to-end flow. What neither catches is
- * the runtime half: a handler that parses cleanly and throws a {@code TypeError} on one browser, on
- * one data shape, most often against a DOM that a {@code krtFetch} fragment swap has just replaced
- * underneath it. That failure produces no request, so there is no access-log line, no {@code
- * http.server.requests} sample and no counter — "the button did nothing" is a user report and
- * nothing else. This endpoint is the missing signal for exactly that case.
- *
- * <p><b>The payload is attacker-controllable and self-triggerable</b> — anyone with a session can
- * POST anything here, repeatedly, and any page can make the browser do it by throwing. Every design
- * choice below follows from that:
- *
- * <ul>
- *   <li>Exactly five fields are accepted ({@link ClientErrorReport}); Jackson silently drops
- *       anything else, so a caller cannot smuggle a stack trace, {@code document.title}, DOM
- *       content, form values or {@code location.search} into the log by adding a property.
- *   <li>Both free-text fields go through {@link LogSafe#text(String, int)} at {@value
- *       #MAX_FIELD_LENGTH} characters, which strips control characters (no forged {@code ERROR}
- *       line, CWE-117) and bounds the line length.
- *   <li>{@code source} additionally loses its query string and fragment <em>server-side</em>, so a
- *       token or search term smuggled into a script URL never reaches the log even if the client
- *       half is bypassed.
- *   <li>{@code kind} is resolved against {@link #ALLOWED_KINDS} — the five {@code MetricNames}
- *       literals — and a report matching none of them is rejected without creating a meter. Echoing
- *       a client-supplied tag value would be an unbounded, attacker-chosen label (REQ-OBS-006).
- *   <li>The user identity comes from the MDC ({@code CorrelationIdFilter} puts the {@code sub}
- *       there), never from the request body. No callsign, name, e-mail, token or client IP is
- *       logged (REQ-OBS-004).
- * </ul>
- *
- * <p><b>DEBUG is not optional here.</b> The endpoint is self-triggerable at frame rate; at INFO or
- * WARN a single looping error handler in one tab would flood the logs and, on the ERROR path, trip
- * the {@code LogbackErrorSpike} alert with a client-side fault. The counter is the always-on signal
- * — it is what an alert or dashboard watches — and the log line is raised to DEBUG via {@code
- * /actuator/loggers} for the duration of a support call, when a specific user's failure needs its
- * message and script URL. Following the same rule, the malformed-body handler below logs at DEBUG
- * too: a client that can send garbage on demand must not be able to author WARN lines.
- *
- * <p>Authorization is doubled on purpose: {@code SecurityConfig}'s {@code
- * anyRequest().authenticated()} catch-all already gates the path (an anonymous POST is answered by
- * the OIDC entry point and never reaches this class), and {@link PreAuthorize} keeps that true if
- * the path is ever moved into a {@code permitAll} block. CSRF protection is the frontend default;
- * the beacon replays the {@code _csrf} meta tags as a header.
+ * <p>The payload is untrusted: only the five {@link ClientErrorReport} fields are bound, free text
+ * is sanitised via {@link LogSafe#text(String, int)}, {@code source} loses its query and fragment,
+ * {@code kind} must be one of {@link #ALLOWED_KINDS} (REQ-OBS-006), and the user identity comes
+ * from the MDC only (REQ-OBS-004). Logging stays at DEBUG because callers can trigger it at will.
  */
 @RestController
 @RequiredArgsConstructor
@@ -120,19 +79,13 @@ public class ClientErrorReportController {
   private final MeterRegistry meterRegistry;
 
   /**
-   * The complete accepted payload — five fields and nothing else. Unknown JSON properties are
-   * ignored by the frontend's Jackson defaults, so the shape of this record <em>is</em> the input
-   * allowlist: a field that is not declared here can never reach a log line or a metric.
+   * The complete accepted beacon payload; undeclared JSON properties are ignored.
    *
-   * @param message the browser's exception message or promise-rejection reason; free text, treated
-   *     as hostile and sanitised before logging
-   * @param source the URL of the script that failed; its query string and fragment are stripped
-   *     server-side before the value is logged
-   * @param line the 1-based line number within {@code source}, or {@code null} when the browser did
-   *     not supply one (promise rejections never do)
+   * @param message the browser's exception message or rejection reason; sanitised before logging
+   * @param source the failing script URL; query and fragment are stripped before logging
+   * @param line the 1-based line number within {@code source}, or {@code null}
    * @param column the 1-based column number within {@code source}, or {@code null}
-   * @param kind the browser-error class; only the five {@link #ALLOWED_KINDS} literals are
-   *     accepted, any other value causes the whole report to be rejected
+   * @param kind the browser-error class; must be one of {@link #ALLOWED_KINDS}
    */
   public record ClientErrorReport(
       @Nullable String message,
@@ -142,14 +95,12 @@ public class ClientErrorReportController {
       @Nullable String kind) {}
 
   /**
-   * Records one browser-side failure: bumps {@code basetool_client_error_total} with the
-   * server-resolved {@code kind} tag and writes the sanitised detail to the DEBUG log.
+   * Records one browser-side failure: increments {@code basetool_client_error_total} with the
+   * resolved {@code kind} tag and logs the sanitised detail at DEBUG.
    *
-   * @param report the beacon payload; {@code null} when the body was absent, which is rejected the
-   *     same way an unknown {@code kind} is
-   * @return {@code 204 No Content} once the report has been counted and logged, or {@code 400 Bad
-   *     Request} when the body is missing or carries a {@code kind} outside {@link #ALLOWED_KINDS}
-   *     — in which case nothing is counted, so a crafted payload cannot create a metric series
+   * @param report the beacon payload; {@code null} when the body was absent
+   * @return {@code 204} once counted and logged, or {@code 400} for a missing body or an unknown
+   *     {@code kind}, in which case nothing is counted
    */
   @PostMapping(PATH)
   public ResponseEntity<Void> report(
@@ -177,20 +128,10 @@ public class ClientErrorReportController {
   }
 
   /**
-   * Answers a malformed, unparseable or wrongly-typed beacon body with a bare {@code 400}.
+   * Answers a malformed or wrongly-typed beacon body with a bare {@code 400}, logging only the
+   * exception type, so the global handler's ERROR log and 500 page are never reached.
    *
-   * <p>Without this controller-local handler both exceptions would reach {@code
-   * GlobalExceptionHandler}'s {@code Exception} catch-all, which logs at ERROR and renders a 500
-   * page — handing any authenticated caller a one-request ERROR-log generator on an endpoint they
-   * can hammer, and one that would trip the {@code LogbackErrorSpike} alert. A controller-local
-   * {@code @ExceptionHandler} wins over the {@code @ControllerAdvice} one, so the flood vector is
-   * closed here rather than by weakening the global handler. For the same reason the mapping
-   * declares no {@code consumes} restriction: a {@code consumes} mismatch is raised during handler
-   * <em>mapping</em>, before this controller is selected, and would therefore escape to the global
-   * advice — whereas a converter mismatch during argument resolution lands here.
-   *
-   * @param e the parse or content-type failure, logged only as its type — the offending body is
-   *     never echoed back into the log
+   * @param e the parse or content-type failure
    * @return {@code 400 Bad Request} with no body
    */
   @ExceptionHandler({
@@ -203,12 +144,8 @@ public class ClientErrorReportController {
   }
 
   /**
-   * Reduces a CSP violation's blocked URI to its origin ({@code scheme://host[:port]}) server-side,
-   * so a path, query or fragment naming a user, a search term or a token cannot reach the log even
-   * when the client half is bypassed (FE-SEC-04). A value that is not a hierarchical URL — the
-   * browser's keywords for inline code and eval, or a {@code data:} scheme — is cut at its first
-   * {@code :}, {@code /}, {@code ?} or {@code #}, which keeps the keyword and drops everything
-   * else. User info in an authority is dropped with the rest.
+   * Reduces a CSP violation's blocked URI to its origin ({@code scheme://host[:port]}); a
+   * non-hierarchical value is cut at its first {@code :}, {@code /}, {@code ?} or {@code #}.
    *
    * @param blocked the reported blocked URI, possibly {@code null}
    * @return the origin, the bare keyword or scheme, or {@code null} when {@code blocked} was {@code
@@ -241,10 +178,7 @@ public class ClientErrorReportController {
   }
 
   /**
-   * Returns {@code source} truncated at the first {@code ?} or {@code #}, so neither a query string
-   * nor a fragment can carry a token, a search term or any other request detail into the log. The
-   * client strips them too; this is the half that is actually a guarantee, because the client half
-   * can be bypassed by posting to the endpoint directly.
+   * Returns {@code source} truncated at the first {@code ?} or {@code #}.
    *
    * @param source the reported script URL, possibly {@code null}
    * @return the URL up to its first {@code ?} or {@code #}, or {@code null} when {@code source} was

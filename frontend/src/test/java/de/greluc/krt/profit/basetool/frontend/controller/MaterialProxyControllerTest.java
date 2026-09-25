@@ -36,17 +36,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Unit tests for {@link MaterialProxyController}. The controller is a thin frontend-side proxy that
- * forwards two read-only endpoints to the backend. The contract under test:
- *
- * <ol>
- *   <li>The downstream URI is composed exactly as documented (path-parameter interpolation,
- *       multi-value query parameters appended in order).
- *   <li>A {@code null} response from the backend is normalised to an empty list — never propagated
- *       to the caller — so that Thymeleaf rendering doesn't NPE.
- *   <li>The optional {@code starSystemNames} parameter is omitted when missing / empty, and
- *       otherwise appended as repeated query params (NOT comma-separated).
- * </ol>
+ * Unit tests for {@link MaterialProxyController}: the downstream URI is composed as documented, a
+ * {@code null} backend response becomes an empty list, and {@code starSystemNames} is omitted when
+ * empty and otherwise sent as repeated query parameters.
  */
 @ExtendWith(MockitoExtension.class)
 class MaterialProxyControllerTest {

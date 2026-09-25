@@ -57,12 +57,12 @@ public record OssComponent(
   /**
    * Copies both lists so the record stays immutable whatever the deserialiser handed in.
    *
-   * @param name see the record description
-   * @param version see the record description
-   * @param title see the record description
-   * @param url see the record description
-   * @param modules see the record description; {@code null} is read as empty
-   * @param licenses see the record description; {@code null} is read as empty
+   * @param name the library coordinate or the bundled asset's product name
+   * @param version the exact version shipped
+   * @param title the library's POM name or the asset's description, or {@code null}
+   * @param url the source repository or home page, or {@code null}
+   * @param modules the shipped modules carrying the component; {@code null} is read as empty
+   * @param licenses the licences the component is offered under; {@code null} is read as empty
    */
   public OssComponent {
     modules = modules == null ? List.of() : List.copyOf(modules);

@@ -49,17 +49,11 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Owns the mission "Ablauf" timeline: the ordered {@link MissionStep}s (procedure phases) and the
- * {@link MissionObjective}s (Ziele). Extracted from {@code MissionService} (L1 step 2, #920) so the
- * steps/objectives responsibility no longer shares that god-class's dependencies.
+ * Manages a mission's Ablauf timeline: its ordered {@link MissionStep}s and its {@link
+ * MissionObjective}s.
  *
- * <p>Both sub-aggregates are edited under their own fine-grained optimistic-lock section counters
- * ({@code stepsVersion} / {@code objectivesVersion}) through {@code MissionSectionVersions}, so an
- * edit here never 409s a concurrent core/schedule/flags/participant edit (REQ-ORG-018). {@code
- * MissionService} keeps its public step/objective methods as thin delegations to this service, so
- * the controller and transaction boundaries are unchanged. Each mutator bumps only its own section
- * counter and mutates managed children via dirty-checking (no bulk {@code clearAutomatically}
- * detach), preserving the no-double-{@code @Version}-bump invariant.
+ * <p>Steps and objectives each have their own section counter ({@code stepsVersion} / {@code
+ * objectivesVersion}), so edits here never collide with other mission sections (REQ-ORG-018).
  */
 @Service
 @RequiredArgsConstructor
@@ -78,10 +72,8 @@ public class MissionTimelineService {
   private final AuditService auditService;
 
   /**
-   * Appends a step to the mission's Ablauf timeline. The new step lands at the end ({@code
-   * orderIndex = max + 1}) and is initially not done. Validates and bumps the dedicated {@code
-   * stepsVersion} section counter so a concurrent step edit surfaces as a 409 while never colliding
-   * with a parallel core / schedule / flags edit.
+   * Appends an undone step to the end of the mission's Ablauf timeline and bumps {@code
+   * stepsVersion}.
    *
    * @param missionId the mission id
    * @param title the required step title
@@ -119,17 +111,13 @@ public class MissionTimelineService {
   }
 
   /**
-   * Creates a step (Ablauf-Schritt) as part of the mission's initial create — no optimistic-lock
-   * version check or bump, because the mission has just been persisted and has no concurrent editor
-   * yet. The caller assigns a contiguous {@code orderIndex} (0..n-1 in create order). Mirrors
-   * {@link #addStep} minus the section guard and runs inside the create transaction ({@code
-   * MANDATORY}). Records a {@code MISSION_STEP_ADDED} audit event carrying the step id only — never
-   * the title (user free text) — exactly like {@link #addStep}.
+   * Creates a step within the mission's create transaction, without a version check or bump, and
+   * records a {@code MISSION_STEP_ADDED} audit event.
    *
    * @param mission the managed, already-persisted mission to append the step to
    * @param title the required step title
    * @param meta the optional free-text time/place hint
-   * @param orderIndex the 0-based position to assign this step, in create order
+   * @param orderIndex the 0-based position to assign this step
    */
   @Transactional(propagation = Propagation.MANDATORY)
   public void addStepAtCreate(@NotNull Mission mission, String title, String meta, int orderIndex) {
@@ -211,15 +199,8 @@ public class MissionTimelineService {
   }
 
   /**
-   * Reorders the mission's Ablauf steps. {@code orderedStepIds} must be exactly the mission's step
-   * ids in the desired order; {@code orderIndex} is reassigned 0..n-1 by dirty-checking the managed
-   * children (no per-child save, no bulk {@code clearAutomatically} query — so no detach/merge
-   * double-version bump). Since #1147 the {@code stepsVersion} guard is DB-enforced: {@code
-   * enforceSectionVersion} runs an atomic conditional {@code UPDATE … WHERE stepsVersion = ?} that
-   * row-locks the mission, so concurrent reorders are genuinely serialised (the loser blocks,
-   * re-reads the bumped counter and 409s) — making a pessimistic lock unnecessary — and the
-   * deferrable unique {@code (mission_id, order_index)} index (V208) backstops any duplicate
-   * ordinal. Records a single reorder event (count only, no titles).
+   * Reorders the mission's Ablauf steps, reassigning {@code orderIndex} 0..n-1 under the atomically
+   * enforced {@code stepsVersion} guard, and records one reorder event.
    *
    * @throws IllegalArgumentException when the id set does not match the mission's steps exactly
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code
@@ -258,9 +239,7 @@ public class MissionTimelineService {
   }
 
   /**
-   * Toggles a step's shared {@code done} flag to the requested state and bumps {@code
-   * stepsVersion}. The single "current phase" (first not-done step) is derived on read, never
-   * stored.
+   * Sets a step's {@code done} flag and bumps {@code stepsVersion}.
    *
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the step is not
    *     a child of the mission
@@ -321,10 +300,8 @@ public class MissionTimelineService {
   }
 
   /**
-   * Appends a goal (Ziel) to a mission at the end of the list (next {@code orderIndex}) and bumps
-   * {@code objectivesVersion}. Guarded by the dedicated goals-section counter so editing the goals
-   * never collides with a concurrent core / schedule / flags / Ablauf edit. Records an audit event
-   * carrying the goal id and kind only — never the title (user free text).
+   * Appends a goal (Ziel) to the end of the mission's goal list, bumps {@code objectivesVersion}
+   * and records an audit event without the title.
    *
    * @param missionId the mission id
    * @param title the required goal text
@@ -368,17 +345,13 @@ public class MissionTimelineService {
   }
 
   /**
-   * Creates a goal (Ziel) as part of the mission's initial create — no optimistic-lock version
-   * check or bump, because the mission has just been persisted and has no concurrent editor yet.
-   * The caller assigns a contiguous {@code orderIndex} (0..n-1 in create order). Mirrors {@link
-   * #addObjective} minus the section guard and runs inside the create transaction ({@code
-   * MANDATORY}). Records a {@code MISSION_OBJECTIVE_ADDED} audit event carrying the goal id and
-   * kind only — never the title (user free text) — exactly like {@link #addObjective}.
+   * Creates a goal within the mission's create transaction, without a version check or bump, and
+   * records a {@code MISSION_OBJECTIVE_ADDED} audit event.
    *
    * @param mission the managed, already-persisted mission to append the goal to
    * @param title the required goal text
    * @param kind the classification (primary / secondary / non-goal)
-   * @param orderIndex the 0-based position to assign this goal, in create order
+   * @param orderIndex the 0-based position to assign this goal
    */
   @Transactional(propagation = Propagation.MANDATORY)
   public void addObjectiveAtCreate(
@@ -468,15 +441,8 @@ public class MissionTimelineService {
   }
 
   /**
-   * Reorders the mission's goals. {@code orderedObjectiveIds} must be exactly the mission's goal
-   * ids in the desired order; {@code orderIndex} is reassigned 0..n-1 by dirty-checking the managed
-   * children (no per-child save, no bulk {@code clearAutomatically} query — so no detach/merge
-   * double-version bump). Since #1147 the {@code objectivesVersion} guard is DB-enforced: {@code
-   * enforceSectionVersion} runs an atomic conditional {@code UPDATE … WHERE objectivesVersion = ?}
-   * that row-locks the mission, so concurrent reorders are genuinely serialised (the loser blocks,
-   * re-reads the bumped counter and 409s) — making a pessimistic lock unnecessary — and the
-   * deferrable unique {@code (mission_id, order_index)} index (V208) backstops any duplicate
-   * ordinal. Records a single reorder event (count only).
+   * Reorders the mission's goals, reassigning {@code orderIndex} 0..n-1 under the atomically
+   * enforced {@code objectivesVersion} guard, and records one reorder event.
    *
    * @throws IllegalArgumentException when the id set does not match the mission's goals exactly
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code

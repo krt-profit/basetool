@@ -77,32 +77,16 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 /**
- * Pure-Mockito unit tests for {@link JobOrderController} — no Spring context and no Docker
- * dependency, so they pin the controller-edge contracts in isolation.
- *
- * <p>Four non-pass-through behaviours need explicit coverage because regressing them is silent at
- * the type level:
+ * Pure-Mockito unit tests for {@link JobOrderController}.
  *
  * <ul>
- *   <li>{@link JobOrderController#addAssignee} / {@link JobOrderController#removeAssignee} resolve
- *       the self-vs-logistician decision at the HTTP boundary via {@code
- *       authHelperService.isLogisticianOrAbove()}. Self-assignment must always work; assigning a
- *       different user requires LOGISTICIAN-or-above (or higher via role hierarchy). The 403 path
- *       is the spot where moving the check into the service would break the ArchUnit rule.
- *   <li>{@link JobOrderController#downloadHandoverReport} parses the optional {@code
- *       X-User-Time-Zone} header. An invalid IANA zone is silently dropped (and the service falls
- *       back to UTC) — never propagated as a {@code DateTimeException} to the caller. The
- *       PDF/Content-Disposition headers are also pinned because they are the entire response
- *       contract for the download endpoint.
- *   <li>{@link JobOrderController#getAllJobOrders} accepts an explicit status filter list; the
- *       service receives it verbatim and the {@code PageResponse} envelope carries the sort tokens
- *       through {@code PaginationUtil.toSortStrings}. Default-empty filter must reach the service
- *       as {@code null}, not an empty list, otherwise the SQL {@code IN ()} clause yields no rows
- *       and the queue page would always be empty.
- *   <li>{@link JobOrderController#createJobOrder} is annotated {@code permitAll()}; the controller
- *       method itself must never consult the JWT helper or the authHelperService — that decision is
- *       intentional so that an unauthenticated squadron member can file a request via the public
- *       form.
+ *   <li>{@link JobOrderController#addAssignee} / {@link JobOrderController#removeAssignee}: self
+ *       assignment always works, assigning others needs LOGISTICIAN or above.
+ *   <li>{@link JobOrderController#downloadHandoverReport}: an invalid {@code X-User-Time-Zone} is
+ *       dropped, and the PDF headers are pinned.
+ *   <li>{@link JobOrderController#getAllJobOrders}: an empty status filter reaches the service as
+ *       {@code null}, and sort tokens pass through.
+ *   <li>{@link JobOrderController#createJobOrder}: never consults the JWT or role helpers.
  * </ul>
  */
 @ExtendWith(MockitoExtension.class)

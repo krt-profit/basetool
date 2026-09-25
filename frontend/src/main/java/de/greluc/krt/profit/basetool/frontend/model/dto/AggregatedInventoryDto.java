@@ -20,12 +20,11 @@
 package de.greluc.krt.profit.basetool.frontend.model.dto;
 
 /**
- * Frontend mirror of the backend {@code AggregatedInventoryDto} (per the {@code
- * feedback_backend_frontend_dto_mirror} memory): the per-catalog-entry Lager overview row — {@code
- * quality} is the amount-weighted average, {@code maxQuality} the highest available quality, {@code
- * amount} the total stock. Catalog-discriminated since V220 (REQ-INV-029): a material row carries
- * {@code material} with the quality figures, a game-item row carries {@code gameItem} with {@code
- * null} quality columns.
+ * Frontend mirror of the backend {@code AggregatedInventoryDto}: one Lager overview row per catalog
+ * entry with total {@code amount}, amount-weighted {@code quality} and {@code maxQuality}.
+ *
+ * <p>A material row carries {@code material} and the quality figures; a game-item row carries
+ * {@code gameItem} and {@code null} quality columns (REQ-INV-029).
  */
 public record AggregatedInventoryDto(
     MaterialDto material,

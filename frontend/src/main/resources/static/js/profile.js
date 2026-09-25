@@ -17,19 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * Profile page module, extracted verbatim from the former inline script of profile.html
- * (ADR-0069, follow-up to #924). One IIFE.
- *
- * Binds the three in-place profile forms (description/display-name, payout preference, global
- * blueprint sharing) to save through krtFetch without reloading and, on success, syncs every
- * hidden version input across the forms (they share one user-row @Version) so the next save
- * from either form does not 409.
- *
- * The Thymeleaf-interpolated toast/conflict labels (window.krtProfileI18n) stay inline in the
- * page bootstrap this module reads.
- */
-
 (function () {
     'use strict';
     if (!window.krtFetch) {
@@ -37,8 +24,6 @@
     }
     const i18n = window.krtProfileI18n;
 
-    // The description form and the payout-preference form share ONE user-row version; sync
-    // every hidden version input on success so the next save (from either form) does not 409.
     function syncAllVersions(version) {
         if (version == null) {
             return;
@@ -100,23 +85,8 @@
         };
     });
 
-    // ---------------------------------------------------------------- Art. 17 erasure request
-    //
-    // The member raises or withdraws a deletion request (REQ-SEC-061). Both writes go through
-    // krtFetch and are followed by a server-rendered fragment swap of the card, so the three
-    // states -- no request / pending / declined-with-reason -- stay decided in ONE place. Nothing
-    // here rebuilds the card in JavaScript: a client-side second opinion on which state to show is
-    // exactly how a swapped card comes to disagree with a freshly loaded page.
-    //
-    // No optimistic-lock version is echoed. The writes are not edits of a row the member is
-    // looking at: raising is idempotent (a partial unique index decides, not a version), and
-    // withdrawing is a state transition guarded by the status itself.
-
     const DELETION_URL = '/profile/deletion-request';
 
-    // Reloads the card fragment in place. Nothing needs rebinding afterwards: the modal trigger
-    // inside the card is a `data-trigger` handled by the document-level delegation in
-    // event-delegation.js, and the withdraw button is delegated on the host below.
     function refreshDeletionCard() {
         if (!window.krtFetch.swap) {
             return undefined;
@@ -129,8 +99,6 @@
         });
     }
 
-    // The submit button lives in the modal, which sits OUTSIDE the swapped host, so one direct
-    // binding survives every swap.
     const deletionSubmit = document.getElementById('profile-deletion-submit');
     if (deletionSubmit) {
         deletionSubmit.addEventListener('click', function () {
@@ -143,12 +111,6 @@
                 successMessage: i18n.deletionRequested,
                 errorMessage: i18n.deletionError,
                 onSuccess() {
-                    // The documented close is the two classes, not an inline style: an inline
-                    // display:none wins over any stylesheet rule and leaves the overlay in a state
-                    // the shared open/close contract does not describe. It happens to reopen today
-                    // only because `open-modal-display` clears the inline style first -- a
-                    // dependency on the order of two unrelated pieces of code, which is the shape
-                    // of a latent defect rather than a working design.
                     window.krtModal.close('profile-deletion-modal');
                     if (eraseHistory) {
                         eraseHistory.checked = false;
@@ -159,9 +121,6 @@
         });
     }
 
-    // The withdraw button lives INSIDE the swapped fragment, so it is bound by delegation on the
-    // host rather than by id: a direct listener would be lost with the element it was attached to
-    // the first time the card is swapped.
     const deletionHost = document.getElementById('profile-deletion-host');
     if (deletionHost) {
         deletionHost.addEventListener('click', function (event) {

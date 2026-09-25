@@ -46,18 +46,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 
 /**
- * Mockito unit tests for the org-tenancy scope-resolution behaviour of {@link RequestScopeResolver}
- * that its collaborators only ever stub out and never assert: the SQUADRON-scope <em>set</em> that
- * filters the admin user-list / search / typeahead / promotion Bewertungsmatrix ({@link
- * RequestScopeResolver#currentUserListScopeSquadronIds()}) and the whole-Bereich cascade membership
- * probe backing the bank {@code AREA_MEMBERS} view grant ({@link
- * RequestScopeResolver#currentUserIsMemberOfAreaCascade(UUID)}).
- *
- * <p>The resolver is instantiated directly with mocked collaborators — the same construction the
- * {@code OwnerScopeService} facade wires internally — so the request-scoped resolution is exercised
- * against the real production logic rather than through a stubbed facade method. The mocked {@code
- * HttpServletRequest} returns {@code null} for every attribute, so the per-request memoisation is a
- * no-op and each scenario re-runs the underlying reads deterministically.
+ * Unit tests for {@link RequestScopeResolver#currentUserListScopeSquadronIds()} and {@link
+ * RequestScopeResolver#currentUserIsMemberOfAreaCascade(UUID)}, using a resolver built from mocks
+ * with request memoisation disabled.
  */
 @ExtendWith(MockitoExtension.class)
 class RequestScopeResolverScopeTest {

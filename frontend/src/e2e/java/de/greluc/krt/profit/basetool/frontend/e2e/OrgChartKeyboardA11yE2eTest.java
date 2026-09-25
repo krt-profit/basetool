@@ -36,28 +36,16 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Interactive accessibility flows for the org chart ({@code /org-chart}, REQ-ORG-013). The static
- * ARIA scaffolding (tree/group/treeitem roles, {@code aria-level}s, the {@code aria-pressed} edit
- * toggle, the edit-mode hint) is pinned by the template-render unit test {@code
- * OrgChartPageRenderTest}; this suite covers the parts that only exist at runtime in the page's
- * inline JavaScript and so cannot be asserted on rendered HTML:
+ * Runtime accessibility flows of the org chart ({@code /org-chart}, REQ-ORG-013):
  *
  * <ol>
- *   <li>the roving tabindex — exactly one treeitem is tabbable at a time — and arrow-key / Home /
- *       End focus movement through the tree;
- *   <li>the editor dialog's focus trap (Tab / Shift+Tab cycle within {@code .krt-modal}), its
- *       Esc-to-close, the focus return to the triggering control, and the {@code inert} + {@code
- *       aria-hidden} page chrome while it is open;
- *   <li>the preservation of the chart's horizontal scroll position across the full-page reload that
- *       a successful edit performs (no snap back to the top-left).
+ *   <li>the roving tabindex and arrow / Home / End focus movement;
+ *   <li>the editor dialog's focus trap, Esc-to-close, focus return and {@code inert} page chrome;
+ *   <li>the horizontal scroll position surviving a successful edit.
  * </ol>
  *
- * <p>Driven as the seeded ADMIN user ({@code test-admin}) so the inline editor affordances render.
- * The chart is descriptive and not org-unit-scoped, so — unlike the Mission / Job-Order flows — the
- * user needs no OrgUnit membership; {@link E2eStackExtension}'s bootstrap opt-in of the IRIDIUM
- * Squadron is enough to render a non-empty, editable chart. Tagged {@code @Tag("e2e")} (not {@code
- * smoke}): the scroll-preservation case creates throwaway Kommando rows, so it must run only
- * against the ephemeral, disposable stack — never a shared staging deployment.
+ * <p>Runs as {@code test-admin}; the scroll case creates Kommando rows, so it runs only against the
+ * ephemeral stack.
  */
 @Tag("e2e")
 class OrgChartKeyboardA11yE2eTest {
@@ -205,18 +193,11 @@ class OrgChartKeyboardA11yE2eTest {
 
   /**
    * Verifies that a successful edit keeps the chart's horizontal scroll position across the
-   * post-save in-place refresh. On a narrow viewport the chart is first widened with a few
-   * leaderless Kommando columns until it scrolls horizontally; the rightmost Kommando is then
-   * renamed with the chart scrolled fully to the right. After the refresh the restored {@code
-   * scrollLeft} must match that pre-save value, not snap back to zero.
+   * in-place refresh.
    *
-   * <p>The rename is deliberate on two counts. First, the editor re-focuses the triggering control
-   * on close — and a {@code focus()} scrolls that control into view, which would itself reset the
-   * scroll if the trigger were off-screen; driving the <em>rightmost</em> control with the chart
-   * scrolled fully right keeps that control visible, so the focus moves nothing and the saved
-   * scroll is the value under test. Second, a rename leaves the chart width unchanged, so the
-   * scroll range is identical before and after the refresh and the restored offset must match
-   * exactly.
+   * <p>Widens the chart with leaderless Kommandos, scrolls fully right and renames the rightmost
+   * Kommando, so neither the re-focus nor a width change moves the scroll; the restored {@code
+   * scrollLeft} must match exactly.
    */
   @Test
   void successfulEditPreservesHorizontalScrollPosition() {
@@ -278,10 +259,7 @@ class OrgChartKeyboardA11yE2eTest {
   }
 
   /**
-   * Turns the inline editor on (idempotently), so the dashed add affordances and the per-node
-   * action controls become visible. Edit mode survives an in-place chart refresh (the {@code
-   * editing} class lives on the stable {@code #oc-chart} container), so the guard is really for the
-   * initial page load, where the toggle starts off; calling it after a refresh is a harmless no-op.
+   * Turns the inline editor on, idempotently, so the add and per-node controls become visible.
    *
    * @param page the page showing the org chart
    */
@@ -295,10 +273,8 @@ class OrgChartKeyboardA11yE2eTest {
   }
 
   /**
-   * Creates a single leaderless Kommando(gruppe) on the first Staffel through the inline editor and
-   * blocks until the post-save in-place chart refresh has settled. Used only to widen the chart for
-   * the scroll-preservation assertion; the holder is intentionally left empty (a {@code
-   * COMMAND_LEAD} is the one rank that may be created vacant).
+   * Creates a leaderless Kommando(gruppe) on the first Staffel through the inline editor and waits
+   * for the in-place refresh; used to widen the chart.
    *
    * @param page the page showing the org chart
    * @param name the Kommando name to enter
@@ -312,13 +288,8 @@ class OrgChartKeyboardA11yE2eTest {
   }
 
   /**
-   * Clicks a control that triggers the editor's "save then in-place refresh" path and blocks until
-   * the refresh has committed. A successful edit no longer reloads the page: it re-renders the
-   * whole tree via {@code krtFetch.swap(?fragment=chartBody)} into the stable {@code #oc-chart}
-   * container (epic #571 / REQ-FE-005), which dispatches a {@code krt:swapped} event on {@code
-   * document} once the new subtree is in the DOM. A one-shot listener scoped to {@code #oc-chart}
-   * flips a sentinel on exactly that commit, so waiting for the sentinel proves the fresh tree is
-   * in place before the caller inspects anything.
+   * Clicks a control that saves and refreshes the chart in place, and waits for the {@code
+   * krt:swapped} event on {@code #oc-chart} (REQ-FE-005).
    *
    * @param page the page that hosts the chart
    * @param submit the submit control to click

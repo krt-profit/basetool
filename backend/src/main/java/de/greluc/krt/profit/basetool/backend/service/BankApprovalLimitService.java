@@ -43,26 +43,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Read-side helper for the per-account approval limits (REQ-BANK-041): it owns the tier dimensions
- * (which role buckets a limit may address per account type) and assembles the {@link
- * BankApprovalLimitsDto} shown on both account-detail surfaces. Deliberately org-unit-blind (it
- * consults only the limit rows and user names, never {@code OwnerScopeService}) so the bank-staff
- * {@code BankAccountService} may reuse it; the org-unit-aware decisions (who may edit, a
- * requester's applicable limit, the actual set/clear writes) live in the {@code
- * OrgUnitBankAccessService} seam.
+ * Read-side helper for per-account approval limits (REQ-BANK-041): defines which role buckets a
+ * limit may address per account type and assembles the {@link BankApprovalLimitsDto}.
  *
- * <p>Limits apply only to the request-capable account types {@code ORG_UNIT} / {@code AREA} /
- * {@code CARTEL} (REQ-BANK-039/-040); their role buckets mirror the account's configurable
- * visibility buckets (squadron sub-ranks / Bereich ranks), plus the all-members tier and individual
- * users.
- *
- * <p>The grantee-kind dimension (table {@code bank_account_approval_limit}) is the same four-kind
- * enum as the visibility-grant model on purpose, so the two tables stay structurally identical. One
- * kind, {@code GLOBAL_ROLE}, is therefore present in the schema and the switches but is never
- * produced for limits by design: it is the SPECIAL-account role bucket, and SPECIAL accounts (being
- * non-request-capable) carry no limits. The tier is kept rather than dropped to preserve the 1:1
- * mirror with the visibility model and to make a future "wire SPECIAL accounts into limits" a
- * purely additive change (REQ-BANK-041).
+ * <p>Org-unit-blind, so the bank-staff services may reuse it; limits apply only to {@code
+ * ORG_UNIT}, {@code AREA} and {@code CARTEL} accounts.
  */
 @Service
 @RequiredArgsConstructor
@@ -84,12 +69,11 @@ public class BankApprovalLimitService {
   private final UserRepository userRepository;
 
   /**
-   * {@code true} iff the account type carries approval limits at all — the request-capable types
-   * {@code ORG_UNIT} / {@code AREA} / {@code CARTEL} (REQ-BANK-039/-040). Sonderkonten and the
-   * bank-operating account never receive booking requests, so no limit applies.
+   * Returns whether the account type carries approval limits: the request-capable types {@code
+   * ORG_UNIT}, {@code AREA} and {@code CARTEL} (REQ-BANK-039/-040).
    *
    * @param type the account type
-   * @return whether approval limits may be configured for this type
+   * @return whether approval limits may be configured
    */
   public static boolean configurable(@NotNull BankAccountType type) {
     return type == BankAccountType.ORG_UNIT
@@ -98,23 +82,19 @@ public class BankApprovalLimitService {
   }
 
   /**
-   * {@code true} iff the account type carries <em>per-audience</em> approval limits (the tiered
-   * editor with role/all-members/area-members/user ceilings): the {@code ORG_UNIT} and {@code AREA}
-   * accounts only. The KRT account ({@code CARTEL}) is request-capable ({@link #configurable}) but
-   * is <em>not</em> per-audience-configurable — it uses the amount-tiered approval ladder managed
-   * in the Verwaltung tab instead (REQ-BANK-047), which replaces the per-audience limits on it.
+   * Returns whether the account type carries per-audience approval limits: {@code ORG_UNIT} and
+   * {@code AREA} only; the KRT account uses its approval ladder instead (REQ-BANK-047).
    *
    * @param type the account type
-   * @return whether the per-audience limit editor applies to this type
+   * @return whether the per-audience limit editor applies
    */
   public static boolean audienceLimitsSupported(@NotNull BankAccountType type) {
     return type == BankAccountType.ORG_UNIT || type == BankAccountType.AREA;
   }
 
   /**
-   * {@code true} iff the account has an all-members limit tier — the per-audience-configurable
-   * types ({@link #audienceLimitsSupported}): every member of the owning org unit who may view the
-   * account may request, so capping that audience is meaningful.
+   * Returns whether the account has an all-members limit tier, which is the case exactly for the
+   * types of {@link #audienceLimitsSupported}.
    *
    * @param type the account type
    * @return whether the all-members limit tier applies
@@ -124,9 +104,8 @@ public class BankApprovalLimitService {
   }
 
   /**
-   * {@code true} iff the account has a "Mitglieder des Bereichs" cascade limit tier — only the
-   * {@code AREA} (Bereichskonto) accounts (REQ-BANK-048). The whole-area audience is meaningless
-   * for a Staffel/SK account (no cascade) and the KRT account (no per-audience limits).
+   * Returns whether the account has a "Mitglieder des Bereichs" limit tier, which only {@code AREA}
+   * accounts have (REQ-BANK-048).
    *
    * @param type the account type
    * @return whether the area-members limit tier applies
@@ -160,12 +139,11 @@ public class BankApprovalLimitService {
   }
 
   /**
-   * Assembles the approval-limit view of one account for an account-detail surface (REQ-BANK-041):
-   * the configured per-tier ceilings (role buckets, all-members, individual users with resolved
-   * names), the addressable role buckets and whether the calling surface may edit.
+   * Assembles the approval-limit view of one account (REQ-BANK-041): configured ceilings per tier,
+   * addressable role buckets and the edit flag.
    *
    * @param account the account
-   * @param canEdit whether the calling surface may set/clear limits (computed by the caller)
+   * @param canEdit whether the calling surface may set or clear limits
    * @return the approval-limit DTO
    */
   @NotNull

@@ -43,35 +43,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Functional flow for the Herstellung (production booking) feature of ITEM job orders
- * (REQ-ORDERS-025): a logistician records how many ordered units were manufactured, and the booking
- * consumes the exact linked inventory the recipe needs. Delivery is gated by manufacture — a fresh
- * item order (manufactured = 0) offers no item-handover control until production is booked.
+ * E2E flow for production booking (Herstellung) on ITEM job orders (REQ-ORDERS-025).
  *
- * <p>The fixture creates a one-unit order of the bootstrap-seeded orderable widget (its blueprint
- * derives a single RESOURCE material at 1.0 SCU/unit), then links one inventory entry of that exact
- * recipe material to the order over the API. The flow then drives the real production modal from
- * the "Bestellte Items" tab (the production surface folds into it): it enters an amount, allocates
- * the required demand from the linked stock entry, and books once the reconcile chip reports full
- * coverage.
- *
- * <p>Since REQ-INV-032 the production modal additionally carries a REQUIRED book-in section: the
- * produced units land as game-item Lager stock at a chosen location, so the flow picks the location
- * combobox (the reconcile gate holds the book button until one is chosen) and afterwards proves the
- * booked-in stock end-to-end — the item-stock total of the produced game item grows by exactly the
- * manufactured unit (read through the same grouped {@code catalog=ITEM} API the item view uses),
- * and the produced widget is visible on {@code /inventory/all?view=items} with its name and
- * whole-unit amount.
- *
- * <p>Six things are asserted end-to-end: before production the item-handover control is absent
- * (delivery gated); the booking succeeds through the UI; afterwards the persisted {@code
- * manufacturedAmount} is 1 (read back through the backend) and the item-handover control has
- * appeared (delivery unlocked); the produced stock is visible in the shared Lager's item view
- * (REQ-INV-032); since the book-in auto-earmarks the produced unit to the order, the order detail's
- * "Bestellte Items" tab shows the earmarked stock inline in the item's expand row (REQ-ORDERS-028);
- * and marking it delivered on the item-collection page persists the per-(entry, order) delivered
- * marker (REQ-ORDERS-030/031). The actor is {@code test-admin}, which satisfies the production role
- * gate through the role hierarchy and is an IRIDIUM member (the order's responsible unit).
+ * <p>Asserts that delivery is gated until production is booked, that booking through the modal
+ * consumes the linked stock and books the produced unit into the Lager (REQ-INV-032), that the
+ * earmarked stock shows on the order's "Bestellte Items" tab (REQ-ORDERS-028), and that marking it
+ * delivered persists (REQ-ORDERS-030/031). Runs as {@code test-admin}.
  */
 @Tag("e2e")
 class JobOrderProductionE2eTest {
@@ -111,13 +88,9 @@ class JobOrderProductionE2eTest {
   }
 
   /**
-   * Creates a one-unit item order, verifies delivery is gated pre-production, books the manufacture
-   * of the single unit through the production modal (consuming the linked stock and booking the
-   * produced unit in, REQ-INV-032), and asserts the persisted manufactured amount, the now-unlocked
-   * item-handover control, and the produced item stock — grown by exactly one unit and visible on
-   * the shared Lager's item view. Finally it asserts the order-detail "Bestellte Items" tab shows
-   * the auto-earmarked stock inline in the item's expand row (REQ-ORDERS-028), and marking it
-   * delivered on the item-collection page persists the marker (REQ-ORDERS-030/031).
+   * Books production of a one-unit item order and asserts the gated-then-unlocked delivery control,
+   * the persisted manufactured amount, the booked-in item stock, the earmarked stock on the order
+   * detail, and the persisted delivered marker.
    */
   @Test
   void booksProductionConsumingLinkedStockAndUnlocksDelivery() {

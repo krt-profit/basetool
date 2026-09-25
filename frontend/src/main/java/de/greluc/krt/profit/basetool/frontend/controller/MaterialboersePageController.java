@@ -55,15 +55,9 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.util.UriComponentsBuilder;
 
 /**
- * Spring MVC controller for the Materialbörse page ({@code /materialboerse}, Flotte &amp; Logistik,
- * REQ-MARKET-001…). Renders the master-detail board (lean list left, full offer right) server-side
- * and proxies the release / remark / deactivate / interest writes to the backend, relaying any
- * RFC-7807 failure as its original status + a slim {@code {code, detail}} body so the page JS can
- * toast the localised message and recognise {@code OPTIMISTIC_LOCK}.
- *
- * <p>The board renders through {@code krtFetch} fragment swaps: a tab / filter / sort change
- * re-swaps the whole {@code board} region, a master-row select re-swaps only the {@code detail}
- * pane (REQ-FE-005/013). The whole surface is gated on {@code KRT_MEMBER} (decision D2).
+ * Controller for the Materialbörse page ({@code /materialboerse}): renders the master-detail board
+ * and proxies the release, remark, deactivate and interest writes, relaying backend failures as
+ * status plus {@code {code, detail}}. Gated on {@code KRT_MEMBER}.
  */
 @Controller
 @UsesLayoutModel
@@ -115,10 +109,8 @@ public class MaterialboersePageController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Renders the Materialbörse page, or just its {@code board} region / {@code detail} pane for an
-   * in-place swap. The board carries two modes — offers (Angebote) and requests (Gesuche) —
-   * selected by {@code mode}; both count pairs are always loaded so the shared four-tab bar stays
-   * accurate regardless of the active mode.
+   * Renders the Materialbörse page, or only its {@code board}, {@code list} or {@code detail}
+   * region for an in-place swap. The counts of both modes are always loaded for the tab bar.
    *
    * @param mode {@code "requests"} for the Gesuche board, anything else for the Angebote board.
    * @param tab {@code "mein"} for "Meine …", else "Alle …".
@@ -215,7 +207,7 @@ public class MaterialboersePageController {
   }
 
   /**
-   * Lists a craftable item on the board ("Item anbieten", #1185).
+   * Lists a craftable item on the board.
    *
    * @param body the {@code {productKey, quantity, remark}} payload.
    * @return the backend result, or its error status + body.
@@ -229,9 +221,8 @@ public class MaterialboersePageController {
   }
 
   /**
-   * Returns craftable items (blueprint products) matching a name fragment, for the "Item anbieten"
-   * type-ahead — a member-gated proxy over the backend blueprint-product search (only items an
-   * active blueprint produces, #1185).
+   * Returns blueprint-producible items matching a name fragment, for the "Item anbieten"
+   * type-ahead.
    *
    * @param q a product-name fragment, or {@code null} for the first products.
    * @return the matching products, or the backend error status + body.
@@ -354,10 +345,8 @@ public class MaterialboersePageController {
   }
 
   /**
-   * Maps the caller-supplied release-picker kind to one of the two known, constant enum tokens,
-   * dropping anything else. Returning a compile-time literal (never the request value) is a strict
-   * allow-list: an unexpected value yields {@code null} (the picker then lists both kinds) instead
-   * of being reflected into the backend URI.
+   * Maps the release-picker kind to the constant {@code "MATERIAL"} or {@code "ITEM"}, dropping any
+   * other value.
    *
    * @param kind the raw request value, or {@code null}.
    * @return the literal {@code "MATERIAL"} or {@code "ITEM"}, or {@code null} for anything else.
@@ -465,9 +454,8 @@ public class MaterialboersePageController {
   }
 
   /**
-   * Returns catalogue materials matching a name fragment, for the "Material suchen" type-ahead — a
-   * member-gated proxy over the backend material search. Unlike the offer picker (the caller's own
-   * Lager rows), a request picks from the whole material catalogue.
+   * Returns catalogue materials matching a name fragment, for the "Material suchen" type-ahead of a
+   * request.
    *
    * @param q a material-name fragment, or {@code null} for the first materials.
    * @return the matching materials page (raw), or the backend error status + body.
@@ -670,19 +658,8 @@ public class MaterialboersePageController {
   }
 
   /**
-   * Runs an authenticated backend GET whose query string carries an optional free-text {@code q}
-   * fragment, encoding {@code q} <em>exactly once</em> across the frontend&rarr;backend hop. The
-   * caller pre-sets every non-free-text (safe) parameter on {@code uri}; this method appends the
-   * {@code q} fragment as a WebClient URI-template variable ({@code q={q}}) rather than into the
-   * pre-encoded {@link UriComponentsBuilder#toUriString()} output.
-   *
-   * <p>The distinction matters because {@code toUriString()} already percent-encodes its query
-   * values and the WebClient then encodes the resulting string a second time: a space in a
-   * multi-word term becomes {@code %2520} instead of {@code %20}, so the backend
-   * {@code @RequestParam} decodes a literal {@code %20}-laden string that matches nothing (the
-   * {@code MaterialboardItemStockOfferE2eTest} "E2E Boerse Item Stock Widget" release-picker search
-   * returned zero rows). Passing {@code q} as a URI variable lets the WebClient encode it once, per
-   * RFC 3986 — the #371 frontend&rarr;backend re-encoding contract (REQ-MARKET-002/014).
+   * Runs an authenticated backend GET, appending the free-text {@code q} as a URI-template variable
+   * so it is encoded exactly once (REQ-MARKET-002/014).
    *
    * @param uri the pre-built URI (path plus every safe, non-free-text query parameter).
    * @param q the free-text search fragment, or {@code null}/blank for no filter.

@@ -48,14 +48,9 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Domain service for {@link MemberEvaluation}.
  *
- * <p>Data isolation: read operations for personal views are filtered by {@code userId} (JWT sub).
- * Write operations (assign/update level) are restricted to ADMIN and OFFICER callers, with two
- * squadron-scope guards that BOTH must pass for a non-admin: an Officer of squadron X may only
- * manage evaluations whose category belongs to a topic owned by squadron X ({@link
- * #assertCallerMayEditCategory}) AND whose evaluated member belongs to squadron X ({@link
- * #assertCallerMayEvaluateUser} — the target-member scope check added by the gap-fill security
- * audit; without it an officer could write a foreign-squadron member's evaluation row). Admins span
- * every squadron unless they have focused the sidebar switcher.
+ * <p>Writes are limited to ADMIN and OFFICER; a non-admin must pass both {@link
+ * #assertCallerMayEditCategory} and {@link #assertCallerMayEvaluateUser}. Personal reads are
+ * filtered by the caller's user id.
  */
 @Service
 @RequiredArgsConstructor
@@ -180,9 +175,8 @@ public class MemberEvaluationService {
   }
 
   /**
-   * Builds the non-personal audit subject label for an evaluation: the graded category, prefixed
-   * with its topic name when available (e.g. {@code "Grundlagen / Teamplay"}). Carries no member
-   * handle — the affected member is recorded separately as the audit target reference.
+   * Builds the non-personal audit label for an evaluation: {@code topic / category}, without any
+   * member handle.
    *
    * @param category the graded category, or {@code null}
    * @return the {@code topic / category} label, or {@code "—"} when no category is present
@@ -208,19 +202,8 @@ public class MemberEvaluationService {
   }
 
   /**
-   * Security audit (gap-fill): asserts the caller may evaluate the <em>member being evaluated</em>,
-   * not just the category. {@link #assertCallerMayEditCategory} validates only the category's
-   * owning squadron, so without this an OFFICER of squadron X could create/overwrite/delete an
-   * evaluation row for a member of squadron Y as long as the category belongs to X (a cross-tenant
-   * write of member-evaluation data). Admins span every squadron and short-circuit; otherwise at
-   * least one of the target member's Staffeln must be within the caller's editable scope ({@link
-   * OwnerScopeService#canEditSquadron(UUID)}), mirroring the officer-scope rule the rest of the
-   * promotion area enforces. Fails closed when the user id is malformed or the member has no
-   * Staffel the caller can edit.
-   *
-   * <p>REQ-ORG-017: the target may now hold up to two Staffeln, so the gate ORs across ALL of them
-   * — the caller may evaluate the member as soon as it can edit ANY one of the member's Staffeln,
-   * so a shared second Staffel is honoured rather than silently dropped.
+   * Asserts that the caller may evaluate the given member: admins pass, others must be able to edit
+   * at least one of the member's Staffeln (REQ-ORG-017). Fails closed on a malformed id.
    *
    * @param userId the {@code app_user.id} of the member being evaluated; never {@code null}.
    */

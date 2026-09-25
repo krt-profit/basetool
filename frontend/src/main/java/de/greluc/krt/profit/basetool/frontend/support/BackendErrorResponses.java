@@ -28,30 +28,17 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 /**
- * Shared relay of a backend {@link BackendServiceException} back to the browser as {@code
- * application/problem+json}, replacing the byte-for-byte-identical {@code propagateBackendError}
- * method that the in-place-AJAX page controllers each carried privately.
- *
- * <p>The emitted body preserves the backend's stable {@code code} (e.g. {@code OPTIMISTIC_LOCK})
- * and status plus, when present, the problem {@code detail} and the {@code correlationId}, so the
- * shared client-side {@code krtFetch} branches on the conflict semantics exactly as it did before.
- *
- * <p>{@link #relay(Logger, String, BackendCall)} wraps the whole {@code try}/{@code catch} that
- * surrounds an AJAX handler's backend call, collapsing the boilerplate the {@code @ResponseBody}
- * write handlers each repeated: run the call, relay a {@link BackendServiceException} as {@code
- * problem+json} (preserving the {@code krtFetch} conflict semantics), and turn any other failure
- * into an empty {@code 500}.
+ * Relays a backend {@link BackendServiceException} to the browser as {@code
+ * application/problem+json}, preserving the backend's status, stable {@code code}, and when present
+ * {@code detail} and {@code correlationId}, for {@code krtFetch}.
  */
 public final class BackendErrorResponses {
 
   private BackendErrorResponses() {}
 
   /**
-   * The backend-touching body of an AJAX write handler: it performs the {@code backendApiClient}
-   * call and builds the success {@link ResponseEntity}. It may fail with a {@link
-   * BackendServiceException} (relayed as {@code problem+json}) or any other runtime exception
-   * (turned into a {@code 500}); no checked exception is declared because the WebClient wrapper
-   * throws only unchecked failures.
+   * The backend call and success-response build of an AJAX write handler, run by {@link #relay}; it
+   * throws only unchecked exceptions.
    */
   @FunctionalInterface
   public interface BackendCall {
@@ -65,30 +52,14 @@ public final class BackendErrorResponses {
   }
 
   /**
-   * Runs an AJAX handler's backend call and uniformly maps its failures, replacing the {@code try {
-   * &hellip; } catch (BackendServiceException) { log; propagateBackendError } catch (Exception) {
-   * log; 500 }} block the {@code @ResponseBody} write handlers each hand-rolled.
+   * Runs an AJAX handler's backend call and maps failures uniformly: a {@link
+   * BackendServiceException} is logged at DEBUG and relayed via {@link #propagateBackendError}, any
+   * other exception is logged at ERROR and answered with an empty {@code 500}.
    *
-   * <p>On success the {@code action}'s own response is returned unchanged. A {@link
-   * BackendServiceException} is logged at {@code DEBUG} (status + message, matching the per-handler
-   * lines it replaces — no PII beyond what those already logged) and relayed via {@link
-   * #propagateBackendError} so the client keeps the exact conflict/toast semantics. Any other
-   * exception is logged at {@code ERROR} (with the stack trace) and answered with an empty {@code
-   * 500}. The caller passes its own {@link Logger} so the line keeps the controller's logger name
-   * (per-class level config still applies) and an {@code operation} label so the "which call
-   * failed" signal survives centralisation.
-   *
-   * <p>Handlers whose {@code BackendServiceException} branch does something other than {@link
-   * #propagateBackendError} (a bare status passthrough, a {@code BackendErrorLogging.warn}
-   * structured line, an extra {@code WebClientResponseException} catch) keep their bespoke block —
-   * this helper only carries the plain propagate-or-500 shape.
-   *
-   * @param log the calling controller's logger, so the failure line keeps that logger name
-   * @param operation a short human-readable label for the attempted operation (e.g. {@code "update
-   *     status for order " + id}) woven into the log line
+   * @param log the calling controller's logger
+   * @param operation a short label of the attempted operation for the log line
    * @param action the backend call plus success-response build to run
-   * @return the {@code action}'s success response, a relayed {@code problem+json}, or an empty
-   *     {@code 500}
+   * @return the {@code action}'s response, a relayed {@code problem+json}, or an empty {@code 500}
    */
   @NotNull
   public static ResponseEntity<Object> relay(

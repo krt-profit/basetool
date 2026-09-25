@@ -35,13 +35,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Cross-Staffel handover flow (UC-09): Staffel A creates a job order, Staffel B supplies it with
- * B-owned inventory, and an Officer of A then records a handover of that foreign item through A's
- * order — optionally naming Staffel B as the recipient. Proves the job-order workspace lets one
- * Staffel act on inventory another Staffel contributed, end to end through the handover UI.
- *
- * <p>Builds on the same seeding as {@link CrossStaffelJobOrderE2eTest}, but drives the full
- * handover modal (item + amount + time + recipient) and verifies the handover row appears.
+ * Cross-Staffel handover flow (UC-09): an officer of Staffel A records, through A's job order, a
+ * handover of inventory that Staffel B contributed, and the handover row appears.
  */
 @Tag("e2e")
 class CrossStaffelHandoverE2eTest {

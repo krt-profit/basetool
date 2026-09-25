@@ -72,22 +72,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 
 /**
- * Unit tests for {@link RefineryOrderService#storeRefineryOrder} — the bulk-update + multi-item
- * flow CLAUDE.md flags as a 409 trap. The Lager is append-only: every stored refinery output
- * becomes its own brand-new {@code InventoryItem} row and is never folded into an existing
- * identical stack, so there is no match-and-merge branch and no note-merge to exercise. This suite
- * covers:
- *
- * <ul>
- *   <li>access-control (owner vs non-owner vs logistician bypass)
- *   <li>per-item lookups (material / location / user / job-order {@link NotFoundException}s)
- *   <li>assignee resolution (explicit user vs order-owner fallback)
- *   <li>always inserting a fresh InventoryItem carrying the incoming amount (rounded to SCU scale)
- *   <li>note normalisation on the new row (trimmed value stored; null / blank stored as null)
- *   <li>{@code updateGoodOutputQuantity}: SCU vs PIECE conversion, {@code @Min(1)} clamp at zero,
- *       no-match silent skip, missing output-material guard
- *   <li>final state transition to {@link RefineryOrderStatus#COMPLETED}
- * </ul>
+ * Unit tests for {@link RefineryOrderService#storeRefineryOrder}: access control, per-item lookups,
+ * assignee resolution, one new inventory row per output, note normalisation, output quantity
+ * conversion and the transition to {@link RefineryOrderStatus#COMPLETED}.
  */
 @ExtendWith(MockitoExtension.class)
 class RefineryOrderServiceTest {
@@ -328,14 +315,8 @@ class RefineryOrderServiceTest {
     }
 
     /**
-     * REQ-SEC-039: the per-item {@code userId} must not let a plain member write into someone
-     * else's ledger.
-     *
-     * <p>The caller here passes every other gate — they own the order, so the ownership check above
-     * is satisfied — and the only thing standing between them and an arbitrary cross-user inventory
-     * write is this guard. Without it a member could fabricate any material, at any quality and any
-     * amount, as another member's stock (or, with {@code personal}, their private stock) and leave
-     * the audit row attributed to the victim.
+     * A plain member who owns the order still may not name another user as the assignee of a stored
+     * item (REQ-SEC-039).
      */
     @Test
     void throwsAccessDenied_whenNonLogisticianNamesAnotherUserAsAssignee() {
@@ -354,16 +335,7 @@ class RefineryOrderServiceTest {
       verify(refineryOrderRepository, never()).save(any());
     }
 
-    /**
-     * REQ-SEC-005 regression: holding LOGISTICIAN is not an answer about a member of a DIFFERENT
-     * org unit.
-     *
-     * <p>The caller here owns the order (so the ownership check passes) and holds the flat {@code
-     * ROLE_LOGISTICIAN} - which is exactly the state that used to authorise this write, because the
-     * guard was a role boolean with no org-unit context. The receiver is a member of another
-     * Staffel, so {@code canManageUserInventory} says no and the write must be refused before the
-     * victim's row or the order completion is touched.
-     */
+    /** A logistician may not name an assignee outside their org-unit scope (REQ-SEC-005). */
     @Test
     void throwsAccessDenied_whenLogisticianNamesAnAssigneeOutsideTheirOrgUnitScope() {
       stubLookupsForSingleItem();

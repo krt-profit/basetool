@@ -22,9 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.util.List;
 
 /**
- * Outbound write DTO mirroring the backend {@code PersonalBlueprintBatchCreateRequest} (#327): the
- * normalized product keys staged by the multi-select add. Validation is authoritative on the
- * backend; this record is just the wire shape.
+ * Outbound mirror of the backend {@code PersonalBlueprintBatchCreateRequest}: the normalized
+ * product keys staged by the multi-select add.
  *
  * @param productKeys the normalized product keys to add in one call
  */

@@ -28,28 +28,11 @@ import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
 
 /**
- * Scrubs URL-carrying observation key-values before they become Prometheus metric tags or trace
- * span attributes (REQ-OBS-006/-009, epic #936 Phase 1b). Boot registers every {@link
- * ObservationFilter} bean on the observation registry, so this applies to all HTTP server and
- * client observations of the module. Mirrored across backend/frontend/ingest per the established
- * no-shared-module convention.
+ * Scrubs the {@code uri} and {@code http.url} observation key-values before they become metric tags
+ * or span attributes (REQ-OBS-006).
  *
- * <p>Two problems are closed here:
- *
- * <ul>
- *   <li><b>Query strings carry user text.</b> Endpoints like the user search take free text as
- *       query parameters; the default conventions put the full request target into the {@code
- *       http.url} attribute and — for hand-assembled client URIs — into the {@code uri} tag.
- *       Everything from the first {@code ?} on is cut from both.
- *   <li><b>Raw ids explode metric cardinality.</b> Client calls built from concatenated strings
- *       (the {@code BackendApiClient} pattern) surface entity UUIDs / numeric ids in the
- *       low-cardinality {@code uri} tag of {@code http_client_requests}. UUID and purely numeric
- *       path segments are collapsed to {@code {id}} so the tag stays bounded by the API's actual
- *       path shapes (REQ-OBS-006 cardinality rule).
- * </ul>
- *
- * <p>Only the URL-ish keys {@code uri} and {@code http.url} are touched — other key-values (status,
- * method, exception, outcome) pass through untouched.
+ * <p>Cuts query strings from both and collapses UUID and numeric path segments in {@code uri} to
+ * {@code {id}}; all other key-values pass through unchanged.
  */
 @Component
 public class ObservationPrivacyFilter implements ObservationFilter {
@@ -99,13 +82,10 @@ public class ObservationPrivacyFilter implements ObservationFilter {
   }
 
   /**
-   * Cuts the query string and — when requested — collapses UUID / numeric path segments to {@code
-   * {id}}.
+   * Cuts the query string and optionally collapses UUID and numeric path segments to {@code {id}}.
    *
-   * @param value the raw key-value content; {@code null}-safe
-   * @param normalizeIds {@code true} for the low-cardinality {@code uri} tag (metric cardinality
-   *     guard), {@code false} for the high-cardinality {@code http.url} attribute (the raw path is
-   *     allowed on trace spans, only the query string is cut)
+   * @param value the raw key-value content; may be {@code null}
+   * @param normalizeIds {@code true} for the {@code uri} tag, {@code false} for {@code http.url}
    * @return the scrubbed value, or the input unchanged when nothing matched
    */
   static String scrub(String value, boolean normalizeIds) {

@@ -20,12 +20,9 @@
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
 /**
- * The role a member holds within a Bereichsleitung (epic #692, REQ-ORG-017). Each value maps to
- * exactly one of the {@code is_bereichsleiter} / {@code is_bereichskoordinator} / {@code
- * is_bereichsoperator} flags on the member's {@code org_unit_membership} row; a Bereichsleitung
- * member carries exactly one of these roles. All three confer the same cascading,
- * officer-equivalent reach over the Bereich's Staffeln/SKs (REQ-ORG-015) — the distinction is
- * organisational, not a permission tier.
+ * The role a member holds within a Bereichsleitung (REQ-ORG-017), each mapping to one flag on the
+ * member's {@code org_unit_membership} row. All three confer the same cascading officer-equivalent
+ * reach (REQ-ORG-015).
  */
 public enum BereichLeadershipRole {
 

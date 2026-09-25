@@ -34,23 +34,16 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Startup bootstrap for the default-blueprint feature (REQ-INV-016/017). Runs once per boot, after
- * Flyway and the rest of the context are ready, and does two things:
+ * Startup bootstrap for the default blueprints (REQ-INV-016/017), run once per boot.
  *
  * <ol>
- *   <li><strong>One-time seed</strong> of the admin-managed {@code default_blueprint} table from
- *       {@link DefaultBlueprintCatalog}, guarded by a {@code SystemSetting} flag so an admin's
- *       later removal of a seeded default is never resurrected on the next boot. Each curated name
- *       is normalized and resolved against the live blueprint catalog to stamp the canonical key /
- *       name / output item; an unresolved name is still seeded (degraded) so the default is granted
- *       regardless, with a warning so an admin can re-resolve it through the picker.
- *   <li><strong>Backfill</strong> — grants the current default set to every existing user, so the
- *       feature takes effect immediately on the deploy that introduces it without waiting for the
- *       periodic sweep. Idempotent ({@code ON CONFLICT DO NOTHING}).
+ *   <li>Seeds the admin-managed {@code default_blueprint} table from {@link
+ *       DefaultBlueprintCatalog} once, guarded by a {@code SystemSetting} flag so removed defaults
+ *       are never resurrected; an unresolved name is seeded degraded with a warning.
+ *   <li>Grants the current default set to every existing user, idempotently.
  * </ol>
  *
- * <p>Gated by {@code app.default-blueprints.provisioning.enabled} (default on) so the test profile
- * can disable it; integration tests that exercise the feature re-enable it explicitly.
+ * <p>Gated by {@code app.default-blueprints.provisioning.enabled} (default on).
  */
 @Component
 @RequiredArgsConstructor

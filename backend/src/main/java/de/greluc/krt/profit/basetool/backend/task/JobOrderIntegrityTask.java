@@ -34,16 +34,10 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Scheduled job-order integrity sweep (REQ-ORDERS-033; pattern: {@link BankLedgerIntegrityTask}).
- * Runs every {@code app.joborder.integrity.interval} (default {@code PT1H}) and delegates to {@link
- * JobOrderIntegrityService#verify()}, which logs each violation at {@code ERROR}. The whole task is
- * gated by {@code app.joborder.integrity.enabled} (default {@code true}); set it to {@code false}
- * to disable the schedule (e.g. in tests that drive the verification directly).
- *
- * <p>The sweep exists because the ordered-item line ↔ blueprint pairing can only be validated when
- * a line is <em>written</em>, while the daily SC-Wiki sync re-resolves each blueprint's output item
- * on every run. Without this the drift is invisible: no error, no audit event, no metric — a line
- * just quietly starts showing a foreign recipe's materials.
+ * Scheduled job-order integrity sweep (REQ-ORDERS-033) that runs {@link
+ * JobOrderIntegrityService#verify()} every {@code app.joborder.integrity.interval} (default {@code
+ * PT1H}), detecting ordered-item lines whose blueprint pairing has drifted. Gated by {@code
+ * app.joborder.integrity.enabled} (default {@code true}).
  */
 @Component
 @ConditionalOnProperty(
@@ -68,12 +62,8 @@ public class JobOrderIntegrityTask {
   private final AtomicInteger blueprintDriftGauge = new AtomicInteger(0);
 
   /**
-   * Registers the {@code basetool_job_order_integrity_violations} gauge, backed by a
-   * zero-initialised holder the sweep updates. Registration happens once after construction, so the
-   * series exists (reporting {@code 0}) before the first sweep and the alert always has something
-   * to evaluate. Because the enclosing bean is config-gated ({@code
-   * app.joborder.integrity.enabled}), disabling the check also removes the gauge, which is
-   * intended.
+   * Registers the {@code basetool_job_order_integrity_violations} gauge, reporting {@code 0} until
+   * the first sweep.
    */
   @PostConstruct
   void registerViolationGauges() {
@@ -89,11 +79,9 @@ public class JobOrderIntegrityTask {
   }
 
   /**
-   * Fires the integrity verification on the configured schedule through {@link TaskMetrics},
-   * publishing the {@code job_order_integrity} job metrics. A transient DB hiccup is recorded as a
-   * failed run and swallowed so the scheduler thread survives; the next tick retries. A run that
-   * completes but reports violations is still a {@code success} — the violation count is the
-   * separate {@code basetool_job_order_integrity_violations} gauge.
+   * Runs the integrity verification through {@link TaskMetrics} as the {@code job_order_integrity}
+   * job. Failures are recorded and swallowed; a run that finds violations still counts as a
+   * success.
    */
   @Scheduled(fixedDelayString = "${app.joborder.integrity.interval:PT1H}")
   public void runIntegrityCheck() {
@@ -112,13 +100,8 @@ public class JobOrderIntegrityTask {
   }
 
   /**
-   * Publishes {@code basetool_scheduled_job_enabled{task="job_order_integrity"} = 1}.
-   *
-   * <p>A bean {@code @ConditionalOnProperty} never created publishes nothing, and that absence is
-   * what lets {@code ScheduledJobStale} tell "switched off on purpose" from "has never succeeded".
-   * Without it, following the documented instruction to disable a sweep before its first
-   * irreversible run raised a permanent warning: the last-success gauge is registered lazily on
-   * first success, so it never appeared and the alert's {@code absent()} leg stayed true.
+   * Publishes {@code basetool_scheduled_job_enabled{task="job_order_integrity"} = 1}, so {@code
+   * ScheduledJobStale} can tell a disabled sweep (no bean, no gauge) from one that never succeeded.
    */
   @PostConstruct
   void publishEnabledGauge() {

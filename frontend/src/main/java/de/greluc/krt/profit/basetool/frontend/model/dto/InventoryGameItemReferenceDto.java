@@ -22,11 +22,9 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.util.UUID;
 
 /**
- * Frontend mirror of the backend {@code InventoryGameItemReferenceDto} (V220, REQ-INV-029): the
- * slim game-item reference the Lager item-stock reads carry — id, display name, resolved
- * manufacturer name (nullable) and the {@code GameItemKind} name as a string. Kept separate from
- * the order-side {@link GameItemReferenceDto}, which deliberately omits the manufacturer, mirroring
- * the backend split.
+ * Frontend mirror of the backend {@code InventoryGameItemReferenceDto} (REQ-INV-029): the slim
+ * game-item reference of Lager item stock, which unlike {@link GameItemReferenceDto} carries the
+ * manufacturer.
  *
  * @param id the game item's primary key
  * @param name the item's display name

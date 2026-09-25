@@ -34,16 +34,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Functional flow: create a Job Order through the UI and verify it appears in the order list.
- *
- * <p>Job Orders are cross-staffel (no OrgUnit-scope filter). The create form carries two org-unit
- * pickers: the responsible (processing) unit — restricted to profit-eligible org units — and the
- * requesting (customer) unit. IRIDIUM is opted into profit-eligibility once at stack bootstrap
- * ({@link E2eStackExtension}) so it offers in the responsible picker; {@link BackendSeeder} seeds
- * the IRIDIUM membership and one {@code isJobOrder=true} material in {@link #setUp()}. Uses the
- * {@code order-material-*} / {@code order-submit} hooks on the create form and {@code order-row} on
- * the index, with the reused authenticated session from {@link
- * E2eSupport#authenticatedStorageState}.
+ * Creates a job order through the UI and verifies it appears in the order list. IRIDIUM is made
+ * profit-eligible in {@link E2eStackExtension}; {@link BackendSeeder} seeds the membership and a
+ * job-order material in {@link #setUp()}.
  */
 @Tag("e2e")
 class JobOrderCreateE2eTest {
@@ -59,11 +52,8 @@ class JobOrderCreateE2eTest {
   private static Browser browser;
 
   /**
-   * Launches the browser and, for the ephemeral stack, seeds the membership and guarantees at least
-   * one {@code isJobOrder} material exists for the create-form dropdown. The specific id is not
-   * retained: the frontend caches the job-order material list ({@code getCached}), so in the shared
-   * stack the dropdown may show a material seeded by another test rather than this one — the test
-   * therefore selects whatever the dropdown offers.
+   * Launches the browser and seeds the membership and at least one {@code isJobOrder} material.
+   * Because the material list is cached, the test uses whatever material the dropdown offers.
    */
   @BeforeAll
   static void setUp() {

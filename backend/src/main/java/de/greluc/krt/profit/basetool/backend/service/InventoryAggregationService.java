@@ -64,30 +64,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Read side of the inventory aggregate — every aggregated / drilldown / stack-entry projection the
- * squadron inventory page and the personal "Mein Inventar" view render.
+ * Read side of the inventory: the aggregated, grouped, flat and per-stack projections behind the
+ * squadron Lager and the personal "Mein Inventar" views.
  *
- * <p>Extracted from {@code InventoryItemService} (#921, L2) as the read cluster of the former
- * god-class: the per-material aggregation ({@link #getAggregatedInventory}), the {@code /grouped}
- * Material→Stack roll-up ({@link #getMyAggregatedInventory} / {@link #getAllAggregatedInventory}
- * over the SQL-computed {@link InventoryStackAggregate} rows), the lazy per-stack drilldowns
- * ({@link #getMyStackEntries} / {@link #getAllStackEntries}), the flat and per-material listings,
- * the craftability stock slices ({@link #getOwnedStockSlices}), the job-order material collection
- * ({@link #getMaterialCollection}) and its game-item sibling, the per-order earmarked item stock
- * ({@link #getItemStockForJobOrder}, REQ-ORDERS-028). {@code InventoryItemService} keeps the
- * identical public method signatures and delegates to this service, so controllers and callers are
- * unchanged.
- *
- * <p>Every method is a pure read — the class is {@code @Transactional(readOnly = true)} and holds
- * no write repositories. Multi-org-unit scoping goes through {@code OwnerScopeService.currentScope
- * Predicate()} exactly as before, so an aggregation can never widen visibility beyond the caller's
- * org-unit slice.
- *
- * <p>Catalog-discriminated since V220 (REQ-INV-029, ADR-0101): the historical methods serve the
- * material catalog (their queries exclude game-item rows), and each grouped / aggregated / flat /
- * stack-entry read has a game-item sibling ({@code *Item*} methods) keyed on the quality-less item
- * stack identity. The controller dispatches between the two families on its {@code catalog} query
- * parameter.
+ * <p>All methods are read-only and scoped through {@code OwnerScopeService}, so no read widens
+ * visibility beyond the caller's org units. Material reads exclude game-item rows; each has a
+ * game-item sibling ({@code *Item*}) keyed on the quality-less item stack (REQ-INV-029).
  */
 @Service
 @RequiredArgsConstructor
@@ -104,12 +86,8 @@ public class InventoryAggregationService {
   private final OwnerScopeService ownerScopeService;
 
   /**
-   * Pools the caller's entire "My Inventory" stock into one SCU total per (material, quality) pair
-   * for the blueprint craftability calculation (#781). Strictly owner-scoped to {@code userId}
-   * (both personal and shared rows the user owns count, matching the default {@code /inventory/my}
-   * view); never org-unit-scoped, because craftability answers "what can I craft from my stock".
-   * The quality is preserved in the result so the calculator can consume the best-quality slices
-   * first.
+   * Sums the caller's own stock into one SCU total per material and quality for the blueprint
+   * craftability calculation. Owner-scoped only, including personal and shared rows.
    *
    * @param userId the owning user; never {@code null}
    * @return one slice per (material, quality) the user owns, with the summed SCU; never {@code
@@ -143,10 +121,8 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Game-item sibling of {@link #getAggregatedInventory(Pageable)} — the {@code catalog=ITEM}
-   * variant of the aggregated Lager overview (REQ-INV-028/029): one row per game item with the
-   * summed non-personal amount in the caller's scope. The quality columns of the material variant
-   * have no item counterpart (items carry no quality dimension) and map to {@code null}.
+   * Game-item sibling of {@link #getAggregatedInventory(Pageable)}: one row per game item with the
+   * summed non-personal amount in the caller's scope; quality columns are {@code null}.
    *
    * @param pageable page request (whitelisted {@code gameItem.name} / {@code amount} sort)
    * @return paged aggregated DTOs carrying the game-item reference and the total amount
@@ -167,8 +143,7 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Per-material drilldown — lists every individual inventory row for the given material. Used by
-   * the inventory drilldown page.
+   * Lists every non-personal inventory row of the given material in the caller's scope.
    *
    * @param materialId material to drill into
    * @param pageable page request
@@ -190,9 +165,8 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Game-item sibling of {@link #getInventoryByMaterial(UUID, Pageable)} — the drilldown behind
-   * {@code GET /api/v1/inventory/game-item/{gameItemId}} (REQ-INV-029): every non-personal stock
-   * row of one game item, under the same strict-staffel scope predicate as the material drilldown.
+   * Game-item sibling of {@link #getInventoryByMaterial(UUID, Pageable)}: every non-personal stock
+   * row of one game item in the caller's scope.
    *
    * @param gameItemId game item to drill into
    * @param pageable page request
@@ -214,9 +188,7 @@ public class InventoryAggregationService {
   }
 
   /**
-   * User-scoped material inventory list ({@code catalog=MATERIAL}). Excludes personal-inventory
-   * records (those have their own dedicated service) and game-item rows (served by {@link
-   * #getUserItemInventory(UUID, Pageable)}).
+   * Lists the user's material inventory rows, excluding personal rows and game-item rows.
    *
    * @param userId owner id
    * @param pageable page request
@@ -230,8 +202,8 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Game-item sibling of {@link #getUserInventory(UUID, Pageable)} — the flat "my inventory" list
-   * for {@code catalog=ITEM} (REQ-INV-029): the game-item stock rows owned by the caller.
+   * Game-item sibling of {@link #getUserInventory(UUID, Pageable)}: the game-item stock rows owned
+   * by the user.
    *
    * @param userId owner id
    * @param pageable page request (whitelisted {@code gameItem.name} / {@code amount} sort)
@@ -257,7 +229,7 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Job-order/mission-filtered convenience overload.
+   * Aggregates the user's inventory filtered only by job orders and missions.
    *
    * @param userId owner id
    * @param jobOrderIds optional job order filter
@@ -270,9 +242,8 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Filter-only convenience overload of {@link #getMyAggregatedInventory(UUID, List, List, Integer,
-   * List, List, boolean, boolean)} that returns both the caller's shared and personal stacks (no
-   * personal-/non-personal-only narrowing) and no location narrowing.
+   * Overload of {@link #getMyAggregatedInventory(UUID, List, List, Integer, List, List, boolean,
+   * boolean)} without location filter and without personal/shared narrowing.
    *
    * @param userId owner id
    * @param materialIds optional material filter
@@ -293,23 +264,19 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Full-filter user-scoped aggregation. Loads the user's items via the parameterized repository
-   * query and groups them in memory — the {@code GroupedInventoryDto} shape is what the {@code
-   * /grouped} frontend endpoint returns directly.
+   * Aggregates the user's material stock into the Material to Stack shape of the {@code /grouped}
+   * view, applying all filters.
    *
    * @param userId owner id
    * @param materialIds optional material filter
-   * @param locationIds optional storage-location filter — the Lager location filter; an empty or
-   *     {@code null} list means "every location" (REQ-INV-040)
+   * @param locationIds optional storage-location filter; empty or {@code null} means every location
+   *     (REQ-INV-040)
    * @param minQuality optional min-quality filter
    * @param jobOrderIds optional job order filter
    * @param missionIds optional mission filter
-   * @param personalOnly when {@code true}, narrows the result to the caller's private stock ({@code
-   *     personal = true} rows) — the "Mein Lager" personal-entries-only filter
-   * @param nonPersonalOnly when {@code true}, narrows the result to the caller's shared stock
-   *     ({@code personal = false} rows) — the "Mein Lager" non-personal-entries-only filter;
-   *     mutually exclusive with {@code personalOnly}, and when both are {@code false} both shared
-   *     and personal stacks are returned
+   * @param personalOnly {@code true} to return only personal rows
+   * @param nonPersonalOnly {@code true} to return only shared rows; mutually exclusive with {@code
+   *     personalOnly}, both {@code false} returns both
    * @return aggregated items
    * @throws NotFoundException when the user id is unknown
    */
@@ -346,8 +313,8 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Convenience overload of {@link #getAllAggregatedInventory(List, List, Integer, List, List)}
-   * without location, job-order and mission filters.
+   * Overload of {@link #getAllAggregatedInventory(List, List, Integer, List, List)} without
+   * location, job-order and mission filters.
    *
    * @param materialIds optional material filter
    * @param minQuality optional min-quality filter
@@ -359,12 +326,12 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Squadron-wide aggregated inventory with the full filter surface. Mirrors {@link
-   * #getMyAggregatedInventory} but scopes to all users (admin/logistician view).
+   * Aggregates the material stock of all users in the caller's scope into the {@code /grouped}
+   * shape.
    *
    * @param materialIds optional material filter
-   * @param locationIds optional storage-location filter — the Lager location filter; an empty or
-   *     {@code null} list means "every location" (REQ-INV-040)
+   * @param locationIds optional storage-location filter; empty or {@code null} means every location
+   *     (REQ-INV-040)
    * @param minQuality optional min-quality filter
    * @param jobOrderIds optional job order filter
    * @param missionIds optional mission filter
@@ -401,14 +368,8 @@ public class InventoryAggregationService {
 
   /**
    * Game-item sibling of {@link #getMyAggregatedInventory(UUID, List, List, Integer, List, List,
-   * boolean, boolean)} — the {@code catalog=ITEM} variant of the "my inventory" {@code /grouped}
-   * view (REQ-INV-029): the caller's game-item stock rolled up GameItem → Stack over the
-   * quality-less item stack key. Item filter surface only ({@code gameItemIds}, {@code
-   * locationIds}, {@code jobOrderIds}) plus the mutually exclusive {@code personalOnly} / {@code
-   * nonPersonalOnly} narrowing toggles; the quality floor and mission filter of the material
-   * variant do not exist for items (REQ-INV-031) and are rejected upstream by the controller. The
-   * location filter is catalog-agnostic — item stacks carry a location like material stacks do
-   * (REQ-INV-040).
+   * boolean, boolean)}: the user's game-item stock grouped by item and stack. Items have no quality
+   * or mission filter (REQ-INV-031).
    *
    * @param userId owner id
    * @param gameItemIds optional game-item filter
@@ -445,15 +406,8 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Flat companion of {@link #getMyAggregatedInventory(UUID, List, List, Integer, List, List,
-   * boolean, boolean)} (REQ-INV-034): returns the ids of <em>every</em> material {@link
-   * de.greluc.krt.profit.basetool.backend.model.InventoryItem} the caller owns that matches the
-   * same "Mein Lager" material filter surface — across all stacks and unbounded by the lazy
-   * per-stack pagination. Backs the frontend "Alle markieren" (select-all) so a bulk check-out can
-   * span the whole filtered view, not only the entries currently expanded on screen. Owner-scoped
-   * from the JWT; the {@code WHERE} clause reuses {@link
-   * de.greluc.krt.profit.basetool.backend.repository.InventoryItemRepository#findUserEntryIds}, the
-   * same optional-filter contract as the grouped view, so it can never return an id outside that
+   * Returns the ids of every material entry the user owns that matches the "Mein Lager" filters,
+   * across all stacks, for select-all (REQ-INV-034). Uses the same filter contract as the grouped
    * view.
    *
    * @param userId owner id
@@ -497,12 +451,8 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Game-item companion of {@link #getMyEntryIds} (REQ-INV-034): returns the ids of every game-item
-   * {@link de.greluc.krt.profit.basetool.backend.model.InventoryItem} the caller owns that matches
-   * the {@code view=items} filter surface, so the "Alle markieren" select-all covers the whole
-   * filtered item tree. Item filter surface only ({@code gameItemIds}, {@code locationIds}, {@code
-   * jobOrderIds}) plus the mutually exclusive personal toggles; no quality floor and no mission
-   * filter exist for items (REQ-INV-031). Owner-scoped from the JWT.
+   * Game-item sibling of {@link #getMyEntryIds}: the ids of every game-item entry the user owns
+   * that matches the item filters (REQ-INV-034).
    *
    * @param userId owner id
    * @param gameItemIds optional game-item filter
@@ -537,11 +487,8 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Game-item sibling of {@link #getAllAggregatedInventory(List, List, Integer, List, List)} — the
-   * {@code catalog=ITEM} variant of the squadron-wide {@code /grouped} view (REQ-INV-029), scoped
-   * by the caller's org-unit predicate exactly like the material variant. Item filter surface only
-   * ({@code gameItemIds}, {@code locationIds}, {@code jobOrderIds}); no quality floor, no mission
-   * filter (REQ-INV-031).
+   * Game-item sibling of {@link #getAllAggregatedInventory(List, List, Integer, List, List)}: the
+   * scoped game-item stock grouped by item and stack. No quality or mission filter (REQ-INV-031).
    *
    * @param gameItemIds optional game-item filter
    * @param locationIds optional storage-location filter (REQ-INV-040)
@@ -569,11 +516,8 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Assembles the Material → Stack shape the {@code /grouped} views render from the SQL-computed
-   * per-stack aggregates. Outer grouping is by material; the individual entries are no longer
-   * materialised here — append-only rows grow unboundedly per stack, so a stack's entries are
-   * loaded lazily and paginated on expand (ADR-0003, REQ-INV-002, see {@link #getMyStackEntries} /
-   * {@link #getAllStackEntries}). Each {@link InventoryStackAggregate} row is one display stack.
+   * Groups SQL-computed per-stack aggregates by material into the {@code /grouped} shape. Entries
+   * are not included; they load lazily per stack (ADR-0003).
    *
    * @param aggregates the SQL-grouped per-stack rows for the current scope/filter
    * @return the materials, each carrying its sorted stacks and material-wide totals
@@ -592,11 +536,8 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Builds one material roll-up from its per-stack aggregates: the stacks (sorted quality desc,
-   * location asc, amount desc) plus the material-wide totals (summed amount, amount-weighted mean
-   * quality, max quality) accumulated from the raw {@code SUM(amount)} / {@code SUM(amount *
-   * quality)} the database returned, so the material average stays independent of per-stack
-   * rounding — identical to the previous over-the-entries computation.
+   * Builds one material group from its stacks: sorted stacks plus summed amount, amount-weighted
+   * mean quality and max quality, computed from the raw database sums.
    *
    * @param matStacks every per-stack aggregate of one material in the current scope; never empty
    * @return the populated material group with its nested stacks
@@ -641,10 +582,8 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Game-item sibling of {@link #buildGroupedFromStacks(List)}: assembles the GameItem → Stack
-   * shape the {@code catalog=ITEM} {@code /grouped} views render from the SQL-computed per-stack
-   * item aggregates. Outer grouping is by game item, sorted by item name; entries stay lazy
-   * (REQ-INV-005) exactly like the material variant.
+   * Game-item sibling of {@link #buildGroupedFromStacks(List)}: groups per-stack item aggregates by
+   * game item, sorted by item name.
    *
    * @param aggregates the SQL-grouped per-item-stack rows for the current scope/filter
    * @return the game-item groups, each carrying its sorted stacks and item-wide total
@@ -663,10 +602,8 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Builds one game-item roll-up from its per-stack aggregates: the stacks (sorted by the shared
-   * {@link #STACK_ORDER}, whose quality key is a constant {@code null} for item stacks, leaving
-   * location asc / amount desc) plus the item-wide summed amount. The quality figures of the
-   * material group have no item counterpart and stay {@code null} (REQ-INV-028/029).
+   * Builds one game-item group from its stacks: stacks sorted by {@link #STACK_ORDER} plus the
+   * summed amount; quality figures stay {@code null}.
    *
    * @param itemStacks every per-stack aggregate of one game item in the current scope; never empty
    * @return the populated game-item group with its nested stacks
@@ -701,12 +638,9 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Game-item counterpart of {@link #mapAggregateRefs(InventoryStackAggregate)}: projects one item
-   * stack aggregate's shared identity entities through the inventory-item mapper via a transient
-   * probe {@link InventoryItem}, so PII redaction, the {@code owningOrgUnit → owningSquadron}
-   * projection and the game-item reference (incl. manufacturer name) behave exactly as for a real
-   * entry. The probe's {@code material} / {@code quality} stay {@code null} — the item stack key
-   * carries neither (REQ-INV-029).
+   * Game-item counterpart of {@link #mapAggregateRefs(InventoryStackAggregate)}: maps an item
+   * stack's identity through a transient probe {@link InventoryItem} so redaction behaves as for a
+   * real entry.
    *
    * @param aggregate the per-stack item aggregate whose shared identity to project
    * @return an inventory-item DTO carrying only the mapped reference fields (amount/version/id
@@ -723,12 +657,9 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Projects one stack aggregate's shared identity entities through the inventory-item mapper to
-   * obtain the redaction-safe reference DTOs (user, material, location, owning squadron) and the
-   * flattened job-order / mission ids the stack DTO carries. A transient probe {@link
-   * InventoryItem} is fed to the mapper so PII redaction and the {@code owningOrgUnit ->
-   * owningSquadron} projection behave exactly as they do for a real entry — the probe is never
-   * persisted and only its identity fields are read.
+   * Maps a stack's shared identity through the inventory-item mapper using a transient, never
+   * persisted probe {@link InventoryItem}, so PII redaction and the org-unit projection behave as
+   * for a real entry.
    *
    * @param aggregate the per-stack aggregate whose shared identity to project
    * @return an inventory-item DTO carrying only the mapped reference fields (amount/version/id
@@ -746,20 +677,16 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Lazily loads one of the caller's own stacks' entries, oldest-first, paginated — the per-stack
-   * drill-down for the "my inventory" view. Scoped to the caller ({@code userId}); the {@code
-   * personal} flag is part of the stock identity, so a private and a shared stack at the same
-   * location/quality drill down separately. {@code null} job-order / mission / owning-org-unit
-   * arguments match rows where that association is itself {@code null}.
+   * Returns one page of the entries of one of the caller's own stacks, oldest first. A {@code null}
+   * owning-org-unit argument matches rows without one; personal and shared stacks are distinct.
    *
    * @param userId the calling owner whose stack to drill into
    * @param materialId the stack's material
    * @param locationId the stack's storage location
    * @param quality the stack's quality grade, or {@code null}
-   * @param personal whether the stack is private stock (defaults to {@code false} when {@code
-   *     null})
+   * @param personal whether the stack is private stock ({@code null} means {@code false})
    * @param owningOrgUnitId the stack's owning org-unit pool id, or {@code null}
-   * @param pageable the page request (the query forces oldest-first by creation instant)
+   * @param pageable the page request; ordering is fixed to oldest first
    * @return one page of the stack's entries, oldest-first
    */
   public Page<InventoryItemDto> getMyStackEntries(
@@ -784,18 +711,15 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Lazily loads one global stack's entries, oldest-first, paginated — the per-stack drill-down for
-   * the squadron-wide Lager view. The same scope predicate as the grouped view is applied so the
-   * drill-down can never widen visibility beyond the caller's org-unit slice; the stack's owner is
-   * an explicit argument because a global stack is per-owner. {@code null} job-order / mission /
-   * owning-org-unit arguments match rows where that association is itself {@code null}.
+   * Returns one page of the entries of a stack in the squadron Lager, oldest first, under the same
+   * scope as the grouped view. A {@code null} owning-org-unit argument matches rows without one.
    *
    * @param materialId the stack's material
    * @param userId the stack's owning user
    * @param locationId the stack's storage location
    * @param quality the stack's quality grade, or {@code null}
    * @param owningOrgUnitId the stack's owning org-unit pool id, or {@code null}
-   * @param pageable the page request (the query forces oldest-first by creation instant)
+   * @param pageable the page request; ordering is fixed to oldest first
    * @return one page of the stack's entries, oldest-first
    */
   public Page<InventoryItemDto> getAllStackEntries(
@@ -822,18 +746,14 @@ public class InventoryAggregationService {
 
   /**
    * Game-item sibling of {@link #getMyStackEntries(UUID, UUID, UUID, Integer, Boolean, UUID,
-   * Pageable)} — the {@code catalog=ITEM} per-stack drill-down of the "my inventory" view
-   * (REQ-INV-005/029). The stack is addressed by {@code gameItemId} with no quality key (items
-   * carry no quality dimension); owner-scoping and the personal/owning-org-unit identity dimensions
-   * behave exactly like the material variant.
+   * Pageable)}, addressed by game item without a quality key.
    *
    * @param userId the calling owner whose stack to drill into
    * @param gameItemId the stack's game item
    * @param locationId the stack's storage location
-   * @param personal whether the stack is private stock (defaults to {@code false} when {@code
-   *     null})
+   * @param personal whether the stack is private stock ({@code null} means {@code false})
    * @param owningOrgUnitId the stack's owning org-unit pool id, or {@code null}
-   * @param pageable the page request (the query forces oldest-first by creation instant)
+   * @param pageable the page request; ordering is fixed to oldest first
    * @return one page of the stack's entries, oldest-first
    * @throws NotFoundException when the user id is unknown
    */
@@ -857,17 +777,14 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Game-item sibling of {@link #getAllStackEntries(UUID, UUID, UUID, Integer, UUID, Pageable)} —
-   * the {@code catalog=ITEM} per-stack drill-down of the squadron-wide Lager view
-   * (REQ-INV-005/029). Addressed by {@code gameItemId} with no quality key; the same scope
-   * predicate as the grouped item view applies, so the drill-down can never widen visibility beyond
-   * the caller's org-unit slice.
+   * Game-item sibling of {@link #getAllStackEntries(UUID, UUID, UUID, Integer, UUID, Pageable)},
+   * addressed by game item without a quality key and under the same scope.
    *
    * @param gameItemId the stack's game item
    * @param userId the stack's owning user
    * @param locationId the stack's storage location
    * @param owningOrgUnitId the stack's owning org-unit pool id, or {@code null}
-   * @param pageable the page request (the query forces oldest-first by creation instant)
+   * @param pageable the page request; ordering is fixed to oldest first
    * @return one page of the stack's entries, oldest-first
    */
   public Page<InventoryItemDto> getAllItemStackEntries(
@@ -887,7 +804,7 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Convenience overload without location, job-order and mission filters.
+   * Flat scoped inventory list filtered only by material and minimum quality.
    *
    * @param materialIds optional material filter
    * @param minQuality optional min-quality filter
@@ -900,8 +817,7 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Flat paged squadron-wide inventory with optional filters. Not aggregated — one row per {@code
-   * InventoryItem}.
+   * Flat paged inventory list in the caller's scope, one row per {@code InventoryItem}.
    *
    * @param materialIds optional material filter
    * @param locationIds optional storage-location filter (REQ-INV-040)
@@ -942,11 +858,8 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Game-item sibling of {@link #getAllInventory(List, List, Integer, List, List, Pageable)} — the
-   * flat squadron-wide list for {@code catalog=ITEM} (REQ-INV-029), scoped by the caller's org-unit
-   * predicate. Item filter surface only ({@code gameItemIds}, {@code locationIds}, {@code
-   * jobOrderIds}); the quality floor and mission filter of the material variant do not exist for
-   * items (REQ-INV-031). Not aggregated — one row per {@code InventoryItem}.
+   * Game-item sibling of {@link #getAllInventory(List, List, Integer, List, List, Pageable)}: the
+   * flat scoped list of game-item rows. No quality or mission filter (REQ-INV-031).
    *
    * @param gameItemIds optional game-item filter
    * @param locationIds optional storage-location filter (REQ-INV-040)
@@ -1018,16 +931,9 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Returns the game-item stock earmarked to the given job order, grouped per {@code GameItem} for
-   * the order-detail Item-Bestand panel (REQ-ORDERS-028) — the item sibling of {@link
-   * #getMaterialCollection(UUID)}. Groups are sorted by game-item name (case-insensitive, id as
-   * tiebreaker); each group's entries keep the repository's owner/location display order. The
-   * per-group {@code orderedAmount} / {@code manufacturedAmount} context is summed from the order's
-   * own item lines requesting that game item (0 for an orphaned earmark whose order no longer
-   * requests it). Loads the rows through {@link
-   * InventoryItemRepository#findGameItemRowsByJobOrderIdOrdered(UUID)} (display associations
-   * entity-graphed) and reads each entry's this-order slice off the {@code @BatchSize}-batched
-   * allocation collection, mirroring the material collection — no per-row queries.
+   * Returns the game-item stock earmarked to the given job order, grouped per game item and sorted
+   * by name (REQ-ORDERS-028). Each group carries the ordered and manufactured amounts of the
+   * order's matching item lines, {@code 0} when the order no longer requests that item.
    *
    * @param jobOrderId the UUID of the job order
    * @return name-sorted list of {@link JobOrderItemStockGroupDto}; empty when no game-item stock is
@@ -1105,8 +1011,8 @@ public class InventoryAggregationService {
   }
 
   /**
-   * Display order of the stacks within a material: highest quality first, then location name
-   * ascending, then largest total amount first — mirrors the previous per-row ordering.
+   * Display order of stacks within a group: highest quality first, then location name ascending,
+   * then largest amount first.
    */
   private static final Comparator<InventoryStackDto> STACK_ORDER =
       Comparator.<InventoryStackDto, Integer>comparing(s -> s.quality() != null ? s.quality() : 0)

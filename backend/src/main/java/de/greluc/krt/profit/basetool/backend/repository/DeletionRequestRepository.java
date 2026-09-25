@@ -37,10 +37,7 @@ import org.springframework.stereotype.Repository;
 public interface DeletionRequestRepository extends JpaRepository<DeletionRequest, UUID> {
 
   /**
-   * Finds the member's open request, if they have one.
-   *
-   * <p>At most one can exist — a partial unique index on {@code (user_id) WHERE status = 'PENDING'}
-   * is the guarantee, so this returns an {@link Optional} rather than a list.
+   * Finds the member's request in the given status; at most one pending request exists per member.
    *
    * @param userId the member
    * @param status the status to look for (in practice {@link DeletionRequestStatus#PENDING})
@@ -49,13 +46,8 @@ public interface DeletionRequestRepository extends JpaRepository<DeletionRequest
   Optional<DeletionRequest> findByUserIdAndStatus(UUID userId, DeletionRequestStatus status);
 
   /**
-   * The member's most recent request, whatever its status.
-   *
-   * <p>Read by the member's own profile page rather than {@link #findByUserIdAndStatus}, and the
-   * difference is an obligation rather than a nicety: a <b>refused</b> request carries the admin's
-   * reasoning, and Art. 12(4) requires the requester to be told it. A projection that returned only
-   * pending requests would leave the member with a notification saying they had been refused and
-   * nowhere to read why.
+   * Returns the member's most recent request in any status, so a refused request's reasoning stays
+   * readable.
    *
    * @param userId the member
    * @return their latest request, or empty when they have never made one
@@ -90,18 +82,10 @@ public interface DeletionRequestRepository extends JpaRepository<DeletionRequest
   Instant findOldestCreatedAtByStatus(@Param("status") DeletionRequestStatus status);
 
   /**
-   * Loads a request for a decision, taking a row lock (REQ-SEC-061).
+   * Loads a request for a decision under a pessimistic write lock (REQ-SEC-061).
    *
-   * <p><b>Pessimistic, because the execute path never writes this row.</b> {@code @Version}
-   * protects {@code decline} and {@code withdraw} for free — they save the entity — but the
-   * execution audits, writes {@code app_user}, deletes the user and lets the {@code ON DELETE
-   * CASCADE} take the request. Hibernate issues no versioned {@code UPDATE}, so optimistic locking
-   * has nothing to compare and the pre-read is the only check there is.
-   *
-   * <p>Without the lock: both transactions read {@code PENDING}, the member's withdrawal commits
-   * first, and the execution's cascade then deletes the just-withdrawn row along with the account.
-   * The member believes they took their request back and is irreversibly deleted anyway. With it,
-   * the second reader waits and then sees the decided row.
+   * <p>The execute path never updates this row, so optimistic locking cannot serialise it against a
+   * concurrent withdrawal.
    *
    * @param id the request to decide
    * @return the request, row-locked for the rest of the transaction

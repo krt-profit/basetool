@@ -51,16 +51,11 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST surface over mission finance entries. Reads are mission-scoped (via {@code
- * /missions/{missionId}/finance-entries}); writes are entry-scoped (via {@code
- * /finance-entries/{entryId}}). The whole finance ledger is restricted to registered members and
- * above ({@code @authHelperService.isMemberOrAbove()}). The two cohorts that gate used to exclude —
- * anonymous callers and the role-less {@code GUEST} — no longer exist: nothing anonymous reaches an
- * {@code /api} path and a role-less token is refused {@code 403 NO_ROLE} before any handler runs
- * (REQ-SEC-052, REQ-SEC-053). The gate is kept because it still answers a question of its own — the
- * finance ledger is the mission's payout view, and membership is what it asks for. Every
- * member-facing response still strips the nested participant PII via {@link #redactParticipantPii}
- * (a peer's email is profile-only; audit finding H-1). Update/delete are gated on {@link
+ * REST surface over mission finance entries: reads are mission-scoped, writes entry-scoped.
+ *
+ * <p>The ledger is restricted to members and above ({@code @authHelperService.isMemberOrAbove()});
+ * every response strips nested participant PII via {@link #redactParticipantPii}. Update/delete are
+ * gated on {@link
  * de.greluc.krt.profit.basetool.backend.service.MissionSecurityService#canEditFinanceEntry}.
  */
 @Slf4j
@@ -70,21 +65,15 @@ import org.springframework.web.bind.annotation.RestController;
 public class MissionFinanceEntryController {
 
   /**
-   * Whitelisted sort fields for {@link #getFinanceEntries}. Anything else from the {@code sort}
-   * query parameter triggers {@link IllegalArgumentException} in {@link
-   * PaginationUtil#createPageRequest} — the global handler turns that into a 400. Without the
-   * whitelist Spring's default resolver accepts paths like {@code participant.user.email,desc},
-   * leaking ordering information about PII columns (audit finding M-1).
+   * Whitelisted sort fields for {@link #getFinanceEntries}; any other field yields a 400, so no
+   * ordering by PII columns is possible.
    */
   private static final Set<String> ALLOWED_SORT =
       Set.of("createdAt", "amount", "type", "note", "id");
 
   /**
-   * Per-endpoint upper bound on the finance-entry list {@code size}, well below the global {@link
-   * PaginationUtil#MAX_PAGE_SIZE}. The mission finance ledger is not a "load-all" surface — the
-   * summary strip reads the SQL aggregate at {@code /finance-entries/summary} instead — so a modest
-   * cap keeps a single render from materializing thousands of rows and pinning a database
-   * connection under the multi-user live-update fan-out (ADR-0078).
+   * Upper bound on the finance-entry list {@code size}, below the global {@link
+   * PaginationUtil#MAX_PAGE_SIZE}; totals come from the summary aggregate instead (ADR-0078).
    */
   private static final int MAX_FINANCE_PAGE_SIZE = 500;
 
@@ -134,13 +123,11 @@ public class MissionFinanceEntryController {
   }
 
   /**
-   * Aggregated finance totals for the mission's summary strip (Gesamtsumme / Einnahmen / Ausgaben /
-   * je Anteil), computed by a single SQL aggregate rather than a ledger load-all (ADR-0078
-   * mission-scale hardening). Carries only sums and counts — no participant PII — so, unlike the
-   * entry list, it needs no redaction.
+   * Aggregated finance totals for the mission's summary strip, computed by a single SQL aggregate
+   * (ADR-0078). Carries no participant PII.
    *
    * @param missionId mission id
-   * @return the mission's finance totals (income/expense sums + counts and the signed total)
+   * @return the income/expense sums and counts plus the signed total
    */
   @GetMapping("/missions/{missionId}/finance-entries/summary")
   @PreAuthorize(
@@ -151,20 +138,9 @@ public class MissionFinanceEntryController {
   }
 
   /**
-   * Creates a finance entry. Restricted to registered members and above ({@code
-   * isMemberOrAbove()}), because the finance ledger is the mission's payout view. The cohorts that
-   * used to make that gate load-bearing on their own — anonymous and role-less callers — are
-   * refused earlier now (REQ-SEC-052, REQ-SEC-053). The response strips the nested participant PII
-   * via {@link #redactParticipantPii} so the create cannot echo a peer's email back to the creator
-   * (email is a profile-only field, H-1).
-   *
-   * <p>REQ-SEC-042: the write gate is {@code @missionSecurityService.canCreateFinanceEntry}, not
-   * the read-level {@code canSeeMission} it used to be. The latter grants the cross-squadron public
-   * escape on a non-internal mission, which let any member book into another squadron's ledger and
-   * attribute the row to one of that squadron's participants — while editing the same row required
-   * being its owner or an officer in scope. The create is now gated like the management act it is:
-   * a mission manager (in scope) books for anyone on the mission, a plain member only for their own
-   * participant row.
+   * Creates a finance entry, gated by {@code @missionSecurityService.canCreateFinanceEntry}
+   * (REQ-SEC-042): a mission manager in scope books for anyone on the mission, a plain member only
+   * for their own participant row.
    *
    * @param dto create payload
    * @return the persisted entry, with nested participant PII stripped
@@ -181,9 +157,8 @@ public class MissionFinanceEntryController {
   }
 
   /**
-   * Updates an entry. Service-layer {@code @PreAuthorize} checks owner-vs-admin; the response has
-   * its nested participant PII stripped via {@link #redactParticipantPii} (email is a profile-only
-   * field; H-1) so an edit cannot echo a peer's email back to the editor.
+   * Updates an entry; the service checks owner-vs-admin, and the response has nested participant
+   * PII stripped via {@link #redactParticipantPii}.
    *
    * @param entryId entry id
    * @param dto update payload (carries the expected version)
@@ -209,16 +184,11 @@ public class MissionFinanceEntryController {
   }
 
   /**
-   * Redacts the nested participant's PII from a finance-entry DTO for every finance-ledger caller
-   * (audit H-1) — the redaction is unconditional, a Logistician/Officer is treated no differently
-   * from a squadron member here. A {@code null} participant or user passes through unchanged;
-   * otherwise the participant goes through {@link MissionPeerRedactor#cleanupParticipantForPeer}
-   * itself — the same pass the mission surface applies, which since V239 deleted the guest edit
-   * token is field-for-field what this method used to spell out on its own (ADR-0159).
+   * Strips the nested participant's PII from a finance-entry DTO, unconditionally for every caller,
+   * using {@link MissionPeerRedactor#cleanupParticipantForPeer}.
    *
-   * @param dto the finance-entry DTO straight from the service
-   * @return a copy with the nested participant PII stripped, or {@code dto} when there is no
-   *     participant/user to redact
+   * @param dto the finance-entry DTO from the service
+   * @return a redacted copy, or {@code dto} when it has no participant or user
    */
   private MissionFinanceEntryDto redactParticipantPii(@NotNull MissionFinanceEntryDto dto) {
     MissionParticipantDto participant = dto.participant();

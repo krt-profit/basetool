@@ -46,19 +46,11 @@ public interface JobOrderItemHandoverRepository extends JpaRepository<JobOrderIt
   boolean existsByJobOrderId(UUID jobOrderId);
 
   /**
-   * Replaces a handle typed into the {@code recipient_handle} free-text field with the erasure
-   * sentinel, matching <b>case-insensitively</b> (REQ-SEC-062).
+   * Replaces a {@code recipient_handle} matching {@code handle} case-insensitively with the erasure
+   * sentinel (REQ-SEC-062).
    *
-   * <p>Unlike every other handle snapshot this column has <b>no user id beside it</b>: a handover
-   * recipient is typed in by hand and may name somebody who has no account at all. So the match can
-   * only be on the text, and it has to ignore case, because whoever typed it was not copying from a
-   * roster. That also makes this the one anonymisation target that works for an <em>already
-   * deleted</em> account, and the reason the admin Personensuche (REQ-SEC-060) exists at all.
-   *
-   * <p><b>A handle is not a unique key.</b> Two people could in principle have used the same
-   * spelling, so this can over-match. That is the correct direction of error for an erasure request
-   * and is stated in {@code docs/privacy/data-subject-requests.md}: the admin reviews the
-   * Personensuche hits before granting.
+   * <p>The column is free text with no user id, so it is matched on text alone and may over-match;
+   * the admin reviews the Personensuche hits before granting.
    *
    * @param handle the recipient spelling to erase; compared case-insensitively
    * @param sentinel {@code HandleAnonymisation#SENTINEL}

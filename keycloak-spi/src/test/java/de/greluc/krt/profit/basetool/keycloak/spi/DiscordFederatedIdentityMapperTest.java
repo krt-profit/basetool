@@ -44,11 +44,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Verifies that {@link DiscordFederatedIdentityMapper} sources the {@code discord_user_id} claim
- * from the user's federated identity link: present link → claim set to the snowflake; no link or a
- * blank id → claim omitted; and a missing alias config falls back to the {@code discord} default.
- * Drives the protected {@code setClaim} directly (same package), since the claim-derivation logic —
- * not Keycloak's own include-in-token gating — is what is under test.
+ * Tests that {@link DiscordFederatedIdentityMapper} sets the {@code discord_user_id} claim from the
+ * federated link, omits it without a link or id, and defaults the alias to {@code discord}.
  */
 @ExtendWith(MockitoExtension.class)
 class DiscordFederatedIdentityMapperTest {

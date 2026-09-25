@@ -81,9 +81,8 @@ class IngestGatePostureMetricTest {
   }
 
   /**
-   * Audit-only counts but never refuses, so the three client-identity gates report 0 — but it does
-   * not reach the audience, which lives in the decoder and refuses from the moment it is set. That
-   * asymmetry is exactly what bit production on 2026-08-03.
+   * Audit-only mode reports the three client-identity gates as off but leaves the audience check,
+   * enforced in the decoder, reported as on.
    */
   @Test
   void auditOnlyTurnsTheClientGatesOffButNotTheAudience() {

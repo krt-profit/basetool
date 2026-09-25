@@ -42,32 +42,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Functional flows for game-item stock rows in the Lager (UC-30, REQ-INV-029/030/031) — the item
- * sibling of {@link InventoryOperationsE2eTest}: einbuchen in the create form's item mode, umbuchen
- * and ausbuchen on an item entry through the shared modals, the ITEM-order-only allocation gate on
- * the einbuchen allocation rows, and the live peer-sync of an item write on {@code
- * /inventory/all?view=items} (REQ-FE-010/015, mirroring {@link InventorySharedLagerLiveSyncE2eTest}
- * — the single {@code inventory}/{@code stock} seam with {@code view=} riding the fragment URL).
+ * Functional flows for game-item stock in the Lager (REQ-INV-029/030/031): einbuchen in item mode,
+ * umbuchen and ausbuchen of an item row, the ITEM-order allocation gate, and live peer sync on
+ * {@code /inventory/all?view=items}.
  *
- * <p><b>Seeding.</b> Bookable game items are the output of at least one active blueprint
- * (REQ-INV-029); the e2e stack's UEX/SCWiki syncs never run, so the catalog is seeded per scenario
- * via {@link BackendSeeder#seedOrderableItem} (a {@code game_item} + active {@code blueprint} +
- * resolved RESOURCE ingredient over JDBC — the same shape the stack bootstrap seeds once for the
- * item-order picker). Item stock rows for the modal flows are seeded through the real {@code POST
- * /api/v1/inventory} with a {@code gameItemId} payload ({@link
- * BackendSeeder#createItemInventoryEntry}), and the allocation-gate fixture seeds one qualifying
- * ITEM order ({@link BackendSeeder#createItemJobOrder}) plus one MATERIAL order as the negative.
- * Each scenario uses its <strong>own game item</strong> for isolation in the shared, sequentially
- * run stack.
- *
- * <p><b>Drive via UI, verify via API.</b> Like the material sibling, every mutation goes through
- * the real form / modal and the outcome is asserted through the same grouped {@code catalog=ITEM}
- * endpoint the item views render from ({@code GET
- * /api/v1/inventory/my-inventory/grouped?catalog=ITEM&gameItemIds=…}), which never races the
- * post-write render. The item picker is a remote-searched combobox ({@code remote-game-items} →
- * {@code /inventory/item-search}, uncached), so a freshly seeded widget is offered at once; the
- * location picker stays the long-cached local combobox, so the flows select whatever it offers
- * rather than assuming a fresh location is listed.
+ * <p>Each scenario seeds its own game item via {@link BackendSeeder#seedOrderableItem}; mutations
+ * are driven through the UI and verified via the grouped {@code catalog=ITEM} endpoint.
  */
 @Tag("e2e")
 class ItemInventoryOperationsE2eTest {
@@ -168,11 +148,8 @@ class ItemInventoryOperationsE2eTest {
   }
 
   /**
-   * <em>Einbuchen (item mode).</em> Switches the create form to item mode via the catalog toggle,
-   * picks the seeded widget from the remote-searched item combobox, a location and a whole amount,
-   * submits the AJAX twin and asserts the stock landed (grouped {@code catalog=ITEM} read grew by
-   * exactly the entered amount) and that the new row is reachable in the {@code
-   * /inventory/my?view=items} tree: gameItem group → stack → lazily loaded entry leaf.
+   * Einbuchen in item mode: books in the seeded widget and asserts the stock grew by the entered
+   * amount and the row is reachable in the {@code /inventory/my?view=items} tree.
    */
   @Test
   void einbuchenCreatesItemStock() {
@@ -216,12 +193,9 @@ class ItemInventoryOperationsE2eTest {
   }
 
   /**
-   * <em>Umbuchen + Ausbuchen (item row).</em> Expands the item tree to the seeded 50-unit entry,
-   * asserts the item view renders neither a quality column nor a mission split (REQ-INV-029/031 —
-   * locator absence), transfers 20 units to a different location through the Umbuchen modal
-   * (append-only: source keeps 30, destination receives a fresh 20), then discards the remaining 30
-   * at the source through the book-out modal — the source stack falls under the deletion epsilon
-   * and vanishes, leaving only the destination stack.
+   * Umbuchen and Ausbuchen of an item row: no quality column or mission split is rendered
+   * (REQ-INV-029/031); 20 of 50 units move to another location, then discarding the remaining 30
+   * removes the source stack.
    */
   @Test
   void umbuchenAndBookOutItemRow() {
@@ -287,12 +261,8 @@ class ItemInventoryOperationsE2eTest {
   }
 
   /**
-   * <em>Einbuchen allocation gate (REQ-INV-031).</em> In item mode with the gate widget picked, the
-   * "+ Auftrag" allocation row offers only ITEM orders whose lines request that gameItem: the
-   * seeded qualifying ITEM order's option stays enabled while the MATERIAL order's option is
-   * filtered out (the {@code data-game-items} CSV sibling of the material {@code data-materials}
-   * filter). The mission allocation section is hidden outright — item rows reject the mission
-   * dimension.
+   * Einbuchen allocation gate (REQ-INV-031): in item mode the "+ Auftrag" row offers only ITEM
+   * orders requesting that game item, and the mission allocation section is hidden.
    */
   @Test
   void einbuchenAllocationGateFiltersOrdersByCatalog() {
@@ -320,14 +290,8 @@ class ItemInventoryOperationsE2eTest {
   }
 
   /**
-   * <em>Restmenge an der Auftragsoption, Item-Variante (REQ-INV-039, #1742).</em> The material
-   * picker states what an order still needs; the item picker states the same thing from a different
-   * calculation — ordered minus delivered minus already earmarked, in whole pieces. Picks the game
-   * item of an order for 7 units with nothing built, delivered or earmarked, adds an allocation row
-   * and asserts the option carries the count.
-   *
-   * <p>Also pins the deliberate asymmetry: item rows carry no quality at all (REQ-INV-029), so the
-   * material picker's quality marker must never appear here.
+   * The item check-in order option shows the outstanding piece count (REQ-INV-039) and never the
+   * quality marker, since item rows have no quality.
    */
   @Test
   void checkInItemOrderOptionStatesTheOutstandingNeed() {
@@ -356,12 +320,8 @@ class ItemInventoryOperationsE2eTest {
   }
 
   /**
-   * <em>Live peer-sync of an item write (REQ-FE-010/015).</em> Two contexts of the same admin view
-   * {@code /inventory/all?view=items} with the seeded 100-unit widget expanded. Context B books out
-   * 40 units (DISCARD) through the book-out modal — the write broadcasts the existing {@code
-   * inventory}/{@code stock} seam — and context A, a passive viewer that never reloads, must show
-   * the widget's group total drop to 60 IN PLACE (its own filtered fragment re-fetch rides the
-   * {@code view=items} query state).
+   * Live peer sync of an item write (REQ-FE-010/015): a 40-unit book-out in one context drops the
+   * widget's group total to 60 in a second, never-reloaded context.
    */
   @Test
   void liveSyncItemWrite() {
@@ -454,17 +414,12 @@ class ItemInventoryOperationsE2eTest {
   }
 
   /**
-   * Navigates to {@code /inventory/my?view=items} and expands the game item's group then the stack
-   * at the given location, waiting for the lazily-fetched entry leaf row to appear (REQ-INV-030 —
-   * the item tree mirrors the material tree's lazy-load semantics with a view-scoped expansion
-   * state). The game item is unique per scenario so the group selector is unambiguous; the stack
-   * header is additionally keyed by location because a transfer splits the item across two stacks
-   * under the same group. Expansion is idempotent like the material sibling's helper: a
-   * restored-open container is not blind-clicked shut (the guard reads the computed {@code
-   * display}, not Playwright visibility).
+   * Navigates to {@code /inventory/my?view=items} and expands the game item's group and the stack
+   * at the given location until the entry leaf row appears (REQ-INV-030). Already-open containers
+   * are left open.
    *
    * @param page the authenticated page
-   * @param gameItemId the (scenario-unique) game item whose group to expand
+   * @param gameItemId the scenario-unique game item whose group to expand
    * @param locationId the storage location identifying the stack to expand
    * @param rowId the inventory row id whose leaf row signals the entries loaded
    */
@@ -495,10 +450,8 @@ class ItemInventoryOperationsE2eTest {
   }
 
   /**
-   * Navigates to {@code /inventory/all?view=items} and expands the sync widget's group then its
-   * single stack, waiting for the lazily-fetched entry leaf row to load — the item-view twin of
-   * {@link InventorySharedLagerLiveSyncE2eTest}'s expansion. Blind clicks are safe here: each
-   * live-sync context starts from the login-time storage state, so no expansion is ever restored.
+   * Navigates to {@code /inventory/all?view=items} and expands the sync widget's group and stack
+   * until the entry leaf row loads.
    *
    * @param page the authenticated page
    */
@@ -514,10 +467,8 @@ class ItemInventoryOperationsE2eTest {
   }
 
   /**
-   * Reports whether the Lager tree container matched by {@code selector} is collapsed, reading its
-   * synchronously-set computed {@code display} rather than Playwright visibility — a restored-open
-   * stack is {@code display: block} yet momentarily zero-height while its lazy leaf rows fetch, so
-   * {@code isVisible()} would misread it as hidden and a blind toggle would collapse it.
+   * Reports whether the Lager tree container matched by {@code selector} is collapsed, judged by
+   * its computed {@code display}, not Playwright visibility.
    *
    * @param page the authenticated page
    * @param selector the CSS selector of the group-items / stack-entries container
@@ -533,11 +484,8 @@ class ItemInventoryOperationsE2eTest {
   }
 
   /**
-   * Submits an open book-out / Umbuchen modal and waits for its in-place AJAX write to settle (both
-   * post to {@code /inventory/{id}/transfer} and re-swap the grouped table on success — neither
-   * path navigates). Sets the {@code window.__krtNoReload} marker, drops the {@code position:
-   * fixed} footer out of the way (it can otherwise intercept the trusted click), waits on the XHR
-   * POST so the backend has provably answered, and finally asserts the marker survived.
+   * Submits an open book-out or Umbuchen modal, waits for its {@code POST /inventory/{id}/transfer}
+   * to answer, and asserts the page was not reloaded.
    *
    * @param page the authenticated page with the modal open and filled
    * @param submitSelector the modal's submit button selector ({@code #bookOutSubmitBtn} or {@code
@@ -558,10 +506,7 @@ class ItemInventoryOperationsE2eTest {
   }
 
   /**
-   * Selects, in the Umbuchen modal's transfer-target location combobox, the first option whose
-   * value differs from the source location, and returns that destination id — the same cached-
-   * option-set-tolerant pick as the material sibling's helper (a distinct option always exists
-   * because the bootstrap refinery hub is cached while the source here is a fresh location).
+   * Selects the first Umbuchen target location that differs from the source and returns its id.
    *
    * @param page the authenticated page with the Umbuchen modal's LOCATION fields visible
    * @param sourceLocationId the row's current (source) location id to avoid
@@ -604,11 +549,10 @@ class ItemInventoryOperationsE2eTest {
   }
 
   /**
-   * Resolves the caller's inventory row holding the given game item from the flat {@code
-   * catalog=ITEM} list — the leaf-row anchor for the tree assertions after a UI book-in (the create
-   * response body is consumed by the page, not the test).
+   * Finds the caller's inventory row holding the given game item in the flat {@code catalog=ITEM}
+   * list.
    *
-   * @param gameItemId the (scenario-unique) game item whose row to find
+   * @param gameItemId the scenario-unique game item whose row to find
    * @return the matching inventory row as JSON ({@code id}, {@code location}, {@code amount}, …)
    * @throws IllegalStateException if the caller holds no row of that game item
    */

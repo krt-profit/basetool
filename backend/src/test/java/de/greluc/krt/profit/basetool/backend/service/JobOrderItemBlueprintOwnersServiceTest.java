@@ -56,15 +56,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Mockito unit tests for {@link JobOrderItemBlueprintOwnersService}: the <em>variant-family</em>
- * matching of an item order's required lines against members' owned blueprints (a base item counts
- * owners of its cosmetic variants and vice-versa), the magazine exclusion (an ammo container never
- * fulfils a weapon line and a member's magazine is never shown), the per-family coverage counting,
- * the per-owner surfacing of the concrete owned variant, and the responsible-org-unit-only member
- * resolution. The real {@link BlueprintVariantFamilyResolver} (with the real {@link
- * BlueprintNameNormalizer} and {@link BlueprintVariantAliasOverrides}) is wired in so the family
- * matching is exercised end-to-end; the surrounding members-only authorization is covered by {@code
- * OwnerScopeServiceTest} and {@code JobOrderControllerTest}.
+ * Mockito unit tests for {@link JobOrderItemBlueprintOwnersService}: variant-family matching of an
+ * item order's lines against owned blueprints, the magazine exclusion, per-family coverage counts,
+ * the concrete owned variant per owner, and member resolution limited to the responsible org unit.
+ * The real {@link BlueprintVariantFamilyResolver}, {@link BlueprintNameNormalizer} and {@link
+ * BlueprintVariantAliasOverrides} are wired in.
  */
 @ExtendWith(MockitoExtension.class)
 class JobOrderItemBlueprintOwnersServiceTest {

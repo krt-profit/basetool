@@ -35,21 +35,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Regression coverage for the stale participant-count displays on the mission-detail page (epic
- * #571 / #574): adding a participant re-renders only the crew-board fragment (#crew-board-results),
- * but the participant counts shown in the page header — the facts-bar "Teilnehmer" value and the
- * crew tab badge "checkedIn/registered" — live OUTSIDE that fragment, so before the fix they kept
- * their page-load value until a full reload (the backend count was correct; only the UI was stale).
+ * Verifies that adding a guest participant updates the header participant count and the crew tab
+ * badge in place, although both live outside the re-rendered crew-board fragment.
  *
- * <p>The fix carries the fresh counts inside the crewBoard fragment ({@code #crew-count-meta}) and
- * a {@code krt:swapped} listener patches the out-of-fragment {@code #facts-registered}, {@code
- * #facts-checked-in} and {@code #tab-crew .tab-count} after every crew swap — the generalisation of
- * the finance-badge precedent. This test seeds a participant-free mission, adds a guest through the
- * UI, and asserts the header count and tab badge update IN PLACE (no full reload).
- *
- * <p>A mission is staffel-scoped, so the user is assigned to the IRIDIUM Squadron first (mirrors
- * {@link MissionFinanceEntryE2eTest}). The distinctive guest name resolves to no realm user, so the
- * add stays on the guest path.
+ * <p>The user is assigned to the IRIDIUM Squadron first; the guest name keeps the add on the guest
+ * path.
  */
 @Tag("e2e")
 class MissionParticipantCountE2eTest {

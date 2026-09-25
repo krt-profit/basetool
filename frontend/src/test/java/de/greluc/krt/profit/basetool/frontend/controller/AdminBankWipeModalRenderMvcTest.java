@@ -38,10 +38,9 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Render regression for the S12 (#918) {@code fragments/modal-wrapper :: modal(...)} extraction on
- * {@code /admin/bank}. The wipe-reset modal exercises the {@code variant} parameter ({@code
- * krt-modal--danger}); this pins that the fragment appends the variant class, renders the unified
- * close trigger, and projects the confirm {@code <form>} body exactly once.
+ * Render test for the {@code /admin/bank} wipe-reset modal: the modal wrapper appends the {@code
+ * krt-modal--danger} variant class, renders the close trigger, and projects the confirm {@code
+ * <form>} body exactly once.
  */
 @SpringBootTest
 class AdminBankWipeModalRenderMvcTest {

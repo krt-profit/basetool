@@ -24,18 +24,11 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Custom-repository fragment giving {@link UserRepository} a graph-free by-id lookup (BE-PERF-12,
- * REQ-DATA-003).
+ * Custom-repository fragment giving {@link UserRepository} a by-id lookup without the {@code roles}
+ * entity graph (REQ-DATA-003).
  *
- * <p>The overridden {@link UserRepository#findById(UUID)} graphs {@code roles} <em>and</em> {@code
- * roles.permissions} — right for the authentication path and the caller's own {@code /users/me},
- * which assemble authorities from both, and pure waste for the many service methods that only need
- * the user as a foreign-key target ({@code ship.owner}, an inventory owner filter, a new membership
- * row) or read a scalar or two (the effective name, the approval status). Those resolve the user
- * here instead, through {@link jakarta.persistence.EntityManager#find(Class, Object)}: the plain
- * row with no collection fetched, first-level-cache aware (a user the transaction already holds
- * costs no statement at all), and never auto-flushing, unlike a JPQL query. A caller that does
- * touch {@code getRoles()} afterwards still gets them, lazily and inside its own transaction.
+ * <p>For callers that need the user only as a foreign-key target or for a few scalars; it uses
+ * {@link jakarta.persistence.EntityManager#find(Class, Object)} and never auto-flushes.
  */
 public interface UserRepositoryPlainLookupFragment {
 

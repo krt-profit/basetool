@@ -40,16 +40,13 @@ import lombok.Setter;
 import lombok.ToString;
 
 /**
- * One ingredient line of a {@link Blueprint} (SC_WIKI_SYNC_PLAN.md §6.3.3). A line is either a
- * {@link BlueprintIngredientKind#RESOURCE} (consumes a {@link Material}, quantity in SCU) or a
- * {@link BlueprintIngredientKind#ITEM} (consumes a {@link GameItem}, quantity in whole units).
+ * One ingredient line of a {@link Blueprint}: a {@link BlueprintIngredientKind#RESOURCE} consumes a
+ * {@link Material} in SCU, an {@link BlueprintIngredientKind#ITEM} a {@link GameItem} in whole
+ * units.
  *
- * <p>The resolved FK ({@link #material} / {@link #gameItem}) may be {@code null} when the sync
- * could not resolve the Wiki reference yet — the raw {@link #wikiResourceUuid} / {@link
- * #wikiItemUuid} / {@link #wikiNameSnapshot} are always persisted so a later sync (after an admin
- * adds an alias, or after the item lands in {@code game_item}) re-resolves transparently without
- * re-fetching the Wiki (§8.2). The DB CHECK constraints enforce kind/FK and kind/quantity
- * exclusivity but permit a null matching FK while unresolved (see V114 migration header).
+ * <p>The resolved {@link #material} / {@link #gameItem} may be {@code null} while unresolved; the
+ * raw {@link #wikiResourceUuid} / {@link #wikiItemUuid} / {@link #wikiNameSnapshot} are always
+ * persisted so a later sync can re-resolve it.
  */
 @Entity
 @Table(name = "blueprint_ingredient")

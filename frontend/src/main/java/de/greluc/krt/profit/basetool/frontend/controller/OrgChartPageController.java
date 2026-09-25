@@ -45,15 +45,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
- * Spring MVC controller for the Profit-Bereich org chart page ({@code /org-chart}). The page itself
- * is open to every authenticated user (read-only view); the inline editor's write operations are
- * proxied through the AJAX endpoints below, each hard-gated to ADMIN — the class is intentionally
- * NOT class-level {@code @PreAuthorize("hasRole('ADMIN')")} so members can still view the chart.
- *
- * <p>The AJAX proxies forward the JSON body verbatim to the backend and, on a backend RFC-7807
- * failure, relay the HTTP status plus a slim {@code {code, detail}} body so the page JS can show
- * the backend's localized message in a toast (and recognise the {@code OPTIMISTIC_LOCK} code to
- * prompt a reload).
+ * Spring MVC controller for the org chart page ({@code /org-chart}): the page is readable by every
+ * authenticated user, and the AJAX editor endpoints are ADMIN-only. Backend RFC 7807 failures are
+ * relayed as their status plus a {@code {code, detail}} body.
  */
 @Controller
 @UsesLayoutModel
@@ -65,20 +59,11 @@ public class OrgChartPageController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Renders the org-chart page (read-only for everyone; admins edit free-text holders inline).
-   * Since epic #800 (REQ-ROLE-006) account-linked seats are a mirror of the functional ranks
-   * appointed under Organisation → Leitung, so the chart editor no longer offers an account picker
-   * and the page needs no user-lookup preload.
-   *
-   * <p>When {@code fragment=chartBody} the controller returns only the {@code chartBody} fragment
-   * so the page re-renders the whole tree in place after an edit instead of a full reload (epic
-   * #571 / REQ-FE-005). The chart is a flat, CSS-connected pre-order tree whose add affordances and
-   * vacant/filled transitions are derived aggregate state, so a per-node DOM patch would desync the
-   * "+" buttons and the ARIA roving-tabindex order — a full fragment swap re-stamps every {@code
-   * data-version} and rebuilds the tree atomically.
+   * Renders the read-only org-chart page, on which admins edit free-text holders inline;
+   * account-held seats mirror the functional ranks (REQ-ROLE-006).
    *
    * @param fragment when {@code "chartBody"}, only the chart-body fragment is rendered for an
-   *     in-place AJAX swap; otherwise the full page.
+   *     in-place AJAX swap (REQ-FE-005); otherwise the full page.
    * @param model Thymeleaf model populated with {@code orgChart}.
    * @return the {@code org-chart} view name, or its {@code chartBody} selector for the fragment
    *     path.

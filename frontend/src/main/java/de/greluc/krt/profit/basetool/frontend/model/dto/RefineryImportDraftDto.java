@@ -22,11 +22,9 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.util.List;
 
 /**
- * Frontend mirror of the backend {@code RefineryImportDraftDto} (#434/#435): the non-persisted
- * pre-fill returned by {@code POST /api/v1/refinery-orders/import-extract}. The import proxy pours
- * {@link #order} into a {@code RefineryOrderForm} flash attribute and renders {@link #issues} as
- * inline review flags on the create page. Fields must stay in lockstep with the backend record
- * (mirror-DTO rule).
+ * Frontend mirror of the backend {@code RefineryImportDraftDto}: the non-persisted pre-fill
+ * returned by {@code POST /api/v1/refinery-orders/import-extract}, rendered into the create form
+ * with its review issues.
  *
  * @param order best-effort pre-fill; unmatched fields are {@code null}
  * @param issues every review finding, order-level first, then per row

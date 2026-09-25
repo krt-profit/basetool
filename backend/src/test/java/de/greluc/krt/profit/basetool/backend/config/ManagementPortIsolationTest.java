@@ -37,24 +37,13 @@ import org.springframework.boot.web.server.servlet.context.ServletWebServerAppli
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * Verifies the management-port isolation for the backend (ADR-0134, extending ADR-0090).
- *
- * <p>Three properties have to hold together, and the third is what makes the backend different from
- * frontend and ingest:
+ * Verifies the backend's management-port isolation (ADR-0134).
  *
  * <ol>
- *   <li>Actuator is absent from the application connector, so the public vhost of the exposure plan
- *       cannot reach it even if the edge deny were removed;
- *   <li>the read endpoints answer on the management port without credentials, because Prometheus
- *       and the Docker health probe send none;
- *   <li>the log-level mutator is still refused without {@code ROLE_ADMIN}. Frontend and ingest give
- *       that up and delete the write instead; the backend keeps it, and this test is the thing that
- *       stops a later widening of the permit-all matcher from silently un-gating it.
+ *   <li>Actuator is absent from the application connector.
+ *   <li>The read endpoints answer on the management port without credentials.
+ *   <li>The log-level mutator still requires {@code ROLE_ADMIN}.
  * </ol>
- *
- * <p>The prod profile additionally serves the management port over HTTPS with the shared keystore.
- * That is declarative SSL configuration, not exercised here — the {@code test} profile runs plain
- * HTTP on both connectors.
  */
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
@@ -162,16 +151,8 @@ class ManagementPortIsolationTest {
   }
 
   /**
-   * Pins why {@code server.tomcat.threads.*} is deliberately not configured and why the "Spring
-   * Boot apps" dashboard reads {@code http_server_requests_active_seconds_count} instead of {@code
-   * tomcat_threads_busy_threads} (FE-PERF-07).
-   *
-   * <p>With {@code spring.threads.virtual.enabled=true} Spring Boot hands the connector an external
-   * {@link VirtualThreadExecutor}. Tomcat applies {@code maxThreads}/{@code minSpareThreads} only
-   * to its own internal executor and reports {@code -1} for every thread-pool gauge, so the
-   * settings were inert and the dashboard panel drew a flat {@code -1}. Should virtual threads ever
-   * be switched off, the executor assertion fails and the thread-pool settings become meaningful
-   * again.
+   * The connector runs on a {@link VirtualThreadExecutor}, so Tomcat thread-pool settings and
+   * gauges are inert and concurrency is measured by the active-request gauge instead.
    *
    * @throws Exception if a probe request fails to send
    */
@@ -199,13 +180,8 @@ class ManagementPortIsolationTest {
   }
 
   /**
-   * The in-flight timer carries no histogram, while the latency timer keeps its buckets.
-   *
-   * <p>{@code management.metrics.distribution.percentiles-histogram[http.server.requests]} matches
-   * the derived {@code http.server.requests.active} long-task timer by prefix, which exported about
-   * fifty {@code _bucket} series per label set that no panel or rule reads. The {@code .active} key
-   * switches it off for that timer alone; the p95 latency panels still need the buckets of {@code
-   * http.server.requests} itself.
+   * The in-flight {@code http.server.requests.active} timer exports no histogram, while the latency
+   * timer {@code http.server.requests} keeps its buckets.
    *
    * @throws Exception if a probe request fails to send
    */

@@ -109,11 +109,9 @@ class GlobalExceptionHandlerTest {
   }
 
   /**
-   * A backend {@code 401}/{@code 403} refuses the gateway's <em>own</em> service-account token, not
-   * the member's (ADR-0129). It must reach the extractor as the server-side relay failure it is — a
-   * 502 with {@code BACKEND_RELAY_FAILED}, never the backend's auth status, which would tell the
-   * member to sign in again — and it must drop the cached token so the next upload mints a fresh
-   * one (ING-SEC-02).
+   * A backend {@code 401}/{@code 403} refuses the gateway's own service-account token (ADR-0129),
+   * so it reaches the extractor as a 502 with {@code BACKEND_RELAY_FAILED} and drops the cached
+   * token.
    */
   @ParameterizedTest
   @ValueSource(ints = {401, 403})

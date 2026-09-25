@@ -34,30 +34,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Servlet filter that intercepts known bot, scanner, and exploit requests before they reach the
- * Spring Security filter chain.
+ * Servlet filter that rejects known bot, scanner and exploit requests before the Spring Security
+ * chain.
  *
- * <p>Four independent detection strategies are applied in order:
- *
- * <ol>
- *   <li><b>Query-string syntax:</b> a query string carrying a chunk with an empty parameter name
- *       (e.g. {@code /?=phpinfo()}) is answered with a bare HTTP 400 — see {@link
- *       #isMalformedQueryString(String)}. This runs <em>first</em>, because the three rules below
- *       answer with {@code sendError()}, and the container's error dispatch would re-read the same
- *       unparseable query string.
- *   <li><b>Path-prefix matching:</b> URIs starting with known bot/scanner path prefixes (e.g.
- *       {@code /wp-admin/}, {@code /actuator}, {@code /.env}) are answered with HTTP 404
- *       immediately.
- *   <li><b>File-extension matching:</b> Requests for file types the application never serves (e.g.
- *       {@code .php}, {@code .asp}, {@code .sql}) are answered with HTTP 404.
- *   <li><b>HTTP-method filtering:</b> Requests using methods the application never uses (e.g.
- *       {@code TRACE}, {@code CONNECT}, {@code PROPFIND}) are answered with HTTP 405.
- * </ol>
- *
- * <p>This filter runs before Spring Security, so bot requests never trigger an OAuth2 flow or load
- * the security context — reducing unnecessary load on Keycloak and the application.
- *
- * <p>All detection is case-insensitive to prevent trivial bypass attempts.
+ * <p>Applies, case-insensitively and in this order: a malformed query string (400), a bot path
+ * prefix (404), a never-served file extension (404), and an unused HTTP method (405).
  */
 @Component
 @Slf4j
@@ -179,28 +160,12 @@ public class BotProtectionFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Mirrors the one query-string syntax rule Tomcat's parameter parser rejects outright: a chunk
-   * whose parameter <em>name</em> is empty but which still carries a value, i.e. a chunk starting
-   * with {@code =} ({@code /?=phpinfo()}, {@code /?a=1&amp;=2}). Tomcat splits on {@code &} before
-   * any percent-decoding, so this check runs on the raw query string and a {@code %3D} is correctly
-   * not treated as a separator. A wholly empty chunk ({@code a=1&amp;&amp;b=2}) is legal and
-   * skipped, matching {@code Parameters.processParameters}.
+   * Detects the query-string shape Tomcat's parameter parser rejects: a chunk with an empty name,
+   * i.e. starting with {@code =} (e.g. {@code /?=phpinfo()}). Checked on the raw string; empty
+   * chunks are legal.
    *
-   * <p>Scanners produce these constantly ({@code GET /?=phpinfo()} is a stock PHP-CGI probe); no
-   * browser or {@code URLSearchParams} caller ever does. Left unhandled, the failure surfaces on
-   * the first {@code getParameter*()} call of the request — for the frontend that is {@code
-   * LocaleChangeInterceptor} reading {@code ?lang}, i.e. <em>every</em> request — and lands on the
-   * {@code Exception} catch-all as a 500 with a full stack trace.
-   *
-   * <p>Deliberately narrow: Tomcat's other two parameter-parse rejects (a percent-escape that fails
-   * to decode, and the {@code maxParameterCount} cap) are not re-implemented here — reproducing its
-   * decoder would be the kind of divergence that turns into a wrong 400 on legitimate traffic.
-   * Those stay with {@code GlobalExceptionHandler}, which demotes them to a clean 400 + {@code
-   * DEBUG}.
-   *
-   * @param queryString the raw query string as returned by {@code getQueryString()}; may be {@code
-   *     null} (no query string at all, which is trivially well-formed)
-   * @return {@code true} when at least one chunk starts with {@code =} and must be rejected
+   * @param queryString the raw query string from {@code getQueryString()}; may be {@code null}
+   * @return {@code true} when at least one chunk starts with {@code =}
    */
   static boolean isMalformedQueryString(String queryString) {
     if (queryString == null || queryString.isEmpty()) {
@@ -234,29 +199,16 @@ public class BotProtectionFilter extends OncePerRequestFilter {
   }
 
   /**
-   * URIs that look like bot/scanner targets at first glance but are in fact legitimate endpoints
-   * the application owns. They short-circuit {@link #isBotPath(String)} — matched
-   * case-insensitively as the exact path or any sub-path — so the regular filter chain (and Spring
-   * Security) gets a chance to handle them.
-   *
-   * <p>Currently only the Spring Boot Actuator health endpoint (incl. its {@code /liveness} /
-   * {@code /readiness} sub-paths) lives here — it is exposed publicly so the Docker {@code
-   * HEALTHCHECK} directive can reach it without authentication. See {@link #LEGITIMATE_EXACT_PATHS}
-   * for the second, stricter whitelist; every other {@code /actuator/...} path stays blocked with
-   * 404.
+   * Legitimate paths exempt from {@link #isBotPath(String)}, matched case-insensitively as the
+   * exact path or any sub-path; currently the Actuator health endpoint. See {@link
+   * #LEGITIMATE_EXACT_PATHS} for the exact-match list.
    */
   static final Set<String> LEGITIMATE_PATHS = Set.of("/actuator/health");
 
   /**
-   * Whitelist entries matched as an <b>exact, case-sensitive</b> path only — sub-paths, trailing
-   * slashes and case variants keep the bot 404. Currently only {@code /actuator/prometheus}, the
-   * monitoring scrape endpoint (REQ-OBS-005, epic #936): without this entry the filter answers 404
-   * before the dedicated basic-auth chain in {@link MonitoringScrapeSecurityConfig} ever runs. The
-   * exact-match semantics mirror that chain's {@code securityMatcher} — the endpoint has no
-   * sub-resources, so anything below it is scanner noise and must not fall through to the main
-   * OAuth2 chain (where it would trigger login redirects and request-cache churn). The path is NOT
-   * public: passing this filter only hands the request to that fail-closed chain (denyAll until the
-   * scrape credentials are configured).
+   * Legitimate paths exempt only as an exact, case-sensitive match; currently {@code
+   * /actuator/prometheus}, which is then secured by {@link MonitoringScrapeSecurityConfig}
+   * (REQ-OBS-005).
    */
   static final Set<String> LEGITIMATE_EXACT_PATHS = Set.of("/actuator/prometheus");
 

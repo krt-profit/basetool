@@ -17,31 +17,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * Admin material-catalog page module (/admin/materials), extracted verbatim from the former inline
- * script of admin/materials.html (ADR-0069, follow-up to #924).
- *
- * On DOMContentLoaded wires the material-name filter autocomplete and the in-place category
- * management (delegated create + krtFetch.write, KRT-confirm + AJAX delete, live <option> and
- * placeholder-row maintenance across every category <select>). filterTable stays a global for the
- * shared filter-table common-handler; per-row updateMaterial PUTs a single field through
- * krtFetch.write and refreshes the row version; the create-material modal open/close/submit posts
- * MaterialCreateAjaxRequest through krtFetch.write and, on success, re-renders the material table
- * in place from a fresh GET of this page (REQ-FE-001: no reload on success).
- *
- * The CAT_MSG / CAT_CONFLICT dicts, the MSG_UPDATE_* and MSG_CREATE_* toast strings and the
- * krtAutocomplete helper are provided by (respectively) the inline Thymeleaf bootstrap block of
- * admin/materials.html and the autocomplete.js module, both loaded before this classic script.
- */
-
 /* global CAT_MSG, CAT_CONFLICT, MSG_UPDATE_SUCCESS, MSG_UPDATE_ERROR, MSG_CREATE_SUCCESS, MSG_CREATE_ERROR, krtAutocomplete */
 
-// The filter autocomplete's data source. krtAutocomplete reads the array on every keystroke, so it
-// is refilled IN PLACE (never reassigned) after a create re-rendered the table — a new material is
-// then suggested without a reload.
 const materialNames = [];
 
-// Refills materialNames from the <datalist id="materialNames-data"> currently in the document.
 function readMaterialNames() {
     const dataList = /** @type {HTMLDataListElement | null} */ (
         document.getElementById('materialNames-data')
@@ -55,19 +34,10 @@ function readMaterialNames() {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-    // Material names come from the sibling <datalist id="materialNames-data">
-    // rather than a Thymeleaf JS-inline expression; see the HTML comment on
-    // the datalist for the Thymeleaf 3.1 truncation bug. th:inline=
-    // "javascript" stays on the inline bootstrap block because the toast
-    // translation keys (notification.success.save / notification.error.save)
-    // still rely on it — those are single primitives, which Thymeleaf's
-    // inline parser handles correctly.
     readMaterialNames();
     const inpMaterials = document.getElementById('filterMaterials');
     if (inpMaterials) krtAutocomplete(inpMaterials, materialNames);
 
-    // Every category <select> (the per-row CATEGORY dropdowns + the create-modal select) must
-    // gain/lose an <option> when a category is added/removed so the page never needs a reload.
     function addCategoryOption(cat) {
         document
             .querySelectorAll('select[data-update-type="CATEGORY"], #cm-category')
@@ -88,9 +58,6 @@ document.addEventListener('DOMContentLoaded', function () {
             });
     }
 
-    // Builds a category-management row (name + delete form) via the DOM API. The trash SVG is a
-    // constant markup string (no user data), so the innerHTML is not an injection sink; the
-    // category name is set via textContent. The new form is picked up by the delegated handler.
     function buildCategoryRow(cat) {
         const tr = document.createElement('tr');
         tr.setAttribute('data-category-row', '');
@@ -118,8 +85,6 @@ document.addEventListener('DOMContentLoaded', function () {
         return tr;
     }
 
-    // Rebuilds the "no entries" placeholder row removed by the first create, so deleting the
-    // last category restores it instead of leaving a header over an empty body.
     function buildEmptyCategoryRow() {
         const tr = document.createElement('tr');
         tr.setAttribute('data-category-empty', '');
@@ -130,8 +95,6 @@ document.addEventListener('DOMContentLoaded', function () {
         return tr;
     }
 
-    // Delegated category create: intercept the form so the new category appears in place (row +
-    // every dropdown option). Native submit is the no-JS fallback.
     document.addEventListener('submit', function (event) {
         const form = event.target.closest('form[data-category-create]');
         if (!form) {
@@ -177,8 +140,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    // Delegated KRT-styled confirm + AJAX delete for data-krt-confirm forms (replaces the former
-    // per-row forEach so rows added after load work too; honours the no-native-dialogs rule).
     document.addEventListener('submit', function (event) {
         const form = event.target.closest('form[data-krt-confirm]');
         if (!form || form.dataset.krtConfirmed === 'true') {
@@ -209,8 +170,6 @@ document.addEventListener('DOMContentLoaded', function () {
                         if (row) {
                             row.remove();
                         }
-                        // Restore the placeholder when the last category is gone (the old full
-                        // reload re-rendered this server-side empty-state row).
                         if (tbody && !tbody.querySelector('tr:not([data-category-empty])')) {
                             tbody.appendChild(buildEmptyCategoryRow());
                         }
@@ -229,7 +188,7 @@ function filterTable(tableId, query) {
     const table = document.getElementById(tableId);
     const tr = table.getElementsByTagName('tr');
     for (let i = 1; i < tr.length; i++) {
-        const td = tr[i].getElementsByTagName('td')[0]; // Name is in the first column
+        const td = tr[i].getElementsByTagName('td')[0];
         if (td) {
             const txtValue = td.textContent || td.innerText;
             if (txtValue.toUpperCase().indexOf(filter) > -1) {
@@ -241,10 +200,6 @@ function filterTable(tableId, query) {
     }
 }
 
-// Publish as a window global for the shared filter-table common-handler: common-handlers.js calls
-// window.filterTable(tableId, value) on the search box's input/keyup. A classic-script top-level
-// function declaration is already a global, so this assignment is a behaviour-neutral no-op — it
-// documents the cross-file contract explicitly (mirroring escape-html.js's `root.escapeHtml = …`).
 window.filterTable = filterTable;
 
 function updateMaterial(selectElement) {
@@ -257,8 +212,6 @@ function updateMaterial(selectElement) {
 
     selectElement.disabled = true;
 
-    // Built at send time (payload thunk): writes on the same row are serialized, so a queued edit
-    // of a second control reads the version the first edit synced back instead of a stale one.
     function buildRequestBody() {
         const requestBody = {
             updateType,
@@ -286,7 +239,6 @@ function updateMaterial(selectElement) {
             url: `/admin/materials/${encodeURIComponent(matId)}/ajax`,
             payload: buildRequestBody,
             serialize: 'admin-material:' + matId,
-            // Writes the fresh version onto the row (and any [data-version] inside it).
             containerSelector: tr,
             successMessage: MSG_UPDATE_SUCCESS,
             errorMessage: MSG_UPDATE_ERROR,
@@ -297,21 +249,12 @@ function updateMaterial(selectElement) {
         });
 }
 
-// CSP-safe delegated binding (replaces onchange="updateMaterial(this)" inline handlers
-// on all the per-row checkboxes / selects). The page-local filterTable function picked
-// up by the global filter-table common-handler stays unchanged.
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('change', 'admin-materials-update', function (el) {
         updateMaterial(el);
     });
 }
 
-// ----------------------------------------------------------------------
-// Create-Material modal: open, close, submit. The form mirrors the
-// backend MaterialCreateAjaxRequest; the server stamps isManualEntry=true
-// so this dialog does not expose that flag. On success the table is
-// re-rendered in place to pick up the new row plus its "Manuell" badge.
-// ----------------------------------------------------------------------
 function openCreateMaterialModal() {
     document.getElementById('cm-name').value = '';
     document.getElementById('cm-type').value = 'RAW';
@@ -324,7 +267,6 @@ function openCreateMaterialModal() {
     document.getElementById('cm-illegal').checked = false;
     document.getElementById('cm-volatile-qt').checked = false;
     document.getElementById('cm-volatile-time').checked = false;
-    // The shared contract (window.krtModal): showModal(), focus on the first field (cm-name).
     window.krtModal.open('modal-create-material', {
         focus: document.getElementById('cm-name'),
     });
@@ -359,23 +301,17 @@ function submitCreateMaterial(btn) {
         method: 'POST',
         url: '/admin/materials/ajax',
         payload,
-        // Double-submit guard: the button stays disabled for the whole round-trip.
         submitter: btn || null,
         successMessage: MSG_CREATE_SUCCESS,
         errorMessage: MSG_CREATE_ERROR,
         conflict: CAT_CONFLICT,
         onSuccess() {
             closeCreateMaterialModal();
-            // Re-render the table in place so the new row (with its "Manuell" badge) appears
-            // without a page reload (REQ-FE-001).
             return refreshMaterialsTable();
         },
     });
 }
 
-// Replaces the element matching selector in the live document with its counterpart from a freshly
-// fetched copy of this page. The node is imported (not re-serialized into innerHTML), so no markup
-// string ever reaches an HTML sink; scripts inside a DOMParser document never run.
 function replaceFromDocument(fresh, selector) {
     const current = document.querySelector(selector);
     const next = fresh.querySelector(selector);
@@ -384,11 +320,6 @@ function replaceFromDocument(fresh, selector) {
     }
 }
 
-// Re-renders the material table (plus the two lists derived from the catalog: the filter
-// autocomplete datalist and the create modal's refined-material select) from a fresh GET of this
-// page. The page has no dedicated fragment endpoint, so the server-rendered page is parsed and the
-// affected nodes are swapped in place; the name filter currently typed is re-applied afterwards.
-// Resolves true when the table was replaced, false when the fetch bailed (the stale table stays).
 function refreshMaterialsTable() {
     return fetch(window.location.pathname + window.location.search, {
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
@@ -397,7 +328,6 @@ function refreshMaterialsTable() {
             if (window.krtFetch && window.krtFetch.maybeReauthenticate(res)) {
                 return null;
             }
-            // A redirected / non-OK response is a login bounce or an error page, not this page.
             return res.redirected || !res.ok ? null : res.text();
         })
         .then(function (html) {
@@ -438,7 +368,6 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     });
 }
 
-// ESC closes the create modal; click on the overlay (outside the box) closes too.
 document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') {
         const overlay = document.getElementById('modal-create-material');

@@ -63,10 +63,7 @@ class PersonalInventoryItemServiceTest {
 
   @Mock private PersonalInventoryItemRepository repository;
 
-  /**
-   * Use the real MapStruct-generated mapper – its behavior is part of the service's contract (e.g.,
-   * snapshot vs. ownerUserId propagation) and we do not want a stub to mask wiring mistakes.
-   */
+  /** The real MapStruct mapper, because its behavior is part of the service's contract. */
   @Spy
   private PersonalInventoryItemMapper mapper = Mappers.getMapper(PersonalInventoryItemMapper.class);
 

@@ -58,16 +58,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
- * Unit coverage for {@link NotificationRuleService}'s admin-CRUD guards: the optimistic-lock check
- * on {@code update} and the per-kind selector validation applied on {@code create}/{@code update}.
- *
- * <p>Pins that a stale client version raises a 409 (lost-update protection) while a matching or
- * absent persisted version proceeds to {@code saveAndFlush}, that the column-configured selector
- * kinds ({@code SPECIFIC_USER}, {@code ROLE}, {@code ORG_RELATIVE_ROLE}) reject missing required
- * fields before any row is written, and that the three event-derived kinds ({@code ACCOUNT_GRANT},
- * {@code ACCOUNT_RESPONSIBLE}, {@code EVENT_RECIPIENT}) are accepted on create and update and
- * stored with every selector column null even when the request carried stray values — so every
- * seeded rule stays editable from the admin screen (REQ-NOTIF-007).
+ * Unit tests for the admin-CRUD guards of {@link NotificationRuleService}: the optimistic-lock
+ * check on update and the per-kind selector validation, including event-derived kinds stored with
+ * null selector columns (REQ-NOTIF-007).
  */
 @ExtendWith(MockitoExtension.class)
 class NotificationRuleServiceTest {

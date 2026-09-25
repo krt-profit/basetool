@@ -55,15 +55,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Verifiziert, dass der Button "Uebergabe protokollieren" auf der Auftragsdetailseite unterhalb des
- * Bearbeiter-Bereichs erscheint und nicht mehr im Header-Bereich.
- *
- * <p>Konkret wird geprueft:
- *
- * <ul>
- *   <li>Der Button erscheint nach dem Bearbeiter-Bereich (assignees) im HTML.
- *   <li>Der Button erscheint nicht mehr im Header-Navigationsbereich (flex-between).
- * </ul>
+ * Verifies that the "Übergabe protokollieren" button on the order detail page renders after the
+ * assignees section and not in the header.
  */
 @SpringBootTest
 @ActiveProfiles("test")

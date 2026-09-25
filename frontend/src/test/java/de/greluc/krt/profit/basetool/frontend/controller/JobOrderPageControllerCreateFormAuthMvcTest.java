@@ -52,22 +52,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Who may open the Job-Order create form ({@code GET /orders/create}), and what it loads.
- *
- * <p>The form used to be anonymous — the public request form — and this class pinned the guest
- * behaviour: the Staffel/SK-only picker catalogue and the pre-selected intake Spezialkommando. That
- * feature is gone (ADR-0149), so the first thing to pin is the refusal.
- *
- * <p>Two things survive the change and are still worth guarding:
- *
- * <ul>
- *   <li>The job-order materials catalog loads through the <em>public</em> WebClient ({@code
- *       isPublic=true}), not the OAuth2-bearer-relaying authenticated one — otherwise the scmdb
- *       shopping-list import finds zero matches (the regression that first motivated this test).
- *       The endpoint is still {@code permitAll}, so this stays true for a logged-in caller too.
- *   <li>The blanket {@code .form-group input} rule keeps its zero-specificity {@code :where()}
- *       exclusion, which is a CSS invariant and has nothing to do with who is looking.
- * </ul>
+ * Who may open the job-order create form ({@code GET /orders/create}) and what it loads: anonymous
+ * access is refused (ADR-0149), the materials catalog is fetched via the public WebClient, and the
+ * {@code .form-group input} rule keeps its {@code :where()} exclusion.
  */
 @SpringBootTest
 class JobOrderPageControllerCreateFormAuthMvcTest {

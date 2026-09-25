@@ -521,12 +521,9 @@ class MaterialClaimServiceTest {
   }
 
   /**
-   * Pins the concurrency contract of the claim upsert: two logisticians of the same squadron
-   * lodging the first claim on one bucket race on the unique index / {@code @Version}, and the
-   * loser must retry in a fresh transaction rather than surface a 500 — so last-writer-wins
-   * actually holds. Drives the orchestrator ({@link MaterialClaimService#upsertClaim}) with a spied
-   * within-transaction body to simulate the race deterministically (a real-Postgres reproduction
-   * lives in {@code MaterialClaimConcurrencyTest}).
+   * Tests that the loser of a same-squadron first-claim race in {@link
+   * MaterialClaimService#upsertClaim} retries in a fresh transaction, simulated with a spied
+   * transaction body.
    */
   @Nested
   class UpsertClaimConcurrencyTests {

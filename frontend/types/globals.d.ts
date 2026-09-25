@@ -1,22 +1,10 @@
 /**
- * Ambient declarations for the cross-file runtime contract of the static
- * browser scripts.
+ * Ambient declarations for the cross-file runtime contract of the static browser scripts.
  *
- * The scripts under `static/js` are loaded as classic <script> tags and share
- * ONE global lexical environment (ADR-0069). A file therefore consumes helpers
- * and API objects that a *different* file installed, with nothing in the source
- * stating the shape of what it consumes — until now that contract lived only in
- * the `/* global ... *\/` ESLint headers, which carry names but no types.
- *
- * This file is that contract, typed. It declares only the surface that is
- * genuinely shared across pages; per-page constants injected by a Thymeleaf
- * bootstrap block live in `thymeleaf-bootstrap.d.ts`, and backend DTO shapes
- * come from the generated `dto.d.ts`.
- *
- * See ADR-0125 and REQ-FE-018.
+ * The scripts under `static/js` share one global scope (ADR-0069); this file types the surface
+ * shared across pages. Per-page bootstrap constants live in `thymeleaf-bootstrap.d.ts`, backend
+ * DTO shapes in `dto.d.ts` (REQ-FE-018).
  */
-
-// ---------------------------------------------------------------- primitives
 
 /** Outcome of a `krtFetch` write: the parsed body plus the raw HTTP status. */
 interface KrtWriteResult {
@@ -30,36 +18,27 @@ interface KrtWriteResult {
      */
     body: any;
     /**
-     * Set on a 2xx only: true when fetch followed a redirect to reach it, so a caller swapping an
-     * HTML body can refuse a whole-document answer (e.g. an error-handler bounce) instead of a
-     * fragment.
+     * Set on a 2xx only: true when fetch followed a redirect, so an HTML-swapping caller can refuse
+     * a whole-document answer instead of a fragment.
      */
     redirected?: boolean;
 }
 
 /**
- * A localized message dictionary handed from a Thymeleaf bootstrap block to a
- * page module (the `window.MISSION_SUBRES_I18N` handoff pattern of #574).
+ * A localized message dictionary handed from a Thymeleaf bootstrap block to a page module.
  * Keys are dotted message keys; values are the resolved translations.
  */
 type KrtI18nDict = Record<string, string>;
 
 /**
- * An element reference accepted wherever the helpers take "container or
- * selector". `null` is included deliberately: every consumer resolves the
- * reference and bails out when nothing was found, so passing the unchecked
- * result of `getElementById` / `querySelector` straight through is the intended
- * usage rather than an oversight the type should forbid.
+ * An element or selector accepted wherever the helpers take "container or selector". `null` is
+ * allowed: every consumer bails out when the reference resolves to nothing.
  */
 type KrtElementRef = Element | string | null;
 
-// -------------------------------------------------------- cross-file helpers
-
 /**
- * The one open/close contract for every `.krt-modal-overlay` dialog (`krt-modal.js`,
- * FE-SIMP-04/04b). Every overlay is a native `<dialog>`: `open` shows it modally
- * (top layer, inert background) and moves focus in, `close` returns focus to where
- * it was; the `krtm-modal-open` / `krtm-hidden` classes follow either way.
+ * The open/close contract for every `.krt-modal-overlay` dialog, installed by `krt-modal.js`.
+ * `open` shows the native `<dialog>` modally and moves focus in; `close` restores focus.
  */
 interface KrtModalApi {
     /** Opens an overlay (element or id); `focus` overrides the default focus target. */
@@ -73,7 +52,7 @@ interface KrtModalApi {
     isOpen(ref: Element | string | null | undefined): boolean;
     /** The topmost open overlay, or null. */
     topmost(): HTMLElement | null;
-    /** Where a toast, confirm or download link must be appended to stay usable: the open modal, else the body. */
+    /** Where toasts, confirms and download links are appended: the open modal, else the body. */
     layerRoot(): HTMLElement;
 }
 
@@ -96,8 +75,6 @@ declare function showFrontendErrorToast(message: string): void;
 /** Shows a transient success toast. Installed by the layout's toast module. */
 declare function showFrontendSuccessToast(message: string): void;
 
-// ------------------------------------------------------------ the krt* APIs
-
 /** CSRF token access and refresh, installed by `krt-fetch.js`. */
 interface KrtCsrfApi {
     /** The current CSRF token from the `_csrf` meta tag, or null when absent. */
@@ -107,11 +84,8 @@ interface KrtCsrfApi {
     /** Merges the CSRF header into `base` and returns the merged header map. */
     headers(base?: Record<string, string>): Record<string, string>;
     /**
-     * Re-reads the CSRF token from `GET /csrf` and updates the meta tags, so a
-     * page whose token rotated can keep writing without a reload. Resolves the
-     * fresh token pair, or null when the refresh failed — call sites test the
-     * result to decide whether retrying the write is worthwhile. Concurrent
-     * calls share one in-flight request.
+     * Re-reads the CSRF token from `GET /csrf` and updates the meta tags. Resolves the fresh
+     * token pair, or null when the refresh failed; concurrent calls share one request.
      */
     refresh(): Promise<{ token: string; headerName: string } | null>;
 }
@@ -133,9 +107,8 @@ interface KrtConflictStrings {
 /** Options shared by every `krtFetch` request helper. */
 interface KrtSendOpts {
     /**
-     * Container (or selector) whose `[data-version]` descendants receive the
-     * fresh version from the response body on success, so the next write on the
-     * same aggregate does not 409 on a stale version.
+     * Container (or selector) whose `[data-version]` descendants receive the response's fresh
+     * version on success.
      */
     containerSelector?: KrtElementRef;
     /** Already-localized prefix for the success toast. */
@@ -153,31 +126,25 @@ interface KrtSendOpts {
     /** The submit button disabled for the in-flight request (double-submit guard). */
     submitter?: KrtElementRef;
     /**
-     * Accept header value; defaults to `application/json`. Set it for an endpoint that answers
-     * another type (e.g. a `text/html` preview) — a non-JSON 2xx body reaches `onSuccess` as text.
+     * Accept header value; defaults to `application/json`. A non-JSON 2xx body reaches `onSuccess`
+     * as text.
      */
     accept?: string;
-    /**
-     * `'blob'` reads a 2xx body as a Blob (a generated PDF, …) instead of JSON/text; an error body
-     * is still parsed as JSON / problem+json so the problem handling keeps working.
-     */
+    /** `'blob'` reads a 2xx body as a Blob; an error body is still parsed as problem+json. */
     responseType?: 'blob';
     /**
-     * Runs after a 2xx with the parsed body. If it returns a thenable the write
-     * awaits it, so a serialized chain waits for the caller's fragment refresh
-     * — which rewrites the version holder — before the next queued write starts.
+     * Runs after a 2xx with the parsed body. A returned thenable is awaited before the next
+     * serialized write starts.
      */
     onSuccess?: (body: any) => void | Promise<unknown>;
     /**
-     * Runs on a non-ok, non-reauth response BEFORE the default problem
-     * handling. Return truthy to signal "handled" (e.g. after rendering 422
-     * field errors) and skip the default toast and conflict dialog.
+     * Runs on a non-ok, non-reauth response before the default problem handling. Returning truthy
+     * skips the default toast and conflict dialog.
      */
     onError?: (status: number, body: any, response: Response) => unknown;
     /**
-     * Runs when the request failed at the transport layer, so no response ever
-     * arrived and `onError` never fires. Return truthy to signal that it
-     * surfaced its own error UI and suppress the default network-error toast.
+     * Runs when the request failed at the transport layer (no response, so no `onError`).
+     * Returning truthy suppresses the default network-error toast.
      */
     onNetworkError?: (error: unknown) => unknown;
 }
@@ -190,15 +157,11 @@ interface KrtWriteOpts extends KrtSendOpts {
     url: string | (() => string);
     /** JSON payload, or a thunk resolved at send time; omitted for GET and DELETE. */
     payload?: unknown | (() => unknown);
-    /**
-     * Send the payload with a DELETE as well, for an endpoint whose DELETE mapping reads a request
-     * body. Off by default, so a DELETE sends no body.
-     */
+    /** Sends the payload with a DELETE as well; off by default, so a DELETE sends no body. */
     bodyOnDelete?: boolean;
     /**
-     * Lock-scope key: writes sharing it run one at a time, in order. Pair it
-     * with thunk `url`/`payload` so a queued write re-reads its optimistic-lock
-     * version after the preceding same-key write refreshed the version holder.
+     * Lock-scope key: writes sharing it run one at a time, in order. Pair it with thunk
+     * `url`/`payload` so a queued write re-reads its version.
      */
     serialize?: string;
     /** Section key resolved against the dictionary by a `sectionWrite` wrapper. */
@@ -209,17 +172,14 @@ interface KrtWriteOpts extends KrtSendOpts {
 interface KrtSubmitFormOpts extends KrtSendOpts {
     /**
      * The form element or a selector for it; supplies action, method and FormData. Optional when
-     * the call passes an explicit `url` and `formData` (a file upload assembled in script).
+     * `url` and `formData` are passed explicitly.
      */
     form?: HTMLFormElement | string;
     /** Target URL; defaults to the form's `action` attribute. */
     url?: string | (() => string);
     /** HTTP method; defaults to the form's `method`, else POST. */
     method?: string;
-    /**
-     * Explicit body; defaults to `new FormData(form)`. A `URLSearchParams` is sent urlencoded (the
-     * browser sets the Content-Type for either).
-     */
+    /** Explicit body; defaults to `new FormData(form)`. A `URLSearchParams` is sent urlencoded. */
     formData?: FormData | URLSearchParams;
     /** Lock-scope key, as on {@linkcode KrtWriteOpts.serialize}. */
     serialize?: string;
@@ -240,49 +200,37 @@ interface KrtSwapOpts {
     /** Value of the fragment query param; defaults to "results". */
     fragmentValue?: string;
     /**
-     * When true the address-bar URL is kept in sync via `history.replaceState`
-     * (minus the internal fragment param) so a refresh or deep link re-renders
-     * the same state. Deliberately replaceState, not pushState, so a debounced
-     * filter does not flood the back-stack with intermediate keystrokes.
+     * When true, the address-bar URL is kept in sync via `history.replaceState`, minus the
+     * fragment param.
      */
     history?: boolean;
     /** Unless false, the scroll position is restored after the swap. */
     preserveScroll?: boolean;
     /**
-     * Already-localized error toast shown when the swap bails because the
-     * response was redirected or not OK. Omit to fail silently; the stale
-     * container is left untouched either way.
+     * Already-localized error toast shown when the response was redirected or not OK; omit to fail
+     * silently. The container is left untouched either way.
      */
     errorMessage?: string;
 }
 
 /** Configuration for {@linkcode KrtFetchApi.sectionWrite}. */
 interface KrtSectionWriteConfig {
-    /**
-     * Late-bound accessor for the page's i18n dictionary — late because the
-     * bootstrap block that defines it runs after this factory is instantiated.
-     */
+    /** Late-bound accessor for the page's i18n dictionary. */
     dict(): KrtI18nDict | null | undefined;
-    /**
-     * The dictionary's global name, used in the key a missing string is rendered and
-     * reported as (`NAME[key]`, see `Window.krtI18nText`).
-     */
+    /** The dictionary's global name, used to report a missing string as `NAME[key]`. */
     dictName?: string;
     /** Message-key prefixes used to derive the per-section localized strings. */
     keys: Record<string, string>;
     /** Maps a section key to its swap container and Thymeleaf fragment value. */
     sections: Record<string, { container: string; fragmentValue: string }>;
     /**
-     * Late-bound accessor for the URL the section fragments are fetched from.
-     * Null while the page's entity has no id yet — `refresh()` then resolves
-     * false for that section instead of fetching, so a detail page can install
-     * the seam before the entity exists.
+     * Late-bound accessor for the URL the section fragments are fetched from. Null while the
+     * entity has no id; `refresh()` then resolves false instead of fetching.
      */
     pageUrl(): string | null;
     /**
-     * Peer-notification closure (REQ-FE-010): called by `refresh`/`notify` with the
-     * changed section keys so the page can publish them to its live-sync room.
-     * Late-bound, since the socket client is installed after this factory runs.
+     * Late-bound peer-notification closure called by `refresh`/`notify` with the changed section
+     * keys, to publish them to the page's live-sync room (REQ-FE-010).
      */
     broadcast?(sectionKeys: string[]): void;
 }
@@ -290,9 +238,8 @@ interface KrtSectionWriteConfig {
 /** Options for {@linkcode KrtSectionWriter.refresh}. */
 interface KrtSectionRefreshOpts {
     /**
-     * `false` suppresses the peer broadcast — mandatory when the refresh IS the
-     * application of a peer's inbound signal, which would otherwise echo straight
-     * back into a loop. Defaults to broadcasting.
+     * `false` suppresses the peer broadcast; required when applying a peer's inbound signal, to
+     * avoid an echo loop. Defaults to broadcasting.
      */
     broadcast?: boolean;
 }
@@ -302,9 +249,8 @@ interface KrtSectionWriter {
     /** {@linkcode KrtFetchApi.write} with the section's localized strings applied. */
     write(opts: KrtWriteOpts): Promise<KrtWriteResult>;
     /**
-     * Re-renders one or more sections in place and broadcasts the change to
-     * peers. Resolves once every swap completed — with one flag per section, in
-     * the order given — so callers can then close a modal.
+     * Re-renders one or more sections in place and broadcasts the change to peers. Resolves with
+     * one success flag per section, in the order given.
      */
     refresh(sectionKeys: string | string[], opts?: KrtSectionRefreshOpts): Promise<boolean[]>;
     /** Broadcast-only sibling of `refresh` for handlers that already patched the DOM. */
@@ -312,10 +258,8 @@ interface KrtSectionWriter {
 }
 
 /**
- * The shared AJAX-mutation foundation installed by `krt-fetch.js`: every
- * create/update/delete on every page routes through it so CSRF, optimistic-lock
- * version sync, re-auth, RFC 7807 problem handling and toasts stay uniform
- * (REQ-FE-001…010, ADR-0012/0013).
+ * The shared AJAX-mutation foundation installed by `krt-fetch.js`: CSRF, optimistic-lock version
+ * sync, re-auth, RFC 7807 problem handling and toasts for every write (REQ-FE-001…010).
  */
 interface KrtFetchApi {
     /** Sends a JSON write and handles the response, returning the parsed outcome. */
@@ -323,18 +267,16 @@ interface KrtFetchApi {
     /** Submits a form as multipart/form-encoded data through the same pipeline. */
     submitForm(opts: KrtSubmitFormOpts): Promise<KrtWriteResult>;
     /**
-     * Fetches a rendered fragment and replaces the container's content in
-     * place. Resolves false when the container could not be resolved or the
-     * fetch failed, true when the swap happened.
+     * Fetches a rendered fragment and replaces the container's content in place. Resolves true
+     * when the swap happened, false otherwise.
      */
     swap(opts: KrtSwapOpts): Promise<boolean>;
     /** Binds in-container pagination/sort anchor interception without an initial fetch. */
     bindSwap(opts: KrtSwapOpts): void;
     /**
-     * Replaces `el`'s content with a server-rendered fragment — the one sanctioned innerHTML sink
-     * for markup not passed through `escapeHtml` (FE-SEC-05). Only for the text of a same-origin
-     * Thymeleaf fragment response, which the template engine already escaped; never for markup
-     * assembled in script. No-op when `el` is absent; null/undefined `html` clears it.
+     * Replaces `el`'s content with a same-origin Thymeleaf fragment response — the one sanctioned
+     * innerHTML sink for unescaped markup; never for markup assembled in script. No-op when `el`
+     * is absent; null/undefined `html` clears it.
      */
     setTrustedHtml(el: Element | null | undefined, html: string | null | undefined): void;
     /**
@@ -342,19 +284,14 @@ interface KrtFetchApi {
      * same trust contract. No-op when `el` is absent or detached; null/undefined `html` removes it.
      */
     replaceWithTrustedHtml(el: Element | null | undefined, html: string | null | undefined): void;
-    /**
-     * Writes `newVersion` to the container and to every `[data-version]`
-     * descendant, so the next write on the same aggregate sends a fresh version.
-     */
+    /** Writes `newVersion` to the container and to every `[data-version]` descendant. */
     syncVersion(container: KrtElementRef, newVersion: number | string | null): void;
     /** Handles an RFC 7807 `problem+json` response, showing the appropriate toast. */
     handleProblem(response: Response, problem: any, opts?: KrtSendOpts): Promise<void>;
 
     /**
-     * The localized message for a `OWNER_ORG_UNIT_REQUIRED` problem, or `null`
-     * when the problem is anything else. Exposed so a page-local `onError`
-     * handler — which bypasses `handleProblem` entirely — renders the same
-     * wording instead of re-deriving it (REQ-ORG-023).
+     * The localized message for an `OWNER_ORG_UNIT_REQUIRED` problem, or `null` for any other
+     * problem; for page-local `onError` handlers (REQ-ORG-023).
      */
     ownerOrgUnitRequiredMessage(problem: any): string | null;
     /** Redirects to the re-auth path when the response carries `X-Reauthenticate`. */
@@ -372,10 +309,8 @@ interface KrtFetchApi {
 /** Delegated event registration installed by `event-delegation.js`. */
 interface KrtEventsApi {
     /**
-     * Registers a delegated handler for `eventType` on elements carrying
-     * `data-trigger="<actionName>"`. Delegation is anchored at `document`, so
-     * the registration survives the fragment swaps that replace container
-     * contents. Disabled form controls never reach the handler.
+     * Registers a handler for `eventType` on elements carrying `data-trigger="<actionName>"`,
+     * delegated from `document` so it survives fragment swaps. Disabled controls never reach it.
      */
     on(
         eventType: string,
@@ -395,10 +330,8 @@ interface KrtLiveSyncApi {
     /** Subscribes to a topic room and returns the subscription handle. */
     subscribe(topic: string, handler: (message: any) => void): unknown;
     /**
-     * Broadcasts that one or more sections changed, so peers re-render them. A bare
-     * key is wrapped into a single-element array by the client; the relay then drops
-     * anything outside the topic class's whitelist. Publishing needs no subscription
-     * to the room (ADR-0094), which is what lets two surfaces poke each other.
+     * Broadcasts that one or more sections changed, so peers re-render them; the relay drops keys
+     * outside the topic's whitelist. Needs no subscription to the room (ADR-0094).
      */
     sendChanged(topic: string, sections: string | string[]): void;
     /** Broadcasts a presence event (focus/blur/heartbeat) for a section. */
@@ -416,64 +349,53 @@ interface KrtReauthApi {
 }
 
 /**
- * Terms-of-Use consent-gate helper installed by `krt-fetch.js` (REQ-SEC-028). The sibling of
- * {@link KrtReauthApi}: a gate that can appear mid-session must navigate the browser rather than
- * stall a fragment swap or toast a write error the user cannot act on.
+ * Terms-of-Use consent-gate helper installed by `krt-fetch.js` (REQ-SEC-028); navigates the
+ * browser when the gate appears mid-session.
  */
 interface KrtTermsGateApi {
     /** Navigates to the consent page and returns true when the response demanded consent. */
     check(response: Response): boolean;
     /**
-     * Navigates the window to a same-origin consent path. Used where the gate reaches a client
-     * that never sees a Response: the `terms-gate` SSE event, and the `/ws/sync` close reason.
+     * Navigates the window to a same-origin consent path, for gate signals without a Response
+     * (the `terms-gate` SSE event, the `/ws/sync` close reason).
      */
     redirect(url?: string | null): boolean;
 }
 
 /**
- * A control the refinery-order forms address by id: the raw `<select>` before
- * combobox enhancement, or the hidden `<input>` that carries the control's id
- * after it (REQ-FE-016). Only `id` and `value` are ever read, which both carry —
- * the union names the two shapes the DOM actually holds at those ids.
+ * A control the refinery-order forms address by id: the raw `<select>`, or the hidden `<input>`
+ * carrying its id after combobox enhancement (REQ-FE-016). Only `id` and `value` are read.
  */
 type KrtRefineryControl = HTMLInputElement | HTMLSelectElement;
 
 /**
- * The material-row yield-badge manager installed by `refinery-yield-badge.js`
- * and shared by both refinery-order forms (create + detail). It holds the
- * `{materialId -> bonusPercent}` map for the order's current refinery in memory,
- * so a material or location change re-renders the badges without a reload.
+ * The material-row yield-badge manager installed by `refinery-yield-badge.js` for both
+ * refinery-order forms. Holds the current refinery's `{materialId -> bonusPercent}` map in memory.
  */
 interface KrtRefineryYieldApi {
     /**
-     * Replaces the in-memory yield map and the badge tooltip text. The page
-     * bootstrap calls this once with the server-rendered state; a nullish map is
-     * read as "no UEX data for this refinery" and collapses every badge.
+     * Replaces the yield map and the badge tooltip text; a nullish map means no UEX data and
+     * collapses every badge.
      */
     init(
         initialMap: Record<string, number> | null | undefined,
         helpText: string | null | undefined,
     ): void;
     /**
-     * Sets, updates or removes the badge on the material row `rowIndex`. A
-     * nullish `bonus` removes the badge entirely ("no UEX row for this material
-     * at this refinery"); 0 renders a neutral "0%" badge rather than none.
+     * Sets, updates or removes the badge on material row `rowIndex`. A nullish `bonus` removes it;
+     * 0 renders a neutral "0%" badge.
      */
     setBadge(rowIndex: string | number, bonus: number | null | undefined): void;
     /**
-     * Re-renders the badge of the row owning `control`, taking the row index
-     * from the control's trailing `_<n>` id suffix and the material id from its
-     * value. A control with no such id suffix is ignored.
+     * Re-renders the badge of the row owning `control`, identified by its trailing `_<n>` id
+     * suffix; a control without one is ignored.
      */
     refreshFor(control: KrtRefineryControl | null | undefined): void;
     /** Re-renders every material row's badge against the current map. */
     refreshAll(): void;
     /**
-     * The location picker changed: refetches that refinery's map from the
-     * page-controller proxy and re-renders every badge. Resolves once the new
-     * map is applied — a nullish location, a 4xx or a network failure all fall
-     * back to an empty map rather than rejecting, so the form stays usable when
-     * UEX or the backend is misbehaving.
+     * Refetches the selected refinery's yield map and re-renders every badge. Never rejects: a
+     * nullish location, a 4xx or a network failure fall back to an empty map.
      */
     onLocationChange(control: KrtRefineryControl | null | undefined): Promise<void>;
 }
@@ -487,10 +409,9 @@ interface KrtHerkunftReduction {
 }
 
 /**
- * The "Herkunft" (provenance) picker installed by `inventory-herkunft.js`: it
- * lets the book-out and transfer modals split a deduction across the earmarks a
- * stock entry carries. Each call is scoped by the modal's `prefix` (`'bookout'`
- * / `'umbuchen'`), so one module serves both dialogs.
+ * The "Herkunft" (provenance) picker installed by `inventory-herkunft.js`, splitting a book-out or
+ * transfer deduction across a stock entry's earmarks. Each call is scoped by the modal's `prefix`
+ * (`'bookout'` / `'umbuchen'`).
  */
 interface KrtHerkunftApi {
     /** Renders the picker for the given modal from the source entry's leaf row. */
@@ -498,9 +419,8 @@ interface KrtHerkunftApi {
     /** Recomputes the picker's derived amounts; returns whether the plan is submittable. */
     recompute(prefix: string): boolean;
     /**
-     * Reads the current plan for submission. Both dimensions are null when the
-     * picker is inactive or contributes no split, which tells the backend to
-     * apply its own default deduction order.
+     * Reads the current plan for submission; both lists are null when the picker contributes no
+     * split, so the backend applies its default deduction order.
      */
     collect(prefix: string): {
         jobOrderReductions: KrtHerkunftReduction[] | null;
@@ -513,9 +433,8 @@ interface KrtHerkunftApi {
 }
 
 /**
- * What differs between the two Lager pages that share `inventory-common.js` —
- * the global Lager (`/inventory/all`, `inventory-admin.js`) and the personal one
- * (`/inventory/my`, `inventory-my.js`).
+ * The per-page settings of the two Lager pages sharing `inventory-common.js`: the global Lager
+ * (`/inventory/all`) and the personal one (`/inventory/my`).
  */
 interface KrtInventoryLagerConfig {
     /** The page's data-trigger prefix: `inv-admin` or `inv-my`. */
@@ -588,17 +507,14 @@ interface KrtScuInputApi {
 }
 
 /**
- * A Materialbörse create/edit dialog — the offer side from
- * `materialboerse-release.js` (`krtMaterialRelease`) and the request side from
- * `materialgesuch-modal.js` (`krtMaterialRequest`). Both expose the same pair.
+ * A Materialbörse create/edit dialog: the offer side (`krtMaterialRelease`) or the request side
+ * (`krtMaterialRequest`).
  */
 interface KrtMaterialDialogApi {
     /**
-     * Opens the dialog. `mode` selects the variant the dialog renders (`'new'`,
-     * `'edit'`, and the offer dialog's `'lager'` / `'item'` entry points), `ctx`
-     * seeds it — an absent or empty object is the "blank new entry" case — and
-     * `doneOrOpts` is either a bare success callback receiving the response body
-     * or a `{onDone, onCancel}` pair, where `onCancel` fires on a dismissal.
+     * Opens the dialog in `mode` (`'new'`, `'edit'`, or the offer dialog's `'lager'` / `'item'`),
+     * seeded by `ctx` (absent or empty for a blank entry). `doneOrOpts` is a success callback
+     * receiving the response body, or an `{onDone, onCancel}` pair.
      */
     open(
         mode: string,
@@ -611,10 +527,8 @@ interface KrtMaterialDialogApi {
 }
 
 /**
- * Combobox labels handed to `krt-searchable-select.js` by the layout bootstrap.
- * The flat entries are the defaults; `kinds` overrides them per remote source
- * (keyed by the element's `data-krt-combobox` value), so a user picker and a
- * location picker can say different things while sharing one implementation.
+ * Combobox labels handed to `krt-searchable-select.js` by the layout bootstrap. The flat entries
+ * are defaults; `kinds` overrides them per remote source (the element's `data-krt-combobox` value).
  */
 interface KrtComboboxI18n extends Partial<Record<string, unknown>> {
     /** Placeholder shown in the search input. */
@@ -631,19 +545,14 @@ interface KrtComboboxI18n extends Partial<Record<string, unknown>> {
     kinds?: Record<string, Partial<Omit<KrtComboboxI18n, 'kinds'>>>;
 }
 
-// -------------------------------------------------------- custom DOM events
-
 /**
- * The application's own DOM events, registered so `addEventListener` infers a
- * `CustomEvent` and its `detail` shape instead of the bare `Event` that carries
- * no detail at all. This is the contract between whoever dispatches and whoever
- * listens — keep it in step when a new custom event is introduced.
+ * The application's custom DOM events, so `addEventListener` infers the `CustomEvent` and its
+ * `detail` shape.
  */
 interface DocumentEventMap {
     /**
-     * Fired after `krtFetch.swap` replaced a container's content, so
-     * progressive enhancement (comboboxes, date localisation, …) can re-run on
-     * the freshly injected markup.
+     * Fired after `krtFetch.swap` replaced a container's content, so progressive enhancement can
+     * re-run on the new markup.
      */
     'krt:swapped': CustomEvent<{ container: Element | null }>;
     /** Fired when a mission section changed locally and peers must re-render it. */
@@ -652,36 +561,23 @@ interface DocumentEventMap {
     'krt:mission-resync': CustomEvent<unknown>;
 }
 
-// ------------------------------------------------------ element augmentation
-
 /** The controller `krt-searchable-select.js` attaches to an enhanced combobox. */
 interface KrtComboboxController {
     /**
-     * Selects `value` (empty or unknown clears) without firing `change`. `label`
-     * names a value outside the loaded item set — the remote-mode case — and
-     * `data` is option metadata mirrored onto the hidden input.
+     * Selects `value` (empty or unknown clears) without firing `change`. `label` names a value
+     * outside the loaded items; `data` is option metadata mirrored onto the hidden input.
      */
     setValue(value: string, label?: string, data?: object): void;
 }
 
 interface HTMLElement {
-    /**
-     * The combobox controller `krt-searchable-select.js` attaches to both the
-     * hidden input and the wrapper, so later code can drive an already-enhanced
-     * field without re-querying the DOM.
-     */
+    /** The combobox controller `krt-searchable-select.js` attaches to the hidden input and wrapper. */
     krtCombobox?: KrtComboboxController;
 }
 
-// ------------------------------------------------------- window augmentation
-
 /**
- * Collapsible filter panels (`krt-filter-panel.js`, REQ-FE-021).
- *
- * Panels wire themselves from markup — `data-filter-panel` plus a toggle carrying `aria-controls`.
- * This API exists only for the two things markup cannot express: a page whose active-filter count
- * is not readable from the panel's own controls, and a page that filters via AJAX and must
- * re-state the count after a swap.
+ * Collapsible filter panels (`krt-filter-panel.js`, REQ-FE-021), which wire themselves from markup.
+ * This API supplies a custom active-filter count and re-renders the count after an AJAX swap.
  */
 interface KrtFilterPanelApi {
     /**
@@ -701,38 +597,30 @@ interface KrtFilterPanelApi {
 }
 
 interface Window {
-    // --- installed by krt-client-error.js (the first script of every page)
     /**
      * Returns `value` when it is a non-empty string; otherwise reports `key` once per page view as
-     * an `i18n_missing` client error and returns the key name, so a missing translation shows in
-     * the UI instead of hiding behind a hardcoded default. `key` is `DICTIONARY.property` for a
-     * bootstrap object or `data-attribute` for a markup attribute (`I18nDictionaryCoverageTest`).
+     * an `i18n_missing` client error and returns the key name. `key` is `DICTIONARY.property` or
+     * `data-attribute`.
      */
     krtI18nText(value: unknown, key: string): string;
 
-    // --- installed by krt-fetch.js
     krtFetch: KrtFetchApi;
     krtCsrf: KrtCsrfApi;
     krtReauth: KrtReauthApi;
     krtTermsGate: KrtTermsGateApi;
 
-    // --- installed by the shared foundation modules
     krtEvents: KrtEventsApi;
     krtLiveSync: KrtLiveSyncApi;
     krtFilterPanel: KrtFilterPanelApi;
     escapeHtml: typeof escapeHtml;
     escapeAttr: typeof escapeAttr;
 
-    // --- toasts and dialogs from the layout
     showFrontendErrorToast?: (message: string) => void;
     showFrontendSuccessToast?: (message: string) => void;
     showInventoryToast?: (message: string, isError?: boolean) => void;
     /**
-     * KRT-styled confirmation modal — the sanctioned replacement for the native
-     * `window.confirm` the design system forbids. Resolves true when the user
-     * confirmed. Each label falls back to its `krtToastI18n` default when
-     * omitted, and the whole dialog falls back to a minimal on-the-fly modal
-     * when the optional confirm fragment is not on the page.
+     * KRT-styled confirmation modal replacing the native `window.confirm`; resolves true when the
+     * user confirmed. Omitted labels fall back to their `krtToastI18n` defaults.
      */
     showKrtConfirm?: (
         title: string | null,
@@ -741,14 +629,12 @@ interface Window {
         cancelLabel?: string,
     ) => Promise<boolean>;
 
-    // --- modal open/close: the one contract (krt-modal.js, FE-SIMP-04, ADR-0177)
     krtModal: KrtModalApi;
-    /** Kept as aliases of `krtModal.open` / `krtModal.close` for the mission page. */
+    /** Alias of `krtModal.open` for the mission page. */
     krtModalOpen?: (overlay: HTMLElement | null) => void;
     krtModalClose?: (overlay: HTMLElement | null) => void;
     openModal?: (...args: any[]) => void;
 
-    // --- progressive enhancement applied to freshly swapped fragments
     krtEnhanceComboboxes?: (root: ParentNode) => void;
     krtLocalizeDates?: (root: ParentNode) => void;
     krtInitDatetimeSplitGroup?: (root: ParentNode) => void;
@@ -757,7 +643,6 @@ interface Window {
     krtComboboxRemoteSources?: Record<string, unknown>;
     krtSegSet?: (...args: any[]) => void;
 
-    // --- localized label dictionaries injected by the layout bootstrap
     krtComboboxI18n?: KrtComboboxI18n;
     krtProfileI18n?: KrtI18nDict;
     krtDeletionRequestsI18n?: KrtI18nDict;
@@ -765,48 +650,38 @@ interface Window {
     krtBlueprintsImportI18n?: KrtI18nDict;
     krtBlueprintsRecipeI18n?: KrtI18nDict;
 
-    // --- per-page endpoint maps injected alongside the label dictionaries, so
-    //     the module never hardcodes a URL the controller owns
     krtP4kImportEndpoints?: Record<string, string>;
     krtBlueprintsEndpoints?: Record<string, string>;
     /**
-     * Toast and confirm-dialog labels from `fragments/toast.html`. Declared
-     * required, not optional: `toast.js` dereferences it unguarded, so a page
-     * that renders a toast without the fragment is already broken — the type
-     * should not paper over that with an optional-chaining obligation at every
-     * call site.
+     * Toast and confirm-dialog labels from `fragments/toast.html`; required because `toast.js`
+     * dereferences it unguarded.
      */
     krtToastI18n: KrtI18nDict;
     krtLiveSyncI18n?: KrtI18nDict;
 
     /**
-     * Wording for the owner-picker's one actionable rejection, from
-     * `fragments/head.html`. Read by `krt-fetch.js` when the backend answers the
-     * stable `OWNER_ORG_UNIT_REQUIRED` code, so the member sees a localized
-     * instruction instead of the backend's English `detail` (REQ-ORG-023).
+     * Wording for the `OWNER_ORG_UNIT_REQUIRED` rejection from `fragments/head.html`, read by
+     * `krt-fetch.js` (REQ-ORG-023).
      */
     krtOwnerPickerI18n?: KrtI18nDict;
     /**
-     * The page-wide krtFetch defaults from `fragments/head.html` — the write success / failure
-     * toast and the conflict dialog — used when a caller passes no string of its own.
+     * The page-wide krtFetch toast and conflict-dialog defaults from `fragments/head.html`, used
+     * when a caller passes no string of its own.
      */
     krtFetchI18n?: KrtI18nDict;
 
     /**
-     * Returns `url` when it is a same-origin absolute path, otherwise
-     * `fallback` (null when omitted). Guards every `data-*`-driven navigation
-     * against protocol-relative and `javascript:` URLs. From `safe-url.js`.
+     * Returns `url` when it is a same-origin absolute path, otherwise `fallback` (null when
+     * omitted). Installed by `safe-url.js`.
      */
     safeSameOriginUrl?: {
         (url: unknown): string | null;
         <T>(url: unknown, fallback: T): string | T;
     };
 
-    // --- page-scoped hooks published for cross-module reuse
     /**
-     * Per-account flag telling the bank booking form whether a justification is
-     * mandatory, keyed by account id. Populated as accounts are resolved by the
-     * remote picker so the form can react without a second round trip.
+     * Whether a bank booking needs a justification, keyed by account id; filled as the remote
+     * picker resolves accounts.
      */
     krtBankAccountMeta?: Record<string, boolean>;
     /** Server-rendered configuration for the admin default-blueprints page module. */
@@ -832,41 +707,33 @@ interface Window {
     krtMaterialRelease?: KrtMaterialDialogApi;
     krtMaterialRequest?: KrtMaterialDialogApi;
     /**
-     * Declared required, not optional: both refinery-order page modules call
-     * `krtRefineryYield.init(...)` unguarded at parse time, and the templates
-     * load `refinery-yield-badge.js` ahead of them. A refinery form rendered
-     * without that script is already broken — the type should not push an
-     * optional-chaining obligation onto every call site to hide it.
+     * The refinery yield-badge manager; required because both refinery-order modules call it
+     * unguarded at parse time.
      */
     krtRefineryYield: KrtRefineryYieldApi;
     krtOpenEditCrewModal?: (...args: any[]) => void;
     krtOperationsReload?: (...args: any[]) => void;
     krtRefreshOrdersQueue?: (...args: any[]) => void;
     /**
-     * Re-swaps the /members roster for the viewer's own filter + page. Exposed by
-     * the members.html bootstrap so the live-sync receiver in members.js can apply
-     * a peer's member edit / delete / Keycloak sync in place (#1235).
+     * Re-swaps the /members roster for the viewer's own filter and page, so the live-sync receiver
+     * can apply a peer's change in place.
      */
     krtRefreshMembersResults?: () => void;
 
-    // --- mission page section-write trio (produced by sectionWrite)
     krtMissionWrite?: KrtSectionWriter['write'];
     krtRefreshMissionSection?: KrtSectionWriter['refresh'];
     krtNotifyMissionChanged?: KrtSectionWriter['notify'];
     MissionPresence?: unknown;
 
-    // --- orders / inventory / operations equivalents
     krtRefreshOrderSection?: (...args: any[]) => void;
     krtNotifyOrderChanged?: (...args: any[]) => void;
     krtNotifyInventoryChanged?: (...args: any[]) => void;
     opRefreshSection?: (...args: any[]) => void;
     opNotifyChanged?: (...args: any[]) => void;
 
-    // --- page-local state flags and legacy inline-template callbacks
     /**
-     * The refinery order the detail page is showing — keys its `refinery-order:{id}` live-sync room
-     * and the base URL its `?fragment=` section refreshes are pulled from. Set by the page bootstrap
-     * of refinery-orders-details.html; absent on every other page.
+     * The id of the refinery order on refinery-orders-details.html, keying its live-sync room and
+     * section refreshes; absent on every other page.
      */
     refineryOrderId?: string | null;
     __unsavedChangesInitialized?: boolean;

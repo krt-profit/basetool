@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
 """Wrap a finished post fragment in the standing bank-update page.
 
-The page is the deliverable: a browser page whose "Formatiert kopieren" button puts
-forum-safe markup on the clipboard, so the report goes into the forum's CKEditor by
-paste and nobody ever handles HTML source. Only the fragment changes from month to
-month; the chrome comes from ``assets/report-page.html`` so every month looks the
-same.
+The chrome comes from ``assets/report-page.html``; its "Formatiert kopieren" button puts
+forum-safe markup on the clipboard.
 
 Usage:
     python .claude/skills/bank-update/scripts/build_page.py \
@@ -22,8 +19,6 @@ from pathlib import Path
 
 TEMPLATE = Path(__file__).resolve().parent.parent / "assets" / "report-page.html"
 
-# A fragment that still carries these has not been finished; publishing one would put
-# a visible placeholder in front of the whole squadron.
 LEFTOVERS = ("{{", "LINK-BITTE-EINSETZEN", "BITTE-EINSETZEN", "TODO", "XXX")
 
 

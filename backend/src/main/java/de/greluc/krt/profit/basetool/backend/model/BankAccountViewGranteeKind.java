@@ -20,12 +20,9 @@
 package de.greluc.krt.profit.basetool.backend.model;
 
 /**
- * The kind of audience a {@link BankAccountViewGrant} opens balance + read-only-detail access to
- * (REQ-BANK-035), reused one-for-one as the tier dimension of {@link BankAccountApprovalLimit}
- * (REQ-BANK-041). Persisted as {@code VARCHAR(16)} via {@code @Enumerated(STRING)}; the V189 {@code
- * chk_bank_view_grant_kind} / {@code chk_bank_view_grant_payload} and V193 {@code
- * chk_bank_appr_limit_kind} / {@code chk_bank_appr_limit_payload} CHECKs (widened by V202 for
- * {@link #AREA_MEMBERS}) mirror this set and which columns each kind populates.
+ * The kind of audience a {@link BankAccountViewGrant} opens access to (REQ-BANK-035), also used as
+ * the tier dimension of {@link BankAccountApprovalLimit} (REQ-BANK-041). Mirrored by database CHECK
+ * constraints.
  */
 public enum BankAccountViewGranteeKind {
 

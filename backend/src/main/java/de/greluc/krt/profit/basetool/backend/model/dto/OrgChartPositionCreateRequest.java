@@ -25,28 +25,19 @@ import jakarta.validation.constraints.Size;
 import java.util.UUID;
 
 /**
- * Inbound payload for {@code POST /api/v1/org-chart/positions} — assigns a user to a new
- * functional-rank position (or creates a Kommando). The combination of {@code positionType}, {@code
- * orgUnitId}, {@code parentId}, {@code userId} and {@code name} is validated against the
- * scope/cardinality/parent rules in {@code OrgChartService}; {@code @Valid} only guarantees {@code
- * positionType} is present and {@code name} stays within its length bound.
+ * Payload of {@code POST /api/v1/org-chart/positions}, which creates a functional-rank position or
+ * a Kommando. {@code OrgChartService} validates the field combination against the scope,
+ * cardinality and parent rules.
  *
- * @param positionType the functional rank to assign; required.
- * @param orgUnitId the owning Staffel/SK; must be {@code null} for area-leadership ranks and
- *     present for Staffel/SK ranks (the service enforces the match).
- * @param userId the account to place in the position. Mutually exclusive with {@code displayName}:
- *     supply one of the two for every rank except {@code COMMAND_LEAD}, where both may be omitted
- *     to create a still-leaderless Kommando. The service rejects supplying both, and rejects
- *     supplying neither for any rank other than {@code COMMAND_LEAD}.
- * @param parentId the parent position for a deputy (its Kommandoleiter) or an Ensign (the
- *     Staffelleiter or a Kommandoleiter); {@code null} for every root rank.
- * @param name the Kommando's display name; only honoured for {@code COMMAND_LEAD} (rejected for any
- *     other rank). {@code null} or blank creates an unnamed Kommando.
- * @param sortIndex optional display order within the sibling group; defaults to {@code 0} when
- *     omitted.
- * @param displayName a free-text holder name for a Kartell member who has no Basetool account yet;
- *     mutually exclusive with {@code userId} (see above). {@code null} or blank means "use {@code
- *     userId} instead". Placed last so it stays optional on every existing call shape.
+ * @param positionType the functional rank to assign; required
+ * @param orgUnitId the owning Staffel/SK; {@code null} for area-leadership ranks
+ * @param userId the account holding the position; exactly one of {@code userId} and {@code
+ *     displayName} is required, except for {@code COMMAND_LEAD}, where both may be omitted
+ * @param parentId the parent position of a deputy or an Ensign; {@code null} for root ranks
+ * @param name the Kommando name, honoured only for {@code COMMAND_LEAD}; blank means unnamed
+ * @param sortIndex optional order within the sibling group; defaults to {@code 0}
+ * @param displayName free-text holder name for a member without an account; mutually exclusive with
+ *     {@code userId}
  */
 public record OrgChartPositionCreateRequest(
     @NotNull OrgChartPositionType positionType,

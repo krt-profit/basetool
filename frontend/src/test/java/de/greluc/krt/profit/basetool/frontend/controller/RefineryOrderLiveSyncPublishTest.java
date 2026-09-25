@@ -43,15 +43,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
 /**
- * Live multi-user sync for the refinery queue (#1235, REQ-FE-015, ADR-0094).
- *
- * <p>The refinery surface publishes <b>server-side</b> rather than from the client because every
- * mutation navigates away — the classic handlers redirect and the AJAX twins answer a {@code
- * targetUrl} the detail page immediately follows — so a client broadcast would race the socket
- * teardown, and the no-JS form-POST fallback would emit nothing at all. These tests pin that the
- * poke fires on success, does <b>not</b> fire when the backend refused (a peer must not re-fetch
- * for a change that never happened), and that the store path additionally pokes the shared Lager,
- * whose rows it writes.
+ * Tests the server-side live-sync publish of the refinery queue (REQ-FE-015, ADR-0094): the poke
+ * fires on success, not after a backend refusal, and the store path also pokes the shared Lager.
  */
 class RefineryOrderLiveSyncPublishTest {
 

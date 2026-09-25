@@ -26,14 +26,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Data transfer record carrying Operation payload.
- *
- * <p>{@code payoutPreliminary} is an authoritative {@link Boolean} only on the {@code GET
- * /api/v1/operations/{id}} detail endpoint, where the controller fills it from {@code
- * OperationService.hasUnfinishedMissions(id)}. On every other endpoint that emits this DTO (list /
- * create / update responses) the field is {@code null} because the question is detail-page-specific
- * and the bulk endpoints have no reason to spend the extra count query. Treat {@code null} as
- * "unknown" — UI consumers should default to hiding the preliminary-warning banner.
+ * Data transfer record carrying an operation.
  *
  * @param id operation primary key
  * @param name operation name
@@ -43,10 +36,9 @@ import org.jetbrains.annotations.Nullable;
  * @param version optimistic-lock version
  * @param createdAt creation timestamp (UTC)
  * @param updatedAt last-update timestamp (UTC)
- * @param payoutPreliminary {@code true} when at least one mission of the operation has no {@code
- *     actualStartTime} or no {@code actualEndTime} and the payout breakdown therefore may rebalance
- *     once every mission is closed; {@code false} when every mission has both timestamps; {@code
- *     null} when the flag was not computed (non-detail endpoints)
+ * @param payoutPreliminary {@code true} when a mission of the operation lacks an actual start or
+ *     end time, so the payout may still change; {@code null} (unknown) on every endpoint except the
+ *     detail {@code GET}
  */
 public record OperationDto(
     UUID id,
@@ -60,12 +52,10 @@ public record OperationDto(
     Boolean payoutPreliminary) {
 
   /**
-   * Returns a copy of this DTO with {@code payoutPreliminary} set to {@code value}. Used by the
-   * detail-endpoint controller to attach the freshly computed flag without re-running the full
-   * mapper or fanning out a second mapping path through MapStruct.
+   * Returns a copy of this DTO with {@code payoutPreliminary} replaced.
    *
-   * @param value the flag value to set on the returned copy
-   * @return a new {@code OperationDto} identical to this one except for {@code payoutPreliminary}
+   * @param value the flag value for the copy
+   * @return a new {@code OperationDto} differing only in {@code payoutPreliminary}
    */
   @NotNull
   public OperationDto withPayoutPreliminary(@Nullable Boolean value) {

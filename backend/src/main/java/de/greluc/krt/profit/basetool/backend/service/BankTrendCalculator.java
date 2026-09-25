@@ -31,15 +31,10 @@ import java.util.stream.Collectors;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Derives the bank's 30-day trend figures (REQ-BANK-016) — the window cutoff, the net delta and the
- * daily end-of-day balance series the frontend renders as an inline SVG sparkline — from the
- * windowed posting slices. The bank dashboard (every visible account) and the org-unit officer/lead
- * balance page (REQ-BANK-021) both show the same trend per account, so the math lives here once and
- * is called from {@link BankDashboardService} and {@link OrgUnitBankAccessService} to keep the two
- * surfaces identical.
+ * Derives the bank's 30-day trend figures (REQ-BANK-016): window cutoff, net delta and daily
+ * end-of-day balance series, shared by the bank dashboard and the org-unit balance page.
  *
- * <p>Pure computation only: it never touches the security context or any repository, so it stays
- * outside the {@code BankSecurityService}/org-unit-scope concerns entirely.
+ * <p>Pure computation; no repository or security access.
  */
 public final class BankTrendCalculator {
 
@@ -50,8 +45,7 @@ public final class BankTrendCalculator {
   private BankTrendCalculator() {}
 
   /**
-   * The inclusive start of the trend window: {@value #WINDOW_DAYS} days before now. The windowed
-   * posting query ({@code BankPostingRepository#postingSlicesSince}) takes this as its cutoff.
+   * Returns the inclusive start of the trend window, {@value #WINDOW_DAYS} days before now.
    *
    * @return the window start instant
    */
@@ -77,10 +71,8 @@ public final class BankTrendCalculator {
   }
 
   /**
-   * Derives the end-of-day balance series of the last {@value #WINDOW_DAYS} days from the window's
-   * posting slices: the series starts at {@code balance - delta} (the balance at window start) and
-   * walks the daily nets; the last value equals the current balance. Days are bucketed in UTC,
-   * matching the ledger's storage zone.
+   * Derives the end-of-day balance series of the last {@value #WINDOW_DAYS} days, starting at
+   * {@code balance - delta} and ending at the current balance. Days are bucketed in UTC.
    *
    * @param balance the account's current balance
    * @param delta the net change inside the window (see {@link #windowDelta(List)})

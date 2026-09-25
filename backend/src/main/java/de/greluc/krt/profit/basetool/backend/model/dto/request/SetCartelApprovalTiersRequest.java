@@ -27,17 +27,14 @@ import java.math.BigDecimal;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Write payload for the KRT-account (CARTEL) 3-stage approval thresholds T1/T2 (REQ-BANK-047),
- * managed by bank management in the Verwaltung tab. Each ceiling is an optional whole-aUEC amount
- * of at least 0 (a {@code null} ceiling clears that band; the
- * {@code @DecimalMin}/{@code @DecimalMax}/ {@code @WholeNumber} constraints skip a {@code null}
- * value by Bean-Validation semantics). The cross-field rule {@code T2 >= T1} and the CARTEL-only
- * rule are enforced in {@code BankAccountService.setCartelApprovalTiers} for clean 400s.
+ * Write payload for the KRT-account (CARTEL) approval thresholds T1/T2 (REQ-BANK-047). Each ceiling
+ * is an optional whole-aUEC amount of at least 0; {@code T2 >= T1} and the CARTEL-only rule are
+ * enforced in {@code BankAccountService.setCartelApprovalTiers}.
  *
  * @param employeeCeiling the bank-employee self-approval ceiling {@code T1}, or {@code null} to
- *     clear it (an unset ceiling is treated as {@code 0} at request time)
+ *     clear it (treated as {@code 0})
  * @param areaLeadCeiling the Bereichsleiter-Profit ceiling {@code T2}, or {@code null} to clear it
- *     (an unset ceiling means no OL band — the Bankleitung covers everything above T1)
+ *     (no OL band)
  * @param version optimistic-locking version the client read (REQ-BANK-018); a mismatch surfaces as
  *     409 {@code OPTIMISTIC_LOCK}
  */

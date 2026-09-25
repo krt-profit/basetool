@@ -36,12 +36,8 @@ public interface BlueprintExternalAliasRepository
     extends JpaRepository<BlueprintExternalAlias, UUID> {
 
   /**
-   * Case-insensitive lookup used both as the personal-blueprint import resolution step and as the
-   * service-layer pre-create duplicate guard. External systems sometimes carry the same name with
-   * different casing across patch versions, so this match folds case — consistent with the DB
-   * functional unique index {@code uq_blueprint_external_alias_source_lower_name} on {@code
-   * (source_system, LOWER(external_name))} (V176, REQ-INV-020). It returns at most one row because
-   * that index forbids two case-only variants from coexisting.
+   * Finds an alias by source system and external name, ignoring case; at most one row exists per
+   * case-folded pair (REQ-INV-020).
    *
    * @param sourceSystem catalogue the alias belongs to
    * @param externalName case-insensitive external blueprint name

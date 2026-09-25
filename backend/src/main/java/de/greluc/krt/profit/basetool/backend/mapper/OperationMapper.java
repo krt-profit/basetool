@@ -32,17 +32,10 @@ import org.mapstruct.Mapping;
 public interface OperationMapper {
 
   /**
-   * Maps an {@link Operation} entity to its outbound DTO.
+   * Maps an {@link Operation} to its DTO, publishing the owning org unit as {@code owningSquadron}.
    *
-   * <p>After R9 Step 2 the operation entity exposes {@code owningOrgUnit} (typed {@code OrgUnit});
-   * the DTO still publishes {@code owningSquadron} as {@code SquadronReferenceDto} for API
-   * stability. The explicit mapping routes the source through {@code
-   * SquadronMapper.orgUnitToReferenceDto}, which projects either kind — a Staffel or a
-   * Spezialkommando — into the slim owner reference (id/name/shorthand), so SK-owned operations now
-   * surface their SK badge instead of a blank cell.
-   *
-   * @param entity the operation entity to project; {@code null} returns {@code null}.
-   * @return the populated operation DTO.
+   * @param entity the entity to project; {@code null} returns {@code null}
+   * @return the operation DTO
    */
   @Mapping(target = "owningSquadron", source = "owningOrgUnit")
   @Mapping(target = "payoutPreliminary", ignore = true)

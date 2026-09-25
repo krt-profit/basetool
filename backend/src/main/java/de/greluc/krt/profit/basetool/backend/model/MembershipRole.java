@@ -20,22 +20,12 @@
 package de.greluc.krt.profit.basetool.backend.model;
 
 /**
- * The functional leadership rank a user holds on a single {@link OrgUnitMembership} row (epic #800,
- * REQ-ROLE-001). This is the unified successor to the five mutually-exclusive boolean leadership
- * flags (<code>is_lead</code>, <code>is_bereichsleiter</code>, <code>is_bereichskoordinator</code>,
- * <code>is_bereichsoperator</code>, <code>is_ol_member</code>): exactly one rank per seat, kind-
- * scoped by the {@code chk_org_unit_membership_role_kind} CHECK so a squadron rank can only sit on
- * a {@code SQUADRON} membership, an area rank on a {@code BEREICH} membership, and so on.
+ * The leadership rank a user holds on one {@link OrgUnitMembership} (REQ-ROLE-001); exactly one
+ * rank per seat, restricted by a CHECK to ranks valid for the org unit's kind.
  *
- * <p>The rank is the <em>source of truth</em> for what a user may do in an org unit; the org chart
- * (<code>org_chart_position</code>) only mirrors it descriptively and grants nothing
- * (REQ-ROLE-006). The orthogonal capability flags {@link OrgUnitMembership#isLogistician()} /
- * {@link OrgUnitMembership#isMissionManager()} are deliberately NOT folded into this enum — a
- * member can be a logistician without holding any rank.
- *
- * <p>During the additive soak (epic #800 Phase 1) the five boolean columns still exist and remain
- * the authoritative read path; this column is written in lockstep (dual-write) and consumed only
- * from Phase 2 onward. The boolean columns drop in the Phase-5 destructive cleanup.
+ * <p>The rank is the source of truth for permissions; the org chart only mirrors it. The capability
+ * flags {@link OrgUnitMembership#isLogistician()} / {@link OrgUnitMembership#isMissionManager()}
+ * are independent of it.
  */
 public enum MembershipRole {
 
@@ -90,9 +80,8 @@ public enum MembershipRole {
   BEREICHSKOORDINATOR,
 
   /**
-   * Bereichsoperator — operator within a Bereich. Valid only on a {@code BEREICH} membership. Same
-   * cascading, officer-equivalent reach over the Bereich's children as {@link #BEREICHSLEITER} for
-   * now.
+   * Bereichsoperator: operator within a Bereich, valid only on a {@code BEREICH} membership, with
+   * the same cascading reach as {@link #BEREICHSLEITER}.
    */
   BEREICHSOPERATOR,
 
@@ -104,19 +93,17 @@ public enum MembershipRole {
   OL_MEMBER,
 
   /**
-   * SK-Leiter — lead of a Spezialkommando (the rank formerly modelled by {@code is_lead}). Valid
-   * only on a {@code SPECIAL_COMMAND} membership. Confers logistician + mission-manager reach over
-   * its own SK and the ability to manage that SK's members; does NOT cascade (SK-only).
+   * SK-Leiter: lead of a Spezialkommando, valid only on a {@code SPECIAL_COMMAND} membership.
+   * Confers logistician and mission-manager reach and member management over its own SK only.
    */
   SK_LEAD;
 
   /**
-   * Whether this is one of the four in-squadron leadership ranks (Staffelleiter / Kommandoleiter /
-   * stellv. Kommandoleiter / Ensign). These ranks are held BY squadron members and are exempt from
-   * the "a leader holds no Staffel" rule (REQ-ORG-017); they confer own-squadron reach only.
+   * Whether this is one of the four in-squadron leadership ranks; these confer own-squadron reach
+   * only and are exempt from the "a leader holds no Staffel" rule (REQ-ORG-017).
    *
    * @return {@code true} for {@link #STAFFELLEITER}, {@link #KOMMANDOLEITER}, {@link
-   *     #STELLV_KOMMANDOLEITER} and {@link #ENSIGN}; {@code false} otherwise.
+   *     #STELLV_KOMMANDOLEITER} and {@link #ENSIGN}
    */
   public boolean isSquadronRank() {
     return this == STAFFELLEITER
@@ -147,11 +134,9 @@ public enum MembershipRole {
   }
 
   /**
-   * Whether holding this rank makes the membership an oversight seat over its own org unit (any
-   * rank except {@link #MEMBER}). From Phase 2 this is the home of the former {@code
-   * isOversightSeat} classifier in {@code OwnerScopeService}.
+   * Whether this rank makes the membership an oversight seat over its own org unit.
    *
-   * @return {@code true} for every rank except {@link #MEMBER}.
+   * @return {@code true} for every rank except {@link #MEMBER}
    */
   public boolean confersOwnLevelOversight() {
     return this != MEMBER;

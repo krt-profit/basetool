@@ -51,8 +51,7 @@
     );
     const deleteMessage = document.getElementById('krt-dbp-delete-message');
     /**
-     * The per-row form the open modal is about (set on open). Its action is server-rendered, so no
-     * URL ever flows from the DOM into a form action.
+     * The server-rendered per-row form the open delete modal submits.
      * @type {HTMLFormElement | null}
      */
     let pendingForm = null;
@@ -95,8 +94,6 @@
         }
     }
 
-    /* ------------------------------------------------------------- the list */
-
     /** Re-reads the default set from the rendered rows, the only copy the page keeps. */
     function syncDefaultKeys() {
         const keys = new Set();
@@ -129,8 +126,6 @@
             .then(syncDefaultKeys);
     }
 
-    /* ------------------------------------------------------------- type-ahead */
-
     function hideResults() {
         if (resultsEl) {
             resultsEl.hidden = true;
@@ -139,9 +134,7 @@
     }
 
     /**
-     * Builds nodes with the DOM API (textContent) rather than innerHTML, so untrusted product
-     * names from the search response can never be reinterpreted as HTML (CodeQL
-     * js/xss-through-dom).
+     * Shows a single message in the search results, built with textContent.
      * @param {string | undefined} text
      */
     function renderMessage(text) {
@@ -234,8 +227,6 @@
             });
     }
 
-    /* ------------------------------------------------------------- staging */
-
     function refreshStagingEmptyState() {
         /** @type {HTMLElement | null} */
         const empty = stagingList ? stagingList.querySelector('.krt-bp-staging-empty') : null;
@@ -289,7 +280,6 @@
         });
         chip.appendChild(removeBtn);
 
-        // Carried for the native-submit fallback; the in-place add sends the staged set as JSON.
         const hidden = document.createElement('input');
         hidden.type = 'hidden';
         hidden.name = 'productKeys';
@@ -299,8 +289,6 @@
         stagingList.appendChild(chip);
         refreshStagingEmptyState();
     }
-
-    /* ------------------------------------------------------------- add */
 
     /**
      * Applies the add's per-key outcome: every key that did not fail leaves the staging (added, or
@@ -346,14 +334,10 @@
                     onSuccess: applyAddResult,
                 })
                 .finally(function () {
-                    // krtFetch re-enables the submit button when the write settles; the staging
-                    // decides whether it stays enabled.
                     refreshStagingEmptyState();
                 });
         });
     }
-
-    /* ------------------------------------------------------------- remove modal */
 
     /**
      * @param {string | null} formId
@@ -407,8 +391,6 @@
             });
         });
     }
-
-    /* ------------------------------------------------------------- wiring */
 
     if (searchInput) {
         const input = searchInput;

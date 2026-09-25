@@ -36,16 +36,11 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 /**
- * Bean Validation contract tests for the three catalog guards on {@link InventoryItemCreateDto}
- * (V220, REQ-INV-029/031): the material/gameItem XOR, the quality-by-kind pairing, and the
- * no-mission-for-game-item rule. Each guard mirrors a DB CHECK or service invariant so a violating
- * payload surfaces as a 400 validation error instead of a 500 integrity failure — a silently
- * dropped {@code @AssertTrue} would regress exactly that, with nothing failing at the type level.
+ * Bean Validation tests for the catalog guards of {@link InventoryItemCreateDto} (REQ-INV-029/031):
+ * material/game-item XOR, quality by kind, and no mission for a game item.
  *
- * <p>The class-level {@code @ValidQuantityAmount} needs its Spring-managed validator, so the
- * factory is configured with a {@link ConstraintValidatorFactory} that hands the {@link
- * ValidQuantityAmountValidator} a stub {@code MaterialPieceTypeLookup} (every material SCU) and
- * falls back to default construction for the built-in validators.
+ * <p>The validator factory supplies {@link ValidQuantityAmountValidator} with a stub lookup that
+ * treats every material as SCU.
  */
 class InventoryItemCreateDtoValidationTest {
 
@@ -87,13 +82,13 @@ class InventoryItemCreateDtoValidationTest {
   }
 
   /**
-   * Builds a create payload with the given catalog references, quality and mission fields; every
-   * other field is a fixed valid value (location set, amount 5.0, non-personal, no allocations).
+   * Builds a create payload with the given catalog, quality and mission fields and fixed valid
+   * values elsewhere.
    *
    * @param materialId the material reference, or {@code null}
    * @param gameItemId the game-item reference, or {@code null}
    * @param quality the quality grade, or {@code null}
-   * @param missionId the legacy single mission reference, or {@code null}
+   * @param missionId the single mission reference, or {@code null}
    * @param missionAllocations the mission split list, or {@code null}
    * @return the assembled payload
    */

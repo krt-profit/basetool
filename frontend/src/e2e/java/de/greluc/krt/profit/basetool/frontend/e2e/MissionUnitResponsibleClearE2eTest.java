@@ -36,28 +36,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Functional flow: a mission unit's explicit responsible person can be REMOVED again through the
- * unit-edit modal — via BOTH supported paths — resetting the field to "none".
- *
- * <p>Regression coverage for the reported bug where, once a responsible person was pinned on a
- * unit, the searchable combobox offered no way back to empty: it swallowed the optional {@code
- * <select>}'s empty option into the placeholder (so "— automatisch: Schiffseigner —" was never a
- * pickable row) and, on blur, snapped a cleared textbox back to the just-removed name. The fix
- * (REQ-FE-011, ADR-0053) exposes two independent paths back to none, one per test method:
+ * Verifies that a mission unit's responsible person can be removed again through the unit-edit
+ * modal, via both paths (REQ-FE-011, ADR-0053):
  *
  * <ul>
- *   <li>the discoverable dropdown <b>"clear" row</b> ({@link
- *       #clearsUnitResponsibleViaTheClearRow});
- *   <li><b>delete-to-clear</b> — emptying the textbox, whose visual regression was that blur
- *       restored the removed name ({@link #clearsUnitResponsibleByEmptyingTheTextbox}).
+ *   <li>the dropdown's "clear" row ({@link #clearsUnitResponsibleViaTheClearRow});
+ *   <li>emptying the textbox ({@link #clearsUnitResponsibleByEmptyingTheTextbox}).
  * </ul>
  *
- * <p>The mission, the acting user as a registered participant (a unit's responsible person is
- * chosen from the registered participants), and one unit per path — each pinned to that participant
- * — are seeded via {@link BackendSeeder}; the tests then drive only the clear-and-save flow through
- * the UI, reusing one authenticated session via {@link E2eSupport#authenticatedStorageState}. A
- * mission is staffel-scoped, so the user is assigned to the IRIDIUM Squadron first. The two tests
- * target DISTINCT units (located by {@code data-name}) so they stay independent of ordering.
+ * <p>Each test targets its own seeded unit, so they are order-independent.
  */
 @Tag("e2e")
 class MissionUnitResponsibleClearE2eTest {
@@ -129,9 +116,8 @@ class MissionUnitResponsibleClearE2eTest {
 
   /**
    * Clears the responsible person of the {@link #DELETE_UNIT} by emptying the combobox textbox and
-   * moving focus away — the path a user takes when they miss the dropdown row. Asserts that blur
-   * does NOT snap the box back to the removed name (the reported visual regression), then saves and
-   * asserts the unit no longer has a responsible person.
+   * moving focus away, asserts that blur does not restore the removed name, then saves and asserts
+   * the unit has no responsible person.
    */
   @Test
   void clearsUnitResponsibleByEmptyingTheTextbox() {

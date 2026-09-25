@@ -81,38 +81,15 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Backend security configuration: JWT resource-server, role hierarchy, CSRF policy and the request
+ * Backend security configuration: JWT resource server, role hierarchy, CSRF policy and the request
  * authorization matrix.
  *
- * <p>The backend is a pure resource server — incoming JWTs are validated against the Keycloak
- * issuer, the {@code CustomJwtGrantedAuthoritiesConverter} maps both Keycloak realm roles AND the
- * project-specific {@code is_logistician} / {@code is_mission_manager} flags on the caller's {@code
- * org_unit_membership} rows into Spring authorities. The role hierarchy mirrors the CLAUDE.md
- * matrix (admin/officer imply logistician/mission-manager).
- *
- * <p>The {@code authorizeHttpRequests} matrix in {@link #filterChain} is the single, exhaustive
- * source for which endpoints are public, which require authentication, and which require a specific
- * role/authority. The order matters — Spring evaluates the matchers top-down. Method-level
- * {@code @PreAuthorize} on services adds fine-grained checks but never weakens the chain matcher.
- *
- * <p><strong>Four paths answer without a token, and that list is the requirement</strong>
- * (REQ-SEC-052, ADR-0159): {@code /error}, {@code /actuator/health(/**)}, {@code /internal/**} —
- * machine-to-machine behind a constant-time shared-secret header, not an anonymous data path — and
- * the two {@code GET}-scoped reads {@code /api/v1/terms/document} and {@code
- * /api/v1/app/version-policy}. Everything else requires authentication at this layer <em>and</em> a
- * method gate; a {@code HEAD} on either read falls to the catch-all and answers {@code 401},
- * because the rules name the verb.
- *
- * <p>An authenticated caller is still not admitted by default. A token whose realm roles map to no
- * application role is refused with {@code 403 NO_ROLE} (REQ-SEC-053) before it reaches a handler,
- * on the JWT path and on the ingest gateway's acting-member path alike. There is no role below
- * member: the {@code GUEST} role was removed with {@code V239}.
- *
- * <p>CSRF is enabled with the cookie token repository except in the {@code test} profile, where it
- * is disabled so MockMvc tests do not need to plumb the token through every call. API endpoints
- * that are exclusively JSON and bearer-token authenticated ({@code /api/v1/missions/**}, {@code
- * /api/v1/operations/**}, {@code /api/v1/orders}, {@code /api/v1/finance-entries}) are explicitly
- * ignored because they can never be triggered from a CSRF-vulnerable browser flow.
+ * <p>The matrix in {@link #filterChain} is the exhaustive source of which endpoints are public or
+ * require a role; method-level {@code @PreAuthorize} only narrows it. Only {@code /error}, {@code
+ * /actuator/health(/**)}, {@code /internal/**} and the {@code GET} reads {@code
+ * /api/v1/terms/document} and {@code /api/v1/app/version-policy} answer without a token
+ * (REQ-SEC-052), and a token mapping to no application role is refused with {@code 403 NO_ROLE}
+ * (REQ-SEC-053).
  */
 @Configuration
 @EnableWebSecurity
@@ -128,81 +105,36 @@ public class SecurityConfig {
   static final String TERMS_GATE_ARMED_IN_TEST = "app.security.terms.armed-in-test";
 
   /**
-   * Paths exempt from cookie-based CSRF, because on them there is no ambient credential for a
-   * cross-site request to ride.
-   *
-   * <p>This chain is {@link
-   * org.springframework.security.config.http.SessionCreationPolicy#STATELESS} and authenticates
-   * with nothing but a bearer JWT — no form login, no basic auth, no session cookie. CSRF defends
-   * against a browser attaching a credential by itself; a bearer token is never attached by itself,
-   * so on {@code /api/v1/**} the check can only ever refuse a legitimate client.
-   *
-   * <p><strong>It did.</strong> The list used to name five paths, and every path outside it
-   * answered {@code 403 MissingCsrfToken} to any caller without a CSRF cookie — which is every
-   * bearer client, i.e. the whole native app. In production that broke booking stock out of the
-   * Lager ({@code POST /api/v1/inventory/{id}/book-out}), taking and progressing an Auftrag ({@code
-   * /api/v1/orders/{id}/assignees/{userId}}, {@code /status}) and a bank account's balance target —
-   * while {@code /api/v1/missions/**} and {@code /api/v1/operations/**}, which were on the list,
-   * worked. The nightly {@code edge-deny-probe} named all four: it asserts {@code 401} for an
-   * anonymous write and got {@code 403}, because the CSRF filter runs ahead of authorization and
-   * answered first.
-   *
-   * <p>Growing the list per broken endpoint is what produced that shape. The pattern now matches
-   * the reason: the whole bearer-only API. {@code /internal/**} keeps its entry —
-   * machine-to-machine with its own shared-secret header, also cookie-less (REQ-SEC-022).
-   *
-   * <p>Package-private so {@code SecurityConfigCsrfExemptionTest} can pin it. The {@code test}
-   * profile disables CSRF outright so MockMvc can post, which means no {@code @SpringBootTest} in
-   * this repo exercises the production branch at all — that blind spot is why the gap shipped, and
-   * a test over this constant is the part of it that can be closed cheaply.
+   * Paths exempt from cookie-based CSRF, because this stateless chain authenticates only with a
+   * bearer JWT, which a browser never attaches by itself.
    */
   static final String[] CSRF_EXEMPT_PATHS = {"/api/v1/**", "/internal/**"};
 
   /**
-   * Cross-origin allowlist for the backend API. Empty by default: the backend is only addressed
-   * server-side from the Spring-Boot frontend (Thymeleaf SSR), so no direct browser-to-backend
-   * cross-origin traffic is expected, and any such call is rejected with HTTP 403. Override in
-   * environment-specific YAML when a real browser client on a different origin is introduced (e.g.
-   * a future mobile web app on https://mobile.profit-base.online).
+   * Cross-origin allowlist for the backend API; empty by default, so every cross-origin browser
+   * call is rejected with {@code 403}.
    */
   @Value("${app.cors.allowed-origin-patterns:}")
   private List<String> allowedOriginPatterns;
 
   /**
-   * Expected JWT {@code aud} (audience) values for the opt-in audience check (audit L-1). Empty by
-   * default → no audience enforcement: the resource server already validates signature, issuer and
-   * expiry, and the effective authority comes from realm roles, so requiring {@code aud} is a
-   * defense-in-depth knob an operator enables once they know the value their realm issues (a wrong
-   * value would reject every token). Set {@code app.security.jwt.expected-audiences} (comma-list)
-   * to the backend client / resource id to turn it on. Under the {@code prod} profile it is not
-   * optional: {@link JwtAudienceStartupCheck} refuses to start the context while it is blank
-   * (APPSEC-08), so "empty = off" holds only for dev, test and e2e.
+   * Expected JWT {@code aud} values for the opt-in audience check; empty disables it. Under the
+   * {@code prod} profile {@link JwtAudienceStartupCheck} refuses to start while it is blank.
    */
   @Value("${app.security.jwt.expected-audiences:}")
   private List<String> expectedAudiences;
 
   /**
-   * Custom resource-server {@link JwtDecoder}, created ONLY when at least one hardening knob is
-   * set: {@code app.security.jwt.expected-audiences} (opt-in {@code aud} enforcement, audit L-1)
-   * and/or {@code app.security.jwt.jwk-set-uri} (opt-in: fetch the JWKS from the INTERNAL Keycloak
-   * so token validation no longer hairpins through the public edge — REQ-SEC-024). When neither is
-   * set the bean is absent and Spring Boot's auto-configured, lazily-fetching decoder is used
-   * unchanged, so the default behaviour — including the {@code test} profile's unreachable
-   * placeholder issuer — is untouched (this is what keeps every {@code @SpringBootTest} that does
-   * not mock {@code JwtDecoder} green).
+   * Creates the resource-server {@link JwtDecoder} when an expected audience or an internal JWKS
+   * URL is configured (REQ-SEC-024); otherwise Spring Boot's auto-configured decoder is used.
    *
-   * <p>The validator chain is identical to the auto-config default plus the optional audience
-   * check: signature + issuer + timestamp via {@link JwtValidators#createDefaultWithIssuer(String)}
-   * — the {@code iss} claim is still validated against the PUBLIC issuer Keycloak stamps into
-   * tokens, so split-horizon JWKS (public {@code iss}, internal key fetch) is transparent — and the
-   * {@code aud} validator only when non-blank audiences are configured.
+   * <p>Validates signature, issuer and timestamps, plus {@code aud} when audiences are configured;
+   * {@code iss} is always checked against the public issuer.
    *
-   * @param issuerUri the configured Keycloak issuer location (used for {@code iss} validation)
-   * @param jwkSetUri the internal JWKS URL, or blank to derive keys from the issuer location as
-   *     before
-   * @param sslBundles the registered SSL bundles, consulted for the {@code keycloak-trust} pin when
-   *     an internal {@code jwkSetUri} is used
-   * @return a Nimbus decoder wired for the configured hardening knobs
+   * @param issuerUri the Keycloak issuer location used for {@code iss} validation
+   * @param jwkSetUri the internal JWKS URL, or blank to derive keys from the issuer
+   * @param sslBundles the SSL bundles holding the {@code keycloak-trust} pin
+   * @return a Nimbus decoder wired for the configured checks
    */
   @Bean
   @ConditionalOnExpression(
@@ -224,18 +156,15 @@ public class SecurityConfig {
   }
 
   /**
-   * Builds the underlying {@link NimbusJwtDecoder} for {@link #resourceServerJwtDecoder}. With a
-   * blank {@code jwkSetUri} it reproduces the auto-config exactly ({@link
-   * NimbusJwtDecoder#withIssuerLocation(String)}, an eager discovery fetch). With an internal
-   * {@code jwkSetUri} it fetches keys lazily from that URL over a {@link
-   * KeycloakTrustSupport}-pinned client so the self-signed internal Keycloak certificate is
-   * trusted; when no {@code keycloak-trust} bundle is registered (dev/test) it falls back to the
-   * default client, matching {@code KeycloakService}'s behaviour.
+   * Builds the {@link NimbusJwtDecoder} for {@link #resourceServerJwtDecoder}: issuer-location
+   * discovery for a blank {@code jwkSetUri}, otherwise a lazy key fetch from that URL over a {@link
+   * KeycloakTrustSupport}-pinned client, falling back to the default client without a {@code
+   * keycloak-trust} bundle.
    *
    * @param issuerUri the Keycloak issuer location
    * @param jwkSetUri the internal JWKS URL, or blank for issuer-location discovery
    * @param sslBundles the registered SSL bundles
-   * @return the Nimbus decoder (validators are attached by the caller)
+   * @return the Nimbus decoder, without validators
    */
   static NimbusJwtDecoder buildDecoder(String issuerUri, String jwkSetUri, SslBundles sslBundles) {
     if (!StringUtils.hasText(jwkSetUri)) {
@@ -255,14 +184,11 @@ public class SecurityConfig {
   }
 
   /**
-   * Builds the {@code aud}-claim validator (audit L-1): a token passes only when its {@code aud}
-   * list intersects {@code expectedAudiences}. Package-private + static so it is unit-testable
-   * without a Spring context.
+   * Builds the {@code aud}-claim validator: a token passes only when its {@code aud} list
+   * intersects {@code expectedAudiences}.
    *
-   * @param expectedAudiences the accepted audience values; never {@code null} (an empty set matches
-   *     no token).
-   * @return an {@link OAuth2TokenValidator} that errors unless the JWT's {@code aud} intersects the
-   *     expected set.
+   * @param expectedAudiences the accepted audience values; an empty list matches no token
+   * @return a validator that fails unless the JWT's {@code aud} intersects the expected set
    */
   @NotNull
   static OAuth2TokenValidator<Jwt> audienceValidator(List<String> expectedAudiences) {
@@ -292,16 +218,11 @@ public class SecurityConfig {
   }
 
   /**
-   * Wires the project's {@code CustomJwtGrantedAuthoritiesConverter} into Spring Security's
-   * standard {@link JwtAuthenticationConverter}, so every authenticated request sees the merged
-   * authority set (Keycloak realm roles + DB-flag-derived roles). The parameter is typed as the
-   * Spring {@link Converter} interface rather than the concrete {@code service}-package bean, so
-   * this {@code config} class does not depend on the {@code service} layer (which would close a
-   * {@code config} &harr; {@code service} package cycle); Spring still injects the single matching
-   * bean by type.
+   * Wires the project's authorities converter into a {@link JwtAuthenticationConverter}, so every
+   * authenticated request carries Keycloak realm roles plus the DB-flag-derived roles.
    *
    * @param customConverter the project-specific authorities converter bean
-   * @return wired {@code JwtAuthenticationConverter}
+   * @return the wired {@code JwtAuthenticationConverter}
    */
   @NotNull
   @Bean
@@ -313,13 +234,9 @@ public class SecurityConfig {
   }
 
   /**
-   * The window the {@code NO_ROLE} refusals are counted into, published as {@link
-   * MetricNames#NO_ROLE_REFUSED_SUBJECTS}.
-   *
-   * <p>Same shape and same 15-minute window as {@link #refusedSubjectWindow(MeterRegistry)}, and a
-   * separate instance on purpose: the two answer different questions and one member can be in both
-   * (a role-less account that has also not accepted the terms), so sharing a window would report
-   * them as one population.
+   * The 15-minute window of distinct subjects refused with {@code NO_ROLE}, published as {@link
+   * MetricNames#NO_ROLE_REFUSED_SUBJECTS}; separate from the consent window because one member can
+   * be in both populations.
    *
    * @param meterRegistry the registry the gauge is published to
    * @return the window the role gate records refusals into
@@ -335,14 +252,8 @@ public class SecurityConfig {
   }
 
   /**
-   * The sliding window of distinct subjects the consent gate refused, published as the {@code
-   * basetool_terms_refused_subjects} gauge (REQ-SEC-028, REQ-OBS-011).
-   *
-   * <p>15 minutes is chosen against the alert that reads it: long enough that a member who is
-   * refused, reads the terms and takes a while to decide stays counted throughout, short enough
-   * that the series falls back to zero within one scrape window of a rollout completing. The 5 000
-   * cap is roughly two orders of magnitude above the membership — it exists so an
-   * internet-reachable refusal path cannot grow the map without bound, not as a functional limit.
+   * The 15-minute sliding window of distinct subjects the consent gate refused, published as the
+   * {@code basetool_terms_refused_subjects} gauge (REQ-SEC-028) and capped at 5 000 entries.
    *
    * @param meterRegistry the registry the gauge is published to
    * @return the window the consent filter records refusals into
@@ -358,34 +269,20 @@ public class SecurityConfig {
   }
 
   /**
-   * Builds the main {@link SecurityFilterChain}: CSRF policy (profile-dependent), CORS source,
-   * security response headers (CSP, X-Frame-Options, Referrer-Policy, Permissions-Policy,
-   * X-Content-Type-Options), the request-authorization matrix and JWT resource-server activation.
+   * Builds the main {@link SecurityFilterChain}: CSRF policy, CORS, security response headers, the
+   * profile-independent request-authorization matrix and the JWT resource server.
    *
-   * <p>The matrix is profile-independent — same rules for {@code dev} and {@code prod}. Public
-   * endpoints (master data, mission-search, guest mission editing) are listed explicitly; every
-   * unlisted request falls through to {@code anyRequest().authenticated()}.
-   *
-   * @param http Spring Security builder
-   * @param jwtAuthenticationConverter wired by {@link #jwtAuthenticationConverter}
-   * @param env active environment, used to detect the {@code test} profile — which disables CSRF
-   *     for MockMvc tests and stands the consent gate down unless {@link #TERMS_GATE_ARMED_IN_TEST}
-   *     re-arms it
-   * @param securityProblemResponseHandler renders filter-level 401/403 as RFC&nbsp;7807
-   *     problem+json (wired as both the entry point and the access-denied handler)
-   * @param messageSource localizes the 403 problem bodies of the three refusing filters ({@code
-   *     PendingApprovalAccessFilter}, {@code TermsAcceptanceAccessFilter}, {@code
-   *     ActingMemberFilter})
-   * @param problemResponseFactory assembles the RFC&nbsp;7807 problem body for those filters
-   * @param objectMapper serializes those filters' {@code ProblemDetail}s to JSON
-   * @param meterRegistry counts the identity-provider-unavailable 503 on {@code
-   *     basetool_http_error_total} (REQ-OBS-011)
-   * @param noRoleRefusedSubjectWindow the distinct-subject window {@code
-   *     PendingApprovalAccessFilter} records its {@code NO_ROLE} refusals into; a separate instance
-   *     from the consent one, because a member can be in both populations at once
-   * @param clientAttribution bounds the {@code client_id} label of {@code
-   *     basetool_api_client_requests_total} (A8, REQ-OBS-018) — the same mapping the audit trail's
-   *     client column records (REQ-AUDIT-005)
+   * @param http the Spring Security builder
+   * @param jwtAuthenticationConverter the converter from {@link #jwtAuthenticationConverter}
+   * @param env the environment; the {@code test} profile disables CSRF and stands the consent gate
+   *     down unless {@link #TERMS_GATE_ARMED_IN_TEST} re-arms it
+   * @param securityProblemResponseHandler renders filter-level 401/403 as problem+json
+   * @param messageSource localizes the 403 bodies of the refusing filters
+   * @param problemResponseFactory assembles the RFC&nbsp;7807 body for those filters
+   * @param objectMapper serializes those filters' {@code ProblemDetail}s
+   * @param meterRegistry counts the identity-provider-unavailable 503
+   * @param noRoleRefusedSubjectWindow the window the {@code NO_ROLE} refusals are recorded into
+   * @param clientAttribution bounds the {@code client_id} label of the API client request counter
    * @return the configured security filter chain
    * @throws Exception propagated from {@link HttpSecurity#build()}
    */
@@ -601,15 +498,10 @@ public class SecurityConfig {
   }
 
   /**
-   * Per-environment CORS configuration.
+   * Builds the CORS source from {@code app.cors.allowed-origin-patterns}, with credentials never
+   * allowed.
    *
-   * <p>The allowed origin patterns come from {@code app.cors.allowed-origin-patterns} — empty by
-   * default because the only legitimate caller is the Spring-Boot frontend running server-side, NOT
-   * a browser. {@code allowCredentials=false} is intentional and load-bearing: combined with a
-   * future misconfigured wildcard origin list it would be the difference between a 403 and a CSRF
-   * exposure across the entire API.
-   *
-   * @return CORS source applied to all paths
+   * @return the CORS source applied to all paths
    */
   @NotNull
   @Bean

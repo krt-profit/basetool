@@ -32,19 +32,18 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * Domain event published right after an org-unit officer/lead's bank booking request is persisted
- * (epic #666 F2, REQ-BANK-026). Carries only the scalars the notification pipeline needs — the
- * target account id (drives the {@code ACCOUNT_GRANT} selector that resolves the employees granted
- * on that account), the render parameters, and the requesting actor to exclude — so the
- * after-commit listener never touches the managed {@link
- * de.greluc.krt.profit.basetool.backend.model.BankBookingRequest}.
+ * Domain event published when an org-unit officer/lead's bank booking request is persisted
+ * (REQ-BANK-026).
+ *
+ * <p>The account id drives the {@code ACCOUNT_GRANT} selector. Carries only scalars, never the
+ * managed {@link de.greluc.krt.profit.basetool.backend.model.BankBookingRequest}.
  *
  * @param requestId the created request's id (also the notification's loose entity id)
  * @param accountId the target bank account id ({@code ACCOUNT_GRANT} selector input)
- * @param type whether the request is a deposit or a withdrawal
+ * @param type deposit or withdrawal
  * @param amount the requested whole-aUEC amount
  * @param accountNo the target account's human-readable number, for rendering
- * @param requesterHandle the requesting officer/lead's effective-name snapshot, for rendering
+ * @param requesterHandle the requester's effective-name snapshot, for rendering
  * @param orgUnitShorthand the requesting org unit's shorthand, for rendering, or {@code null}
  * @param actorSub the requesting user's sub, excluded from recipients
  */

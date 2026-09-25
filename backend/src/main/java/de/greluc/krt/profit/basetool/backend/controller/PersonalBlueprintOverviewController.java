@@ -40,11 +40,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST endpoints for the org-unit blueprint availability overview (#364): which blueprints are
- * available among the members of the caller's oversight org units, and which members own a given
- * blueprint. Read-only oversight surface, gated to admins, officers (their Staffel) and
- * Spezialkommando leads (their SK) by {@code @ownerScopeService.canAccessBlueprintOverview()}; the
- * per-row scope itself is resolved in {@link PersonalBlueprintOverviewService}.
+ * Read-only REST endpoints for the org-unit blueprint availability overview: which blueprints the
+ * members of the caller's oversight org units own, and who owns a given one.
+ *
+ * <p>Gated by {@code @ownerScopeService.canAccessBlueprintOverview()}; row scope is resolved in
+ * {@link PersonalBlueprintOverviewService}.
  */
 @RestController
 @RequestMapping("/api/v1/personal-blueprints/overview")
@@ -59,11 +59,9 @@ public class PersonalBlueprintOverviewController {
   private final PersonalBlueprintOverviewService service;
 
   /**
-   * Lists the blueprints available among the members of the caller's oversight org units
-   * (paginated, sortable by product name), one row per product with the owning-member count. The
-   * optional {@code search} narrows to products whose name contains the fragment
-   * (case-insensitive); it is applied before pagination so the page numbers describe the filtered
-   * set.
+   * Lists the blueprints owned among the members of the caller's oversight org units, one row per
+   * product with the owner count. {@code search} filters by name (case-insensitive) before
+   * pagination.
    *
    * @param page optional zero-based page index
    * @param size optional page size
@@ -101,11 +99,8 @@ public class PersonalBlueprintOverviewController {
   }
 
   /**
-   * Lists the in-scope members that own the given blueprint variant family, by display name only.
-   * The scope is re-resolved server-side, so the {@code productKey} parameter cannot widen
-   * visibility. The {@code productKey} carries the row's variant family key (a base item and its
-   * cosmetic variants share one), which the service expands to the family's product keys before
-   * resolving owners.
+   * Lists, by display name only, the in-scope members owning any product of the given variant
+   * family. The scope is resolved server-side, so {@code productKey} cannot widen visibility.
    *
    * @param productKey the variant family key (the availability row's key) whose owners to list
    * @return the owning in-scope members' display names

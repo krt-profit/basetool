@@ -30,18 +30,8 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 
 /**
- * The public Terms-of-Use page ({@code /terms}).
- *
- * <p>No longer a static template: the wording moved to the backend so that this page, the consent
- * gate and the Android app all render one source (ADR-0138). The read is <strong>anonymous</strong>
- * — the page is reachable without a session, which is the whole reason the backend endpoint permits
- * anonymous callers.
- *
- * <p>A backend outage therefore takes this page with it, where before it rendered from a local
- * bundle. That is the accepted cost of removing the second copy, and it is the failure mode every
- * other page already has. Keeping a fallback copy in this module would reintroduce exactly the
- * drift this change removes — and a fallback that silently serves <em>older</em> terms than the
- * ones being accepted is worse than a page that is briefly unavailable.
+ * The public Terms-of-Use page ({@code /terms}), rendered anonymously from the wording the backend
+ * serves (ADR-0138).
  */
 @Slf4j
 @Controller
@@ -58,20 +48,8 @@ public class TermsController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Renders the wording in force, or the "temporarily unavailable" notice when the backend cannot
-   * be read.
-   *
-   * <p>The template's {@code terms == null} branch was added for exactly this, and without the
-   * catch it covered only the one case that never happens: a {@code 200} with an empty body. {@code
-   * executeGet} raises {@link BackendServiceException} for every 4xx/5xx and for a Resilience4j
-   * {@code CallNotPermittedException}, so a backend restart or an open circuit — the case the
-   * template comment and the CHANGELOG both name — propagated to the error view instead. On the one
-   * page a logged-out visitor is meant to be able to read, and the one every member must read
-   * before consenting.
-   *
-   * <p>DEBUG, not WARN: {@code BackendApiClient} has already logged the failure once at its own
-   * boundary (REQ-OBS-001), and this page is reachable without a session, so a crawler hitting it
-   * during a restart must not multiply that into a client-error storm.
+   * Renders the wording in force, or the "temporarily unavailable" notice when the backend read
+   * fails; the failure is logged at DEBUG only.
    *
    * @param model receives the document under {@code terms}, or nothing when it could not be read
    * @return the {@code terms} view name

@@ -35,28 +35,9 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 /**
- * Verifies that {@link ReactorContextPropagationConfig} actually does what its Javadoc claims: a
- * {@link ActiveSquadronContext} value set on the calling thread is visible inside a Reactor
- * pipeline that runs on a different scheduler thread.
- *
- * <p>The regression this anchors: before this config existed, the {@code
- * ActiveSquadronRelayFilter.relayActiveSquadron()} lambda observed {@code
- * ActiveSquadronContext.get() == null} on the Reactor worker thread (because classic {@link
- * ThreadLocal} values are not copied across threads), and the outbound {@code X-Active-Org-Unit-Id}
- * header was silently dropped — leaking foreign squadrons' rows into a pinned admin's Lager view.
- * Same regression applied to {@link CorrelationContext}, breaking the correlation-id join between
- * frontend and backend log lines.
- *
- * <p>The Reactor side relies on {@link
- * reactor.core.publisher.Hooks#enableAutomaticContextPropagation()} being on. That is activated in
- * {@link ReactorContextPropagationConfig#enableContextPropagation()}; we trigger it once at {@link
- * BeforeAll} time, then run a parallel-scheduler-bound assertion for each registered accessor —
- * {@link ActiveSquadronContext}, {@link CorrelationContext}, {@link ClientIpContext} and the {@link
- * LocaleContextHolder}-backed user locale. The two later-added accessors (client IP for the backend
- * per-IP rate limiter, user locale for the {@code Accept-Language} relay) would each silently drop
- * their outbound header if the registration or its null/blank branch regressed. A fifth accessor
- * carried the guest edit token for anonymous mission sign-up edits; it went with the token itself
- * (ADR-0159, V239).
+ * Verifies that {@link ReactorContextPropagationConfig} makes each registered thread-local ({@link
+ * ActiveSquadronContext}, {@link CorrelationContext}, {@link ClientIpContext} and the {@link
+ * LocaleContextHolder} user locale) visible on a Reactor worker thread.
  */
 class ReactorContextPropagationConfigTest {
 

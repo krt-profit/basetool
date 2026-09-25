@@ -22,19 +22,17 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.util.List;
 
 /**
- * Frontend mirror of the backend {@code ImportIssueDto} (#434/#435): one review finding on a
- * refinery screenshot import draft. {@code field} follows the backend's addressing convention —
- * draft-row issues use {@code "goods[<draftIndex>].<subField>"} (anchored to the rendered form
- * row), skipped-row issues use the bare {@code "goods[<rowIndex>]"} (summary only), order-level
- * issues use plain names ({@code "location"}, {@code "refiningMethod"}, {@code "quoted"}, …).
- * Fields must stay in lockstep with the backend record (mirror-DTO rule).
+ * Frontend mirror of the backend {@code ImportIssueDto}: one review finding on a refinery
+ * screenshot import draft.
  *
- * @param field dotted path per the convention above
+ * @param field the addressed field: {@code "goods[<draftIndex>].<subField>"} for a draft row,
+ *     {@code "goods[<rowIndex>]"} for a skipped row, or a plain order-level name such as {@code
+ *     "location"}
  * @param rawValue verbatim screen read or compact diagnostic
  * @param code machine-readable reason, translated via {@code refineryImport.issue.<CODE>}
  * @param severity visual grading
- * @param confidence contextual confidence in {@code [0,1]}; fuzzy score for {@code
- *     LOW_CONFIDENCE_MATERIAL}, otherwise the row's derived read confidence; nullable
+ * @param confidence confidence in {@code [0,1]}: the fuzzy score for {@code
+ *     LOW_CONFIDENCE_MATERIAL}, otherwise the row's read confidence; nullable
  * @param suggestions ranked candidates for material issues; {@code null} otherwise
  */
 public record ImportIssueDto(

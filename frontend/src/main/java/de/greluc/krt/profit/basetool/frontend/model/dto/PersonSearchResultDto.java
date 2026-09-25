@@ -25,8 +25,8 @@ import java.util.List;
  * The admin Personensuche response (REQ-SEC-060).
  *
  * @param hits the matches, member record first and the audit trails last
- * @param truncated whether the overall cap was reached - shown to the admin, because a capped list
- *     that looked complete would make an erasure look complete when it is not
+ * @param truncated whether the overall cap was reached, shown so a capped list is not taken as
+ *     complete
  */
 public record PersonSearchResultDto(
     List<PersonSearchHitDto> hits, boolean truncated, List<String> cappedColumns) {}

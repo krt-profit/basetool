@@ -36,18 +36,9 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.web.filter.ShallowEtagHeaderFilter;
 
 /**
- * The guard that keeps the ETag buffer off the Server-Sent-Event endpoints (#1653).
- *
- * <p>The defect this pins had no other signal: the plain filter buffers a response to compute its
- * ETag and skips the write-back once async processing has started, so an SSE endpoint answered
- * {@code 200} and then delivered nothing at all, indefinitely, while every connection metric read
- * healthy.
- *
- * <p>The second exemption is a cost fix rather than a correctness fix, and the cases below pin the
- * claim it rests on — that skipping the {@link NoStoreApiScopes} families changes no response
- * header, because Spring already refuses to put an ETag on a {@code no-store} response. That claim
- * is asserted against Spring's own filter ({@link #springItselfEmitsNoEtagOnANoStoreResponse()}),
- * not against a reading of its source.
+ * Tests the ETag filter's exemptions: Server-Sent-Event endpoints are never buffered, and skipping
+ * the {@link NoStoreApiScopes} families changes no header because Spring already emits no ETag on a
+ * {@code no-store} response ({@link #springItselfEmitsNoEtagOnANoStoreResponse()}).
  */
 class StreamAwareShallowEtagHeaderFilterTest {
 
@@ -239,13 +230,10 @@ class StreamAwareShallowEtagHeaderFilterTest {
   }
 
   /**
-   * A chain answering like a {@code no-store} family: the directive first, then a JSON body.
+   * A chain answering like a {@code no-store} family: the {@code Cache-Control} header first, then
+   * a JSON body, matching the production filter order.
    *
-   * <p>The order matters and mirrors production. {@code ApiCacheControlFilter} runs at {@code
-   * HIGHEST_PRECEDENCE + 20}, so the header is on the response before the body is written and
-   * before this filter's write-back looks at it.
-   *
-   * @return a chain that writes {@code private, no-store} and a one-field body.
+   * @return a chain that writes {@code private, no-store} and a one-field body
    */
   private static FilterChain noStoreJsonChain() {
     return (req, res) -> {

@@ -23,20 +23,16 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Frontend mirror of the Organisationsleitung tier of the org chart (epic #692, REQ-ORG-026),
- * decoded from {@code GET /api/v1/org-chart}: the OL org unit's id + name plus its OL_MEMBER nodes.
+ * Frontend mirror of the Organisationsleitung tier of the org chart (REQ-ORG-026), decoded from
+ * {@code GET /api/v1/org-chart}.
  *
- * <p>The whole record is {@code null} on the parent {@link OrgChartDto} when no active OL exists,
- * so the template omits the OL tier entirely. The {@code orgUnitId} is the scope the inline editor
- * stamps a new OL member against, so the "add OL member" affordance works even while the tier holds
- * no members yet.
+ * <p>{@code null} on {@link OrgChartDto} when no active OL exists.
  *
  * @param orgUnitId the OL org unit's id (the add-member affordance's target scope).
  * @param name the OL's display name (the tier caption).
  * @param shorthand the OL's short tag.
- * @param grandAdmiral the OL member holding the Grand Admiral post (REQ-ORG-021), rendered at the
- *     top of the OL above the other members, or {@code null} when the post is vacant. Split out of
- *     {@code members}, so it never also appears there.
+ * @param grandAdmiral the OL member holding the Grand Admiral post (REQ-ORG-021), or {@code null}
+ *     when vacant; never also listed in {@code members}.
  * @param members the remaining OL members (OL_MEMBER positions, excluding the Grand Admiral); never
  *     {@code null}, possibly empty.
  */

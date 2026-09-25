@@ -62,28 +62,10 @@ import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 
 /**
- * Unit tests for {@link BackendRoleSyncFilter}, covering three behaviours.
- *
- * <ul>
- *   <li>The "do not poison the session on a failed sync" contract (REQ-SEC-013): the {@code
- *       BACKEND_ROLES_SYNCED_AT} session stamp must only be written when the backend role read
- *       genuinely succeeded, so a transient backend outage on the first request of a session is
- *       retried instead of leaving the principal under-privileged.
- *   <li>The epic-#720 approval gate: a {@code PENDING}/{@code REJECTED} registration is redirected
- *       to {@code /pending-approval} on guarded paths but allowed through on the {@code
- *       isApprovalExempt} whitelist (e.g. {@code /logout}).
- *   <li>The staleness bounds that keep both pieces of session state honest (REQ-SEC-013): a
- *       terminal {@code ACTIVE} verdict is cached for good, a non-terminal one expires so an
- *       approval reaches a live session without a re-login (and immediately re-syncs the roles it
- *       unlocks), the role sync itself repeats on its own interval, and static assets skip the
- *       whole filter body so neither refresh costs a read per page asset.
- *   <li>The two-way reconciliation (ADR-0122): a {@code ROLE_*} the backend no longer reports is
- *       revoked, a permission only when a previous sync asserted it, the login-owned {@code
- *       OIDC_USER} / {@code SCOPE_*} authorities survive every sync, and a response with no
- *       role/permission list revokes nothing.
- *   <li>The role-less gate (REQ-SEC-053): a {@code 403 NO_ROLE} from the role read is a verdict of
- *       its own, and it routes the request that discovered it rather than the one after it.
- * </ul>
+ * Unit tests for {@link BackendRoleSyncFilter}: the session stamp is written only after a
+ * successful role read, the approval gate redirects pending registrations, session verdicts expire
+ * as designed (REQ-SEC-013), roles are reconciled both ways (ADR-0122), and a {@code 403 NO_ROLE}
+ * routes the request that discovered it (REQ-SEC-053).
  */
 class BackendRoleSyncFilterTest {
 
@@ -321,14 +303,7 @@ class BackendRoleSyncFilterTest {
     verify(chain).doFilter(request, response);
   }
 
-  /**
-   * Public documents short-circuit the body as well — the half of the list that was missing.
-   *
-   * <p>None of these can answer differently for a member whose roles just changed, so a role
-   * reconciliation on them is pure cost. {@code /.well-known/assetlinks.json} paid it on every hit
-   * because it sat in {@code SecurityConfig}'s {@code permitAll} list and in neither gate's
-   * exemption list; the two lists are one now ({@code PublicPaths}).
-   */
+  /** Verifies that public documents skip the filter body entirely. */
   @Test
   void publicDocument_skipsFilterBodyEntirely() throws Exception {
     for (String path :
@@ -538,11 +513,8 @@ class BackendRoleSyncFilterTest {
   }
 
   /**
-   * Turns the mocked session into a map-backed one, so an attribute written during the filter run
-   * is readable later in that same run. The role-less routing depends on exactly that: {@code
-   * syncRoles} records its verdict as a session attribute and {@code doFilterInternal} reads it
-   * back to decide whether to redirect, which a plain {@code mock(HttpSession.class)} - where
-   * {@code setAttribute} is silently discarded - would never let happen.
+   * Makes the mocked session map-backed, so an attribute written during the filter run is readable
+   * later in the same run.
    *
    * @return the live backing map, for asserting what the filter wrote
    */

@@ -935,13 +935,8 @@ class InventoryItemServiceTest {
   }
 
   /**
-   * REQ-SEC-005 regression: the receiver is authorised against the TARGET, never against a role.
-   *
-   * <p>Before this gate the decision was a flat {@code isLogisticianOrAbove()} boolean handed in
-   * from the controller, so a logistician of any Staffel could fabricate stock in a member of any
-   * other Staffel's ledger. The scope predicate must be consulted with the requested id, and it
-   * must be consulted BEFORE the user lookup so a refused caller cannot tell "no such user" from
-   * "access denied" and use the endpoint as an existence oracle.
+   * Creating stock for a target outside the caller's scope is refused (REQ-SEC-005), and the scope
+   * check runs before the user lookup so the endpoint does not reveal whether the user exists.
    */
   @Test
   void createInventoryItem_shouldThrowAccessDenied_whenTargetIsOutsideTheCallersScope() {
@@ -1041,14 +1036,13 @@ class InventoryItemServiceTest {
   }
 
   /**
-   * Builds a game-item create payload for the fixed owner/location pair with the given job-order /
-   * mission references (quality {@code null}, amount 5.0, non-personal — the well-formed item
-   * shape).
+   * Builds a well-formed game-item create payload for the fixed owner/location pair (quality {@code
+   * null}, amount 5.0, non-personal).
    *
    * @param userId the target owner
    * @param gameItemId the game-item reference
    * @param locationId the storage location
-   * @param missionId the legacy single mission reference, or {@code null}
+   * @param missionId the single mission reference, or {@code null}
    * @param jobOrderAllocations the job-order split list, or {@code null}
    * @param missionAllocations the mission split list, or {@code null}
    * @return the assembled payload

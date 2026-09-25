@@ -43,20 +43,11 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Full Thymeleaf render of the account-status page across all three approval states (REQ-SEC-017).
+ * Full Thymeleaf render of the account-status page for all three approval states (REQ-SEC-017):
+ * which block exists and is visible, its copy, and whether the status poll is wired.
  *
- * <p>The bug this pins: {@code BackendRoleSyncFilter} routes {@code PENDING} and {@code REJECTED}
- * to the same path, and the page used to render the waiting copy unconditionally — so a
- * registration an admin had declined kept reading "waiting for the approval of an administrator …
- * can take 1 to 2 days" indefinitely, and was reported as a stuck approval. A model-attribute
- * assertion alone would not have caught it, because the defect lived in the template; these
- * assertions therefore go through the real render: which block exists, which one is visible, which
- * copy it carries, and whether the status poll is wired at all.
- *
- * <p>The expected strings are resolved from the message bundles rather than hardcoded, so the test
- * pins the render against the shipped wording instead of duplicating (and drifting from) it. The
- * locale is pinned per request via {@code ?lang=} — the app resolves it from the {@code KRT_LOCALE}
- * cookie and would otherwise fall back to its German default.
+ * <p>Expected strings are resolved from the message bundles; the locale is pinned via {@code
+ * ?lang=}.
  */
 @SpringBootTest
 class PendingApprovalRenderMvcTest {
@@ -199,8 +190,7 @@ class PendingApprovalRenderMvcTest {
   }
 
   /**
-   * Resolves a bundle key so the assertions compare the render against the shipped wording instead
-   * of a copy of it.
+   * Resolves a bundle key so assertions compare the render against the shipped wording.
    *
    * @param key the message key
    * @param locale the locale to resolve in

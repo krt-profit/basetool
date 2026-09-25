@@ -31,39 +31,29 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Write payload for booking a deposit (REQ-BANK-004/-005): money entered the bank and physically
- * landed with the named holder. The amount is whole-aUEC and strictly positive — the sign is
- * determined by the transaction type, never by the caller.
+ * Write payload for booking a deposit (REQ-BANK-004): money entered the bank and landed with the
+ * named holder.
  *
- * <p><strong>Split deposit (REQ-BANK-043).</strong> When {@link #splitEnabled} is set the caller
- * additionally provides a whole-percent {@link #splitPercent} (1–100): that percentage of the gross
- * is distributed <em>evenly by count</em> across all active squadron accounts (excluding the named
- * account), and the named account is credited only the remainder. The percentage applies to the
- * whole gross; the resulting per-account amounts stay whole aUEC and sum back to the gross exactly
- * (largest-remainder distribution, see {@code BankLedgerService}). Both fields are absent (a plain
- * single-account deposit) unless the caller opts in.
+ * <p>With {@link #splitEnabled}, {@link #splitPercent} of the gross is distributed evenly across
+ * all other active squadron accounts and the named account receives the remainder, all in whole
+ * aUEC (REQ-BANK-043).
  *
  * @param accountId the receiving account
  * @param holderId the player who physically received the money (REQ-BANK-003)
  * @param amount whole-aUEC amount, at least 1
  * @param note optional free-text note for the booking history and statements
- * @param staffNote optional free-text note authored by the booking bank employee ("Notiz
- *     Bankmitarbeiter", REQ-BANK-054): internal context for the movement, shown to bank staff and
- *     the account's responsible side but redacted from the org-unit member-facing views
- * @param splitEnabled whether to distribute {@link #splitPercent} of the gross across all squadron
- *     accounts (REQ-BANK-044)
- * @param splitPercent the whole-percent (1–100) of the gross to distribute; required when {@link
- *     #splitEnabled}, ignored otherwise
- * @param counterpartyUserId optional Einzahler — the member who handed the money in (REQ-BANK-044),
- *     distinct from the receiving holder; {@code null} when no counterparty is recorded
- * @param counterpartyOrgUnitId optional org unit the Einzahler belongs to; for a registered
- *     counterparty ({@code counterpartyUserId}) it is validated to be one of that user's
- *     memberships, for an external counterparty ({@code counterpartyExternalName}) it may be
- *     <em>any</em> active org unit (REQ-BANK-044, #994)
- * @param counterpartyExternalName optional Einzahler recorded as <strong>free text</strong> for a
- *     person <em>without</em> a basetool account (REQ-BANK-044, #994); mutually exclusive with
- *     {@code counterpartyUserId}. When set, the handle is snapshotted from this name and no {@code
- *     counterparty_user_id} FK is stored
+ * @param staffNote optional internal note by the booking bank employee (REQ-BANK-054), hidden from
+ *     the member-facing views
+ * @param splitEnabled whether to distribute {@link #splitPercent} of the gross across the squadron
+ *     accounts
+ * @param splitPercent the whole percent (1–100) to distribute; required when {@link #splitEnabled},
+ *     ignored otherwise
+ * @param counterpartyUserId optional registered Einzahler who handed the money in (REQ-BANK-044);
+ *     {@code null} when none is recorded
+ * @param counterpartyOrgUnitId optional org unit of the Einzahler; one of the user's memberships
+ *     for a registered counterparty, any active org unit for an external one
+ * @param counterpartyExternalName optional Einzahler without a basetool account, as free text;
+ *     mutually exclusive with {@code counterpartyUserId}
  */
 public record BankDepositRequest(
     @NotNull UUID accountId,
@@ -78,13 +68,9 @@ public record BankDepositRequest(
     @Nullable @Size(max = 100) String counterpartyExternalName) {
 
   /**
-   * Cross-field rule (REQ-BANK-043): a split deposit must carry a percentage; a non-split deposit
-   * carries none. The numeric range/whole-number of {@link #splitPercent} is enforced by its own
-   * field constraints — this only pins the presence/absence relationship to {@link #splitEnabled}.
-   *
-   * <p>Hidden from the OpenAPI document for the same reason as {@link
-   * CreateBankBookingRequest#isSplitConfigConsistent()}: it is derived from the other fields, never
-   * sent by a client, and accessor-order instability rewrote {@code openapi.json} between builds.
+   * Checks that a split deposit carries a percentage and a non-split deposit carries none
+   * (REQ-BANK-043); the range of {@link #splitPercent} and its relation to {@link #splitEnabled}
+   * are separate constraints. Hidden from OpenAPI because it is derived.
    *
    * @return {@code true} when the split flag and the percentage are consistent
    */
@@ -95,11 +81,8 @@ public record BankDepositRequest(
   }
 
   /**
-   * Convenience constructor for a plain single-account deposit with no split and no recorded
-   * counterparty: delegates to the canonical constructor with both defaults. Keeps the many call
-   * sites and tests that predate REQ-BANK-043/-044 unchanged; inbound JSON is always deserialized
-   * via the canonical (all-component) constructor, so this overload only serves programmatic
-   * callers.
+   * Creates a plain single-account deposit with no split and no counterparty; for programmatic
+   * callers only.
    *
    * @param accountId the receiving account
    * @param holderId the player who physically received the money
@@ -115,10 +98,7 @@ public record BankDepositRequest(
   }
 
   /**
-   * Convenience constructor for a split deposit with no recorded counterparty (REQ-BANK-043):
-   * delegates to the canonical constructor with both counterparty fields {@code null}. The 5th/6th
-   * parameter types (a primitive {@code boolean} + {@code BigDecimal}) distinguish this overload
-   * from the counterparty one below; programmatic callers only, Jackson uses the canonical.
+   * Creates a split deposit with no counterparty (REQ-BANK-043); for programmatic callers only.
    *
    * @param accountId the receiving account
    * @param holderId the player who physically received the money
@@ -138,10 +118,8 @@ public record BankDepositRequest(
   }
 
   /**
-   * Convenience constructor for a non-split deposit that records a counterparty (REQ-BANK-044):
-   * delegates to the canonical constructor with the split disabled. The 5th/6th parameter types
-   * (two {@code UUID}s) distinguish this overload from the split one above; programmatic callers
-   * only, Jackson uses the canonical.
+   * Creates a non-split deposit with a registered counterparty (REQ-BANK-044); for programmatic
+   * callers only.
    *
    * @param accountId the receiving account
    * @param holderId the player who physically received the money
@@ -171,10 +149,8 @@ public record BankDepositRequest(
   }
 
   /**
-   * Convenience constructor for a deposit with no external free-text counterparty (REQ-BANK-044,
-   * #994) — the pre-#994 canonical shape. Delegates to the canonical constructor with {@code
-   * counterpartyExternalName} {@code null}, keeping every call site that used the split +
-   * registered-counterparty form unchanged; programmatic callers only, Jackson uses the canonical.
+   * Creates a deposit without an external free-text counterparty (REQ-BANK-044); for programmatic
+   * callers only.
    *
    * @param accountId the receiving account
    * @param holderId the player who physically received the money

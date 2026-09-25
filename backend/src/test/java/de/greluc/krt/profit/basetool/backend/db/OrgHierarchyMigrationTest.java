@@ -35,21 +35,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
- * Verifies the V164 org-hierarchy migration (epic #692, REQ-ORG-014/017): the two new {@code
- * org_unit} kinds, the {@code parent_org_unit_id} column with its index, the cross-row parent-kind
- * trigger, the OL-has-no-parent CHECK, the relaxed "at most two Staffeln" guard (the old single-
- * Staffel unique index is gone, replaced by INSERT- and UPDATE-side counting triggers), and the new
- * {@code org_unit_membership} leadership flags. The test profile boots Postgres via Testcontainers
- * and runs every migration at startup, so this exercises the real DDL.
- *
- * <p>Three angles are covered: structural presence of every new object (so a renamed/dropped object
- * is caught as an early-warning canary), the org_unit-side three-level parent invariants, and the
- * membership-side ≤2-Staffel counting trigger on both INSERT and UPDATE (the UPDATE path proves the
- * re-point edge case where the about-to-be-replaced row must not be counted against itself). The
- * membership-flag CHECKs and the matching service-layer guard (REQ-ORG-017) are verified in a later
- * phase where the service and its fixtures exist; here throwaway {@code app_user} / {@code
- * org_unit} rows are inserted directly and removed in a finally block so the shared schema is left
- * untouched.
+ * Verifies the V164 org-hierarchy migration (REQ-ORG-014/017): the new {@code org_unit} kinds and
+ * parent column, the parent-kind invariants, and the at-most-two-Staffeln membership triggers.
+ * Throwaway rows are removed in a finally block.
  */
 @SpringBootTest
 class OrgHierarchyMigrationTest {
@@ -126,12 +114,8 @@ class OrgHierarchyMigrationTest {
   }
 
   /**
-   * Behavioural checks for the ≤2-Staffel counting trigger on both INSERT and UPDATE (REQ-ORG-017),
-   * the guard that replaced the old single-Staffel unique index. Inserts a throwaway user plus four
-   * org units (three Staffeln + one Spezialkommando), then drives the trigger: a third Staffel
-   * INSERT is rejected, a re-point that keeps the user at two Staffeln is allowed (the
-   * about-to-be-replaced row must not be counted against itself), and an UPDATE that would push the
-   * user to a third Staffel is rejected. All rows are removed in a finally block.
+   * Verifies the at-most-two-Staffeln trigger (REQ-ORG-017): a third Staffel is rejected on INSERT
+   * and UPDATE, while a re-point that stays at two is allowed.
    */
   @Test
   void v164EnforcesAtMostTwoSquadronMembershipsOnInsertAndUpdate() {
@@ -194,10 +178,8 @@ class OrgHierarchyMigrationTest {
   }
 
   /**
-   * V184 (epic #800, REQ-ROLE-001): the unified {@code role} rank column exists, is kind-scoped by
-   * {@code chk_org_unit_membership_role_kind}, defaults to {@code MEMBER}, and rejects a rank that
-   * does not match the membership's org-unit kind. Uses throwaway rows cleaned up in a finally
-   * block.
+   * Verifies V184 (REQ-ROLE-001): the kind-scoped {@code role} column defaults to {@code MEMBER}
+   * and rejects a rank not matching the org-unit kind.
    */
   @Test
   void v184AddsKindScopedRoleColumn() {
@@ -234,9 +216,8 @@ class OrgHierarchyMigrationTest {
   }
 
   /**
-   * V185 (epic #800, REQ-ROLE-003): the {@code kommando_group} table + the membership group link
-   * exist; a group must belong to a SQUADRON; a squadron holds at most four groups; and the
-   * group-link CHECK confines {@code kommando_group_id} to the in-group squadron ranks.
+   * Verifies V185 (REQ-ROLE-003): {@code kommando_group} belongs to a SQUADRON, at most four per
+   * squadron, and {@code kommando_group_id} is confined to in-group squadron ranks.
    */
   @Test
   void v185CreatesKommandoGroupWithSquadronAndCardinalityRules() {
@@ -278,11 +259,8 @@ class OrgHierarchyMigrationTest {
   }
 
   /**
-   * V186 (epic #800, REQ-ROLE-006): the org-chart Kommando node ({@code COMMAND_LEAD}) carries a
-   * nullable {@code kommando_group_id} link. A leaderless linked node is accepted (exactly what the
-   * chart mirror writes); a second node for the same group is rejected by {@code
-   * uq_org_chart_one_command_per_group}; and a group link on any non-{@code COMMAND_LEAD} rank is
-   * rejected by {@code chk_org_chart_kommando_group_type}.
+   * Verifies V186 (REQ-ROLE-006): a {@code COMMAND_LEAD} node may link one Kommandogruppe, a second
+   * node for the same group is rejected, and non-{@code COMMAND_LEAD} ranks cannot link one.
    */
   @Test
   void v186LinksOrgChartCommandNodeToKommandoGroup() {
@@ -333,9 +311,8 @@ class OrgHierarchyMigrationTest {
   }
 
   /**
-   * V187 (epic #800, REQ-ROLE-001 Phase 5 cleanup): the five legacy boolean leadership columns and
-   * their three CHECK constraints are gone, while the unified {@code role} column and the rewritten
-   * {@code enforce_leader_excludes_squadron} trigger remain.
+   * Verifies V187 (REQ-ROLE-001): the boolean leadership columns and their CHECKs are absent, while
+   * the {@code role} column and the {@code enforce_leader_excludes_squadron} trigger remain.
    */
   @Test
   void v187DropsBooleanFlagsAndConstraints() {
@@ -360,11 +337,8 @@ class OrgHierarchyMigrationTest {
   }
 
   /**
-   * V187 behavioural proof that the rewritten {@code enforce_leader_excludes_squadron} trigger
-   * reads the unified {@code role} (not the dropped booleans): a squadron rank is EXEMPT (a
-   * Staffelleiter IS a Staffel member), while a silo-leadership rank (here {@code SK_LEAD}) is
-   * still rejected for a user who holds a Staffel membership (REQ-ORG-017). Uses throwaway rows
-   * cleaned up in a finally block.
+   * Verifies that {@code enforce_leader_excludes_squadron} reads {@code role}: squadron ranks are
+   * exempt, while {@code SK_LEAD} is rejected for a Staffel member (REQ-ORG-017).
    */
   @Test
   void v187LeaderExclusionTriggerReadsRole_squadronRanksExempt() {
@@ -396,10 +370,8 @@ class OrgHierarchyMigrationTest {
   }
 
   /**
-   * V188 (epic #800, REQ-ROLE-003): the squadron-rank singleton caps are backstopped by partial
-   * unique indexes. A second STAFFELLEITER on the same Staffel is rejected at the DB layer — the
-   * airtight backstop behind the service-layer roster check for the concurrent-double-assign
-   * window. Uses throwaway rows cleaned up in a finally block.
+   * Verifies V188 (REQ-ROLE-003): a partial unique index rejects a second STAFFELLEITER on the same
+   * Staffel.
    */
   @Test
   void v188SquadronRankSingletonIndexes() {

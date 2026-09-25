@@ -26,20 +26,19 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Response payload for one activity audit-trail row (REQ-AUDIT-001) — admin-only surface. The actor
- * and subject render from the deletion-proof handle/label snapshots, never from a live join.
+ * Admin-only response payload for one activity audit-trail row (REQ-AUDIT-001); actor and subject
+ * render from snapshots, never from a live join.
  *
  * @param id the audit row's id
  * @param occurredAt the mutation instant (UTC)
- * @param domain the functional area the row belongs to
+ * @param domain the functional area
  * @param eventType what happened
  * @param actorHandle the acting user's handle snapshot
- * @param subjectId the primary affected aggregate's id, when the event concerns one
- * @param subjectLabel the affected aggregate's human-readable label snapshot
+ * @param subjectId the affected aggregate's id, if any
+ * @param subjectLabel the affected aggregate's label snapshot
  * @param targetUserId the affected user for user-centric events
- * @param details compact human-readable details payload
- * @param clientId which client the mutation came through (REQ-AUDIT-005) — a bounded label, {@code
- *     null} only on rows written before the column existed
+ * @param details compact human-readable details
+ * @param clientId the client the mutation came through (REQ-AUDIT-005); may be {@code null}
  */
 public record AuditEventDto(
     UUID id,

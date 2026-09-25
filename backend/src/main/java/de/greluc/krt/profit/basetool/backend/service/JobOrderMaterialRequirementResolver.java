@@ -34,17 +34,10 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 
 /**
- * Normalises one job order — of either kind — into its outstanding material requirement buckets,
- * the shape every cross-order material read is built on.
+ * Normalises a job order of either kind into its outstanding material requirement buckets, shared
+ * by the demand overview (REQ-ORDERS-034) and the allocation pickers (REQ-INV-039).
  *
- * <p>Extracted from {@link JobOrderMaterialDemandService} (#1740) so the check-in allocation
- * picker's per-order need figures (REQ-INV-039) are folded from the <em>same</em> normalisation the
- * cross-order demand overview (REQ-ORDERS-034) uses. A second implementation would drift: the two
- * kinds reduce their requirements differently, and the difference is exactly where a "still needed"
- * figure is easy to get wrong.
- *
- * <p>Read-only and side-effect free — it maps and reads a managed order's requirement branches, so
- * every caller must already be inside a transaction with those branches reachable.
+ * <p>Read-only; callers must be inside a transaction.
  */
 @Slf4j
 @Service
@@ -58,12 +51,8 @@ public class JobOrderMaterialRequirementResolver {
   private final MaterialMapper materialMapper;
 
   /**
-   * Normalises one order into its material buckets, hiding the two kinds' different shapes from the
-   * callers. A {@code MATERIAL} order contributes its material lines directly (their {@code amount}
-   * is already the outstanding requirement — {@code JobOrderHandoverService} decrements the line in
-   * place on a handover); an {@code ITEM} order contributes the blueprint-derived aggregation,
-   * which already scales each line by its not-yet-manufactured share. Neither is adjusted again
-   * here, so no reduction is applied twice.
+   * Normalises one order into its material buckets: a {@code MATERIAL} order's lines as they are,
+   * an {@code ITEM} order's blueprint-derived outstanding aggregation.
    *
    * @param order the managed order to normalise.
    * @return its buckets; empty for an order with no requirements, never {@code null}.

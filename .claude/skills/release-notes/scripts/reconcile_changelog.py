@@ -1,33 +1,9 @@
 #!/usr/bin/env python3
 """Reconcile CHANGELOG.md: move released ``[Unreleased]`` entries under their tag.
 
-In this project the whole history historically piled up under a single
-``## [Unreleased]`` heading -- the version tags (``vMAJOR.MINOR.PATCH``) were
-never cut into their own changelog sections. This script repairs that: every
-bullet still sitting in ``[Unreleased]`` is attributed, via ``git blame``, to the
-commit that wrote it, that commit is mapped to the *earliest* release tag that
-contains it, and the bullet is rewritten under a ``## [vX.Y.Z] - DATE`` section.
-Entries whose introducing commit is not contained in any tag stay in
-``[Unreleased]`` -- those are the genuinely-unreleased changes.
-
-How an entry is mapped:
-  * An entry is a top-level ``- `` bullet plus every following indented
-    sub-bullet / continuation / blank line up to the next top-level bullet or
-    ``#`` heading. Its section (Added / Changed / Fixed / ...) is the nearest
-    preceding ``### `` header, normalised to its first word (so
-    ``### Changed (Paket 3A ...)`` folds into ``Changed``).
-  * Each non-blank physical line of the entry is blamed to a commit; each commit
-    is mapped to the earliest well-formed ``vN.N.N`` tag containing it. The
-    entry's release is the *minimum* version across those lines (a later cosmetic
-    edit to one line cannot push the whole entry into a newer release).
-
-Only tags matching ``^v\\d+\\.\\d+\\.\\d+$`` are considered -- malformed typo
-tags (e.g. ``v-0.2.23``, ``v.0.1.1``) are ignored everywhere.
-
-Default is a DRY-RUN report (nothing is written). Pass ``--write`` to rewrite the
-file in place. The verbatim tail (already-cut sections such as ``## [v1.0.0]``)
-and the preamble are preserved byte-for-byte; only the ``[Unreleased]`` block is
-restructured.
+Each bullet is blamed line by line; its release is the earliest ``vN.N.N`` tag
+containing any of its lines. Bullets in no tag stay in ``[Unreleased]``. Only the
+``[Unreleased]`` block is rewritten. Default is a dry-run report; ``--write`` applies.
 
 Usage:
     python reconcile_changelog.py                       # dry-run report, cwd repo
@@ -44,21 +20,14 @@ import re
 import subprocess
 import sys
 
-# The changelog is full of umlauts and em dashes; Windows consoles default to
-# cp1252 and would crash printing them. Force UTF-8 so the report prints anywhere.
 for _stream in (sys.stdout, sys.stderr):
     try:
         _stream.reconfigure(encoding="utf-8")
-    except (AttributeError, ValueError):  # already wrapped / not reconfigurable
+    except (AttributeError, ValueError):
         pass
 
-# A release tag we are willing to attribute entries to. Deliberately strict so
-# typo tags (``v-0.2.23``, ``v.0.1.1``) never win a mapping.
 VERSION_TAG_RE = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
-# A blame --line-porcelain header line: "<40-hex sha> <origline> <finalline>...".
 PORCELAIN_HEADER_RE = re.compile(r"^(?P<sha>[0-9a-f]{40}) \d+ (?P<final>\d+)")
-# Canonical Keep-a-Changelog section order; anything else is appended after,
-# in first-seen order (e.g. this repo's bespoke "Migration" section).
 CANONICAL_ORDER = ["Added", "Changed", "Deprecated", "Removed", "Fixed", "Security"]
 
 
@@ -91,9 +60,7 @@ def version_key(tag: str) -> tuple[int, int, int]:
 def derive_repo_url(repo: str) -> str:
     """Derive the ``https://github.com/<owner>/<repo>`` base from ``origin``.
 
-    Handles both ``https://github.com/o/r.git`` and ``git@github.com:o/r.git``
-    remotes; falls back to a neutral placeholder if origin is missing so the
-    script never crashes on a detached clone.
+    Handles HTTPS and SSH remotes; falls back to the project URL without ``origin``.
     """
     try:
         url = run_git(repo, ["remote", "get-url", "origin"]).strip()
@@ -118,12 +85,7 @@ def blame_line_shas(repo: str, rev: str, path: str) -> dict[int, str]:
 
 
 class TagResolver:
-    """Resolve a commit SHA to the earliest well-formed release tag containing it.
-
-    ``git tag --contains`` is run once per unique SHA and memoised; the result is
-    the minimum ``vN.N.N`` tag by version, i.e. the first release the commit
-    shipped in. SHAs contained in no version tag resolve to ``None`` (unreleased).
-    """
+    """Resolve a commit SHA to the earliest well-formed release tag containing it, memoised."""
 
     def __init__(self, repo: str) -> None:
         """Bind the resolver to ``repo`` and start with an empty cache."""
@@ -156,11 +118,9 @@ class DateResolver:
 
 
 class Entry:
-    """One changelog bullet: its section, its text, and the lines it spans.
+    """One changelog bullet: its section, its text and its 1-based file lines.
 
-    ``line_numbers`` are 1-based file lines (used for blame); ``text`` is the
-    rendered bullet with trailing blank lines trimmed. ``tags`` is filled in
-    after blame and holds the distinct release tags its lines mapped to.
+    ``tags`` and ``release`` are filled in after blame.
     """
 
     def __init__(self, section: str, line_numbers: list[int], text: list[str]) -> None:
@@ -179,10 +139,8 @@ class Entry:
 def split_sections(lines: list[str]) -> tuple[list[str], int, int, list[str]]:
     """Split the file into (preamble, unreleased_start, unreleased_end, tail).
 
-    ``unreleased_start`` is the index of the ``## [Unreleased]`` header;
-    ``unreleased_end`` is the index of the next ``## `` header (the first
-    already-cut section) or ``len(lines)``. The preamble is everything before the
-    Unreleased header; the tail is everything from ``unreleased_end`` onward.
+    ``unreleased_start`` indexes the ``## [Unreleased]`` header, ``unreleased_end``
+    the next ``## `` header or ``len(lines)``.
     """
     start = next(
         (i for i, ln in enumerate(lines)
@@ -201,12 +159,9 @@ def split_sections(lines: list[str]) -> tuple[list[str], int, int, list[str]]:
 def parse_entries(lines: list[str], start: int, end: int) -> tuple[list[Entry], list[int]]:
     """Parse the ``[Unreleased]`` body into entries; return (entries, anomaly_lines).
 
-    Walks ``lines[start+1:end]`` tracking the current ``### `` section. Each
-    top-level ``- `` bullet absorbs following indented / continuation / blank
-    lines until the next top-level bullet or ``#`` heading. ``anomaly_lines`` are
-    1-based numbers of non-blank lines that fell outside any entry (e.g. prose
-    sitting directly under ``[Unreleased]`` before the first ``### `` header) --
-    these are reported so nothing is silently dropped.
+    A top-level ``- `` bullet absorbs following lines up to the next bullet or ``#``
+    heading; its section is the first word of the preceding ``### `` header.
+    ``anomaly_lines`` are 1-based numbers of non-blank lines outside any entry.
     """
     entries: list[Entry] = []
     anomalies: list[int] = []
@@ -225,7 +180,6 @@ def parse_entries(lines: list[str], start: int, end: int) -> tuple[list[Entry], 
                 i += 1
             block = lines[block_start:i]
             line_numbers = [block_start + 1 + off for off, _ in enumerate(block)]
-            # Trim trailing blank lines from the rendered text (keep numbers for blame).
             text = list(block)
             while text and text[-1].strip() == "":
                 text.pop()
@@ -241,7 +195,7 @@ def order_sections(present: list[str]) -> list[str]:
     """Order section names: canonical Keep-a-Changelog order, then extras first-seen."""
     ordered = [s for s in CANONICAL_ORDER if s in present]
     seen = set(ordered)
-    for section in present:  # append non-canonical sections in first-seen order
+    for section in present:
         if section not in seen:
             ordered.append(section)
             seen.add(section)
@@ -249,11 +203,7 @@ def order_sections(present: list[str]) -> list[str]:
 
 
 def render_group(entries: list[Entry]) -> list[str]:
-    """Render one release's entries as markdown lines, grouped + ordered by section.
-
-    Entries keep their original top-to-bottom (newest-first) order within a
-    section; one blank line separates consecutive entries and trails each section.
-    """
+    """Render one release's entries as markdown lines, grouped by section in file order."""
     by_section: dict[str, list[Entry]] = {}
     for entry in entries:
         by_section.setdefault(entry.section, []).append(entry)
@@ -276,16 +226,14 @@ def build_changelog(
 ) -> str:
     """Assemble the rewritten CHANGELOG text from its parts.
 
-    ``[Unreleased]`` is emitted first (with any genuinely-unreleased entries),
-    then one ``## [vX.Y.Z] - DATE`` section per release in descending version
-    order, then the verbatim ``tail``.
+    Order: ``[Unreleased]``, one ``## [vX.Y.Z] - DATE`` section per release in
+    descending version order, then the verbatim ``tail``.
     """
     by_release: dict[str | None, list[Entry]] = {}
     for entry in entries:
         by_release.setdefault(entry.release, []).append(entry)
 
     out: list[str] = []
-    # Preamble verbatim, then exactly one blank line before the first heading.
     out.extend(ln.rstrip("\n") for ln in preamble)
     while out and out[-1].strip() == "":
         out.pop()
@@ -304,7 +252,6 @@ def build_changelog(
         out.append("")
         out.extend(render_group(by_release[tag]))
 
-    # Tail (already-cut sections) verbatim, with a single blank line before it.
     while out and out[-1].strip() == "":
         out.pop()
     out.append("")
@@ -374,7 +321,7 @@ def main() -> None:
     args = parser.parse_args()
 
     repo = os.path.abspath(args.repo)
-    if not os.path.exists(os.path.join(repo, ".git")):  # worktrees keep .git as a file
+    if not os.path.exists(os.path.join(repo, ".git")):
         sys.exit(f"error: {repo} is not a git repository")
     changelog = args.changelog or os.path.join(repo, "CHANGELOG.md")
     if not os.path.isfile(changelog):
@@ -397,7 +344,7 @@ def main() -> None:
         resolved = []
         for number in entry.line_numbers:
             sha = line_sha.get(number)
-            if sha and lines[number - 1].strip():  # ignore blank lines for mapping
+            if sha and lines[number - 1].strip():
                 resolved.append(tags.earliest_tag(sha))
         entry.tags = [t for t in resolved if t is not None]
         entry.release = min(entry.tags, key=version_key) if entry.tags else None

@@ -35,15 +35,9 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
- * Verifies the ADR-0090 management-port isolation: with {@code management.server.port} set to a
- * separate port, Actuator is served ONLY there and is absent from the public application connector,
- * and the management-port endpoints are unauthenticated (Boot's management-context security
- * auto-config backs off given the custom {@link SecurityConfig} chains).
- *
- * <p>The prod {@code application-prod.yml} additionally serves this port over HTTPS with the shared
- * keystore; that is declarative SSL config not exercised here (the {@code test} profile disables
- * the server connector's TLS), so the management port runs plain HTTP for the probe. What this test
- * pins is the load-bearing behaviour: the public port no longer exposes {@code /actuator/**}.
+ * Integration tests for the management-port isolation (ADR-0090): with {@code
+ * management.server.port} set, Actuator is served only on that port, unauthenticated, and not on
+ * the public connector.
  */
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,

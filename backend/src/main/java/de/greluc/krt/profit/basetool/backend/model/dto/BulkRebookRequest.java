@@ -27,30 +27,23 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Request DTO for the bulk rebooking (Massen-Umbuchen, REQ-INV-036) of several own inventory rows
- * in one action. All listed ids must belong to the authenticated caller.
+ * Request DTO for the bulk rebooking (Massen-Umbuchen) of several of the caller's own inventory
+ * rows in one action (REQ-INV-036).
  *
- * <p>Every listed row moves in <em>full</em> — there is no per-row amount. The bulk bar's selection
- * spans collapsed stacks and later pages (REQ-INV-034), so a per-row quantity could not be reviewed
- * before submitting; moving the whole row keeps the action predictable and lets each moved row
- * inherit all of its job-order / mission earmarks unchanged ("Marken mitnehmen", REQ-INV-027).
+ * <p>Every row moves in full, keeping all its job-order / mission earmarks. Carries no {@code
+ * version}: the write serialises on a pessimistic row lock per entry.
  *
- * <p>Carries no {@code version}: like {@link BulkCheckoutRequest} the write serialises on a
- * pessimistic row lock per entry rather than a client-echoed optimistic token, because the bulk bar
- * holds only entry ids (a server-resolved "Alle markieren" set never carries versions).
- *
- * @param itemIds the ids of the caller's own rows to rebook; must be non-empty
- * @param mode which move to perform — the personal directions are explicit rather than inferred,
- *     see {@link BulkRebookMode}
+ * @param itemIds ids of the caller's own rows to rebook; non-empty
+ * @param mode which move to perform, see {@link BulkRebookMode}
  * @param targetUserId {@code LOCATION} only: the destination owner, or {@code null} to keep each
- *     row's current owner
+ *     row's owner
  * @param targetLocationId {@code LOCATION} only: the destination location, or {@code null} to keep
- *     each row's current location
- * @param targetOwningOrgUnitId the org-unit pool to stamp onto the moved rows ({@code LOCATION} and
- *     {@code DEPERSONALIZE}); {@code null} resolves to the target owner's default pool. {@code
- *     PERSONALIZE} ignores it — a personalized row keeps its source stamp
- * @param mergeStock the per-action stock-merge opt-in (REQ-INV-026) applied to every moved row;
- *     ignored for PIECE materials and game items, which always merge
+ *     each row's location
+ * @param targetOwningOrgUnitId org-unit pool stamped onto moved rows for {@code LOCATION} and
+ *     {@code DEPERSONALIZE}; {@code null} means the target owner's default pool; ignored by {@code
+ *     PERSONALIZE}
+ * @param mergeStock stock-merge opt-in applied to every moved row (REQ-INV-026); ignored for PIECE
+ *     materials and game items, which always merge
  */
 public record BulkRebookRequest(
     @NotNull @NotEmpty List<@NotNull UUID> itemIds,

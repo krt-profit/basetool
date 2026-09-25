@@ -35,31 +35,20 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Delegating facade over the org-unit scope / authorization services (L3 split, #922). Resolves the
- * org-unit context of the current request and answers the "may the caller see / edit this
- * org-unit-scoped data?" questions that gate every {@code @PreAuthorize} on the org-unit-scoped
- * aggregates (mission, hangar, inventory, refinery, operation, job order).
- *
- * <p>This bean was decomposed into three focused collaborators, each holding a byte-for-byte
- * verbatim slice of the former god-class; this facade keeps every public method + signature and
- * forwards each one-line:
+ * Facade over the org-unit scope and authorization services: resolves the org-unit context of the
+ * current request and answers the see/edit gates used by {@code @PreAuthorize} on the
+ * org-unit-scoped aggregates. Every method delegates to one of:
  *
  * <ul>
- *   <li>{@link RequestScopeResolver} — the request-scoped context core: the active-context header /
- *       persistent Staffel, the {@link ScopePredicate} scope vectors, the caller's membership rows,
- *       the cascading / own-level oversight reach and the promotion-feature flags, plus the
- *       per-request memoisation they share.
- *   <li>{@link AccessGateService} — the {@code can*} authorization gates evaluated from SpEL as
- *       {@code @ownerScopeService.canX(...)}.
- *   <li>{@link OrgUnitStampingService} — the create-time owner-stamping (SPEZIALKOMMANDO_PLAN.md
- *       §5.5.1 picker matrix) and the explicit owning-org-unit reassignment (REQ-ORG-018).
+ *   <li>{@link RequestScopeResolver} — the request-scoped context, {@link ScopePredicate} scope
+ *       vectors, memberships and oversight reach.
+ *   <li>{@link AccessGateService} — the {@code can*} authorization gates.
+ *   <li>{@link OrgUnitStampingService} — create-time owner stamping and owning-org-unit
+ *       reassignment (REQ-ORG-018).
  * </ul>
  *
- * <p>Bean identity: this is the {@code ownerScopeService} bean (auto-named from the class), so the
- * existing {@code @PreAuthorize("@ownerScopeService.canX(...)")} SpEL strings keep resolving
- * unchanged. The class-level {@code @Transactional(readOnly = true)} mirrors the historical setting
- * — every delegated call is read-only, and the sub-services join this facade's read-only
- * transaction (propagation {@code REQUIRED}).
+ * <p>Registered as the {@code ownerScopeService} bean that the SpEL expressions reference;
+ * read-only transactional.
  */
 @Service
 @RequiredArgsConstructor
@@ -67,10 +56,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class OwnerScopeService {
 
   /**
-   * Name of the HTTP request header through which the frontend relays the caller's active OrgUnit
-   * selection. Re-exported from {@link RequestScopeResolver#ACTIVE_ORG_UNIT_HEADER} so the
-   * historical {@code OwnerScopeService.ACTIVE_ORG_UNIT_HEADER} public constant keeps resolving for
-   * existing callers.
+   * Name of the HTTP request header relaying the caller's active OrgUnit selection; same value as
+   * {@link RequestScopeResolver#ACTIVE_ORG_UNIT_HEADER}.
    */
   public static final String ACTIVE_ORG_UNIT_HEADER = RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER;
 
@@ -193,7 +180,7 @@ public class OwnerScopeService {
 
   /**
    * Delegates to {@link RequestScopeResolver#canAccessBlueprintOverview()}: the leadership gate for
-   * the org-unit blueprint availability overview (#364).
+   * the org-unit blueprint availability overview.
    *
    * @return {@code true} iff the caller is an admin, an officer, or holds at least one oversight
    *     seat.
@@ -323,7 +310,7 @@ public class OwnerScopeService {
    *     used.
    * @return the Squadron whose stock / aggregate list this row should join; never {@code null}.
    * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when the picker
-   *     output is invalid for the target user (see the delegate).
+   *     output is invalid for the target user.
    */
   public Squadron resolveSquadronForPickerOutput(@NotNull User targetUser, UUID owningOrgUnitId) {
     return orgUnitStampingService.resolveSquadronForPickerOutput(targetUser, owningOrgUnitId);
@@ -331,7 +318,7 @@ public class OwnerScopeService {
 
   /**
    * Delegates to {@link OrgUnitStampingService#resolveOrgUnitForPickerOutput(User, UUID)}: the
-   * SK-aware create-time owner-stamp resolution.
+   * create-time owner-stamp resolution for every org-unit kind.
    *
    * @param targetUser the user whose memberships gate the picker output validation; never {@code
    *     null}.
@@ -339,7 +326,7 @@ public class OwnerScopeService {
    *     path when the user has exactly one membership.
    * @return the resolved {@link OrgUnit}; never {@code null}.
    * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException on an invalid
-   *     picker output (see the delegate).
+   *     picker output.
    */
   public OrgUnit resolveOrgUnitForPickerOutput(@NotNull User targetUser, UUID owningOrgUnitId) {
     return orgUnitStampingService.resolveOrgUnitForPickerOutput(targetUser, owningOrgUnitId);
@@ -355,8 +342,8 @@ public class OwnerScopeService {
    *     used.
    * @return the resolved {@link OrgUnit}, or {@code null} for the ownerless-personal-aggregate
    *     case.
-   * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException for every
-   *     non-ownerless rejection branch (see the delegate).
+   * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException for every rejection
+   *     other than the ownerless case.
    */
   @Nullable
   public OrgUnit resolveOrgUnitForPickerOutputNullable(
@@ -426,8 +413,8 @@ public class OwnerScopeService {
   }
 
   /**
-   * Delegates to {@link AccessGateService#hasRoleInOrgUnit(UUID, String)}: the
-   * SPEZIALKOMMANDO_PLAN.md §6.1 contextual-authority check for {@code @PreAuthorize} SpEL.
+   * Delegates to {@link AccessGateService#hasRoleInOrgUnit(UUID, String)}: the contextual-authority
+   * check for {@code @PreAuthorize} SpEL.
    *
    * @param orgUnitId the OrgUnit the caller wants to act on; never {@code null}.
    * @param roleName the role to check for; never {@code null}.

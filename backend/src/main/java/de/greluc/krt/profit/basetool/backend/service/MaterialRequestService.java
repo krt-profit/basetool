@@ -56,20 +56,12 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Write/lifecycle half of the Materialbörse Gesuche (wanted-listings) board — the request-side
- * sibling of {@link MaterialExchangeService} (REQ-MARKET-015…, ADR-0116). It owns the create / edit
- * / deactivate lifecycle of a request, the fulfilment-signal register / withdraw ("Ich kann
- * liefern"), and the audit trail for every mutation.
+ * Write half of the Materialbörse Gesuche board (REQ-MARKET-015, ADR-0116): create, edit and
+ * deactivation of requests, "Ich kann liefern" signals, and their audit trail.
  *
- * <p>Every mutation projects its result through {@link MaterialRequestBoardService} — the injected
- * read half — so the anonymity redaction (REQ-MARKET-019: supplier names for the owner only) is
- * applied by the exact same code that serves {@link MaterialRequestBoardService#detail(UUID)}. The
- * dependency is one-way (write→read), so the split introduces no cycle.
- *
- * <p>Unlike an offer, a request has <b>no backing Lager row</b>: the requester states the material
- * or item identity and the desired quantity directly (closest to a free-stated item offer). Owner
- * and org unit are stamped from the acting member; there is no ownership-of-item check and no stock
- * cap.
+ * <p>Every mutation returns its result through {@link MaterialRequestBoardService}, so the
+ * anonymity redaction (REQ-MARKET-019) is shared. A request has no backing Lager row; owner and org
+ * unit come from the acting member.
  */
 @Service
 @RequiredArgsConstructor
@@ -122,15 +114,12 @@ public class MaterialRequestService {
   private final ObjectProvider<MaterialRequestService> selfProvider;
 
   /**
-   * Posts a material wanted-listing (Gesuch) to the board ("Material suchen", REQ-MARKET-015). The
-   * requester names a catalogue material, the desired quantity in the material's own unit and an
-   * optional minimum quality; owner and org unit are stamped from the acting member (there is no
-   * source item to copy them from). A member may post several requests for the same material.
+   * Posts a material Gesuch to the board (REQ-MARKET-015), stamped with the acting member as owner.
    *
-   * @param request the material id, desired amount, optional minimum quality and description.
-   * @return the resulting request detail (the caller is the owner, so names are included).
-   * @throws NotFoundException if the caller or the material does not exist.
-   * @throws BadRequestException if the desired amount is not positive.
+   * @param request the material id, desired amount, optional minimum quality and description
+   * @return the resulting request detail, including supplier names
+   * @throws NotFoundException if the caller or the material does not exist
+   * @throws BadRequestException if the desired amount is not positive
    */
   @Transactional
   public MaterialRequestDto createMaterialRequest(MaterialRequestCreateRequest request) {
@@ -169,19 +158,14 @@ public class MaterialRequestService {
   }
 
   /**
-   * Posts a craftable-item wanted-listing (Gesuch) to the board ("Item suchen", REQ-MARKET-015) —
-   * the item counterpart to {@link #createMaterialRequest(MaterialRequestCreateRequest)}. The
-   * requester supplies the blueprint {@code productKey}, validated against {@link
-   * BlueprintProductService#resolveByProductKey(String)} (only items an active blueprint produces
-   * can be requested) and its canonical display name is snapshotted; the desired quantity is a
-   * whole number and an optional minimum quality may be stated (a pure preference — items have no
-   * intrinsic quality). Owner and squadron are stamped from the acting member.
+   * Posts a craftable-item Gesuch to the board (REQ-MARKET-015); the product key must resolve to an
+   * active blueprint product, whose name is snapshotted.
    *
    * @param request the blueprint product key, the whole-piece quantity, an optional minimum quality
-   *     and the description.
-   * @return the resulting request detail (the caller is the owner, so names are included).
+   *     and the description
+   * @return the resulting request detail, including supplier names
    * @throws NotFoundException if the caller is unknown or the product key resolves to no active
-   *     blueprint product.
+   *     blueprint product
    */
   @Transactional
   public MaterialRequestDto createItemRequest(MaterialItemRequestCreateRequest request) {
@@ -220,21 +204,17 @@ public class MaterialRequestService {
   }
 
   /**
-   * Edits an existing request's desired quantity, minimum quality and description ("Gesuch
-   * bearbeiten", REQ-MARKET-016). Only the owner may edit; the echoed version guards against a
-   * concurrent edit. The edit is kind-aware: a {@link MaterialExchangeRequestKind#MATERIAL} request
-   * stores the new positive amount in {@code requestedAmount}, an {@link
-   * MaterialExchangeRequestKind#ITEM} request validates the new quantity to be a positive whole
-   * number and stores it in {@code itemQuantity}. The request's {@code desiredAmount} field carries
-   * the SCU amount for a material request and the whole-unit quantity for an item request.
+   * Edits a request's desired quantity, minimum quality and description; owner only, guarded by the
+   * echoed version (REQ-MARKET-016).
    *
-   * @param requestId the request to edit.
-   * @param request the new desired amount/quantity, minimum quality, description and the client's
-   *     last-seen version.
-   * @return the updated request detail.
-   * @throws NotFoundException if the request does not exist.
-   * @throws AccessDeniedException if the caller is not the owner.
-   * @throws BadRequestException if the amount/quantity is invalid.
+   * <p>Item quantities must be positive whole numbers.
+   *
+   * @param requestId the request to edit
+   * @param request the new amount or quantity, minimum quality, description and last-seen version
+   * @return the updated request detail
+   * @throws NotFoundException if the request does not exist
+   * @throws AccessDeniedException if the caller is not the owner
+   * @throws BadRequestException if the amount/quantity is invalid
    */
   @Transactional
   public MaterialRequestDto updateRequest(UUID requestId, MaterialRequestUpdateRequest request) {
@@ -300,15 +280,15 @@ public class MaterialRequestService {
   }
 
   /**
-   * Signals that the caller can supply a request ("Ich kann liefern", REQ-MARKET-019). A
-   * non-transactional orchestrator: it runs the insert in a fresh transaction through the proxy and
-   * treats a concurrent duplicate-signal race (the unique {@code (request, user)} constraint) as an
-   * idempotent success (CLAUDE.md find-or-create rule), then re-reads the request for the response.
+   * Signals that the caller can supply a request (REQ-MARKET-019).
    *
-   * @param requestId the request to signal on.
-   * @return the resulting request detail (with {@code viewerInterested = true}).
-   * @throws NotFoundException if the request does not exist or is not active.
-   * @throws AccessDeniedException if the caller is the request's owner.
+   * <p>Not transactional itself: the insert runs in a new transaction, and a concurrent duplicate
+   * signal counts as success.
+   *
+   * @param requestId the request to signal on
+   * @return the resulting request detail (with {@code viewerInterested = true})
+   * @throws NotFoundException if the request does not exist or is not active
+   * @throws AccessDeniedException if the caller is the request's owner
    */
   public MaterialRequestDto signalFulfillment(UUID requestId) {
     UUID viewerId = requireViewerId();
@@ -321,17 +301,14 @@ public class MaterialRequestService {
   }
 
   /**
-   * The transactional insert behind {@link #signalFulfillment(UUID)}, run in a fresh transaction so
-   * a unique-constraint violation aborts only this transaction (the orchestrator catches it).
-   * Public so the Spring proxy applies the {@code REQUIRES_NEW} propagation. On a genuinely new
-   * signal it publishes a {@link MaterialRequestFulfillmentSignalledEvent} so the after-commit
-   * notification listener alerts the request's owner (REQ-MARKET-020); a duplicate signal returns
-   * early and publishes nothing.
+   * Inserts the fulfilment signal behind {@link #signalFulfillment(UUID)} in a new transaction and,
+   * for a new signal, publishes a {@link MaterialRequestFulfillmentSignalledEvent}
+   * (REQ-MARKET-020).
    *
-   * @param requestId the request to signal on.
-   * @param viewerId the signalling member.
-   * @throws NotFoundException if the request does not exist or is not active.
-   * @throws AccessDeniedException if the member is the request's owner.
+   * @param requestId the request to signal on
+   * @param viewerId the signalling member
+   * @throws NotFoundException if the request does not exist or is not active
+   * @throws AccessDeniedException if the member is the request's owner
    */
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void signalFulfillmentInNewTransaction(UUID requestId, UUID viewerId) {
@@ -422,15 +399,11 @@ public class MaterialRequestService {
   }
 
   /**
-   * Validates and normalises a client-supplied desired amount for a material request: it must be a
-   * positive number, and is rounded to three-decimal SCU storage precision so the stored value
-   * never carries floating-point noise (the same rounding a material offer applies). The
-   * {@code @Positive}/{@code @NotNull} DTO constraints already reject the null/non-positive input
-   * on the controller path; this re-check keeps the service safe when called directly.
+   * Validates a desired material amount as positive and rounds it to three-decimal SCU precision.
    *
-   * @param requested the client-supplied desired amount.
-   * @return the amount rounded to three-decimal SCU precision.
-   * @throws BadRequestException if the amount is not positive.
+   * @param requested the client-supplied desired amount
+   * @return the amount rounded to three-decimal SCU precision
+   * @throws BadRequestException if the amount is not positive
    */
   private static double requirePositiveAmount(@Nullable Double requested) {
     if (requested == null || requested <= 0.0) {
@@ -444,13 +417,11 @@ public class MaterialRequestService {
   }
 
   /**
-   * Validates a client-supplied item-request quantity as a positive whole number — the item sibling
-   * of {@link #requirePositiveAmount(Double)} (REQ-MARKET-015/016). The request carries the
-   * quantity as a {@link Double}; it must round to a whole number.
+   * Validates an item-request quantity as a positive whole number.
    *
-   * @param requested the client-supplied whole-unit quantity.
-   * @return the quantity as a whole int.
-   * @throws BadRequestException if the quantity is absent, below one, or not a whole number.
+   * @param requested the client-supplied whole-unit quantity
+   * @return the quantity as a whole int
+   * @throws BadRequestException if the quantity is absent, below one, or not a whole number
    */
   private static int wholeItemQuantity(@Nullable Double requested) {
     if (requested == null || requested < 1.0) {
@@ -464,13 +435,11 @@ public class MaterialRequestService {
   }
 
   /**
-   * The non-personal audit subject label of a request — the material name for a {@link
-   * MaterialExchangeRequestKind#MATERIAL} request, the snapshotted item name for an {@link
-   * MaterialExchangeRequestKind#ITEM} request. Kind-aware so it never dereferences a {@code null}
-   * material for an item request (both are game asset names, never PII).
+   * Returns the PII-free audit subject label of a request: the material name or the snapshotted
+   * item name.
    *
-   * @param request the request.
-   * @return the audit subject label.
+   * @param request the request
+   * @return the audit subject label
    */
   private static String requestLabel(MaterialExchangeRequest request) {
     if (request.getKind() == MaterialExchangeRequestKind.ITEM) {
@@ -480,12 +449,11 @@ public class MaterialRequestService {
   }
 
   /**
-   * The PII-free {@code kind=… subject=…} audit details identifying a request's subject — the
-   * material id for a material request, the blueprint product key for an item request. Kind-aware
-   * so it never dereferences a {@code null} material for an item request.
+   * Builds the PII-free {@code kind=… subject=…} audit details of a request: the material id or the
+   * blueprint product key.
    *
-   * @param request the request.
-   * @return the composed audit details.
+   * @param request the request
+   * @return the composed audit details
    */
   private static AuditDetails requestSubjectDetails(MaterialExchangeRequest request) {
     if (request.getKind() == MaterialExchangeRequestKind.ITEM) {

@@ -23,24 +23,19 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
- * Inbound JSON record for UEX Corp's {@code /items} endpoint (R2). Mapped to the project's own
- * {@code GameItem} entity by {@code UexItemSyncService}; downstream code consumes the entity, not
- * this DTO.
+ * UEX Corp {@code /items} row, mapped to the {@code GameItem} entity by {@code UexItemSyncService}.
  *
- * <p>The {@code uuid} field is captured as a raw {@link String} because UEX returns an empty string
- * ({@code ""}) for the ~30% of rows that have no in-game asset UUID (Avionics 100%, Decorations
- * 88%, Liveries 42%, Armor ~33% — see SC_WIKI_SYNC_PLAN.md §3.6). Jackson cannot bind the empty
- * string to {@link java.util.UUID}; the sync service parses the non-empty values with {@link
- * java.util.UUID#fromString(String)} and treats empty / blank as {@code null}.
+ * <p>{@code uuid} is a raw string because UEX sends {@code ""} for items without an asset UUID; the
+ * sync treats a blank value as {@code null}.
  *
  * @param id UEX integer item id (stable across runs); the secondary cross-source join key
- * @param idParent variant grouping (0 = no parent); unused in R2 but captured for forensics
+ * @param idParent variant grouping (0 = no parent); captured, unused
  * @param idCategory FK to {@code /categories[].id} — the kind-derivation lookup key
- * @param idCompany FK to {@code /companies[].id} — resolved to {@code manufacturer} entity
+ * @param idCompany FK to {@code /companies[].id} — resolved to the {@code manufacturer} entity
  * @param idVehicle FK to {@code /vehicles[].id} — set for vehicle-bound items (paints, components)
  * @param name display name
- * @param slug kebab-case URL slug; consumed by R3 Wiki slug-fallback resolution
- * @param uuid in-game RSI asset UUID (shared with SC Wiki) — empty string for ~30% of rows
+ * @param slug kebab-case URL slug, used for the Wiki slug fallback
+ * @param uuid in-game asset UUID shared with the SC Wiki, or an empty string
  * @param size weapon / component size tier as a string ({@code "1"}, {@code "2"}, …)
  * @param color primary color of the variant
  * @param color2 secondary color

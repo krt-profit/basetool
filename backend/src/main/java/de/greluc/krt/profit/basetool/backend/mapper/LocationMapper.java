@@ -38,14 +38,8 @@ public interface LocationMapper {
   Location toEntity(LocationDto dto);
 
   /**
-   * Strips server-managed fields from a freshly mapped entity for the POST/create flow so a client
-   * cannot pre-set them via the request body (mass-assignment / over-posting). {@code id} is left
-   * null so JPA performs an INSERT instead of a merge against an existing row; {@code version} is
-   * left null so the persistence provider initializes the optimistic-locking counter.
-   *
-   * <p>Declared as a static helper rather than a default mapping method so MapStruct does not
-   * consider it a candidate for nested {@code LocationDto -> Location} mappings inside other
-   * mappers.
+   * Clears {@code id} and {@code version} on a freshly mapped entity for the create flow, so a
+   * client cannot pre-set them and JPA performs an INSERT.
    */
   static Location stripServerManaged(Location entity) {
     if (entity != null) {

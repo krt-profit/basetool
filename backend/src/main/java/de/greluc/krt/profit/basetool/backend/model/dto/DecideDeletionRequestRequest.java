@@ -24,31 +24,13 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * An admin's decision on a member's erasure request (REQ-SEC-061).
+ * An admin's decision on a member's erasure request, used for both refusing and carrying it out
+ * (REQ-SEC-061).
  *
- * <p>Used for both outcomes, because the two differ only in what the note is for and whether the
- * history wish is granted:
- *
- * <ul>
- *   <li><b>Refusing</b> — the note is <b>mandatory</b>. Art. 12(4) obliges the controller to tell
- *       the requester why, so a refusal with no recorded reason cannot be communicated. The
- *       database enforces it too.
- *   <li><b>Carrying it out</b> — the note is <b>ignored</b>, and the dialog does not ask for one:
- *       there is nowhere durable to put it, because the row cascades away with the account and
- *       REQ-AUDIT-001 keeps free text out of the audit payload. {@code grantHistoryErasure} is the
- *       admin's answer to the member's wish and is independent of what the member asked for:
- *       granting is a deliberate act, and a wish is not an instruction.
- * </ul>
- *
- * @param grantHistoryErasure whether the surviving handle snapshots are anonymised as well; ignored
+ * @param grantHistoryErasure whether the surviving handle snapshots are anonymised too; ignored
  *     when refusing
- * @param note the refusal's reason. Required for a refusal, ignored on an execution — see above.
- * @param version the request row's optimistic-lock version as the client last saw it, echoed back
- *     on every write (root {@code CLAUDE.md}). {@code null} is accepted and means "decide whatever
- *     is there", the admin force-save semantics {@code OptimisticLock#checkOptionalClient} exists
- *     for. It matters most on the execute path: that one is irreversible, and {@code @Version}
- *     cannot protect it on its own because the execution never writes this row — it deletes the
- *     account and lets the cascade take it.
+ * @param note the reason; required for a refusal, ignored on execution
+ * @param version the request row's optimistic-lock version; {@code null} skips the check
  */
 public record DecideDeletionRequestRequest(
     boolean grantHistoryErasure, @Nullable @Size(max = 4000) String note, @Nullable Long version) {

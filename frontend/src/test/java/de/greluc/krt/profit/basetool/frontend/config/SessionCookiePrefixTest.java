@@ -35,17 +35,9 @@ import org.springframework.session.web.http.CookieSerializer.CookieValue;
 import org.springframework.session.web.http.DefaultCookieSerializer;
 
 /**
- * Pins the {@code __Host-} prefix on the session cookie (FE-SEC-06, REQ-SEC-025).
- *
- * <p>A browser accepts a {@code __Host-} cookie only when it is {@code Secure}, has {@code Path=/}
- * and carries no {@code Domain} attribute — which is the point: no sibling subdomain and no plain
- * http response can then plant or overwrite the session cookie. The flip side is that the three
- * conditions become load-bearing. A {@code domain:} or a non-root {@code path:} added to the
- * configuration, or {@code secure: false} in any profile, would not weaken the cookie quietly — the
- * browser would drop it and <em>every login would fail</em>. This test pins the name and the three
- * conditions in {@code application.yml}, pins that no profile file overrides them, and renders the
- * cookie through Spring Session's serializer configured exactly as Spring Boot configures it from
- * those properties.
+ * Verifies the {@code __Host-} session cookie (FE-SEC-06, REQ-SEC-025): its name and the {@code
+ * Secure}, {@code Path=/} and no-{@code Domain} conditions in {@code application.yml}, and that no
+ * profile overrides them.
  */
 class SessionCookiePrefixTest {
 

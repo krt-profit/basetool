@@ -25,16 +25,14 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Frontend mirror of one dashboard KPI card (D1 mockup): balance, sign-colored 30-day delta and the
- * end-of-day balance series the page controller scales into the inline-SVG sparkline polyline. The
- * optional Bereich fields drive the by-Bereich grouping (REQ-BANK-016); {@code null} for accounts
- * outside a Bereich (CARTEL / KRT-bank / Sonderkonten and org units with no Bereich).
+ * Frontend mirror of one dashboard account card: balance, 30-day delta, sparkline series and the
+ * optional Bereich grouping fields (REQ-BANK-016).
  *
  * @param id the account's id (the card links to the detail page)
  * @param accountNo the account's display number
  * @param name the account's display name
  * @param type account type enum name (rendered as chip)
- * @param status lifecycle enum name — closed cards render dimmed
+ * @param status lifecycle enum name; closed cards render dimmed
  * @param balance current balance
  * @param delta30d net change over the last 30 days (signed)
  * @param sparkline end-of-day balances of the last 30 days, oldest first

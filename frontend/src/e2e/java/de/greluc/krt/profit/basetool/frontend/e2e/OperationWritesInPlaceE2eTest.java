@@ -37,13 +37,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Functional flow (#576): operation writes save in place. Proves the three conversions: creating an
- * operation from the list modal swaps the list with no full-page reload, editing an operation on
- * the detail page saves in place and a second consecutive save does not 409 (the version
- * writeback), and deleting from the detail page navigates back to the list (the entity is gone).
+ * Verifies that operation writes save in place: create from the list modal without a reload, edit
+ * on the detail page twice without a 409, and delete from the detail page back to the list.
  *
- * <p>Drive via UI, verify via API ({@link BackendSeeder}). The actor is {@code test-admin}, who can
- * create, edit and delete every operation through the role hierarchy.
+ * <p>Drives the UI and verifies via {@link BackendSeeder}, as {@code test-admin}.
  */
 @Tag("e2e")
 class OperationWritesInPlaceE2eTest {

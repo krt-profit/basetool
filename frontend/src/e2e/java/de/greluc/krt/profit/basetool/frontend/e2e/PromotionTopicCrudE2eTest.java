@@ -35,23 +35,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Functional CRUD coverage for the audited "Beförderung" (Promotion) area — the topic-catalogue
- * admin surface at {@code /promotion/admin/topics} — which previously had no end-to-end test at
- * all. It exercises the create / rename / delete lifecycle of a promotion topic through the
- * modal-driven {@code krtFetch} writes (REQ-AUDIT-001 audited mutations, REQ-FE-001/005 in-place
- * fragment swap): each write re-renders the {@code #pa-topics-results} fragment in place and
- * dispatches {@code krt:swapped}, never reloading the page.
+ * Functional CRUD coverage for the audited "Beförderung" topic-catalogue admin surface at {@code
+ * /promotion/admin/topics}: create, rename and delete, each re-rendering {@code #pa-topics-results}
+ * in place (REQ-AUDIT-001, REQ-FE-001).
  *
- * <p><b>Actor: an IRIDIUM-homed officer, not the admin.</b> The promotion pages are per-squadron
- * and gated on the active squadron's promotion flag; an admin with no squadron pin resolves to
- * all-squadrons mode, where the CRUD affordances and their JS module are not rendered. A non-admin
- * is never in all-squadrons mode, so {@code test-officer} (realm role {@code Officer}, which passes
- * the {@code ADMIN_OR_OFFICER} gate) homed to the IRIDIUM Squadron — whose promotion feature is on
- * by default — renders the full editor with zero squadron-pin plumbing. The topic create also
- * auto-stamps its owning squadron from the caller's single membership, which the homing provides.
- *
- * <p>Tagged {@code @Tag("e2e")} (not {@code smoke}): it mutates promotion data, so it must run only
- * against the ephemeral, disposable stack.
+ * <p>Runs as the IRIDIUM-homed {@code test-officer}, because an admin without a squadron pin is in
+ * all-squadrons mode, where the editor is not rendered.
  */
 @Tag("e2e")
 class PromotionTopicCrudE2eTest {
@@ -174,13 +163,8 @@ class PromotionTopicCrudE2eTest {
   }
 
   /**
-   * Runs an action that triggers a promotion-topic write and blocks until the resulting in-place
-   * {@code #pa-topics-results} refresh has committed. The topic admin JS re-renders that fragment
-   * via {@code krtFetch.swap(?fragment=topicsResults)} and dispatches a {@code krt:swapped} event
-   * on {@code document} once the new subtree is in the DOM; a one-shot listener scoped to {@code
-   * #pa-topics-results} flips a sentinel on exactly that commit, so waiting for it proves the fresh
-   * fragment (with its re-stamped {@code data-pa-version}s) is in place before the caller inspects
-   * anything.
+   * Runs an action that triggers a promotion-topic write and blocks until the {@code krt:swapped}
+   * event for the refreshed {@code #pa-topics-results} fragment has fired.
    *
    * @param page the page that hosts the topics fragment
    * @param action the action that starts the write (and the in-place refresh it triggers)

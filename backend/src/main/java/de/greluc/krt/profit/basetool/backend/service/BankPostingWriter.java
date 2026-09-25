@@ -46,21 +46,11 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The bank's low-level persistence engine (extracted from {@link BankLedgerService}, #1253): the
- * mechanical row-locking, entity resolution and append-only writes that every booking path composes
- * — locking an account row for update, resolving/pre-loading holders, and inserting the transaction
- * header plus its signed account and holder legs onto the <strong>two</strong> ledgers ({@code
- * bank_posting} / {@code bank_holder_posting}, REQ-BANK-004, ADR-0010/0039). The booking
- * orchestration, fee arithmetic, audit trail and every validation guard stay in {@link
- * BankLedgerService} / {@link BankBookingGuards}; this class only touches the database.
+ * The bank's low-level persistence engine: account row locks, holder resolution and the insert-only
+ * writes of transaction headers and signed account and holder legs (REQ-BANK-004, ADR-0039).
  *
- * <p><strong>Every method is {@link Propagation#MANDATORY}</strong> — it may only run inside an
- * already-open booking transaction driven by a {@code BankLedgerService} entry point. That is what
- * makes the row lock ({@link #lockAccount}) serialize value movement against concurrent bookings
- * and keeps the ledger inserts atomic with the surrounding audit write; calling any of these
- * outside a transaction is a programming error and fails fast rather than silently committing a
- * partial booking. The ledger rows are insert-only — no {@code @Version} churn, no {@code
- * save()}-on-managed traps.
+ * <p>Every method is {@link Propagation#MANDATORY} and must run inside a booking transaction opened
+ * by {@link BankLedgerService}.
  */
 @Service
 @RequiredArgsConstructor
@@ -99,13 +89,12 @@ public class BankPostingWriter {
   }
 
   /**
-   * Resolves a holder from a pre-loaded batch ({@link #loadHolders(Collection)}), enforcing the
-   * same not-found contract as {@link #requireHolder(UUID)}.
+   * Resolves a holder from a map pre-loaded by {@link #loadHolders(Collection)}.
    *
-   * @param holders the pre-loaded holder map.
-   * @param holderId the holder to resolve.
-   * @return the managed holder.
-   * @throws NotFoundException when no holder with that id exists.
+   * @param holders the pre-loaded holder map
+   * @param holderId the holder to resolve
+   * @return the managed holder
+   * @throws NotFoundException when no holder with that id exists
    */
   public BankHolder requireHolder(@NotNull Map<UUID, BankHolder> holders, @NotNull UUID holderId) {
     BankHolder holder = holders.get(holderId);
@@ -116,12 +105,10 @@ public class BankPostingWriter {
   }
 
   /**
-   * Pre-loads the holders referenced by a batch posting loop in one query, keyed by id, so the loop
-   * (wipe-reset / reversal) does not fire {@link #requireHolder(UUID)}'s {@code findById} per
-   * leg/slice (REQ-DATA-003).
+   * Loads the given holders in one query, keyed by id, for batch posting loops (REQ-DATA-003).
    *
-   * @param holderIds the holder ids to load; may be empty.
-   * @return holder id → entity for every id that exists.
+   * @param holderIds the holder ids to load; may be empty
+   * @return holder id to entity for every id that exists
    */
   public Map<UUID, BankHolder> loadHolders(@NotNull Collection<UUID> holderIds) {
     return holderRepository.findAllById(holderIds).stream()
@@ -133,18 +120,13 @@ public class BankPostingWriter {
    *
    * @param type the transaction type
    * @param note optional free-text note
-   * @param justification optional free-text justification (Begr&uuml;ndung), only a {@code
-   *     WITHDRAWAL} / {@code TRANSFER} carries one (REQ-BANK-045); {@code null} otherwise
-   * @param staffNote optional free-text note authored by the booking bank employee ("Notiz
-   *     Bankmitarbeiter", REQ-BANK-054); carried by every employee-initiated kind incl. a {@code
-   *     DEPOSIT}, and {@code null} for the holder Umbuchung, reversals and the wipe reset
+   * @param justification the Begr&uuml;ndung, set only on a {@code WITHDRAWAL} or {@code TRANSFER}
+   *     (REQ-BANK-045), else {@code null}
+   * @param staffNote the bank employee's note (REQ-BANK-054), or {@code null}
    * @param reversed the reversed original for {@code REVERSAL} rows, else {@code null}
-   * @param fee the in-game transfer fee added on top of the entered amount (ADR-0052); {@link
-   *     BigDecimal#ZERO} for non-fee transactions
+   * @param fee the in-game transfer fee added on top (ADR-0052); {@link BigDecimal#ZERO} when none
    * @param now the shared booking instant
-   * @param counterparty the deposit/withdrawal counterparty to stamp on the header (REQ-BANK-044),
-   *     or {@code null} for transfers, holder→holder Umbuchungen, reversals, the wipe reset and
-   *     bookings without a recorded counterparty
+   * @param counterparty the deposit/withdrawal counterparty (REQ-BANK-044), or {@code null}
    * @return the persisted header
    */
   public BankTransaction persistTransaction(
@@ -179,7 +161,7 @@ public class BankPostingWriter {
    *
    * @param tx the owning header
    * @param account the posted account
-   * @param amount the signed amount (never zero — callers always pass validated non-zero values)
+   * @param amount the signed, non-zero amount
    * @param now the shared booking instant
    */
   public void persistAccountPosting(
@@ -202,7 +184,7 @@ public class BankPostingWriter {
    *
    * @param tx the owning header
    * @param holder the named holder
-   * @param amount the signed amount (never zero — callers always pass validated non-zero values)
+   * @param amount the signed, non-zero amount
    * @param now the shared booking instant
    */
   public void persistHolderPosting(

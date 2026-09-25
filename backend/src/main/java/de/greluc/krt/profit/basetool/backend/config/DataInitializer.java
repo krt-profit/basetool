@@ -33,12 +33,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Seeds the default roles and the IRIDIUM squadron on first startup.
+ * Seeds the default roles and the IRIDIUM squadron on startup.
  *
- * <p>Roles are matched by {@code code}, not by {@code name}, so an admin renaming a role in the
- * admin UI does not trigger a silent re-create with the default permissions on the next boot. The
- * permission sets here are the baseline a fresh DB needs to bring up the security model — admins
- * extend them at runtime via the role-management screens.
+ * <p>Roles are matched by {@code code}, so renamed roles are not re-created.
  */
 @Configuration
 @RequiredArgsConstructor
@@ -48,9 +45,8 @@ public class DataInitializer {
   private final SquadronRepository squadronRepository;
 
   /**
-   * Returns a {@link CommandLineRunner} that runs the role + squadron seeding exactly once at boot.
-   * Each individual upsert is guarded by an existence check, so the runner is safe to invoke on a
-   * non-empty database.
+   * Returns a {@link CommandLineRunner} that seeds the roles and the IRIDIUM squadron; each upsert
+   * checks for existence first, so it is safe on a populated database.
    *
    * @return the seeding runner Spring Boot executes after the context is ready
    */
@@ -90,14 +86,8 @@ public class DataInitializer {
   }
 
   /**
-   * Seeds the canonical IRIDIUM squadron with the fixed {@link Squadron#IRIDIUM_ID} UUID so that
-   * Flyway backfills, application-level lookups and tests refer to a deterministic id
-   * (MULTI_SQUADRON_PLAN.md section 3). Idempotent — no-op when a row already exists at the
-   * canonical id. Flyway migration V80 seeds the same row at boot in every profile — the {@code
-   * test} profile included, which runs Flyway against PostgreSQL with {@code ddl-auto: validate}
-   * (application-test.yml) — so on a migrated schema this is a defensive no-op. It only inserts
-   * when the canonical row is absent and no {@code IRI} row exists either, i.e. on a schema whose
-   * squadron rows were removed after migration.
+   * Inserts the IRIDIUM squadron under the fixed {@link Squadron#IRIDIUM_ID} when neither that row
+   * nor an {@code IRI} row exists; otherwise does nothing.
    */
   private void seedIridiumIfMissing() {
     if (squadronRepository.existsById(Squadron.IRIDIUM_ID)) {

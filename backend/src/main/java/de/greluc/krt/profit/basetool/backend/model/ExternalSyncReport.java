@@ -37,17 +37,11 @@ import lombok.Setter;
 import lombok.ToString;
 
 /**
- * One append-only audit row recording a finding of a sync cycle (SC_WIKI_SYNC_PLAN.md §8.8).
+ * One append-only row recording a finding of an external sync run.
  *
- * <p>Deliberately does <b>not</b> extend {@link AbstractEntity}: this is an event log, not a
- * mutable aggregate. There is no optimistic-lock {@code @Version} (rows are never updated, only
- * inserted then eventually pruned by retention) and no {@code createdAt}/{@code updatedAt} pair —
- * {@link #ranAt} is the single authoritative timestamp, shared across every event of one run via
- * {@link #runId}.
- *
- * <p>Populated through {@code SyncReportService}; surfaced read-only on the {@code
- * /admin/sync-reports} pages. {@code SyncReportService} keeps the last 30 runs per source and
- * prunes older ones at the end of each cycle.
+ * <p>Not an {@link AbstractEntity}: rows are only inserted and later pruned, so there is no
+ * {@code @Version}; {@link #ranAt} is the single timestamp, shared by all events of one {@link
+ * #runId}. Written by {@code SyncReportService}, which keeps the last 30 runs per source.
  */
 @Entity
 @Table(name = "external_sync_report")

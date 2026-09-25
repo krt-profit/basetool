@@ -27,10 +27,8 @@ import java.util.UUID;
 import org.springframework.stereotype.Repository;
 
 /**
- * Spring Data repository for {@link Bereich}, narrowed by Hibernate's single-table discriminator to
- * {@code kind = 'BEREICH'} rows — Squadron, Spezialkommando and Organisationsleitung rows never
- * leak into a {@code Bereich}-typed query. Mirrors {@link SquadronRepository} so the Bereich admin
- * flows (epic #692) read like the existing org-unit lifecycle code.
+ * Spring Data repository for {@link Bereich}, restricted by the single-table discriminator to
+ * {@code kind = 'BEREICH'} rows.
  */
 @Repository
 public interface BereichRepository extends LookupTableRepository<Bereich, UUID> {
@@ -42,11 +40,8 @@ public interface BereichRepository extends LookupTableRepository<Bereich, UUID> 
   List<Bereich> findAllByActiveTrue();
 
   /**
-   * Returns every Bereich tagged with the given department (REQ-BANK-037). Backs the {@code
-   * CARTEL_BANK} responsible-holder resolution: the holder is the {@code BEREICHSLEITER} of a
-   * {@code Department.PROFIT} Bereich. The {@code department} column is not unique, so there may be
-   * zero, one or several matches; the seam treats every {@code BEREICHSLEITER} of any returned
-   * Bereich as a holder.
+   * Returns every Bereich tagged with the given department; used to resolve the {@code CARTEL_BANK}
+   * responsible holders (REQ-BANK-037).
    *
    * @param department the department to match; never {@code null}
    * @return the matching Bereiche; never {@code null}, possibly empty

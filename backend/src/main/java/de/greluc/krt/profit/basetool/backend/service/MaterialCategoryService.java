@@ -34,13 +34,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * CRUD service for the {@code material_category} reference table.
+ * Cached CRUD service for the admin-defined {@code material_category} reference table.
  *
- * <p>Categories are the admin-defined grouping above {@link
- * de.greluc.krt.profit.basetool.backend.model.Material} (e.g. "Refinable Ore", "Manufactured Good")
- * — independent of the UEX-imported flags. The list is always sorted alphabetically because the
- * frontend renders it directly into dropdowns without sorting again. Read methods are cached
- * against {@link CacheConfig#MATERIAL_CATEGORIES_CACHE}; every mutator evicts the whole cache.
+ * <p>Lists are sorted alphabetically; every mutator evicts {@link
+ * CacheConfig#MATERIAL_CATEGORIES_CACHE}.
  */
 @Service
 @RequiredArgsConstructor

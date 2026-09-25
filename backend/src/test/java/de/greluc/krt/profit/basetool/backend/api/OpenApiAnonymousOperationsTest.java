@@ -32,25 +32,12 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * What the committed {@code openapi.json} says about who may call each operation.
+ * Verifies what the committed {@code openapi.json} states about who may call each operation: every
+ * security requirement names a defined scheme, and exactly the operations that answer without a
+ * token declare {@code security: []} (REQ-SEC-052).
  *
- * <p><strong>Two defects this exists for, both of which shipped.</strong>
- *
- * <p>The first: twenty controllers declared {@code @SecurityRequirement(name = "bearerAuth")} while
- * {@code OpenApiConfig} defines the scheme as {@code bearer-jwt}. A name that resolves to nothing
- * is not an error in OpenAPI — it is an operation-level override that replaces the global
- * requirement with a reference to a scheme the document does not describe. 108 operations carried
- * it, and the Android app's generated client froze it. Nothing failed; the document simply stopped
- * saying that those operations need a token.
- *
- * <p>The second: <em>zero</em> operations declared {@code security: []}, so the two that genuinely
- * answer without one (REQ-SEC-052) were documented as requiring a bearer. That is the same defect
- * pointing the other way — a generated client attaches a token it may not have yet on exactly the
- * two calls a caller makes <em>before</em> it can have one.
- *
- * <p>The document is read from the classpath rather than regenerated here: it is the committed
- * artefact every downstream consumer reads (the Android contract sync, {@code generateApiTypes}),
- * and asserting on a freshly generated one would pass while the committed copy stayed wrong.
+ * <p>Reads the committed document from the classpath, since that is what downstream clients
+ * consume.
  */
 class OpenApiAnonymousOperationsTest {
 

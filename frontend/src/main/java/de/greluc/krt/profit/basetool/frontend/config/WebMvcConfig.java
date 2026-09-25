@@ -33,50 +33,11 @@ import org.springframework.web.servlet.resource.VersionResourceResolver;
 public class WebMvcConfig implements WebMvcConfigurer {
 
   /**
-   * Registers one resource handler per asset tree that actually exists on the classpath.
+   * Registers one resource handler per asset tree present on the classpath, rather than a
+   * catch-all, so resource-URL lookups for controller routes skip the resolver chain.
    *
-   * <p><b>Why one handler per tree instead of a single catch-all.</b> {@code
-   * spring.web.resources.chain.strategy.content.enabled} is on, which satisfies {@code
-   * ConditionalOnEnabledResourceChain} and puts a {@code ResourceUrlEncodingFilter} in front of
-   * every response. That filter routes every URL a Thymeleaf {@code @{...}} expression emits
-   * through {@code ResourceUrlProvider#getForLookupPath}, which walks the resolver chain of every
-   * registered handler whose pattern matches. While the pattern was a catch-all it matched
-   * everything, so a {@code @{/missions}} — a controller route that can never be a file — was
-   * probed against all four classpath locations on the way out. {@code CachingResourceResolver}
-   * caches only non-{@code null} results, so those lookups never populate the cache and every page
-   * render repeated all of them.
-   *
-   * <p>The cost was measured, not assumed: <b>267 us per controller-route lookup</b> with the
-   * catch-all present against <b>0.25 us</b> without it, and 20 000 repeats of the same six routes
-   * stayed expensive throughout, which is the missing cache showing. The shared chrome fragments
-   * emit 77 such links on every page before a page's own content adds more.
-   *
-   * <p>Narrowing the patterns is what fixes it: a lookup path that matches no handler returns
-   * {@code null} without touching the chain.
-   *
-   * <p><b>The pattern list is the classpath, verified rather than assumed.</b> Enumerating {@code
-   * classpath*:} under all four configured locations at runtime yields exactly {@code images} and
-   * {@code logos} under {@code META-INF/resources/}, and {@code css}, {@code fonts}, {@code
-   * images}, {@code js} and {@code robots.txt} under {@code static/} — no dependency JAR
-   * contributes anything, and {@code classpath:/resources/} and {@code classpath:/public/} do not
-   * exist at all, which is why neither is listed below. {@code StaticResourceHandlerMappingTest}
-   * pins that inventory, so a new asset tree that is added without a pattern here fails a test
-   * rather than 404ing quietly in production.
-   *
-   * <p><b>Not listed, deliberately.</b> {@code /favicon.ico} and {@code /sm/**} are {@code
-   * permitAll} in {@link SecurityConfig}, but nothing ships a file at either: the favicon is
-   * declared by {@code <link rel="icon">} against {@code /logos/}, and {@code /sm/} is a path
-   * third-party browser extensions probe (Sentry Replay), not a tree this app serves. Both answered
-   * 404 before this change and answer 404 after it — those allow-list entries exist to keep the
-   * probes off the OAuth entry point, not to serve them.
-   *
-   * <p><b>Each pattern's locations point into its own tree</b> because {@code
-   * extractPathWithinPattern} hands the handler only the part of the path that the wildcard
-   * matched: {@code /css/**} resolves {@code /css/styles.css} as {@code styles.css}, so the
-   * location has to be {@code classpath:/static/css/} rather than {@code classpath:/static/}.
-   * {@code /images/**} keeps both of its trees, in the original order, because the manufacturer
-   * marks live under {@code META-INF/resources/images/} and the community badge and flags under
-   * {@code static/images/}.
+   * <p>Each pattern's locations point into its own tree, since the handler only sees the part of
+   * the path matched by the wildcard.
    *
    * @param registry the registry to add the asset handlers to; never {@code null}
    */
@@ -95,19 +56,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
   }
 
   /**
-   * Registers one asset tree with the cache headers and resource chain every tree shares.
-   *
-   * <p>Spelled once because the chain below is the part that must not drift between trees: a tree
-   * that lost its {@link VersionResourceResolver} would be served without a content hash and then
-   * cached for a year as {@code immutable}, which is unrecoverable for that URL.
-   *
-   * <p>{@code setCacheControl} replaces the older {@code setCachePeriod(31536000)} so the emitted
-   * header is {@code Cache-Control: max-age=31536000, public, immutable} instead of a bare {@code
-   * max-age} — every static asset URL carries a content hash via the {@link
-   * VersionResourceResolver} below, which means the resource at a given URL never changes and
-   * {@code immutable} is the safe and correct hint to browsers ("do not even revalidate"). This
-   * also lets us retire the standalone {@code StaticCacheHeaderFilter}: Spring's resource chain now
-   * sets the exact same header set the filter used to inject.
+   * Registers one asset tree with the shared resource chain: content-hash versioning via {@link
+   * VersionResourceResolver} and {@code Cache-Control: max-age=31536000, public, immutable}.
    *
    * @param registry the registry to add the handler to; never {@code null}
    * @param pathPattern the URL pattern to serve, e.g. {@code /css/**}; never {@code null}

@@ -38,17 +38,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.util.UriComponentsBuilder;
 
 /**
- * Admin overview of who has and has not accepted the Terms of Use (REQ-SEC-028).
+ * Read-only admin overview of who has and has not accepted the Terms of Use (REQ-SEC-028).
  *
- * <p>Read-only by design: this page reports consent, it never grants it. Accepting on someone
- * else's behalf would defeat the point of recording consent in the first place, so there is no
- * write here for an admin to reach for.
- *
- * <p>Filtering and paging swap the results fragment in place (REQ-FE-001). There is deliberately
- * <em>no</em> live peer sync: the rows change when ordinary users accept on their own gate page,
- * not when another admin edits something, so there is no peer edit to propagate — and standing up a
- * broadcast room for "somebody, somewhere, accepted" would put a message on the relay for every
- * consent in the fleet to refresh a page that is opened a handful of times per terms change.
+ * <p>Filtering and paging swap the results in place; the page has no live peer sync.
  */
 @Controller
 @UsesLayoutModel
@@ -75,20 +67,14 @@ public class AdminTermsPageController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Renders the consent overview, or its results fragment when swapped in place.
+   * Renders the consent overview, or its results fragment for an in-place swap.
    *
-   * <p>Defaults to {@code PENDING} rather than {@code ALL}: the reason to open this page is almost
-   * always "who is still missing", and after a terms change the {@code ALL} list is a wall of rows
-   * in which the handful that matter are invisible.
-   *
-   * @param filter {@code ALL}, {@code ACCEPTED} or {@code PENDING}; anything else falls back to
-   *     {@code PENDING} rather than erroring, because the value reaches us from a query string a
-   *     user can edit and a broken filter should not be a broken page
+   * @param filter {@code ALL}, {@code ACCEPTED} or {@code PENDING}; anything else, and the default,
+   *     is {@code PENDING}
    * @param page zero-based page index, clamped at zero
-   * @param fragment {@code results} when {@code krtFetch.swap} is asking for the results section
-   *     alone; anything else renders the whole page
-   * @param model receives the rows, the pending count and the echoed filter
-   * @return the {@code admin/terms} view, or its {@code adminTermsResults} fragment for a swap
+   * @param fragment {@code results} to render only the results section
+   * @param model receives the rows, the pending count and the filter
+   * @return the {@code admin/terms} view, or its {@code adminTermsResults} fragment
    */
   @GetMapping("/admin/terms")
   public @NotNull String showOverview(

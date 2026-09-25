@@ -38,20 +38,12 @@ import lombok.Setter;
 import lombok.ToString;
 
 /**
- * Ship / vehicle catalogue entry, jointly synced from UEX and (R4+) SC Wiki.
+ * Ship / vehicle catalogue entry, synced from UEX and SC Wiki.
  *
- * <p>R2 expands the entity to mirror SC_WIKI_SYNC_PLAN.md §6.5: the hardened {@code
- * UexVehicleService} populates the 36 {@code is_*} capability flags, dimensions, fuel and urls from
- * the extended {@code UexVehicleDto}, plus the shared {@link #externalUuid} / {@link #uexVehicleId}
- * cross-source keys. It writes neither description column — UEX serves no description at all — so
- * {@link #descriptionEn} is filled by the SC-Wiki vehicle sync and the P4K import, never by UEX.
- * Wiki-side columns ({@link #scwikiSlug}, {@link #gameName}, {@link #descriptionDe}, …) stay
- * nullable until R4.
- *
- * <p>SC Wiki sync R9 Step 4 dropped the legacy synthesized {@code description} column — migration
- * {@code V125__drop_legacy_material_and_ship_type_columns.sql}, shipped 2026-06-01 — together with
- * the JPA field that mapped it, so no {@code description} member exists on this entity any more.
- * Ship-type descriptions come from {@link #descriptionEn} / {@link #descriptionDe}.
+ * <p>The UEX vehicle sync fills the capability flags, dimensions, fuel, URLs and the cross-source
+ * keys {@link #externalUuid} / {@link #uexVehicleId}; descriptions ({@link #descriptionEn}, {@link
+ * #descriptionDe}) come only from the SC Wiki sync and the P4K import. Wiki-side columns are
+ * nullable.
  */
 @Entity
 @Getter
@@ -339,11 +331,7 @@ public class ShipType extends AbstractEntity<UUID> {
   @Column(name = "url_wiki", length = 512)
   private String urlWiki;
 
-  /**
-   * English description. Replaces the legacy synthesized {@code description} column, which V125
-   * dropped on 2026-06-01 together with its JPA field — no {@code description} member exists on
-   * this entity any more.
-   */
+  /** English description, filled by the SC Wiki vehicle sync and the P4K import, never by UEX. */
   @Column(name = "description_en", columnDefinition = "TEXT")
   private String descriptionEn;
 

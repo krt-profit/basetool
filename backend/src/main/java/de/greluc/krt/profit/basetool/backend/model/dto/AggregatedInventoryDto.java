@@ -20,20 +20,16 @@
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
 /**
- * Data transfer record carrying one row of the aggregated Lager overview ({@code GET
- * /api/v1/inventory/aggregated}). Catalog-discriminated since V220 (REQ-INV-029, ADR-0101): a
- * {@code catalog=MATERIAL} row aggregates one material with its quality figures and {@code gameItem
- * == null}; a {@code catalog=ITEM} row aggregates one game item with {@code material == null} and
- * {@code null} quality columns (game items carry no quality dimension, REQ-INV-028).
+ * One row of the aggregated Lager overview ({@code GET /api/v1/inventory/aggregated}), either a
+ * material row ({@code gameItem == null}) or a game-item row ({@code material == null}, no quality
+ * figures) (REQ-INV-029).
  *
- * @param material the aggregated material, or {@code null} for a game-item row.
- * @param gameItem the aggregated game item, or {@code null} for a material row.
- * @param quality the amount-weighted <em>average</em> quality across the material's stock; {@code
- *     null} for a game-item row.
- * @param maxQuality the <em>highest</em> quality available for the material (the best single
- *     entry's quality); {@code 0.0} when the material has no stock, {@code null} for a game-item
- *     row.
- * @param amount the total quantity in stock.
+ * @param material the aggregated material, or {@code null} for a game-item row
+ * @param gameItem the aggregated game item, or {@code null} for a material row
+ * @param quality amount-weighted average quality; {@code null} for a game-item row
+ * @param maxQuality highest single-entry quality; {@code 0.0} without stock, {@code null} for a
+ *     game-item row
+ * @param amount total quantity in stock
  */
 public record AggregatedInventoryDto(
     MaterialDto material,

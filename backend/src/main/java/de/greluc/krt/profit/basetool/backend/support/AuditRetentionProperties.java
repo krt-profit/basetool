@@ -30,20 +30,11 @@ import org.springframework.validation.annotation.Validated;
  * Validated configuration of the audit-trail retention sweep (REQ-AUDIT-006, prefix {@code
  * app.audit.retention}, fed by {@code APP_AUDIT_RETENTION_*}).
  *
- * <p>The sweep deletes, irreversibly and on a schedule, every activity and bank audit row older
- * than {@code maxAge}. Bound through {@code @Value} it accepted any duration, so a mistyped {@code
- * P0D} or a negative value would have put the cutoff at "now" or in the future and deleted the
- * entire trail on the next run (BE-MOD-03). The floor below is a guard against that
- * misconfiguration, not a retention policy — the policy is the two-year default. It sits at 30
- * days: short enough not to stand in the way of a deliberate shorter window, long enough that no
- * slip of a digit or a sign can reach the rows of the current month. A value under it refuses to
- * start the context.
+ * <p>The sweep irreversibly deletes activity and bank audit rows older than {@code maxAge}; a value
+ * below the {@link #MIN_MAX_AGE_DAYS} floor refuses to start the context.
  *
- * <p>Lives in the dependency-leaf {@code support} package like {@link AuthoritiesCacheProperties}
- * and is registered by {@code @ConfigurationPropertiesScan}.
- *
- * @param enabled whether the sweep bean exists at all ({@code @ConditionalOnProperty} on the task
- *     reads the same key; default {@code true}, {@code false} under the {@code test} profile)
+ * @param enabled whether the sweep bean exists; default {@code true}, {@code false} under the
+ *     {@code test} profile
  * @param maxAge how long an audit row is kept after it occurred; at least {@link #MIN_MAX_AGE_DAYS}
  *     days, default {@code P730D}
  * @param interval the pause between two sweeps ({@code fixedDelay}); at least one minute, default

@@ -43,21 +43,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Pins the Stufe-2 DB backstops the Wave-2 migrations add so the in-memory guards (which have a
- * TOCTOU window under concurrency) can never be silently bypassed:
- *
- * <ul>
- *   <li>V206 partial unique index {@code uq_mission_participant_single_lead} — at most one
- *       Einsatzleiter per mission (REQ-MISSION-013, #1113).
- *   <li>V207 unique index {@code uq_mission_crew_participant} — a participant sits in at most one
- *       crew (#1132).
- * </ul>
- *
- * <p>Each test inserts a conflicting second row and asserts Hibernate surfaces the SQL {@code
- * unique_violation} as a {@link DataIntegrityViolationException} (which {@code
- * GlobalExceptionHandler} maps to HTTP 409 — the same status as the friendly in-memory branch).
- * {@code @Transactional} so the rows roll back after each test; the unique index is checked
- * immediately by Postgres, so the violation surfaces at the conflicting {@code saveAndFlush}.
+ * Verifies the unique-index backstops behind the in-memory mission guards: at most one
+ * Einsatzleiter per mission (REQ-MISSION-013) and one crew per participant, each surfacing as a
+ * {@link DataIntegrityViolationException}.
  */
 @SpringBootTest
 @ActiveProfiles("test")

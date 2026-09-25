@@ -44,34 +44,11 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * End-to-end verification that the P4K import's reconciliation actually <b>matches and merges</b>
- * against existing UEX / SC-Wiki master data — the part the empty-database parse test cannot cover.
- * Runs against the real Testcontainers Postgres of the {@code test} profile and uses <em>real</em>
- * DataForge identifiers lifted from the live catalog (Upsiders, a Gyson undersuit, the Drake
- * Clipper, Zeta-Prolanide, a real {@code BP_CRAFT_*} blueprint and one of its resource
- * ingredients).
+ * Verifies against Postgres that a P4K import matches and merges existing master data: rows seeded
+ * with canonical UUIDs are stripped of them, re-imported, and must re-match by name, class name,
+ * code or key, backfill the UUID and re-resolve a blueprint ingredient without creating rows.
  *
- * <p>The match-key contract under test: the P4K {@code guid} is the DataForge {@code __ref}, which
- * is the same UUID SC-Wiki publishes (so it equals {@code game_item.external_uuid} / {@code
- * ship_type.external_uuid} and {@code manufacturer.scwiki_uuid} / {@code material.scwiki_uuid} /
- * {@code blueprint.scwiki_uuid}). UEX-origin rows that never received that canonical UUID are still
- * merged via the case-insensitive {@code class_name} / {@code name} / {@code code} / {@code key}
- * fallback, which then backfills the UUID ({@code LINKED_VIA_NAME}).
- *
- * <p>Strategy (all inside one rolled-back transaction):
- *
- * <ol>
- *   <li><b>Seed</b> the "existing" master data by applying the catalog with seeding on — this
- *       creates a row of every type carrying the canonical UUID, exactly as a UEX/Wiki sync would.
- *   <li><b>Strip</b> the canonical UUIDs ({@code external_uuid} / {@code scwiki_uuid}) from those
- *       rows and clear one blueprint ingredient's resolved material, simulating the UEX-origin "no
- *       UUID yet" / "unresolved ingredient" state the merge is meant to repair.
- *   <li><b>Re-import</b> (apply, seeding off): every row must now re-match by name / class_name /
- *       code / key, backfill its canonical UUID, and the blueprint ingredient must re-resolve —
- *       with <em>zero</em> new rows created.
- * </ol>
- *
- * {@link JwtDecoder} is mocked so the resource-server context boots without Keycloak.
+ * <p>Runs in one rolled-back transaction; {@link JwtDecoder} is mocked.
  */
 @SpringBootTest
 @ActiveProfiles("test")

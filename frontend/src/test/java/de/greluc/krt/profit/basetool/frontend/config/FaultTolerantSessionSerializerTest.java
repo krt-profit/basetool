@@ -39,19 +39,9 @@ import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.data.redis.serializer.SerializationException;
 
 /**
- * An unreadable session value must sign a member out, not take the application down — and must say
- * enough about itself to be fixed.
- *
- * <p><strong>What this pins.</strong> On 2026-09-02 a session attribute in Redis could not be
- * deserialized, and because nothing on Spring Session's read path catches that, the exception
- * escaped the session filter and became an HTTP 500 on every request carrying a session cookie —
- * the entire application, behind the login, for everybody.
- *
- * <p>The diagnostics cases pin the follow-up. Once the fault was survivable it stopped being
- * legible: three hours of that day's export are 496 identical WARN lines naming only {@code
- * InvalidTypeIdException}, with no attribute, no type id and no metric. The assertions below fix
- * the meaning of each of the three failure shapes, and one of them exists specifically to keep a
- * member's own data out of a log line.
+ * Verifies that an unreadable session value signs the member out instead of failing the request,
+ * and that each failure shape is reported with enough detail to fix it but without the member's
+ * data.
  */
 class FaultTolerantSessionSerializerTest {
 

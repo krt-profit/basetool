@@ -34,13 +34,8 @@ import org.junit.jupiter.api.Test;
 import org.thymeleaf.standard.serializer.IStandardJavaScriptSerializer;
 
 /**
- * Pins down the behaviour of {@link
- * ThymeleafJavaScriptSerializerConfig.JavaTimeAwareJavaScriptSerializer}. The test reproduces the
- * exact failure that triggered a 500 on {@code /promotion/admin/rank-requirements} — a {@code
- * LinkedHashMap<String, List<PromotionCategoryDto>>} whose nested DTOs carry {@link Instant}
- * timestamps — and locks the surrounding XSS-protection escapes ({@code <}, {@code >}, {@code &},
- * {@code '}, {@code "}, {@code /}, {@code U+2028}, {@code U+2029}) in place so a future
- * "simplification" of the serializer cannot silently regress either side.
+ * Tests {@link ThymeleafJavaScriptSerializerConfig.JavaTimeAwareJavaScriptSerializer}: nested DTOs
+ * with {@link Instant} timestamps serialize, and the XSS-protection escapes stay in place.
  */
 class ThymeleafJavaScriptSerializerConfigTest {
 

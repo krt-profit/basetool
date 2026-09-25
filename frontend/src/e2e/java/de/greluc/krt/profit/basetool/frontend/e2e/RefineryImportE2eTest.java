@@ -35,17 +35,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Functional flow (UC-24): upload a {@code RefineryExtract} JSON on the refinery create page, get
- * the form pre-filled from the backend draft (#434/#435), resolve the one intentionally unmatched
- * row via its suggestion chip, save, and verify the order appears in the list.
+ * Functional flow (UC-24): uploads a {@code RefineryExtract} JSON on the refinery create page, gets
+ * the form pre-filled from the backend draft, resolves the intentionally misspelled row via its
+ * suggestion chip, saves, and verifies the order appears in the list.
  *
- * <p>This is the repo's first file-upload e2e: {@code setInputFiles} targets the hidden file input
- * behind the styled import button; the change handler submits the multipart form to {@code
- * /refinery-orders/import}, which relays to the Phase 1 backend endpoint and — via the #591 AJAX
- * twin — swaps the pre-filled create-form fragment back in place with no full reload. The fixture's
- * second row ("E2E IMPRT MATERAIL") is misspelled on purpose (3 edits over 19 characters ≈ 0.84
- * similarity) so it stays below the fuzzy accept threshold and surfaces only as a ranked
- * suggestion.
+ * <p>The misspelled row ("E2E IMPRT MATERAIL") stays below the fuzzy accept threshold, so it
+ * surfaces only as a suggestion.
  */
 @Tag("e2e")
 class RefineryImportE2eTest {

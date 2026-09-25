@@ -39,14 +39,10 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Join entity linking a {@link JobOrder} to a {@link User} who signed up to work on it (a
- * "Bearbeiter"), carrying an optional free-text note the assignee can attach to their own entry —
- * e.g. when they plan to work on it or which part they take. Promoted from the former pure
- * many-to-many join table by migration V147 so the edge can hold its own {@code note} plus an
- * independent {@code @Version}: editing a note bumps only this row's version, never the parent
- * {@link JobOrder}'s, so concurrent assignee edits do not collide with order-level writes.
+ * "Bearbeiter"), with an optional free-text note.
  *
- * <p>The {@code (job_order_id, user_id)} pair is unique, so a user is an assignee at most once per
- * order.
+ * <p>Carries its own {@code @Version}, so editing a note never bumps the parent {@link JobOrder}.
+ * The {@code (job_order_id, user_id)} pair is unique.
  */
 @Entity
 @Getter

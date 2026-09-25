@@ -34,16 +34,8 @@ import org.springframework.transaction.event.TransactionalEventListener;
 /**
  * Bridges published {@link NotificationEvent}s to notification creation.
  *
- * <p>Fires only {@code AFTER_COMMIT} of the originating transaction (so a rolled-back business
- * action never produces phantom notifications) and runs on the dedicated {@link
- * AsyncConfig#NOTIFICATION_EXECUTOR} thread pool (so creation never adds latency to the request).
- * Any failure is swallowed and logged: the business transaction has already committed, so a
- * notification hiccup must not surface to the user or be retried inline.
- *
- * <p>Lives in the {@code service} package rather than {@code event}: it is the orchestration seam
- * that consumes a {@link NotificationCreationService}, so keeping it here leaves {@code event} a
- * pure payload leaf (the {@link NotificationEvent} records depend only on {@code model}) and avoids
- * an {@code event} &rarr; {@code service} package cycle.
+ * <p>Runs after the originating transaction commits, on the {@link
+ * AsyncConfig#NOTIFICATION_EXECUTOR} pool; failures are logged and swallowed.
  */
 @Component
 @RequiredArgsConstructor
@@ -54,15 +46,10 @@ public class NotificationEventListener {
   private final NotificationFanout notificationFanout;
 
   /**
-   * Creates notifications for an event after its originating transaction commits, then pushes the
-   * real-time SSE signal to the resolved recipients.
+   * Creates notifications for an event, then pushes the real-time SSE signal to the recipients once
+   * that creation has committed.
    *
-   * <p>The push runs here, <em>after</em> {@link NotificationCreationService#createFromEvent}
-   * returns — i.e. after that method's own transaction has committed (#1152) — so the client's
-   * unread-count refetch reads the committed rows rather than a pre-commit stale count, and the
-   * blocking SSE fan-out no longer pins the creation transaction's Hikari connection. The push is
-   * best-effort: a failure is swallowed because the frontend polling fallback keeps the badge
-   * correct (REQ-NOTIF-010).
+   * <p>The push is best-effort; polling keeps the badge correct (REQ-NOTIF-010).
    *
    * @param event the published notification event
    */

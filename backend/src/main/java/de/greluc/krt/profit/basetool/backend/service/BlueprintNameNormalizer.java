@@ -25,28 +25,20 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
- * Derives the canonical {@code product_key} from a blueprint product name. The personal-blueprint
- * feature (#327) models ownership per product and matches names across two catalogues (SC Wiki and
- * the SCMDB log-watcher export) that spell the same product slightly differently, so both the
- * search and the import normalize names through this single helper before comparing them.
+ * Derives the canonical {@code product_key} from a blueprint product name, so names from the SC
+ * Wiki and the SCMDB export compare equal.
  *
- * <p>Normalization is intentionally conservative — it only folds the differences that actually
- * drift between the sources (surrounding whitespace, internal whitespace runs, the various Unicode
- * quote/apostrophe glyphs, and letter case). It does <strong>not</strong> strip punctuation
- * wholesale, which could collide genuinely distinct products.
+ * <p>Folds only whitespace, Unicode quote glyphs and case; punctuation is not stripped.
  */
 @Component
 public class BlueprintNameNormalizer {
 
   /**
    * Normalizes a raw product name into its {@code product_key}: trims, collapses internal
-   * whitespace to single spaces, folds Unicode double/single quote glyphs to their ASCII forms, and
-   * lowercases using {@link Locale#ROOT}. A {@code null} or all-whitespace input yields an empty
-   * string.
+   * whitespace, folds Unicode quote glyphs to ASCII and lowercases with {@link Locale#ROOT}.
    *
-   * @param raw the raw product name (SC Wiki output name or SCMDB product name); may be {@code
-   *     null}
-   * @return the normalized product key, never {@code null}
+   * @param raw the raw product name; may be {@code null}
+   * @return the normalized key, empty for a {@code null} or blank input
    */
   @NotNull
   public String normalize(@Nullable String raw) {

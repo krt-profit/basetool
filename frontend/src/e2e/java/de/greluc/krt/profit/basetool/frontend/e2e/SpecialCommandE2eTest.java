@@ -37,16 +37,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Spezialkommando (SK) flow (UC-11): an admin manages an SK as a first-class OrgUnit, and the
- * documented limitation holds — a not-yet-profit-eligible SK cannot be the responsible (processing)
- * unit of a job order. Only profit-eligible org units process orders (V128), and a freshly created
- * SK is not profit-eligible by default, so naming it as the responsible unit returns HTTP 400.
+ * Spezialkommando (SK) flow (UC-11): an admin manages an SK as an OrgUnit, and a
+ * non-profit-eligible SK cannot be the responsible unit of a job order.
  *
  * <ul>
  *   <li>Lifecycle (UI): the admin creates an SK via {@code /admin/special-commands} and it appears
  *       in the list.
- *   <li>Member page (UI): the old {@code /admin/special-commands/{id}} URL redirects to the SK
- *       member page at {@code /organisation/special-commands/{id}}.
+ *   <li>Member page (UI): {@code /admin/special-commands/{id}} redirects to the SK member page at
+ *       {@code /organisation/special-commands/{id}}.
  *   <li>Limitation (API): naming a non-profit-eligible SK as a job order's responsible OrgUnit
  *       returns 400.
  * </ul>
@@ -128,12 +126,9 @@ class SpecialCommandE2eTest {
   }
 
   /**
-   * The admin soft-deletes (deactivates) a Spezialkommando from the list page: the per-row trash
-   * button opens the KRT confirmation modal (no native {@code confirm()}), confirming POSTs the
-   * deactivate, and the row drops out of the default active-only list while reappearing — flagged
-   * inactive — under {@code includeInactive=true}. Guards the pre-existing bug where the trash
-   * button was inert (no enclosing form, no script wiring), so the SK could never be deleted from
-   * the list UI. Ephemeral-stack only: it seeds a throwaway SK to delete.
+   * Verifies that the admin can deactivate an SK from the list page: the trash button opens the KRT
+   * confirmation modal, confirming POSTs the deactivation, and the row leaves the default list but
+   * reappears as inactive under {@code includeInactive=true}.
    */
   @Test
   void adminDeactivatesSpecialCommandFromTheList() {
@@ -184,11 +179,9 @@ class SpecialCommandE2eTest {
   }
 
   /**
-   * The SK member page moved out of the admin area to {@code /organisation/special-commands/{id}}
-   * (an SK's own lead manages its members too, and {@code /admin/**} stays admin-only): the old
-   * {@code /admin/special-commands/{id}} URL redirects there, and the page renders the member
-   * roster box with its add-member action. Ephemeral-stack only: it needs the SK seeded in {@link
-   * #setUp}.
+   * Verifies that {@code /admin/special-commands/{id}} redirects to the SK member page at {@code
+   * /organisation/special-commands/{id}}, which renders the member roster with its add-member
+   * action.
    */
   @Test
   void oldAdminDetailUrlRedirectsToTheMemberPage() {
@@ -241,11 +234,9 @@ class SpecialCommandE2eTest {
   }
 
   /**
-   * Submits an in-place SK write (#582): drops the {@code position: fixed} footer (the WebKit
-   * click-interception guard {@link E2eSupport#clickSubmitClearingFooter} also applies) and clicks
-   * the submit, blocking on the AJAX twin's {@code POST /admin/special-commands*} response. The
-   * write now re-swaps the SK-list fragment instead of navigating, so — unlike the classic flow —
-   * there is no post-submit document load to await; the caller re-loads the list itself afterwards.
+   * Submits an in-place SK write: hides the {@code position: fixed} footer, clicks the submit and
+   * waits for the {@code POST /admin/special-commands*} response. The list fragment is re-swapped
+   * rather than navigated, so the caller reloads the list itself.
    *
    * @param submit the submit control (in the create/edit or delete modal) to click
    */

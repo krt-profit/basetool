@@ -27,20 +27,8 @@ import java.util.UUID;
 import java.util.function.ToIntFunction;
 
 /**
- * Clears the price rows an upstream feed no longer returns, in chunks whose size does not depend on
- * the feed's.
- *
- * <p>Both UEX price syncs used to express the sweep as a single {@code WHERE id NOT IN :seenIds}
- * bulk update, binding one parameter per row the feed had just returned. That works until it does
- * not: {@code items_prices_all} answers with 23 770 rows today, Spring Boot's IN-clause parameter
- * padding rounds the list up to the next power of two (32 768), and PostgreSQL refuses a statement
- * with more than 65 535 bind parameters. The next padding step crosses that line, so at roughly 38%
- * growth the sweep would have started failing with a protocol error — and a failing sweep is
- * invisible in the way that matters, because stale prices simply keep being served (REQ-DATA-014).
- *
- * <p>Inverting it removes the coupling entirely: ask the database which rows still hold a price,
- * subtract the ids this run saw, and clear the remainder in fixed-size batches. The parameter count
- * is then bounded by {@link #CHUNK_SIZE} regardless of how large the price matrix grows.
+ * Clears the price rows an upstream feed no longer returns, in batches of at most {@link
+ * #CHUNK_SIZE} ids so the bind-parameter count is independent of the feed size (REQ-DATA-014).
  */
 public final class StalePriceSweep {
 

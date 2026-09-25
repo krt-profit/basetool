@@ -535,11 +535,7 @@ class BlueprintImportServiceTest {
   }
 
   /**
-   * Audit MEDIUM-6: the byte cap is not an entry-count cap, and de-duplication keys on the NAME -
-   * so every distinct name survives it. An upload of minimal records therefore stayed under 8 MiB
-   * while yielding hundreds of thousands of entries, each of which costs one alias lookup plus a
-   * full-catalogue fuzzy scan, all inside one {@code @Transactional(readOnly = true)} that holds a
-   * Hikari connection for the whole run.
+   * A preview with too many distinct entries is rejected with 400 before touching the catalogue.
    */
   @Test
   void preview_tooManyDistinctEntriesThrowsBadRequestWithoutTouchingTheCatalogue() {

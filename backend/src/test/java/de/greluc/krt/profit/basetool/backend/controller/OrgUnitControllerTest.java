@@ -37,12 +37,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Thin delegation tests for {@link OrgUnitController}. Each endpoint is a single-line passthrough
- * to {@link OrgUnitMembershipQueryService} — the resolver / sort behaviour is pinned by {@link
- * de.greluc.krt.profit.basetool.backend.service.OrgUnitMembershipQueryServiceTest}, so this class
- * only verifies the wiring (handlers exist, response shape preserved, no surprise filtering). The
- * declarative {@code @PreAuthorize} gates (public {@code /active} vs authenticated {@code
- * /active-all-kinds}) are enforced by Spring Security, not asserted here.
+ * Delegation tests for {@link OrgUnitController}, whose endpoints pass through to {@link
+ * OrgUnitMembershipQueryService}.
  */
 @ExtendWith(MockitoExtension.class)
 class OrgUnitControllerTest {

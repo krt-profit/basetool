@@ -46,14 +46,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC-level render test for the refinery-order-list pagination on {@link
- * RefineryOrderPageController} — pins REQ-REFINERY-019: {@code GET /refinery-orders} renders the
- * shared page-nav and the 10/50/100 size picker (REQ-INV-013 contract) from the {@code
- * PageResponse} envelope, and every generated link keeps the active status + {@code onlyMine}
- * filter.
- *
- * <p>The mocked backend returns an empty content page with inflated totals: pagination chrome is
- * driven by the page envelope, not the row content.
+ * MVC render test for the refinery-order list pagination on {@link RefineryOrderPageController}
+ * (REQ-REFINERY-019): the page nav and size picker render from the {@code PageResponse} envelope
+ * and every link keeps the status and {@code onlyMine} filters.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -75,13 +70,12 @@ class RefineryOrderPaginationMvcTest {
   }
 
   /**
-   * Builds a deterministic page envelope as the mocked backend answer. The content is intentionally
-   * empty — only the page coordinates matter for the pagination chrome.
+   * Builds a mocked page envelope with empty content; only the page coordinates matter.
    *
    * @param pageIndex zero-based page index to report
    * @param pageSize page size to report
    * @param total total number of matching orders to report
-   * @return the mocked page envelope with empty content and the derived total-pages count
+   * @return the page envelope with empty content and the derived total-pages count
    */
   private static PageResponse<RefineryOrderListDto> page(int pageIndex, int pageSize, int total) {
     int totalPages = (int) Math.ceil((double) total / pageSize);

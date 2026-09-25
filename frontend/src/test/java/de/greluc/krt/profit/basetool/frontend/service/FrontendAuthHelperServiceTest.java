@@ -31,12 +31,9 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 /**
- * Unit tests for {@link FrontendAuthHelperService}, focused on the {@code isMemberOrAbove}
- * predicate that gates the member-only mission finance/refinery fetches (REQ-SEC-013). The
- * regression these guard against: the check must read the request {@link
- * org.springframework.security.core.Authentication} authorities (where Spring's {@code
- * userAuthoritiesMapper} puts the Keycloak {@code ROLE_*}), not an {@code OidcUser} principal's own
- * authorities.
+ * Unit tests for {@link FrontendAuthHelperService#isMemberOrAbove}, which gates member-only mission
+ * finance and refinery fetches (REQ-SEC-013) and must read the request {@link
+ * org.springframework.security.core.Authentication} authorities, not the {@code OidcUser}'s own.
  */
 class FrontendAuthHelperServiceTest {
 

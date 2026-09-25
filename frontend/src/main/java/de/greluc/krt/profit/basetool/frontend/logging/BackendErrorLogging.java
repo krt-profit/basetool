@@ -25,23 +25,17 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 /**
- * Centralised structured logging for {@link BackendServiceException} catches in page controllers.
+ * Structured WARN logging for {@link BackendServiceException}s caught in page controllers.
  *
- * <p>Every backend error propagated to a user is logged on a single WARN line containing the action
- * / endpoint identifier, HTTP status, stable {@code problemCode}, {@code correlationId} (so the
- * same request can be located in the backend log), the localized-safe {@code detail} and the
- * structured {@code fieldErrors[]}. Rejected user values are intentionally never logged (PII
- * protection, see AGENTS.md).
- *
- * <p>Use a single helper call instead of bespoke {@code log.error(e)} patterns to keep the
- * operational log analysable across all controllers.
+ * <p>One line carries the action, HTTP status, {@code problemCode}, {@code correlationId}, {@code
+ * detail} and {@code fieldErrors[]}; rejected user values are never logged.
  */
 public final class BackendErrorLogging {
 
   private BackendErrorLogging() {}
 
   /**
-   * Log the given {@link BackendServiceException} at WARN level using a stable, parseable format.
+   * Logs the given {@link BackendServiceException} at WARN level in a stable, parseable format.
    *
    * @param logger controller-local SLF4J logger
    * @param action short action identifier (e.g. {@code "createHandover"} or {@code "POST

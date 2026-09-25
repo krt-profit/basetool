@@ -33,20 +33,18 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * Domain event published right after a bank employee rejects a booking request (epic #666 F2,
- * REQ-BANK-026). It is directed at the requesting officer/lead so they learn the outcome and the
- * reason: the {@code EVENT_RECIPIENT} selector resolves to {@link #contextRecipientUserId()} (the
- * requester), while the rejecting employee is the {@link #actorSub()}. It additionally carries the
- * account id ({@link #contextAccountId()}) so the {@code ACCOUNT_RESPONSIBLE} selector can notify
- * the account's responsible holder (REQ-BANK-034). Carries only scalars so the after-commit
- * listener never touches the managed request.
+ * Domain event published when a bank employee rejects a booking request (REQ-BANK-026).
+ *
+ * <p>Directed at the requester via {@link #contextRecipientUserId()}; {@link #contextAccountId()}
+ * lets the {@code ACCOUNT_RESPONSIBLE} selector notify the account's responsible holder
+ * (REQ-BANK-034). Carries only scalars.
  *
  * @param requestId the rejected request's id (also the notification's loose entity id)
  * @param accountId the target bank account id ({@code ACCOUNT_RESPONSIBLE} selector input)
  * @param accountNo the target account's human-readable number, for rendering
  * @param amount the requested whole-aUEC amount, for rendering
  * @param reason the rejection reason, for rendering
- * @param requesterSub the requesting officer/lead's sub — the directed recipient
+ * @param requesterSub the requesting officer/lead's sub; the directed recipient
  * @param actorSub the rejecting employee's sub
  */
 public record BankBookingRequestRejectedEvent(

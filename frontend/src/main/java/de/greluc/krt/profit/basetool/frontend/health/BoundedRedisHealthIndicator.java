@@ -33,31 +33,13 @@ import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
 /**
- * Hard wall-clock bound around Spring Boot's reactive Redis health check ({@link
- * DataRedisReactiveHealthIndicator}): the {@code PING} either completes within {@link #TIMEOUT} or
- * the contributor reports {@code DOWN} — it can never hang the health endpoint.
+ * Bounds Spring Boot's reactive Redis health check ({@link DataRedisReactiveHealthIndicator}) by
+ * wall-clock time: if the {@code PING} does not complete within {@link #TIMEOUT}, the contributor
+ * reports {@code DOWN}.
  *
- * <p><b>Why the ADR-0114 property bound is not enough.</b> {@code spring.data.redis.timeout} (2s,
- * ADR-0114) reaches Lettuce as a command timeout, and Boot enables {@code TimeoutOptions} so it
- * covers reactive command dispatch too — but it can only bound a command that <em>reached the
- * dispatch layer</em>. During the 2026-07-22 incident the frontend's shared reactive Lettuce
- * channel wedged at the connection-acquisition/reconnect layer (monitor-synchronised, no timeout
- * applies there), and successive health {@code PING}s queued behind it for 161&ndash;836
- * <em>seconds</em> on a build that already carried the 2s property. Readiness — and with it the
- * Docker {@code HEALTHCHECK} (5s budget) — hung for ~15 minutes. This wrapper bounds the whole
- * check at the health layer, immune to which Lettuce-internal layer stalls.
- *
- * <p><b>Wiring.</b> The bean is deliberately named {@code redisHealthIndicator}: Boot's {@code
- * DataRedisReactiveHealthContributorAutoConfiguration} backs off on exactly that name, so this bean
- * transparently replaces the auto-configured indicator while keeping the contributor key {@code
- * redis} (bean name minus the {@code HealthIndicator} suffix) — the {@code readiness} health-group
- * include in {@code application.yml} continues to match. {@code
- * management.health.redis.enabled=false} disables it exactly like the auto-configured bean it
- * replaces.
- *
- * <p>A timed-out check reports {@code DOWN} truthfully: a Redis that cannot answer a {@code PING}
- * within {@link #TIMEOUT} cannot serve Spring Session either, so failing readiness is the correct
- * signal, and it now arrives deterministically instead of after the edge of a multi-minute queue.
+ * <p>The bound covers stalls that Lettuce's command timeout cannot, such as a wedged connection
+ * acquisition. Named {@code redisHealthIndicator}, it replaces the auto-configured indicator under
+ * the same {@code redis} key.
  */
 @Component("redisHealthIndicator")
 @ConditionalOnEnabledHealthIndicator("redis")
@@ -79,13 +61,10 @@ public class BoundedRedisHealthIndicator implements ReactiveHealthIndicator {
   private final @NotNull Duration timeout;
 
   /**
-   * Production constructor used by Spring; wraps the real {@link DataRedisReactiveHealthIndicator}
-   * with the {@link #TIMEOUT} bound. {@link Autowired} is required because the class declares a
-   * second (package-private, test-only) constructor; without it Spring 4+'s constructor-selection
-   * logic falls back to a non-existent default constructor and fails at startup.
+   * Creates the indicator around a {@link DataRedisReactiveHealthIndicator} on the given connection
+   * factory.
    *
    * @param connectionFactory the reactive Redis connection factory the delegate {@code PING}s over
-   *     (the shared auto-configured {@code LettuceConnectionFactory})
    */
   @Autowired
   public BoundedRedisHealthIndicator(@NotNull ReactiveRedisConnectionFactory connectionFactory) {

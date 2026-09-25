@@ -23,26 +23,13 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * The result of a bank-staff direct withdrawal / transfer (REQ-BANK-047, ADR-0109). Exactly one of
- * the two fields is set:
+ * Result of a bank-staff direct withdrawal / transfer (REQ-BANK-047, ADR-0109); exactly one field
+ * is set. {@code transaction} means the booking went onto the ledger ({@code 201}); {@code
+ * pendingRequest} means the amount exceeded the KRT ceiling {@code T1} and a pending request was
+ * filed for the amount-band approver instead ({@code 202}).
  *
- * <ul>
- *   <li>{@code transaction} — the booking went straight onto the ledger (the normal case, and the
- *       only outcome for a non-KRT account or a within-ceiling KRT amount); the endpoint answers
- *       {@code 201 Created}.
- *   <li>{@code pendingRequest} — the amount exceeded the KRT bank-employee ceiling {@code T1}, so
- *       nothing was booked; instead a {@code PENDING} booking request was filed, routed to the
- *       amount-band approver (Bankleitung for {@code T1..T2}, Organisationsleitung above {@code
- *       T2}) who must approve it before a bank employee confirms it onto the ledger; the endpoint
- *       answers {@code 202 Accepted}.
- * </ul>
- *
- * <p>The frontend branches on which field is present: a set {@code pendingRequest} renders the
- * "request filed, needs approval — tell the Bankleitung" notice instead of the booked-success flow.
- *
- * @param transaction the booked ledger transaction when the booking went through, else {@code null}
- * @param pendingRequest the filed pending booking request when the amount needed approval, else
- *     {@code null}
+ * @param transaction the booked ledger transaction, else {@code null}
+ * @param pendingRequest the filed pending booking request, else {@code null}
  */
 public record BankBookingOutcomeDto(
     @Nullable BankTransactionDto transaction, @Nullable BankBookingRequestDto pendingRequest) {

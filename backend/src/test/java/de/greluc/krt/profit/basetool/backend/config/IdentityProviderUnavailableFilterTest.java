@@ -49,11 +49,9 @@ import org.springframework.web.client.HttpServerErrorException;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Unit tests for {@link IdentityProviderUnavailableFilter} (REQ-SEC-024). The critical regression
- * guarantees: a transport / upstream-5xx failure talking to Keycloak's JWKS endpoint becomes a
- * retryable {@code 503} problem+json (with {@code Retry-After} and the error counter), while an
- * {@link AuthenticationServiceException} <em>without</em> a transport cause — and any other
- * exception — propagates unchanged, so genuine 401/403/500 semantics are never swallowed.
+ * Unit tests for {@link IdentityProviderUnavailableFilter} (REQ-SEC-024): a transport or upstream
+ * 5xx failure reaching Keycloak's JWKS becomes a retryable {@code 503} problem with {@code
+ * Retry-After}, while any other exception propagates unchanged.
  */
 class IdentityProviderUnavailableFilterTest {
 

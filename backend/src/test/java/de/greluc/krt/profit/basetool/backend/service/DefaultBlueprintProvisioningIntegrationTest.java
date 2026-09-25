@@ -34,11 +34,9 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Integration coverage for the Postgres-specific default-blueprint grant queries against the real
- * test container (REQ-INV-016): the V157 schema validates against {@link DefaultBlueprint}, and the
- * native {@code INSERT … SELECT … ON CONFLICT} bulk grants behave as written — they materialise a
- * row per (user, default), are idempotent, and the all-users grant skips soft-deleted users. Random
- * ids / keys isolate each test from the shared container.
+ * Integration tests for the default-blueprint grant queries against the Postgres test container
+ * (REQ-INV-016): the schema validates against {@link DefaultBlueprint}, and the native bulk grants
+ * create one row per (user, default), are idempotent and skip soft-deleted users.
  */
 @SpringBootTest
 @ActiveProfiles("test")

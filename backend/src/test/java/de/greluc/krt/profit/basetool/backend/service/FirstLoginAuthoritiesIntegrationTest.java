@@ -37,39 +37,11 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 /**
- * The <b>first</b> authenticated request of a brand-new account carries the authorities its token
- * claims — against a real database, a real role catalogue and a real transaction.
+ * Integration tests asserting that the first authenticated request of a new account carries the
+ * authorities its token claims, against a real database, role catalogue and transaction.
  *
- * <p><b>Why this exists.</b> Nothing covered this path, and it is the one every session starts on:
- * {@code CustomJwtGrantedAuthoritiesConverter} calls {@code syncUser(jwt)}, which creates the row
- * and maps the token's realm-role names onto the local catalogue, and then hands the result
- * straight to {@code assembleFor}. Every unit test around it mocks {@code RoleRepository}, so every
- * {@code Role} is a plain object with no persistence context — which makes the two failure modes
- * that actually happened invisible:
- *
- * <ul>
- *   <li><b>2026-09-06, the 500.</b> An N+1 fix cached the role catalogue in a field across
- *       transactions, handing out detached entities.
- *   <li><b>The 403 that followed.</b> Same defect one layer down and far better hidden: the roles
- *       were managed again, but {@code Role.permissions} is a {@code LAZY @ElementCollection} and
- *       {@code assembleFor} reads it <em>after</em> {@code syncUser}'s transaction has committed —
- *       a {@code LazyInitializationException} on the authentication path, so every login answered
- *       {@code 500}. It surfaced as a {@code 403} because the E2E seeder records its consent right
- *       after the password grant and <em>swallows</em> that call's failure by design; three calls
- *       later the terms gate refused with {@code TERMS_NOT_ACCEPTED}, which is what the run
- *       reported. Two CI cycles to get from that symptom back to this line.
- * </ul>
- *
- * <p>Both are one assertion away from being caught in seconds instead: a fresh admin login either
- * comes back holding {@code ROLE_ADMIN} or it does not. The seeding step that fails first in E2E is
- * an {@code @PreAuthorize(hasRole('ADMIN'))} endpoint called with a freshly minted admin token, so
- * this test stands exactly where that request stands.
- *
- * <p><b>Deliberately NOT {@code @Transactional}.</b> A test transaction keeps one Hibernate session
- * open for the whole method, which is precisely the condition a real request does not have: {@code
- * syncUser} commits and returns, and {@code assembleFor} then touches {@code Role.permissions}
- * outside it. Annotating this class {@code @Transactional} made all four cases pass while every
- * login in the E2E stack answered {@code 500} - the test would have been a decoration.
+ * <p>Deliberately not {@code @Transactional}: {@code syncUser} must commit before {@code
+ * assembleFor} reads the lazily loaded {@code Role.permissions}, exactly as in a real request.
  */
 @SpringBootTest
 class FirstLoginAuthoritiesIntegrationTest {
@@ -83,13 +55,8 @@ class FirstLoginAuthoritiesIntegrationTest {
   private final List<UUID> createdSubjects = new java.util.ArrayList<>();
 
   /**
-   * Removes the rows these cases wrote.
-   *
-   * <p>Necessary because the class is deliberately not {@code @Transactional} (see above): without
-   * a test transaction nothing rolls back, and the container is shared with data tests that count
-   * users — {@code TermsAcceptanceQueryDataTest} paginates the whole login-capable population and
-   * fails on four extra rows it never seeded. A faithful transaction boundary is worth this
-   * bookkeeping; hiding the bug behind {@code @Transactional} to avoid it is not.
+   * Removes the rows these cases wrote, since the class runs without a rolling-back test
+   * transaction and shares its container with tests that count users.
    */
   @AfterEach
   void removeWhatTheseCasesCreated() {

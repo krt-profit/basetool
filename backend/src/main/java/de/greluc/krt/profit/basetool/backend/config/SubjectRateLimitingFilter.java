@@ -54,43 +54,13 @@ import org.springframework.web.util.pattern.PathPatternParser;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Bounds how hard one authenticated account can drive the API (REQ-SEC-033).
+ * Bounds how hard one authenticated account can drive the API, keyed on the JWT {@code sub}
+ * (REQ-SEC-033).
  *
- * <p><b>Why the per-IP limiter is not enough.</b> {@code RateLimitingFilter} keys on a client
- * address. Even with the trusted-proxy walk of REQ-SEC-011 making that address honest, it is the
- * wrong unit for two opposite reasons: behind CGNAT many unrelated members share one IPv4, so a
- * tight per-IP budget throttles innocents, and a caller with a pool of addresses is not bounded by
- * it at all. The JWT {@code sub} is bound to a Keycloak identity and cannot be chosen by the
- * client, so it is the only key that bounds an account rather than a network position. The ingest
- * gateway reached the same conclusion for the same reason ({@code SubjectRateLimiter},
- * REQ-INGEST-005); this is that control applied to the backend's own surface.
- *
- * <p><b>What it covers.</b> Every {@code /api/**} write — {@code POST}, {@code PUT}, {@code PATCH},
- * {@code DELETE} — plus the notification SSE connect, and the exports on a bucket of their own
- * (below). Other reads are deliberately left to the per-IP budget: they are cheap, cacheable and
- * the surface a legitimate client hits most. Writes are what cost database work and produce audit
- * rows, and an SSE connect holds a server-side resource open, so a reconnect loop is worth bounding
- * by identity rather than by address.
- *
- * <p>The two budgets share one bucket on purpose. A reconnect storm that also blocks the account's
- * writes is the intended outcome: both come from the same misbehaving client, and splitting them
- * would let one starve the server while the other stayed within its own budget.
- *
- * <p><b>The export carve-out</b> (APPSEC-10, owner decision 2026-09-22). The export, statement,
- * report and PDF endpoints are reads, but each one renders a whole document — a period's postings,
- * a member's complete Art. 15 export, an audit trail. They get a second, much tighter per-subject
- * bucket of their own ({@code app.rate-limit.subject.export}, 10 per minute by default). It is
- * recognised by path segment ({@link #EXPORT_SEGMENTS}) rather than by a list of endpoints, so an
- * export added later is covered without anyone remembering this filter. It is deliberately separate
- * from the write bucket: a member downloading a handful of statements must not lose their ordinary
- * writes for it. An export that is also a write (the handover-report preview is a {@code POST})
- * spends from both.
- *
- * <p>Anonymous requests pass straight through — they carry no subject to key on. That is no longer
- * a hole worth naming a ceiling for: since ADR-0159 the only paths an anonymous caller reaches are
- * {@code GET /api/v1/terms/document} and {@code GET /api/v1/app/version-policy}, neither of which
- * is paginated, and the per-IP limiter ahead of the chain bounds them. The anonymous page-size
- * ceiling this paragraph used to cite (REQ-SEC-032) went with the surface it bounded.
+ * <p>Every {@code /api/**} write and the notification and live-sync stream connects share one
+ * per-subject bucket; export, statement, report and PDF endpoints ({@link #EXPORT_SEGMENTS}) spend
+ * from a separate, tighter bucket, and an export that is also a write spends from both. Other reads
+ * and anonymous requests pass through to the per-IP limiter.
  */
 @Slf4j
 public class SubjectRateLimitingFilter extends OncePerRequestFilter {
@@ -112,20 +82,14 @@ public class SubjectRateLimitingFilter extends OncePerRequestFilter {
       PathPatternParser.defaultInstance.parse("/api/v1/notifications/stream");
 
   /**
-   * The app's live-sync stream (ADR-0143), counted for the same reason {@link #SSE_CONNECT} is: it
-   * is a GET, so the write-only default would skip it, and opening a stream costs an authorization
-   * read per named topic — cheap once per screen, worth bounding when a client loops.
+   * The app's live-sync stream (ADR-0143), counted like {@link #SSE_CONNECT} although it is a GET.
    */
   private static final PathPattern LIVE_SYNC_CONNECT =
       PathPatternParser.defaultInstance.parse("/api/v1/live-sync/stream");
 
   /**
-   * Path segments that mark an expensive document-rendering endpoint (APPSEC-10): any {@code
-   * /api/**} path carrying one of them, compared on the decoded value, spends from the export
-   * budget. Today that is the Art. 15 exports ({@code /users/me/export}, {@code /export/pdf}, the
-   * admin twin), the audit and bank-audit exports ({@code /export}, {@code /export.json}), both
-   * bank statements, the three-month bank report and the job-order handover reports including the
-   * preview.
+   * Path segments that mark an expensive document-rendering endpoint: any {@code /api/**} path
+   * carrying one of them, compared decoded, spends from the export budget.
    */
   static final Set<String> EXPORT_SEGMENTS =
       Set.of("export", "export.json", "statement", "report", "pdf", "three-month-report");
@@ -221,9 +185,8 @@ public class SubjectRateLimitingFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Whether a path names an expensive document-rendering endpoint — one of its segments, decoded
-   * and stripped of matrix parameters, is in {@link #EXPORT_SEGMENTS}. Package-private so the
-   * endpoint sweep in {@code SecurityFilterChainOrderTest} can hold every mapped export to it.
+   * Answers whether a path names a document-rendering endpoint: one of its segments, decoded and
+   * stripped of matrix parameters, is in {@link #EXPORT_SEGMENTS}.
    *
    * @param path the request path.
    * @return {@code true} when any segment marks an export.

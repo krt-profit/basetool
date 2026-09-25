@@ -44,11 +44,8 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 /**
- * Directly exercises the pure static math extracted into {@link OperationPayoutCalculator}: the
- * operation total sum, the per-owner out-of-pocket reimbursement map and the per-participant
- * attendance breakdown. These branches are also covered end-to-end through {@code
- * OperationPayoutServiceTest}, but pinning them at the calculator boundary keeps the arithmetic
- * regression-guarded without the payout service's repository / audit collaborators.
+ * Tests the static math of {@link OperationPayoutCalculator}: operation total, per-owner
+ * reimbursement and per-participant attendance.
  */
 class OperationPayoutCalculatorTest {
 

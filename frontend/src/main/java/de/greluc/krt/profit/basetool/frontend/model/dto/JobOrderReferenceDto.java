@@ -23,20 +23,12 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Frontend mirror of the backend {@code JobOrderReferenceDto}. {@code requiredMaterialIds} carries
- * the order's distinct required material ids across both order kinds (ITEM-derived included) so the
- * Lager "Auftrag" dropdown and the refinery-order store "Auftrag" dropdown can hide an order that
- * does not require a row's material (REQ-ORDERS-018); {@code materials} stays the MATERIAL-order
- * lines (empty for ITEM orders). {@code requestingOrgUnit} labels the refinery store picker option
- * with the order's customer org unit (may be {@code null} on pre-rework rows). {@code
- * requiredGameItemIds} is the game-item sibling of {@code requiredMaterialIds} (REQ-INV-031): the
- * distinct game items an ITEM order's lines request, empty for MATERIAL orders — the item-view
- * order picker's gate. {@code materialNeeds} carries what the order still needs per {@code
- * (material, quality)} bucket so the allocation pickers can label an option with it (REQ-INV-039);
- * it is <b>empty unless the page asked the lookup for it</b> ({@code withNeeds=true}). {@code
- * gameItemNeeds} is its item-mode sibling under the same opt-in — a separate projection, because an
- * item line's remaining count is {@code ordered − delivered − earmarked} rather than a material
- * bucket. Always empty for a MATERIAL order.
+ * Frontend mirror of the backend {@code JobOrderReferenceDto}, backing the order pickers.
+ *
+ * <p>{@code requiredMaterialIds} and {@code requiredGameItemIds} let pickers hide orders that do
+ * not need a row's material or game item (REQ-ORDERS-018, REQ-INV-031). {@code materialNeeds} and
+ * {@code gameItemNeeds} label options with the outstanding need (REQ-INV-039) and are empty unless
+ * requested with {@code withNeeds=true}. {@code requestingOrgUnit} may be {@code null}.
  */
 public record JobOrderReferenceDto(
     UUID id,

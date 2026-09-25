@@ -54,20 +54,13 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClientException;
 
 /**
- * Hard-deletes an {@code app_user} row together with every foreign-key reference that points at it,
- * in the exact order the database constraints demand. Split out of {@link UserService} (audit
- * Thema&nbsp;7, #1252) so the load-bearing FK-cascade ordering — a genuine landmine — lives on its
- * own seam with its own focused collaborators instead of diluting the identity/query/self-service
- * surface of {@code UserService}.
+ * Hard-deletes an {@code app_user} row with every foreign-key reference to it, in the order the
+ * database constraints demand.
  *
- * <p>The single write, {@link #deleteUser(UUID)}, only ever runs for an ex-member already removed
- * from Keycloak -- or, through {@link #deleteUser(UUID, KeycloakPresenceCheck)}, for one whose
- * Keycloak user the calling orchestrator removes itself (#1827); it purges the account-owned data,
- * reassigns the shared aggregates that must outlive the member to a fallback admin, unlinks the
- * nullable back-references, clears the Discord-approval audit trail, and snapshots the bank
- * responsible-holder change around the delete. The identity seam it needs (who is the calling
- * admin) is borrowed from {@link UserService#getCurrentUser()} rather than reimplemented, keeping
- * the JWT-subject resolution in its single canonical place.
+ * <p>Runs only for an ex-member already removed from Keycloak: purges the account-owned data,
+ * reassigns shared aggregates to a fallback admin, unlinks nullable back-references and audits bank
+ * responsible-holder changes. The calling admin is resolved through {@link
+ * UserService#getCurrentUser()}.
  */
 @Service
 @RequiredArgsConstructor
@@ -91,15 +84,8 @@ public class UserDeletionService {
    * Whether {@link #deleteUser(UUID, KeycloakPresenceCheck)} must verify against Keycloak that the
    * account is really gone before purging it.
    *
-   * <p>Two callers, two truths. An administrator deleting a departed member has only the cached
-   * {@code in_keycloak} flag to go on, and a swallowed sync error can leave that stale — so the
-   * probe is the thing standing between a stale flag and an irreversible purge. A consolidation
-   * orchestrator, by contrast, removes the Keycloak user itself and does so <em>after</em> the
-   * database half for retry safety, so for it the probe reports a presence the caller is in the
-   * middle of ending.
-   *
-   * <p>Spelled as an enum rather than a boolean so neither can be passed by accident: the waiving
-   * constant states in its own name what the caller is promising to do.
+   * <p>An admin deletion relies on a cached flag that may be stale, so it is probed; an
+   * orchestrator that deletes the Keycloak user itself afterwards waives the probe.
    */
   public enum KeycloakPresenceCheck {
 
@@ -130,11 +116,9 @@ public class UserDeletionService {
   private final AuditService auditService;
 
   /**
-   * The five stores keyed by a plain {@code app_user.id} column rather than by a {@code @ManyToOne
-   * User} association. Since V235 each column carries a foreign key with {@code ON DELETE CASCADE}
-   * (REQ-DATA-008, ADR-0142), so the database removes them with the account; {@link
-   * #deleteUser(UUID)} still deletes them explicitly, because that is where the audit event's row
-   * counts come from -- a cascade reports none.
+   * The five stores keyed by a plain {@code app_user.id} column. Their foreign keys cascade on
+   * delete (REQ-DATA-008), but {@link #deleteUser(UUID)} deletes them explicitly to count the rows
+   * for the audit event.
    */
   private final PersonalInventoryItemRepository personalInventoryItemRepository;
 
@@ -151,11 +135,8 @@ public class UserDeletionService {
   private final KeycloakService keycloakService;
 
   /**
-   * The OwnerScope-free responsible-holder audit seam, injected as an {@link ObjectProvider} and
-   * resolved lazily. Used only by {@link #deleteUser(UUID)} to audit a change of a bank account's
-   * derived responsible holder when the deleted user was a leader whose membership the DB cascade
-   * removes (REQ-BANK-034, ADR-0070). All bank access stays inside {@link
-   * OrgUnitBankResponsibilityService}.
+   * Lazily resolved audit seam for bank responsible-holder changes, used by {@link
+   * #deleteUser(UUID)} when the deleted user led an org unit (REQ-BANK-034).
    */
   private final ObjectProvider<OrgUnitBankResponsibilityService>
       orgUnitBankResponsibilityServiceProvider;
@@ -169,51 +150,33 @@ public class UserDeletionService {
   private final UserService userService;
 
   /**
-   * Hard-deletes a user account and everything that belonged to it, keeping only the shared and
-   * historical records the organisation still needs. Used by admins to remove ex-members; only a
-   * user no longer present in Keycloak may be deleted. The cascade is explicit (per-table delete /
-   * reassign calls) so the order matches the FK constraints; auto-cascading would surface confusing
-   * FK errors when the table order changes.
+   * Hard-deletes a user no longer present in Keycloak, keeping only the shared and historical
+   * records the organisation still needs.
    *
-   * <p>The split is deliberate and is the contract of this method:
+   * <p>The account's rows are handled as follows:
    *
    * <ul>
-   *   <li><b>Purged</b> — the departing member's warehouse rows (with the job-order and mission
-   *       allocations the database cascades off them), their hangar, and the five FK-less personal
-   *       stores: "Mein Inventar", personal blueprints, notifications, notification-rule selectors
-   *       and promotion evaluations. Nothing else in the system can remove those five, so leaving
-   *       them behind orphans them permanently and lets a returning Keycloak subject re-adopt them.
-   *   <li><b>Reassigned to the fallback admin</b> — refinery orders, missions and the 1:1 {@code
-   *       mission_ownership} companion. These are not account data: they carry operation finances
-   *       and mission history that must stay readable after the member leaves. The companion
-   *       reassignment must stay paired with {@code missionRepository.updateOwner}: the parent
-   *       mission survives the delete, so the {@code ON DELETE CASCADE} on {@code mission_id} never
-   *       fires to clear the row, and the FK-less {@code owner_id} would dangle and FK-fail
-   *       (SQLSTATE 23503).
-   *   <li><b>Unlinked</b> — mission managers, job-order assignees, mission participants (the row
-   *       survives and renders as the deleted-user placeholder) and the audit-only {@code
-   *       material_claim.claimed_by_user_id} stamp.
-   *   <li><b>Left to the database</b> — every reference whose FK declares {@code ON DELETE SET
-   *       NULL} / {@code CASCADE} (bank tables, org-unit membership, org-chart, …).
+   *   <li><b>Purged</b>: warehouse rows, hangar, "Mein Inventar", personal blueprints,
+   *       notifications, notification-rule selectors and promotion evaluations.
+   *   <li><b>Reassigned to the fallback admin</b>: refinery orders, missions and their {@code
+   *       mission_ownership} companion.
+   *   <li><b>Unlinked</b>: mission managers, job-order assignees, mission participants and {@code
+   *       material_claim.claimed_by_user_id}.
+   *   <li><b>Left to the database</b>: every reference whose FK declares {@code ON DELETE SET NULL}
+   *       or {@code CASCADE}.
    * </ul>
    *
-   * <p>Every purge is a set-based statement. Loading any of those rows as managed entities first
-   * would leave them referencing the {@code User} removed at the end and abort the flush with
-   * {@code TransientPropertyValueException} — the failure class that took the production delete
-   * down via the responsible-holder snapshot. Nor may any of them use {@code clearAutomatically},
-   * which would detach the {@code User} about to be deleted.
+   * <p>Every purge is a set-based statement without {@code clearAutomatically}; loading those rows
+   * as managed entities would abort the flush.
    *
    * @param userId user to delete
    * @throws NoSuchElementException when the user id is unknown
-   * @throws BadRequestException when the user is still present in Keycloak — checked both against
-   *     the stored {@code in_keycloak} flag and, because that flag is only a cached mirror a
-   *     swallowed sync error can leave stale, against Keycloak itself. The second check exempts the
-   *     service account of a configured ingest gateway, for which the two views disagree by
-   *     construction (see {@link #isConfiguredGatewayServiceAccount})
-   * @throws IllegalStateException when no other admin exists to receive the reassigned owner
-   *     references — a deployment defect, answered as a 500
+   * @throws BadRequestException when the user is still present in Keycloak, by the stored flag or a
+   *     live check; the service account of a configured ingest gateway is exempt from the live
+   *     check
+   * @throws IllegalStateException when no other admin exists to receive the reassigned references
    * @throws org.springframework.web.client.RestClientException when Keycloak cannot be reached for
-   *     that check; the deletion is refused rather than performed on an unverified assumption
+   *     the live check; the deletion is refused
    */
   @Transactional
   public void deleteUser(UUID userId) {
@@ -222,23 +185,7 @@ public class UserDeletionService {
 
   /**
    * Deletes {@code userId} as {@link #deleteUser(UUID)} does, but lets a caller that removes the
-   * Keycloak user itself waive the presence probe.
-   *
-   * <p>The probe exists for the <em>admin-initiated</em> deletion of an account believed to be
-   * gone, where the only evidence is a cached flag a swallowed sync error can leave stale. A
-   * consolidation orchestrator is a different caller: it has just read that Keycloak user, moved
-   * its identity away, and will delete it moments later — and it deletes the Keycloak user
-   * <em>last</em> on purpose, so a rolled-back database half leaves it intact for a clean retry
-   * (REQ-SEC-026, ADR-0111). Under {@link KeycloakPresenceCheck#ENFORCED} those two designs are in
-   * direct contradiction and the second always loses: the probe finds the throwaway user present
-   * and refuses, which is how the queue's link action came to fail every time from #1460 onward
-   * (#1827).
-   *
-   * <p>Teaching the guard about that caller is deliberately preferred over reordering the
-   * orchestrator. Reordering would work — {@code readDiscordLink} maps a 404 to empty and the local
-   * {@code discord_user_id} fallback exists precisely for the already-deleted case — but it would
-   * contradict an acceptance bullet of REQ-SEC-026 and trade away documented retry semantics to
-   * route around a guard rather than to inform it.
+   * Keycloak user itself afterwards waive the presence probe (REQ-SEC-026).
    *
    * @param userId user to delete
    * @param presenceCheck whether the Keycloak presence probe applies; {@link
@@ -383,28 +330,12 @@ public class UserDeletionService {
   }
 
   /**
-   * Whether this row belongs to the service account of a configured ingest gateway.
+   * Whether this row belongs to the service account of a configured ingest gateway, the single
+   * exemption from the live Keycloak presence check.
    *
-   * <p>The single exemption from the stale-flag re-check above, and it exists because the two
-   * checks genuinely disagree for exactly this kind of row. An unfiltered {@code GET /users} omits
-   * service accounts, so the roster sync never sees one and {@code markMissingUsers} sets {@code
-   * in_keycloak = false}; {@link KeycloakService#userExists} asks by id and finds it. The member
-   * list therefore shows such a row as "not in Keycloak" while the delete refuses it as still
-   * present — which is precisely the state production is in, because the gateway's first call ran
-   * the registration flow on itself before the machine-identity carve-out existed (ADR-0129).
-   *
-   * <p>The re-check is there to stop an admin hard-deleting a real member on a stale flag, which
-   * would destroy their Lager, hangar and personal data. A machine has none of that: the row holds
-   * nothing, grants nothing (the authority converter short-circuits on {@code azp} before ever
-   * reading it), and should never have existed. So the protection is not weakened here, it is
-   * simply not applicable.
-   *
-   * <p><strong>Keyed on the client's own service-account link, not on the username.</strong> {@code
-   * service-account-<clientId>} is a display convention, not a reserved namespace — an ordinary
-   * user can be created with that exact name — so matching the prefix would let a hand-made account
-   * inherit this exemption. Asking Keycloak which user backs a configured gateway client cannot be
-   * spoofed that way, and it reuses the same allowlist that already decides which clients may act
-   * for a member, so the two cannot drift apart.
+   * <p>Such a row is marked missing by the roster sync yet found by id, and holds no member data.
+   * Keyed on the client's service-account link as reported by Keycloak, not on the spoofable {@code
+   * service-account-} username prefix.
    *
    * @param userId the row being deleted
    * @return {@code true} when Keycloak reports this user as the service account of a configured

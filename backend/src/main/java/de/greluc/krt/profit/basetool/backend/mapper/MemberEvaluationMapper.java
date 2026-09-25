@@ -29,12 +29,12 @@ import org.mapstruct.Mapping;
 public interface MemberEvaluationMapper {
 
   /**
-   * Converts a {@link MemberEvaluation} into its {@link MemberEvaluationResponse} DTO, flattening
-   * the linked {@link de.greluc.krt.profit.basetool.backend.model.PromotionCategory} and its parent
-   * topic into id/name pairs so the client can group evaluations without a follow-up call.
+   * Converts a {@link MemberEvaluation} into its {@link MemberEvaluationResponse}, flattening the
+   * linked {@link de.greluc.krt.profit.basetool.backend.model.PromotionCategory} and its topic into
+   * id/name pairs.
    *
-   * @param entity the managed evaluation to convert
-   * @return the response DTO mirroring the entity's fields
+   * @param entity the evaluation to convert
+   * @return the response DTO
    */
   @Mapping(target = "categoryId", source = "category.id")
   @Mapping(target = "categoryName", source = "category.name")

@@ -38,20 +38,9 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The guard that makes "the Personensuche covers every free-text column" enforceable rather than
- * aspirational (REQ-SEC-060).
- *
- * <p>It sweeps {@code information_schema} for every text column in the schema and requires each one
- * to be <b>either</b> searched by {@link PersonSearchTargets#TARGETS} <b>or</b> recorded in {@link
- * PersonSearchTargets#EXEMPT_COLUMNS} / {@link PersonSearchTargets#EXEMPT_TABLES}. So a new
- * free-text column cannot be added silently: whoever adds it has to decide which it is, and say so.
- *
- * <p>That is the whole point. The privacy record tells an admin to run this search for
- * <em>every</em> Art. 16 or Art. 17 request; a column nobody remembered to add would make that
- * instruction quietly false, and the person whose data it is would have no way to know.
- *
- * <p>It also verifies the other half — that every registered target actually exists — so a renamed
- * or dropped column fails here instead of at the first search an admin runs during a real request.
+ * Requires every text column in the schema to be either searched by {@link
+ * PersonSearchTargets#TARGETS} or listed in {@link PersonSearchTargets#EXEMPT_COLUMNS} / {@link
+ * PersonSearchTargets#EXEMPT_TABLES}, and every registered target to exist (REQ-SEC-060).
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -68,11 +57,8 @@ class PersonSearchCoverageTest {
   @PersistenceContext private EntityManager entityManager;
 
   /**
-   * Every text column in the application schema, as {@code table.column}.
-   *
-   * <p>Restricted to {@code BASE TABLE}s. Views are excluded because {@code pg_stat_statements}
-   * (V240) exposes a {@code query} column holding raw SQL: a diagnostic view, not application data,
-   * and nothing writes a name into it.
+   * Every text column of the application's base tables, as {@code table.column}; views are
+   * excluded.
    *
    * @return the columns, excluding structural ones
    */

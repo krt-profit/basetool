@@ -38,16 +38,11 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
- * Static lint of the frontend message bundles. A user-visible string added to one locale but not
- * the other otherwise surfaces only as a raw {@code operation.some.key} at render time; a literal
- * umlaut in the German bundle breaks the project's {@code \\uXXXX} encoding rule; a key declared
- * twice silently shadows its earlier value (how the 2026-05-11 backfill duplicates went unnoticed);
- * a key missing from the no-locale default bundle falls back to its raw key for any locale that is
- * neither {@code de} nor {@code en}; and a default value that drifts from its German counterpart
- * renders stale text for such a locale. All of these are pinned here so they fail the build instead
- * of production. Reads the source files under {@code src/main/resources} directly (the Gradle
- * {@code Test} task runs with the module directory as its working directory) so the assertions see
- * the exact committed bytes, not the processed classpath copy.
+ * Static checks of the frontend message bundles: the locales declare the same keys, the German
+ * bundle has no literal umlauts, no key is declared twice, the default bundle declares every key
+ * and mirrors the German values, and every static template key is declared.
+ *
+ * <p>Reads the source files under {@code src/main/resources} directly.
  */
 class MessageBundleConsistencyTest {
 
@@ -108,10 +103,8 @@ class MessageBundleConsistencyTest {
   }
 
   /**
-   * Asserts that no bundle declares the same key twice. {@link Properties#load(Reader)} silently
-   * keeps the last value of a repeated key, which is how the 2026-05-11 backfill left dozens of
-   * duplicate declarations per bundle undetected; this reads the raw lines so a re-introduced
-   * duplicate fails the build.
+   * Asserts that no bundle declares a key twice, reading the raw lines because {@link
+   * Properties#load(Reader)} silently keeps the last value.
    *
    * @throws IOException if a bundle cannot be read from disk
    */
@@ -153,10 +146,7 @@ class MessageBundleConsistencyTest {
   }
 
   /**
-   * Asserts that the no-locale default bundle resolves every key to the same value as the German
-   * bundle. The default bundle is the German fallback, so it must mirror {@code messages_de}; a
-   * drift means a locale that is neither {@code de} nor {@code en} renders stale or wrong-language
-   * text.
+   * Asserts that the default bundle resolves every key to the same value as the German bundle.
    *
    * @throws IOException if a bundle cannot be read from disk
    */
@@ -180,20 +170,8 @@ class MessageBundleConsistencyTest {
   private static final Pattern COMMENT = Pattern.compile("<!--.*?-->", Pattern.DOTALL);
 
   /**
-   * Every {@code #{...}} a template asks for is declared by the bundles.
-   *
-   * <p>The cases above compare the bundles only with each other, so all of them are satisfied by
-   * deleting a key from all three at once — which is exactly how {@code orders.create.link} went.
-   * Its anonymous use went with the public order form (ADR-0149) and the key with it; the
-   * authenticated one in the sidebar survived, and every signed-in member for whom neither {@code
-   * canViewJobOrders} nor {@code canViewOwnJobOrders} holds (the non-profit-unit case {@code
-   * CapabilityFlagsAdvice} preserves deliberately) then read {@code ??orders.create.link_de??} as a
-   * nav label on every page of the tool. Nothing failed: Thymeleaf renders the marker and carries
-   * on.
-   *
-   * <p>Only static keys are checked. A {@code #{'prefix.' + ${x}}} cannot be resolved without
-   * running the page, so the scan skips anything that is not a bare dotted literal rather than
-   * guessing at it.
+   * Every static {@code #{...}} key a template uses is declared by the bundles; dynamic keys are
+   * skipped.
    *
    * @throws IOException when a template or bundle cannot be read
    */
@@ -224,12 +202,10 @@ class MessageBundleConsistencyTest {
   }
 
   /**
-   * Returns the declared property keys of a bundle in stable sorted order, parsed via {@link
-   * #load(Path)} (which handles comments, {@code =}/{@code :}/space separators, line continuations
-   * and escapes correctly).
+   * Returns the declared keys of a bundle, sorted, as parsed by {@link #load(Path)}.
    *
    * @param path the bundle to read
-   * @return the bundle's keys in stable sorted order
+   * @return the bundle's keys in sorted order
    * @throws IOException if the bundle cannot be read
    */
   private static Set<String> keysOf(Path path) throws IOException {
@@ -237,8 +213,7 @@ class MessageBundleConsistencyTest {
   }
 
   /**
-   * Loads a bundle via {@link Properties#load(Reader)}, exposing the resolved (unescaped) values so
-   * callers can compare them across bundles.
+   * Loads a bundle via {@link Properties#load(Reader)}, with resolved (unescaped) values.
    *
    * @param path the bundle to read
    * @return the parsed properties
@@ -253,8 +228,7 @@ class MessageBundleConsistencyTest {
   }
 
   /**
-   * Computes {@code left \\ right} (the keys in {@code left} absent from {@code right}) as a new
-   * sorted set, leaving the inputs untouched.
+   * Returns the keys of {@code left} that are absent from {@code right}, as a new sorted set.
    *
    * @param left the source key set
    * @param right the key set whose members are excluded
@@ -267,13 +241,11 @@ class MessageBundleConsistencyTest {
   }
 
   /**
-   * Collects keys declared more than once in a bundle. Unlike {@link Properties#load(Reader)} --
-   * which silently keeps the last value of a repeated key and so hides duplicates -- this walks the
-   * raw physical lines (honouring line continuations and {@code #}/{@code !} comment lines) and
-   * records every key whose declaration is seen a second time.
+   * Collects keys declared more than once in a bundle by walking its raw lines, honouring line
+   * continuations and comment lines.
    *
    * @param path the bundle to scan
-   * @return the duplicated keys in first-seen order (empty when every key is unique)
+   * @return the duplicated keys in first-seen order; empty when every key is unique
    * @throws IOException if the bundle cannot be read
    */
   private static List<String> duplicateKeys(Path path) throws IOException {
@@ -315,12 +287,11 @@ class MessageBundleConsistencyTest {
   }
 
   /**
-   * Extracts the key of a property declaration: everything up to the first unescaped {@code =},
-   * {@code :} or whitespace separator, matching {@code java.util.Properties} key parsing for the
-   * flat single-line declarations these bundles use.
+   * Extracts the key of a property declaration: everything before the first unescaped {@code =},
+   * {@code :} or whitespace.
    *
-   * @param stripped the property line with leading whitespace already removed
-   * @return the declared key (empty when the line carries no key)
+   * @param stripped the property line without leading whitespace
+   * @return the declared key; empty when the line carries none
    */
   private static String parseKey(String stripped) {
     StringBuilder key = new StringBuilder();

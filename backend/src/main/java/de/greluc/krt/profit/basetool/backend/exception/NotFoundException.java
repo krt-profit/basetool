@@ -20,28 +20,10 @@
 package de.greluc.krt.profit.basetool.backend.exception;
 
 /**
- * Indicates that a requested domain entity could not be found.
+ * Indicates that a requested domain entity does not exist; mapped to {@code 404 Not Found}.
  *
- * <p>Thrown by service-layer lookups (e.g. {@code findById}) when the identifier does not resolve
- * to an existing row. Handled centrally by {@link
- * de.greluc.krt.profit.basetool.backend.exception.GlobalExceptionHandler} and mapped to an HTTP
- * {@code 404 Not Found} RFC7807 problem response.
- *
- * <p>Rationale: previously the services threw a plain {@link RuntimeException}, which hit the
- * fallback {@code @ExceptionHandler(Exception.class)} in {@code GlobalExceptionHandler} and
- * produced HTTP 500 responses together with a full ERROR stacktrace in the logs (e.g. for
- * externally crawled / deleted mission IDs). 404 is the semantically correct status and keeps the
- * logs clean.
- *
- * <p>Unlike its six {@link AppException} siblings, {@code NotFoundException} is <b>not</b> routed
- * through {@code GlobalExceptionHandler}'s generic dispatch handler — it keeps its own dedicated
- * {@code @ExceptionHandler}, shared with three non-{@code AppException} JPA/JDK "not found" flavors
- * ({@code EntityNotFoundException}, {@code NoSuchElementException}, {@code
- * NoResourceFoundException}) that cannot be sealed under this hierarchy. Every accessor is still
- * inherited unchanged from {@link AppException} — it delegates to {@link
- * AppExceptionKind#NOT_FOUND}, the fixed identity passed to the superclass constructor — so that
- * dedicated handler reads its status/code/title/detail literals from that same constant (see {@code
- * GlobalExceptionHandler#handleNotFound}) instead of hardcoding a second copy of them.
+ * <p>Handled by its own {@code GlobalExceptionHandler} method rather than the generic {@link
+ * AppException} dispatch; its accessors delegate to {@link AppExceptionKind#NOT_FOUND}.
  */
 public final class NotFoundException extends AppException {
 

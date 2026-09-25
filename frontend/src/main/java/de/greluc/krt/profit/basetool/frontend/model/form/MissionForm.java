@@ -27,43 +27,22 @@ import java.util.UUID;
 /**
  * Form-binding object for mission input.
  *
- * <p>{@code version} is the legacy global mission counter and remains for the create-mission flow.
- * On updates of an existing mission, the section-scoped counters {@code coreVersion}, {@code
- * scheduleVersion} and {@code flagsVersion} drive optimistic locking — they enable concurrent users
- * to edit disjoint sections (core / schedule / flags) on the same mission without producing
- * spurious 409 conflicts.
+ * <p>{@code version} is the mission counter used on create; updates lock per section through {@code
+ * coreVersion}, {@code scheduleVersion} and {@code flagsVersion}, so disjoint sections can be
+ * edited concurrently.
  *
- * <p>{@code calendarLink} is rendered as an {@code &lt;a href&gt;} on the public landing page. The
- * {@code @Pattern} forces an {@code https://} prefix so a mission manager cannot persist a {@code
- * javascript:fetch(document.cookie)} stored-XSS payload — Thymeleaf's {@code th:href} only
- * HTML-escapes the value, not the scheme. The backend mirrors the same constraint on its DTO so
- * both layers reject the payload independently (audit finding H-1).
+ * <p>{@code calendarLink} must start with {@code https://}, since it is rendered as a link and
+ * {@code th:href} does not check the scheme.
  *
- * <p>{@code owningOrgUnitId} (R5.d.d) is the owner-picker output: when the caller belongs to more
- * than one OrgUnit, the picker offers each membership and the chosen id lands here. The backend
- * service resolves it via {@code OwnerScopeService.resolveOrgUnitForPickerOutputNullable}, which
- * accepts all four org-unit kinds (Staffel, Spezialkommando, Bereich, Organisationsleitung) and
- * rejects with 400 only a pick that is neither one of the mission owner's DIRECT memberships nor an
- * org unit the caller may edit ({@code AccessGateService.canEditOrgUnit}, cascade-aware — epic #692
- * Phase 4 / REQ-ORG-016). {@code null} leaves the stamp to the resolver's auto-stamp / pin /
- * ownerless branches.
+ * <p>{@code owningOrgUnitId} is the owner-picker output, resolved by the backend (REQ-ORG-016);
+ * {@code null} leaves the stamp to the resolver.
  *
  * <p>{@code objectivesJson} / {@code stepsJson} carry the create form's optional Ziele / Ablauf
- * rows as a compact JSON array, client-serialized into a hidden input on submit (blank when none).
- * They are used only on the create path — the edit page manages goals and steps through their own
- * AJAX section editors — and the write controller parses them into the backend create request's
- * nested {@code objectives} / {@code steps} lists. Binding them as form fields makes them survive a
- * validation-failure re-render / error re-flash exactly like the other inputs.
+ * rows as JSON arrays and are used only on create.
  *
- * <p>{@code dirtyCore} / {@code dirtySchedule} / {@code dirtyFlags} drive the dirty-section-aware
- * edit save (#1136, REQ-FE-014): the edit page's JavaScript sets each flag to whether the user
- * actually touched that header section, and {@code applyMissionUpdate} then skips the PATCH for any
- * untouched section. This stops a peer's concurrent schedule bump (the "Jetzt" actual-time stamp or
- * a PLANNED&nbsp;→&nbsp;ACTIVE auto-transition) from 409ing a name-only edit that never touched the
- * schedule, and it never re-writes untouched schedule/flags values. They default to {@code true} in
- * the rendered form so the no-JavaScript classic fallback still saves every section; a {@code null}
- * value (an older cached page, or the create path where the flags are unused) likewise means "save
- * this section".
+ * <p>{@code dirtyCore} / {@code dirtySchedule} / {@code dirtyFlags} mark which header sections the
+ * user touched, so the edit save skips untouched ones (REQ-FE-014); {@code null} means "save this
+ * section".
  */
 public record MissionForm(
     @NotBlank(message = "{validation.name.required}") @Size(max = 255) String name,

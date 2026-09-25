@@ -52,9 +52,8 @@ import org.springframework.web.bind.annotation.RestController;
  * REST surface for the squadron reference table. Mutations are OFFICER/ADMIN; activate is
  * ADMIN-only.
  *
- * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor, not the
- * ceiling — it is stated here so an endpoint added later inherits it rather than relying on a URL
- * matcher elsewhere being right, and a method-level gate still wins where one is present.
+ * <p>The class-level {@code isAuthenticated()} gate is the floor for every endpoint; a method-level
+ * gate still wins (REQ-SEC-052).
  */
 @RestController
 @RequestMapping("/api/v1/squadrons")
@@ -70,11 +69,8 @@ public class SquadronController {
   private final AuthHelperService authHelperService;
 
   /**
-   * Paged list with {@code includeInactive} for the admin view. The {@code includeInactive=true}
-   * flavour is admin-only — soft-deleted squadron descriptions can carry internal context, and any
-   * member could otherwise enumerate every archived squadron (audit finding M-6). The finding was
-   * written when {@code /api/v1/squadrons} was {@code permitAll} and the reader was an anonymous
-   * one; ADR-0159 deleted that matcher, which narrows the audience but does not remove the reason.
+   * Paged squadron list. {@code includeInactive=true} is ADMIN-only because soft-deleted squadron
+   * descriptions can carry internal context.
    *
    * @return paged squadron DTOs
    */

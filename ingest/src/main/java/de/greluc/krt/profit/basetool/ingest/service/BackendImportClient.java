@@ -38,25 +38,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
 /**
- * Relays an ingest call to the backend's existing import endpoints under the <em>gateway's own</em>
- * identity, naming the member it acts for in {@link #ON_BEHALF_OF_HEADER} (ADR-0129,
- * REQ-INGEST-001), plus the {@code Accept-Language} and {@code X-Correlation-Id} headers
- * (REQ-OBS-*). The backend does all matching and persists nothing (REQ-REFINERY-002); the gateway
- * only returns the draft JSON verbatim.
+ * Relays an ingest call to the backend import endpoints under the gateway's own identity, naming
+ * the member it acts for in {@link #ON_BEHALF_OF_HEADER} (ADR-0129), and returns the draft JSON
+ * verbatim.
  *
- * <p>It used to forward the caller's own token instead. That made sender-constrained tokens
- * impossible — a DPoP-bound token is rejected outright by a resource server on the second hop,
- * which is what broke every send from 2026-08-03 — and it is why the caller's token no longer
- * travels through this class at all.
- *
- * <p>Each call runs through a Resilience4j circuit breaker (instance {@code backend}) so a backend
- * outage trips open quickly instead of piling up blocked threads. The breaker is configured to
- * ignore HTTP response errors ({@code RestClientResponseException} — a 400 envelope reject is a
- * client problem, not a backend-health signal); only transport failures count toward opening it.
- * The call is a blocking {@link RestClient} exchange decorated with {@link
- * CircuitBreaker#executeSupplier} (ADR-0204), which acquires a permission, records the outcome and
- * throws {@code CallNotPermittedException} while open — what the reactive operator did around the
- * old {@code WebClient} chain.
+ * <p>Each call runs through the {@code backend} circuit breaker via {@link
+ * CircuitBreaker#executeSupplier} (ADR-0204); only transport failures, not HTTP error responses,
+ * count toward opening it.
  */
 @Slf4j
 @Service
@@ -66,24 +54,11 @@ public class BackendImportClient {
   private static final String BLUEPRINT_PREVIEW_PATH = "/api/v1/personal-blueprints/import/preview";
 
   /**
-   * Names the member the gateway is acting for on the backend hop (ADR-0129, REQ-INGEST-001).
+   * Header naming the member the gateway acts for on the backend hop (ADR-0129, REQ-INGEST-001).
    *
-   * <p>Since the gateway stopped relaying the caller's token, the backend can no longer read the
-   * subject out of the bearer — that bearer now identifies the <em>gateway</em>. The subject
-   * travels here instead, and the backend honours it only when the authenticated principal is the
-   * gateway's service account.
-   *
-   * <p>It carries a subject and nothing else — but that subject now selects the whole security
-   * identity of the call, not merely an owner field: the backend assembles the named member's own
-   * roles and org-unit scope and evaluates both person-gates against them (ADR-0129, amended
-   * 2026-08-04). What bounds it is therefore not the header's narrowness but the backend's four
-   * guards, chiefly that the named member must still be live. This paragraph used to claim the
-   * header "cannot grant a role, widen a scope or select an org unit"; that stopped being true when
-   * the gateway stopped relaying the caller's token.
-   *
-   * <p>The backend declares the same literal; the two are kept in step by a parity test, because a
-   * rename on one side alone degrades silently into "every ingest write is attributed to nobody"
-   * rather than failing loudly.
+   * <p>The backend honours it only from the gateway's service account and evaluates the call with
+   * the named member's roles and scope. The backend declares the same literal, kept in step by a
+   * parity test.
    */
   public static final String ON_BEHALF_OF_HEADER = "X-Ingest-On-Behalf-Of";
 
@@ -95,11 +70,8 @@ public class BackendImportClient {
   private static final int MAX_ACCEPT_LANGUAGE_LENGTH = 100;
 
   /**
-   * The character set an RFC 5646 language-range header can legitimately contain: tags, the {@code
-   * *} wildcard, {@code q}-weights and their separators. Deliberately a whitelist — the point is to
-   * exclude CR/LF and everything else that has no business in a header value, not to parse the
-   * grammar. Every quantifier applies to a single disjoint character class, so the expression is
-   * linear and cannot be driven into catastrophic backtracking by the very input it guards.
+   * Whitelist of characters allowed in a relayed {@code Accept-Language} header; excludes CR/LF and
+   * cannot backtrack catastrophically.
    */
   private static final Pattern ACCEPT_LANGUAGE_PATTERN = Pattern.compile("[A-Za-z0-9*,;=. _-]+");
 
@@ -110,9 +82,8 @@ public class BackendImportClient {
   private final String correlationIdMdcKey;
 
   /**
-   * Wires the backend {@link RestClient}, resolves the {@code backend} circuit breaker from the
-   * Resilience4j registry, and captures the configured correlation-id header name so the outbound
-   * relay uses the same header the gateway accepts inbound (REQ-OBS-002).
+   * Wires the backend {@link RestClient}, the {@code backend} circuit breaker and the configured
+   * correlation-id header name (REQ-OBS-002).
    *
    * @param backendRestClient the backend-facing client from {@code RestClientConfig}
    * @param serviceAccountTokenProvider supplies the gateway's own token for the backend hop
@@ -166,9 +137,8 @@ public class BackendImportClient {
   }
 
   /**
-   * Forwards a blueprint export, already validated as a JSON object, to the backend's multipart
-   * preview endpoint as a single {@code file} part (so the backend stays unchanged — it parses the
-   * upload exactly as a manual file import would), and returns the preview JSON verbatim.
+   * Forwards a blueprint export to the backend's multipart preview endpoint as a single {@code
+   * file} part and returns the preview JSON verbatim.
    *
    * @param callerSub the authenticated caller the gateway acts for; relayed in {@link
    *     #ON_BEHALF_OF_HEADER}, never as a bearer
@@ -198,22 +168,10 @@ public class BackendImportClient {
   }
 
   /**
-   * Builds the common outbound header customizer: the gateway's own bearer and the caller it acts
-   * for, plus the sanitized locale/correlation relays. Never logs either token (REQ-OBS-*).
+   * Builds the outbound header customizer: the gateway's bearer, the on-behalf-of subject, the
+   * sanitized locale and the correlation id from the MDC (REQ-OBS-002).
    *
-   * <p><b>Neither relayed header may come from the request unchanged.</b> The gateway is the only
-   * internet-facing module, so anything it copies onto an internal call carries hostile input
-   * across a trust boundary the backend was designed without — the backend is unreachable from the
-   * internet and its other caller is the trusted frontend. The correlation id is therefore taken
-   * from the MDC (already validated by {@link
-   * de.greluc.krt.profit.basetool.ingest.filter.CorrelationIdFilter}) rather than from the inbound
-   * header, and the locale is charset- and length-bounded here.
-   *
-   * <p>Sourcing the id from the MDC also fixes a correlation defect: the gateway logged the
-   * sanitized id but forwarded the raw one, so a request whose inbound header failed validation was
-   * logged under a fresh UUID in the gateway while the backend minted a <em>different</em> one —
-   * the two modules' lines for one request could not be joined, precisely in the case worth tracing
-   * (REQ-OBS-002).
+   * <p>No relayed header is copied from the inbound request unchanged.
    *
    * @param callerSub the authenticated caller the gateway is acting for
    * @param acceptLanguage the client-supplied locale, sanitized here; {@code null} omits the header
@@ -237,17 +195,12 @@ public class BackendImportClient {
   }
 
   /**
-   * Bounds a client-supplied {@code Accept-Language} to what an RFC 5646 header can legitimately
-   * contain, so a hostile value cannot ride the relay into the internal call.
-   *
-   * <p>Rejects rather than trims on the first offending character: a header that is not a plain
-   * language range is not a locale the backend should act on, and silently forwarding a repaired
-   * prefix would hide the anomaly. Dropping it degrades to the backend's default locale, which is
-   * the correct failure mode for a content-negotiation hint.
+   * Validates a client-supplied {@code Accept-Language} against the RFC 5646 character set and a
+   * length bound, dropping it entirely rather than repairing it.
    *
    * @param acceptLanguage the raw inbound value, possibly {@code null}
    * @return the value when it is a well-formed, length-bounded language range, otherwise {@code
-   *     null} to omit the header entirely
+   *     null} to omit the header
    */
   private static @Nullable String sanitizedAcceptLanguage(@Nullable String acceptLanguage) {
     if (acceptLanguage == null || acceptLanguage.isBlank()) {

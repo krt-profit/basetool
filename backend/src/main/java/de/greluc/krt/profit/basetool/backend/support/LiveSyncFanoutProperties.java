@@ -25,19 +25,11 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Settings of the app live-sync bridge's Redis fan-out (ADR-0143).
- *
- * <p>Off by default and on in production, mirroring {@link NotificationFanoutProperties}: Redis is
- * an optional enhancement for this backend, deliberately outside the readiness group (ADR-0084), so
- * a build or a test profile without it must start and serve normally. With the fan-out off, the
- * bridge still relays what this instance itself accepts; only the crossing to the web frontend and
- * to peer replicas stops.
+ * Settings of the app live-sync bridge's Redis fan-out (ADR-0143); off by default.
  *
  * @param enabled whether to publish and consume {@code changed} frames over Redis
- * @param channel the channel the frames cross — <strong>the frontend's channel</strong>, not a
- *     second one. The whole bridge rests on both modules speaking on the same wire with the same
- *     payload, so overriding this to anything the frontend does not also use silently severs
- *     web-to-app propagation while leaving every health signal green.
+ * @param channel the channel the frames cross; must be the frontend's channel, or web-to-app
+ *     propagation silently stops
  */
 @Validated
 @ConfigurationProperties("app.live-sync.redis-fanout")

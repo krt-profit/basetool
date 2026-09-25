@@ -22,10 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.util.List;
 
 /**
- * Frontend mirror of the backend {@code PersonalBlueprintRecipeResponse}: the SC Wiki recipe graph
- * (build slots with ingredients + per-quality stat modifiers) of a single owned blueprint's
- * product, consumed by the Personal Inventory blueprint view's expandable "Zutaten &amp; Stats"
- * detail (#327).
+ * Frontend mirror of the backend {@code PersonalBlueprintRecipeResponse}: the SC Wiki recipe of one
+ * owned blueprint's product, for the "Zutaten &amp; Stats" detail of the blueprint view.
  *
  * @param productName canonical display name of the product
  * @param variantCount number of recipe variants collapsing into the product

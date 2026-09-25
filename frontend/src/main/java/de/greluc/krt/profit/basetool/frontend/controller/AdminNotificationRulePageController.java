@@ -47,12 +47,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
- * Admin page + AJAX relay for the data-driven notification rules (REQ-NOTIF-007). Admin-only; the
- * page lists the rules and the form / selector editor builds the JSON the backend admin API
- * expects, proxied through {@link BackendApiClient}. Backend failures are relayed as {@code
- * application/problem+json} so {@code krtFetch} branches on conflicts exactly as elsewhere. After a
- * successful write the page re-fetches the {@code rules} table fragment in place instead of
- * reloading (REQ-FE-001).
+ * Admin page and AJAX relay for the data-driven notification rules (REQ-NOTIF-007), proxied through
+ * {@link BackendApiClient}. Backend failures are relayed as {@code application/problem+json}; after
+ * a write the rules table is re-fetched in place (REQ-FE-001).
  */
 @Controller
 @UsesLayoutModel
@@ -144,16 +141,13 @@ public class AdminNotificationRulePageController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Renders the rules admin page (list + create/edit form), fail-soft to an empty list with the
-   * {@code error} key set. With {@code fragment=rules} only the rules-table fragment is rendered —
-   * the target of the in-place {@code krtFetch.swap} after a create, update or delete (REQ-FE-001);
-   * any other value renders the whole page, so a stray parameter cannot blank it.
+   * Renders the rules admin page, or with {@code fragment=rules} only the rules table for the
+   * in-place swap (REQ-FE-001). A failed load renders an empty list with {@code error} set.
    *
-   * @param fragment {@code "rules"} for the table fragment, anything else (or absent) for the page
-   * @param model the view model, filled with {@code rules}, the six option lists ({@code
-   *     eventTypes}, {@code notificationTypes}, {@code selectorKinds}, {@code orgRelativeRoles},
-   *     {@code contextRoles}, {@code roleCodes}) and, on a failed load, {@code error}
-   * @return {@code admin/notification-rules}, or its {@code rules} fragment for a swap
+   * @param fragment {@code "rules"} for the table fragment; anything else renders the page
+   * @param model the view model, filled with {@code rules}, the six option lists and, on a failed
+   *     load, {@code error}
+   * @return {@code admin/notification-rules}, or its {@code rules} fragment
    */
   @org.jetbrains.annotations.NotNull
   @GetMapping

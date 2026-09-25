@@ -23,20 +23,13 @@ import java.util.List;
 
 /**
  * One game-item group of the order-detail Item-Bestand panel (REQ-ORDERS-028): the item stock
- * earmarked to a job order, grouped per {@code GameItem} — the item sibling of the per-order
- * material collection. Groups are name-sorted; {@code entries} keeps the repository's
- * owner/location display order.
+ * earmarked to a job order for one {@code GameItem}.
  *
- * <p>{@code orderedAmount} / {@code manufacturedAmount} are the order's own line context for the
- * group's game item (summed over the order's lines requesting it, REQ-ORDERS-025); both are {@code
- * 0} when the order no longer requests the item (an orphaned earmark, which REQ-ORDERS-019 flags
- * separately). {@code allocatedTotal} is the whole-unit sum of the entries' this-order slices.
- *
- * @param gameItem the slim game-item reference (id, name, manufacturer, kind)
- * @param orderedAmount whole units of this game item the order requests (0 when not requested)
- * @param manufacturedAmount whole units already manufactured on the order's matching lines
- * @param allocatedTotal whole units of stock earmarked to this order across the group's entries
- * @param entries the linked entries backing the group, in owner/location display order
+ * @param gameItem the slim game-item reference
+ * @param orderedAmount whole units the order requests (0 when not requested)
+ * @param manufacturedAmount whole units already manufactured on the matching lines
+ * @param allocatedTotal whole units earmarked to this order across the group's entries
+ * @param entries the linked entries, in owner/location display order
  */
 public record JobOrderItemStockGroupDto(
     InventoryGameItemReferenceDto gameItem,

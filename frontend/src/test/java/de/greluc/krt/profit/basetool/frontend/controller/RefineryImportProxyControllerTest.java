@@ -53,11 +53,9 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
 /**
- * Unit tests for {@link RefineryImportProxyController} (#435): the JSON relay to the Phase 1
- * backend endpoint, the draft-to-form mapping (incl. the hours/minutes split and the row-issue
- * grouping by draft index), and every error branch (not-JSON upload, backend problem detail,
- * unexpected failure). The backend seam is a mocked {@link BackendApiClient} — the typed client is
- * the frontend's single backend seam, so no raw HTTP server is needed here.
+ * Unit tests for {@link RefineryImportProxyController}: the JSON relay to the backend, the
+ * draft-to-form mapping (hours/minutes split, row issues grouped by draft index) and every error
+ * branch, against a mocked {@link BackendApiClient}.
  */
 class RefineryImportProxyControllerTest {
 

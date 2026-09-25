@@ -50,23 +50,9 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Frontend proxy for the blueprint import flow (#327, Phase 6). Two AJAX endpoints used by the
- * Blueprints-page import modal:
- *
- * <ul>
- *   <li>{@code POST /personal-inventory/blueprints/import/preview} — forwards the uploaded
- *       blueprint export JSON multipart (SCMDB log-watcher, Basetool Blueprint Extractor, or
- *       scmdb.net profile / tracking export) to the backend {@code POST
- *       /api/v1/personal-blueprints/import/preview} via the authenticated {@link WebClient} (which
- *       attaches the OAuth2 token) and returns the typed preview unchanged. A backend parse failure
- *       (400) is surfaced as-is so the user sees a meaningful error.
- *   <li>{@code POST /personal-inventory/blueprints/import/apply} — wraps the resolution list in the
- *       backend apply request and relays it via {@link BackendApiClient}.
- * </ul>
- *
- * <p>Returned as a {@code @RestController} (raw JSON), separate from the page controller, so the
- * import modal can drive preview / apply without a full navigation. Both endpoints are
- * authenticated; the backend re-derives the owner from the relayed JWT.
+ * AJAX proxy for the blueprint import modal: {@code POST .../preview} forwards an uploaded
+ * blueprint export to the backend preview endpoint, and {@code POST .../apply} relays the chosen
+ * resolutions. The backend derives the owner from the relayed JWT.
  */
 @RestController
 @RequestMapping("/personal-inventory/blueprints/import")
@@ -80,19 +66,9 @@ public class PersonalBlueprintImportProxyController {
   private final IngestHandoffService ingestHandoffService;
 
   /**
-   * Returns the one-click ingest handoff staged for the current user (epic #639, REQ-INGEST-004):
-   * the desktop extractor sent a blueprint export and opened {@code
-   * /personal-inventory/blueprints?handoff=<id>}; the import JS POSTs the id here and renders the
-   * staged preview without an upload. Single-use and scoped to the session subject — an unknown,
-   * expired, consumed or foreign id is a 404 (no IDOR leak), which the JS treats as "nothing
-   * staged".
-   *
-   * <p>Deliberately a <strong>POST</strong>, not a GET: consuming the handoff is a single-use,
-   * state-changing operation (an atomic Redis {@code GETDEL}), so it must not ride a cacheable /
-   * prefetchable safe method. The navigational page GET ({@code /personal-inventory/blueprints})
-   * already never consumes; keeping the consume itself off any GET means a speculative browser
-   * prefetch or a duplicate load cannot burn the token before the real pickup (REQ-INGEST-004, the
-   * 2026-07-19 double-GET incident that hit the refinery surface).
+   * Returns and consumes the blueprint import handoff the desktop extractor staged for the current
+   * user (REQ-INGEST-004). A POST because the pickup is single-use; an unknown, expired, consumed
+   * or foreign id is a 404.
    *
    * @param handoff the handoff id from the {@code ?handoff=} parameter
    * @param principal the authenticated user (its subject scopes the staged lookup)

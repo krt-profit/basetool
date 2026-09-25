@@ -29,13 +29,8 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit tests for {@link PiiMasker} — the regex-based PII / secret masker behind every log appender
- * of all three applications. A regex bug here silently leaks PII into the centralized log files of
- * every module at once, which is exactly the failure mode the project's "Never log names, emails or
- * tokens" rule is designed to prevent. Until ADR-0205 the backend and the ingest gateway each kept
- * their own copy of this test (the frontend kept none); both are folded in here.
- *
- * <p>The masker is a pure static function: tests are framework-free.
+ * Framework-free unit tests for {@link PiiMasker}, the PII and secret masker behind every log
+ * appender.
  */
 class PiiMaskerTest {
 

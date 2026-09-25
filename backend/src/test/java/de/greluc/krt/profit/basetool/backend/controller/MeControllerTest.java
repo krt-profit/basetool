@@ -45,11 +45,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-/**
- * Mockito-driven tests for {@link MeController}. The {@code GET /active-org-unit} read endpoint
- * pulls from the {@code OwnerScopeService.currentOrgUnitId()} resolver; the {@code GET
- * /capabilities} endpoint reflects the blueprint-overview gate (#364).
- */
+/** Unit tests for {@link MeController}: the active-org-unit read and the capabilities endpoint. */
 @ExtendWith(MockitoExtension.class)
 class MeControllerTest {
 
@@ -185,13 +181,8 @@ class MeControllerTest {
   }
 
   /**
-   * The whole reason these two flags exist rather than the client reading role names.
-   *
-   * <p>A Bankleitung holds {@code BANK_MANAGEMENT} and <strong>not</strong> {@code BANK_EMPLOYEE};
-   * the hierarchy is what connects them, and it lives here rather than on the wire. A client
-   * matching role names would hide the staff bank from the people who run the bank &mdash; and the
-   * names it would be matching are display names ({@code "Bank Employee"}), not the codes the gates
-   * use.
+   * Verifies that a Bankleitung without {@code BANK_EMPLOYEE} still receives the bank-employee
+   * capability through the role hierarchy.
    */
   @Test
   void getCapabilities_bankManagement_reachesTheEmployeeRoleThroughTheHierarchy() {

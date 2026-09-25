@@ -32,13 +32,8 @@ import org.springframework.security.web.authentication.AuthenticationSuccessHand
 
 /**
  * {@link AuthenticationSuccessHandler} decorator that counts a successful OAuth2 login into {@code
- * basetool_login_total{outcome="success"}} before delegating the actual post-login navigation to
- * the wrapped handler (in production the {@link AssetAwareAuthenticationSuccessHandler}).
- *
- * <p>Pairs with {@link LoginFailureMetricsHandler}: together they give the frontend a
- * success/failure signal so a code-to-token / JWKS / state failure that breaks <b>all</b> logins is
- * visible as failures-with-zero-successes ({@code FrontendLoginBroken}) rather than only inferable
- * from a Keycloak-side event regex that misses code-to-token errors (#1041 item 18, REQ-OBS-011).
+ * basetool_login_total{outcome="success"}} and then delegates the navigation to the wrapped handler
+ * (REQ-OBS-011). Pairs with {@link LoginFailureMetricsHandler}.
  */
 @RequiredArgsConstructor
 public class LoginSuccessMetricsHandler implements AuthenticationSuccessHandler {

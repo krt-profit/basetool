@@ -22,9 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.time.Instant;
 
 /**
- * Outbound write DTO mirroring the backend {@code PersonalBlueprintUpdateRequest} (#327): the
- * editable fields of an owned blueprint plus the optimistic-lock version. Validation is
- * authoritative on the backend.
+ * Outbound mirror of the backend {@code PersonalBlueprintUpdateRequest}: the editable fields of an
+ * owned blueprint plus its optimistic-lock version.
  *
  * @param acquiredAt in-game acquisition time, or {@code null}
  * @param note free-form note, or {@code null}

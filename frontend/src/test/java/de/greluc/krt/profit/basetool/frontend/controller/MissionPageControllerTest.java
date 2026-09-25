@@ -49,13 +49,11 @@ class MissionPageControllerTest {
   private static final ParallelPageLoader PARALLEL = new ParallelPageLoader();
 
   /**
-   * Builds a {@link FrontendAuthHelperService} mock whose {@link
-   * FrontendAuthHelperService#isAnonymous()} returns the requested value, so a {@link
-   * MissionWriteController} write handler resolves its {@code isPublic} flag to the branch the test
-   * exercises (guest → {@code true}, authenticated → {@code false}).
+   * Builds a {@link FrontendAuthHelperService} mock for injection into the {@link
+   * MissionWriteController} under test.
    *
-   * @param anonymous the value {@code isAnonymous()} should report
-   * @return a stubbed auth-helper mock for injection into the controller under test
+   * @param anonymous the anonymity flag the test case models
+   * @return an auth-helper mock for the controller under test
    */
   private static FrontendAuthHelperService authHelper(boolean unusedAnonymousFlag) {
     return mock(FrontendAuthHelperService.class);

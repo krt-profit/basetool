@@ -24,21 +24,18 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * One preview row of an SCMDB blueprint import (#327, Phase 4): an external name plus how it
- * resolved against the master product list. For {@link BlueprintImportStatus#MATCHED}, {@link
- * BlueprintImportStatus#MATCHED_BY_ALIAS} and {@link BlueprintImportStatus#ALREADY_OWNED} the
- * resolved-product fields are populated; for {@link BlueprintImportStatus#SUGGESTED} the {@link
- * #suggestions} list carries the fuzzy candidates and the resolved fields are {@code null}; {@link
- * BlueprintImportStatus#UNMATCHED} carries neither.
+ * One preview row of a blueprint import: an external name and how it resolved. Resolved-product
+ * fields are set for {@link BlueprintImportStatus#MATCHED}, {@link
+ * BlueprintImportStatus#MATCHED_BY_ALIAS} and {@link BlueprintImportStatus#ALREADY_OWNED}; {@link
+ * #suggestions} only for {@link BlueprintImportStatus#SUGGESTED}.
  *
- * @param externalName the export {@code productName} exactly as it appeared in the upload
+ * @param externalName the export {@code productName} exactly as uploaded
  * @param status the resolution outcome for this name
  * @param productKey normalized key of the resolved product, or {@code null} when unresolved
  * @param productName display name of the resolved product, or {@code null} when unresolved
- * @param outputItemId resolved output {@code game_item} id, or {@code null} when none / unresolved
- * @param suggestedAcquiredAt acquisition time derived from the earliest export timestamp ({@code
- *     ts} or {@code receivedAt}), or {@code null} if the export carried no timestamp
- * @param suggestions fuzzy candidates (highest score first); empty unless {@code status} is {@link
+ * @param outputItemId resolved output {@code game_item} id, or {@code null}
+ * @param suggestedAcquiredAt the earliest export timestamp, or {@code null} if none was carried
+ * @param suggestions fuzzy candidates, highest score first; empty unless {@code status} is {@link
  *     BlueprintImportStatus#SUGGESTED}
  */
 public record BlueprintImportEntryDto(

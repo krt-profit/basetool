@@ -33,18 +33,11 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ArrayNode;
 
 /**
- * The bridge itself: publishes app-originated {@code changed} frames onto the frontend's Redis
- * channel and delivers the frontend's frames to the app's SSE streams (ADR-0143).
+ * Bridges live-sync {@code changed} frames between the app's SSE streams and the frontend's Redis
+ * channel {@code basetool:livesync:changed} (ADR-0143).
  *
- * <p>Both directions ride one channel, {@code basetool:livesync:changed}, with the payload ADR-0094
- * defined — {@code {"v":1,"topic":…,"sections":[…],"origin":…}}. Nothing here is app-specific on
- * the wire, which is the point: a frontend instance cannot tell an app frame from a peer
- * frontend's, and neither can this class tell a frontend frame from a peer backend's. Both simply
- * skip their own origin.
- *
- * <p>Local delivery happens in {@link LiveSyncRelayService} <em>before</em> {@link #publish} is
- * called, so a Redis outage costs peer delivery and nothing else — the same ordering, for the same
- * reason, as {@link RedisNotificationFanout}.
+ * <p>Local delivery happens in {@link LiveSyncRelayService} before {@link #publish}, so a Redis
+ * outage only costs peer delivery.
  */
 public class RedisLiveSyncFanout implements LiveSyncFanout, MessageListener {
 
@@ -56,12 +49,12 @@ public class RedisLiveSyncFanout implements LiveSyncFanout, MessageListener {
   private final RedisJsonFanout transport;
 
   /**
-   * Builds the Redis live-sync bridge.
+   * Creates the Redis live-sync bridge.
    *
    * @param streamService the local emitter registry a consumed frame is delivered to
    * @param redisTemplate the string template used to publish
    * @param meterRegistry registry the publish/consume/error counters bind to
-   * @param channel the shared channel — the frontend's, not a second one
+   * @param channel the shared channel used by the frontend as well
    * @param instanceId this JVM's stable id, used to skip frames this instance published
    */
   public RedisLiveSyncFanout(
@@ -115,15 +108,11 @@ public class RedisLiveSyncFanout implements LiveSyncFanout, MessageListener {
   }
 
   /**
-   * Consumes a frame from a frontend instance or a peer backend replica.
-   *
-   * <p>Skips this instance's own publications — the local delivery already happened — and drops
-   * anything it cannot make sense of rather than raising: the sender is another process on a shared
-   * channel, possibly a different build, and a frame naming a room this backend does not serve (the
-   * frontend's staff-only rooms, for one) is an ordinary occurrence, not a fault.
+   * Delivers a frame from a frontend instance or a peer backend replica to the local streams,
+   * skipping own-origin and unusable frames without raising.
    *
    * @param message the raw Redis message
-   * @param pattern the subscription pattern; unused, a single exact channel is subscribed
+   * @param pattern the subscription pattern; unused
    */
   @Override
   public void onMessage(@NotNull Message message, byte[] pattern) {
@@ -160,11 +149,7 @@ public class RedisLiveSyncFanout implements LiveSyncFanout, MessageListener {
   }
 
   /**
-   * Reads the {@code sections} array defensively.
-   *
-   * <p>A non-string or null element is skipped rather than aborting the frame, matching the
-   * per-element tolerance of the notification consume path: one malformed entry from a peer must
-   * not cost every other section its refresh.
+   * Reads the {@code sections} array, skipping non-string and null elements.
    *
    * @param root the parsed payload
    * @return the raw section strings, in wire order

@@ -37,16 +37,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * End-to-end smoke test (see {@code docs/e2e-test/README.md}): a real Chromium browser completes
- * the Keycloak OIDC authorization-code login against the running frontend, lands back on an
- * authenticated frontend page, and yields a reusable {@code storageState} snapshot.
+ * E2E smoke test: a real browser completes the Keycloak login against the frontend and saves a
+ * reusable {@code storageState} snapshot.
  *
- * <p>Target-agnostic: the {@link E2eStackExtension} registered below either provisions an ephemeral
- * local stack (default) or, when {@code E2E_BASE_URL} is set, targets that deployment (e.g.
- * staging). {@code STACK.baseUrl()} is the single source of truth for the origin under test.
- *
- * <p>Tagged {@code e2e} so it is picked up only by the dedicated {@code :frontend:e2eTest} Gradle
- * task and never by the regular {@code test}/{@code check} build.
+ * <p>Targets an ephemeral local stack, or the deployment named by {@code E2E_BASE_URL}.
  */
 @Tag("e2e")
 class LoginSmokeE2eTest {
@@ -87,13 +81,9 @@ class LoginSmokeE2eTest {
   }
 
   /**
-   * Initiates the Spring {@code oauth2Login} flow, fills the Keycloak default-theme login form,
-   * waits to be redirected back to the frontend origin, asserts a Spring Session cookie was
-   * established, and writes the authenticated {@code storageState} to {@code
-   * build/e2e/storageState.json} for later reuse. A Playwright trace (screenshots + DOM snapshots +
-   * sources) is recorded for the whole run and saved to {@code build/e2e/trace.zip} — inspect it
-   * with {@code npx playwright show-trace build/e2e/trace.zip}. On failure a screenshot + page HTML
-   * dump is captured in addition.
+   * Logs in through Keycloak, asserts a Spring Session cookie, and writes {@code
+   * build/e2e/storageState.json}; a Playwright trace is saved to {@code build/e2e/trace.zip} and
+   * failure diagnostics are captured on error.
    *
    * @throws Exception if a diagnostic artifact cannot be written
    */
@@ -150,9 +140,8 @@ class LoginSmokeE2eTest {
   }
 
   /**
-   * Captures a screenshot, the page HTML and the current URL/title when a step fails, so a CI run
-   * (or this Phase-0 spike) can see what the browser was actually showing. Best-effort: diagnostic
-   * failures are swallowed so the original assertion/timeout error still surfaces.
+   * Captures a screenshot, the page HTML and the current URL/title on failure; diagnostic errors
+   * are swallowed so the original failure surfaces.
    *
    * @param page the Playwright page at the point of failure
    */

@@ -33,13 +33,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Read service plus visibility / loading-dock / auto-load overrides for the terminal catalog. The
- * records themselves are owned by {@link UexUniverseSyncService}; this service only exposes the
- * read API and the admin-only flag flips. Read methods are cached against {@link
- * CacheConfig#TERMINALS_CACHE}; every mutator evicts the whole cache, and the periodic {@link
- * UexUniverseSyncService} sweep evicts it on completion (via {@code
- * MasterDataCacheEvictionService}, CACHE-SYNC-EVICT-001), so background-sync writes are visible on
- * the next read; the 12-hour master-data TTL is only the backstop.
+ * Cached read service plus admin-only visibility, loading-dock and auto-load overrides for the
+ * terminal catalog owned by {@link UexUniverseSyncService}.
+ *
+ * <p>Every mutator and every completed UEX sweep evicts {@link CacheConfig#TERMINALS_CACHE}.
  */
 @Service
 @RequiredArgsConstructor
@@ -60,7 +57,7 @@ public class TerminalService {
   }
 
   /**
-   * Returns the terminal.
+   * Returns the terminal with the given id (cached).
    *
    * @param id terminal primary key
    * @return the terminal
@@ -105,15 +102,8 @@ public class TerminalService {
   }
 
   /**
-   * Releases the admin pin on {@code hasLoadingDock} and immediately reverts the value column to
-   * the last UEX-reported state ({@link Terminal#getUexHasLoadingDock()}), so consumers like the
-   * materials-overview filter and the UEX-source chip stop seeing the stale admin-pinned value
-   * before the next UEX sweep runs.
-   *
-   * <p>If the terminal has never been synced yet, {@code uexHasLoadingDock} is {@code null} and the
-   * value column is cleared to {@code null} too — that maps to "unknown" in every consumer and is
-   * the correct semantics for "I do not have a UEX value yet, fall back to whatever the next sweep
-   * tells me".
+   * Releases the admin pin on {@code hasLoadingDock} and immediately restores the value from {@link
+   * Terminal#getUexHasLoadingDock()}, which is {@code null} if the terminal was never synced.
    *
    * @param id terminal primary key
    * @return the persisted terminal
@@ -145,15 +135,8 @@ public class TerminalService {
   }
 
   /**
-   * Releases the admin pin on {@code isAutoLoad} and immediately reverts the value column to the
-   * last UEX-reported state ({@link Terminal#getUexIsAutoLoad()}), so consumers like the
-   * materials-overview filter and the UEX-source chip stop seeing the stale admin-pinned value
-   * before the next UEX sweep runs.
-   *
-   * <p>If the terminal has never been synced yet, {@code uexIsAutoLoad} is {@code null} and the
-   * value column is cleared to {@code null} too — that maps to "unknown" in every consumer and is
-   * the correct semantics for "I do not have a UEX value yet, fall back to whatever the next sweep
-   * tells me".
+   * Releases the admin pin on {@code isAutoLoad} and immediately restores the value from {@link
+   * Terminal#getUexIsAutoLoad()}, which is {@code null} if the terminal was never synced.
    *
    * @param id terminal primary key
    * @return the persisted terminal

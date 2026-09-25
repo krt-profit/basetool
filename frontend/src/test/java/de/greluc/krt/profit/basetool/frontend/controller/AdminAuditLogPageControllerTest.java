@@ -280,8 +280,7 @@ class AdminAuditLogPageControllerTest {
 
   /**
    * The bank audit event types the backend can emit, read from the {@code BankAuditEventDto
-   * .eventType} enum in the committed openapi document — the cross-module contract between the
-   * (backend) enum and the (frontend) viewer.
+   * .eventType} enum in the committed openapi document.
    *
    * @return the produced bank audit event-type names
    * @throws Exception when the spec cannot be located or parsed
@@ -292,9 +291,8 @@ class AdminAuditLogPageControllerTest {
 
   /**
    * The generic-area audit event types the backend can emit, read from the {@code
-   * AuditEventDto.eventType} enum in the committed openapi document. Covers all nine non-bank
-   * domains at once — the document does not say which domain a type belongs to, so the assertion
-   * above checks membership in the union of the nine per-tab lists.
+   * AuditEventDto.eventType} enum in the committed openapi document, across all nine non-bank
+   * domains.
    *
    * @return the produced generic audit event-type names
    * @throws Exception when the spec cannot be located or parsed
@@ -304,9 +302,8 @@ class AdminAuditLogPageControllerTest {
   }
 
   /**
-   * Reads the {@code eventType} enum of one audit DTO schema out of the committed openapi document,
-   * walking up from the working directory until {@code backend/src/main/resources/api/openapi.json}
-   * is found (the test runs from the module directory, the spec lives in the sibling module).
+   * Reads the {@code eventType} enum of one audit DTO schema from the committed openapi document,
+   * located by walking up from the working directory.
    *
    * @param schema the openapi schema name, {@code BankAuditEventDto} or {@code AuditEventDto}
    * @return the enum constant names declared for that schema's {@code eventType}

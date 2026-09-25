@@ -20,15 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.event;
 
 /**
- * Shared supertype for the three bank-booking-request notification events (created / confirmed /
- * rejected). They all deep-link to the same aggregate kind, so the loose entity-type tag and its
- * {@link #entityType()} accessor live here once instead of being repeated as an identical {@code
- * public static final String ENTITY_TYPE} field plus {@code entityType()} override on each event
- * record (#906 Q7).
- *
- * <p>The constant stays on this bank-specific interface rather than on {@link NotificationEvent}
- * because that broader contract is also implemented by events with different tags (e.g. {@code
- * JOB_ORDER}, {@code DISCORD_REGISTRATION}); a single inherited value there would be wrong.
+ * Shared supertype of the bank-booking-request notification events, holding their common {@link
+ * #entityType()} tag.
  */
 public interface BankBookingRequestEvent extends NotificationEvent {
 

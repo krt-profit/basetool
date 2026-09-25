@@ -37,12 +37,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Integration coverage for {@link ShipRepository#findByOwnerIdFiltered} against real Postgres
- * (REQ-HANGAR-002). The personal hangar's rich multi-key ordering — including the computed
- * insurance-tier bucket and the {@code cast(insurance as integer)} amount key — and the server-side
- * search are exercised end-to-end here precisely because the {@code CASE}/{@code cast} idiom is
- * Postgres-specific and would not surface in a Mockito unit test; this is the regression guard that
- * the ordering and the cast keep working on the production database.
+ * Integration tests for {@link ShipRepository#findByOwnerIdFiltered} against real Postgres,
+ * covering the Postgres-specific multi-key ordering and the server-side search (REQ-HANGAR-002).
  */
 @SpringBootTest
 @ActiveProfiles("test")

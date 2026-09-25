@@ -68,35 +68,14 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 /**
- * Coverage for the {@code catalog=ITEM} read family of {@link InventoryAggregationService} — {@link
+ * Unit tests for the item-catalog read family of {@link InventoryAggregationService} — {@link
  * InventoryAggregationService#getMyAggregatedItemInventory}, {@link
  * InventoryAggregationService#getAllAggregatedItemInventory}, {@link
  * InventoryAggregationService#getAggregatedItemInventory} and {@link
- * InventoryAggregationService#getAllItemInventory} (V220, REQ-INV-028/029) with the private item
- * assembly ({@code buildGroupedFromItemStacks} / {@code buildItemGroup} / {@code
- * mapItemAggregateRefs}). The sibling {@code InventoryItemServiceAggregateTest} pins the material
- * assembly only; the controller tests mock this service and the Testcontainers data tests stop at
- * the SQL projection, so the item grouping logic itself had no unit coverage. Verified over mocked
- * repositories:
- *
- * <ul>
- *   <li>filter routing: {@code gameItemIds} / {@code jobOrderIds} flip the corresponding {@code
- *       hasX} flag (an empty list counts as no filter), the mutually exclusive personal-narrowing
- *       toggles pass through unchanged, and the squadron-wide variants forward the caller's {@link
- *       ScopePredicate} triple verbatim;
- *   <li>assembly: the per-stack aggregates group into one {@link GroupedInventoryDto} per game item
- *       (summed total, per-stack entry counts, {@code null} quality figures — items carry no
- *       quality dimension), the items sort alphabetically by name, and the stacks reuse the shared
- *       material comparator whose quality key coalesces the item stacks' constant {@code null} to
- *       zero, degrading the order to location asc / amount desc without an NPE;
- *   <li>tuple mapping: the aggregated view projects raw {@code Object[]} rows into game-item {@link
- *       AggregatedInventoryDto}s with null-coalesced sums, and the flat list maps entities through
- *       the inventory-item mapper.
- * </ul>
- *
- * <p>The SQL grouping itself (catalog split, quality-less stack key, the appended {@code
- * gameItem.name} sort on Postgres) is a data-layer concern covered by {@code
- * InventoryItemStackQueryDataTest}, not by this mocked unit.
+ * InventoryAggregationService#getAllItemInventory} (REQ-INV-028/029) — over mocked repositories:
+ * filter routing and scope forwarding, grouping into one {@link GroupedInventoryDto} per game item
+ * with alphabetical order, and the mapping of raw rows into {@link AggregatedInventoryDto}s with
+ * null-coalesced sums.
  */
 @ExtendWith(MockitoExtension.class)
 class InventoryAggregationServiceTest {
@@ -644,11 +623,9 @@ class InventoryAggregationServiceTest {
   }
 
   /**
-   * Rigs the inventory-item mapper used by {@code mapItemAggregateRefs}: the service feeds it a
-   * transient probe {@link InventoryItem} carrying the item stack's identity entities, so the mock
-   * reads the probe's game item / location / personal flag back into the reference DTOs the
-   * assembly needs. The probe's material and quality are a constant {@code null} on the item path
-   * (REQ-INV-029) and stay null in the DTO; only the fields the assertions touch are projected.
+   * Stubs the inventory-item mapper so it reads the probe {@link InventoryItem}'s game item,
+   * location and personal flag back into the reference DTOs; material and quality stay {@code null}
+   * (REQ-INV-029).
    */
   private void stubItemRefMapper() {
     lenient()

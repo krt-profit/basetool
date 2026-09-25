@@ -25,16 +25,9 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Data transfer record carrying Mission Participant payload. The {@code orgUnits} list carries the
- * participant's affiliations (zero, one, or several org units — a Staffel and/or Spezialkommandos),
- * replacing the former single {@code squadron} field so a member of both a Staffel and an SK has
- * both badges rendered on the roster.
- *
- * <p>A row with no {@code user} is an <em>external</em> participant — a named person without an
- * account, recorded by the mission leadership (ADR-0159, decision D4). It used to carry a {@code
- * guestEditToken}: a per-row capability token handed to an anonymous creator so they could edit
- * their own sign-up without a login. There is no anonymous sign-up left to mint one for, and V239
- * dropped the column that stored its hash.
+ * Data transfer record carrying a mission participant. {@code orgUnits} lists the participant's
+ * affiliations (zero or more Staffeln and Spezialkommandos). A row without a {@code user} is an
+ * external participant recorded by the mission leadership (ADR-0159).
  */
 public record MissionParticipantDto(
     UUID id,

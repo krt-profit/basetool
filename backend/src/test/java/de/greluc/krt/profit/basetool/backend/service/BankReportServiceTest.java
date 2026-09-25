@@ -53,10 +53,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * Integration tests for the two bank PDF exports against the real Testcontainers PostgreSQL:
- * statement balance math, period filtering, holder-distribution section and audit events
- * (REQ-BANK-014), and the three-month report's per-account summaries (REQ-BANK-015). Content is
- * asserted through {@code PdfTextExtractor} — the same channel the handover regression tests use.
+ * Integration tests for the bank PDF exports against real Postgres: the account statement
+ * (REQ-BANK-014) and the three-month report (REQ-BANK-015).
  */
 @SpringBootTest
 @ActiveProfiles("test")

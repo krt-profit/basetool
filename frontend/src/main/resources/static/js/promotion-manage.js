@@ -17,36 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * Promotion evaluation matrix page module (/promotion/manage), extracted verbatim from the
- * former inline script of promotion-manage.html (#924 Part 2).
- *
- * - Serialized, key-deduplicated save queue for the per-cell level-select PUTs; a 409 conflict
- *   drops the pending queue and re-renders the matrix in place via window.krtFetch.swap
- *   (fragment matrixBody) instead of a full-page reload.
- * - Per-member eligibility-cell swaps once the queue drains, topic collapse/expand with
- *   localStorage persistence (REQ-UI-017: collapse state, checkbox filters and the sort mode
- *   survive the browser session; the member-search text stays unpersisted by design),
- *   search/checkbox filters, a five-mode sort cycle, row selection
- *   with bulk apply through window.showKrtConfirm, client-side CSV export (UTF-8 BOM so Excel
- *   detects umlauts) and local formatting of the last-evaluated timestamps.
- * - Wiring runs on DOMContentLoaded through window.krtEvents delegation; the krt:swapped
- *   listener restores collapse/sort/filter/selection view state after a matrixBody container
- *   swap and deliberately ignores the id-less per-cell eligibility swaps.
- *
- * The localized MSG_* strings, SORT_LABELS and the localStorage key names are defined by the
- * inline Thymeleaf bootstrap block of promotion-manage.html, which executes immediately before
- * this classic script; both tags share th:unless="${isAllSquadronsMode}", so neither runs in
- * all-squadrons mode.
- */
-
 /* global MSG_SAVED, MSG_ERROR, MSG_CONFLICT, MSG_LAST_EVAL, MSG_BULK_CONFIRM_TITLE, MSG_BULK_CONFIRM_MSG, MSG_BULK_NEED_CAT, MSG_BULK_NEED_LEVEL, MSG_CSV_NAME, MSG_CSV_HEADER_MEMBER, MSG_CSV_HEADER_RANK, MSG_CSV_HEADER_ELIG, MSG_CSV_HEADER_LAST, SORT_LABELS, STORAGE_KEY_COLLAPSED, STORAGE_KEY_SORT, STORAGE_KEY_FILTERS, MSG_REFRESH_FAILED */
 
-// PUT an evaluation through krtFetch.write (REQ-FE-002: CSRF, the bare-403 refresh-and-retry and the
-// re-auth redirect). Resolves to the updated evaluation, or to null once the failure was surfaced:
-// a 409 toasts MSG_CONFLICT, drops the pending jobs and re-renders the matrix in place from the
-// server's authoritative state (fresh @Version on every cell) — the in-place equivalent of the old
-// full-page reload; any other failure toasts MSG_ERROR.
 function pmPutEvaluation(url, payload) {
     if (!window.krtFetch) {
         return Promise.resolve(null);
@@ -83,15 +55,8 @@ function pmPutEvaluation(url, payload) {
         });
 }
 
-// Members whose stored grades changed during the current save run. Their
-// eligibility chips are recomputed once the queue drains (one lightweight
-// per-member fetch each) instead of reloading the whole matrix (#580).
 const pmEligibilityDirty = new Set();
 
-// Full in-place re-render of the matrix used to recover from an optimistic-lock
-// conflict: the server rebuilds every row with fresh @Version / level /
-// eligibility, replacing the old full-page reload. View state (collapse, sort,
-// filter, formatting) is restored by the krt:swapped listener.
 function pmRefreshMatrix() {
     if (!window.krtFetch || typeof window.krtFetch.swap !== 'function') {
         window.location.reload();
@@ -105,9 +70,6 @@ function pmRefreshMatrix() {
     });
 }
 
-// Recompute one member's eligibility chips in place after a successful save by
-// swapping just that row's eligibility cell, then derive the row-level
-// data-pm-eligible flag the "Nur Beförderbare" filter reads.
 function pmRefreshEligibility(userId) {
     const row = document.querySelector('tr[data-pm-user-id="' + userId + '"]');
     if (!row) return Promise.resolve(false);
@@ -139,20 +101,6 @@ function pmFlushEligibility() {
     });
 }
 
-// ----------------------------------------------------------------------
-// Save queue
-// ----------------------------------------------------------------------
-// Each item in the queue is `{ key, select }`. `key` is `userId_categoryId`,
-// which is also the optimistic-lock identity in the backend. We dedupe by
-// key so rapid changes to the same cell collapse into a single PUT (the
-// last one wins) — important for two reasons:
-//   - prevents needless network roundtrips when the user clicks through a
-//     dropdown to settle on a value;
-//   - prevents a queued earlier value from overwriting a later one with a
-//     stale @Version, which would silently 409 and drop user input.
-// Saves run sequentially: a row's `data-version` must be refreshed from
-// the response before the next save for that row fires. Conflicts (409)
-// pause the queue and reload the page so the user sees authoritative state.
 let pmSaveQueue = [];
 let pmInFlightKey = null;
 
@@ -169,9 +117,6 @@ function pmEnqueueSave(select) {
     const userId = select.getAttribute('data-user-id');
     const catId = select.getAttribute('data-category-id');
     const key = userId + '_' + catId;
-    // Replace any queued entry for the same cell — only the latest value
-    // is interesting. The currently in-flight save is *not* cancelled;
-    // its response will simply be followed by the next one for this cell.
     pmSaveQueue = pmSaveQueue.filter(function (job) {
         return job.key !== key;
     });
@@ -185,8 +130,6 @@ function pmProcessNextSave() {
     if (pmSaveQueue.length === 0) {
         pmInFlightKey = null;
         pmUpdateQueueIndicator();
-        // Queue drained: recompute eligibility chips for every member touched
-        // during this run, in place, instead of reloading the page.
         pmFlushEligibility();
         return;
     }
@@ -213,14 +156,10 @@ function pmProcessNextSave() {
             if (data) {
                 select.setAttribute('data-version', data.version);
                 select.setAttribute('data-level', assignedLevel || '');
-                // Mark this member for an eligibility recompute once the queue drains.
                 pmEligibilityDirty.add(userId);
                 if (cell) {
-                    // Restart the animation by removing+re-adding the class on
-                    // the next animation frame. Without the rAF the browser
-                    // batches both mutations and the animation never replays.
                     cell.classList.remove('pm-cell-saved');
-                    void cell.offsetWidth; /* trigger reflow */
+                    void cell.offsetWidth;
                     cell.classList.add('pm-cell-saved');
                     setTimeout(function () {
                         cell.classList.remove('pm-cell-saved');
@@ -243,9 +182,6 @@ function pmProcessNextSave() {
         });
 }
 
-// ----------------------------------------------------------------------
-// Topic collapse / expand
-// ----------------------------------------------------------------------
 function pmLoadCollapsedTopics() {
     try {
         const raw = localStorage.getItem(STORAGE_KEY_COLLAPSED);
@@ -259,9 +195,7 @@ function pmLoadCollapsedTopics() {
 function pmSaveCollapsedTopics(ids) {
     try {
         localStorage.setItem(STORAGE_KEY_COLLAPSED, JSON.stringify(ids));
-    } catch {
-        /* ignore */
-    }
+    } catch {}
 }
 
 function pmSetTopicCollapsed(topicId, collapsed) {
@@ -279,15 +213,6 @@ function pmSetTopicCollapsed(topicId, collapsed) {
     cells.forEach(function (cell) {
         cell.setAttribute('data-pm-topic-collapsed', collapsed ? 'true' : 'false');
     });
-    // The topic header keeps its original colspan. Reducing it to 1
-    // while the cat/body rows below lose all N category slots leaves
-    // the topic row one slot shorter than the cat row, and the
-    // browser slides the next topic's cells leftward to fill the
-    // gap — which is the "I can't find the + trigger anymore" bug.
-    // The visual collapse is purely CSS-driven now: the topic header
-    // narrows to 3rem (data-pm-collapsed) and the cat/body cells
-    // shrink to zero width (data-pm-topic-collapsed). See the CSS
-    // block of the same name for details.
 }
 
 function pmApplyCollapsedState(collapsedIds) {
@@ -329,9 +254,6 @@ function pmCollapseAllTopics() {
     pmSaveCollapsedTopics(ids);
 }
 
-// ----------------------------------------------------------------------
-// Filter (search + checkboxes)
-// ----------------------------------------------------------------------
 function pmGetFilterState() {
     const search = document.getElementById('pm-member-search');
     const elig = document.getElementById('pm-filter-eligible');
@@ -342,8 +264,6 @@ function pmGetFilterState() {
         noEvalOnly: !!(noEval && noEval.checked),
     };
 }
-// Persist ONLY the two checkbox filters (REQ-UI-017); the #pm-member-search text filter is
-// deliberately excluded (free text is never persisted).
 function pmSaveFilters() {
     try {
         const f = pmGetFilterState();
@@ -354,9 +274,7 @@ function pmSaveFilters() {
                 noEvalOnly: f.noEvalOnly,
             }),
         );
-    } catch {
-        /* ignore */
-    }
+    } catch {}
 }
 function pmRestoreFilters() {
     try {
@@ -367,9 +285,7 @@ function pmRestoreFilters() {
         const noEval = document.getElementById('pm-filter-no-eval');
         if (elig && typeof f.eligibleOnly === 'boolean') elig.checked = f.eligibleOnly;
         if (noEval && typeof f.noEvalOnly === 'boolean') noEval.checked = f.noEvalOnly;
-    } catch {
-        /* ignore */
-    }
+    } catch {}
 }
 
 function pmApplyFilters() {
@@ -391,13 +307,6 @@ function pmApplyFilters() {
     if (empty) empty.hidden = visible !== 0;
 }
 
-// ----------------------------------------------------------------------
-// Sort cycle on the Mitglied header
-// ----------------------------------------------------------------------
-// Five-state cycle: 0=original | 1=name asc | 2=name desc | 3=rank asc | 4=rank desc
-// Sort runs on a snapshot of the current tbody children — that keeps the
-// semantics of "filtered rows stay filtered" intact, because we never
-// toggle .pm-row-hidden during sort.
 function pmGetSortMode() {
     const btn = document.querySelector('.pm-sort-toggle');
     return btn ? parseInt(btn.getAttribute('data-pm-sort-mode') || '0', 10) : 0;
@@ -409,9 +318,7 @@ function pmSetSortMode(mode) {
     if (indicator) indicator.textContent = SORT_LABELS[mode] || SORT_LABELS[0];
     try {
         localStorage.setItem(STORAGE_KEY_SORT, String(mode));
-    } catch {
-        /* ignore */
-    }
+    } catch {}
 }
 function pmRestoreSortMode() {
     try {
@@ -438,7 +345,6 @@ function pmApplySort(mode) {
             if (cmp === 0) cmp = origA - origB;
             return mode === 1 ? cmp : -cmp;
         }
-        // rank sort: missing ranks go to the bottom regardless of direction
         const ra = a.getAttribute('data-pm-rank');
         const rb = b.getAttribute('data-pm-rank');
         const rai = ra ? parseInt(ra, 10) : NaN;
@@ -462,9 +368,6 @@ function pmCycleSort() {
     pmApplySort(next);
 }
 
-// ----------------------------------------------------------------------
-// Selection & bulk edit
-// ----------------------------------------------------------------------
 function pmGetSelectedRows() {
     return document.querySelectorAll('.pm-matrix tbody tr.pm-row-selected:not(.pm-row-hidden)');
 }
@@ -478,7 +381,6 @@ function pmRefreshBulkPanel() {
         panel.hidden = count === 0;
         panel.classList.toggle('visible', count > 0);
     }
-    // Sync select-all checkbox to current state of visible rows.
     const selectAll = document.getElementById('pm-select-all');
     if (selectAll) {
         const visible = document.querySelectorAll(
@@ -544,9 +446,6 @@ function pmBulkApply() {
     const rows = pmGetSelectedRows();
     if (rows.length === 0) return;
 
-    // Render a confirmation modal that uses the level's *displayed* text
-    // (not LEVEL_A / __NONE__) so the officer reviews the change in the
-    // same language the dropdown uses.
     const levelLabel = lvlSel.options[lvlSel.selectedIndex].textContent.trim();
     const catLabel = catSel.options[catSel.selectedIndex].textContent.trim();
     const msg = MSG_BULK_CONFIRM_MSG.replace('{level}', levelLabel)
@@ -560,9 +459,6 @@ function pmBulkApply() {
         };
     confirmFn(MSG_BULK_CONFIRM_TITLE, msg).then(function (ok) {
         if (!ok) return;
-        // Enqueue one save per selected row. The queue serialises saves,
-        // so all of these will eventually be PUT in order without
-        // overwhelming the backend or stepping on each other's @Version.
         const apiLevel = level === '__NONE__' ? '' : level;
         rows.forEach(function (row) {
             const userId = row.getAttribute('data-pm-user-id');
@@ -581,9 +477,6 @@ function pmBulkApply() {
     });
 }
 
-// ----------------------------------------------------------------------
-// Last-evaluated formatting (server sends ISO Instant; we format locally)
-// ----------------------------------------------------------------------
 function pmFormatLastEvaluated() {
     const nodes = document.querySelectorAll('.pm-member-last-eval[data-pm-last-evaluated]');
     nodes.forEach(function (node) {
@@ -597,8 +490,6 @@ function pmFormatLastEvaluated() {
     });
 }
 function pmRefreshLastEvaluatedFor(userId) {
-    // After a save we just bump the row's last-evaluated to "now". The
-    // server's authoritative timestamp lands on the next full page load.
     const row = document.querySelector('tr[data-pm-user-id="' + userId + '"]');
     if (!row) return;
     const node = row.querySelector('.pm-member-last-eval');
@@ -611,9 +502,6 @@ function pmRefreshLastEvaluatedFor(userId) {
     row.setAttribute('data-pm-has-evaluations', 'true');
 }
 
-// ----------------------------------------------------------------------
-// CSV export (respects current filter + sort, never reads from server)
-// ----------------------------------------------------------------------
 function pmCsvEscape(value) {
     if (value === null || value === undefined) return '';
     let s = String(value);
@@ -635,9 +523,6 @@ function pmLevelLabel(value) {
     return value;
 }
 function pmExportCsv() {
-    // Column order from the second header row so the CSV matches the
-    // matrix exactly (including any future column re-ordering done by
-    // the backend). Each header carries the topic and category name.
     const catHeaders = document.querySelectorAll(
         '.pm-matrix thead tr.pm-row-category th[data-pm-category-id]',
     );
@@ -687,7 +572,6 @@ function pmExportCsv() {
     });
 
     const csv = lines.join('\r\n');
-    // BOM so Excel auto-detects UTF-8 for umlauts in member names.
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const iso = new Date().toISOString().slice(0, 10);
@@ -702,9 +586,6 @@ function pmExportCsv() {
     }, 0);
 }
 
-// ----------------------------------------------------------------------
-// Wiring
-// ----------------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', function () {
     pmApplyCollapsedState(pmLoadCollapsedTopics());
     pmFormatLastEvaluated();
@@ -739,13 +620,6 @@ document.addEventListener('DOMContentLoaded', function () {
         window.krtEvents.on('click', 'pm-bulk-clear', pmClearSelection);
     }
 
-    // After a full matrix re-render (409 recovery) the rows are rebuilt from
-    // server state, so re-apply every client-side view layer: topic collapse,
-    // last-evaluated formatting, the persisted sort mode, the active filter
-    // and the bulk-selection panel. The delegated change/click handlers above
-    // survive the swap (they are bound on document), so only view state needs
-    // restoring. The lighter eligibility-cell swaps target a <td> (no id), so
-    // they are intentionally ignored here.
     document.addEventListener('krt:swapped', function (e) {
         const c = e.detail && e.detail.container;
         if (!c || c.id !== 'pm-matrix-results') return;

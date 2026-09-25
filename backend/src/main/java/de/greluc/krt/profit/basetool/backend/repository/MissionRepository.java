@@ -46,34 +46,20 @@ public interface MissionRepository
 
   /**
    * Returns slim {@link de.greluc.krt.profit.basetool.backend.model.dto.MissionReferenceDto}s for
-   * the mission-picker dropdowns of the warehouse (Lager) views, sorted newest-first by planned
-   * start (missions without a planned start sort last, then alphabetically by name), without
-   * pulling the full {@link Mission} aggregate. The result contains every {@code PLANNED} / {@code
-   * ACTIVE} mission visible to the caller (the live operational set, regardless of date) plus every
-   * recently-closed {@code COMPLETED} / {@code CANCELLED} mission whose {@code plannedStartTime} is
-   * on or after {@code cutoff} — so an inventory item can still be filtered by, or re-bound to, a
-   * mission that has just wrapped up. Terminal missions older than the cut-off (and terminal
-   * missions with no planned start) are dropped to keep the dropdown from ballooning with
-   * historical operations.
+   * the Lager mission pickers: every visible {@code PLANNED} / {@code ACTIVE} mission plus {@code
+   * COMPLETED} / {@code CANCELLED} ones planned on or after {@code cutoff}, newest planned start
+   * first.
    *
-   * <p>Multi-tenant rule (MULTI_SQUADRON_PLAN.md §1, audit finding H-4 + R6.c §5.4): the lookup
-   * uses the standard org-unit scope-predicate triple — admin all-scope sees every matching
-   * mission; a specific {@code activeOrgUnitId} narrows to that OrgUnit's missions; the non-admin
-   * path passes the union of memberships. Cross-staffel public missions ({@code isInternal=false})
-   * remain visible regardless of scope — so a member from one OrgUnit can still see other OrgUnits'
-   * public missions in the typeahead. An <em>ownerless</em> mission ({@code owningOrgUnit IS NULL}
-   * — a leadership / "Bereichsleitung" mission) is surfaced through the {@code isInternal = false}
-   * branch when public, and to organisation members-or-above (the {@code viewerIsMemberOrAbove}
-   * flag) when internal.
+   * <p>Scoped by the org-unit scope-predicate triple; public missions stay visible across units,
+   * and internal ownerless missions only to members or above.
    *
    * @param isAdminAllScope {@code true} iff the caller is admin without an active OrgUnit selection
    *     — disables the scope filter entirely.
    * @param activeOrgUnitId the single OrgUnit the caller is pinned to, or {@code null}.
    * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin path); empty for
    *     admins and anonymous callers.
-   * @param viewerIsMemberOrAbove {@code true} iff the caller is an organisation member or above
-   *     (not an anonymous / guest outsider); lets the caller see <em>internal</em> ownerless
-   *     leadership missions, which carry no owning OrgUnit to scope against.
+   * @param viewerIsMemberOrAbove {@code true} iff the caller is an organisation member or above;
+   *     reveals internal ownerless missions.
    * @param cutoff inclusive lower bound on {@code plannedStartTime} for {@code COMPLETED} / {@code
    *     CANCELLED} missions; {@code PLANNED} / {@code ACTIVE} missions are returned regardless of
    *     it.
@@ -97,23 +83,10 @@ public interface MissionRepository
       @Param("cutoff") Instant cutoff);
 
   /**
-   * Loads a mission by id, eagerly fetching only the {@code participants} collection via
-   * {@code @EntityGraph}.
+   * Loads a mission by id with its {@code participants} and their to-one associations fetched.
    *
-   * <p><strong>Single-collection graph on purpose (#1138).</strong> Graphing <em>two</em> sibling
-   * collections ({@code participants} <em>and</em> {@code assignedUnits}) fetch-joins them into a
-   * {@code |participants| x |assignedUnits|} cartesian product — every mission scalar (including
-   * the TEXT {@code description}) repeated across thousands of rows on a large operation, on the
-   * hottest mission query (detail GET, every mutator, and — before #1139 — the authorization
-   * gates). {@code assignedUnits} is therefore left lazy: with {@code
-   * hibernate.default_batch_fetch_size=100} it loads in a single bounded {@code IN} query when the
-   * DTO mapper touches it, eliminating the row product with no N+1. The mapping runs inside the
-   * class-{@code @Transactional} controller, so the lazy fetch is always inside an open persistence
-   * context.
-   *
-   * <p>The participants' three to-one associations ride along in the same join since they became
-   * lazy (BE-PERF-11): each is one row per participant, so joining them adds no row product, and
-   * the roster mapping reads all three for every participant.
+   * <p>{@code assignedUnits} stays lazy to avoid a cartesian product; it batch-loads on first
+   * access, which requires an open transaction.
    *
    * @param id the mission id
    * @return the mission with its participants pre-loaded, or empty when none exists
@@ -129,16 +102,10 @@ public interface MissionRepository
   Optional<Mission> findById(UUID id);
 
   /**
-   * Initialises a mission's {@code assignedUnits} together with every to-one the unit mapping reads
-   * — the unit's ship type and its manufacturer, the assigned ship with its type, manufacturer,
-   * location and owner, and the responsible user — in one statement, into the <em>current</em>
-   * persistence context.
+   * Initialises a mission's {@code assignedUnits} and every to-one the unit mapping reads in one
+   * statement, into the current persistence context.
    *
-   * <p>The detail read calls it right after {@link #findById(UUID)}; the result is the same managed
-   * {@link Mission}, so the collection the mapper then walks is already initialised. Kept out of
-   * {@code findById}'s graph on purpose: two sibling collections there would fetch-join into a
-   * {@code participants x assignedUnits} product (#1138). Until BE-PERF-11 these to-ones were EAGER
-   * and came with the unit rows; lazy, they would cost five batch loads per detail read.
+   * <p>Call it after {@link #findById(UUID)}; it returns the same managed {@link Mission}.
    *
    * @param id the mission id
    * @return the mission (at most one element), with its unit graph initialised
@@ -153,14 +120,10 @@ public interface MissionRepository
   List<Mission> fetchAssignedUnitGraph(@Param("id") UUID id);
 
   /**
-   * Returns the next upcoming mission (limit 1) whose {@code plannedStartTime} is after {@code
-   * date} and whose {@code status} is one of {@code statuses} — the home-page "next mission" banner
-   * passes {@code PLANNED} / {@code ACTIVE} so a {@code COMPLETED} / {@code CANCELLED} mission with
-   * a future planned start never surfaces there. Deliberately NOT graphed: combining the {@code
-   * limit 1} with a collection {@code @EntityGraph} ({@code participants} / {@code assignedUnits})
-   * forces Hibernate to load the whole result set and paginate in memory (HHH90003004). Callers
-   * that need the collections re-fetch the single hit by id through the graphed {@link
-   * #findById(UUID)} — see {@code MissionService.getNextMission}.
+   * Returns the next mission whose {@code plannedStartTime} is after {@code date} and whose status
+   * is one of {@code statuses}.
+   *
+   * <p>Loads no collections; callers needing them re-fetch via {@link #findById(UUID)}.
    *
    * @param date exclusive lower bound on {@code plannedStartTime}
    * @param statuses the mission statuses to include (e.g. {@code PLANNED} / {@code ACTIVE})
@@ -170,31 +133,11 @@ public interface MissionRepository
       Instant date, Collection<String> statuses);
 
   /**
-   * Org-unit-scoped next-mission lookup (REQ-MISSION-008). Returns the upcoming missions owned by
-   * the caller's org units, soonest planned start first, so the home-page "next mission" banner can
-   * surface only the next mission that belongs to the viewer's own unit(s) — or, for a Bereich/OL
-   * leader, their subordinate units — instead of the organisation-wide next one. Pass {@code
-   * PageRequest.of(0, 1)} to take only the head; the result is the soonest match.
+   * Returns upcoming missions owned by the caller's org units, soonest first, for the home-page
+   * "next mission" banner (REQ-MISSION-008).
    *
-   * <p>Scope is the same org-unit-predicate shape used by {@link #searchMissions} minus the
-   * cross-staffel public escape: a pinned {@code activeOrgUnitId} narrows to that single OrgUnit;
-   * otherwise the mission's {@code owningOrgUnit} must be one of {@code memberOrgUnitIds} (the
-   * caller's membership union already expanded with the epic #692 / REQ-ORG-015 leadership cascade
-   * by {@link
-   * de.greluc.krt.profit.basetool.backend.service.OwnerScopeService#currentScopePredicate()}).
-   * Foreign missions — including other OrgUnits' public ones — are deliberately excluded, because
-   * the banner answers "what is <em>my</em> unit heading towards". The admin-all and the
-   * no-org-unit (membershipless) cases never reach this query; the service routes them to the
-   * unscoped {@link #findFirstByPlannedStartTimeAfterAndStatusInOrderByPlannedStartTimeAsc(Instant,
-   * java.util.Collection)} instead.
-   *
-   * <p>Internal missions are included unconditionally. Until ADR-0159 an {@code allowInternal} flag
-   * gated them, kept "defensive should a non-member ever carry an org-unit scope" — but every
-   * caller passed {@code true}, and the audience the {@code false} arm existed for (the anonymous
-   * banner) no longer exists. A parameter whose other value cannot occur is a choice the signature
-   * advertises and nobody can make. Deliberately NOT graphed — combining the {@code limit 1} with a
-   * collection {@code @EntityGraph} forces in-memory pagination (HHH90003004); the caller
-   * re-fetches the single hit by id through the graphed {@link #findById(UUID)}.
+   * <p>Narrows to {@code activeOrgUnitId} when set, else to {@code memberOrgUnitIds}; other units'
+   * public missions are excluded, internal ones included. Loads no collections.
    *
    * @param now exclusive lower bound on {@code plannedStartTime}
    * @param statuses the mission statuses to include (e.g. {@code PLANNED} / {@code ACTIVE})
@@ -220,34 +163,12 @@ public interface MissionRepository
       Pageable pageable);
 
   /**
-   * Full-text + date-range + status + scope search across missions, one page at a time. Each filter
-   * parameter is optional - a {@code null} cast removes the corresponding clause; the {@code status
-   * IN (:status)} list is always applied (pass the full enum set to disable status filtering), and
-   * sorting is delegated to {@link Pageable} so the caller can pick the column.
+   * Paged mission search by text, date range, status and org-unit scope.
    *
-   * <p>Multi-tenant access control via the org-unit scope-predicate triple ({@code isAdminAllScope}
-   * / {@code activeOrgUnitId} / {@code memberOrgUnitIds}): admin all-scope sees everything, a
-   * pinned {@code activeOrgUnitId} narrows to that OrgUnit, and the non-admin path passes the
-   * membership union. Non-internal missions of any OrgUnit stay visible cross-staffel (the public
-   * escape). Ownerless leadership missions ({@code owningOrgUnit IS NULL}) follow the same
-   * public/internal split — public to all; internal only to organisation members-or-above (the
-   * {@code viewerIsMemberOrAbove} flag).
-   *
-   * <p>The unpaged {@code List} sibling, which fetch-joined both {@code participants} and {@code
-   * assignedUnits} into a cartesian product, had no caller and was deleted on 2026-09-22
-   * (BE-PERF-02, REQ-DATA-003).
-   *
-   * <p><strong>No collection graph, on purpose.</strong> The controller maps the page result
-   * through {@code MissionMapper.toListDto}, which reads only scalar columns plus the two
-   * {@code @ManyToOne} associations {@code operation} and {@code owningSquadron} — it never touches
-   * {@code participants} or {@code assignedUnits}. Eager-loading those collections via
-   * {@code @EntityGraph} forces Hibernate into in-memory pagination ({@code HHH000104:
-   * firstResult/maxResults specified with collection fetch; applying in memory}) because SQL-level
-   * {@code OFFSET}/{@code LIMIT} cannot be combined with a collection join. The resulting cartesian
-   * {@code mission x participant x unit} fetch + JVM-side slicing was the dominant cost of the
-   * missions list page after the multi-squadron rollout. Eager-loading only the two
-   * {@code @ManyToOne} associations here keeps Hibernate on SQL pagination and resolves the per-row
-   * mapping in a single query.
+   * <p>Filters are optional ({@code null} removes a clause) except {@code status}, which is always
+   * applied. Scoped by the org-unit scope-predicate triple; public missions stay visible across
+   * units, internal ownerless missions only to members or above. Fetches only {@code operation} and
+   * {@code owningOrgUnit}, so pagination stays in SQL.
    */
   @EntityGraph(attributePaths = {"operation", "owningOrgUnit"})
   @Query(
@@ -290,16 +211,8 @@ public interface MissionRepository
   void removeManager(@Param("userId") UUID userId);
 
   /**
-   * Returns {@code true} if the given operation has at least one mission whose actual time window
-   * is incomplete — either {@code actualStartTime} or {@code actualEndTime} is {@code null}. Drives
-   * the "payout figures are preliminary" warning on the operation-detail page: as long as any
-   * mission has not been started or has not been finalized, the operation's payout breakdown cannot
-   * include the unfinished mission's checked-in time (see {@code
-   * OperationService#computeParticipationBreakdown} which skips such missions), so the percentages
-   * may rebalance once every mission is closed.
-   *
-   * <p>Implemented as a single {@code COUNT > 0} / {@code EXISTS}-equivalent JPQL query so the
-   * detail-endpoint adds at most one cheap round-trip on top of the existing {@code findById} hit.
+   * Returns whether any mission of the operation lacks {@code actualStartTime} or {@code
+   * actualEndTime}, i.e. whether the operation's payout figures are still preliminary.
    *
    * @param operationId the operation to inspect
    * @return {@code true} if at least one mission of the operation lacks {@code actualStartTime} or
@@ -356,8 +269,7 @@ public interface MissionRepository
 
   /**
    * Atomically bumps {@code partyLeadVersion} iff it still equals {@code expected}; the party-lead
-   * section guard. Closes the P0-3 silent lost update (#1112) — its whole write set is excluded, so
-   * without this the in-memory check let two overlapping reassignments both win.
+   * section guard.
    *
    * @param id the mission id.
    * @param expected the party-lead-section version the caller echoed back.
@@ -371,8 +283,7 @@ public interface MissionRepository
 
   /**
    * Atomically bumps {@code stepsVersion} iff it still equals {@code expected}; the Ablauf-steps
-   * section guard. Serialises concurrent step adds/reorders so the {@code max+1} order-index
-   * computation and the reorder id-set check become race-free (#1147).
+   * section guard that serialises concurrent step adds and reorders.
    *
    * @param id the mission id.
    * @param expected the steps-section version the caller echoed back.
@@ -386,7 +297,7 @@ public interface MissionRepository
 
   /**
    * Atomically bumps {@code objectivesVersion} iff it still equals {@code expected}; the goals
-   * (Ziele) section guard. Serialises concurrent goal adds/reorders like its steps twin (#1147).
+   * (Ziele) section guard that serialises concurrent goal adds and reorders.
    *
    * @param id the mission id.
    * @param expected the goals-section version the caller echoed back.
@@ -400,8 +311,7 @@ public interface MissionRepository
 
   /**
    * Atomically bumps {@code owningOrgUnitVersion} iff it still equals {@code expected}; the
-   * owning-org-unit reassignment guard. The other half of the P0-3 fix (#1112): the association is
-   * fully excluded, so the DB check is what makes two concurrent re-homings collide.
+   * owning-org-unit reassignment guard.
    *
    * @param id the mission id.
    * @param expected the owning-org-unit-section version the caller echoed back.
@@ -414,16 +324,9 @@ public interface MissionRepository
   int bumpOwningOrgUnitVersionIfMatches(@Param("id") UUID id, @Param("expected") long expected);
 
   /**
-   * Loads a mission for the legacy full-replace path ({@code MissionService.updateMission}, {@code
-   * PUT /missions/{id}}) under {@link LockModeType#OPTIMISTIC_FORCE_INCREMENT}. Since #1114 every
-   * mutable mission scalar is {@code @OptimisticLock(excluded = true)}, so a whole-mission
-   * overwrite would no longer bump the row {@code @Version} on its own; forcing the increment here
-   * restores the "two concurrent full overwrites 409 against each other" guarantee that path always
-   * had. The same single-collection {@code participants} graph as {@link #findById(UUID)} is
-   * fetched because the full-replace re-clamps participant end-times in memory; {@code
-   * assignedUnits} batch-loads on first touch. Graphing both siblings, as this finder did until
-   * 2026-09-22, fetch-joined them into a {@code |participants| x |units|} cartesian product with
-   * every mission column repeated per row (REQ-DATA-003, #1138, BE-PERF-03).
+   * Loads a mission with its {@code participants} under {@link
+   * LockModeType#OPTIMISTIC_FORCE_INCREMENT} for the full-replace update ({@code PUT
+   * /missions/{id}}), so two concurrent full overwrites conflict.
    *
    * @param id the mission id.
    * @return the mission with its participants loaded, under a forced version increment, or empty

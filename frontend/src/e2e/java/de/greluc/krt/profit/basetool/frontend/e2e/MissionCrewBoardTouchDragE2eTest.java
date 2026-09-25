@@ -37,23 +37,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Functional flow: on a touch device a mission participant can be dragged from the "Ohne Einheit"
- * pool into a unit by pressing and holding the row (#1936, REQ-MISSION-005).
+ * Verifies that on a touch device a participant can be dragged from the "Ohne Einheit" pool into a
+ * unit by press-and-hold (REQ-MISSION-005).
  *
- * <p>Regression coverage for the reported defect: no mobile browser synthesises {@code dragstart}
- * from touch input, so the crew board's whole drag half was inert on a phone and the long press
- * raised the browser's own context menu instead. The board therefore carries a second,
- * pointer-based drag for touch and pen, plus the CSS that keeps the browser's long-press behaviour
- * out of the way.
- *
- * <p><b>What this proves and what it cannot.</b> The gesture is driven with synthetic {@code
- * PointerEvent}s, which exercise the board's own state machine end to end — hold, activation, the
- * {@code elementFromPoint} hit-test, the drop, and the backend write it triggers. What no automated
- * browser test can reach is the platform behaviour underneath: that Android really does withhold
- * its context menu and that the page really stops scrolling under the finger. The CSS half is
- * asserted as computed style and the board's own {@code preventDefault} as a cancelled event, which
- * is the closest a headless engine gets; the platform's reaction to them still needs a human with a
- * phone.
+ * <p>Synthetic {@code PointerEvent}s drive the board's own drag logic end to end; the platform's
+ * native long-press and scroll behaviour is asserted only indirectly, as computed style and a
+ * cancelled event.
  */
 @Tag("e2e")
 class MissionCrewBoardTouchDragE2eTest {
@@ -67,7 +56,7 @@ class MissionCrewBoardTouchDragE2eTest {
   /** The unit the held participant is dropped into. */
   private static final String UNIT = "E2E Touch Drag Unit";
 
-  /** Phone class of REQ-UI-009, the class the reported defect was seen on. */
+  /** Phone viewport width of REQ-UI-009. */
   private static final int PHONE_WIDTH = 375;
 
   private static final int PHONE_HEIGHT = 812;

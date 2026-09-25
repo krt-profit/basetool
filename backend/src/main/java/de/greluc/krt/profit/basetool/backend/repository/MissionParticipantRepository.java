@@ -37,10 +37,8 @@ public interface MissionParticipantRepository extends JpaRepository<MissionParti
   Optional<MissionParticipant> findByMissionIdAndUserId(UUID missionId, UUID userId);
 
   /**
-   * Returns {@code true} iff at least one participant is affiliated with the org unit (Staffel or
-   * Spezialkommando) of the given id, traversing the {@code orgUnits} many-to-many. Replaces the
-   * former {@code existsBySquadronId} after the participant affiliation moved from the single
-   * {@code squadron_id} FK to the {@code mission_participant_org_unit} join.
+   * Returns whether any participant is affiliated with the given org unit (Staffel or
+   * Spezialkommando).
    *
    * @param orgUnitId the org-unit id to check for any participant affiliation.
    * @return {@code true} iff at least one participant references the org unit.
@@ -78,13 +76,8 @@ public interface MissionParticipantRepository extends JpaRepository<MissionParti
   void unlinkUser(@Param("userId") UUID userId);
 
   /**
-   * Clears the derived {@code is_mission_lead_participant} flag on every participant whose planned
-   * job type is the given (now no-longer-mission-lead) job type. Called when an admin moves or
-   * removes the single Einsatzleiter designation from a job type ({@code
-   * JobTypeService.applyMissionLeadDesignation}) so a stale flag on a demoted type cannot falsely
-   * trip the {@code uq_mission_participant_single_lead} partial unique index and block a legitimate
-   * new lead assignment (#1113). Bulk update — the participant collections it touches are not
-   * loaded in the job-type transaction, so no persistence-context reconciliation is needed.
+   * Clears the {@code is_mission_lead_participant} flag on every participant whose planned job type
+   * is the given job type, once it no longer carries the Einsatzleiter designation.
    *
    * @param jobTypeId the job type that is no longer the mission lead.
    * @return the number of participant rows whose flag was cleared.
@@ -96,15 +89,11 @@ public interface MissionParticipantRepository extends JpaRepository<MissionParti
   int clearMissionLeadFlagForJobType(@Param("jobTypeId") UUID jobTypeId);
 
   /**
-   * Atomically clamps the {@code endTime} of every checked-in participant of a mission to {@code
-   * end} in a single set-based statement, bumping each touched row's {@code @Version} so it stays
-   * consistent. Used by the schedule-close path when {@code actualEndTime} is set, replacing the
-   * per-row entity loop that (a) 409'd the whole schedule write if any of up-to-500 rows was
-   * concurrently modified and (b) 409'd concurrent check-outs at their own commit (#1146, the
-   * CLAUDE.md bulk-update rule). Only rows still checked in ({@code startTime} set) and either not
-   * yet checked out or checked out later than {@code end} are touched. {@code flushAutomatically}
-   * so a pending schedule-scalar change lands first; deliberately NOT {@code clearAutomatically} —
-   * the managed mission is still needed by the caller after this runs.
+   * Clamps the {@code endTime} of every checked-in participant of a mission to {@code end} in one
+   * statement, bumping each touched row's {@code version}.
+   *
+   * <p>Touches only rows with a {@code startTime} whose {@code endTime} is unset or later than
+   * {@code end}. Flushes first and keeps the persistence context.
    *
    * @param missionId the mission whose checked-in participants to clamp.
    * @param end the mission's actual end time to clamp late/open check-outs to.
@@ -118,12 +107,9 @@ public interface MissionParticipantRepository extends JpaRepository<MissionParti
   int clampCheckedInEndTimes(@Param("missionId") UUID missionId, @Param("end") Instant end);
 
   /**
-   * Registration counts for a whole page of missions in ONE grouped statement.
+   * Returns participant counts for a page of missions in one grouped query.
    *
-   * <p>The mission list shows "{n} angemeldet" per row. Reading it from each mission's lazy {@code
-   * participants} collection would be one SELECT per row (REQ-DATA-003), and the detail endpoint —
-   * the only other place the figure exists — is a different read entirely. Missions with no
-   * participants produce no row; the caller treats a missing id as zero.
+   * <p>Missions without participants produce no row.
    *
    * @param missionIds the missions on the page; an empty collection yields an empty list.
    * @return one count row per mission that has at least one participant.

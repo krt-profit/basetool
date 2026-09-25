@@ -43,11 +43,8 @@ import org.springframework.context.MessageSource;
 import org.springframework.mock.web.MockHttpServletRequest;
 
 /**
- * Unit tests for {@link LayoutMiscAdvice}. Focuses on the {@code appTitle} composition
- * (REQ-ORG-024) — the single surface for the active OrgUnit context after the redundant top-right
- * chip was removed — across all five branches: a Staffel pin, an SK pin (the case the removed chip
- * used to be the only surface for), a pin without a shorthand (name fallback), an admin in
- * all-OrgUnits mode, and no context at all.
+ * Unit tests for {@link LayoutMiscAdvice}'s {@code appTitle} composition (REQ-ORG-024): Staffel
+ * pin, SK pin, pin without shorthand, admin in all-OrgUnits mode, and no context.
  */
 @ExtendWith(MockitoExtension.class)
 class LayoutMiscAdviceTest {

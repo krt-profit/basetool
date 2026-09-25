@@ -52,17 +52,13 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Unit tests for {@link UexRefinerySyncService}. Like the sibling UEX sync services, the contract
- * under test is:
+ * Unit tests for {@link UexRefinerySyncService}:
  *
  * <ul>
- *   <li>Empty UEX response → service aborts early without wiping the local table.
- *   <li>Rows with missing identifiers are skipped (defensive: refining methods need a name; yields
- *       need both commodity-id and terminal-id plus a non-null value).
- *   <li>Existing rows are mutated in place (preserves id / version); new rows are created with the
- *       canonical fields.
- *   <li>Yield rows referencing an unknown material or terminal are skipped — never silently
- *       auto-created with placeholder data.
+ *   <li>an empty UEX response aborts without wiping the local table;
+ *   <li>rows missing identifiers are skipped;
+ *   <li>existing rows are updated in place, new rows created;
+ *   <li>yields referencing an unknown material or terminal are skipped.
  * </ul>
  */
 @ExtendWith(MockitoExtension.class)

@@ -31,17 +31,9 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 /**
- * Keeps the Art. 17 erasure's set of columns closed against the schema (REQ-SEC-062, ADR-0183).
- *
- * <p>{@code HandleAnonymisationService} used to describe its set as closed in a comment, and the
- * comment went out of date: five columns survived a granted erasure, among them the bank custodian
- * registry, whose whole purpose is to outlive the account. The person search never drifted the same
- * way because {@code PersonSearchCoverageTest} would not let it. This is that gate for the erasure.
- *
- * <p>Every column {@link PersonSearchTargets} registers as a place a person is named must carry a
- * disposition in {@link HandleErasureCoverage}. Adding a search target therefore forces somebody to
- * answer "and what does an erasure do about this one?" while they still have the context to answer
- * it — which is the whole mechanism, not a side effect of it.
+ * Requires every column {@link PersonSearchTargets} registers as naming a person to carry a
+ * disposition in {@link HandleErasureCoverage}, keeping the Art. 17 erasure's column set closed
+ * (REQ-SEC-062, ADR-0183).
  */
 class HandleErasureCoverageTest {
 

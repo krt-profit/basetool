@@ -20,8 +20,8 @@
 package de.greluc.krt.profit.basetool.frontend.model.dto;
 
 /**
- * One fuzzy-match candidate mirroring the backend {@code BlueprintImportSuggestionDto} (#327),
- * offered for an unmatched SCMDB blueprint name in the import preview.
+ * Frontend mirror of the backend {@code BlueprintImportSuggestionDto}: one fuzzy-match candidate
+ * for an unmatched blueprint name.
  *
  * @param productKey normalized product key of the candidate (echoed back on apply)
  * @param productName display spelling of the candidate product

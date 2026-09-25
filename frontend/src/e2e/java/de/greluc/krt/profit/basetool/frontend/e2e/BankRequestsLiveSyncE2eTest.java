@@ -36,18 +36,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Two-context live-sync coverage for the Kartellbank staff request queue (#1102, REQ-FE-015 /
- * ADR-0094): a staff decision one bank employee makes on {@code /bank/requests} must update another
- * employee's queue without a manual reload — the {@code requestQueue} section key crossing the
- * global {@code bank} room.
- *
- * <p>Two browser contexts as the same bank employee are two distinct {@code /ws/sync} sockets, so
- * the deterministic pre-mutation wait is {@code window.krtLiveSync.subscribedTopics()} becoming
- * non-empty (the {@code bank} staff room is authorized by a local role check against the
- * handshake-captured authorities). A pending request is seeded through the backend; context A
- * <em>rejects</em> it (which books nothing and needs no holder, yet still broadcasts {@code
- * bank/[requestQueue,grid]}) and context B — a passive viewer — must drop the now-decided request
- * from its default pending-only queue in place.
+ * Two-context live-sync test of the bank staff request queue (REQ-FE-015): rejecting a request in
+ * one context removes it from the other context's pending queue without a reload.
  */
 @Tag("e2e")
 class BankRequestsLiveSyncE2eTest {
@@ -178,12 +168,8 @@ class BankRequestsLiveSyncE2eTest {
   }
 
   /**
-   * Regression guard for the bank decision-modal reopen bug: after a bank employee decides one
-   * request, the shared decision modal must re-open for the very next request in the same session —
-   * without a page reload. The success path once closed the modal by writing an inline {@code
-   * style.display = 'none'}, which outranks the class-based {@code open-modal-display} re-open (a
-   * modal is shown via the {@code krtm-modal-open} class since the CSP class migration, ADR-0093),
-   * so the second request's button silently did nothing until the page was reloaded (REQ-UI-013).
+   * Asserts that after deciding one request the shared decision modal reopens for the next request
+   * without a reload (REQ-UI-013).
    */
   @Test
   void decidingOneRequestReopensTheModalForTheNextInPlace() {

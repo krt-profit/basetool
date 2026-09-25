@@ -40,12 +40,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST surface for Kommandogruppen — the named sub-structures of a Staffel (epic #800,
- * REQ-ROLE-003/004). Reads are open to any authenticated user (descriptive structure); the writes
- * are delegated: admin, or — via {@code OrgRoleManagementSecurityService} — the Staffelleiter of
- * the group's squadron. Create is keyed on the squadron id in the path; update / delete resolve the
- * group's squadron from its persisted edge (so a Staffelleiter cannot edit another squadron's group
- * by forging the path).
+ * REST surface for Kommandogruppen, the named sub-structures of a Staffel (REQ-ROLE-003).
+ *
+ * <p>Reads are open to any authenticated user. Writes are allowed to admins and to the
+ * Staffelleiter of the group's squadron; update and delete resolve that squadron from the persisted
+ * group, not from the path.
  */
 @RestController
 @RequiredArgsConstructor

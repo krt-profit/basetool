@@ -55,11 +55,9 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
- * Mockito unit tests for {@link OrgRoleManagementSecurityService} — the delegated appointment
- * ladder (epic #800, REQ-ROLE-004). Pins the strictly-higher-tier rule (so self-promotion is
- * impossible), the parent-Bereich-derived-from-the-edge scoping (so a foreign unit is denied), and
- * that the verdict <em>never</em> consults {@code isAdmin()} (admin is decided at the
- * {@code @PreAuthorize} layer).
+ * Unit tests for {@link OrgRoleManagementSecurityService} (REQ-ROLE-004): the strictly-higher-tier
+ * rule, parent-Bereich scoping from the persisted edge, and that {@code isAdmin()} is never
+ * consulted.
  */
 @ExtendWith(MockitoExtension.class)
 class OrgRoleManagementSecurityServiceTest {

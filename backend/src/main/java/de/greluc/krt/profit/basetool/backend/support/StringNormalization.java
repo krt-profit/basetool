@@ -24,17 +24,10 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Shared free-text normalization primitives for inbound string fields.
- *
- * <p>Both the JSON path ({@code NormalizedStringDeserializer}) and the form-binding path ({@code
- * NormalizedStringEditor}) must land a submitted value in the same canonical form so a JSON post
- * and a form post of the identical text reach the database identically. This class holds the pieces
- * they share — the single authoritative free-text length cap, the NFC-normalize-and-length-check
- * step, the full trim + empty-policy + normalize {@link #normalize(String, int, boolean) pipeline},
- * and the two blank-collapse primitives ({@link #blankToNull(String)}, {@link #trimToNull(String)})
- * that the service layer reuses instead of re-inlining the {@code null}/blank idiom at each note
- * field. The JSON deserializer keeps its own Unicode-blank-to-{@code null} policy inline because it
- * deliberately differs from the form editor's ASCII-empty policy.
+ * Shared normalization primitives for inbound free-text fields, used by both the JSON and the
+ * form-binding path so identical text reaches the database identically: the length cap, NFC
+ * normalization, the full {@link #normalize(String, int, boolean) pipeline} and the {@link
+ * #blankToNull(String)} / {@link #trimToNull(String)} collapses.
  */
 public final class StringNormalization {
 
@@ -49,17 +42,12 @@ public final class StringNormalization {
   private StringNormalization() {}
 
   /**
-   * NFC-normalizes {@code value} and enforces {@code maxLength}. NFC collapses Unicode combining
-   * sequences into precomposed code points so {@code "café"} (one code point) and {@code "cafe +
-   * ́"} (two code points) canonicalize to the same string and compare equal in the database. The
-   * caller is responsible for trimming and for its own null/blank handling before calling this;
-   * {@code value} must be non-null.
+   * NFC-normalizes an already-trimmed, non-null {@code value} and enforces {@code maxLength}.
    *
    * @param value the already-trimmed, non-null value to canonicalize
    * @param maxLength the inclusive maximum allowed length after normalization
    * @return the NFC-normalized value
-   * @throws IllegalArgumentException when the normalized value exceeds {@code maxLength}; {@code
-   *     GlobalExceptionHandler} maps this to an HTTP 400
+   * @throws IllegalArgumentException when the normalized value exceeds {@code maxLength} (HTTP 400)
    */
   public static String normalizeAndCap(String value, int maxLength) {
     String normalized = Normalizer.normalize(value, Normalizer.Form.NFC);
@@ -70,14 +58,8 @@ public final class StringNormalization {
   }
 
   /**
-   * Collapses a {@code null} or blank string to {@code null}, otherwise returns it unchanged.
-   *
-   * <p>"Blank" is {@link String#isBlank()} — a {@link Character#isWhitespace(int)}-based test — so
-   * a value made up only of spaces, tabs or other Unicode whitespace (e.g. an em space) maps to
-   * {@code null}, whereas a non-breaking space (U+00A0, deliberately not {@code isWhitespace})
-   * counts as content. Unlike {@link #trimToNull(String)} the returned value is <em>not</em>
-   * stripped; this is the plain "empty means absent" collapse used by importer resolution code that
-   * must leave an otherwise-present value byte-for-byte intact.
+   * Collapses a {@code null} or {@link String#isBlank() blank} string to {@code null}, otherwise
+   * returns it unstripped.
    *
    * @param value the candidate value, may be {@code null}
    * @return {@code null} when {@code value} is {@code null} or blank, otherwise {@code value}
@@ -89,16 +71,8 @@ public final class StringNormalization {
   }
 
   /**
-   * Strips leading/trailing (Unicode) whitespace and collapses a {@code null} or blank result to
+   * Strips leading and trailing Unicode whitespace and collapses a {@code null} or blank result to
    * {@code null}.
-   *
-   * <p>Equivalent to {@code value == null || value.isBlank() ? null : value.strip()}: a {@code
-   * null} or whitespace-only input yields {@code null}, otherwise the {@link String#strip()
-   * stripped} value. This is the canonical free-text "note" collapse. Every inbound note has
-   * already been trimmed, NFC-normalized and length-capped by the global binder ({@code
-   * NormalizedStringDeserializer} for JSON, {@code NormalizedStringEditor} for forms), so at the
-   * service layer this only re-asserts the "blank means cleared" invariant on an already-clean
-   * value — it centralizes the idiom the note setters used to inline five different ways.
    *
    * @param value the candidate value, may be {@code null}
    * @return the stripped value, or {@code null} when {@code value} is {@code null} or blank
@@ -109,21 +83,14 @@ public final class StringNormalization {
   }
 
   /**
-   * Full inbound-string pipeline: trim, optional empty-to-{@code null}, then NFC-normalize and cap.
-   *
-   * <p>Mirrors {@code NormalizedStringEditor}'s form-binding path exactly so the editor is a
-   * one-line delegate: a {@code null} input stays {@code null}; the value is trimmed with {@link
-   * String#trim()}; when {@code emptyAsNull} is set and the trimmed value is ASCII-empty it becomes
-   * {@code null}; otherwise it is passed through {@link #normalizeAndCap(String, int)}. The {@code
-   * emptyAsNull} flag lets a caller choose whether a blank input reads as "absent" ({@code null})
-   * or as an explicitly-cleared empty string.
+   * Full inbound-string pipeline: {@link String#trim()}, optionally ASCII-empty to {@code null},
+   * then {@link #normalizeAndCap(String, int)}. A {@code null} input stays {@code null}.
    *
    * @param value the raw inbound value, may be {@code null}
    * @param maxLength the inclusive maximum length enforced after normalization
    * @param emptyAsNull whether a trimmed-empty value collapses to {@code null}
    * @return the trimmed, NFC-normalized, length-checked value, or {@code null}
-   * @throws IllegalArgumentException when the normalized value exceeds {@code maxLength}; {@code
-   *     GlobalExceptionHandler} maps this to an HTTP 400
+   * @throws IllegalArgumentException when the normalized value exceeds {@code maxLength} (HTTP 400)
    */
   @Contract(value = "null, _, _ -> null", pure = true)
   public static @Nullable String normalize(

@@ -74,12 +74,9 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
- * Mockito unit tests for {@link OrgUnitMembershipService}. Pins the CRUD contract that the SK
- * member-management UI relies on: listing through the SK existence guard, add/remove happy paths
- * plus the duplicate-409 and not-found-404 paths, the flag-patch semantics including
- * optimistic-lock failures, and the dedicated lead toggle. The {@code …Dto} projection wrappers
- * (L4, #923, ADR-0067) are covered against the real MapStruct mapper so the wire shape — incl. the
- * flushed {@code @Version} the client must echo back (REQ-FE-003) — is asserted, not mocked.
+ * Unit tests for {@link OrgUnitMembershipService}: SK member listing, add and remove including the
+ * 409 and 404 paths, flag patches with optimistic-lock failures, the lead toggle, and the DTO
+ * projections through the real mapper including the flushed {@code @Version}.
  */
 @ExtendWith(MockitoExtension.class)
 class OrgUnitMembershipServiceTest {

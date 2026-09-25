@@ -45,34 +45,13 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * R7 UEX item-price sync (SC_WIKI_SYNC_PLAN.md §8.x / §11 R7). Walks the full UEX item-price matrix
- * ({@code /items_prices_all}) and upserts one {@code game_item_price} row per (item, terminal)
- * pair.
+ * Syncs the UEX item-price matrix ({@code /items_prices_all}) into one {@code game_item_price} row
+ * per (item, terminal) pair (REQ-DATA-005).
  *
- * <p>Resolution: {@code id_item → game_item} and {@code id_terminal → terminal}, both through id
- * maps read once per run ({@link GameItemRepository#findUexItemRefs()}, {@link
- * TerminalRepository#findUexTerminalRefs()}), and the existing row through a third ({@link
- * GameItemPriceRepository#findPriceKeyRefs()}). Unlike the commodity-price sync, an unknown item is
- * <b>skipped</b> (not auto-created): {@code game_item} is owned by the UEX item catalogue + Wiki
- * backfill, which run earlier in the same scheduler tick, so a price referencing an item not yet
- * catalogued resolves on the next cycle. Unknown terminals are skipped too (the universe sync owns
- * {@code terminal}).
- *
- * <p><strong>Transactions (BE-PERF-09, REQ-DATA-005).</strong> The ~24 000-row feed is fetched with
- * no transaction open and written through {@link SyncChunkWriter}: chunks of {@value
- * SyncChunkWriter#DEFAULT_CHUNK_SIZE} rows in their own transactions, each chunk's existing rows
- * loaded with one {@code findAllById}, a failed chunk replayed row by row. Until 2026-09-22 the run
- * was one transaction across the fetch and every row, with three lookups per row and a
- * flush-and-clear every 500 rows to keep the context from growing.
- *
- * <p>After the writes the ids of every touched row drive the stale sweep ({@link
- * GameItemPriceRepository#clearPricesByIds}), which nulls out (item, terminal) pairs UEX no longer
- * returns. The sweep is gated on a non-empty touched-set so a run that fails on every row never
- * wipes the whole matrix; an empty upstream response short-circuits before the sweep entirely.
- *
- * <p>Gated behind {@code krt.uex.item-price-sync-enabled} (default {@code false}); ships dark. The
- * payload is the largest UEX feed (~24 000 rows) so this is the most expensive UEX sync — flip it
- * on deliberately, per the deployment runbook §7.
+ * <p>Items and terminals resolve through id maps read once per run; unknown ones are skipped, not
+ * created. Rows are written through {@link SyncChunkWriter} after a transaction-free fetch, and
+ * pairs UEX no longer returns are cleared via {@link GameItemPriceRepository#clearPricesByIds}
+ * unless nothing was written. Disabled unless {@code krt.uex.item-price-sync-enabled} is set.
  */
 @Slf4j
 @Service
@@ -86,7 +65,7 @@ public class UexItemPriceSyncService {
   private final GameItemPriceRepository gameItemPriceRepository;
   private final TerminalRepository terminalRepository;
 
-  /** Writes the matrix in short isolated transactions after the fetch (BE-PERF-09). */
+  /** Writes the matrix in short isolated transactions after the fetch. */
   private final SyncChunkWriter chunkWriter;
 
   /**

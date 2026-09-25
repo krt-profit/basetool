@@ -26,22 +26,15 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 /**
- * Write payload for listing a craftable item on the Materialbörse (#1185, REQ-MARKET-012) — the
- * "Item anbieten" counterpart to {@link MaterialExchangeReleaseRequest}.
+ * Payload for listing a craftable item on the Materialbörse, the item counterpart to {@link
+ * MaterialExchangeReleaseRequest} (REQ-MARKET-012).
  *
- * <p>Unlike a material release — where amount and quality are derived server-side from the caller's
- * Lager row — an item offer has no backing stock, so the caller supplies both the product and the
- * {@link #quantity}. The {@link #productKey} is the normalized blueprint {@code product_key} chosen
- * from the blueprint-product search; the service validates it against {@code
- * BlueprintProductService.resolveByProductKey(...)}, so only items an active blueprint produces can
- * be listed, and it snapshots the canonical display name from that resolution rather than trusting
- * client text. Owner and squadron are stamped from the acting member; there is no quality and no
- * location.
+ * <p>The {@link #productKey} must resolve to an item an active blueprint produces; the display
+ * name, owner and squadron are set server-side.
  *
- * @param productKey the normalized blueprint product key of the item to offer; must resolve to an
- *     item an active blueprint produces.
- * @param quantity the whole-piece quantity being offered; must be at least 1.
- * @param remark the free-form Markdown trade remark, at most 20 000 characters (may be blank).
+ * @param productKey the normalized blueprint product key of the item to offer.
+ * @param quantity the whole-piece quantity being offered; at least 1.
+ * @param remark the Markdown trade remark, at most 20 000 characters (may be blank).
  */
 public record MaterialExchangeItemReleaseRequest(
     @NotBlank @Size(max = 255) String productKey,

@@ -22,10 +22,9 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.util.List;
 
 /**
- * Frontend mirror of the backend {@code JobOrderItemBlueprintOwnersDto}: the item job-order
- * blueprint-coverage view fetched for the order detail page. Loaded only for {@code ITEM} orders
- * and only when the viewer is a member of the responsible org unit (the backend returns 403
- * otherwise, which the page controller swallows so the section is simply omitted).
+ * Frontend mirror of the backend {@code JobOrderItemBlueprintOwnersDto}: the blueprint coverage of
+ * an ITEM order. Available only to members of the responsible org unit; on 403 the page omits the
+ * section.
  *
  * @param requiredBlueprints the order's distinct required products with per-product owner counts
  * @param owners the members owning at least one required blueprint, with the products they hold

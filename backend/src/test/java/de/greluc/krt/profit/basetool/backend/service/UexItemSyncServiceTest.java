@@ -613,10 +613,8 @@ class UexItemSyncServiceTest {
   }
 
   /**
-   * A swallowed-failure fetch result — empty data, {@code notModified = false}, {@code complete =
-   * false}: the shape {@link UexClient#getItemsForCategory(int)} returns when the call timed out,
-   * answered non-2xx, failed to decode, or carried a non-ok envelope status. Indistinguishable from
-   * an empty category by its rows alone, which is exactly why the flag exists.
+   * Returns a swallowed-failure result of {@link UexClient#getItemsForCategory(int)}: empty data,
+   * {@code notModified = false}, {@code complete = false}.
    *
    * @return an empty {@link UexClient.FetchResult} flagged incomplete
    */

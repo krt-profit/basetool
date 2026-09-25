@@ -46,15 +46,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
 /**
- * Pure-Mockito unit tests for {@link PromotionTopicController}. The controller is a thin pass-
- * through to {@link PromotionTopicService}; the tests pin down two contracts that the pass-through
- * must not silently break: the pagination wrapper translates a Spring {@link Page} into the
- * project's {@link PageResponse} record (content/page/size/totalElements/totalPages/sort
- * one-to-one), and the create/update/delete endpoints forward their inputs to the service verbatim.
- * There is no integration test using {@code @WebMvcTest} here on purpose — the project memory pins
- * us to Mockito-only because the local TestContainers stack does not run reliably, and this
- * controller's logic is small enough that the slice test adds no signal beyond what these unit
- * tests already pin.
+ * Unit tests for {@link PromotionTopicController}: {@link Page} to {@link PageResponse} translation
+ * and verbatim forwarding of create/update/delete inputs to {@link PromotionTopicService}.
  */
 @ExtendWith(MockitoExtension.class)
 class PromotionTopicControllerTest {

@@ -72,11 +72,8 @@ public class BackendServiceException extends RuntimeException {
 
   /**
    * Problem code the backend answers every {@code /api} call with once the caller's token maps to
-   * no application role (REQ-SEC-053). The third member of the same family as {@link
-   * #CODE_PENDING_APPROVAL} and {@link #CODE_TERMS_NOT_ACCEPTED}: an expected 403 that says the
-   * gate is working, arriving once per fragment of every page such a member loads until an
-   * administrator assigns a role. Counting it as a backend-call failure would let one waiting
-   * account push {@code basetool_backend_client_errors_total} on its own.
+   * no application role (REQ-SEC-053). Like {@link #CODE_PENDING_APPROVAL} and {@link
+   * #CODE_TERMS_NOT_ACCEPTED}, an expected 403 that is not counted as a backend-call failure.
    */
   public static final String CODE_NO_ROLE = "NO_ROLE";
 
@@ -145,8 +142,7 @@ public class BackendServiceException extends RuntimeException {
   }
 
   /**
-   * Returns the trailing segment of the Problem {@code type} URI — kept for backwards compatibility
-   * with existing call sites that previously used the {@code type} suffix as a discriminator.
+   * Returns the trailing segment of the Problem {@code type} URI, or {@code null} when absent.
    * Prefer {@link #getProblemCode()}.
    */
   public @Nullable String getProblemType() {

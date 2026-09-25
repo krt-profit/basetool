@@ -20,19 +20,11 @@
 package de.greluc.krt.profit.basetool.backend.exception;
 
 /**
- * Thrown by the service layer when a request cannot be fulfilled because of caller-supplied input
- * that is semantically invalid in a way that {@code @Valid} on the controller cannot express.
+ * Thrown by the service layer for caller input that is semantically invalid in a way {@code @Valid}
+ * cannot express, such as a business-rule violation or a cross-field constraint.
  *
- * <p>Typical cases: business-rule violations ("personal items cannot be assigned to a job order"),
- * cross-field constraints not modellable as a Jakarta annotation, references to entities that exist
- * but are in the wrong state, or requests that conflict with an aggregate's current state.
- *
- * <p>Mapped to HTTP {@code 400 Bad Request} by {@link
- * de.greluc.krt.profit.basetool.backend.exception.GlobalExceptionHandler}'s generic {@code
- * AppException} dispatch handler with the stable error code {@code BAD_REQUEST}. Prefer this over
- * {@code ResponseStatusException} so the code/title/detail flow stays consistent with the other RFC
- * 7807 responses. Every accessor is inherited unchanged from {@link AppException} — it delegates to
- * {@link AppExceptionKind#BAD_REQUEST}, the fixed identity passed to the superclass constructor.
+ * <p>Mapped to HTTP {@code 400} with the code {@code BAD_REQUEST} ({@link
+ * AppExceptionKind#BAD_REQUEST}).
  */
 public final class BadRequestException extends AppException {
 

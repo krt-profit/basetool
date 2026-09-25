@@ -34,20 +34,13 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * One asynchronous KRT P4K Reader catalog-import run. The upload enqueues a {@link
- * P4kImportJobKind#PREVIEW PREVIEW} job ({@link P4kImportJobStatus#PENDING PENDING}); a
- * single-thread {@code @Async} worker advances it to {@link P4kImportJobStatus#RUNNING RUNNING},
- * parses the stored catalog and reconciles it against the master data, then writes the serialized
- * {@code P4kImportResultDto} into {@link #resultJson} and flips to {@link
- * P4kImportJobStatus#SUCCEEDED SUCCEEDED} (or stores an {@link #errorMessage} and flips to {@link
- * P4kImportJobStatus#FAILED FAILED}). A finished preview can be launched as a second {@link
- * P4kImportJobKind#APPLY APPLY} job, which carries {@link #previewJobId} back to its origin and
- * runs against its own copy of the upload.
+ * One asynchronous KRT P4K Reader catalog-import run, either a {@link P4kImportJobKind#PREVIEW
+ * PREVIEW} or an {@link P4kImportJobKind#APPLY APPLY} launched from a finished preview.
  *
- * <p>The multi-MB upload itself lives in the 1:1 {@link P4kImportJobPayload} side table (keyed by
- * this job's id), never mapped here, so listing / polling jobs stays cheap. Extends {@link
- * AbstractEntity} for the optimistic-lock {@code version} and the {@code created_at} / {@code
- * updated_at} audit timestamps.
+ * <p>An {@code @Async} worker moves it from {@link P4kImportJobStatus#PENDING PENDING} through
+ * {@link P4kImportJobStatus#RUNNING RUNNING} to {@link P4kImportJobStatus#SUCCEEDED SUCCEEDED}
+ * (with {@link #resultJson}) or {@link P4kImportJobStatus#FAILED FAILED} (with {@link
+ * #errorMessage}). The upload itself lives in the 1:1 {@link P4kImportJobPayload} side table.
  */
 @Entity
 @Table(name = "p4k_import_job")
@@ -85,9 +78,8 @@ public class P4kImportJob extends AbstractEntity<UUID> {
   private Long fileSizeBytes;
 
   /**
-   * The serialized {@code P4kImportResultDto} (plain JSON text) once the run succeeds, or {@code
-   * null} while pending / running / on failure. Only ever stored and echoed back to the page, never
-   * queried into, hence {@code TEXT} rather than {@code jsonb}.
+   * The serialized {@code P4kImportResultDto} as plain JSON text once the run succeeds; {@code
+   * null} while pending, running or on failure.
    */
   @Column(name = "result_json", columnDefinition = "TEXT")
   private String resultJson;
@@ -97,9 +89,8 @@ public class P4kImportJob extends AbstractEntity<UUID> {
   private String errorMessage;
 
   /**
-   * For an APPLY run, the PREVIEW job it was launched from (informational link; the APPLY copies
-   * the upload into its own payload row so it does not depend on the preview's payload surviving).
-   * {@code null} for a PREVIEW run.
+   * For an APPLY run, the PREVIEW job it was launched from (informational only; the APPLY holds its
+   * own copy of the upload); {@code null} for a PREVIEW run.
    */
   @Column(name = "preview_job_id")
   private UUID previewJobId;

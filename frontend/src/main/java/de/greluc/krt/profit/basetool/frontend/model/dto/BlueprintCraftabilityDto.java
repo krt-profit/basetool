@@ -23,17 +23,13 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Frontend mirror of the backend {@code BlueprintCraftabilityDto}: the craftability of one owned
- * blueprint computed from the caller's own stock (#781), keyed by the owned blueprint id so the
- * view can decorate the matching master-list row and detail pane. Counts are given both from
- * inventory alone and with the open refinery yield folded in.
+ * Frontend mirror of the backend {@code BlueprintCraftabilityDto}: how often one owned blueprint
+ * can be crafted from the caller's stock, with and without open refinery yield.
  *
  * @param blueprintId the owned blueprint's id
  * @param recipeResolved whether an active recipe backs the owned product
- * @param hasItemIngredients whether the recipe still needs an ITEM ingredient that is not evaluated
- *     (a craftable sub-assembly or an unresolved item), marked "not evaluated" in the UI
- * @param hasResourceIngredients whether the recipe has any evaluable material requirement (a
- *     RESOURCE commodity or a PIECE-material-bridged ITEM)
+ * @param hasItemIngredients whether the recipe needs an ITEM ingredient that is not evaluated
+ * @param hasResourceIngredients whether the recipe has any evaluable material requirement
  * @param craftable how many crafts the inventory stock alone allows
  * @param craftableWithRefinery how many crafts inventory plus open refinery yield allows
  * @param limitingMaterialName the commodity capping the inventory-only count, or {@code null}

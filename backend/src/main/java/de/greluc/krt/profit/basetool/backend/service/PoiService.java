@@ -34,13 +34,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Read service plus admin-override mutators for the POI catalogue. The records themselves are owned
- * by {@link UexUniverseSyncService}; this service only exposes the read API and the admin-only
- * {@code hasLoadingDock} pin used by the UEX-overrides admin page. Read methods are cached against
- * {@link CacheConfig#POIS_CACHE}; the override mutators evict the whole cache, and the periodic
- * {@link UexUniverseSyncService} sweep evicts it on completion (via {@code
- * MasterDataCacheEvictionService}, CACHE-SYNC-EVICT-001), so background-sync writes are visible on
- * the next read; the 12-hour master-data TTL is only the backstop.
+ * Cached read service for the POI catalogue plus the admin {@code hasLoadingDock} pin. The records
+ * are written by {@link UexUniverseSyncService}; mutators here evict {@link
+ * CacheConfig#POIS_CACHE}.
  */
 @Service
 @RequiredArgsConstructor

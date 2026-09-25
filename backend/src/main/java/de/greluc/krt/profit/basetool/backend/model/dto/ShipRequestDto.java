@@ -26,13 +26,10 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Data transfer record carrying Ship Request payload (create + update).
+ * Create and update payload for a ship.
  *
- * <p>R5.d.f added the trailing {@link #owningOrgUnitId} picker output. When present on create, the
- * service layer routes the stamping through {@code OwnerScopeService.resolveOrgUnitForPickerOutput}
- * — the picked OrgUnit is validated against the target user's memberships in {@code
- * org_unit_membership}. When {@code null}, the resolver auto-stamps the user's single membership
- * (today's common single-Staffel case). Ignored on update — the existing stamp survives.
+ * <p>On create, {@link #owningOrgUnitId} is validated against the target user's memberships; when
+ * {@code null} the user's single membership is stamped. It is ignored on update.
  */
 public record ShipRequestDto(
     String name,

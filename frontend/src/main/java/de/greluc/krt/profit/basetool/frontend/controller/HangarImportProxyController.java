@@ -45,23 +45,11 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Frontend proxy for the third-party ship-export import endpoint. Accepts CCU Game Fleetview,
- * HangarXPLOR Shiplist, Fleetyards and StarJump FleetViewer JSON payloads; the backend auto-detects
- * the format from the payload shape.
+ * Proxies third-party ship-export uploads (CCU Game Fleetview, HangarXPLOR, Fleetyards, StarJump
+ * FleetViewer) to {@code POST /api/v1/hangar/import/ships}, which detects the format.
  *
- * <p>Receives the multipart file from the browser, forwards it to the backend {@code POST
- * /api/v1/hangar/import/ships} via the authenticated {@link WebClient} (which automatically
- * attaches the OAuth2 token), and returns the backend response as-is to the browser.
- *
- * <p>An upload above {@link #MAX_IMPORT_BYTES} is refused with {@code 413} before a single byte of
- * it is read, and an accepted one is streamed to the backend rather than buffered into a {@code
- * byte[]} first. Without the cap the relay was the cheaper target of the two hops: the multipart
- * limit allows 64 MB and the edge proxy 2000 MB, while the backend parser refuses anything above 8
- * MiB only after this process had already pulled the whole upload into its heap (APPSEC-03).
- *
- * <p>The {@code /hangar/import/fleetview} path is retained as a deprecated alias that forwards to
- * the same backend endpoint, so any cached browser script or bookmark continues to work until the
- * sunset date communicated by the backend's {@code Sunset} response header.
+ * <p>Uploads above {@link #MAX_IMPORT_BYTES} are refused with {@code 413} unread; accepted ones are
+ * streamed. {@code /hangar/import/fleetview} is a deprecated alias.
  */
 @RestController
 @RequestMapping("/hangar/import")
@@ -70,11 +58,8 @@ import org.springframework.web.server.ResponseStatusException;
 public class HangarImportProxyController {
 
   /**
-   * Inclusive upper bound on a relayed ship-export upload: 8 MiB, the backend parser's own cap
-   * ({@code FleetExportParser}). A real fleet export is a few hundred kilobytes. Mirrors {@code
-   * PersonalBlueprintImportProxyController#MAX_EXPORT_BYTES} and is also published to the hangar
-   * page as {@code data-max-bytes}, so {@code hangar.js} refuses an oversized file before uploading
-   * it.
+   * Inclusive upper bound on a relayed ship-export upload: 8 MiB, the backend parser's cap. Also
+   * published to the hangar page as {@code data-max-bytes}.
    */
   public static final long MAX_IMPORT_BYTES = 8L * 1024 * 1024;
 
@@ -101,14 +86,12 @@ public class HangarImportProxyController {
   }
 
   /**
-   * Legacy path retained for browser scripts and bookmarks that still target the old Fleetview-only
-   * endpoint. Forwards to the same backend endpoint as {@link #importShips(MultipartFile)}.
+   * Deprecated alias of {@link #importShips(MultipartFile)} for the Fleetview-only path.
    *
    * @param file the uploaded JSON file
    * @return the backend response (a {@code FleetviewImportResponseDto}) as a raw JSON map, or a
    *     {@code 413} JSON body when the upload exceeds {@link #MAX_IMPORT_BYTES}
-   * @deprecated use {@code POST /hangar/import/ships} — this path keeps working until the backend's
-   *     sunset date but new code should target the format-neutral path directly.
+   * @deprecated use {@code POST /hangar/import/ships}.
    */
   @PostMapping(value = "/fleetview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   @PreAuthorize("isAuthenticated()")
@@ -119,10 +102,9 @@ public class HangarImportProxyController {
   }
 
   /**
-   * Shared multipart-forwarding plumbing for both the canonical and the legacy path. Refuses an
-   * upload above {@link #MAX_IMPORT_BYTES} without reading it, streams an accepted one to the
-   * backend, translates a {@link WebClientResponseException} into a {@link ResponseStatusException}
-   * carrying the backend's status, and wraps any other failure as {@code 500}.
+   * Forwards a multipart upload to the backend: refuses one above {@link #MAX_IMPORT_BYTES} unread,
+   * streams an accepted one, maps a {@link WebClientResponseException} to a {@link
+   * ResponseStatusException} with the backend's status and any other failure to {@code 500}.
    *
    * @param file uploaded multipart file
    * @param backendPath relative path on the backend (without host) to forward to
@@ -194,11 +176,8 @@ public class HangarImportProxyController {
   }
 
   /**
-   * The uploaded file as a {@link org.springframework.core.io.Resource} that the multipart writer
-   * streams from the container's part storage, instead of the {@code byte[]} copy the relay used to
-   * build. Every {@link #getInputStream()} call opens the part afresh, so a writer that reads the
-   * resource twice still gets the whole file. Carries a filename because the backend reads the part
-   * as a file only when its {@code Content-Disposition} names one.
+   * The uploaded file as a streamed {@link org.springframework.core.io.Resource} with a filename.
+   * Each {@link #getInputStream()} call reopens the part.
    */
   private static final class StreamedUpload extends AbstractResource {
 

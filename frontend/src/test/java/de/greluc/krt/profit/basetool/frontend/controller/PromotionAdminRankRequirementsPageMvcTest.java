@@ -51,22 +51,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Renders {@code /promotion/admin/rank-requirements} as an OFFICER and asserts the toolbar create
- * button AND the inline event-handler registration survive end-to-end.
- *
- * <p>Regression guard for the silent template truncation that turned the "NEUE ANFORDERUNG" button
- * into a no-op. The page inlines a {@code Map<UUID, List<PromotionCategoryDto>>} into the bottom
- * {@code <script>} block via {@code [[${categoriesByTopic}]]}. The custom {@code
- * JavaTimeAwareJavaScriptSerializer} called {@code ObjectMapper.writeValue(writer, ...)} on
- * Thymeleaf's shared template writer; with Jackson's {@code AUTO_CLOSE_TARGET} default the writer
- * was closed immediately after the JSON was emitted, so every byte that followed (the message
- * bundle inlines, the {@code openCreateModal} helper, and the {@code window.krtEvents.on('click',
- * 'ar-open-create', ...)} wiring) was dropped. The page still rendered 200 OK but with an
- * unterminated {@code <script>} block, leaving the create button orphaned. Post-ADR-0069 the map
- * lives in the inline bootstrap with the page module loaded via {@code th:src} right after it; the
- * assertions below pin the map's JSON and that following {@code th:src}, so a re-introduced writer-
- * closing serializer (truncating the bootstrap and dropping the module tag) is still caught at the
- * test layer instead of in production.
+ * Renders {@code /promotion/admin/rank-requirements} as an OFFICER and verifies that the inline
+ * {@code categoriesByTopic} JSON bootstrap is complete and followed by the page module's {@code
+ * th:src} tag, so the create button stays wired.
  */
 @SpringBootTest
 class PromotionAdminRankRequirementsPageMvcTest {

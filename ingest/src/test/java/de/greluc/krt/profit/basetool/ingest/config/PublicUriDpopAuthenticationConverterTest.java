@@ -27,14 +27,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.server.resource.authentication.DPoPAuthenticationToken;
 
 /**
- * Behaviour of the {@code htu} target substitution (ADR-0129).
- *
- * <p>{@link #substitutesTheConfiguredOriginForTheRequestDerivedOne} is the whole point. Spring
- * compares {@code htu} with a bare {@code String.equals} against a URL Tomcat assembles from the
- * reverse proxy's forwarded headers; a proxy that omits {@code X-Forwarded-Port} leaves the
- * internal port in the server's value while the client signed the public one, and every proof
- * fails. That cannot be reproduced without a proxy, so what is pinned here is the substitution
- * itself.
+ * Unit tests for the configured substitution of the DPoP {@code htu} target origin (ADR-0129), the
+ * core case being {@link #substitutesTheConfiguredOriginForTheRequestDerivedOne}.
  */
 class PublicUriDpopAuthenticationConverterTest {
 
@@ -82,12 +76,7 @@ class PublicUriDpopAuthenticationConverterTest {
         .isEqualTo("https://ingest.profit-base.online/v1/blueprint-preview");
   }
 
-  /**
-   * With nothing configured the stock behaviour is what a deployment gets.
-   *
-   * <p>Half-applying the override would be worse than not applying it: the operator would see the
-   * class in the chain and assume the proxy no longer matters.
-   */
+  /** With no origin configured, the converter behaves exactly like the stock one. */
   @Test
   void delegatesUnchangedWhenNoOriginIsConfigured() {
     PublicUriDpopAuthenticationConverter converter = new PublicUriDpopAuthenticationConverter("  ");

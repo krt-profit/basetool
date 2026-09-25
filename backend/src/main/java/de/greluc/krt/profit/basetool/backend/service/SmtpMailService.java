@@ -35,20 +35,10 @@ import org.springframework.util.StringUtils;
 /**
  * {@link MailService} backed by Spring's {@link JavaMailSender} (SMTP).
  *
- * <p>Three gates keep mail off unless deliberately configured: the {@code app.mail.enabled} flag
- * (an explicit kill-switch, ships {@code true}); a non-blank {@code spring.mail.host} (the
- * effective switch — set it to start sending, e.g. an SMTP relay); and the presence of the {@link
- * JavaMailSender} bean (autoconfigured by Spring Boot only when the host is set, injected
- * optionally via {@link ObjectProvider}). Any gate closed makes {@link #send} a logged no-op — so a
- * blank host, which Docker Compose may still pass through as an empty env var, never lets a broken
- * sender fire. A delivery failure is caught and logged, never rethrown, so best-effort mail can
- * never break the caller. The recipient address and body are <b>never</b> logged (PII); only the
- * static localized subject is.
- *
- * <p>Every path bumps the {@code basetool_mail_total{outcome}} counter (sent / failed / the three
- * {@code dropped_*} gate outcomes) so a broken relay or an env-var regression that silently
- * swallows registration mail surfaces on the dashboard and alerts instead of only in a log-spike
- * heuristic.
+ * <p>{@link #send} is a logged no-op unless {@code app.mail.enabled} is true, {@code
+ * spring.mail.host} is non-blank and a {@link JavaMailSender} bean exists. Delivery failures are
+ * logged, never rethrown; recipient and body are never logged. Every outcome increments {@code
+ * basetool_mail_total{outcome}}.
  */
 @Service
 @Slf4j

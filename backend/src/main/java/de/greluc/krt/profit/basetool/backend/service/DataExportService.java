@@ -29,7 +29,6 @@ import de.greluc.krt.profit.basetool.backend.support.DataExportSections;
 import de.greluc.krt.profit.basetool.backend.support.DataExportSections.Section;
 import de.greluc.krt.profit.basetool.backend.support.HandleScrubber;
 import de.greluc.krt.profit.basetool.backend.support.HandleSpellings;
-import de.greluc.krt.profit.basetool.backend.support.PersonSearchTargets;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.Query;
@@ -50,18 +49,9 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Assembles a member's Art. 15 / Art. 20 data export (REQ-SEC-058).
  *
- * <p>Before this existed, an access request meant a person reading ~25 tables by hand, which is
- * both slow and the kind of task that quietly produces an incomplete answer.
- *
- * <p><b>Third-party data is excluded by construction.</b> The statements in {@link
- * DataExportSections} select the requester's own columns and never another member's id or handle —
- * so the structured half of the export cannot leak a counterparty even if somebody later adds a
- * section carelessly, because the leak would have to be written into a visible {@code SELECT} list.
- * Free text the requester wrote goes through {@link HandleScrubber}, which is the only part that
- * scrubs rather than omits, for the only data where omission is not possible.
- *
- * <p><b>Each section is marked with its legal basis</b>, so the Art. 20 portable subset is
- * identifiable without re-deriving which sections qualify.
+ * <p>The {@link DataExportSections} statements select only the requester's own columns; free text
+ * the requester wrote is passed through {@link HandleScrubber}. Each section carries its legal
+ * basis, so the Art. 20 portable subset is identifiable.
  */
 @Service
 @RequiredArgsConstructor
@@ -185,32 +175,13 @@ public class DataExportService {
   }
 
   /**
-   * Appends the audit row for one served export (REQ-SEC-058, REQ-AUDIT-001).
+   * Appends the audit row for one served export in its own writable transaction (REQ-SEC-058,
+   * REQ-AUDIT-001). The payload names only the format and the row count.
    *
-   * <p>Separate from {@link #export(UUID)}, and deliberately so. The assembly is {@code readOnly =
-   * true} — the right setting for ~29 statements across the whole schema, and one that cannot hold
-   * an {@code INSERT}: Spring marks the JDBC connection read-only and Postgres refuses the write.
-   * The audit row therefore gets its own short writable transaction, which also satisfies the
-   * {@code MANDATORY} propagation on {@link AuditService#record} that a controller calling it
-   * directly cannot satisfy at all.
-   *
-   * <p>Being a second transaction rather than the export's own is acceptable <em>here</em> and
-   * nowhere near a mutation: the export is a read, so there is no business write for the audit row
-   * to be atomic with. What the guarantee costs is the case where the row is written and the
-   * response never reaches the caller — an export recorded that nobody received, which errs towards
-   * over-recording and is the safe direction for an access-request trail.
-   *
-   * <p>The payload names the format and the row count only. Nothing about the export's contents
-   * goes in, and neither does the subject's handle.
-   *
-   * @param userId the member the export was about, recorded as both subject and target
+   * @param userId the member the export was about, recorded as subject and target
    * @param format {@code json} or {@code pdf}
-   * @param rows how many rows the export contains, taken from the assembled {@link
-   *     DataExport#totalRows()} of the export that was actually served. Both formats report it; the
-   *     PDF path used to pass {@code -1}, on a sentinel that described a discarded object rather
-   *     than a limitation of the format (corrected 2026-09-17)
-   * @param bySelf whether the subject exported their own data, as opposed to an admin doing it for
-   *     them — the distinction the trail exists to make answerable
+   * @param rows the served export's {@link DataExport#totalRows()}
+   * @param bySelf whether the subject exported their own data rather than an admin
    */
   @Transactional
   public void recordExport(@NotNull UUID userId, @NotNull String format, int rows, boolean bySelf) {
@@ -223,25 +194,11 @@ public class DataExportService {
   }
 
   /**
-   * A scrubber loaded with every spelling of every member's name <em>except</em> the subject's.
+   * Builds a scrubber that replaces every spelling (username, display name, Discord nickname) of
+   * every member except the subject.
    *
-   * <p>Not scrubbing the subject is not an optimisation: replacing their own name would remove the
-   * one name the export is supposed to be about, and would do it from the entries they wrote
-   * themselves.
-   *
-   * <p><b>But they are still passed to the scrubber, as protected terms.</b> Leaving them out of
-   * the matcher entirely is what shredded them — longest-match ranks only the terms it knows, so a
-   * three-character third-party handle that is a prefix of the subject's own longer name won, and
-   * the name came back with a placeholder spliced into the middle of it.
-   *
-   * <p><b>Every spelling, not just the effective one.</b> {@code getEffectiveName()} is {@code
-   * displayName ?: username}, so loading only that left a member's {@code username} unscrubbed for
-   * as long as they had a display name set, and left every member's {@code discord_guild_nickname}
-   * unscrubbed always — while the export still told the reader that other members' names had been
-   * removed. Whoever typed the name into a note was typing what they call the person, which is as
-   * likely to be the Discord nickname as the display name. {@link PersonSearchTargets} registers
-   * all three columns as places a person is named, and a scrubber that knew fewer of them than the
-   * search did was the two registries disagreeing about the same question.
+   * <p>The subject's spellings are passed as protected terms, so a shorter third-party handle that
+   * is a prefix of the subject's name cannot be spliced into it.
    *
    * @param subjectId the member the export is about
    * @return the scrubber

@@ -23,10 +23,10 @@ import jakarta.validation.constraints.Size;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Body of a reject-registration request (epic #720, Track 1).
+ * Body of a reject-registration request.
  *
- * @param reason optional free-text reason recorded in the approval audit; capped at 1000 chars
- * @param version the optimistic-lock version the admin last read; {@code null} bypasses the check
+ * @param reason optional reason recorded in the approval audit; max 1000 chars
+ * @param version the optimistic-lock version last read; {@code null} bypasses the check
  */
 public record RejectRegistrationRequest(
     @Nullable @Size(max = 1000) String reason, @Nullable Long version) {}

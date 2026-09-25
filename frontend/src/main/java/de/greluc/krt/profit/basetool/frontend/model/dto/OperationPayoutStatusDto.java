@@ -22,10 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.time.Instant;
 
 /**
- * Frontend mirror of the backend {@code OperationPayoutStatusDto}: the minimal paid-out status
- * block the payout toggle returns. The operation-detail JS patches the single "Bezahlt" cell from
- * these fields — a toggle never changes any amount, so the backend does not re-run the payout
- * computation (#1121).
+ * Frontend mirror of the backend {@code OperationPayoutStatusDto}: the paid-out status returned by
+ * the payout toggle, used to patch the single "Bezahlt" cell.
  *
  * @param participantKey opaque participant key — user UUID stringified or {@code "guest_<name>"}
  * @param paidOut whether the mission manager has marked this participant as already paid

@@ -30,18 +30,8 @@ import org.springframework.stereotype.Service;
 
 /**
  * Loads a cached reference catalog through {@link BackendApiClient#getCached} and unwraps its paged
- * envelope into a fresh, mutable list, degrading to an empty list (and logging) on any backend
- * failure. This collapses the "fetch a cached catalog page, take its {@code content()}, fall back
- * to an empty list if the backend is down" idiom that the page controllers each carried verbatim —
- * the hangar's inline ship-type / location / manufacturer catalog loads, the refinery form's
- * private {@code fetchMaterials()} / {@code fetchMethods()} / … copies, and their peers — into one
- * place so a single dead reference catalog degrades identically everywhere and never blanks a whole
- * page.
- *
- * <p>It composes the single {@link BackendApiClient} frontend seam rather than replacing it, so the
- * shared Resilience4j pass still wraps the underlying call. The returned list is always a new
- * {@code ArrayList} the caller may sort in place; callers that need the fetch off the request
- * thread wrap this in {@code parallelPageLoader.loadAsync(...)} exactly as before.
+ * envelope into a fresh mutable list, degrading to an empty list (and logging) on any backend
+ * failure.
  */
 @Service
 @Slf4j

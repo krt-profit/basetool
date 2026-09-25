@@ -22,21 +22,12 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import java.util.List;
 
 /**
- * Blueprint-coverage view for an {@code ITEM} job order: who among the members of the order's
- * responsible (processing) squadron/SK owns the blueprints for the items the order requests, and
- * which of those required blueprints each member holds.
+ * Blueprint-coverage view of an {@code ITEM} job order: which members of the responsible org unit
+ * own the blueprints for the requested items. Empty for {@code MATERIAL} orders.
  *
- * <p>This payload is members-only — its endpoint is gated by {@code
- * @ownerScopeService.canSeeJobOrderBlueprintOwners}, which is stricter than the order's own
- * visibility (an SK-responsible order is publicly readable, but this coverage view is restricted to
- * SK members + admins). It is empty for {@code MATERIAL} orders, which request raw materials rather
- * than crafted items.
- *
- * @param requiredBlueprints one row per distinct required product, each with the count of
- *     responsible-org-unit members owning its blueprint (zero = coverage gap); sorted by product
- *     name. Never {@code null}.
- * @param owners the members owning the blueprint for at least one required product, each with the
- *     required products they hold; sorted by member name. Never {@code null}.
+ * @param requiredBlueprints one row per required product with its owner count, sorted by product
+ *     name; never {@code null}
+ * @param owners members owning at least one required blueprint, sorted by name; never {@code null}
  */
 public record JobOrderItemBlueprintOwnersDto(
     List<JobOrderRequiredBlueprintDto> requiredBlueprints,

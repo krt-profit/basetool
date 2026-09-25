@@ -60,11 +60,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC render + proxy test for {@link MaterialboersePageController}. Renders the real Thymeleaf
- * master-detail (catching any template error) with a mocked backend, proves the server-side
- * Markdown remark is rendered into the page, and proves the remark-edit proxy relays a backend
- * optimistic-lock conflict as a 409 with the problem code so {@code krtFetch} can offer the
- * reload-confirm.
+ * Render and proxy tests for {@link MaterialboersePageController}: the master-detail page renders
+ * with the Markdown remark, and the remark-edit proxy relays a lock conflict as 409 with its
+ * problem code.
  */
 @SpringBootTest
 class MaterialboersePageControllerMvcTest {
@@ -129,14 +127,7 @@ class MaterialboersePageControllerMvcTest {
         .andExpect(content().string(containsString(">IRI<")));
   }
 
-  /**
-   * The default offers-mode full page renders ONLY the offers board — never the Gesuche (requests)
-   * board stacked on top of it. Regression for the Thymeleaf attribute-precedence trap where {@code
-   * th:if} and {@code th:replace} sat on one {@code th:block}: {@code th:replace} outranks {@code
-   * th:if}, so the request-board fragment was included unconditionally and both boards rendered at
-   * once on page open (until a tab switch swapped one away). The request board's own wrapper
-   * markers ({@code id="mg-listwrap"}, {@code data-mg-search}) must be absent here.
-   */
+  /** The default offers page renders only the offers board, never the Gesuche board. */
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void page_offersMode_rendersOnlyOffersBoardNotRequestsBoard() throws Exception {
@@ -151,11 +142,7 @@ class MaterialboersePageControllerMvcTest {
         .andExpect(content().string(not(containsString("data-mg-search"))));
   }
 
-  /**
-   * A PIECE material renders its amount as an integer count in the piece unit ("12 Piece"), never
-   * as SCU — the regression from issue #1182 where every offer was shown as SCU. The locale is
-   * pinned to English via {@code ?lang} so the assertion stays ASCII.
-   */
+  /** A PIECE material renders its amount as a count in the piece unit ("12 Piece"), not SCU. */
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void page_pieceMaterial_rendersPieceUnitNotScu() throws Exception {
@@ -193,9 +180,7 @@ class MaterialboersePageControllerMvcTest {
   }
 
   /**
-   * An item offer (#1185) renders with its item name, its whole-piece quantity and the "Item"
-   * marker, and never a quality (item offers have none — no stray "Q null"). The locale is pinned
-   * to English via {@code ?lang} so the assertion stays ASCII.
+   * An item offer renders its item name, whole-piece quantity and "Item" marker, without a quality.
    */
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
@@ -236,12 +221,9 @@ class MaterialboersePageControllerMvcTest {
   }
 
   /**
-   * A <b>stock-backed</b> item offer the viewer owns (REQ-MARKET-014) renders the edit CTA — unlike
-   * a free-stated item offer, its quantity is stock-backed so it is editable. The button carries
-   * the {@code data-kind="ITEM"} / {@code data-quantity-type="PIECE"} attributes and the item
-   * quantity as {@code data-amount}, and the template never dereferences the null {@code
-   * material()} of an item offer. The locale is pinned to English via {@code ?lang} so the
-   * assertion stays ASCII.
+   * A stock-backed item offer owned by the viewer renders the edit button with {@code
+   * data-kind="ITEM"}, {@code data-quantity-type="PIECE"} and the quantity as {@code data-amount}
+   * (REQ-MARKET-014).
    */
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
@@ -308,12 +290,7 @@ class MaterialboersePageControllerMvcTest {
   }
 
   /**
-   * The release-picker item search passes a multi-word {@code q} to the backend as a single-encoded
-   * URI variable ({@code ?q={q}}) rather than pre-encoding it into the URI string. #1344
-   * regression: the pre-encoded {@link
-   * org.springframework.web.util.UriComponentsBuilder#toUriString()} value was re-encoded by the
-   * WebClient (space &rarr; {@code %2520}), so a game-item stock row named "E2E Boerse Item Stock
-   * Widget" matched nothing in the release picker.
+   * The release-picker item search sends a multi-word {@code q} as a single-encoded URI variable.
    */
   @Test
   @WithMockUser(roles = "KRT_MEMBER")

@@ -29,19 +29,9 @@ import javax.net.ssl.X509TrustManager;
 import org.junit.jupiter.api.Test;
 
 /**
- * The property both shipped attempts violated: <strong>adding one anchor set must never remove the
- * other</strong> (ADR-0129).
- *
- * <p>The gateway's token endpoint may be the public Keycloak (validated by the JVM's default
- * anchors) or an internal one (validated by the pinned {@code keycloak-trust} bundle), and nothing
- * in the SSL configuration knows which was configured. Picking a single anchor set therefore breaks
- * whichever case was not picked. It broke twice in production, both times as {@code PKIX path
- * building failed}: first pinned to the <em>backend's</em> truststore, then to the pinned Keycloak
- * one.
- *
- * <p>Verified end to end before shipping by handshaking against the real public certificate with a
- * pinned store present — pinned-only reproduced the production failure, pinned-plus-defaults
- * succeeded. That check needs the internet, so what is pinned here is the logic underneath it.
+ * Unit tests asserting that adding one trust-anchor set never removes the other (ADR-0129): the
+ * token endpoint may be validated by the JVM's default anchors or by the pinned {@code
+ * keycloak-trust} bundle.
  */
 class AdditiveTrustManagerTest {
 

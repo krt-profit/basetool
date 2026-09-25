@@ -40,20 +40,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Business operations on {@link MaterialExternalAlias}. The service is the single seam between the
- * admin REST controller and the JPA repository — controllers must not inject the repository
- * directly (enforced by the {@code controllerLayerShouldNotDependOnRepositoryLayer} ArchUnit rule).
+ * Business operations on {@link MaterialExternalAlias}.
  *
- * <p>{@code createdBy} is stamped from the JWT principal name on every create. The V108 seed
- * inserts use the literal {@code "system"} so admin-created rows are distinguishable from the
- * R1-seeded fuzzy / manual aliases in audit views.
- *
- * <p>The {@code (sourceSystem, externalName)} uniqueness is case-INSENSITIVE — matching the
- * resolution lookup, so {@link #resolveMaterialByAlias} can never see two candidate rows
- * (REQ-REFINERY-010). It is enforced both by the V146 DB unique index on {@code (source_system,
- * LOWER(external_name))} (catch-all defence) and pre-emptively here so the caller gets a clean
- * {@link DuplicateEntityException} → 409 instead of a generic {@code
- * DataIntegrityViolationException}.
+ * <p>{@code (sourceSystem, externalName)} is unique case-insensitively (REQ-REFINERY-010); a
+ * duplicate raises {@link DuplicateEntityException}.
  */
 @Slf4j
 @Service
@@ -87,9 +77,8 @@ public class MaterialExternalAliasService {
   }
 
   /**
-   * Resolution-chain lookup consumed by the R3 SC Wiki commodity sync (and the R6 UEX counterpart).
-   * Case-insensitive on {@code externalName} so a patch-version casing drift on the upstream side
-   * still resolves to the curated row.
+   * Resolves a material through its external alias, matching {@code externalName}
+   * case-insensitively.
    *
    * @param sourceSystem catalogue the alias belongs to
    * @param externalName the external commodity name (case-insensitive match)
@@ -108,9 +97,7 @@ public class MaterialExternalAliasService {
   }
 
   /**
-   * Returns every alias of one source system. Consumed by the refinery import, which folds the
-   * {@code REFINERY_SCREEN} alias names through the shared canonicalizer and uses them as
-   * containment anchors for game-UI-truncated reads (REQ-REFINERY-004 stage 3).
+   * Returns every alias of one source system.
    *
    * @param sourceSystem catalogue the aliases belong to
    * @return all alias rows of that source
@@ -120,15 +107,8 @@ public class MaterialExternalAliasService {
   }
 
   /**
-   * Persists a new alias. Validates that the referenced material exists and that no alias with the
-   * same {@code (sourceSystem, externalName)} exists yet — compared case-insensitively, matching
-   * the V146 unique index and the resolution lookup (REQ-REFINERY-010); on a duplicate the row is
-   * NOT saved and a {@link DuplicateEntityException} is thrown so the controller can map it to HTTP
-   * 409.
-   *
-   * <p>{@code createdBy} is stamped from the authenticated principal — {@code "system"} when no
-   * principal can be resolved (defensive default; the controller's {@code @PreAuthorize} gate
-   * already requires {@code ROLE_ADMIN}, but tests run without a full security context).
+   * Persists a new alias, stamping {@code createdBy} from the principal ({@code "system"} when
+   * none).
    *
    * @param request validated create payload
    * @return the persisted alias row
@@ -159,16 +139,14 @@ public class MaterialExternalAliasService {
   }
 
   /**
-   * Applies an update to an existing alias. The {@code version} on the request must match the row's
-   * current {@code @Version} or Hibernate raises an optimistic-lock failure → HTTP 409 via {@link
-   * de.greluc.krt.profit.basetool.backend.exception.GlobalExceptionHandler}.
+   * Updates an existing alias; a stale {@code version} results in HTTP 409.
    *
    * @param id alias UUID to update
    * @param request validated update payload
    * @return the persisted alias row
    * @throws NotFoundException if {@code id} or {@code request.materialId()} does not exist
    * @throws DuplicateEntityException if the new {@code (sourceSystem, externalName)} collides
-   *     case-insensitively with a different row (REQ-REFINERY-010)
+   *     case-insensitively with a different row
    */
   @Transactional
   public MaterialExternalAlias update(UUID id, MaterialExternalAliasWriteRequest request) {
@@ -203,14 +181,12 @@ public class MaterialExternalAliasService {
   }
 
   /**
-   * Guards the case-insensitive {@code (sourceSystem, externalName)} uniqueness (REQ-REFINERY-010)
-   * before a create / update flushes, so the caller gets a clean {@link DuplicateEntityException} →
-   * 409 rather than the DB unique index's generic {@code DataIntegrityViolationException}.
+   * Checks the case-insensitive {@code (sourceSystem, externalName)} uniqueness before a create or
+   * update (REQ-REFINERY-010).
    *
    * @param source the alias source system
    * @param externalName the external name to check (matched case-insensitively)
-   * @param excludeId the row being updated, excluded from the collision check, or {@code null} on a
-   *     create so every existing row counts
+   * @param excludeId the row being updated, or {@code null} on a create
    * @throws DuplicateEntityException if a different row already holds the same source / external
    *     name
    */
@@ -233,9 +209,8 @@ public class MaterialExternalAliasService {
   }
 
   /**
-   * Copies the writable fields of a create / update request onto an alias entity — the material
-   * reference, source system, external name / key / uuid / code and note. The {@code createdBy}
-   * stamp is intentionally not touched here so it stays create-only.
+   * Copies the writable fields of a create / update request onto an alias; {@code createdBy} is
+   * left untouched.
    *
    * @param alias the target entity (new or managed)
    * @param material the resolved material reference

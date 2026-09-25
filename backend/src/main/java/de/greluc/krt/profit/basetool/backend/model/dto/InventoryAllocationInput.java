@@ -24,16 +24,11 @@ import jakarta.validation.constraints.Positive;
 import java.util.UUID;
 
 /**
- * One quantity-split assignment supplied at inventory check-in (Variante C, REQ-INV-027, R4):
- * {@code amount} of the newly created entry is earmarked to the job order or mission identified by
- * {@code targetId}. Which dimension it belongs to is given by the list it appears in on {@link
- * InventoryItemCreateDto} ({@code jobOrderAllocations} vs {@code missionAllocations}).
+ * One quantity-split earmark supplied at inventory check-in (REQ-INV-027): {@code amount} of the
+ * new entry is earmarked to the job order or mission {@code targetId}, depending on the {@link
+ * InventoryItemCreateDto} list it appears in.
  *
- * <p>The create service enforces, per dimension, that the Σ of these amounts stays within the
- * entry's own amount (R5) and that a personal entry carries none; a job-order target additionally
- * requires the material to be one the order needs.
- *
- * @param targetId the job order / mission to earmark part of the new entry to; never {@code null}.
- * @param amount the SCU to earmark to {@code targetId}; strictly positive.
+ * @param targetId the job order or mission to earmark to; never {@code null}
+ * @param amount the SCU to earmark; strictly positive
  */
 public record InventoryAllocationInput(@NotNull UUID targetId, @NotNull @Positive Double amount) {}

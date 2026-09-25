@@ -17,28 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * Job-order create/edit page module (/orders/create, /orders/items/edit), extracted verbatim from
- * the former inline script of orders-create.html (ADR-0069, follow-up to #924).
- *
- * Drives both order modes: the material-order editor (quantity-type-aware rows, SCU hint, SCMDB
- * screenshot import) and the item-order editor (searchable item combobox with on-demand backend
- * search, blueprint + derivation loading, sub-assembly adoption, edit-mode prefill), the order-mode
- * toggle, and the #575 in-place create/edit submit through window.krtFetch.submitForm.
- *
- * The localized MSG_* and ITEM_I18N strings, the server materialIndex seed and EDIT_ITEMS prefill are
- * defined by the inline Thymeleaf bootstrap block of orders-create.html, which executes immediately
- * before this classic script.
- */
-
 /* global materialIndex: writable, MSG_UNIT_SCU, MSG_UNIT_PIECE, MSG_MATERIAL_LABEL, MSG_AMOUNT_LABEL, MSG_MINQUALITY_LABEL, SCU_HINT_TEXT, MSG_SCMDB_SUCCESS, MSG_SCMDB_SOME_UNKNOWN, MSG_SCMDB_NO_MATCH, MSG_SCMDB_NOT_FOUND, ITEM_I18N, EDIT_ITEMS, MSG_MATERIAL_INVALID, MSG_ITEM_INVALID, MSG_CREATE_FAILED, MSG_UPDATE_FAILED, showFrontendErrorToast */
 
-// Inline "?" SCU-hint marker for JS-built rows (the Thymeleaf fragment cannot be used here), built
-// through the DOM so the hint text is set as text, never parsed as markup. Starts hidden via the
-// runtime `krtm-hidden` class (mirroring the scu-hint fragment's `th:classappend`);
-// refreshMaterialUnit() toggles it for SCU materials. The former inline `style="display:none;"` is
-// blocked by the CSP style-src-attr 'none' pin (ADR-0093), and a `style.display = ''` reveal cannot
-// override a class, so visibility is class-based throughout.
 function buildScuHint() {
     const hint = document.createElement('span');
     hint.className = 'scu-hint krtm-hidden';
@@ -58,8 +38,6 @@ function buildScuHint() {
     return hint;
 }
 
-// Copies the <option>s of a hidden server-rendered template <select> (localized labels, rendered by
-// Thymeleaf) into target as DOM clones — no markup string is re-parsed.
 function copyTemplateOptions(templateId, target) {
     const tpl = document.getElementById(templateId);
     if (!tpl || !target) return;
@@ -68,9 +46,6 @@ function copyTemplateOptions(templateId, target) {
     });
 }
 
-// Mirrors a material row's amount field to the selected material's quantity type: PIECE -> integer
-// step + "(Stueck)" unit and no SCU hint; SCU -> 0.001 step + "(SCU)" unit + hint. Called on
-// material change, after adding/importing a row, and once per existing row on load.
 function refreshMaterialUnit(row) {
     if (!row) {
         return;
@@ -82,11 +57,6 @@ function refreshMaterialUnit(row) {
     if (!sel || !amountInput) {
         return;
     }
-    // The material picker is a searchable combobox (REQ-FE-016): after enhancement, data-role
-    // lives on the hidden input and the selected option's data-quantity-type is mirrored onto
-    // it. This module's on-load row sync runs at parse time, BEFORE the DOMContentLoaded
-    // enhancer — at that point the raw <select> still answers the data-role query, so fall
-    // back to its selected option (edit mode / validation redisplay).
     let qt = sel.dataset.quantityType || '';
     if (!qt && sel.tagName === 'SELECT') {
         const opt = sel.selectedOptions && sel.selectedOptions[0];
@@ -107,11 +77,6 @@ function refreshMaterialUnit(row) {
     }
 }
 
-// Resolves a parsed SCMDB material name to its catalog entry via the server-side job-order
-// material search (the page no longer preloads the catalog as <option>s, REQ-FE-016).
-// Exact-match on the trimmed, lowercased name — the same normalization the former
-// preloaded-option scan applied. Returns the matching MaterialDto or null on a miss or any
-// fetch failure, so the import degrades to "material unknown" instead of throwing.
 async function findJobOrderMaterialByName(normalizedName) {
     try {
         const res = await fetch(
@@ -135,13 +100,9 @@ async function importFromScmdb() {
     let foundAny = false;
     const unknownMaterials = [];
 
-    // Regex für SCU (Spitzhacke): ⛏ Name — Menge SCU (oder ähnliche Trennzeichen)
     const scuRegex = /⛏\s*(.+?)\s*[—–-]\s*([\d,.]+)\s*SCU/i;
-    // Regex für Stück (Diamant): 💎 Name × Menge (oder ähnliche Trennzeichen)
     const pieceRegex = /💎\s*(.+?)\s*[×x*]\s*([\d,.]+)/i;
 
-    // Lines are processed sequentially (one awaited lookup per line) so the row targeting stays
-    // deterministic: each hit fills the next fresh row in export order.
     for (let line of lines) {
         line = line.trim();
         if (!line) continue;
@@ -150,22 +111,15 @@ async function importFromScmdb() {
 
         if (match) {
             const materialName = match[1].trim().toLowerCase();
-            // Komma zu Punkt + numerische Normalisierung, damit Werte wie
-            // "2.0000" (Laranite/Titanium) oder "0.0200" (Aluminum) ohne
-            // überflüssige Nachkomma-Nullen im number-Input landen.
             const amount = parseFloat(match[2].replace(',', '.'));
             if (isNaN(amount)) continue;
 
-            // Resolve the name against the job-order material catalog on the server.
             const material = await findJobOrderMaterialByName(materialName);
 
             if (material) {
                 const container = document.getElementById('materials-container');
                 let targetRow = null;
 
-                // Beim ersten gefundenen Material prüfen, ob die erste Zeile leer ist. The
-                // material picker is an enhanced combobox, so it is addressed by data-role (the
-                // hidden input) — a bare querySelector('select') would hit the minQuality select.
                 if (!foundAny) {
                     const rows = container.getElementsByClassName('material-row');
                     if (rows.length > 0) {
@@ -184,10 +138,6 @@ async function importFromScmdb() {
                 const matField = targetRow.querySelector('[data-role="material-select"]');
                 const amountInput = targetRow.querySelector('[data-role="material-amount"]');
 
-                // setValue() syncs the hidden value, the visible label and the mirrored
-                // option metadata in one step (REQ-FE-016). The picker is remote-mode, so
-                // the label + data map MUST be passed — the id cannot be resolved from a
-                // preloaded option list, and a value-only call would clear the selection.
                 if (matField.krtCombobox) {
                     matField.krtCombobox.setValue(material.id, material.name, {
                         quantityType: material.quantityType || '',
@@ -233,10 +183,6 @@ function addMaterialRow() {
     const row = document.createElement('div');
     row.className = 'material-row';
 
-    // The material select is built EMPTY: the marker value opts it into the server-side-search
-    // combobox (remote-materials-joborder, REQ-FE-016), which fetches its options on demand —
-    // no preloaded catalog options exist on this page anymore. Every interpolated value is escaped;
-    // the SCU hint and the min-quality options are added as DOM nodes below.
     row.innerHTML = `
         <div class="form-group flex-2 mb-0">
             <label>${escapeHtml(MSG_MATERIAL_LABEL)}</label>
@@ -262,8 +208,6 @@ function addMaterialRow() {
     );
 
     container.appendChild(row);
-    // Manually built DOM: the global DOMContentLoaded/krt:swapped enhancer does not see it, so
-    // upgrade the fresh material select in place (REQ-FE-016).
     if (window.krtEnhanceComboboxes) {
         window.krtEnhanceComboboxes(row);
     }
@@ -271,12 +215,8 @@ function addMaterialRow() {
     materialIndex++;
 }
 
-// ── Item-order editor ────────────────────────────────────────────────
 let itemLineIndex = 0;
 
-// Live-searches the orderable-item catalog on the backend (the combobox debounces the calls) and
-// maps the result to the combobox's {value, label} option shape. Returns [] on any failure so the
-// picker degrades to "no matches" instead of throwing.
 function fetchItemOptions(query) {
     return fetch('/orders/item-search?q=' + encodeURIComponent(query || ''), {
         headers: { Accept: 'application/json' },
@@ -307,8 +247,6 @@ function toggleOrderMode() {
     const mode = checked ? checked.value : 'material';
     document.getElementById('mode-material').hidden = mode !== 'material';
     document.getElementById('mode-item').hidden = mode !== 'item';
-    // Disable the hidden form's controls so their `required` fields never block the visible
-    // form's submit (disabled controls are also omitted from the POST body).
     setFormDisabled('mode-material', mode !== 'material');
     setFormDisabled('mode-item', mode !== 'item');
 }
@@ -322,13 +260,8 @@ function addItemLine(prefill) {
     row.className = 'item-line';
     row.dataset.lineIndex = idx;
     row.style.cssText = 'border:1px solid var(--color-gray-3); padding:1rem; margin-bottom:1rem;';
-    // Units already produced on this line (edit mode only). A line with booked production may not
-    // be removed and may not drop below what was made — the backend rejects both — so the editor
-    // pins the minimum and hides the remove button instead of letting the save fail.
     const manufactured = Number(prefill.manufactured) || 0;
     const minAmount = manufactured > 0 ? manufactured : 1;
-    // Optional markup pieces are assigned through let + if (not a ternary) and every interpolated
-    // value is escaped, so the innerHTML sink below provably only sees escaped values.
     let idInput = '';
     if (prefill.id) {
         idInput = `<input type="hidden" name="items[${escapeAttr(idx)}].id" value="${escapeAttr(prefill.id)}">`;
@@ -366,11 +299,6 @@ function addItemLine(prefill) {
     `;
     copyTemplateOptions('item-options-template', row.querySelector('[data-role="item-select"]'));
     container.appendChild(row);
-    // Seed the chosen item as a selected <option> BEFORE enhancing, so the combobox shows its
-    // label even though the option list is now fetched on demand rather than preloaded. Built via
-    // the DOM so the backend-supplied name is never parsed as HTML. Then upgrade into a
-    // searchable, backend-backed dropdown; if the enhancer failed to load, the plain <select>
-    // with the seeded option keeps working as a fallback.
     const itemSelect = row.querySelector('select[data-role="item-select"]');
     if (itemSelect && prefill.gameItemId) {
         const seeded = document.createElement('option');
@@ -391,9 +319,6 @@ function addItemLine(prefill) {
         });
     }
     if (prefill.gameItemId) {
-        // In edit mode, thread the stored blueprint + per-material qualities through the async
-        // load so the line restores exactly as ordered. After enhancement the value lives on
-        // the combobox's hidden input, which still carries data-role="item-select".
         loadBlueprints(row, prefill.blueprintId, prefill.qualities);
     }
     return row;
@@ -423,7 +348,6 @@ function loadBlueprints(row, preselectBpId, qualities) {
         .then((r) => (r.ok ? r.json() : []))
         .then((list) => {
             list = list || [];
-            // Built through the DOM: the backend-supplied blueprint name is set as text.
             bpSelect.replaceChildren(
                 ...list.map((b) => {
                     const opt = document.createElement('option');
@@ -434,7 +358,6 @@ function loadBlueprints(row, preselectBpId, qualities) {
             );
             wrap.hidden = list.length <= 1;
             if (list.length > 0) {
-                // Restore the previously-chosen blueprint in edit mode if it is still offered.
                 const pick =
                     preselectBpId && list.some((b) => b.id === preselectBpId)
                         ? preselectBpId
@@ -468,7 +391,6 @@ function loadDerivation(row, qualities) {
                 clearDerived(row);
                 return;
             }
-            // Every interpolated value below is escaped (the sinks provably see escaped values only).
             let html = `<strong class="oc-label-strong">${escapeHtml(ITEM_I18N.materialsTitle)}</strong>`;
             (d.materials || []).forEach((m, mi) => {
                 const mat = m.material || {};
@@ -477,7 +399,6 @@ function loadDerivation(row, qualities) {
                     mat.quantityType === 'PIECE'
                         ? Math.round(m.requiredQuantity || 0)
                         : Number((m.requiredQuantity || 0).toFixed(3));
-                // Edit mode: restore the stored quality for this material; else blueprint default.
                 const storedQ =
                     qualities && mat.id && qualities[mat.id] ? qualities[mat.id] : m.defaultQuality;
                 let goodSel = '';
@@ -508,8 +429,6 @@ function loadDerivation(row, qualities) {
                 unresolved.classList.add('krtm-hidden');
                 unresolved.innerHTML = '';
             }
-            // Declared at function level (not inside the if): the lint rule only traces an
-            // accumulator declared in the same function scope as its innerHTML sink.
             let s = '';
             if ((d.subAssemblies || []).length) {
                 s = `<strong class="oc-label-strong">${escapeHtml(ITEM_I18N.subTitle)}</strong>`;
@@ -560,8 +479,6 @@ if (itemLinesContainer) {
             });
         }
     });
-    // Edit mode: rebuild the existing lines from the injected prefill; otherwise start with one
-    // empty line.
     if (Array.isArray(EDIT_ITEMS) && EDIT_ITEMS.length) {
         EDIT_ITEMS.forEach((line) => addItemLine(line));
     } else {
@@ -573,7 +490,6 @@ document
     .forEach((r) => r.addEventListener('change', toggleOrderMode));
 toggleOrderMode();
 
-// Quantity-type-aware material rows: react to material changes and sync the rows present on load.
 const materialsContainerEl = document.getElementById('materials-container');
 if (materialsContainerEl) {
     materialsContainerEl.addEventListener('change', (e) => {
@@ -584,25 +500,12 @@ if (materialsContainerEl) {
     materialsContainerEl.querySelectorAll('.material-row').forEach(refreshMaterialUnit);
 }
 
-// CSP-safe delegated bindings (replaces onclick="importFromScmdb()" and
-// onclick="addMaterialRow()" inline handlers).
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('click', 'orders-import-scmdb', importFromScmdb);
     window.krtEvents.on('click', 'orders-add-material', addMaterialRow);
     window.krtEvents.on('click', 'orders-add-item', () => addItemLine());
 }
 
-// In-place create submit (#575): a create/edit navigates away on success, so intercept the form,
-// POST it via FormData (the browser serializes the dynamic material/item editor AND omits the
-// disabled inactive-form controls, exactly like the native POST) and navigate to the JSON
-// targetUrl. On a validation/backend failure the page STAYS with an inline toast instead of the
-// POST->redirect reflash. The classic form-POST is the no-JS fallback (krtCsrf absent).
-// Migrated to krtFetch.submitForm (S10, REQ-FE-009): the shared foundation owns the CSRF header
-// (no Content-Type so the browser sets the multipart boundary), the bare-403 refresh-and-retry,
-// X-Reauthenticate and the double-submit guard (submitter). This helper keeps only its page
-// behaviour: navigate away to the JSON targetUrl on success (toast:false; a create/edit leaves
-// the page) and the 400-invalid vs generic inline error toast (onError). The classic form-POST
-// stays the no-JS fallback (krtFetch absent).
 function _submitOrderCreate(form, invalidMessage, failedMessage, submitter) {
     if (!window.krtFetch) {
         form.submit();

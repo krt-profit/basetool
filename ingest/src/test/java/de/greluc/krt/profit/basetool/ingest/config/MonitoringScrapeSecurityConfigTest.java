@@ -41,11 +41,10 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Integration tests for the configured state of the {@code /actuator/prometheus} scrape chain on
- * the internet-facing ingest gateway (REQ-OBS-005, epic #936 Phase 1): only the dedicated
- * basic-auth identity may read the metrics payload — anonymous callers, wrong passwords, raw bearer
- * headers and even fully valid extractor JWTs are rejected — while {@code /actuator/health} stays
- * reachable without authentication. Test-only credentials, never production values.
+ * Integration tests for the configured {@code /actuator/prometheus} scrape chain (REQ-OBS-005):
+ * only the dedicated basic-auth identity may read metrics, every other caller including valid
+ * extractor JWTs is rejected, and {@code /actuator/health} stays public. Uses test-only
+ * credentials.
  */
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.MOCK,

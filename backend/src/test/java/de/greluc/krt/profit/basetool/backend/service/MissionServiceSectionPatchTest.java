@@ -62,15 +62,13 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 
 /**
- * Unit-Tests fuer die Section-Patch-Methoden in {@link MissionService}.
- *
- * <p>Verifiziert, dass:
+ * Unit tests for the section-patch methods of {@link MissionService}.
  *
  * <ul>
- *   <li>ein erfolgreicher Section-Patch nur die Felder der jeweiligen Sektion aktualisiert,
- *   <li>bei abweichender {@code expectedVersion} eine {@link
- *       ObjectOptimisticLockingFailureException} (HTTP 409) geworfen wird,
- *   <li>die Zeitplan-Validierung (meeting &le; plannedStart &le; plannedEnd) weiterhin greift.
+ *   <li>A patch updates only the fields of its section.
+ *   <li>A mismatching {@code expectedVersion} throws {@link
+ *       ObjectOptimisticLockingFailureException}.
+ *   <li>The schedule validation (meeting &le; plannedStart &le; plannedEnd) still applies.
  * </ul>
  */
 @ExtendWith(MockitoExtension.class)

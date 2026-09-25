@@ -33,31 +33,18 @@ import tools.jackson.databind.cfg.DateTimeFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Round-trip serialisation tests for the temporal types used at the REST boundary.
- *
- * <p>CLAUDE.md mandates "store/process as {@code Instant} or {@code OffsetDateTime}" plus "write
- * serialization tests for timezone behavior". These tests pin down the contract:
+ * Round-trip serialisation tests for the temporal types at the REST boundary.
  *
  * <ul>
- *   <li>{@link Instant} is always rendered as a UTC string ending in {@code Z}, never with a
- *       server-default offset.
- *   <li>{@link OffsetDateTime} <em>serialises</em> with whichever offset the in-memory value
- *       carries (positive, negative or {@code Z}) — but Jackson's default {@code
- *       ADJUST_DATES_TO_CONTEXT_TIME_ZONE} setting <em>normalises the value to UTC on
- *       deserialise</em>. The latter matches the CLAUDE.md "times in UTC" contract: no matter what
- *       offset a client sends, the server-side instant is stored in UTC and the original offset is
- *       dropped.
- *   <li>{@link LocalDateTime} in {@link HandoverReportPreviewRequestDto} is the documented
- *       exception (see DTO Javadoc): the value the user typed in their local time zone is echoed
- *       back unchanged, with no implicit conversion to UTC. The DTO is parsed and re-serialised
- *       here to make sure no Jackson default silently adds an offset.
- *   <li>DST boundary timestamps (Europe/Berlin spring-forward) survive round-tripping through
- *       {@link OffsetDateTime} with their wall-clock value intact.
+ *   <li>{@link Instant} always renders as a UTC string ending in {@code Z}.
+ *   <li>{@link OffsetDateTime} serialises with its own offset and is normalised to UTC on
+ *       deserialisation.
+ *   <li>{@link LocalDateTime} in {@link HandoverReportPreviewRequestDto} round-trips unchanged,
+ *       without an added offset.
+ *   <li>DST boundary timestamps keep their wall-clock value.
  * </ul>
  *
- * <p>All tests configure the {@link JsonMapper} the same way Spring Boot does by default (java.time
- * support is built into Jackson 3, {@code WRITE_DATES_AS_TIMESTAMPS} disabled) so that any
- * regression in this configuration here also surfaces in production.
+ * <p>The {@link JsonMapper} is configured like Spring Boot's default.
  */
 class TimezoneSerializationTest {
 

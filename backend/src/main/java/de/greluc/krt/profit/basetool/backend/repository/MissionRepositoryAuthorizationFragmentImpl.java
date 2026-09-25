@@ -27,9 +27,9 @@ import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * {@code EntityManager.find}-based implementation of {@link MissionRepositoryAuthorizationFragment}
- * (#1139). Spring Data wires this fragment into {@link MissionRepository} by the {@code <fragment
- * interface name> + "Impl"} naming convention.
+ * {@code EntityManager.find}-based implementation of {@link
+ * MissionRepositoryAuthorizationFragment}, wired into {@link MissionRepository} by Spring Data's
+ * {@code Impl} naming convention.
  */
 public class MissionRepositoryAuthorizationFragmentImpl
     implements MissionRepositoryAuthorizationFragment {
@@ -37,9 +37,8 @@ public class MissionRepositoryAuthorizationFragmentImpl
   @PersistenceContext private EntityManager entityManager;
 
   /**
-   * Resolves the mission through {@link EntityManager#find(Class, Object)} — a first-level-cache
-   * lookup that applies no collection {@code @EntityGraph} and never auto-flushes the persistence
-   * context. See {@link MissionRepositoryAuthorizationFragment#findByIdForAuthorization(UUID)}.
+   * Resolves the mission through {@link EntityManager#find(Class, Object)}, applying no entity
+   * graph and never auto-flushing.
    *
    * @param id the mission id
    * @return the mission, or empty when none exists

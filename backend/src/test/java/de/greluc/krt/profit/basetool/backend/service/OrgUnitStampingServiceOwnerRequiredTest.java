@@ -42,19 +42,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * The "pin, else choose" rejection carries its own stable problem code (REQ-ORG-017, REQ-ORG-023).
- *
- * <p>Why a test for what looks like an exception type swap: the code is the frontend's only
- * branching point, and until 2026-09-16 there was none. Every picker surface fell through to
- * echoing the backend's own English {@code detail} — "User belongs to multiple org units;
- * owningOrgUnitId is required" — straight into a German toast, which is an i18n violation and tells
- * a member neither what is wrong nor what to do. If this rejection ever slides back under the
- * generic {@code BAD_REQUEST}, five surfaces silently regress to that at once and nothing else in
- * the build would notice.
- *
- * <p>Both stamping entry points are exercised. They are separate methods with separate membership
- * lookups that happen to share a tail, and the four-eyes version of this defect is fixing one of
- * them.
+ * Verifies that the "pin, else choose" rejection of both stamping entry points carries its own
+ * stable problem code (REQ-ORG-017, REQ-ORG-023), on which the frontend branches.
  */
 @ExtendWith(MockitoExtension.class)
 class OrgUnitStampingServiceOwnerRequiredTest {

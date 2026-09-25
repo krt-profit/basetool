@@ -39,18 +39,9 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
- * Happy-path coverage for every HTTP verb and overload on {@link BackendApiClient}, driven by
- * {@link MockWebServer}.
- *
- * <p>The companion suite {@code BackendApiClientResilienceTest} covers the error / unwrap branches
- * via plain Mockito; {@code BackendApiClientProblemJsonTest} covers RFC 7807 decoding. This file
- * plugs the remaining gap: the success path of every public method (cached / uncached, {@code
- * Class<T>} / {@code ParameterizedTypeReference<T>}, public / authenticated client, POST/PUT/PATCH
- * with and without a body, DELETE).
- *
- * <p>A single shared {@link MockWebServer} is used; the {@code isPublic} flag selects between two
- * WebClient instances that both point at the same server so we can observe which path was taken
- * (the server records every request).
+ * Success-path coverage for every public method and overload of {@link BackendApiClient} (cached
+ * and uncached, {@code Class<T>} and {@code ParameterizedTypeReference<T>}, every verb with and
+ * without body), driven by a shared {@link MockWebServer}.
  */
 class BackendApiClientHappyPathTest {
 
@@ -139,9 +130,7 @@ class BackendApiClientHappyPathTest {
   }
 
   /**
-   * REQ-SEC-052: every verb goes out on the authenticated client. The class used to prove the
-   * opposite eight times over — once per verb, that the {@code isPublic} flag selected the
-   * anonymous transport. One case each way is what the surface can still be wrong about.
+   * Every verb goes out on the authenticated client (REQ-SEC-052).
    *
    * @throws Exception if a request could not be read back from the stub server
    */

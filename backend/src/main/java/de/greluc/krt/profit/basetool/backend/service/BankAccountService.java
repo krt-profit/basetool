@@ -72,10 +72,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Account lifecycle and read surface of the Kartell bank (epic #556, REQ-BANK-001/-002): create,
- * rename, close, reopen plus the paged listings, the detail aggregate and the booking history.
- * Balances are always computed on read from the ledger (ADR-0010) and joined in batch-wise — never
- * per account (REQ-DATA-003).
+ * Account lifecycle and read surface of the Kartell bank (REQ-BANK-001/-002): create, rename,
+ * close, reopen, listings, detail and booking history.
+ *
+ * <p>Balances are computed from the ledger on read (ADR-0010) and joined in batch (REQ-DATA-003).
  */
 @Service
 @RequiredArgsConstructor
@@ -96,29 +96,19 @@ public class BankAccountService {
   private final BankApprovalLimitService bankApprovalLimitService;
 
   /**
-   * Pages over the accounts the caller may see: management/admin get all accounts, employees get
-   * exactly their granted accounts (REQ-BANK-010), optionally narrowed by a case-insensitive
-   * name/account-number substring and by status/type sets (REQ-BANK-053, ADR-0106 — the server-side
-   * account search that backs the remote account pickers and the paged management table, replacing
-   * the former unbounded {@code size=500} preload). Balances are joined in one grouped query, so
-   * the read stays statement-bounded regardless of the account count (REQ-DATA-003, {@code
-   * BankReadNoNPlusOneTest}). A blank/{@code null} query is normalised to the empty string, which
-   * the repository turns into the match-all {@code LIKE '%%'} (never a null bind — the "empty means
-   * all" convention). The query is a <strong>bound parameter</strong> (SQL-injection-safe) and is
-   * intentionally <strong>not</strong> {@code LikePatterns}-escaped: plain {@code LIKE} does not
-   * honour the backslash escape in this Hibernate/PostgreSQL setup, so escaping would only hide an
-   * account whose name contains a literal {@code %}/{@code _}; a caller's {@code %}/{@code _}
-   * therefore act as harmless LIKE wildcards on this bank-employee-gated read.
+   * Pages over the accounts the caller may see, optionally filtered by a case-insensitive name or
+   * account-number fragment and by status and type (REQ-BANK-053).
+   *
+   * <p>Management sees all accounts, employees only their granted ones (REQ-BANK-010). The query is
+   * a bound parameter; {@code %} and {@code _} in it act as LIKE wildcards.
    *
    * @param management whether the caller has the management perspective
-   * @param userId the caller's user id (used for the employee filter)
-   * @param query the raw name/account-no search fragment, or {@code null}/blank for no text filter
-   * @param statuses the account statuses to include (never empty — the controller passes the full
-   *     set for "no status filter")
-   * @param types the account types to include (never empty — the controller passes the full set for
-   *     "no type filter")
+   * @param userId the caller's user id, for the employee filter
+   * @param query the name/account-number fragment, or {@code null}/blank for no text filter
+   * @param statuses the account statuses to include; never empty
+   * @param types the account types to include; never empty
    * @param pageable page, size and whitelisted sort
-   * @return one page of matching accounts incl. balances
+   * @return one page of matching accounts with balances
    */
   public Page<BankAccountDto> getAccounts(
       boolean management,
@@ -141,16 +131,8 @@ public class BankAccountService {
   }
 
   /**
-   * Loads the detail aggregate of one account (K1 mockup): account + balance, 30-day delta,
-   * facts-strip booking count and the caller's capabilities. Since ADR-0039 an account carries no
-   * per-account holder distribution (holders are global). Visibility is gated at the controller via
-   * {@code BankSecurityService.canSee}; the controller also evaluates and passes the capability
-   * flags so this service stays free of authentication concerns.
-   *
-   * <p>The approval limits are always assembled <strong>read-only</strong> ({@code canEdit =
-   * false}): per REQ-BANK-041 limits are configured exclusively on the org-unit bank settings
-   * surface, so this bank-staff detail aggregate (and the org-unit read-only display that reuses
-   * it) only ever shows the configured ceilings — it never offers the editor.
+   * Loads one account's detail aggregate: account, balance, 30-day delta, booking count and the
+   * caller's capabilities. Approval limits are always read-only here (REQ-BANK-041).
    *
    * @param accountId the account
    * @param capabilities the caller's evaluated capabilities on the account
@@ -176,17 +158,14 @@ public class BankAccountService {
   }
 
   /**
-   * Pages over one account's booking history with the transfer counter-account resolved and the
-   * holder annotation derived from the holder ledger, both in batched IN-queries (no per-row
-   * lookups, REQ-BANK-018, ADR-0039). An optional inclusive {@code [from, to]} period narrows the
-   * history to that window (REQ-BANK-051); a {@code null} bound drops that side of the filter, so
-   * {@code (null, null)} pages the whole history.
+   * Pages over one account's booking history with counter-accounts and holder annotations resolved
+   * in batch (REQ-BANK-018), optionally within an inclusive period (REQ-BANK-051).
    *
    * @param accountId the account
    * @param pageable page, size and whitelisted sort (default newest first)
-   * @param from inclusive lower bound on the booking instant, or {@code null} for no lower bound
-   * @param to inclusive upper bound on the booking instant, or {@code null} for no upper bound
-   * @return one page of booking rows inside the (optionally bounded) period
+   * @param from inclusive lower bound on the booking instant, or {@code null} for none
+   * @param to inclusive upper bound on the booking instant, or {@code null} for none
+   * @return one page of booking rows in the period
    */
   public Page<BankBookingDto> getBookings(
       @NotNull UUID accountId,
@@ -217,18 +196,13 @@ public class BankAccountService {
   }
 
   /**
-   * Builds the account's balance-over-time series for a caller-chosen period plus its balance
-   * target (REQ-BANK-049), the data behind the detail page's SVG line chart. Reuses the statement
-   * math (REQ-BANK-014): the opening balance strictly before {@code from} plus the period's
-   * postings, walked into an end-of-day series by {@link BankBalanceSeriesCalculator}. A read-only,
-   * non-audited projection of the ledger — the balance is already visible in the facts strip, so
-   * the series adds no new information and needs no redaction on the org-unit surface.
+   * Builds the account's end-of-day balance series for a period plus its balance target
+   * (REQ-BANK-049), using {@link BankBalanceSeriesCalculator}.
    *
    * @param accountId the account
    * @param from inclusive period start
    * @param to inclusive period end
-   * @return the balance series (oldest first) and the account's balance target ({@code null} when
-   *     unset)
+   * @return the balance series (oldest first) and the balance target ({@code null} when unset)
    * @throws NotFoundException when the account does not exist
    */
   @NotNull
@@ -243,18 +217,16 @@ public class BankAccountService {
   }
 
   /**
-   * Creates an account (REQ-BANK-001/-002/-030): validates the type-specific owner reference,
-   * enforces the singleton/per-org-unit uniqueness with clean 409s, draws the next {@code KB-}
-   * number and audits the creation. Bank management (and admins) create any type; a non-management
-   * bank employee may create <strong>only</strong> {@code SPECIAL} accounts and is auto-granted
-   * full capability on the account they create (ADR-0040) so it is immediately usable. Nothing is
-   * seeded by migration.
+   * Creates an account (REQ-BANK-001/-002/-030): validates the owner reference, enforces
+   * uniqueness, draws the next {@code KB-} number and audits the creation.
+   *
+   * <p>Management may create any type; a non-management employee only {@code SPECIAL} accounts, and
+   * is granted full capability on them (ADR-0040).
    *
    * @param request validated creation payload
-   * @param management whether the caller has the bank-management perspective (may create any type)
-   * @param creatorUserId the caller's user id, used to auto-grant an employee-created special
-   *     account; may be {@code null}
-   * @return the created account incl. its (zero) balance
+   * @param management whether the caller has the bank-management perspective
+   * @param creatorUserId the caller's user id for the auto-grant; may be {@code null}
+   * @return the created account with its zero balance
    * @throws AccessDeniedException when a non-management employee creates a non-{@code SPECIAL} type
    * @throws BadRequestException when the owner reference does not match the type
    * @throws DuplicateEntityException when the singleton or per-org-unit uniqueness is violated
@@ -384,16 +356,12 @@ public class BankAccountService {
   }
 
   /**
-   * Sets or clears an account's balance target ("Kontostandsziel", REQ-BANK-036) from the bank
-   * surface. A {@code null} target clears the goal. Gated at the controller to bank staff with
-   * access to the account ({@code BankSecurityService.canSee}); the org-unit responsible holder
-   * sets the target through the {@code OrgUnitBankAccessService} seam instead. Audited either way.
+   * Sets or clears an account's balance target ("Kontostandsziel", REQ-BANK-036); audited.
    *
    * @param accountId the account
-   * @param target the new target, or {@code null} to clear it (a present target is a positive whole
-   *     amount, validated on the request)
+   * @param target the new positive whole target, or {@code null} to clear it
    * @param version the echoed optimistic-locking version
-   * @return the updated account incl. its balance
+   * @return the updated account with its balance
    * @throws NotFoundException when the account does not exist
    * @throws ObjectOptimisticLockingFailureException on a version mismatch (409)
    */
@@ -416,21 +384,17 @@ public class BankAccountService {
   }
 
   /**
-   * Sets or clears the KRT-account (CARTEL) 3-stage approval thresholds T1/T2 (REQ-BANK-047) from
-   * the Verwaltung tab. Only the KRT account carries thresholds; both {@code null} clears the
-   * ladder. The whole-aUEC / non-negativity of each value is validated on the request; here the
-   * business rules are enforced: the account must be a {@code CARTEL} account and — when both are
-   * set — the area-lead ceiling {@code T2} must be at or above the bank-employee ceiling {@code
-   * T1}. Gated at the controller to bank management (admins pass via the hierarchy). Audited.
-   * Shares the account row's {@code @Version} with rename/close/target.
+   * Sets or clears the KRT account's (CARTEL) approval thresholds T1/T2 (REQ-BANK-047); audited.
+   *
+   * <p>Both {@code null} clears the ladder; when both are set, {@code T2} must be at least {@code
+   * T1}.
    *
    * @param accountId the KRT account
-   * @param employeeCeiling the bank-employee self-approval ceiling {@code T1}, or {@code null} to
-   *     clear it
+   * @param employeeCeiling the bank-employee ceiling {@code T1}, or {@code null} to clear it
    * @param areaLeadCeiling the Bereichsleiter-Profit ceiling {@code T2}, or {@code null} to clear
    *     it
    * @param version the echoed optimistic-locking version
-   * @return the updated account incl. its balance
+   * @return the updated account with its balance
    * @throws NotFoundException when the account does not exist
    * @throws BadRequestException when the account is not the KRT account or {@code T2 < T1}
    * @throws ObjectOptimisticLockingFailureException on a version mismatch (409)
@@ -474,8 +438,7 @@ public class BankAccountService {
   }
 
   /**
-   * Closes an account (REQ-BANK-002): requires a zero balance — transfer the remainder first. The
-   * closed account stays fully readable with its history; only postings are rejected.
+   * Closes an account with a zero balance (REQ-BANK-002); it stays readable but rejects postings.
    *
    * @param accountId the account
    * @param request the echoed optimistic-locking version
@@ -545,17 +508,14 @@ public class BankAccountService {
   }
 
   /**
-   * Resolves one booking row's holder annotation and — for transfers — the counter account/holder
-   * from the batched legs, and maps to the DTO. The holder annotation is the holder leg whose
-   * amount sign matches this account leg (deposit/withdrawal: the single leg; transfer/reversal:
-   * the matching leg of the pair); a {@code WIPE_RESET} row has no 1:1 holder leg and shows none
-   * (ADR-0039).
+   * Maps one booking row to its DTO, resolving the holder annotation and, for transfers, the
+   * counter account from the batched legs (ADR-0039).
    *
    * @param accountId the account whose history is rendered
    * @param row the projected booking row
-   * @param accountLegsByTx account legs of the page's transfer transactions, grouped by transaction
+   * @param accountLegsByTx account legs of the page's transfers, grouped by transaction
    * @param holderLegsByTx holder legs of the page's transactions, grouped by transaction
-   * @return the booking DTO with holder annotation and counter-side labels for transfers
+   * @return the booking DTO
    */
   @NotNull
   private BankBookingDto toBookingDto(
@@ -604,12 +564,10 @@ public class BankAccountService {
   }
 
   /**
-   * Picks the handle of the holder leg whose amount sign matches the requested sign — the holder
-   * paired with an account leg of the same sign in the same transaction (ADR-0039). Returns {@code
-   * null} when no such leg exists (e.g. an account with no sibling holder leg).
+   * Picks the handle of the holder leg whose amount sign matches {@code sign} (ADR-0039).
    *
    * @param holderLegs the transaction's holder legs
-   * @param sign the wanted amount sign (+1, -1; 0 never matches a non-zero leg)
+   * @param sign the wanted amount sign (+1 or -1; 0 never matches)
    * @return the matching holder's handle, or {@code null}
    */
   private static String matchHolderHandle(@NotNull List<BankHolderLeg> holderLegs, int sign) {
@@ -643,8 +601,7 @@ public class BankAccountService {
 
   /**
    * Rejects an org-unit reference on the types that carry none: {@code CARTEL_BANK} and {@code
-   * SPECIAL}. {@code ORG_UNIT} (Staffel/SK), {@code AREA} (Bereich) and {@code CARTEL} (OL) all
-   * carry the org_unit FK and validate it in their own switch branch (epic #692, REQ-ORG-019).
+   * SPECIAL} (REQ-ORG-019).
    *
    * @param request the creation payload
    */
@@ -656,9 +613,8 @@ public class BankAccountService {
   }
 
   /**
-   * Rejects a free-form area name. Since epic #692 (REQ-ORG-019) an AREA account is owned by its
-   * Bereich via the org_unit FK, so no type accepts an area name on creation — the legacy {@code
-   * areaName} form survives only for rows created before the FK and is never produced here.
+   * Rejects a free-form area name; an AREA account is owned by its Bereich via the org-unit FK
+   * (REQ-ORG-019).
    *
    * @param request the creation payload
    */

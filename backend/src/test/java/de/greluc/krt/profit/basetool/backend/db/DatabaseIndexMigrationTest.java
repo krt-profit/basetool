@@ -32,13 +32,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
-/**
- * Verifies that the indexes introduced by the Flyway migrations actually exist in the test
- * database. The test profile now boots Postgres via Testcontainers and runs every V<n>__*.sql
- * migration during context startup (see {@code application-test.yml}), so this test no longer needs
- * its own container/dynamic-property wiring nor the {@code ENABLE_TC} gate that historically kept
- * it from running in the default build — it is part of the standard test suite now.
- */
+/** Verifies that the indexes created by the Flyway migrations exist in the test database. */
 @SpringBootTest
 class DatabaseIndexMigrationTest {
 
@@ -49,22 +43,8 @@ class DatabaseIndexMigrationTest {
   @Autowired private DataSource dataSource;
 
   /**
-   * Spot-checks a handful of indexes from the Flyway migrations to make sure they are actually
-   * present in the live Postgres test schema. Picks one representative index from each migration
-   * that introduces a non-trivial indexing strategy:
-   *
-   * <ul>
-   *   <li>V34 (foreign-key b-tree index, e.g. {@code idx_ship_owner_id})
-   *   <li>V35 (pg_trgm GIN index used by the ILIKE search endpoints)
-   *   <li>V48 (mission owner/manager indexes added with the ownership rewrite)
-   *   <li>V65 (personal inventory composite owner+name index)
-   *   <li>V92 (backfill FK indexes that escaped V34's blanket sweep)
-   *   <li>V122 (second FK backfill: handover / unit / yield lookup indexes)
-   * </ul>
-   *
-   * The test is intentionally not exhaustive: it acts as an early-warning canary that Flyway
-   * actually ran and produced the expected DDL. A missing index here is almost always a sign that a
-   * migration was renamed/squashed without updating the index name.
+   * Spot-checks one representative index per migration with a non-trivial indexing strategy (V34,
+   * V35, V48, V65, V92, V122) in the live test schema.
    */
   @Test
   void flywayMigrationAddsExpectedIndexes() {
@@ -176,19 +156,13 @@ class DatabaseIndexMigrationTest {
   }
 
   /**
-   * Pins the live {@code CREATE INDEX} definition of {@code indexName} on {@code table} by
-   * asserting (case-insensitively) that every given fragment appears in its {@code pg_get_indexdef}
-   * text. Unlike {@link #assertIndexExists}, which only proves the name is present, this locks the
-   * index <em>shape</em>: the partial-index {@code WHERE} predicate and the key-column ordering. It
-   * catches a migration that keeps the index name but silently narrows the predicate or flips a
-   * sort direction — a change that would otherwise pass green while no longer serving the query the
-   * index was added for.
+   * Asserts that the {@code pg_get_indexdef} text of {@code indexName} on {@code table} contains
+   * every fragment, case-insensitively, pinning the index shape rather than only its name.
    *
    * @param jdbc the template bound to the live Postgres test schema
    * @param table the table owning the index
    * @param indexName the index whose {@code pg_indexes.indexdef} text is inspected
-   * @param fragments substrings, each matched case-insensitively, that must all appear in the
-   *     definition
+   * @param fragments substrings that must all appear in the definition
    */
   private static void assertIndexDefContains(
       JdbcTemplate jdbc, String table, String indexName, String... fragments) {

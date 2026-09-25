@@ -29,15 +29,9 @@ import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
 
 /**
- * Builds a {@code @ConfigurationProperties} record for a unit test the way the application context
- * does — through Spring's {@link Binder}, so every component a test does not set takes its
- * production {@code @DefaultValue} (BE-MOD-04).
- *
- * <p>The properties records have no setters and no no-argument constructor, and spelling every
- * default out in a test would copy the production defaults into dozens of places that then drift.
- * Binding instead keeps one source of truth: a test names only the keys it cares about, relative to
- * the record's own prefix and in the same kebab-case the YAML uses. Bean validation is not applied
- * here; the startup validation has its own context tests.
+ * Builds a {@code @ConfigurationProperties} record for a unit test through Spring's {@link Binder},
+ * so every component the test does not set takes its production {@code @DefaultValue}. Bean
+ * validation is not applied.
  */
 public final class BoundProperties {
 

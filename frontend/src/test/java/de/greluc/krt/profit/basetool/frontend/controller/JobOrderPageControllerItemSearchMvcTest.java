@@ -46,11 +46,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC tests for the item-order picker's live-search JSON proxy ({@code GET /orders/item-search} →
- * backend {@code GET /api/v1/orders/item-catalog?search=...}). The picker now searches the catalog
- * on the backend per keystroke instead of preloading a capped, client-filtered list, so these cover
- * the happy mapping (id + name reach the browser) and the fail-soft empty-list behaviour that keeps
- * the field usable when the backend is unavailable.
+ * MVC tests for the item picker's search proxy ({@code GET /orders/item-search}): id and name are
+ * mapped, and a backend failure yields an empty list.
  */
 @SpringBootTest
 class JobOrderPageControllerItemSearchMvcTest {

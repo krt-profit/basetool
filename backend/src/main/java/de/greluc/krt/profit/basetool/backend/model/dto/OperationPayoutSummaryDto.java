@@ -23,19 +23,12 @@ import java.math.BigDecimal;
 import java.util.List;
 
 /**
- * Aggregated payout view for an operation: the per-participant breakdown plus the operation-wide
- * donation total.
+ * Payout view of an operation: the per-participant breakdown plus the operation-wide donation
+ * total, which always equals the sum of the rows' {@link OperationPayoutDto#donatedAmount()}.
  *
- * <p>{@code totalDonations} is the sum of every row's {@link OperationPayoutDto#donatedAmount()} —
- * the pool share that DONATE participants contributed to the org instead of receiving it. It is
- * derived from the same rows it ships with, so the central figure on the operation-detail page
- * always equals the sum of the per-donor donated amounts in the table. Donations are retained
- * centrally and are never redistributed to PAYOUT participants — a PAYOUT participant's share is
- * their own attendance slice of the full pool, unaffected by who donates.
- *
- * @param totalDonations operation-wide sum of donated shares (always &gt;= 0, two-decimal scale);
- *     {@link BigDecimal#ZERO} when no participant donated
- * @param payouts the per-participant payout rows, sorted by participant name
+ * @param totalDonations sum of donated shares, two-decimal scale; {@link BigDecimal#ZERO} when no
+ *     participant donated
+ * @param payouts the per-participant rows, sorted by participant name
  */
 public record OperationPayoutSummaryDto(
     BigDecimal totalDonations, List<OperationPayoutDto> payouts) {}

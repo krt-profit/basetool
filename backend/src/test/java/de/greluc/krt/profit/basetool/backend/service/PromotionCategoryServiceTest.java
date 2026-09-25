@@ -160,9 +160,8 @@ class PromotionCategoryServiceTest {
   }
 
   /**
-   * REQ-OBS-004 / CWE-117: the category name is admin-entered free text that reaches the creation
-   * log line verbatim. A newline plus a fabricated level prefix would otherwise read as a genuine
-   * second log line during triage, so the value must go through {@code LogSafe} first.
+   * The admin-entered category name passes through {@code LogSafe} before it is logged
+   * (REQ-OBS-004).
    */
   @Test
   void create_sanitisesTheCategoryNameBeforeLoggingIt() {

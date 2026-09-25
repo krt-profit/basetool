@@ -59,15 +59,10 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
- * Spring MVC controller for the mutating half of the inventory area ({@code /inventory} prefix),
- * split out of {@link InventoryPageController} in the #924 read/write controller split (L5).
+ * Spring MVC controller for the mutating inventory endpoints under {@code /inventory}: create,
+ * book-out, transfer and personal rebooking, bulk checkout and rebooking, allocations, and notes.
  *
- * <p>Write paths cover create (classic input-form post plus its {@code X-Requested-With} AJAX
- * twin), book-out (consume / transfer / sell), inline transfer and personal rebooking (AJAX), bulk
- * checkout, association update (re-bind to a different mission/job-order), note update, and the
- * delivered-status toggle. Validation-failure paths re-render the read views inline by delegating
- * to the read controller, so the {@code BindingResult} stays request-scoped exactly as before the
- * split.
+ * <p>Validation failures re-render the read views inline via {@link InventoryPageController}.
  */
 @Controller
 @UsesLayoutModel
@@ -81,21 +76,16 @@ public class InventoryWriteController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * The read half of the inventory area. Validation failures in the classic form handlers re-render
-   * the originating read view inline (input form / personal listing / admin listing) instead of
-   * redirecting, so the {@code BindingResult} stays request-scoped; those inline renders are
-   * delegated to the read controller's public endpoint methods ({@code viewInputPage}, {@code
-   * viewMyInventory}, {@code viewAllInventory}), which own the catalog fetching and model seeding.
+   * The read half of the inventory area, whose endpoint methods re-render the originating view
+   * inline when a classic form handler fails validation.
    */
   private final InventoryPageController inventoryPageController;
 
   /**
    * Persists a new inventory item.
    *
-   * <p>Enforces a cross-field invariant before the backend call: a personal entry cannot be
-   * assigned to a job order or mission. Validation failure re-renders the input page inline so the
-   * BindingResult stays request-scoped. On success, redirects to the page the user came from
-   * (encoded in {@code source}).
+   * <p>A personal entry cannot be assigned to a job order or mission. Validation failure re-renders
+   * the input page inline; success redirects to the page named by {@code source}.
    *
    * @param form inventory form
    * @param bindingResult validation errors carrier
@@ -149,14 +139,8 @@ public class InventoryWriteController {
   }
 
   /**
-   * AJAX twin of {@link #addInventoryItem} (#577): books an item into the inventory in place.
-   * Routed by the {@code X-Requested-With} header (the classic {@code POST /inventory/input}
-   * redirect stays the no-JavaScript fallback). The form is multipart/form-encoded (the create page
-   * has the SCU-decimal amount + the owner-picker), so it binds the same {@code @ModelAttribute}
-   * the classic handler does. On success it returns the source listing URL the client navigates to
-   * (navigate-after-AJAX, REQ-FE-006 — book-in is a standalone page with no local list to patch); a
-   * cross-field or bind error returns {@code 422} {@code problem+json} with a {@code code} the
-   * client maps to an inline toast, and a backend failure is propagated as {@code problem+json}.
+   * AJAX twin of {@link #addInventoryItem}, routed by the {@code X-Requested-With} header: books an
+   * item in and returns the listing URL to navigate to (REQ-FE-006).
    *
    * @param form the bound inventory form
    * @param bindingResult the binding/validation result
@@ -189,13 +173,8 @@ public class InventoryWriteController {
   }
 
   /**
-   * Cross-field catalog-mode validation of the create form (design §6.2, REQ-INV-029): exactly one
-   * of {@code materialId} / {@code gameItemId} must be set (the inactive mode's controls are
-   * disabled client-side, so both-set or neither-set only happens on a crafted or degraded
-   * request), and material mode additionally requires a {@code quality} (item rows carry none, so
-   * the field-level {@code @NotNull} moved here). Shared by the classic and AJAX handlers; the
-   * classic path renders the rejected fields inline, the AJAX path maps any error to the generic
-   * 422 {@code VALIDATION} code.
+   * Validates the create form's catalog mode (REQ-INV-029): exactly one of {@code materialId} and
+   * {@code gameItemId} is set, and material mode requires a {@code quality}.
    *
    * @param form the bound create form
    * @param bindingResult the binding result the violations are recorded on
@@ -218,12 +197,8 @@ public class InventoryWriteController {
   }
 
   /**
-   * Maps the validated create form to the backend create payload. Derives the catalog mode from the
-   * set reference ({@link #validateCatalogMode} guarantees the XOR) and defensively clears every
-   * inactive-mode field server-side: item mode sends {@code gameItemId} with {@code null} quality,
-   * no mission assignment (item rows reject the mission dimension, REQ-INV-031) and no merge opt-in
-   * (items always auto-merge, REQ-INV-026); material mode sends {@code materialId} + quality
-   * exactly as before the item mode shipped.
+   * Maps the validated create form to the backend create payload, clearing the fields of the
+   * inactive catalog mode; item mode sends no quality, mission or merge opt-in.
    *
    * @param form the validated create form
    * @return the backend create payload
@@ -248,12 +223,11 @@ public class InventoryWriteController {
   }
 
   /**
-   * Whether a create form marks the entry personal while also carrying any assignment — a single
-   * job order / mission or a Variante-C split-at-check-in earmark (REQ-INV-027, R4). Personal stock
-   * can never be assigned, so this drives the friendly pre-backend rejection on both create paths.
+   * Whether a create form marks the entry personal while carrying any job-order or mission
+   * assignment, including split earmarks (REQ-INV-027).
    *
-   * @param form the bound create form.
-   * @return {@code true} when the entry is personal and carries at least one assignment.
+   * @param form the bound create form
+   * @return {@code true} when the entry is personal and carries at least one assignment
    */
   private static boolean formPersonalWithAssignment(InventoryForm form) {
     if (!Boolean.TRUE.equals(form.getPersonal())) {
@@ -266,22 +240,16 @@ public class InventoryWriteController {
   }
 
   /**
-   * Maps the create form's split-at-check-in rows to the backend allocation-input list
-   * (REQ-INV-027, R4), dropping rows without a target and rows whose amount the user left blank.
+   * Maps the create form's split-at-check-in rows to backend allocation inputs (REQ-INV-027),
+   * dropping rows without a target or amount.
    *
-   * <p>Single-target shorthand: when a dimension names <strong>exactly one</strong> target and its
-   * amount is blank, the whole entry amount is earmarked to it — assigning a book-in to one order /
-   * mission is the common case and needs no amount typed twice. The shorthand deliberately does
-   * <em>not</em> extend to several targets: with two or more rows there is no unambiguous split, so
-   * each amount must be entered and a blank row is dropped as before. A blank amount with no usable
-   * entry amount (missing / non-positive — the {@code @NotNull} {@code @Min(0)} bind error already
-   * rejects the submit) yields no allocation, and an explicitly entered non-positive amount is
-   * forwarded unchanged so the backend's {@code @Positive} keeps rejecting it.
+   * <p>When a dimension names exactly one target with a blank amount, the whole entry amount is
+   * earmarked to it.
    *
-   * @param rows the bound allocation rows; may be {@code null}.
-   * @param entryAmount the amount of the entry being booked in, used by the single-target
-   *     shorthand; may be {@code null}.
-   * @return the resolved allocation inputs; never {@code null}.
+   * @param rows the bound allocation rows; may be {@code null}
+   * @param entryAmount the amount being booked in, used for the single-target shorthand; may be
+   *     {@code null}
+   * @return the resolved allocation inputs; never {@code null}
    */
   private static List<InventoryAllocationInput> toAllocationInputs(
       List<InventoryForm.AllocationRow> rows, Double entryAmount) {
@@ -321,10 +289,8 @@ public class InventoryWriteController {
   }
 
   /**
-   * Builds a {@code 422} {@code problem+json} response carrying a stable {@code code} the inventory
-   * pages map to a localized inline toast — used by {@link #addInventoryItemAjax} for the
-   * server-side cross-field rule (a personal entry cannot carry an order/mission) and for a bind
-   * failure, so the create page surfaces the error without a navigation.
+   * Builds a {@code 422} {@code problem+json} response with a stable {@code code} the inventory
+   * pages show as an inline toast.
    *
    * @param code the validation code ({@code INVENTORY_PERSONAL_ASSIGNMENT} / {@code VALIDATION})
    * @return a {@code 422} {@code problem+json} response
@@ -340,22 +306,17 @@ public class InventoryWriteController {
   }
 
   /**
-   * Books out an inventory item (consume / transfer / sell). The {@code type} field on the form
-   * selects the operation; the backend computes the resulting state changes (decrement, transfer to
-   * another user/location, or sell with terminal + price).
+   * Books out an inventory item (consume / transfer / sell, selected by the form's {@code type}).
    *
-   * <p>The redirect target preserves filter query parameters from the {@code Referer} header (see
-   * {@link #buildInventoryRedirectFromReferer}) so the user does not lose their active filters
-   * after a successful book-out. Validation failures drop the filter state and re-render the
-   * originating listing inline — acceptable for a rare validation path.
+   * <p>Success redirects with the {@code Referer}'s filter parameters kept; validation failure
+   * re-renders the originating listing inline without them.
    *
    * @param id inventory item id
    * @param form book-out form
    * @param bindingResult validation errors carrier
    * @param model Thymeleaf model used for inline re-rendering on validation failure
    * @param redirectAttributes flash attributes carrier
-   * @param referer browser-supplied origin URL, used to derive the redirect target and the
-   *     admin-vs-my detection
+   * @param referer origin URL, used for the redirect target and the admin-vs-my detection
    * @return inline rerendered listing on failure, otherwise redirect preserving filters
    */
   @PostMapping("/{id}/book-out")
@@ -409,15 +370,10 @@ public class InventoryWriteController {
   }
 
   /**
-   * Builds a redirect target for inventory list views that preserves the filter query parameters
-   * (e.g. {@code materialIds}, {@code minQuality}, {@code jobOrderIds}, {@code missionIds}, {@code
-   * page}, {@code size}, {@code sort}) taken from the given Referer URL. This is the single source
-   * of truth for filter state (URL-based) and guarantees that users keep their active filters after
-   * write actions such as book-out / transfer / sell.
+   * Builds a redirect to an inventory list view that keeps the filter query parameters of the given
+   * Referer URL, dropping {@code fragment}.
    *
-   * <p>If the referer is empty, not parseable, or contains no query string, the plain base path is
-   * returned. The {@code fragment} parameter is intentionally stripped since the redirect always
-   * targets the full page view.
+   * <p>Returns the plain base path when the referer is empty, unparseable or has no query.
    */
   @org.jetbrains.annotations.NotNull
   static String buildInventoryRedirectFromReferer(
@@ -484,11 +440,8 @@ public class InventoryWriteController {
   }
 
   /**
-   * AJAX endpoint that proxies a personal-marker rebooking (Umbuchung, REQ-INV-007) to the backend.
-   * Drives the PERSONAL mode of the Umbuchen modal: the source row's quantity is split and the
-   * moved amount inserted as a new row with the opposite {@code personal} flag. Always returns the
-   * new row (the source row may have been depleted), so the page re-swaps the grouped table on
-   * success.
+   * AJAX proxy for a personal-marker rebooking (REQ-INV-007): splits the source row and inserts the
+   * moved amount as a new row with the opposite {@code personal} flag.
    *
    * @param id the source inventory row id
    * @param dto the rebooking payload (amount, version, optional target org unit)
@@ -514,15 +467,8 @@ public class InventoryWriteController {
   }
 
   /**
-   * AJAX proxy for the bulk book-out of several fully-consumed inventory items in one call (#577,
-   * part 2). The personal-inventory page collects the checked item ids and posts them here; this
-   * forwards to the backend {@code POST /api/v1/inventory/bulk-checkout} (which discards each item
-   * in full and enforces per-item ownership). It replaces the page's former direct browser call to
-   * the backend {@code /api/v1/...} path, which had no matching frontend route — so the bulk action
-   * never reached the backend. On a backend failure the {@code problem+json} is propagated (so the
-   * client's {@code krtFetch.handleProblem} can drive the optimistic-lock reload-confirm or an
-   * error toast); on success {@code 204} lets the page re-swap the grouped table in place rather
-   * than reload.
+   * AJAX proxy for booking out several owned inventory items in full, forwarding to {@code POST
+   * /api/v1/inventory/bulk-checkout}.
    *
    * @param request the ids of the owned items to book out
    * @return {@code 204} on success, otherwise the propagated backend error
@@ -547,17 +493,10 @@ public class InventoryWriteController {
   }
 
   /**
-   * AJAX proxy for the bulk rebooking (Massen-Umbuchen, REQ-INV-036) of several owned inventory
-   * rows in one call. The "Mein Lager" bulk bar collects the marked ids plus the chosen mode and
-   * target, and posts them here; this forwards to the backend {@code POST
-   * /api/v1/inventory/bulk-rebook} (which enforces per-row ownership and moves each row in full).
+   * AJAX proxy for the bulk rebooking of several owned inventory rows (REQ-INV-036), forwarding to
+   * {@code POST /api/v1/inventory/bulk-rebook}.
    *
-   * <p>Returns the backend's moved/skipped counts so the page can distinguish a full success from a
-   * selection that was largely already at the target. The empty/missing id list is guarded here
-   * rather than via {@code @Valid} — which the frontend {@code GlobalExceptionHandler} would
-   * surface as a 500 — so the page gets a clean 422 {@code problem+json}, mirroring {@link
-   * #bulkCheckout}. On a backend failure the {@code problem+json} is propagated so {@code
-   * krtFetch.handleProblem} can drive the optimistic-lock reload-confirm or an error toast.
+   * <p>An empty id list is rejected here with a 422 {@code problem+json}.
    *
    * @param request the marked ids, the rebooking mode and its target fields
    * @return {@code 200} with the moved/skipped counts, otherwise the propagated backend error
@@ -587,16 +526,12 @@ public class InventoryWriteController {
   }
 
   /**
-   * AJAX endpoint that proxies an inventory allocation add (Variante C, REQ-INV-027) to the
-   * backend: earmarks part of an entry's quantity to a job order or mission. Relays the backend
-   * status verbatim through {@link
-   * de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses#propagateBackendError} so
-   * the RFC&nbsp;7807 {@code code} survives — the AJAX layer keeps its 409-reload vs 422-toast
-   * (over-allocation) distinction.
+   * AJAX proxy that earmarks part of an entry's quantity to a job order or mission (REQ-INV-027),
+   * relaying the backend status and RFC 7807 {@code code} verbatim.
    *
-   * @param id the inventory entry id.
-   * @param dto the allocation write payload (dimension, target, amount, echoed version).
-   * @return the updated entry on success, propagated backend status/body on failure.
+   * @param id the inventory entry id
+   * @param dto the allocation write payload (dimension, target, amount, echoed version)
+   * @return the updated entry on success, propagated backend status/body on failure
    */
   @PostMapping("/{id}/allocation")
   @ResponseBody
@@ -621,12 +556,12 @@ public class InventoryWriteController {
   }
 
   /**
-   * AJAX endpoint that proxies an inventory allocation amount change (Variante C, REQ-INV-027).
-   * Same verbatim status relay as {@link #addAllocation}.
+   * AJAX proxy that changes an allocation's amount (REQ-INV-027), relaying the backend status
+   * verbatim.
    *
-   * @param id the inventory entry id.
-   * @param dto the allocation write payload (dimension, target, new amount, echoed version).
-   * @return the updated entry on success, propagated backend status/body on failure.
+   * @param id the inventory entry id
+   * @param dto the allocation write payload (dimension, target, new amount, echoed version)
+   * @return the updated entry on success, propagated backend status/body on failure
    */
   @PatchMapping("/{id}/allocation")
   @ResponseBody
@@ -653,14 +588,12 @@ public class InventoryWriteController {
   }
 
   /**
-   * AJAX endpoint that proxies an inventory allocation removal (Variante C, REQ-INV-027). The
-   * backend DELETE carries the slice identity (dimension + target + echoed version) in the body, so
-   * the payload is relayed through the body-carrying {@code delete} client overload. Same verbatim
-   * status relay as {@link #addAllocation}.
+   * AJAX proxy that removes an allocation (REQ-INV-027), sending the slice identity in the DELETE
+   * body and relaying the backend status verbatim.
    *
-   * @param id the inventory entry id.
-   * @param dto the allocation write payload (dimension, target, echoed version; amount ignored).
-   * @return the updated entry on success, propagated backend status/body on failure.
+   * @param id the inventory entry id
+   * @param dto the allocation write payload (dimension, target, echoed version; amount ignored)
+   * @return the updated entry on success, propagated backend status/body on failure
    */
   @DeleteMapping("/{id}/allocation")
   @ResponseBody
@@ -687,11 +620,10 @@ public class InventoryWriteController {
   }
 
   /**
-   * AJAX endpoint that proxies a note update (add/edit/remove) for an inventory item to the
-   * backend. Authorisation is enforced by the backend (owner or {@code LOGISTICIAN}/{@code
-   * OFFICER}/ {@code ADMIN} via role hierarchy). A blank or empty {@code note} removes the note. On
-   * success, returns the updated {@link InventoryItemDto} (including the incremented version) so
-   * the frontend can synchronize {@code data-version} DOM attributes.
+   * AJAX proxy that adds, edits or removes an inventory item's note; a blank note removes it.
+   *
+   * <p>Returns the updated {@link InventoryItemDto} with its new version. Authorisation is enforced
+   * by the backend.
    */
   @PutMapping("/{id}/note")
   @ResponseBody

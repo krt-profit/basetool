@@ -40,11 +40,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.oauth2.server.resource.InvalidBearerTokenException;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Unit tests for the filter-level 401/403 problem responses. Before this handler the gateway
- * answered both with an <em>empty</em> body and logged nothing, so an extractor with an expired
- * token got a response it could not branch on and the operator saw no trace of it at all.
- */
+/** Unit tests for the filter-level 401/403 problem responses and their logging. */
 class SecurityProblemResponseHandlerTest {
 
   private static final String URI = "/v1/refinery-extract";

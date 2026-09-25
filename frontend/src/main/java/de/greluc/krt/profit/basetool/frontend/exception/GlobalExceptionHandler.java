@@ -57,16 +57,9 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 /**
  * Central Spring MVC error mapping for the frontend module.
  *
- * <p>Translates {@link BackendServiceException} (raised by the WebClient layer when the backend
- * returns an RFC7807 Problem+JSON response or when a Resilience4j fallback fires) into localized,
- * user-facing messages using {@link MessageSource}. The stable Problem {@code code} (e.g. {@code
- * OPTIMISTIC_LOCK}, {@code ACCESS_DENIED}, {@code VALIDATION_FAILED}) is mapped onto a well-defined
- * set of {@code error.*} message keys — no hardcoded user-facing strings are emitted (AGENTS.md:
- * DYNAMIC TRANSLATION ONLY).
- *
- * <p>AJAX/JSON requests receive a compact JSON body so that the client-side {@code
- * window.showError(problem)} function can render a KRT-styled toast, while regular navigation
- * requests render the error page with a localized title and explanation.
+ * <p>Maps {@link BackendServiceException}s by their stable problem {@code code} to localized {@code
+ * error.*} messages from {@link MessageSource}. AJAX/JSON requests get a compact JSON body for the
+ * client-side {@code window.showError(problem)} toast; navigations get the error page.
  */
 @ControllerAdvice
 @RequiredArgsConstructor
@@ -146,17 +139,12 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * Bounces a caller whose frontend OAuth2 session lost its usable token through a fresh Keycloak
-   * login instead of letting the failure render an empty page / 500 and flood the log (REQ-SEC-012,
-   * ADR-0019).
+   * Sends a caller whose OAuth2 session lost its usable token through a fresh Keycloak login
+   * (REQ-SEC-012, ADR-0019).
    *
-   * <p>For a normal HTML navigation this returns a {@code 302} to the Keycloak authorization
-   * endpoint; while the Keycloak SSO session is still alive the re-authentication is transparent
-   * and the user lands back in the app with a freshly minted token. For an AJAX/JSON caller (the
-   * unread-count poll, a {@code krtFetch} write) it returns {@code 401} carrying the {@code
-   * X-Reauthenticate} response header (and a mirrored JSON body) so the shared client-side helper
-   * can redirect the whole browser window — an in-place toast would strand the user on a dead
-   * session.
+   * <p>An HTML navigation gets a {@code 302} to the Keycloak authorization endpoint. An AJAX/JSON
+   * caller gets a {@code 401} with the {@code X-Reauthenticate} header and a mirrored JSON body, so
+   * the client helper can redirect the whole window.
    *
    * @param request the current request, used to decide HTML-redirect vs JSON and to prefix the
    *     context path
@@ -189,22 +177,9 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * Renders the 404 error page for a URL that names neither a handler nor a file.
-   *
-   * <p>Two exceptions, one meaning. {@link NoResourceFoundException} comes from a resource handler
-   * whose pattern matched but whose tree holds no such file ({@code /css/typo.css}); {@link
-   * NoHandlerFoundException} comes from the dispatcher when nothing matched at all ({@code
-   * /favicon.ico}, {@code /actuator/health} on the public connector, any mistyped page).
-   *
-   * <p><strong>The second one used to be unreachable</strong>, which is worth knowing before anyone
-   * simplifies it away again. While the static-resource handler was registered on a catch-all
-   * pattern it matched every unmapped URL, so the dispatcher always found a handler and every 404
-   * in the application arrived here as a {@link NoResourceFoundException}. Narrowing those patterns
-   * to the asset trees that exist — and turning {@code spring.web.resources.add-mappings} off,
-   * which is what lets Spring raise {@link NoHandlerFoundException} at all — made the dispatcher's
-   * own exception reachable, and without this entry it fell through to the {@code Exception}
-   * catch-all below and answered 500 where the app had always answered 404. {@code
-   * ManagementPortIsolationTest} is what caught that.
+   * Renders the 404 error page for a URL that names neither a handler nor a file: {@link
+   * NoResourceFoundException} for a missing file under an asset tree, {@link
+   * NoHandlerFoundException} when no handler matched at all.
    *
    * @param model the view model the 404 page renders from; never {@code null}
    * @return the {@code error/error} view name
@@ -223,17 +198,12 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * Renders a 400 error page when an MVC path / query parameter cannot be coerced to its declared
-   * type. The rejected value is intentionally not logged because it may carry PII.
+   * Renders a 400 error page when a path or query parameter cannot be coerced to its declared type;
+   * the rejected value is not logged.
    *
-   * <p>Asset-shaped carve-out (REQ-OBS-001): crawlers occasionally resolve the shared script
-   * filenames of {@code fragments/head.html} relative to a page's URL and request e.g. {@code GET
-   * /missions/common-handlers.js}, which binds to a {@code /{id}} mapping and fails UUID
-   * conversion. Such a path names no resource, so when the required type is {@link UUID} and the
-   * final path segment looks like a static-asset filename the handler renders the 404 page instead
-   * of a 400 and logs at DEBUG — pure bot noise must not pollute the WARN stream. Every other type
-   * mismatch (a garbled id on a real navigation, a broken {@code data-*} echo) keeps the 400 + WARN
-   * signal.
+   * <p>A failed {@link UUID} conversion whose last path segment looks like a static-asset filename
+   * (e.g. {@code /missions/common-handlers.js}) renders the 404 page instead and logs at DEBUG
+   * (REQ-OBS-001).
    */
   @ExceptionHandler(MethodArgumentTypeMismatchException.class)
   @ResponseStatus(HttpStatus.BAD_REQUEST)
@@ -291,13 +261,9 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * Decides whether a failed path-variable conversion was caused by a static-asset-shaped request
-   * path rather than a genuinely malformed identifier. True only when <em>both</em> hold: the
-   * declared target type is {@link UUID} (so a legitimately dotted route parameter of another type
-   * can never be misclassified — keep this guard if a dotted route ever gains a UUID parameter) and
-   * the final path segment carries a short alphanumeric filename extension (e.g. {@code
-   * common-handlers.js}). All seven bare {@code /{id}} detail routes take pure UUIDs, which never
-   * contain a dot, so a truncated pasted link keeps its 400 + WARN.
+   * Decides whether a failed path-variable conversion came from an asset-shaped path rather than a
+   * malformed identifier: the target type must be {@link UUID} and the last path segment must carry
+   * a short alphanumeric file extension.
    *
    * @param ex the conversion failure raised during handler argument resolution
    * @param request the current request; its URI (not the rejected value) feeds the filename check
@@ -313,17 +279,12 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * Translates Spring Security authorization failures (raised by {@code @PreAuthorize} checks
-   * within controllers) into a 403 response page or a JSON body for AJAX callers, instead of
-   * letting them fall through to the generic 500 handler. Without this mapping, a missing role
-   * would surface to the user as an opaque "Internal Server Error" — which both hides the real
-   * cause and contradicts the standard semantics for HTTP 403.
+   * Translates Spring Security authorization failures into a 403 page, or a JSON body for AJAX
+   * callers.
    *
-   * <p>The wording adapts to the security context: an authenticated caller who lacks the required
-   * role sees the generic "you do not have permission" copy, while an anonymous caller (no {@link
-   * Authentication} or an {@link AnonymousAuthenticationToken}) gets the "please sign in and try
-   * again" variant plus an {@code unauthenticated=true} model attribute that flips on the sign-in
-   * CTA on the error page (issue #108).
+   * <p>An anonymous caller (no {@link Authentication} or an {@link AnonymousAuthenticationToken})
+   * gets the sign-in wording and an {@code unauthenticated=true} model attribute that shows the
+   * sign-in button; an authenticated one gets the missing-permission wording.
    */
   @ExceptionHandler({
     org.springframework.security.access.AccessDeniedException.class,
@@ -360,17 +321,11 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * Maps a multipart upload that breaches Tomcat's part-count, part-size or total-size limit onto a
-   * clean {@code 413 Payload Too Large} instead of letting it fall through to the generic 500
-   * handler. The frontend's in-place AJAX writes (epic #571) submit their forms as {@code
-   * multipart/form-data} via {@code FormData}, so every form field is a separate multipart part; a
-   * large editor (a refinery order with many goods rows, a job order with many items) can exceed
-   * Tomcat 11's lowered {@code maxPartCount} default of 10. The connector cap is raised in {@code
-   * application.yml}; this handler is the graceful backstop for any residual breach (REQ-FE-009).
+   * Maps a multipart upload that exceeds Tomcat's part-count, part-size or total-size limit to a
+   * {@code 413 Payload Too Large} (REQ-FE-009).
    *
-   * <p>Spring raises {@link MaxUploadSizeExceededException} during {@code DispatcherServlet}'s
-   * multipart resolution — before a handler method is selected — so only a global {@code
-   * &#64;ControllerAdvice} (not a controller-local {@code &#64;ExceptionHandler}) can intercept it.
+   * <p>The exception is raised during multipart resolution, before a handler is selected, so only a
+   * global {@code &#64;ControllerAdvice} can intercept it.
    *
    * @param request the current request, used to decide JSON-vs-HTML and for the diagnostic log line
    * @param model the model populated for the HTML error page
@@ -408,26 +363,12 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * Answers a request whose parameters the servlet container refused to parse with a clean {@code
-   * 400} instead of letting it reach the {@link Exception} catch-all as a {@code 500} + {@code
-   * ERROR} + full stack trace.
+   * Answers a request whose parameters Tomcat refused to parse (an empty parameter name, a
+   * percent-escape that fails to decode, too many parameters, or a malformed {@code POST} body)
+   * with a {@code 400}.
    *
-   * <p>Tomcat rejects three things at parameter-parse time: a chunk with an empty parameter name
-   * ({@code /?=phpinfo()} — a stock PHP-CGI scanner probe), a percent-escape that fails to decode
-   * ({@code ?q=100%}, which a real user can produce by pasting a truncated link), and a breach of
-   * {@code maxParameterCount}. All three surface on the <em>first</em> {@code getParameter*()} call
-   * of the request, which in this module is {@code LocaleChangeInterceptor} reading {@code ?lang} —
-   * i.e. on every request, whatever it was addressed to, and again on the {@code /error} dispatch
-   * that the resulting failure triggers. {@link
-   * de.greluc.krt.profit.basetool.frontend.config.BotProtectionFilter} rejects the first and by far
-   * most common case at the edge before anything parses; this handler is the backstop for the other
-   * two and for a malformed {@code POST} body.
-   *
-   * <p>{@code DEBUG}, not {@code ERROR}: the input is entirely client-controlled, so any higher
-   * level is a log-flood vector (REQ-OBS-001) — one scanner produced three 200-line ERROR stack
-   * traces in eight seconds, which is exactly what {@code LogbackErrorSpike} watches for. The
-   * exception message is never logged either: it quotes the offending chunk verbatim, i.e. raw
-   * attacker-controlled bytes including possible line breaks (CWE-117, REQ-OBS-004).
+   * <p>Logged at DEBUG without the exception message, because the input is client-controlled
+   * (REQ-OBS-001, REQ-OBS-004).
    *
    * @param request the current request, used to decide JSON-vs-HTML and for the diagnostic line
    * @param model the model populated for the HTML error page
@@ -459,28 +400,12 @@ public class GlobalExceptionHandler {
 
   /**
    * Answers a {@link ResponseStatusException} with the status it carries instead of letting the
-   * {@link Exception} catch-all below turn it into a {@code 500} + {@code ERROR} + stack trace.
+   * {@link Exception} catch-all turn it into a {@code 500}.
    *
-   * <p>A {@code @ControllerAdvice} {@code @ExceptionHandler(Exception.class)} is consulted before
-   * Spring's own {@code ResponseStatusExceptionResolver}, so without this entry every {@code throw
-   * new ResponseStatusException(...)} in the module — the proxy relays that forward a backend
-   * {@code 400} / {@code 404} / {@code 409} as {@code new
-   * ResponseStatusException(e.getStatusCode(), ...)}, and every explicit {@code 404} — reached the
-   * caller as a {@code 500} and the log as an {@code ERROR} (APPSEC-11). A client {@code 4xx} at
-   * {@code ERROR} is exactly what REQ-OBS-001 forbids: it inflates {@code
-   * logback_events_total{level="error"}} and trips {@code LogbackErrorSpike} on ordinary user
-   * input.
-   *
-   * <p>Logging: a {@code 4xx} is logged at {@code DEBUG} — the relays already log the backend's
-   * refusal at {@code WARN} where they catch it, and REQ-OBS-001 wants a relayed failure logged
-   * once. A {@code 5xx} is logged at {@code ERROR} without a stack trace: the throw site that
-   * caught the real cause owns the trace. The exception's reason is never shown to the user and
-   * never logged — for a relay it is the {@code WebClientResponseException} message, which names
-   * the internal backend URL.
-   *
-   * <p>JSON callers receive the same compact shape as the other handlers ({@code code}, {@code
-   * status}, {@code title}, {@code message}) plus {@code detail}, which {@code krtFetch} and the
-   * upload pages read; everyone else gets the error page with the matching status.
+   * <p>A {@code 4xx} is logged at DEBUG, a {@code 5xx} at ERROR without a stack trace
+   * (REQ-OBS-001). The exception's reason is neither shown nor logged, since it may name an
+   * internal backend URL. JSON callers get {@code code}, {@code status}, {@code title}, {@code
+   * message} and {@code detail}; others get the error page with the matching status.
    *
    * @param ex the exception carrying the status to answer with
    * @param request the current request, used to decide JSON-vs-HTML and for the diagnostic line
@@ -529,30 +454,12 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * A client that went away while the response was still being written. Not an error, and
-   * deliberately answered with <em>nothing at all</em> (REQ-OBS-001, REQ-NOTIF-010).
+   * Handles a client that disconnected while the response was being written ({@link
+   * AsyncRequestNotUsableException} on an async response such as the SSE stream, {@link
+   * ClientAbortException} on a plain one) by logging at DEBUG and writing nothing (REQ-OBS-001,
+   * REQ-NOTIF-010).
    *
-   * <p>Written after it reached the production log: 33 {@code ERROR} lines in two minutes on {@code
-   * GET /notifications/stream} right after the v1.11.0 deploy (2026-09-25). The notification relay
-   * holds an {@code SseEmitter} open for up to 30 minutes, and every ordinary way a browser leaves
-   * closes it mid-write — a navigation, a closed tab, a window handed to the login flow. The relay
-   * then completes its emitter; Spring flushes a response that already failed, raises {@link
-   * AsyncRequestNotUsableException}, sets it as the async result and dispatches it back here.
-   * Before this handler existed it fell through to {@link #handleException}, which cost two lines
-   * per disconnect: that handler's {@code ERROR} with a full stack trace — feeding {@code
-   * logback_events_total{level="error"}} and {@code LogbackErrorSpike} — and Tomcat's {@code
-   * Servlet.service() … threw exception}, because rendering the error page into the dead response
-   * raised the same exception again. Those lines render {@code userId} as {@code anonymous} because
-   * the async dispatch runs without the request thread's MDC, not because the caller was.
-   *
-   * <p>{@link ClientAbortException} is the same fact on a plain, non-async response: Tomcat's word
-   * for "the client closed the connection while we were writing the body".
-   *
-   * <p><strong>The {@code void} return type is the fix, not an oversight.</strong> It tells Spring
-   * the exception is handled and leaves the response untouched: there is no connection left to
-   * write to, and trying to write one is what produced the second line. The backend's handler of
-   * the same name makes the same choice. {@code DEBUG} rather than {@code INFO}: a disconnect
-   * carries nothing a reader would act on, and an SSE page produces one per viewer per navigation.
+   * <p>The {@code void} return marks the exception handled and leaves the dead response untouched.
    *
    * @param ex the disconnect, kept only for the debug line's exception type
    * @param request the current request, for the method and URI in the debug line
@@ -611,16 +518,8 @@ public class GlobalExceptionHandler {
   }
 
   /**
-   * Returns {@code true} when the current Spring Security context represents an unauthenticated
-   * caller — either no {@link Authentication} at all or an {@link AnonymousAuthenticationToken}
-   * supplied by the {@code AnonymousAuthenticationFilter}. Used to decide whether a 403 message
-   * should explain "you don't have permission" (authenticated user, insufficient role) versus
-   * "please sign in and try again".
-   *
-   * <p>The second branch was for an anonymous caller reaching a {@code @PreAuthorize} gate behind a
-   * {@code permitAll()} route. REQ-SEC-052 left four public routes and none of them carries a
-   * method gate, so nothing should reach it any more — it stays because a wrong message on a route
-   * that grows one is worse than a branch nobody takes.
+   * Returns {@code true} when the security context holds no {@link Authentication} or an {@link
+   * AnonymousAuthenticationToken}; selects the sign-in wording of the 403 message.
    */
   private static boolean isAnonymous() {
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();

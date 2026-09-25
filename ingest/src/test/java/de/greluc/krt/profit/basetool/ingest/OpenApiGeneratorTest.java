@@ -45,15 +45,9 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Regenerates the committed ingest OpenAPI document from the live SpringDoc output, the gateway
- * twin of the backend {@code OpenApiGeneratorTest}. The committed {@code
- * src/main/resources/api/openapi.json} is the module's single API-documentation artifact — no
- * Swagger UI is bundled and {@code /v3/api-docs} is disabled in prod — so it must be regenerated
- * (and committed) whenever an endpoint, DTO or response contract changes.
- *
- * <p>Beyond writing the file, the test asserts the document's load-bearing parts so a silent
- * regression (a lost security scheme, a dropped endpoint, a controller that stopped being scanned)
- * fails the build rather than quietly shrinking the committed spec.
+ * Regenerates the committed ingest OpenAPI document ({@code src/main/resources/api/openapi.json})
+ * from the live SpringDoc output and asserts its essential parts: security scheme, endpoints and
+ * scanned controllers.
  */
 @SpringBootTest
 @Slf4j
@@ -99,10 +93,8 @@ class OpenApiGeneratorTest {
   }
 
   /**
-   * Serializes {@code document} into {@code target} via a temporary sibling file that is then moved
-   * into place, so the committed spec is never observable half-written — the same guard the backend
-   * generator carries, because {@code org.gradle.parallel=true} lets the module test tasks run
-   * concurrently with anything that reads the committed specs.
+   * Writes {@code document} to {@code target} through a temporary sibling file moved into place, so
+   * concurrent readers never see a half-written spec.
    *
    * @param target the committed spec path to replace
    * @param document the parsed OpenAPI document to serialize

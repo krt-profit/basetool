@@ -45,10 +45,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Service responsible for generating handover report PDFs in KRT Corporate Design. Supports both
- * persisted handovers (by ID) and preview generation from raw DTO data. The page background, the
- * embedded Lato fonts and every cell helper come from the shared {@link KrtPdfSupport} layer (epic
- * #556 Phase 3) — the rendered content is unchanged.
+ * Generates handover report PDFs in KRT corporate design, for persisted handovers or as a preview
+ * from raw DTO data, using the shared {@link KrtPdfSupport} layer.
  */
 @Service
 @RequiredArgsConstructor
@@ -63,16 +61,12 @@ public class JobOrderHandoverReportService {
   private final MessageSource messageSource;
 
   /**
-   * Generates a handover report PDF for a persisted handover.
-   *
-   * <p>The persisted {@code handoverTime} is a UTC {@link java.time.Instant}; for display in the
-   * PDF it must be rendered in the user's actual time zone (passed in via {@code userZone}, e.g.
-   * from the {@code X-User-Time-Zone} request header). If {@code userZone} is {@code null}, UTC is
-   * used as a safe fallback.
+   * Generates the report PDF for a persisted handover, rendering the handover time in {@code
+   * userZone}.
    *
    * @param jobOrderId the job order ID
    * @param handoverId the handover ID
-   * @param userZone the time zone to render the handover time in; may be {@code null}
+   * @param userZone the display time zone; {@code null} means UTC
    * @return PDF as byte array
    */
   public byte @NotNull [] generateHandoverReport(
@@ -221,12 +215,8 @@ public class JobOrderHandoverReportService {
       String materialName, String locationName, double amount, int quality, String quantityType) {}
 
   /**
-   * Resolves one German PDF label from the backend message bundle.
-   *
-   * <p>This document is German by construction (its headers are literals), so the locale is fixed.
-   * The one label that is resolved rather than written inline is the erased-handle placeholder: it
-   * is shared with every other surface that renders a handle snapshot, and a second spelling of it
-   * here would be a second thing to keep in step (REQ-SEC-062).
+   * Resolves a German PDF label from the backend message bundle, used for the shared erased-handle
+   * placeholder (REQ-SEC-062).
    *
    * @param key the message key
    * @return the resolved label

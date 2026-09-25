@@ -34,20 +34,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Guards the Materialbörse partial-offer amount field (REQ-MARKET-002, ADR-0086): a member may
- * release only a part of a Lager row, so the release/edit modal carries an editable "Menge
- * anbieten" number input alongside the read-only material/quality facts.
- *
- * <p>Only a real browser catches the field's dynamic wiring: in "new" (Material-anbieten) mode the
- * amount input has no ceiling until an item is picked, so {@code materialboerse-release.js}
- * disables it on open and only enables it (with the item's stock as {@code max}) once a picker row
- * is chosen. MockMvc render tests do not run that JS, so they cannot see the disabled-until-picked
- * state. This drives the board in a real engine and asserts the amount input is present and
- * disabled on a fresh "new" open — no inventory seed is required because the empty picker leaves
- * the field disabled, which is exactly the state under test.
- *
- * <p>The actor is {@code test-admin}, whose seeded IRIDIUM membership carries KRT_MEMBER, the role
- * the board requires.
+ * E2E check of the Materialbörse offered-amount field (REQ-MARKET-002, ADR-0086): in "new" mode the
+ * "Menge anbieten" input is present and disabled until an item is picked.
  */
 @Tag("e2e")
 class MaterialboardOfferedAmountFieldE2eTest {

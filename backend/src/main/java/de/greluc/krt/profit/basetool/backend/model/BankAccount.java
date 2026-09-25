@@ -39,20 +39,12 @@ import lombok.ToString;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * A Kartell bank account (epic #556, REQ-BANK-001) — one row per org-unit/area/cartel/cartel-bank/
- * special account, persisted in the {@code bank_account} table created by Flyway V150.
+ * A Kartell bank account (REQ-BANK-001): one row per org-unit, area, cartel, cartel-bank or special
+ * account.
  *
- * <p>The account deliberately stores no balance: balances are SQL sums over {@link BankPosting}
- * computed on read (ADR-0010), so this row only changes on rename and lifecycle transitions and the
- * optimistic-locking {@code @Version} from {@link AbstractEntity} never churns on bookings. The
- * owner reference must match the {@link #type} — V150's {@code chk_bank_account_owner_ref} enforces
- * the combination at the database level, {@code BankAccountService} validates it before insert for
- * a clean 400/409 instead of a constraint error.
- *
- * <p>Bank accounts are NOT org-unit-scoped aggregates: visibility is decided exclusively by the
- * bank roles and {@link BankAccountGrant} rows (REQ-BANK-008/-010), never by {@code
- * OwnerScopeService}. The {@link #orgUnit} reference is the *owner label* of an {@code ORG_UNIT}
- * account, not a tenancy scope.
+ * <p>Stores no balance; balances are sums over {@link BankPosting} computed on read (ADR-0010).
+ * Visibility is decided by the bank roles and {@link BankAccountGrant} rows, never by org-unit
+ * scope; {@link #orgUnit} is only the owner label.
  */
 @Entity
 @Table(name = "bank_account")
@@ -92,15 +84,10 @@ public class BankAccount extends AbstractEntity<UUID> {
   private BankAccountStatus status = BankAccountStatus.ACTIVE;
 
   /**
-   * Owning org unit reference. For {@link BankAccountType#ORG_UNIT} accounts this is the Staffel or
-   * Spezialkommando; since epic #692 (REQ-ORG-019, V168) it also carries the Bereich for {@link
-   * BankAccountType#AREA} accounts and the Organisationsleitung for the {@link
-   * BankAccountType#CARTEL} account — Bereiche/OL are first-class {@link OrgUnit} rows now, so the
-   * AREA/CARTEL owner is the same FK rather than the legacy {@link #areaName}. {@code null} for a
-   * legacy {@code areaName}-based AREA account and for {@code CARTEL_BANK} / {@code SPECIAL}. At
-   * most one account per org unit (V150 {@code uq_bank_account_org_unit} partial unique index) — so
-   * one AREA per Bereich and one CARTEL per OL. Lazy-fetched — listing accounts must not hydrate
-   * org-unit rows unless mapped.
+   * Owning org unit: the Staffel or Spezialkommando of an {@link BankAccountType#ORG_UNIT} account,
+   * the Bereich of an {@link BankAccountType#AREA} account, or the Organisationsleitung of the
+   * {@link BankAccountType#CARTEL} account. {@code null} for an {@link #areaName}-based AREA
+   * account and for {@code CARTEL_BANK} / {@code SPECIAL}; at most one account per org unit.
    */
   @Nullable
   @ManyToOne(fetch = FetchType.LAZY)
@@ -109,50 +96,35 @@ public class BankAccount extends AbstractEntity<UUID> {
   private OrgUnit orgUnit;
 
   /**
-   * Legacy free-form Bereich name for {@link BankAccountType#AREA} accounts created before the
-   * Bereich FK (epic #692). {@code null} for FK-linked AREA accounts (whose Bereich is carried by
-   * {@link #orgUnit}) and for every non-AREA type. New AREA accounts are created with the FK, not
-   * this field.
+   * Free-form Bereich name of an {@link BankAccountType#AREA} account that has no {@link #orgUnit}
+   * reference; {@code null} for every other account. New AREA accounts use {@link #orgUnit}.
    */
   @Nullable
   @Column(name = "area_name", updatable = false)
   private String areaName;
 
   /**
-   * Optional aspirational balance goal ("Kontostandsziel", REQ-BANK-036, V189) — a target up to
-   * which the account should be filled, shown with progress to everyone who may view the balance.
-   * {@code null} means no target is set. Settable by the account's derived responsible holder and
-   * by bank staff with access; persisted as {@code NUMERIC(19,4)} per ADR-0002. Editing it bumps
-   * this row's {@code @Version} (shared with rename/close, both infrequent), so a concurrent edit
-   * surfaces a 409.
+   * Optional balance goal ("Kontostandsziel", REQ-BANK-036) shown with progress to everyone who may
+   * view the balance; {@code null} means no target. Editing it bumps this row's {@code @Version}.
    */
   @Nullable
   @Column(name = "balance_target", precision = 19, scale = 4)
   private BigDecimal balanceTarget;
 
   /**
-   * The KRT-account bank-employee approval ceiling {@code T1} (REQ-BANK-047, V203) — the amount up
-   * to which a bank employee may approve a withdrawal / transfer <em>leaving</em> the {@link
-   * BankAccountType#CARTEL} account on their own (self-approve, or book directly). Above it the
-   * request must be approved by the Bankleitung (or the Organisationsleitung above {@code T2},
-   * ADR-0109); {@code null} means no ceiling is configured yet (treated as {@code 0} — an employee
-   * may self-approve nothing). Only meaningful for the CARTEL account — V203's {@code
-   * chk_bank_account_cartel_tiers} CHECK pins it {@code null} for every other type. Managed
-   * exclusively by bank management in the Verwaltung tab; shares this row's {@code @Version} with
-   * rename/close/target (all infrequent). Persisted as {@code NUMERIC(19,4)} per ADR-0002.
+   * Bank-employee approval ceiling {@code T1} of the {@link BankAccountType#CARTEL} account
+   * (REQ-BANK-047): up to this amount an employee may approve a debit leaving the account on their
+   * own. {@code null} means none configured and is treated as {@code 0}; always {@code null} for
+   * other account types.
    */
   @Nullable
   @Column(name = "employee_approval_ceiling", precision = 19, scale = 4)
   private BigDecimal employeeApprovalCeiling;
 
   /**
-   * The KRT-account area-lead approval ceiling {@code T2} (REQ-BANK-047, V203; the middle-band
-   * approver is the Bankleitung since ADR-0109) — the amount up to which the Bankleitung approves a
-   * withdrawal / transfer leaving the {@link BankAccountType#CARTEL} account; above it the
-   * Organisationsleitung must approve. Must be {@code >= }{@link #employeeApprovalCeiling} when
-   * both are set (V203 CHECK); {@code null} means no upper band (treated as {@code +∞} — the
-   * Bankleitung covers everything above {@code T1}, the OL band stays empty). CARTEL-only,
-   * bank-management-managed; shares this row's {@code @Version}.
+   * Bankleitung approval ceiling {@code T2} of the {@link BankAccountType#CARTEL} account
+   * (REQ-BANK-047, ADR-0109); above it the Organisationsleitung must approve. Must be at least
+   * {@link #employeeApprovalCeiling} when both are set; {@code null} means no upper band.
    */
   @Nullable
   @Column(name = "area_lead_approval_ceiling", precision = 19, scale = 4)

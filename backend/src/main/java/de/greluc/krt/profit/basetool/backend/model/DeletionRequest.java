@@ -37,15 +37,9 @@ import org.jetbrains.annotations.Nullable;
 /**
  * A member's request to have their account erased (Art. 17 GDPR, REQ-SEC-061).
  *
- * <p>The member raises it on their profile page; an admin decides it. It is <b>never</b> carried
- * out on the spot, because the deletion removes the Keycloak account and purges warehouse stock and
- * a hangar while reassigning missions and refinery orders (REQ-DATA-008) — none of it reversible,
- * and a mis-click on one's own profile must not be able to start it (ADR-0181).
- *
- * <p>The row cascades away with the {@code app_user} row when the request is carried out, so a
- * decided-and-executed request is never readable afterwards. That is deliberate: the request is
- * itself personal data about the member, and the record of the deletion is the {@code USER_DELETED}
- * audit event.
+ * <p>Raised by the member and decided by an admin, never executed on the spot (ADR-0181). The row
+ * cascades away with the {@code app_user} row when carried out; the lasting record is the {@code
+ * USER_DELETED} audit event.
  */
 @Entity
 @Table(name = "deletion_request")
@@ -71,12 +65,8 @@ public class DeletionRequest extends AbstractEntity<UUID> {
   private DeletionRequestStatus status = DeletionRequestStatus.PENDING;
 
   /**
-   * The member also asked for the handle snapshots that survive a deletion to be anonymised — both
-   * audit trails, the bank booking history, the booking requests and the two handover recipients.
-   *
-   * <p><b>A wish, not an instruction.</b> Nothing acts on this automatically: an admin weighs it
-   * against the legitimate interest in an auditable ledger and decides it deliberately -- decision
-   * 6, {@literal @}greluc, with the procedure in {@code docs/privacy/data-subject-requests.md}.
+   * Whether the member also asked for the handle snapshots that survive a deletion to be
+   * anonymised. Advisory only: nothing acts on it automatically, an admin decides it.
    */
   @Column(name = "erase_history_requested", nullable = false)
   private boolean eraseHistoryRequested;

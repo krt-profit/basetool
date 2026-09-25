@@ -33,15 +33,8 @@ import org.openpdf.text.pdf.PdfTemplate;
 import org.openpdf.text.pdf.PdfWriter;
 
 /**
- * Draws the per-account balance-over-time chart embedded in the management three-month report
- * (REQ-BANK-015, epic #556). The account balance is piecewise constant — it only changes at a
- * booking — so the running balance is rendered as a step line in the DAS KARTELL orange over a dark
- * panel, with the data min/max on the y-axis and the period bounds on the x-axis.
- *
- * <p>Implemented as a {@link PdfTemplate} wrapped in an {@link Image} so the chart flows inline in
- * the document like any other element (OpenPDF has no charting API). All drawing is vector — there
- * is no raster image and the labels use the embedded Lato font, so the report stays crisp at any
- * zoom.
+ * Draws the per-account balance-over-time step chart for the management three-month report
+ * (REQ-BANK-015), as a vector {@link PdfTemplate} wrapped in an {@link Image}.
  */
 public final class BankBalanceChart {
 
@@ -179,8 +172,7 @@ public final class BankBalanceChart {
   }
 
   /**
-   * Draws a single Lato label at the given anchor, computing the offset for right alignment from
-   * the font's own metrics (OpenPDF's canvas has no layout engine).
+   * Draws a single Lato label at the given anchor, computing right alignment from the font metrics.
    *
    * @param cb the template canvas
    * @param font the Lato base font

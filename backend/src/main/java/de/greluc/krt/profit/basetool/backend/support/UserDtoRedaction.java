@@ -26,38 +26,20 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * The one peer projection of a {@link UserDto}, shared by every surface that embeds another
- * member's user record.
- *
- * <p>It exists because the projection was previously a private helper of {@code UserController},
- * which meant the direct read {@code GET /api/v1/users/&#123;id&#125;} returned the slim shape
- * while every aggregate that <em>nests</em> a {@code UserDto} returned the full one to the same
- * caller - the same person, more data, through a different door. {@code GET
- * /api/v1/orders/&#123;id&#125;} was the instance the audit named: it redacts the requester tier
- * but hands every other viewer, including a member of another Staffel reading through the SK public
- * escape, each assignee's complete record with {@code roles}, {@code permissions}, {@code
- * description}, {@code joinDate} and {@code discordLinked}. The assignee chips render {@code
- * effectiveName} and nothing else.
- *
- * <p>Kept in the dependency-leaf {@code support} package so controllers, mappers and services can
- * all reach it without a package cycle.
+ * The peer projection of a {@link UserDto}, shared by every surface that embeds another member's
+ * user record. Lives in the dependency-leaf {@code support} package.
  */
 public final class UserDtoRedaction {
 
   private UserDtoRedaction() {}
 
   /**
-   * Returns the slim peer view: keeps the identification tuple ({@code id}, {@code username},
-   * {@code displayName}, {@code effectiveName}, {@code rank}, {@code inKeycloak}, {@code squadron},
-   * {@code squadrons}, {@code version}) and drops everything else - {@code email} (already {@code
-   * null} out of the mapper), {@code description}, {@code roles}, {@code permissions}, {@code
-   * lastReadAnnouncementId}, the {@code isLogistician} / {@code isMissionManager} flags, {@code
-   * joinDate} and {@code discordLinked}.
+   * Returns the slim peer view, keeping only {@code id}, {@code username}, {@code displayName},
+   * {@code effectiveName}, {@code rank}, {@code inKeycloak}, {@code squadron}, {@code squadrons}
+   * and {@code version}.
    *
-   * <p><b>Not identical to {@code MissionPeerRedactor.cleanupUserForPeer}</b>, the mission and
-   * finance surfaces' peer projection of the same record: that one additionally nulls {@code
-   * squadron} and {@code squadrons}. Noticed in the 2026-09-06 review; see that method's Javadoc
-   * for why the difference was recorded rather than reconciled.
+   * <p>Unlike {@code MissionPeerRedactor.cleanupUserForPeer}, it keeps {@code squadron} and {@code
+   * squadrons}.
    *
    * @param dto the persisted user DTO, or {@code null}.
    * @return the peer-shaped DTO, or {@code null} when {@code dto} was {@code null}.

@@ -22,15 +22,10 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 /**
- * Frontend mirror of the backend {@code P4kImportJobDto} returned by the async P4K import job
- * endpoints ({@code /api/v1/admin/import/p4k/jobs[/{id}][/apply]}). The page polls these: while
- * {@link #status} is {@code PENDING} / {@code RUNNING} the {@link #result} is {@code null}; on
- * {@code SUCCEEDED} it carries the per-type {@link P4kImportResultDto}; on {@code FAILED} the
- * {@link #errorMessage} explains why.
+ * Frontend mirror of the backend {@code P4kImportJobDto}, polled by the P4K import page: {@link
+ * #result} is set once {@code SUCCEEDED}, {@link #errorMessage} once {@code FAILED}.
  *
- * <p>Jackson-bindable (camelCase matching the backend JSON); {@code @JsonIgnoreProperties} keeps
- * the frontend resilient if the backend grows the payload. Ids, the {@code kind} / {@code status}
- * enums and the timestamps are carried as plain strings; the page only displays / compares them.
+ * <p>Ids, enums and timestamps are carried as strings; unknown fields are ignored.
  *
  * @param id the job id
  * @param kind {@code PREVIEW} or {@code APPLY}

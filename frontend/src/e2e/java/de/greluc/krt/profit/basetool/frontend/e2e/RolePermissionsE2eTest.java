@@ -32,26 +32,19 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Role-permission flow: the action controls on {@code orders-detail.html} are each gated by a
- * different {@code sec:authorize} expression, so what a user sees on an order they CAN open is the
- * UI face of the edit/delete tenancy matrix. This test pins down three of them on the seeded
- * MATERIAL order:
+ * Role-permission flow: asserts which order-detail controls a user sees on the seeded MATERIAL
+ * order, each gated by its own {@code sec:authorize} expression.
  *
  * <ul>
- *   <li><b>Handover</b> ({@code order-handover-open}) — {@code hasAnyRole('LOGISTICIAN', 'OFFICER',
- *       'ADMIN')}: hidden from a plain KRT Member, shown to an Officer.
- *   <li><b>Edit</b> (the {@code edit-modal} trigger) — {@code hasRole('LOGISTICIAN')}: hidden from
- *       a Member, shown to an Officer (and Admin, via the role hierarchy).
- *   <li><b>Delete</b> (the {@code /delete} form) — {@code hasRole('ADMIN')}: hidden from both
- *       Member and Officer, shown only to an Admin.
+ *   <li><b>Handover</b> ({@code order-handover-open}): hidden from a plain KRT Member, shown to an
+ *       Officer.
+ *   <li><b>Edit</b> (the {@code edit-modal} trigger): hidden from a Member, shown to an Officer and
+ *       an Admin.
+ *   <li><b>Delete</b> (the {@code /delete} form): shown only to an Admin.
  * </ul>
  *
- * <p>This is the first flow to exercise the {@code test-member}, {@code test-officer} and {@code
- * test-admin} realm users together and the multi-user login pattern — one fresh Keycloak session
- * per role, each in its own browser context (the suite's {@code authenticatedStorageState} writes a
- * single fixed path, so per-user isolation uses separate contexts logging in directly instead). It
- * relies on JUnit running test classes sequentially, so the IRIDIUM home assigned here is not
- * clobbered by a cross-Staffel class.
+ * <p>Each role logs in within its own browser context. Relies on JUnit running test classes
+ * sequentially, so the IRIDIUM home assigned here is not clobbered.
  */
 @Tag("e2e")
 class RolePermissionsE2eTest {
@@ -148,12 +141,9 @@ class RolePermissionsE2eTest {
   }
 
   /**
-   * Logs in as the given user in a fresh context, opens the seeded order, and asserts whether the
-   * {@code order-handover-open} control is present. {@code nav-logout} is asserted first as a
-   * locale-independent proof that the authenticated app shell actually rendered (so an absent
-   * handover control means "role-gated away", not "page failed to load"). It is used instead of a
-   * nav link because the links now sit inside collapsed {@code <details>} sections (hidden until
-   * expanded), whereas the logout control is always rendered for a logged-in user.
+   * Logs in as the given user in a fresh context, opens the seeded order and asserts whether the
+   * {@code order-handover-open} control is present. {@code nav-logout} is asserted first, so an
+   * absent control means role-gated rather than a failed page load.
    *
    * @param user the Keycloak username to log in as
    * @param password the Keycloak password
@@ -183,12 +173,10 @@ class RolePermissionsE2eTest {
   }
 
   /**
-   * Logs in as the given user in a fresh context, opens the seeded order, and asserts whether the
-   * LOGISTICIAN-gated edit-modal trigger and the ADMIN-gated delete form are rendered. As with the
-   * handover check, {@code nav-logout} is asserted first as locale-independent proof the
-   * authenticated shell rendered, so an absent control means "role-gated away", not "page failed to
-   * load". The delete control is matched by its {@code /delete} form action — the only such form on
-   * the page — and asserted on its submit button so presence implies a clickable control.
+   * Logs in as the given user in a fresh context, opens the seeded order and asserts whether the
+   * LOGISTICIAN-gated edit-modal trigger and the ADMIN-gated delete form's submit button are
+   * rendered. {@code nav-logout} is asserted first, so an absent control means role-gated rather
+   * than a failed page load.
    *
    * @param user the Keycloak username to log in as
    * @param password the Keycloak password

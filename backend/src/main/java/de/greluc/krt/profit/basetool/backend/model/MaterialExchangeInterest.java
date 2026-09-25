@@ -36,19 +36,12 @@ import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * A member's <em>interest</em> registration on a {@link MaterialExchangeOffer} — "Interesse
- * anmelden" (REQ-MARKET-006). It records that a member wants the anbieter to open the negotiation;
- * the actual trade happens off-tool.
+ * A member's interest registration ("Interesse anmelden") on a {@link MaterialExchangeOffer}
+ * (REQ-MARKET-006); the trade itself happens off-tool.
  *
- * <p>Like {@link MaterialClaim}, interest is a <b>signal-only, independent aggregate</b>: no mapped
- * collection lives on the offer, so registering or withdrawing interest never bumps the offer's
- * {@code @Version}. A unique constraint on {@code (offer_id, interested_user_id)} (V210) makes
- * "Interesse anmelden" an idempotent upsert (the service treats a duplicate-key race as success);
- * withdrawing deletes the row.
- *
- * <p><b>Anonymity (REQ-MARKET-006):</b> the interessenten names are visible only to the offer's
- * owner. Every other viewer receives just the count — the redaction is applied in the service,
- * never by exposing this entity or a name-carrying projection to non-owners.
+ * <p>Signal-only, independent aggregate: registering never bumps the offer's {@code @Version}.
+ * Unique per {@code (offer_id, interested_user_id)}; withdrawing deletes the row. Names are shown
+ * only to the offer's owner, redacted in the service.
  */
 @Entity
 @Getter
@@ -75,13 +68,10 @@ public class MaterialExchangeInterest extends AbstractEntity<UUID> {
   private User interestedUser;
 
   /**
-   * Renders the interest using only safe scalar identifiers — its own id and the (null-safe)
-   * foreign-key ids of the offer and the interested user. Deliberately does <b>not</b> call {@code
-   * toString()} on the {@code @ManyToOne} associations: those are {@code FetchType.LAZY}, and the
-   * {@link #interestedUser} must never surface as a name/email in a log line. Reading only the
-   * foreign-key id off a lazy proxy does not initialise it.
+   * Renders the interest from its id and the associated ids only, so logging it never triggers a
+   * lazy load or exposes a user's name or e-mail.
    *
-   * @return a stable, PII-free single-line representation of this interest registration.
+   * @return a PII-free single-line representation
    */
   @NotNull
   @Override

@@ -20,9 +20,8 @@
 package de.greluc.krt.profit.basetool.frontend.model.dto;
 
 /**
- * Which kind of draft a one-click ingest handoff carries (epic #639). Mirror of the ingest
- * gateway's {@code HandoffKind}; the value is stored alongside the staged draft in Redis and tells
- * the frontend which review surface to pre-fill.
+ * Kind of draft a one-click ingest handoff carries, mirroring the ingest gateway's {@code
+ * HandoffKind}; tells the frontend which review surface to pre-fill.
  */
 public enum HandoffKind {
   /** A refinery-order draft; pre-fills the refinery create form. */

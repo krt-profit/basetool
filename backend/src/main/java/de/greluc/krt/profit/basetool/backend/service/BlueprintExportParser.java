@@ -40,27 +40,10 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Parses an uploaded SCMDB blueprint export into the de-duplicated {@link ParsedEntry} stream that
- * {@code BlueprintImportService} then resolves against the master product list. Extracted verbatim
- * from that service (audit L-tier import-engine split, #16) so it owns the JSON shape handling, the
- * tag-vs-name de-duplication and the multi-exporter timestamp coercion, while the service keeps the
- * resolution chain, owned-flag logic and persistence.
+ * Parses an uploaded blueprint export into de-duplicated {@link ParsedEntry} records (REQ-INV-014).
  *
- * <p>Accepts either the documented {@code {"blueprints": [...]}} object (SCMDB log-watcher,
- * Basetool Blueprint Extractor, scmdb.net profile / tracking export — REQ-INV-014) or a bare array.
- * Entries collapse by their structural {@code tag} when present, else by trimmed product name,
- * keeping the earliest acquisition time; scmdb.net checklist rows not yet unlocked ({@code
- * completed == false}) are skipped and blank names dropped. Acquisition time is coerced from
- * whichever field the source stamped: SCMDB {@code ts} (fractional epoch seconds) first, then the
- * Extractor's ISO-8601 {@code receivedAt} (a malformed value is treated as absent, never failing
- * the import).
- *
- * <p>Stateless and static-only; it takes the caller's {@link ObjectMapper} as a parameter rather
- * than injecting one, so {@code BlueprintImportService} passes its own configured mapper. The
- * 8&nbsp;MB pre-{@code readTree} size cap ({@link #MAX_IMPORT_BYTES}) bounds the transient heap a
- * multi-MB array expands into; the per-entry work downstream is bounded separately by {@link
- * #MAX_IMPORT_ENTRIES}, because de-dup keys on the name and therefore does not bound the entry
- * count at all.
+ * <p>Accepts a {@code {"blueprints": [...]}} object or a bare array. The upload is capped at {@link
+ * #MAX_IMPORT_BYTES} and {@link #MAX_IMPORT_ENTRIES} distinct entries.
  */
 @Slf4j
 public final class BlueprintExportParser {
@@ -74,39 +57,22 @@ public final class BlueprintExportParser {
   private static final long MAX_IMPORT_BYTES = 8L * 1024 * 1024;
 
   /**
-   * Cap on the number of <em>distinct</em> entries one import may carry, enforced after de-dup.
-   *
-   * <p>The byte cap above is not the backstop its javadoc claimed. De-duplication keys on the name
-   * (or tag), so every distinct name survives it: an 8&nbsp;MiB upload of ~14-byte minimal records
-   * yields on the order of half a million entries, and {@code BlueprintImportService} then runs one
-   * alias lookup plus one full-catalogue fuzzy scan <em>per entry</em> - inside a single
-   * {@code @Transactional(readOnly = true)}, so one request also parks one Hikari connection for
-   * the whole run. Enough concurrent requests exhaust the pool for everybody, from any
-   * authenticated account.
-   *
-   * <p>A real export is in the hundreds; 20&nbsp;000 leaves three orders of magnitude of headroom
-   * over the largest plausible library while removing the unbounded loop.
+   * Maximum number of distinct entries per import, enforced after de-duplication, which bounds the
+   * per-entry resolution work of one request.
    */
   private static final int MAX_IMPORT_ENTRIES = 20_000;
 
   private BlueprintExportParser() {}
 
   /**
-   * Reads the multipart body and converts it into the de-duplicated parsed entries. Accepts either
-   * the documented {@code {"blueprints": [...]}} object (the SCMDB log-watcher, the Basetool
-   * Blueprint Extractor, and the scmdb.net profile / tracking export all wrap their records this
-   * way — REQ-INV-014) or a bare array of blueprint records. The scmdb.net {@code name} key is read
-   * as {@code productName} (via {@code @JsonAlias}); scmdb.net checklist entries the user has not
-   * unlocked yet ({@code completed == false}) are skipped, while a {@code null} / {@code true} flag
-   * (the watcher / extractor exports, which list only acquired blueprints) counts as owned. Entries
-   * collapse by their structural {@code tag} when present, else by trimmed product name, keeping
-   * the earliest acquisition time as the suggestion — so two distinct blueprints scmdb.net shows
-   * under one name (different tags) stay separate while tag-less duplicates merge as before; blank
-   * names are dropped.
+   * Parses the upload into de-duplicated entries (REQ-INV-014).
    *
-   * @param objectMapper the caller's configured JSON mapper
+   * <p>Entries collapse by {@code tag} when present, else by trimmed name, keeping the earliest
+   * acquisition time; entries with {@code completed == false} and blank names are dropped.
+   *
+   * @param objectMapper the caller's JSON mapper
    * @param file the uploaded blueprint export JSON
-   * @return parsed entries in first-seen order (possibly empty)
+   * @return parsed entries in first-seen order, possibly empty
    * @throws BadRequestException if the file is empty, too large, not valid JSON, or carries no
    *     blueprint array
    */
@@ -187,13 +153,11 @@ public final class BlueprintExportParser {
   }
 
   /**
-   * Resolves a parsed entry's acquisition instant from whichever timestamp its source exporter
-   * stamped: SCMDB's {@code ts} (fractional Unix epoch seconds) takes precedence, then the Basetool
-   * Blueprint Extractor's {@code receivedAt} (ISO-8601 instant). A malformed {@code receivedAt} is
-   * treated as absent rather than failing the whole import.
+   * Resolves an entry's acquisition instant from {@code ts} (epoch seconds) or, failing that,
+   * {@code receivedAt} (ISO-8601); a malformed value counts as absent.
    *
    * @param entry the parsed export entry
-   * @return the acquisition instant, or {@code null} if neither field is present and parseable
+   * @return the acquisition instant, or {@code null}
    */
   private static @Nullable Instant acquiredAtOf(@NotNull BlueprintExportEntryDto entry) {
     if (entry.ts() != null) {
@@ -203,8 +167,7 @@ public final class BlueprintExportParser {
   }
 
   /**
-   * Parses an ISO-8601 instant string (e.g. {@code 2026-03-26T16:49:31.050Z}) leniently. A blank or
-   * unparseable value yields {@code null} so one malformed record never aborts the import.
+   * Parses an ISO-8601 instant leniently; a blank or unparseable value yields {@code null}.
    *
    * @param iso the ISO-8601 instant string, or {@code null}
    * @return the parsed instant, or {@code null}
@@ -233,14 +196,12 @@ public final class BlueprintExportParser {
   }
 
   /**
-   * A single de-duplicated export entry after parsing: the external product name, the structural
-   * blueprint tag (scmdb.net only), and the earliest acquisition instant seen for it.
+   * A de-duplicated export entry: external product name, structural tag and earliest acquisition
+   * instant.
    *
-   * @param externalName the export {@code productName} / scmdb.net {@code name} (trimmed)
-   * @param tag the scmdb.net structural blueprint key for the tag match (REQ-INV-019), or {@code
-   *     null} for the watcher / extractor exports, which do not carry it
-   * @param suggestedAcquiredAt the earliest acquisition instant (from {@code ts} or {@code
-   *     receivedAt}), or {@code null}
+   * @param externalName the trimmed external product name
+   * @param tag the scmdb.net structural blueprint key (REQ-INV-019), or {@code null}
+   * @param suggestedAcquiredAt the earliest acquisition instant, or {@code null}
    */
   public record ParsedEntry(
       @NotNull String externalName, @Nullable String tag, @Nullable Instant suggestedAcquiredAt) {}

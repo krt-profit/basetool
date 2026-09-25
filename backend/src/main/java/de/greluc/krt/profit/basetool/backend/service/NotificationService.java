@@ -40,11 +40,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Owner-scoped service for the per-user notification inbox.
  *
- * <p>Every read and mutation is keyed by the caller's Keycloak {@code sub}; an id that is unknown
- * <em>or</em> owned by someone else yields {@link EntityNotFoundException} (→ HTTP 404) so a caller
- * can neither read, mark, nor delete a peer's notification (REQ-NOTIF-004). The inbox is not
- * org-unit scoped and so injects neither {@code OwnerScopeService} nor {@code AuthHelperService} —
- * the {@code recipientUserId} the controller passes in <em>is</em> the authorization boundary.
+ * <p>Every operation is keyed by the caller's {@code sub}; an unknown or foreign id yields {@link
+ * EntityNotFoundException} (REQ-NOTIF-004).
  */
 @Service
 @RequiredArgsConstructor
@@ -53,12 +50,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class NotificationService {
 
   /**
-   * Sort properties accepted on the list endpoint; restricting them prevents unstable sorting.
-   * {@code id} is included so {@link
-   * de.greluc.krt.profit.basetool.backend.web.PaginationUtil#createPageRequest} appends it as a
-   * deterministic tiebreaker — without it, two notifications sharing a {@code createdAt} instant
-   * could reorder between page fetches and the inbox page's load-more (REQ-NOTIF-019) would skip a
-   * row at the page boundary.
+   * Sort properties accepted on the list endpoint; {@code id} serves as the deterministic
+   * tiebreaker for stable paging (REQ-NOTIF-019).
    */
   public static final Set<String> SORTABLE_FIELDS =
       Set.of("id", "createdAt", "readAt", "read", "type");
@@ -83,11 +76,10 @@ public class NotificationService {
   }
 
   /**
-   * Returns the caller's most recent notifications (newest first), capped at {@code limit}. Backs
-   * the bell dropdown.
+   * Returns the caller's most recent notifications for the bell dropdown, newest first.
    *
    * @param recipientUserId Keycloak {@code sub} of the caller
-   * @param limit maximum number of entries to return (clamped to a sane range)
+   * @param limit maximum number of entries, clamped to 1–50
    * @return the most-recent-first list of DTOs
    */
   public List<NotificationDto> listRecentOwn(@NotNull UUID recipientUserId, int limit) {
@@ -169,8 +161,7 @@ public class NotificationService {
   }
 
   /**
-   * Deletes read notifications whose read timestamp is older than the cutoff; backs the scheduled
-   * retention sweep. Independent of the user-initiated delete.
+   * Deletes read notifications read before the cutoff, for the scheduled retention sweep.
    *
    * @param cutoff delete read notifications read before this instant
    * @return the number of notifications deleted
@@ -185,13 +176,7 @@ public class NotificationService {
   }
 
   /**
-   * Deletes unread notifications raised before the cutoff; the second half of the scheduled
-   * retention sweep. Independent of the user-initiated delete.
-   *
-   * <p>Separate from {@link #purgeReadOlderThan(Instant)} because the two halves answer to
-   * different clocks and different windows: a read notification ages from when it was consumed, an
-   * unread one only from when it was raised. Both are bounded — an unbounded unread backlog is what
-   * let a triggering member's handle outlive every stated retention period.
+   * Deletes unread notifications created before the cutoff, for the scheduled retention sweep.
    *
    * @param cutoff delete unread notifications created before this instant
    * @return the number of notifications deleted

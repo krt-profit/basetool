@@ -47,37 +47,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Evaluates whether a member fulfils the promotion requirements for one or all configured rank
- * transitions.
+ * transitions. Read-only.
  *
- * <p>Each {@code RankRequirement} is either:
- *
- * <ul>
- *   <li><strong>category-scoped</strong> (a specific {@code PromotionCategory} must reach at least
- *       {@code minimumLevel}); or
- *   <li><strong>topic-scoped</strong> ({@code requiredCount} categories belonging to the same
- *       {@code PromotionTopic} must each reach at least {@code minimumLevel}); or
- *   <li><strong>global</strong> (neither topic nor category set – {@code requiredCount} categories
- *       anywhere must reach the level; used as a fallback).
- * </ul>
- *
- * <p>Category-scoped and global requirements are evaluated independently and may freely overlap
- * with topic aggregates – e.g. a LEVEL_A in Anwesenheit simultaneously satisfies the category-
- * scoped "Anwesenheit must be LEVEL_A" rule and counts towards the topic-scoped "Grundlagen
- * requires 2× LEVEL_A" rule.
- *
- * <p>Topic-scoped requirements within the <em>same topic</em>, however, are matched
- * <strong>disjointly</strong>: each evaluated category may count towards at most one topic-scoped
- * rule of that topic. The matching is greedy with strictest-minimum-level first ({@code LEVEL_C}
- * before {@code LEVEL_B} before {@code LEVEL_A}), which is optimal because a higher-level category
- * can fill both stricter and looser slots, so giving the stricter slot first pick never wastes a
- * higher-level category on a slot a lower-level one could have covered. Without this, two rules
- * like "3× LEVEL_B in Grundlagen" + "1× LEVEL_A in another Grundlagen category" would both succeed
- * on the same three B-rated categories – but the second rule's "in another category" intent demands
- * a fourth distinct category.
- *
- * <p>Read-only by design: the service never persists state. Personal queries are filtered by JWT
- * sub at the call site; the {@code *ForUser} methods that take an arbitrary userId are gated by
- * {@code ADMIN} or {@code OFFICER}.
+ * <p>A requirement is category-scoped, topic-scoped or global. Category-scoped and global rules are
+ * evaluated independently; topic-scoped rules of the same topic are matched disjointly, so each
+ * category counts towards at most one of them.
  */
 @Service
 @RequiredArgsConstructor
@@ -90,11 +64,8 @@ public class PromotionEligibilityService {
   private final OwnerScopeService ownerScopeService;
 
   /**
-   * Evaluates the eligibility of the given user for one specific rank transition.
-   *
-   * <p>Returns a response with {@code eligible == false} and {@code hasConfiguredRules == false}
-   * when no requirement is configured for the transition, so the UI can distinguish "missing
-   * configuration" from "configured but not met".
+   * Evaluates the eligibility of the given user for one rank transition; {@code hasConfiguredRules}
+   * is {@code false} when no requirement is configured for it.
    *
    * @param userId the {@code app_user.id} of the member being evaluated
    * @param fromRank the rank the member currently holds
@@ -113,18 +84,15 @@ public class PromotionEligibilityService {
   }
 
   /**
-   * Core transition evaluation that reuses a pre-loaded {@link EvaluationIndex}. The member's
-   * evaluation set is constant for a given {@code (userId, scope)}, so {@link
-   * #evaluateAllForUser(String)} loads it once and passes it into every transition instead of
-   * re-querying it 2×T times. The public {@link #evaluateForRanks(String, int, int)} owns the gate
-   * check and builds the index for a single transition.
+   * Evaluates one rank transition against a pre-loaded {@link EvaluationIndex}, without the feature
+   * gate check.
    *
-   * @param userId the member's {@code app_user.id}.
-   * @param fromRank the source rank.
-   * @param toRank the target rank.
-   * @param scope the promotion scope (squadron id) the requirements and evaluation are read in.
-   * @param index the member's pre-loaded assigned-level and category→topic maps.
-   * @return the per-rule outcome plus the aggregate {@code eligible} flag.
+   * @param userId the member's {@code app_user.id}
+   * @param fromRank the source rank
+   * @param toRank the target rank
+   * @param scope the promotion scope (squadron id) the requirements and evaluation are read in
+   * @param index the member's pre-loaded assigned-level and category-to-topic maps
+   * @return the per-rule outcome plus the aggregate {@code eligible} flag
    */
   @NotNull
   private PromotionEligibilityResponse evaluateForRanks(
@@ -161,10 +129,8 @@ public class PromotionEligibilityService {
   }
 
   /**
-   * Evaluates the user against every {@code (fromRank, toRank)} transition that has at least one
-   * configured requirement. The result is ordered the same way as {@link
-   * RankRequirementRepository#findDistinctRankTransitions()} – senior transitions first – so the UI
-   * can show the next reachable promotion at the top.
+   * Evaluates the user against every rank transition with at least one configured requirement,
+   * senior transitions first.
    *
    * @param userId the {@code app_user.id} of the member being evaluated
    * @return eligibility entries for every configured transition, possibly empty
@@ -188,9 +154,7 @@ public class PromotionEligibilityService {
   }
 
   /**
-   * Admin/officer view: same as {@link #evaluateAllForUser(String)} but explicitly callable for any
-   * user id. Authorisation is enforced via {@code @PreAuthorize} so personal views keep using
-   * {@link #evaluateAllForUser(String)} without a role check.
+   * Evaluates every configured rank transition for any user; restricted to ADMIN or OFFICER.
    *
    * @param userId the {@code app_user.id} of the member being evaluated
    * @return eligibility entries for every configured transition, possibly empty
@@ -202,26 +166,22 @@ public class PromotionEligibilityService {
   }
 
   /**
-   * The member's per-(user, scope) evaluation projection: the assigned promotion level per category
-   * and the owning topic per category. Both maps are derived from a single pass over the member's
-   * evaluation rows.
+   * The member's assigned promotion level per category and owning topic per category, for one user
+   * and scope.
    *
-   * @param levelByCategory category id → the level the member is assigned in it.
-   * @param topicByCategory category id → the topic the category belongs to.
+   * @param levelByCategory category id to the level the member is assigned in it
+   * @param topicByCategory category id to the topic the category belongs to
    */
   private record EvaluationIndex(
       Map<UUID, PromotionLevel> levelByCategory, Map<UUID, UUID> topicByCategory) {}
 
   /**
-   * Loads the member's evaluation rows once and derives both the assigned-level-by-category and the
-   * category→topic maps in a single pass. Previously each of those two maps was built by its own
-   * full scan of the identical {@code findAllByUserIdWithCategoryAndTopicScoped} query — two
-   * round-trips per call, multiplied across every rank transition; this collapses them to one
+   * Loads the member's evaluation rows once and derives both index maps in a single pass
    * (REQ-DATA-003).
    *
-   * @param userId the member's {@code app_user.id}.
-   * @param scope the promotion scope (squadron id) to read the evaluation in, or {@code null}.
-   * @return the assigned-level and category→topic maps for the member.
+   * @param userId the member's {@code app_user.id}
+   * @param scope the promotion scope (squadron id) to read the evaluation in, or {@code null}
+   * @return the assigned-level and category-to-topic maps for the member
    */
   @NotNull
   private EvaluationIndex loadEvaluationIndex(@NotNull UUID userId, @Nullable UUID scope) {
@@ -244,12 +204,7 @@ public class PromotionEligibilityService {
   }
 
   /**
-   * Evaluates a category-scoped or global requirement independently of any other rule. Topic-
-   * scoped requirements must NOT reach this method; they are pre-resolved by {@link
-   * #evaluateTopicScopedDisjoint} so the greedy disjoint matching across topic siblings is
-   * respected. The defensive {@link IllegalStateException} below exists to surface a regression
-   * immediately if a future change ever bypasses that pre-pass — silently falling back to
-   * independent topic evaluation would re-introduce the bug the disjoint matching exists to fix.
+   * Evaluates a category-scoped or global requirement on its own.
    *
    * @param req the rank requirement to evaluate
    * @param levelByCategory the member's assigned levels keyed by category id
@@ -273,26 +228,15 @@ public class PromotionEligibilityService {
   }
 
   /**
-   * Resolves all topic-scoped requirements in {@code requirements} via greedy disjoint matching,
-   * grouped per topic. Within a topic the rules are sorted strictest-minimum-level first ({@code
-   * LEVEL_C} before {@code LEVEL_B} before {@code LEVEL_A}); the algorithm then walks the sorted
-   * list and reserves the first {@code requiredCount} unreserved categories that reach the minimum.
-   * Each category is consumed by at most one topic-scoped rule of the same topic.
-   *
-   * <p>Strictest-first is optimal: a category with a higher level can fill both stricter and looser
-   * slots, so giving the stricter slot first pick never wastes a higher-level category on a slot a
-   * lower-level one could have covered. Ties on {@code minimumLevel} fall back to the stable
-   * repository order so admins' rule ordering is not silently re-arranged.
-   *
-   * <p>Requirements that are <em>not</em> topic-scoped (category-scoped or global) are skipped here
-   * and resolved separately by {@link #evaluateRequirement}; those overlap freely with the topic
-   * aggregate, as pinned by the "Anwesenheit A counts towards 2A" scenario.
+   * Resolves the topic-scoped requirements by greedy disjoint matching per topic: rules are taken
+   * strictest minimum level first (ties in repository order), and each reserves the first {@code
+   * requiredCount} unreserved categories that reach its level.
    *
    * @param requirements all rank requirements for the transition, in repository order
    * @param levelByCategory the member's assigned levels keyed by category id
    * @param topicByCategory category-to-topic index for the categories the member has evaluated
-   * @return a map from requirement id to its disjoint-matched check result; non-topic-scoped
-   *     requirements are absent from the map and must be evaluated separately
+   * @return a map from requirement id to its check result; requirements that are not topic-scoped
+   *     are absent
    */
   @NotNull
   private Map<UUID, PromotionRequirementCheckResponse> evaluateTopicScopedDisjoint(

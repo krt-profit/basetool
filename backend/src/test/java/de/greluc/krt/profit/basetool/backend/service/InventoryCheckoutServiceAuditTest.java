@@ -55,16 +55,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * REQ-AUDIT-001 audit-trail coverage for the two non-book-out state mutations of {@link
- * InventoryCheckoutService} — the delivered-flag toggle ({@link
- * InventoryCheckoutService#updateDelivered}) and the admin global-wipe ({@link
- * InventoryCheckoutService#deleteAllGlobalInventory}).
- *
- * <p>These paths were exercised for their flag/return/scope behaviour elsewhere but their audited
- * side effects (INVENTORY_ITEM_DELIVERY_TOGGLED, INVENTORY_WIPED) were never verified. Dropping or
- * mis-typing either audit call would leave the audited Lager area with no trace of a delivered
- * toggle or — most damaging — of the destructive global wipe, with nothing failing. This test
- * drives the service directly against Mockito mocks and pins the exact audit events.
+ * Audit tests (REQ-AUDIT-001) for the delivered-flag toggle ({@link
+ * InventoryCheckoutService#updateDelivered}) and the admin global wipe ({@link
+ * InventoryCheckoutService#deleteAllGlobalInventory}) of {@link InventoryCheckoutService}, pinning
+ * the exact audit events each records.
  */
 @ExtendWith(MockitoExtension.class)
 class InventoryCheckoutServiceAuditTest {

@@ -29,29 +29,14 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Configuration properties under {@code krt.refinery-import.*} — tuning knobs of the refinery
- * screenshot import's material-matching fuzzy stage (#434, plan §7.3). Externalized so the accept
- * threshold can be re-calibrated against the Phase 0 golden set without a code change. An immutable
- * record bound by {@code @ConfigurationPropertiesScan} (BE-MOD-04).
+ * Tuning of the refinery screenshot import's fuzzy material and method matching, under {@code
+ * krt.refinery-import.*}.
  *
- * @param fuzzyAcceptThreshold the minimum {@code BlueprintFuzzyMatcher} score at which a fuzzy
- *     candidate is auto-applied to the draft (still flagged {@code LOW_CONFIDENCE_MATERIAL} so the
- *     user verifies it). Candidates below this score leave the row unmatched and appear only as
- *     ranked suggestions. The conservative 0.9 default follows plan §7.3 — a wrong silent pick
- *     costs more than an extra manual assignment.
- * @param methodFuzzyAcceptThreshold the minimum {@code BlueprintFuzzyMatcher} score at which the
- *     nearest refining method is accepted for the draft. Deliberately lower than {@code
- *     fuzzyAcceptThreshold}: refining methods are a CLOSED set of nine very distinct UEX names, so
- *     a mis-read snaps unambiguously to its intended method — the VLM's known autocorrect {@code
- *     "DINYX SOLVATION"} → {@code "Dinyx Solventation"} scores ~0.83 while every other method stays
- *     below ~0.36, and non-method text (e.g. a stray panel label) peaks near 0.4. The 0.6 default
- *     sits comfortably between that noise ceiling and the mis-read floor. An open-catalogue
- *     material match, by contrast, must clear the stricter 0.9 bar.
- * @param suggestionFloor the minimum score for a candidate to be offered as a suggestion at all
- *     (the pick-list floor, far below {@code fuzzyAcceptThreshold}); mirrors {@code
- *     BlueprintFuzzyMatcher.DEFAULT_THRESHOLD}
- * @param suggestionLimit the maximum number of ranked suggestions attached to a single
- *     unmatched/low-confidence issue
+ * @param fuzzyAcceptThreshold the minimum {@code BlueprintFuzzyMatcher} score for auto-applying a
+ *     material candidate, still flagged {@code LOW_CONFIDENCE_MATERIAL}
+ * @param methodFuzzyAcceptThreshold the minimum score for accepting the nearest refining method
+ * @param suggestionFloor the minimum score for a candidate to be offered as a suggestion
+ * @param suggestionLimit the maximum number of suggestions per unmatched or low-confidence issue
  */
 @Validated
 @ConfigurationProperties(prefix = "krt.refinery-import")

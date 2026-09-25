@@ -22,9 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.util.UUID;
 
 /**
- * Frontend mirror of a Kommandogruppe (epic #800, REQ-ROLE-003), decoded as part of the Leitung
- * view. Descriptive sub-structure of a Staffel; the rank-bearing authority sits on the membership
- * row, not here.
+ * Frontend mirror of a Kommandogruppe (REQ-ROLE-003), part of the Leitung view. It is descriptive;
+ * rank authority sits on the membership row.
  *
  * @param id the group id.
  * @param squadronId the owning Staffel.

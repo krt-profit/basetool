@@ -66,13 +66,8 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 /**
- * Unit tests for the split deposit engine {@code BankLedgerService#bookSplitDeposit}
- * (REQ-BANK-043): a deposit that distributes a whole-percent of the gross evenly across all active
- * squadron accounts (excluding the named account) while booking a <strong>single</strong> holder
- * leg over the whole gross. Pure Mockito — the squadron-account enumeration, the largest-remainder
- * distribution, the exclude-named rule, the 100 % and rounds-to-zero edges and the no-targets guard
- * are all account/leg arithmetic that needs no database. Account-locking and overdraft concurrency
- * stay covered by the Testcontainers {@code BankLedgerServiceTest}.
+ * Unit tests for {@code BankLedgerService#bookSplitDeposit} (REQ-BANK-043): distribution across
+ * active squadron accounts except the named one, with a single holder leg over the gross.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -94,11 +89,8 @@ class BankLedgerSplitDepositTest {
   private final Map<UUID, BankAccount> accountsById = new HashMap<>();
 
   /**
-   * Assembles the ledger service under test with the real persistence engine {@link
-   * BankPostingWriter} and validation guards {@link BankBookingGuards} (#1253), both driven by the
-   * mocked repositories, so the split-arithmetic assertions on the captured {@code
-   * postingRepository} / {@code holderPostingRepository} legs still exercise the extracted
-   * persistence path end to end.
+   * Assembles the ledger service with the real {@link BankPostingWriter} and {@link
+   * BankBookingGuards} over mocked repositories.
    */
   @BeforeEach
   void setUp() {
@@ -127,9 +119,8 @@ class BankLedgerSplitDepositTest {
   }
 
   /**
-   * Wires the shared, always-needed stubs and registers every supplied account for the
-   * lock-by-id-for-update path and the squadron enumeration. The named account is registered too
-   * but is never part of the squadron set returned by the enumeration query.
+   * Wires the shared stubs and registers every supplied account for lookup; the named account is
+   * not part of the squadron enumeration.
    *
    * @param holder the receiving holder
    * @param named the deposit's named account (the remainder target)

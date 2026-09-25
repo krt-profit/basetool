@@ -51,13 +51,9 @@ import reactor.core.publisher.Flux;
 
 /**
  * Unit tests for {@link NotificationPageController#stream(HttpServletRequest, Authentication)}: the
- * notification SSE relay must resolve the OAuth2 bearer <b>read-only</b> and never drive a token
- * refresh on this long-lived request (REQ-SEC-012, ADR-0019). A refresh here would rotate the
- * session's online refresh token and a late session write-back could resurrect a stale token,
- * tripping Keycloak's reuse detection and revoking the whole session. The relay attaches the
- * snapshot token as a plain {@code Authorization} header on the filter-free {@code sseWebClient},
- * so it is structurally refresh-incapable — these tests pin that it fails soft without a usable
- * token and otherwise relays the snapshot bearer verbatim, even when expired.
+ * SSE relay resolves the bearer read-only and never refreshes the token (REQ-SEC-012, ADR-0019). It
+ * fails soft without a usable token and otherwise relays the snapshot bearer verbatim, even when
+ * expired.
  */
 class NotificationPageControllerStreamTest {
 

@@ -29,13 +29,9 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 /**
- * Data transfer record carrying Mission Finance Entry Create payload. The {@code @Size} /
- * {@code @DecimalMax} caps cap the anonymous attack surface — without them an unauthenticated
- * caller could push a 100 MB {@code note} or a {@code 1e100} amount through the public create-entry
- * endpoint (audit finding C-2). The {@link WholeNumber} constraint rejects fractional amounts —
- * mission finance is entered and stored as whole aUEC (REQ-MISSION-001); the system keeps
- * fractional precision only for derived totals (refinery profit), never for an operator-entered
- * entry.
+ * Data transfer record carrying a new mission finance entry. Size and magnitude caps bound the
+ * anonymously reachable create endpoint, and {@link WholeNumber} restricts the amount to whole aUEC
+ * (REQ-MISSION-001).
  */
 public record MissionFinanceEntryCreateDto(
     @NotNull UUID missionId,

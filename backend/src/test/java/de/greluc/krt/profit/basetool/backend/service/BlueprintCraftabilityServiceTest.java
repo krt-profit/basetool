@@ -54,11 +54,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
-/**
- * Unit tests for {@link BlueprintCraftabilityService} (#781, REQ-INV-048): craftable count,
- * best-first effective quality, the min-quality + no-degradation floor exclusion, the refinery
- * fold-in, and the ITEM / unresolved-recipe carve-outs.
- */
+/** Unit tests for {@link BlueprintCraftabilityService} (REQ-INV-048). */
 @ExtendWith(MockitoExtension.class)
 class BlueprintCraftabilityServiceTest {
 

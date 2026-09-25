@@ -37,36 +37,20 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Phase 7 (#700) end-to-end visibility matrix for the new Bereich tier of the org hierarchy (epic
- * #692) — the security/regression gate's cross-Bereich slice, asserting the three invariants the
- * restructure must hold for a {@code BEREICH}-leadership principal:
+ * End-to-end visibility matrix for the Bereich tier of the org hierarchy.
+ *
+ * <p>For a {@code BEREICH}-leadership principal it asserts:
  *
  * <ul>
- *   <li><b>Own-Bereich reach:</b> a Bereichsleiter sees their own Bereich's data (the cascade
- *       includes the Bereich's own id), via the strict-staffel Lager-View.
- *   <li><b>Strict silo (no cross-Bereich leak):</b> the same Bereichsleiter is denied a
- *       <em>foreign</em> Bereich's data — and a plain Staffel member never sees Bereich-owned data
- *       at all.
- *   <li><b>No admin escalation (REQ-ORG-015 HARD INVARIANT):</b> a Bereichsleiter's
- *       officer-equivalent reach grants <b>no</b> admin rights — an {@code ADMIN}-gated endpoint
- *       stays 403.
+ *   <li>a Bereichsleiter sees their own Bereich's data in the Lager view;
+ *   <li>they are denied a foreign Bereich's data, and a plain Staffel member never sees
+ *       Bereich-owned data;
+ *   <li>their reach grants no admin rights: an {@code ADMIN}-gated endpoint stays 403
+ *       (REQ-ORG-015).
  * </ul>
  *
- * <p>The descendant cascade (Bereichsleiter → child Staffel/SK) and the OL total-reach are pinned
- * at the unit level ({@code OwnerScopeServiceTest.CascadingScopeTests}); this e2e drives the new
- * Bereich-leadership path through the real stack end-to-end.
- *
- * <p><b>Fixtures.</b> {@code test-bereich} is a dedicated realm user carrying only the {@code KRT
- * Member} base role and <em>no</em> Staffel membership, so it can be made a Bereichsleiter without
- * tripping the leader-excludes-Staffel invariant (REQ-ORG-017). It is this suite's own
- * membership-shape-owned profile: making a user a Bereich leader gives it a Bereich membership for
- * the rest of the sequentially-run shared stack, so we must <em>not</em> reuse {@code test-none} —
- * the dedicated membershipless user that {@code RefineryOrderTenancyE2eTest} and {@code
- * InventoryTenancyE2eTest} rely on staying membershipless (a single membership would auto-stamp
- * their "ownerless" fixtures and break their tenancy assertions). The admin seeds two Bereiche, one
- * inventory item owned by each Bereich (create-on-behalf stamping, REQ-ORG-016, on its own material
- * so a material maps 1:1 to a Bereich), then grants {@code test-bereich} the {@code LEITER} role on
- * Bereich A only.
+ * <p>Uses the dedicated membershipless user {@code test-bereich}, made Bereichsleiter of Bereich A
+ * only, because the appointment leaves a membership behind on the shared stack.
  */
 @Tag("e2e")
 class OrgHierarchyVisibilityMatrixE2eTest {

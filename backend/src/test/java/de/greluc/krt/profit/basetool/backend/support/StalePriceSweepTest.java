@@ -31,13 +31,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit tests for {@link StalePriceSweep}.
- *
- * <p>The sweep replaced a single {@code WHERE id NOT IN :seenIds} bulk update whose bind-parameter
- * count scaled with the feed — 23 770 rows today, padded to 32 768, against PostgreSQL's 65 535
- * ceiling (REQ-DATA-014). These tests pin the two properties that make the replacement safe: the
- * same rows are cleared as before, and the per-statement parameter count stays bounded however
- * large the matrix grows.
+ * Unit tests for {@link StalePriceSweep}: pins that it clears the right rows and keeps the
+ * per-statement bind-parameter count bounded however large the price matrix grows (REQ-DATA-014).
  */
 class StalePriceSweepTest {
 

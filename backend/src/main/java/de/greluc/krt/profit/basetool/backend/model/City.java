@@ -84,14 +84,9 @@ public class City extends AbstractEntity<UUID> {
   private Boolean hasRefinery;
 
   /**
-   * Derived truth for "a refinery exists here", recomputed by {@code
-   * UexUniverseSyncService.reconcileRefineryTerminalFlags()} from the presence of a live {@code
-   * type = 'refinery'} terminal at this city (REQ-REFINERY-020).
-   *
-   * <p>Distinct from {@link #hasRefinery}, which mirrors UEX's parent-level {@code has_refinery}
-   * claim verbatim and is wrong in both directions — it misses MIC-L5, ARC-L4 and Patch City, and
-   * invents four People's Service Stations. The raw claim is kept for diagnostics; this flag is
-   * what the refinery-order picker and its create/update gate key on.
+   * Whether a live refinery terminal exists at this city, recomputed by {@code
+   * UexUniverseSyncService.reconcileRefineryTerminalFlags()} (REQ-REFINERY-020). This, not the raw
+   * UEX claim in {@link #hasRefinery}, is what the refinery-order picker and its gates use.
    */
   @Column(name = "has_refinery_terminal", nullable = false)
   private Boolean hasRefineryTerminal = false;

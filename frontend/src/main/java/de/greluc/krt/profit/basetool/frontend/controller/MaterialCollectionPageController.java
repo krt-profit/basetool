@@ -65,20 +65,11 @@ public class MaterialCollectionPageController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Renders the material-collection page for a single job order ({@code
+   * Renders the material-collection page of a job order ({@code
    * /orders/{jobOrderId}/material-collection}).
    *
-   * <p>Loads two independent datasets and tolerates partial failure: the entries list for the job
-   * order and the cached location lookup. A {@link BackendServiceException} on either is logged and
-   * that section degrades to an empty list — partial-success rendering is much more useful here
-   * than a single full-page error. The per-row owner reassignment picker is now a server-side
-   * searchable combobox (remote-users, #1193) that seeds each entry's current owner from {@code
-   * MaterialCollectionEntryDto.ownerName()}, so the whole roster is no longer preloaded here.
-   *
-   * <p>When called with {@code ?fragment=results} it returns only the {@code collectionResults}
-   * fragment (the entries table / empty state) rather than the full page — the live-sync receiver
-   * ({@code material-collection.js}, REQ-FE-010) re-fetches it to swap the table in place when a
-   * peer flips a delivered flag or moves a row.
+   * <p>A backend failure loading the entries or the locations degrades that section to an empty
+   * list. With {@code fragment=results} only the {@code collectionResults} fragment is rendered.
    *
    * @param jobOrderId job order id passed through to the template
    * @param fragment when {@code results}, render only the {@code collectionResults} fragment

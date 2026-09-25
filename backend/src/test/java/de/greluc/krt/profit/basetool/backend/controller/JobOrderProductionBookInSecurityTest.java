@@ -42,14 +42,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Pins the on-behalf gate of the production book-in (REQ-INV-032, APPSEC-01) through the real HTTP
- * chain: a logistician who may edit the order (the endpoint's {@code canEditJobOrder} gate passes)
- * but names a book-in owner whose inventory they may not write is answered with a 403 — produced by
- * the real {@code JobOrderItemProductionService}, not by a mocked service — rather than having the
- * stock written into that member's ledger. Only {@link OwnerScopeService} is replaced, so the
- * refusal demonstrably comes from the {@code canManageUserInventory} question for exactly the named
- * owner, asked before the order is even loaded (the order id here does not exist, so any later
- * failure would surface as a 404 instead).
+ * Verifies over HTTP that the production book-in refuses with 403 an owner whose inventory the
+ * caller may not write, even when the caller may edit the order (REQ-INV-032).
  */
 @SpringBootTest
 class JobOrderProductionBookInSecurityTest {

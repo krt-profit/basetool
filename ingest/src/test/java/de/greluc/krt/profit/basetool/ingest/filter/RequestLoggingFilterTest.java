@@ -59,15 +59,7 @@ class RequestLoggingFilterTest {
         .hasSize(1);
   }
 
-  /**
-   * An encoded spelling of an ingest path is still logged.
-   *
-   * <p>The {@code startsWith("/v1/")} test this replaced read the raw URI, so {@code
-   * /%761/refinery-extract} — which Spring MVC decodes and dispatches to the ingest controller —
-   * produced no access line at all. That is the worst possible pairing with the sibling filters the
-   * same idiom also skipped: the one request class that evaded the client-identity gate was the one
-   * class that left no trace.
-   */
+  /** A percent-encoded spelling of an ingest path still produces an access line. */
   @Test
   void logsTheAccessLineForAPercentEncodedIngestPath() throws Exception {
     MockHttpServletRequest request = new MockHttpServletRequest("POST", "/%761/refinery-extract");
@@ -155,17 +147,7 @@ class RequestLoggingFilterTest {
         .isFalse();
   }
 
-  /**
-   * Audit MEDIUM-8: the request URI is the only client-supplied value this module logs, and it was
-   * the only one logged raw and unbounded.
-   *
-   * <p>This filter sits at {@code HIGHEST_PRECEDENCE + 15} — ahead of the rate limiter and the
-   * whole security chain — and writes from a {@code finally} block, so an anonymous probe gets a
-   * line even when the request is answered with {@code 401} or already refused with {@code 429}. An
-   * 8 KB request line therefore reached every appender and was run through {@code PiiMasker} on the
-   * request thread (the console appender is synchronous by design). {@code LogSafe.text} is what
-   * every other client-supplied value in this module already passes through.
-   */
+  /** An overlong request URI is truncated in the access line via {@code LogSafe.text}. */
   @Test
   void truncatesAnOverlongRequestUriInTheAccessLine() throws Exception {
     MockHttpServletResponse response = new MockHttpServletResponse();

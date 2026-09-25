@@ -29,35 +29,20 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /**
- * Behaviour-equivalence guard for the epic #800 Phase-2 migration (REQ-ROLE-001/002): the four
- * authorisation readers — {@code CustomJwtGrantedAuthoritiesConverter}, {@code
- * OrgUnitCascadeService}, {@code OwnerScopeService} and {@code OrgUnitMembershipService} — were
- * switched from the five mutually-exclusive boolean leadership flags onto the {@link
- * MembershipRole} rank. This test pins, in one place, that the switch is byte-for-byte
- * behaviour-preserving for every row that could exist before the migration, and that the net-new
- * squadron ranks get exactly the baseline grant the spec promises and nothing more.
- *
- * <p>The proof has two halves:
+ * Verifies that the authorisation readers based on {@link MembershipRole} behave exactly like the
+ * former boolean leadership flags (REQ-ROLE-001/002).
  *
  * <ol>
- *   <li><b>Legacy equivalence.</b> The legacy booleans were mutually exclusive and kind-scoped, so
- *       the universe of pre-migration rows is "exactly one flag true" plus "all flags false". For
- *       each such profile we apply the V184 CASE backfill to get the rank, then assert that every
- *       reader's <em>new</em> rank predicate returns the same value its <em>old</em> boolean
- *       predicate did. Because the backfill never produces a squadron rank (squadron rows backfill
- *       to {@link MembershipRole#MEMBER}), the squadron-rank terms added in Phase 2 are dormant
- *       here — exactly why behaviour is unchanged for existing rows.
- *   <li><b>Net-new squadron grant (D3).</b> The four squadron ranks confer own-squadron
- *       officer-equivalent reach only: own-level oversight yes, downward cascade no, area/OL no,
- *       and they are exempt from the "a silo leader holds no Staffel" guard (they <em>are</em>
- *       Staffel members).
+ *   <li>For every legacy flag profile, the V184 backfilled rank yields the same result in each
+ *       reader as the old flag did.
+ *   <li>The squadron ranks grant own-squadron officer-equivalent reach only, with no downward
+ *       cascade or area/OL reach.
  * </ol>
  */
 class MembershipRoleMigrationEquivalenceTest {
 
   /**
-   * The five legacy boolean leadership flags in the exact shape {@code OrgUnitMembership} carried
-   * them before Phase 2.
+   * The five legacy boolean leadership flags of {@code OrgUnitMembership}.
    *
    * @param lead the former {@code is_lead} flag.
    * @param bereichsleiter the former {@code is_bereichsleiter} flag.
@@ -72,11 +57,7 @@ class MembershipRoleMigrationEquivalenceTest {
       boolean bereichsoperator,
       boolean olMember) {}
 
-  /**
-   * Every legacy flag profile that could exist before Phase 2: the booleans were mutually exclusive
-   * (each valid on exactly one org-unit kind), so the universe is the five "exactly one true" rows
-   * plus the "all false" plain-member / chart-only row.
-   */
+  /** Every possible legacy flag profile: each single flag set, plus none set. */
   private static final List<LegacyFlags> LEGACY_PROFILES =
       List.of(
           new LegacyFlags(false, false, false, false, false),
@@ -86,7 +67,7 @@ class MembershipRoleMigrationEquivalenceTest {
           new LegacyFlags(false, false, false, true, false),
           new LegacyFlags(false, false, false, false, true));
 
-  /** The four squadron leadership ranks introduced by epic #800. */
+  /** The four squadron leadership ranks. */
   private static final Set<MembershipRole> SQUADRON_RANKS =
       EnumSet.of(
           MembershipRole.STAFFELLEITER,
@@ -95,8 +76,8 @@ class MembershipRoleMigrationEquivalenceTest {
           MembershipRole.ENSIGN);
 
   /**
-   * The V184 {@code CASE} backfill: maps a legacy flag profile to the rank it is backfilled to.
-   * Mirrors {@code V184__add_org_unit_membership_role_and_backfill.sql} exactly.
+   * Maps a legacy flag profile to its rank exactly as the {@code CASE} in {@code
+   * V184__add_org_unit_membership_role_and_backfill.sql} does.
    *
    * @param f the legacy flag profile; never {@code null}.
    * @return the rank V184 assigns to a row carrying {@code f}.

@@ -32,13 +32,11 @@ public interface RefiningMethodRepository extends JpaRepository<RefiningMethod, 
   Optional<RefiningMethod> findByName(String name);
 
   /**
-   * Case-insensitive name lookup used by the refinery screenshot import (#434): UEX stores method
-   * names in title case ({@code "Ferron Exchange"}) while the SC refinement screen renders them
-   * uppercase ({@code "FERRON EXCHANGE"}). {@code refining_method.name} is unique, so at most one
-   * row matches.
+   * Case-insensitive name lookup for the refinery screenshot import, which reads method names in
+   * upper case. {@code refining_method.name} is unique, so at most one row matches.
    *
    * @param name the method name to match ignoring case
-   * @return the refining method if one exists with that name (any case)
+   * @return the refining method with that name (any case), if one exists
    */
   Optional<RefiningMethod> findByNameIgnoreCase(String name);
 }

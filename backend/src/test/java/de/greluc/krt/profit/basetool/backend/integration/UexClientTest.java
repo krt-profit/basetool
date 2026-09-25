@@ -50,21 +50,9 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 
 /**
- * Unit tests for the {@link UexClient}. Uses {@link MockWebServer} to drive the RestClient against
- * an in-process HTTP endpoint instead of hitting the real UEX API.
- *
- * <p>Three behaviour patterns to cover for every endpoint method:
- *
- * <ol>
- *   <li>Happy path — JSON wrapped in {@code {"status":"ok","data":[...]}} → list contents are
- *       parsed and returned.
- *   <li>Server error (5xx, network blip) → the counted fallback returns an empty list so the caller
- *       never sees an exception.
- *   <li>Empty body / no {@code data} field → empty list.
- * </ol>
- *
- * Each test pins the endpoint URI so a future refactor that accidentally swaps two endpoint
- * constants in {@link UexProperties} would fail loud.
+ * Unit tests for {@link UexClient} against a {@link MockWebServer}: parsed happy path, empty-list
+ * fallback on server errors, and empty-list result for an empty body, with each endpoint URI
+ * pinned.
  */
 class UexClientTest {
 
@@ -96,11 +84,8 @@ class UexClientTest {
   }
 
   /**
-   * REQ-OBS-009 / BE-MOD-01: the UEX fetch goes out through the observed builder of {@link
-   * RestClientConfig}, so it records {@code http.client.requests} — the Prometheus {@code
-   * http_client_requests_seconds} series — with the same default key values the replaced {@code
-   * WebClient} recorded: {@code method}, {@code status}, {@code outcome}, {@code uri} and {@code
-   * client.name} (the {@code client_name} label).
+   * A UEX fetch records the {@code http.client.requests} observation with its default key values
+   * (REQ-OBS-009).
    *
    * @throws Exception if the client cannot be built
    */
@@ -139,10 +124,8 @@ class UexClientTest {
   }
 
   /**
-   * The 16 MiB response-body cap the reactive codec used to enforce survives the move to {@code
-   * RestClient}: a body past {@link UexClient#MAX_RESPONSE_BYTES} is not truncated into a partial
-   * parse but fails the fetch into the counted empty-result fallback, so an oversized feed stays
-   * visible on {@code basetool_external_fetch_errors_total{source=uex}}.
+   * A body past {@link UexClient#MAX_RESPONSE_BYTES} fails into the counted empty-result fallback
+   * instead of a partial parse.
    */
   @Test
   void getCommodities_bodyPastTheSizeCap_failsIntoTheCountedFallback() {

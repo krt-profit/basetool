@@ -48,15 +48,8 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
- * Unit-level behaviour of {@link TermsAcceptanceService} (REQ-SEC-028): the sort translation, the
- * deliberately one-sided cache, and the idempotence of recording consent.
- *
- * <p>The sort tests are the ones that matter operationally. {@code AdminTermsController} lets a
- * caller sort by {@code acceptedAt}, but that column lives on the outer-joined acceptance row, not
- * on the query root — passing it through unchanged makes Hibernate reject the entire query at
- * runtime. {@code TermsAcceptanceQueryDataTest} pins the repository half of that contract against
- * real Postgres; these pin that the service actually performs the translation, which is what stands
- * between the admin's sort click and a 500.
+ * Unit tests for {@link TermsAcceptanceService} (REQ-SEC-028): translation of the {@code
+ * acceptedAt} sort onto the acceptance row, the positive-only cache, and idempotent consent.
  */
 @ExtendWith(MockitoExtension.class)
 class TermsAcceptanceServiceTest {
@@ -144,10 +137,7 @@ class TermsAcceptanceServiceTest {
     verify(termsAcceptanceRepository, times(1)).existsByUserIdAndTermsVersion(userId, VERSION);
   }
 
-  /**
-   * A negative answer is deliberately NOT cached: with several instances behind the proxy, a user
-   * who accepts on one instance must not stay blocked on another until an entry expires.
-   */
+  /** A negative answer is not cached, so an acceptance on another instance takes effect at once. */
   @Test
   void doesNotCacheANegativeAcceptanceAnswer() {
     when(termsVersionProvider.getCurrentVersion()).thenReturn(VERSION);
@@ -192,16 +182,8 @@ class TermsAcceptanceServiceTest {
   }
 
   /**
-   * A race with another instance is absorbed, and the verdict is <strong>re-read</strong> rather
-   * than assumed.
-   *
-   * <p>The caller still gets a clean "already accepted" instead of a 500. What changed is that the
-   * catch no longer caches: {@code DataIntegrityViolationException} does not say <em>which</em>
-   * constraint fired, and from inside an aborted transaction that cannot be established. A unique
-   * violation does imply a committed row, but the foreign key to {@code app_user} raises the same
-   * exception type with nothing committed at all — and caching that positive would let a subject
-   * with no local row through the consent gate for the process lifetime. One extra {@code exists}
-   * query buys the distinction.
+   * A concurrent acceptance from another instance yields "already accepted", and the verdict is
+   * re-read from the database rather than cached from the exception.
    */
   @Test
   void absorbsAConcurrentAcceptanceFromAnotherInstanceAndRereadsTheVerdict() {
@@ -218,17 +200,8 @@ class TermsAcceptanceServiceTest {
   }
 
   /**
-   * Consent recorded inside a transaction is not cached until that transaction commits.
-   *
-   * <p>The defect this closes: {@code TermsAcceptance} carries an assigned {@code @Id} and no
-   * {@code @Version}, so {@code save()} issues no SQL — the insert, and any constraint violation it
-   * trips, surfaces at <strong>commit</strong>, after the method has returned and after the cache
-   * was written. A caller whose insert failed there was remembered as consenting for the process
-   * lifetime with no row to show for it, and REQ-SEC-028's gate then waved them through until the
-   * next deploy.
-   *
-   * <p>Drives the real {@code TransactionSynchronizationManager} and deliberately never fires
-   * {@code afterCommit}, which is precisely the failed-commit case.
+   * Consent recorded inside a transaction is not cached until that transaction commits; the test
+   * never fires {@code afterCommit}.
    */
   @Test
   void doesNotCacheConsentUntilTheTransactionCommits() {

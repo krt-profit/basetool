@@ -80,10 +80,8 @@ public class AdminController {
   }
 
   /**
-   * Replaces the permission set of a role. Permissions are re-read on every JWT authentication so
-   * the change takes effect on the next user login without a server restart. Audited as {@code
-   * ROLE_PERMISSIONS_CHANGED} in the "Rollen" area (REQ-AUDIT-001); the class-level transaction is
-   * what lets the service write that audit row in the same transaction as the change itself.
+   * Replaces the permission set of a role, effective on each user's next authentication. Audited as
+   * {@code ROLE_PERMISSIONS_CHANGED} in the same transaction (REQ-AUDIT-001).
    *
    * @param name role name
    * @param permissions new permission set
@@ -109,12 +107,12 @@ public class AdminController {
   }
 
   /**
-   * Admin override of a user's editable attributes (rank, description, displayName, joinDate).
-   * Carries an optimistic-lock version in the body so two admins racing on the same user surface a
-   * 409 instead of silently overwriting.
+   * Admin override of a user's editable attributes (rank, description, displayName, joinDate),
+   * optimistically locked so concurrent admin edits surface as 409.
    *
    * @param id user id
-   * @param request typed body (note: NOT query params — keeping user values out of access logs)
+   * @param request the new attributes and the echoed version, sent as a body to keep them out of
+   *     access logs
    * @return the persisted user DTO
    */
   @PutMapping("/users/{id}/attributes")
@@ -132,9 +130,8 @@ public class AdminController {
   }
 
   /**
-   * Body for {@code PUT /api/v1/admin/users/{id}/attributes}. Moves the four user-controlled values
-   * out of the query string (where they leak into access logs and browser history) into a typed,
-   * validated request body.
+   * Body for {@code PUT /api/v1/admin/users/{id}/attributes}, carrying the four user-controlled
+   * values in a validated body rather than the query string.
    */
   public record AdminUserAttributesRequest(
       Integer rank,

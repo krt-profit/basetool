@@ -24,9 +24,8 @@ import java.util.List;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Frontend mirror of the account balance-over-time series (REQ-BANK-049): the end-of-bucket running
- * balance points over the chosen period plus the account's balance target, scaled by {@code
- * BankBalanceChart} into the detail page's inline SVG line chart.
+ * Frontend mirror of an account's balance-over-time series (REQ-BANK-049), rendered as the detail
+ * page's SVG line chart by {@code BankBalanceChart}.
  *
  * @param points the balance points, oldest first (possibly empty)
  * @param balanceTarget the account's balance target (REQ-BANK-036) drawn as the reference line, or

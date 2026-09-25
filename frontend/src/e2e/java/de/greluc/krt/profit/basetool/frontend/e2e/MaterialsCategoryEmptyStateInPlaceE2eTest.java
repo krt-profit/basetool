@@ -37,20 +37,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Regression for the "empty-state lost after the last in-place delete" bug class introduced by the
- * epic-#571 no-reload conversion: the admin material-category sub-table on {@code /admin/materials}
- * deletes a row through {@code krtFetch} without a page reload, and when the deleted row was the
- * last one the server-rendered "no entries" placeholder ({@code [data-category-empty]}) must be
- * restored in place — the old full reload re-rendered it, an unguarded in-place delete left a
- * header over an empty body until the next manual reload.
+ * E2E regression test: deleting the last material category in place on {@code /admin/materials}
+ * restores the "no entries" placeholder without a reload.
  *
- * <p>Deterministic on the ephemeral stack: no {@code DataInitializer} or SQL seed creates material
- * categories, so the category table starts empty. The test creates exactly one category, deletes it
- * (confirming the no-native-dialogs KRT confirm overlay), and asserts the placeholder reappears
- * without a reload. A window marker proves no full navigation cleared the page between the writes.
- *
- * <p>The actor is {@code test-admin}, who carries ADMIN through the seeded realm and may manage
- * material categories.
+ * <p>Relies on the ephemeral stack starting with no categories; runs as {@code test-admin}.
  */
 @Tag("e2e")
 class MaterialsCategoryEmptyStateInPlaceE2eTest {
@@ -88,11 +78,8 @@ class MaterialsCategoryEmptyStateInPlaceE2eTest {
   }
 
   /**
-   * Creates a single material category in place, then deletes it in place and asserts the
-   * empty-state placeholder row is restored without a reload. Because the category table starts
-   * empty on the ephemeral stack, deleting the only category drains it, so the placeholder must
-   * reappear — the discriminator that turns this red on the pre-fix frontend (which only did {@code
-   * row.remove()}).
+   * Creates one material category in place, deletes it in place, and asserts the empty-state
+   * placeholder reappears without a reload.
    */
   @Test
   void deletingLastCategoryRestoresEmptyStateInPlace() {

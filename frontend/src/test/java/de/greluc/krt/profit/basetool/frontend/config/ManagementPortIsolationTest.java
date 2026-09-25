@@ -39,15 +39,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
- * Verifies the ADR-0090 management-port isolation for the frontend: with {@code
- * management.server.port} set to a separate port, Actuator is served ONLY there and is absent from
- * the public application connector, and the management-port scrape is reachable without credentials
- * (the {@link ManagementPortSecurityConfig} permit-all chain, else the main OAuth2 chain would
- * challenge {@code /actuator/prometheus}). Mirrors the ingest module's isolation test.
- *
- * <p>The prod {@code application-prod.yml} additionally serves the management port over HTTPS with
- * the shared keystore; that is declarative SSL config not exercised here (the {@code test} profile
- * runs plain HTTP), so the management port runs plain HTTP for the probe.
+ * Verifies the management-port isolation (ADR-0090): Actuator is served only on the management
+ * port, and the scrape there needs no credentials.
  */
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
@@ -72,10 +65,10 @@ class ManagementPortIsolationTest {
       HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
 
   /**
-   * Issues a plain GET against a local port + path and returns the response.
+   * Issues a plain GET against a local port and path.
    *
-   * @param port the local port to target
-   * @param path the request path (leading slash included)
+   * @param port the local port
+   * @param path the request path, with leading slash
    * @return the HTTP response with a string body
    * @throws IOException if the request fails to send
    * @throws InterruptedException if the send is interrupted
@@ -126,16 +119,8 @@ class ManagementPortIsolationTest {
   }
 
   /**
-   * Pins why {@code server.tomcat.threads.*} is deliberately not configured and why the "Spring
-   * Boot apps" dashboard reads {@code http_server_requests_active_seconds_count} instead of {@code
-   * tomcat_threads_busy_threads} (FE-PERF-07).
-   *
-   * <p>With {@code spring.threads.virtual.enabled=true} Spring Boot hands the connector an external
-   * {@link VirtualThreadExecutor}. Tomcat applies {@code maxThreads}/{@code minSpareThreads} only
-   * to its own internal executor and reports {@code -1} for every thread-pool gauge, so the
-   * settings were inert and the dashboard panel drew a flat {@code -1}. Should virtual threads ever
-   * be switched off, the executor assertion fails and the thread-pool settings become meaningful
-   * again.
+   * Verifies that the connector runs on a {@link VirtualThreadExecutor}, so the Tomcat thread-pool
+   * settings are inert and concurrency is measured by the active-request gauge (FE-PERF-07).
    *
    * @throws Exception if a probe request fails to send
    */
@@ -163,13 +148,8 @@ class ManagementPortIsolationTest {
   }
 
   /**
-   * The in-flight timer carries no histogram, while the latency timer keeps its buckets.
-   *
-   * <p>{@code management.metrics.distribution.percentiles-histogram[http.server.requests]} matches
-   * the derived {@code http.server.requests.active} long-task timer by prefix, which exported about
-   * fifty {@code _bucket} series per label set that no panel or rule reads. The {@code .active} key
-   * switches it off for that timer alone; the p95 latency panels still need the buckets of {@code
-   * http.server.requests} itself.
+   * Verifies that the in-flight timer carries no histogram while the latency timer keeps its
+   * buckets.
    *
    * @throws Exception if a probe request fails to send
    */

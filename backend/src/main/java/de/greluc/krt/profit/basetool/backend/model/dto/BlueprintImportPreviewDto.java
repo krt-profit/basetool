@@ -22,9 +22,8 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import java.util.List;
 
 /**
- * Result of an SCMDB blueprint import preview (#327, Phase 4): one {@link BlueprintImportEntryDto}
- * per unique external name plus per-status counts for the summary banner. No rows are persisted by
- * the preview step — the user reviews and resolves, then the frontend posts an apply request.
+ * Result of a blueprint import preview: one {@link BlueprintImportEntryDto} per unique external
+ * name plus per-status counts. Nothing is persisted.
  *
  * @param total number of unique external names parsed from the upload
  * @param matched count of {@link BlueprintImportStatus#MATCHED} rows

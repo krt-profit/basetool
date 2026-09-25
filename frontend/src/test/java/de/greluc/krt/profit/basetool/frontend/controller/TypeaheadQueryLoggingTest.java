@@ -40,15 +40,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.ui.ExtendedModelMap;
 
 /**
- * Pins the logging contract of the type-ahead / search proxies (audit finding M3).
- *
- * <p>Two things are under test on every one of them. <b>Level:</b> these endpoints fire one request
- * per keystroke, so with the backend down a single member typing produces one log record per
- * character — a flood an ordinary user triggers by accident, which REQ-OBS-001 puts at DEBUG. Only
- * {@code AdminBlueprintsPageController}'s {@code catch (Exception)} catch-all stays at ERROR.
- * <b>Sanitising:</b> the query is a raw {@code @RequestParam}, so a member pasting a newline plus a
- * fabricated log prefix could otherwise forge a second log line (CWE-117) — it must go through
- * {@code LogSafe}, which replaces every ISO control character with {@code '?'}.
+ * Tests the logging of the type-ahead and search proxies: backend failures log at DEBUG
+ * (REQ-OBS-001), and the query passes through {@code LogSafe} so it cannot forge log lines
+ * (CWE-117).
  */
 class TypeaheadQueryLoggingTest {
 

@@ -39,19 +39,9 @@ import org.springframework.stereotype.Component;
 /**
  * Scheduled cleanup of notifications past their retention window (REQ-NOTIF-009).
  *
- * <p>Two windows, swept in one run. A <b>read</b> notification ages from the moment it was consumed
- * ({@code max-age}, default 90 days); an <b>unread</b> one has no read timestamp to age from and so
- * ages from when it was raised ({@code unread-max-age}, default 180 days). The unread window is the
- * longer of the two on purpose — a notification still waiting to be seen is worth more than one
- * already consumed — but it is finite, which is the point: while the sweep reached read rows only,
- * an inbox nobody opened retained the triggering member's handle forever, so the retention period
- * stated in the privacy policy held for attentive members and not for absent ones.
- *
- * <p>Gated by {@code app.notifications.retention.enabled} (default on; disabled under {@code test}
- * so the sweep never races assertions) and paced by {@code app.notifications.retention.interval}.
- * Failures are logged, not rethrown, so a bad sweep never tears down the scheduler thread. This is
- * orthogonal to the user-initiated delete (REQ-NOTIF-005): users may remove any of their own
- * notifications at any time regardless of age or read state.
+ * <p>A read notification expires {@code max-age} (default 90 days) after it was read, an unread one
+ * {@code unread-max-age} (default 180 days) after it was raised. Gated by {@code
+ * app.notifications.retention.enabled} and paced by {@code app.notifications.retention.interval}.
  */
 @Component
 @ConditionalOnProperty(
@@ -104,28 +94,11 @@ public class NotificationRetentionTask {
   }
 
   /**
-   * Performs both retention deletes, each isolated from the other.
+   * Performs the read and the unread retention delete independently, with one shared cutoff
+   * instant; a failure in one does not skip the other and is rethrown afterwards.
    *
-   * <p><b>The halves are independent, so a failure in one must not skip the other.</b> They were
-   * two sequential statements: a read purge that threw — a lock timeout on a large batch, a
-   * constraint the inbox fanout writes — returned before the unread purge was reached, so the half
-   * this feature added (REQ-NOTIF-009) silently never ran while the job reported a plain failure.
-   * {@code AuditRetentionService}, written in the same work, isolates each audit domain for the
-   * same reason; this is that shape, applied to the two windows that have nothing to do with each
-   * other beyond sharing a schedule.
-   *
-   * <p><b>A failure is still a failure.</b> Both halves are attempted and then the first failure is
-   * rethrown, so {@link TaskMetrics} records {@code outcome=failure} and {@code
-   * ScheduledJobFailureStreak} can see it. Isolating the halves buys the other half a run; it does
-   * not turn a broken sweep into a green one.
-   *
-   * <p>The two windows share one {@code Instant.now()} so a slow first delete cannot shift the
-   * second window, which would make two rows of identical age fall on opposite sides of the cutoff
-   * within a single run.
-   *
-   * @return the total number of notifications deleted this run (the {@code items} metric); the two
-   *     halves are also counted separately under {@link MetricNames#NOTIFICATION_RETENTION_DELETED}
-   *     because a sum cannot say which half did the work
+   * @return the total number of notifications deleted this run; each half is also counted under
+   *     {@link MetricNames#NOTIFICATION_RETENTION_DELETED}
    */
   private int purgeExpired() {
     log.info(
@@ -180,13 +153,8 @@ public class NotificationRetentionTask {
   }
 
   /**
-   * Publishes {@code basetool_scheduled_job_enabled{task="notification_retention"} = 1}.
-   *
-   * <p>A bean {@code @ConditionalOnProperty} never created publishes nothing, and that absence is
-   * what lets {@code ScheduledJobStale} tell "switched off on purpose" from "has never succeeded".
-   * Without it, following the documented instruction to disable a sweep before its first
-   * irreversible run raised a permanent warning: the last-success gauge is registered lazily on
-   * first success, so it never appeared and the alert's {@code absent()} leg stayed true.
+   * Publishes {@code basetool_scheduled_job_enabled{task="notification_retention"} = 1}, so {@code
+   * ScheduledJobStale} can tell a disabled sweep (no bean, no gauge) from one that never succeeded.
    */
   @PostConstruct
   void publishEnabledGauge() {

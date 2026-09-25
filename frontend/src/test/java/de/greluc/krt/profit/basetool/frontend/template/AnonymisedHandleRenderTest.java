@@ -35,44 +35,18 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
- * No template may render a handle snapshot without the sentinel-aware display helper (REQ-SEC-062,
- * the root i18n rule).
+ * No template may render a handle snapshot without {@code @handles.display(...)}, which maps the
+ * erasure sentinel {@code #ANONYMISED#} to {@code general.anonymisedHandle} (REQ-SEC-062).
  *
- * <p>A granted Art. 17 erasure replaces the member's name in these columns with {@code
- * #ANONYMISED#}, a deliberately untranslatable token. Every human-facing surface is supposed to map
- * it through {@code @handles.display(...)} to {@code general.anonymisedHandle}; a template that
- * renders the column directly prints the token verbatim, which is both a hardcoded user-visible
- * string and a worse answer than the erasure deserves.
- *
- * <p><b>Why a gate and not a careful sweep.</b> The first sweep was by hand and missed two sites in
- * a file whose two <em>other</em> sites had been wrapped — the reviewer found them by reading. This
- * change also widened the erasure to {@code bank_holder.handle} and {@code
- * audit_event.subject_label}, which added eleven more render points across five templates. A
- * hand-kept list of wrapped call sites is exactly the shape that drifts.
- *
- * <p>Presence checks are not renders: {@code th:if="${!#strings.isEmpty(r.counterpartyHandle())}"}
- * asks whether there is a value, and wrapping that would compare against the placeholder rather
- * than the column. Only the attributes that put text on the page are scanned, and within those a
- * comparison or an emptiness test is skipped — a ternary's condition is a question about the column
- * and only its branches are renders.
+ * <p>Only text-rendering attributes are scanned; comparisons and emptiness tests of the column are
+ * skipped, and in a ternary only the branches count as renders.
  */
 class AnonymisedHandleRenderTest {
 
   /**
-   * A navigation onto something whose value can be the erasure sentinel.
-   *
-   * <p><b>A pattern, not a set of literal strings, and both halves of it are a correction.</b> The
-   * first version of this gate held {@code Set.of("handle()", "actorHandle()", …)} and matched with
-   * a case-sensitive {@code indexOf}, which is blind twice over: {@code ${order.handle}} contains
-   * no {@code handle()} at all, and {@code "handle()"} is not a substring of {@code
-   * "holderHandle()"}. Simulated over every template, that matcher flagged <b>nothing</b> while
-   * nine sites were unwrapped — and two sites that <em>are</em> wrapped use property navigation, so
-   * unwrapping them would have left the suite green. It never did the wrapping it appeared to pin.
-   *
-   * <p>So: any dotted segment whose name ends in {@code handle} in either case, or is {@code
-   * subject}, with or without the call parentheses. That over-flags — a hypothetical {@code
-   * hasHandle()} would match — which is the right direction for a gate whose failure mode is a name
-   * nobody noticed.
+   * Matches a navigation onto a value that can be the erasure sentinel: any dotted segment ending
+   * in {@code handle} in either case, or {@code subject}, with or without call parentheses. It
+   * deliberately over-matches rather than miss a site.
    */
   private static final Pattern SNAPSHOT_ACCESSOR =
       Pattern.compile("\\.(\\w*[Hh]andle|subject)(\\(\\))?\\b");
@@ -94,12 +68,9 @@ class AnonymisedHandleRenderTest {
   private static final String WRAPPER = "@handles.display(";
 
   /**
-   * The attribute forms Thymeleaf evaluates in restricted mode, where a bean reference throws.
-   *
-   * <p>{@code th:attr} / {@code th:attrappend} / {@code th:attrprepend} set arbitrary attributes,
-   * and {@code th:data-*} (any {@code th:} prefix on a non-standard attribute) goes through the
-   * same default-attribute processor. Group 1 is the attribute for the failure message, group 2 the
-   * expression text.
+   * The attribute forms Thymeleaf evaluates in restricted mode, where a bean reference throws:
+   * {@code th:attr}, {@code th:attrappend}, {@code th:attrprepend} and {@code th:data-*}. Group 1
+   * is the attribute, group 2 the expression text.
    */
   private static final Pattern RESTRICTED_ATTRIBUTE =
       Pattern.compile("th:(attr|attrappend|attrprepend|data-[\\w-]+)=\"([^\"]*)\"");
@@ -135,20 +106,8 @@ class AnonymisedHandleRenderTest {
   }
 
   /**
-   * The wrapper may not sit in an attribute Thymeleaf evaluates in restricted mode.
-   *
-   * <p>The companion defect to an unwrapped render, and it costs a 500 rather than a leak: {@code
-   * th:attr}, its prepend/append siblings and every {@code th:<custom-attribute>} are evaluated
-   * with {@code StandardExpressionExecutionContext.RESTRICTED}, which refuses a bean reference. So
-   * {@code th:attr="data-handle=${@handles.display(...)}"} parses and then throws "Instantiation of
-   * new objects and access to static classes or parameters is forbidden in this context" the first
-   * time the page renders.
-   *
-   * <p>Three sites were written that way when the wrapping was applied (2026-09-17) and only one of
-   * them had an MVC render test, so two shipped broken behind a green suite. The remedy is {@code
-   * th:with}: a declaration rather than an attribute value, evaluated in normal mode and at a
-   * higher precedence than {@code th:attr}, so the bound name is available where the bean call is
-   * not.
+   * The display helper may not appear in an attribute evaluated in restricted mode, where the bean
+   * call throws at render time; such sites must bind the value with {@code th:with} instead.
    */
   @Test
   void theWrapperNeverSitsInARestrictedAttribute() throws IOException {
@@ -231,12 +190,8 @@ class AnonymisedHandleRenderTest {
   }
 
   /**
-   * Whether the occurrence at this position is a question about the value rather than a render.
-   *
-   * <p>A ternary in a {@code th:text} routinely tests the column and renders it in one branch:
-   * {@code ${r.deciderHandle() != null} ? ${@handles.display(r.deciderHandle())} : '-'}. The test
-   * must not be wrapped — comparing the display placeholder against {@code null} would answer the
-   * wrong question — so only the branch counts.
+   * Returns whether the occurrence at this position tests the value (a comparison or emptiness
+   * check) rather than rendering it.
    *
    * @param expression the whole attribute value
    * @param at the index of the accessor's leading dot
@@ -256,11 +211,8 @@ class AnonymisedHandleRenderTest {
   }
 
   /**
-   * Whether the occurrence at this position sits inside the display helper's parentheses.
-   *
-   * <p>Looks backwards for the wrapper rather than forwards for a closing bracket: the expression
-   * between the two is always a single navigation like {@code r.counterpartyHandle()}, so the
-   * helper's opening parenthesis is the nearest thing to the left.
+   * Returns whether the occurrence at this position sits inside the display helper's parentheses,
+   * found by searching backwards for the helper.
    *
    * @param expression the whole attribute value
    * @param at the index of the accessor

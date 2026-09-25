@@ -39,24 +39,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * The member's own Art. 15 / Art. 20 data export (REQ-SEC-058).
+ * The caller's own Art. 15 / Art. 20 data export as JSON (full, portable) or PDF (readable summary
+ * with a per-section inventory) (REQ-SEC-058).
  *
- * <p>Two formats, and they are not alternatives:
- *
- * <ul>
- *   <li><b>JSON</b> is the full disclosure and the Art. 20 portable copy — every section, every
- *       row, each marked with its legal basis so the portable subset is identifiable.
- *   <li><b>PDF</b> is the readable answer: master data in full, then an inventory naming every
- *       section with its row count and basis, so the document is complete about <em>what</em> is
- *       held even where it does not print it.
- * </ul>
- *
- * <p>The subject is always the caller, derived from the token. No endpoint here takes a user id, so
- * there is no parameter with which one member could export another's data — the same property that
- * makes the erasure-request surface safe to open to everybody.
- *
- * <p>Both formats are audit-logged. An export is a read of everything the system holds about a
- * person, and the one operation whose misuse would otherwise leave no trace.
+ * <p>The subject is always the caller from the token; no endpoint takes a user id. Every export is
+ * audit-logged.
  */
 @RestController
 @RequestMapping("/api/v1/users/me/export")

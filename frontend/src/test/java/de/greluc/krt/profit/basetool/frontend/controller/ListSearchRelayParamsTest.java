@@ -58,21 +58,11 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
- * Pins how the mission and operation list pages relay their filters into the backend search URI
- * (FE-SEC-01, REQ-SEC-051).
+ * Verifies how the mission and operation list pages pass their filters into the backend search URI
+ * (REQ-SEC-051): as URI template variables, never concatenated or pre-encoded.
  *
- * <p>The mission list concatenated {@code search}, {@code start}, {@code end} and {@code status}
- * into the URI string it handed to {@code WebClient}, whose template expansion then treated that
- * string as a template: {@code &} in a search opened a second backend query parameter, {@code #}
- * cut the query off, {@code +} arrived as a space and {@code {x}} threw. The operation list
- * URL-encoded its dates <em>into</em> the template, so the WebClient encoded them a second time and
- * the backend received {@code %3A} literally — its date filter never worked.
- *
- * <p>Two layers are pinned. The first mocks {@link BackendApiClient} and asserts the exact template
- * and the exact variables — equality, not a prefix, so an extra concatenated parameter cannot hide
- * behind a {@code startsWith}. The second wires the real {@link BackendApiClient} to a {@link
- * MockWebServer} and reads the query the backend actually receives, so the template and the
- * encoding are proven together.
+ * <p>Checks the exact template and variables against a mocked {@link BackendApiClient}, and the
+ * query the backend actually receives against a {@link MockWebServer}.
  */
 class ListSearchRelayParamsTest {
 

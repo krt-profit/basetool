@@ -37,17 +37,16 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
- * Spring Data repository for {@link BankAccount} rows (epic #556). Visibility filtering happens
- * here only as data-level helpers ({@link #findGrantedToFiltered}); the authorization decision
- * itself lives in {@code BankSecurityService} (REQ-BANK-010).
+ * Spring Data repository for {@link BankAccount} rows. Offers data-level visibility helpers such as
+ * {@link #findGrantedToFiltered}; the authorization decision lives in {@code BankSecurityService}
+ * (REQ-BANK-010).
  */
 @Repository
 public interface BankAccountRepository extends JpaRepository<BankAccount, UUID> {
 
   /**
-   * Loads one account under a pessimistic write lock for the duration of the surrounding
-   * transaction. Every booking flow locks the affected account(s) first so concurrent bookings on
-   * the same account serialize and the no-overdraft check (REQ-BANK-006) cannot race.
+   * Loads one account under a pessimistic write lock for the surrounding transaction, so concurrent
+   * bookings serialize and the no-overdraft check cannot race (REQ-BANK-006).
    *
    * @param id the account id
    * @return the locked account, or empty when it does not exist
@@ -68,9 +67,8 @@ public interface BankAccountRepository extends JpaRepository<BankAccount, UUID> 
   List<BankAccount> findAllForUpdateOrderById();
 
   /**
-   * Existence probe backing the singleton pre-check for {@code CARTEL} / {@code CARTEL_BANK}
-   * account creation (REQ-BANK-001) — gives a clean 409 before the V150 partial unique index would
-   * reject the insert.
+   * Whether an account of the given type exists; backs the singleton check for {@code CARTEL} /
+   * {@code CARTEL_BANK} account creation (REQ-BANK-001).
    *
    * @param type the account type to probe
    * @return {@code true} when at least one account of the type exists
@@ -78,10 +76,8 @@ public interface BankAccountRepository extends JpaRepository<BankAccount, UUID> 
   boolean existsByType(BankAccountType type);
 
   /**
-   * Loads the singleton account of the given type with its owning org unit pre-fetched — used only
-   * for the {@code CARTEL} / {@code CARTEL_BANK} singletons (REQ-BANK-001) when the
-   * responsible-holder change audit resolves the Profit-Bereichsleiter ripple onto them
-   * (REQ-BANK-034/-047, ADR-0070).
+   * Loads the singleton {@code CARTEL} or {@code CARTEL_BANK} account with its owning org unit
+   * fetched (REQ-BANK-001).
    *
    * @param type the singleton account type ({@code CARTEL} or {@code CARTEL_BANK})
    * @return the account, or empty when none of that type exists yet
@@ -98,13 +94,8 @@ public interface BankAccountRepository extends JpaRepository<BankAccount, UUID> 
   boolean existsByOrgUnitId(UUID orgUnitId);
 
   /**
-   * Loads the single account owned by the given org unit, with the owning org unit pre-fetched.
-   * Backs the org-unit officer/lead balance view (REQ-BANK-021) and the confirm-before-post request
-   * flow (REQ-BANK-022): both resolve a caller's own-level org unit to its account. Since epic #692
-   * Phase 6 (REQ-ORG-019) the owning org unit can be any account-owning kind — a Staffel/SK for an
-   * {@code ORG_UNIT} account, the Bereich for an {@code AREA} account, or the Organisationsleitung
-   * for the {@code CARTEL} account — all carried by the same {@code org_unit_id} FK. The V150
-   * partial unique index {@code uq_bank_account_org_unit} guarantees at most one row per org unit.
+   * Loads the single account owned by the given org unit, with the org unit fetched (REQ-BANK-021,
+   * REQ-BANK-022). A unique index guarantees at most one account per org unit.
    *
    * @param orgUnitId the owning org unit
    * @return the org unit's account (ORG_UNIT / AREA / CARTEL), or empty when it owns none
@@ -123,14 +114,8 @@ public interface BankAccountRepository extends JpaRepository<BankAccount, UUID> 
   long nextAccountNoValue();
 
   /**
-   * Pages over all accounts with the owning org unit pre-fetched — the management/admin account
-   * list (REQ-BANK-010 "sees all") — narrowed by a case-insensitive name/account-number substring
-   * and by status/type sets (REQ-BANK-053: the server-side account search behind the remote account
-   * pickers and the paged management table). The {@code query} is a bound-parameter substring; an
-   * <strong>empty string</strong> means "no filter" (it becomes the match-all {@code LIKE '%%'},
-   * never {@code null}) — the "empty means all" convention shared with {@code
-   * UserRepository.searchScoped}. The status/type filters are IN-lists by design: callers pass the
-   * full enum set for "no filter", so the query never binds a null enum.
+   * Pages over all accounts with the owning org unit fetched, filtered by name/account-number
+   * substring and by status and type sets (REQ-BANK-053).
    *
    * @param query the name/account-no substring, or the empty string for no text filter
    * @param statuses the statuses to include (pass all values for "no filter")
@@ -153,9 +138,8 @@ public interface BankAccountRepository extends JpaRepository<BankAccount, UUID> 
       Pageable pageable);
 
   /**
-   * Pages over exactly the accounts the given user holds a grant row on — the employee account list
-   * (REQ-BANK-009: row existence = view access) — narrowed exactly like {@link #findAllFiltered}
-   * (REQ-BANK-053), so an employee's remote account picker and paged table scope to their grants.
+   * Pages over the accounts the given user holds a grant on (REQ-BANK-009), filtered like {@link
+   * #findAllFiltered} (REQ-BANK-053).
    *
    * @param userId the employee's user id
    * @param query the name/account-no substring, or the empty string for no text filter
@@ -181,9 +165,8 @@ public interface BankAccountRepository extends JpaRepository<BankAccount, UUID> 
       Pageable pageable);
 
   /**
-   * Unfiltered list variant of the granted-accounts query for the dashboard, ordered by account
-   * number (REQ-BANK-016). Unbounded by design — the org holds a handful of accounts and the
-   * dashboard renders all of them as cards.
+   * Lists every account granted to the user, ordered by account number, for the dashboard
+   * (REQ-BANK-016). Unbounded.
    *
    * @param userId the employee's user id
    * @return every granted account, ordered by account number
@@ -207,13 +190,8 @@ public interface BankAccountRepository extends JpaRepository<BankAccount, UUID> 
   List<BankAccount> findAllByOrderByAccountNoAsc();
 
   /**
-   * Loads every account of one type/status with the owning org unit pre-fetched — backs the split
-   * deposit's squadron-account enumeration (REQ-BANK-043): it reads {@code ORG_UNIT}/{@code ACTIVE}
-   * accounts, then filters them to those whose org unit is a {@code SQUADRON} in Java (the {@code
-   * org_unit.kind} discriminator is read via {@code OrgUnit#getKind()}, not a JPQL attribute, see
-   * {@code OrgUnit}). Unbounded by design — the org holds a handful of accounts. The returned rows
-   * are <strong>not</strong> locked; the split flow re-locks each target via {@link
-   * #findByIdForUpdate(UUID)} in ascending id order before posting.
+   * Loads every account of one type and status with its org unit fetched, for the split deposit's
+   * squadron-account enumeration (REQ-BANK-043). The rows are not locked.
    *
    * @param type the account type to load (e.g. {@code ORG_UNIT})
    * @param status the account status to load (e.g. {@code ACTIVE})

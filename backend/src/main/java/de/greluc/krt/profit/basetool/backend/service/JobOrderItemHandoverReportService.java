@@ -44,12 +44,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Generates the item-handover delivery-note PDF in KRT Corporate Design — the item-order
- * counterpart of {@link JobOrderHandoverReportService}. Renders the persisted handover (by id) with
- * the produced items and their whole-unit quantities. The persisted {@code handoverTime} is UTC and
- * is rendered in the caller's zone (from {@code X-User-Time-Zone}), falling back to UTC. The page
- * background, the embedded Lato fonts and the cell helpers come from the shared {@link
- * KrtPdfSupport} layer (epic #556 Phase 3) — the rendered content is unchanged.
+ * Generates the item-handover delivery-note PDF in KRT Corporate Design, the item-order counterpart
+ * of {@link JobOrderHandoverReportService}. The UTC handover time is rendered in the caller's zone,
+ * falling back to UTC.
  */
 @Service
 @RequiredArgsConstructor
@@ -165,12 +162,8 @@ public class JobOrderItemHandoverReportService {
   private record ItemRow(String itemName, int amount) {}
 
   /**
-   * Resolves one German PDF label from the backend message bundle.
-   *
-   * <p>This document is German by construction (its headers are literals), so the locale is fixed.
-   * The one label that is resolved rather than written inline is the erased-handle placeholder: it
-   * is shared with every other surface that renders a handle snapshot, and a second spelling of it
-   * here would be a second thing to keep in step (REQ-SEC-062).
+   * Resolves one German PDF label from the backend message bundle; the locale is fixed because the
+   * document is German.
    *
    * @param key the message key
    * @return the resolved label

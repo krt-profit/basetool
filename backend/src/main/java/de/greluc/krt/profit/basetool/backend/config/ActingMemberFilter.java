@@ -58,46 +58,18 @@ import org.springframework.web.util.pattern.PathPatternParser;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Makes the <em>acting member</em> the security identity of an ingest-gateway request (ADR-0129).
+ * Makes the <em>acting member</em> named by the ingest gateway the security identity of the request
+ * (ADR-0129), so authorization, scoping, audit and the consent and approval gates all evaluate that
+ * member.
  *
- * <p>The gateway calls the backend under its own service-account identity and names the member it
- * acts for. The first cut substituted that member at two call sites, for the {@code owner}
- * parameter only — which fixed attribution and nothing else. Everything that reads the {@link
- * SecurityContext} still saw the gateway: {@code @PreAuthorize}, {@code @CurrentUserId}, the
- * org-unit scope, the audit trail, and both person-gates. The gates in particular are the reason
- * this filter exists rather than a per-call-site resolver: consent (REQ-SEC-028) and approval
- * (REQ-SEC-017) must be evaluated against the person who is sending, exactly as they were while the
- * gateway still relayed that person's token.
- *
- * <p>So the context is replaced instead, and the per-call-site substitution is gone.
- *
- * <p><strong>That only works because identity is read through one seam.</strong> The claim
- * "everything downstream sees the member" was false when this filter first shipped: a large share
- * of the consumers branched on the authentication <em>type</em> rather than on the subject, and the
- * acting member — which deliberately carries no token — split them into two camps. {@code
- * CurrentUserArgumentResolver} failed closed and 403'd every gateway call at argument resolution;
- * {@code TermsAcceptanceAccessFilter} failed <em>open</em> and skipped the consent gate entirely.
- * Every consumer now asks {@link
- * de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject}, and {@code ArchitectureTest
- * #identityMustBeReadThroughTheSeamNotTheAuthenticationType} keeps it that way, so the next
- * authentication type cannot reopen the same split.
- *
- * <p><strong>Four guards, each closing a way this could go wrong.</strong>
+ * <p>The header is honoured only when all of these hold:
  *
  * <ol>
- *   <li><b>Only the two ingest endpoints.</b> Matched as parsed {@link PathPattern}s against the
- *       <em>decoded</em> path (REQ-SEC-029): {@code getRequestURI()} is percent-encoded while MVC
- *       routes on the decoded path, so a {@code startsWith} test would let {@code /%61pi/...}
- *       through. ADR-0129 bounds the header to these two endpoints, and this is where that bound is
- *       enforced rather than assumed. Checked <em>first</em> — see the comment on that check for
- *       why the order is part of the design and not an accident.
- *   <li><b>Fail closed on a header with no authenticated caller.</b> A present header without a
- *       {@link Jwt} is refused, not ignored — so a future change to the authentication filters
- *       cannot silently reproduce the ordering bug this filter was written after.
- *   <li><b>Only a configured gateway.</b> Keyed on {@code azp} through {@link
- *       IngestGatewayProperties#isGatewayClient(String)} — the same rule the {@code azp}
- *       machine-identity carve-out uses, so the two cannot drift. An empty allowlist admits nobody.
- *   <li><b>Liveness.</b> See {@link #actingAuthorities}.
+ *   <li>the decoded path matches one of the two ingest endpoints (REQ-SEC-029);
+ *   <li>the caller is authenticated with a {@link Jwt} — a header without one is refused;
+ *   <li>the caller's {@code azp} is a configured gateway ({@link
+ *       IngestGatewayProperties#isGatewayClient(String)}); an empty allowlist admits nobody;
+ *   <li>the named member is live (see {@link #actingAuthorities}).
  * </ol>
  */
 @Slf4j
@@ -122,12 +94,8 @@ public class ActingMemberFilter extends OncePerRequestFilter {
   static final String CORRELATION_ID_HEADER = "X-Correlation-Id";
 
   /**
-   * Stable machine-readable code for this filter's refusals.
-   *
-   * <p>Stable <em>so that</em> a client could branch on it, not because one does: the ingest module
-   * relays the backend body verbatim and branches on no problem {@code code}, and the frontend
-   * never reaches these two endpoints with the header. Its job today is to keep this filter's
-   * answer the same shape as the two person-gates', so a caller cannot tell the three apart.
+   * Stable machine-readable problem {@code code} for this filter's refusals, matching the shape of
+   * the person-gates' refusals.
    */
   static final String CODE_ACTING_MEMBER_REFUSED = "ACTING_MEMBER_REFUSED";
 
@@ -209,12 +177,9 @@ public class ActingMemberFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Whether the request names no acting member at all.
+   * Whether the request names no acting member; a blank value counts as absent.
    *
-   * <p>Absent and blank are the same answer on purpose: a blank value names nobody, so it is
-   * treated as no header rather than refused as a malformed subject.
-   *
-   * @param onBehalfOf the raw on-behalf-of header value, {@code null} when the header is missing
+   * @param onBehalfOf the raw on-behalf-of header value, {@code null} when missing
    * @return {@code true} when the header is missing, empty or whitespace only
    */
   private static boolean isAbsent(@Nullable String onBehalfOf) {
@@ -235,28 +200,16 @@ public class ActingMemberFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Answers the refusal directly, rather than throwing.
+   * Writes the refusal as an RFC 7807 403 problem document instead of throwing, because this filter
+   * runs before exception translation.
    *
-   * <p><strong>Not an {@link AccessDeniedException}.</strong> This filter runs immediately after
-   * the bearer-token filter, which is <em>before</em> {@code ExceptionTranslationFilter} — so a
-   * thrown {@code AccessDeniedException} escapes the chain untranslated and reaches the client as a
-   * 500 instead of a 403. That was not theory: the real-chain test caught it, where a filter tested
-   * in isolation would have passed.
+   * <p>Every reason produces a byte-identical body; the reason goes only to the metric and the log,
+   * so the endpoint cannot reveal which subjects exist.
    *
-   * <p>The neighbouring person-gates write their own bodies for the same reason, and this writes
-   * the same shape they do — a full RFC 7807 document with a stable {@code code}, a localized title
-   * and detail, and a correlation id in both the body and the header. A client cannot tell the
-   * three refusing filters apart by the shape of the answer, and the ingest module's error mapping
-   * does not need a special case for this one.
-   *
-   * <p><strong>Every reason produces a byte-identical body.</strong> The reason is carried by the
-   * metric and the log line, never by the response: an unknown member and an offboarded one must
-   * look the same from outside, or this endpoint becomes an oracle for which subjects exist.
-   *
-   * @param request the refused request, for the problem {@code instance} and the caller's locale
+   * @param request the refused request, for the problem {@code instance} and the locale
    * @param response the response to write into
-   * @param detail the developer-facing reason; deliberately terse and free of caller-supplied text
-   * @param metricReason the bounded {@code MetricNames.ON_BEHALF_OF_*} reason for this refusal
+   * @param detail the developer-facing reason, free of caller-supplied text
+   * @param metricReason the bounded {@code MetricNames.ON_BEHALF_OF_*} refusal reason
    * @throws IOException if serialization or writing fails
    */
   private void refuse(
@@ -297,15 +250,11 @@ public class ActingMemberFilter extends OncePerRequestFilter {
   }
 
   /**
-   * The authentication that stands in for the acting member.
+   * Token-less authentication standing in for the acting member, exposing its OIDC {@code sub}
+   * through {@link SubjectAuthentication}.
    *
-   * <p>Not a {@link JwtAuthenticationToken}: there is no token for this member, and manufacturing
-   * one would put a forged {@link Jwt} into a context where anything may read its claims.
-   *
-   * <p>It advertises the subject through {@link SubjectAuthentication} rather than relying on
-   * {@code getName()}. The seam cannot read names generically — for a username/password caller the
-   * name is a callsign, which REQ-OBS-004 keeps out of logs — so this type states explicitly that
-   * its name is an OIDC {@code sub}.
+   * <p>Deliberately not a {@link JwtAuthenticationToken}, so no forged {@link Jwt} enters the
+   * context.
    */
   static final class ActingMemberAuthentication extends AbstractAuthenticationToken
       implements SubjectAuthentication {

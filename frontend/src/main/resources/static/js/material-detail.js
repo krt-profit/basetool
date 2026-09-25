@@ -17,19 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * Material-detail page module (/materials/{...}), extracted verbatim from the former inline script of
- * material-detail.html (ADR-0069, follow-up to #924).
- *
- * Client-side sort of the terminal price table (numeric columns 1/2 vs. lexical, toggling asc/desc
- * with a header indicator) and the terminal-name filter autocomplete (names read from the sibling
- * <datalist id="terminalNames-data">, deduplicated), plus the live text filter with a no-results row.
- * All wired via window.krtEvents delegation (material-detail-sort / material-detail-filter-terminals).
- *
- * The block carried no Thymeleaf interpolation, so there is no inline bootstrap; krtAutocomplete
- * comes from the autocomplete.js module loaded before this classic script.
- */
-
 /* global krtAutocomplete */
 
 function sortTable(n) {
@@ -151,8 +138,6 @@ function filterTerminals() {
 
     const noResults = document.getElementById('noResultsRow');
     if (noResults) {
-        // #noResultsRow starts hidden via the krtm-display-none-5790 class (ADR-0093); a
-        // `style.display = ''` reveal cannot override the class, so toggle the class instead.
         if (visibleCount === 0 && tr.length > (document.getElementById('noDataRow') ? 1 : 0)) {
             noResults.classList.remove('krtm-display-none-5790');
         } else {
@@ -161,8 +146,6 @@ function filterTerminals() {
     }
 }
 
-// CSP-safe delegated bindings (replaces onkeyup="filterTerminals()" and
-// onclick="sortTable(N)" inline handlers).
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('keyup', 'material-detail-filter-terminals', filterTerminals);
     window.krtEvents.on('click', 'material-detail-sort', function (el) {

@@ -45,12 +45,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
- * Room bookkeeping and delivery of the app's live-sync SSE registry (ADR-0143).
+ * Tests room bookkeeping and delivery of the live-sync SSE registry (ADR-0143).
  *
- * <p>Most cases run the service over a direct executor, so a drain happens inside the call that
- * queued the frame and the recorded order is observable without waiting. The BE-PERF-13 cases at
- * the end run it over real virtual threads, because what they prove — a blocked subscriber does not
- * hold the publisher, order survives concurrency, a full queue drops — only exists off-thread.
+ * <p>Most cases use a direct executor so delivery order is observable synchronously; the
+ * concurrency cases use real virtual threads.
  */
 class LiveSyncStreamServiceTest {
 

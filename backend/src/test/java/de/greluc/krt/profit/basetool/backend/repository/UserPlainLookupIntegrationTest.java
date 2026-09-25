@@ -50,15 +50,11 @@ import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Pins BE-PERF-12 (REQ-DATA-003): the graph-free {@link UserRepository#findPlainById(UUID)} leaves
- * {@code roles} lazy, and a request path that now resolves its user through it still returns the
- * user's roles — loaded lazily inside the handler's own transaction.
+ * Verifies that {@link UserRepository#findPlainById(UUID)} leaves {@code roles} lazy while a
+ * request path using it still returns the user's roles (REQ-DATA-003).
  *
- * <p>Deliberately <em>not</em> {@code @Transactional}: a test transaction would hold one session
- * open across the whole method, which is exactly the condition a real request does not have and
- * would hide a {@code LazyInitializationException} (the 2026-09-06 lesson recorded in the vault's
- * Backend note). The seed commits, the request runs in its own transaction, and the rows are
- * removed afterwards.
+ * <p>Not {@code @Transactional}, so a {@code LazyInitializationException} is not masked by a
+ * test-wide session; seeded rows are removed afterwards.
  */
 @SpringBootTest
 @ActiveProfiles("test")

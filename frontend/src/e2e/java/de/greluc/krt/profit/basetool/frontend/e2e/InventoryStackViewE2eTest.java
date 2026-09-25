@@ -34,25 +34,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Regression flow for the group-on-read Lager (ADR-0003, REQ-INV-002): a non-personal stock row
- * linked to <em>neither</em> a job order <em>nor</em> a mission — the overwhelmingly common case —
- * must still appear in the squadron-wide grouped view at {@code /inventory/all}.
- *
- * <p>The v0.4.0 group-on-read queries projected and grouped the nullable {@code jobOrder} / {@code
- * mission} / {@code owningOrgUnit} associations as whole entities, which rendered implicit INNER
- * joins and silently dropped every stack missing those links. The result: {@code /inventory/all}
- * (and {@code /inventory/my}) showed "Keine Einträge gefunden" even though the per-material
- * aggregate page ({@code /inventory}) still listed the stock. This test seeds exactly such a row
- * via the backend API and asserts the material surfaces as a group row in the grouped UI — the
- * data-only counterpart is {@code InventoryItemStackQueryDataTest}.
- *
- * <p>The assertion targets the material's {@code div.tree-row--group} row in the consolidated
- * {@code .tree-table} (rebuilt as a CSS tree table in #484) by its {@code data-material-id}. The
- * {@code tree-row--group} class qualifier is load-bearing: the same {@code data-material-id} is
- * also stamped on the collapsed (hidden) child {@code tree-row--mid} stack rows, so a bare
- * attribute selector could resolve to a hidden element. The attribute is emitted only for non-empty
- * groups, so it still cannot match the material name in the filter dropdown nor an empty grouped
- * table.
+ * Verifies that a non-personal stock row linked to neither a job order nor a mission appears as a
+ * group row in {@code /inventory/all} (ADR-0003, REQ-INV-002).
  */
 @Tag("e2e")
 class InventoryStackViewE2eTest {

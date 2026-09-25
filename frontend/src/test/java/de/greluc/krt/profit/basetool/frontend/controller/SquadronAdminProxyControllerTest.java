@@ -36,13 +36,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
 
 /**
- * Unit tests for {@link SquadronAdminProxyController}. The controller is a thin admin-only proxy
- * that forwards two per-squadron flag toggles to the backend. Both flags live on the cached {@code
- * SquadronDto} that {@code OrgUnitContextAdvice} reads on every authenticated render, so the
- * contract under test (REQ-DATA-007) is: each toggle forwards the PATCH and then evicts the {@code
- * SQUADRON} + {@code ORG_UNIT} caches — in that order — so the shared squadron catalogue cannot
- * serve a stale flag up to the cache TTL after the toggle. Without the eviction the sidebar/title
- * promotion gate would lag behind the admin's change.
+ * Unit tests for {@link SquadronAdminProxyController}: each flag toggle forwards the PATCH and then
+ * evicts the {@code SQUADRON} and {@code ORG_UNIT} caches, in that order (REQ-DATA-007).
  */
 @ExtendWith(MockitoExtension.class)
 class SquadronAdminProxyControllerTest {

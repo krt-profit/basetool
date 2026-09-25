@@ -43,14 +43,8 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.dataformat.cbor.CBORMapper;
 
 /**
- * The second representation of the API, and the four things that must not move with it (ADR-0161
- * §8.5).
- *
- * <p>Nothing in this repository registers a CBOR converter by hand. Spring Framework 7 detects
- * {@code tools.jackson.dataformat.cbor.CBORMapper} on the classpath and contributes one, which
- * makes "add a dependency" the entire implementation — and makes a test the only place the
- * behaviour is actually stated. What follows is that statement: the same objects, the same errors,
- * a cache key that distinguishes the two, and no client that did not ask for it noticing at all.
+ * Verifies CBOR content negotiation of the API (ADR-0161): same objects and errors as JSON, a cache
+ * key that distinguishes the two, and no change for clients that do not request CBOR.
  */
 @SpringBootTest
 @ActiveProfiles("test")

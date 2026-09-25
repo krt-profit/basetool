@@ -63,11 +63,8 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 
 /**
- * Unit tests for {@link MissionFinanceEntryService}. Money-handling code with a tricky aggregation
- * step ({@link MissionFinanceEntryService#calculateTotalSum}) that mixes manual ledger entries with
- * refinery-order profit/loss including legacy-null safety. Previous coverage was 39% line / 5%
- * branch with no test file at all; these tests close every branch of {@code calculateTotalSum},
- * {@code createEntry}, {@code updateEntry}, and {@code deleteEntry}.
+ * Unit tests for {@link MissionFinanceEntryService}, covering every branch of {@link
+ * MissionFinanceEntryService#calculateTotalSum} and the create, update and delete paths.
  */
 @ExtendWith(MockitoExtension.class)
 class MissionFinanceEntryServiceTest {

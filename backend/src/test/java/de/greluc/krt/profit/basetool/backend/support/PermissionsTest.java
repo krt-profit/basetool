@@ -24,9 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit test for {@link Permissions} (S3, #909): pins the byte-identical permission-string values
- * that already exist as {@code role_permissions} DB rows, so a future edit here cannot silently
- * revoke/grant a permission for every role that carries it.
+ * Unit test for {@link Permissions}: pins the permission-string values that exist as {@code
+ * role_permissions} rows.
  */
 class PermissionsTest {
 

@@ -55,24 +55,9 @@ import org.springframework.validation.BindingResult;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Regression coverage for the Redis-session {@link JsonMapper} configuration in {@link
- * RedisSessionConfig}. The original bug was a 500 surfacing on POST {@code /personal-inventory/add}
- * whenever the submitted form failed validation: the page controller pushed the {@link
- * BeanPropertyBindingResult} into a {@code RedirectAttributes} flash attribute, the redirect commit
- * serialised the FlashMap to Redis and Jackson exploded on the {@code BindingResult -> model ->
- * BindingResult -> ...} self-reference cycle with {@code Document nesting depth (501) exceeds the
- * maximum (500)}.
- *
- * <p>{@link RedisSessionConfig#buildSessionJsonMapper(ClassLoader)} now installs a Jackson mix-in
- * that hides {@code BindingResult.getModel()} from the serialiser, breaking the cycle without
- * dropping the field errors / target / object-name. These tests pin that behaviour so it cannot
- * silently regress when the configuration is touched in the future.
- *
- * <p>Also pins {@link RedisSessionConfig#sessionRepositoryCustomizer(ObjectProvider)}: the
- * configurable {@code spring.session.redis.flush-mode} must bind leniently (case- and {@code
- * -}/{@code _}-insensitive) and fall back to the durable {@code IMMEDIATE} default on an
- * unrecognised value rather than crashing startup, while the session timeout and key namespace stay
- * applied.
+ * Unit tests for {@link RedisSessionConfig}: a flashed {@link BeanPropertyBindingResult} serialises
+ * without recursion and keeps its errors, and the flush mode, timeout and namespace are applied by
+ * {@link RedisSessionConfig#sessionRepositoryCustomizer(ObjectProvider)}.
  */
 class RedisSessionConfigTest {
 
@@ -105,13 +90,11 @@ class RedisSessionConfigTest {
   }
 
   /**
-   * The flush mode is resolved leniently: any case and {@code -}/{@code _} spelling of a valid
-   * constant binds, and an unrecognised value degrades to the durable {@code IMMEDIATE} default.
-   * The lowercase {@code on_save} case is the load-bearing one — it is the spelling Spring's own
-   * docs use, and a direct {@code @Value FlushMode} binding would crash startup on it.
+   * Verifies that the flush mode binds in any case and {@code -}/{@code _} spelling, and that an
+   * unrecognised value falls back to {@code IMMEDIATE}.
    *
    * @param configured the raw {@code spring.session.redis.flush-mode} value
-   * @param expected the {@link FlushMode} the customizer must apply to the repository
+   * @param expected the {@link FlushMode} the customizer must apply
    */
   @ParameterizedTest
   @CsvSource({
@@ -140,11 +123,8 @@ class RedisSessionConfigTest {
   }
 
   /**
-   * Security audit gap-fill: the concurrent-session cap ({@code maximumSessions}) must be backed by
-   * the Redis session store, because with {@code @EnableRedisIndexedHttpSession} the default
-   * in-memory registry never sees the (Spring-Session-owned) sessions. The config exposes a {@link
-   * SpringSessionBackedSessionRegistry} built from the Redis {@link
-   * FindByIndexNameSessionRepository}.
+   * Verifies that the session registry is a {@link SpringSessionBackedSessionRegistry} built from
+   * the Redis {@link FindByIndexNameSessionRepository}.
    */
   @Test
   void sessionRegistryIsBackedByTheRedisSessionRepository() {
@@ -227,12 +207,10 @@ class RedisSessionConfigTest {
   }
 
   /**
-   * The 2026-09-25 production finding: under the frontend's own ACL user the startup step must send
-   * no {@code CONFIG} at all — every refused {@code CONFIG GET} is counted by Redis and fed {@code
-   * RedisAclDenials} on each restart — and must still prove the store answers, with a {@code PING}
-   * its {@code +@connection} allows.
+   * Verifies that under a per-service ACL user the startup step sends no {@code CONFIG} and checks
+   * the store with a {@code PING}.
    *
-   * @param username a per-service ACL user, including one a relaxed {@code .env} padded.
+   * @param username a per-service ACL user, including a padded one
    */
   @ParameterizedTest(name = "username=[{0}]")
   @ValueSource(strings = {"basetool-frontend", " basetool-frontend ", "Default"})
@@ -258,12 +236,11 @@ class RedisSessionConfigTest {
   }
 
   /**
-   * Instantiates {@link RedisSessionConfig} with the given flush-mode value (plus fixed timeout and
-   * namespace), runs its {@link
+   * Runs {@link RedisSessionConfig}'s {@link
    * RedisSessionConfig#sessionRepositoryCustomizer(org.springframework.beans.factory.ObjectProvider)}
-   * against a mock repository, and returns that mock for verification.
+   * with the given flush mode against a mock repository.
    *
-   * @param flushModeValue the raw {@code spring.session.redis.flush-mode} value to inject
+   * @param flushModeValue the raw {@code spring.session.redis.flush-mode} value
    * @return the mock repository the customizer was applied to
    */
   private static RedisIndexedSessionRepository applyCustomizer(String flushModeValue) {
@@ -293,11 +270,7 @@ class RedisSessionConfigTest {
     return beanFactory.getBeanProvider(MeterRegistry.class);
   }
 
-  /**
-   * Simple form bean with a single property. We intentionally avoid one of the real frontend form
-   * classes here so the test does not depend on their evolving validation annotations — the cycle
-   * this test reproduces lives in Spring's {@code BeanPropertyBindingResult}, not in our forms.
-   */
+  /** Minimal form bean with one property, independent of the real frontend forms. */
   @SuppressWarnings("unused")
   @Getter
   @Setter

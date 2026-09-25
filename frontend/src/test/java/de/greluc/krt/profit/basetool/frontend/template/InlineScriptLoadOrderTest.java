@@ -36,25 +36,9 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
- * The structural half of the deferred load order (FE-PERF-05, REQ-FE-023).
- *
- * <p>Every external script is {@code defer} — the head's shared ones and every page module — so
- * they run in document order after parsing, and the page modules still run after the head scripts
- * they depend on. The one exception is {@code krt-client-error.js}, which must run first and
- * synchronously: it installs the error handlers that observe every other script.
- *
- * <p>What that makes dangerous is an <em>inline</em> script: it still runs where it stands, during
- * parsing, before any deferred file. A top-level {@code bindSwaps()} or {@code (function () {…})()}
- * that touches {@code window.krtFetch} therefore meets an undefined global, and the {@code if
- * (window.krtFetch)} guard those scripts carry turns it into a silent no-op — the exact shape this
- * load order has regressed in three times. So an inline script in a page may only declare
- * (constants, functions, {@code window.*} dictionaries) and register listeners at its top level;
- * anything it has to <em>run</em> goes into a {@code DOMContentLoaded} listener, which fires after
- * every deferred script.
- *
- * <p>{@code fragments/head.html} is exempt from the second rule by design: its inline scripts are
- * the bootstrap stubs and dictionaries that must exist before anything else, and they call nothing
- * but their own code. {@code ScriptLoadOrderE2eTest} is the runtime half.
+ * Verifies the structural half of the deferred script load order (REQ-FE-023): a page's inline
+ * script may only declare and register listeners at its top level; anything it runs belongs in a
+ * {@code DOMContentLoaded} listener. {@code fragments/head.html} is exempt.
  */
 class InlineScriptLoadOrderTest {
 
@@ -169,9 +153,8 @@ class InlineScriptLoadOrderTest {
   }
 
   /**
-   * The calls an inline script makes at brace depth zero, outside every function body, that are not
-   * in {@link #ALLOWED_TOP_LEVEL_CALLS}; an immediately invoked function is reported as {@code
-   * (IIFE)}.
+   * Returns the calls an inline script makes at brace depth zero that are not in {@link
+   * #ALLOWED_TOP_LEVEL_CALLS}; an immediately invoked function is reported as {@code (IIFE)}.
    *
    * @param code the inline script's source
    * @return the offending calls, in source order

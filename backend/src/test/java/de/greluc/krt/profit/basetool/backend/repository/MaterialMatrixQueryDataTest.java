@@ -40,18 +40,9 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Data-level coverage for {@link MaterialPriceRepository#findMatrixItems} against the real Postgres
- * test schema (Testcontainers + Flyway via the {@code test} profile). It pins the server-side
- * matrix filtering added for ADR-0105 / REQ-UI-014: the four optional dimensions (material names,
- * star systems, has-loading-dock, is-auto-load) applied through the {@code :param IS NULL OR …}
- * idiom, their intersection, and that the base predicates (hidden terminals excluded, only rows
- * with an active buy/sell side) still hold under every filter combination.
- *
- * <p>All fixtures use per-run unique names (a random suffix) and are always queried by those exact
- * names, so the assertions are isolated from any material / terminal rows the shared Testcontainers
- * database already carries — the counts below are exact for the seeded set, never the whole
- * catalogue. {@link Transactional} rolls each method back so nothing commits to the shared
- * database.
+ * Verifies {@link MaterialPriceRepository#findMatrixItems} against PostgreSQL: the four optional
+ * filters, their intersection and the base predicates (REQ-UI-014). Fixtures use unique names; each
+ * test rolls back.
  */
 @SpringBootTest
 @ActiveProfiles("test")

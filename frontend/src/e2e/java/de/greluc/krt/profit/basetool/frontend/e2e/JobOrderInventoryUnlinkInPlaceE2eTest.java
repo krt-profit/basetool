@@ -39,22 +39,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Closes a previously-untested #571 coverage gap: unlinking a linked inventory item from a job
- * order on the order-detail page ({@code DELETE /orders/{id}/inventory/{invId}/unlink/ajax} →
- * re-render of the materials section), an in-place flow that had no e2e.
+ * E2E flow for unlinking a linked inventory item from a job order in place on the order-detail
+ * page.
  *
- * <p>Clicking a material row lazily fetches the order's linked inventory ({@code GET
- * /api/v1/orders/{id}/materials/{matId}/inventory}) and renders the drill-down with a per-row
- * unlink button (logistician only). The button posts the unlink in place through {@code
- * krtFetch.write} and re-swaps {@code #order-materials-results} — no page reload. After the unlink
- * the item's job-order link is cleared, so it disappears from that endpoint.
- *
- * <p><b>Drive via UI, verify via API.</b> The unlink is driven through the real drill-down button;
- * the outcome is read back from the order's linked-inventory endpoint (the same {@code
- * findByJobOrderIdOrdered} source the drill-down uses) so the assertion never races the in-place
- * re-render. A window marker proves no reload happened. The order requests more than is held, so it
- * never auto-completes (a completed order unlinks its remaining inventory on its own), isolating
- * the manual unlink as the cause.
+ * <p>Drives the drill-down unlink button, asserts no reload via a window marker, and verifies
+ * through the order's linked-inventory endpoint that the item is gone. The order never
+ * auto-completes, so the manual unlink is the only cause.
  */
 @Tag("e2e")
 class JobOrderInventoryUnlinkInPlaceE2eTest {

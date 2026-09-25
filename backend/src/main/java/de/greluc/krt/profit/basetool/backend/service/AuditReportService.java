@@ -42,11 +42,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Renders one area's activity audit log for a chosen period as a KRT-design PDF or as JSON
- * (REQ-AUDIT-001/-003) and records each export itself in the audit trail. Write transaction on
- * purpose: the audit insert runs {@code MANDATORY} inside it. Labels are German from the backend
- * message bundle; the PDF visual layer is the shared {@link AuditLogPdfFormat} / {@code
- * KrtPdfSupport}.
+ * Exports one area's activity audit log for a period as a KRT-design PDF or as JSON
+ * (REQ-AUDIT-001/-003) and records each export in the audit trail.
  */
 @Service
 @RequiredArgsConstructor
@@ -117,14 +114,12 @@ public class AuditReportService {
   }
 
   /**
-   * Returns one area's audit events for a period as DTOs (the JSON export, REQ-AUDIT-003) and
-   * records the export. Write transaction on purpose: the export audit insert runs {@code
-   * MANDATORY} inside it.
+   * Returns one area's audit events for a period as DTOs (REQ-AUDIT-003) and records the export.
    *
    * @param domain the area to export
    * @param from period start (inclusive)
    * @param to period end (inclusive); must not be before {@code from}
-   * @return the period's events as DTOs, oldest first
+   * @return the period's events, oldest first
    * @throws BadRequestException when the period is inverted
    */
   @Transactional
@@ -149,11 +144,10 @@ public class AuditReportService {
   }
 
   /**
-   * Rejects an export whose period would load more than {@link #MAX_EXPORT_ROWS} rows, guarding the
-   * unpaged export query against OOM / a pathologically large document.
+   * Rejects an export whose period would load more than {@link #MAX_EXPORT_ROWS} rows.
    *
    * @param count the number of rows the period would load
-   * @param label the area label for the log/error message
+   * @param label the area label for the log and error message
    * @throws BadRequestException when the period exceeds the cap
    */
   private void ensureWithinExportCap(long count, @NotNull String label) {

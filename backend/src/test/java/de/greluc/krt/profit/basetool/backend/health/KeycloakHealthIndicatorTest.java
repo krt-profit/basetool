@@ -38,36 +38,15 @@ import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.Status;
 
 /**
- * Unit tests for the {@link KeycloakHealthIndicator}. The indicator is driven against an in-process
- * {@link MockWebServer} so the OIDC discovery response — including failure modes such as 4xx/5xx
- * upstream codes and connection-refused — can be staged deterministically without a real Keycloak
- * running.
- *
- * <p>Three behaviour classes are covered:
- *
- * <ol>
- *   <li>Happy path — a 2xx response from {@code /.well-known/openid-configuration} yields {@link
- *       Status#UP}.
- *   <li>Upstream error — a 4xx/5xx response yields {@link Status#DOWN} with the upstream status
- *       code attached as a detail for log correlation.
- *   <li>Transport failure — the upstream port is closed (server shut down before the probe), so the
- *       {@code JdkClientHttpRequestFactory} surfaces an I/O failure that maps to {@link
- *       Status#DOWN} with the exception class as a detail.
- * </ol>
- *
- * <p>Each test pins the request path to {@code /.well-known/openid-configuration} so a future
- * refactor that accidentally pointed the indicator at the wrong sub-resource (e.g. the JWKS or the
- * token endpoint) would fail loud.
+ * Unit tests for {@link KeycloakHealthIndicator} against a {@link MockWebServer}: a 2xx discovery
+ * response is {@link Status#UP}; an upstream 4xx/5xx or a transport failure is {@link Status#DOWN}
+ * with a detail.
  */
 class KeycloakHealthIndicatorTest {
 
   /**
-   * Test timeouts. These stay fast without being flaky: the transport-failure test hits a closed
-   * port, where connection-refused is surfaced immediately (not by an elapsed timeout), so a larger
-   * bound does not slow it; the happy-path and upstream-error tests make a real localhost
-   * round-trip whose first {@code JdkClientHttpRequestFactory} call can cold-start past a tight
-   * 500&nbsp;ms bound on a loaded CI runner and spuriously report {@link Status#DOWN}. 2&nbsp;s
-   * gives ample margin while staying well under the production indicator's 2&nbsp;s / 3&nbsp;s.
+   * Connect timeout for the tests, generous enough to absorb a cold first HTTP call on a loaded
+   * runner.
    */
   private static final Duration TEST_CONNECT_TIMEOUT = Duration.ofSeconds(2);
 

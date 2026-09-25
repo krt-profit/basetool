@@ -53,42 +53,21 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
 /**
- * Client for the Keycloak Admin REST API. The bulk of it is the read-only scheduled user sync;
- * {@link #linkDiscordIdentity}, {@link #unlinkDiscordIdentity} and {@link #deleteUser} are the only
- * writes — the narrow account-linking path (REQ-SEC-026) that attaches a Discord federated identity
- * to an existing account and removes the throwaway Discord user. Those writes require the service
- * account to hold the {@code manage-users} realm-management role on top of the {@code
- * view-users}/{@code view-realm} the sync needs.
+ * Client for the Keycloak Admin REST API: the read-only scheduled user sync plus the Discord
+ * account-linking writes {@link #linkDiscordIdentity}, {@link #unlinkDiscordIdentity} and {@link
+ * #deleteUser} (REQ-SEC-026), which need the {@code manage-users} role.
  *
- * <p>Obtains an admin access token via the {@code client_credentials} grant against the realm's
- * {@code openid-connect/token} endpoint, then pages through {@code /admin/realms/{realm}/users} and
- * joins each user record with the roles the app cares about. Role membership is resolved
- * <em>role-indexed</em> — one paged {@code GET /roles/{name}/users} per app-relevant realm role
- * (see {@link #fetchRoleMemberships}) — rather than one {@code /role-mappings} call per user, so
- * the per-run Admin-API call count is bounded by the (small) number of mappable roles instead of
- * the user count. That N&#8594;#roles collapse is the primary 5000-account scaling fix: the old
- * per-user fan-out issued ~2 admin calls per user (one roles, one federated-identity), which at
- * thousands of accounts was a multi-minute Keycloak-hammering burst. The Discord federated-identity
- * back-fill is likewise made <em>incremental</em> — read only for users who do not already carry a
- * local Discord link (see the {@code knownDiscordLinkedIds} argument of {@link #fetchUsers}).
- * Failures are swallowed at the top level: the scheduler treats an empty list as "skip this run"
- * and never wipes local users based on it (see {@link UserService#markMissingUsers}).
- *
- * <p>The {@link #BEARER_PREFIX} constant exists so the literal {@code "Bearer "} never gets typed
- * by hand at a new call site — open-coding the prefix in a future log statement is the canonical
- * way to accidentally leak a raw token; the PII masker catches it, but defense in depth is cheaper
- * than auditing every new log line.
+ * <p>Authenticates with {@code client_credentials}, pages all users and resolves role membership
+ * per role rather than per user; the Discord link is read only for users without a local one. On
+ * failure the sync returns an empty list, which the scheduler treats as "skip this run".
  */
 @Service
 @Slf4j
 public class KeycloakService {
 
   /**
-   * RFC 6750 Bearer-token authentication scheme prefix used when handing the access token to
-   * Keycloak's admin REST API. Centralised here so the literal never gets typed by hand at a call
-   * site — open-coding {@code "Bearer " + token} in a log statement or a future request builder is
-   * the canonical way to accidentally leak a raw token into the logs (the PII masker catches it,
-   * but defence in depth is cheaper than auditing every new log line).
+   * RFC 6750 {@code Bearer} prefix for the admin access token, kept in one place so the token is
+   * never concatenated by hand where it could reach a log.
    */
   private static final String BEARER_PREFIX = "Bearer ";
 
@@ -100,11 +79,8 @@ public class KeycloakService {
   private static final String KEYCLOAK_TRUST_BUNDLE = "keycloak-trust";
 
   /**
-   * Alias of the Discord identity provider in the realm. Must match the alias configured in
-   * Keycloak (fixed to {@code discord} by {@code docs/keycloak/DISCORD_KEYCLOAK_SETUP.md}, since
-   * the alias is the broker redirect path and the {@code kc_idp_hint}). Used to pick the Discord
-   * entry out of a user's federated-identity list when back-filling the local Discord link
-   * (REQ-DATA-006).
+   * Alias of the Discord identity provider in the realm; must match the Keycloak configuration.
+   * Used to pick the Discord entry from a user's federated identities (REQ-DATA-006).
    */
   private static final String DISCORD_IDP_ALIAS = "discord";
 
@@ -114,28 +90,21 @@ public class KeycloakService {
   private final MeterRegistry meterRegistry;
 
   /**
-   * The one Keycloak Admin API client, bound to the configured admin base URL and built once at
-   * construction (BE-MOD-02). It comes from the observed builder of {@code RestClientConfig}, so
-   * every admin call records {@code http.client.requests} and, with tracing on, a client span
-   * (REQ-OBS-009) — the per-call {@code RestClient.builder()} this replaces was never observed.
-   * When the {@link #KEYCLOAK_TRUST_BUNDLE} bundle is configured its truststore-pinned request
-   * factory (via {@link KeycloakTrustSupport}) replaces the builder's default one; otherwise the
-   * default JDK factory trusts the JVM {@code cacerts}, which is what the dev/test plain-HTTP admin
-   * URL needs.
+   * The Keycloak Admin API client, built once from the observed builder so every call is metered
+   * and traced (REQ-OBS-009). Uses the truststore-pinned factory when {@link
+   * #KEYCLOAK_TRUST_BUNDLE} is configured, otherwise the JVM default trust.
    */
   private final RestClient adminClient;
 
   /**
-   * Wires the user-sync properties and builds the Keycloak Admin API client once at startup,
-   * resolving its TLS trust from the SSL bundles.
+   * Wires the sync properties and builds the Keycloak Admin API client with its TLS trust.
    *
-   * @param properties the {@code app.keycloak.sync.*} configuration (admin URL, realm, credentials)
-   * @param restClientBuilder a fresh, observed builder from {@code RestClientConfig}
-   *     (prototype-scoped, so the base URL and request factory set here stay with this client)
-   * @param sslBundles the registered Spring SSL bundles; consulted for {@link
-   *     #KEYCLOAK_TRUST_BUNDLE} to pin the self-signed Keycloak certificate in production
-   * @param meterRegistry the Micrometer registry for the {@code
-   *     basetool_keycloak_sync_fetch_failures_total} counter
+   * @param properties the {@code app.keycloak.sync.*} configuration
+   * @param restClientBuilder a fresh, observed, prototype-scoped builder from {@code
+   *     RestClientConfig}
+   * @param sslBundles the SSL bundles, consulted for {@link #KEYCLOAK_TRUST_BUNDLE}
+   * @param meterRegistry registry for the {@code basetool_keycloak_sync_fetch_failures_total}
+   *     counter
    */
   public KeycloakService(
       @NotNull KeycloakSyncProperties properties,
@@ -155,16 +124,13 @@ public class KeycloakService {
   }
 
   /**
-   * Resolves the truststore-pinned {@link ClientHttpRequestFactory} for the Keycloak Admin API by
-   * delegating to {@link KeycloakTrustSupport#trustedRequestFactory}, and logs a debug line when
-   * the {@link #KEYCLOAK_TRUST_BUNDLE} bundle is absent (dev/test plain-HTTP admin URL) so the
-   * fallback to the default {@link RestClient} is visible. Hostname verification stays at the JDK
-   * default, so the pinned certificate must carry {@code dns:keycloak} in its SAN.
+   * Resolves the truststore-pinned request factory via {@link
+   * KeycloakTrustSupport#trustedRequestFactory}. Hostname verification stays on, so the pinned
+   * certificate must carry {@code dns:keycloak} in its SAN.
    *
    * @param sslBundles the registered Spring SSL bundles
-   * @return a truststore-pinned request factory, or {@code null} to fall back to the default {@link
-   *     RestClient} (JVM trust store + plain HTTP for dev/test)
-   * @throws IllegalStateException if the bundle exists but a TLS context cannot be built from it
+   * @return a pinned request factory, or {@code null} to use the default {@link RestClient}
+   * @throws IllegalStateException if the bundle exists but no TLS context can be built from it
    */
   @Nullable
   private static ClientHttpRequestFactory buildTrustedRequestFactory(SslBundles sslBundles) {
@@ -179,31 +145,16 @@ public class KeycloakService {
   }
 
   /**
-   * Fetches the entire realm user catalog plus the app-relevant role memberships, joining an
-   * incremental Discord federated-identity back-fill.
+   * Fetches all realm users with their app-relevant realm roles and, for users not yet linked
+   * locally, their Discord link.
    *
-   * <p>Short-circuits to an empty list when sync is disabled or the admin URL is unconfigured — a
-   * missing setting must NOT trigger an exception that would leak the configuration shape to the
-   * sync task. Any unexpected error (network, auth, malformed payload) is logged and the method
-   * returns an empty list; the scheduler then treats the run as "skip" rather than marking every
-   * local user as missing.
+   * <p>Returns an empty list when sync is disabled, the admin URL is unset, or any error occurs;
+   * the scheduler then skips the run instead of marking users missing.
    *
-   * <p>Scaling shape (5000-account hardening): roles are resolved <em>once per role</em> via {@link
-   * #fetchRoleMemberships(Collection, String)} rather than once per user, and the Discord link is
-   * read only for users NOT in {@code knownDiscordLinkedIds}. On a steady-state run that means a
-   * handful of role-listing calls plus a Discord read only for accounts still missing a local link
-   * (new members, or ones that never linked) — the linked majority is skipped entirely.
-   *
-   * @param appRoleNames the realm role names the app maps locally (from the local role catalog);
-   *     these are matched case-insensitively against the realm's actual role names and only the
-   *     matches are indexed against Keycloak, so default/technical realm roles never trigger a
-   *     wasteful full-membership page. A role that exists locally but not in Keycloak is absent
-   *     from the realm listing and simply contributes no memberships. Never {@code null}.
-   * @param knownDiscordLinkedIds ids of users who already carry a local Discord link and therefore
-   *     do NOT need their federated identity re-read this run; every other roster user (including
-   *     brand-new ones absent locally) gets the read. Never {@code null}.
-   * @return list of Keycloak users with their resolved realm role names and (for the non-skipped
-   *     subset) Discord link, or empty on any failure
+   * @param appRoleNames the locally mapped role names, matched case-insensitively against the
+   *     realm; never {@code null}
+   * @param knownDiscordLinkedIds users whose Discord link need not be re-read; never {@code null}
+   * @return the users with their role names and Discord link where read, or empty on failure
    */
   @NotNull
   public List<KeycloakUserDto> fetchUsers(
@@ -239,17 +190,11 @@ public class KeycloakService {
   }
 
   /**
-   * Logs a swallowed {@link #fetchUsers(Collection, Set)} failure, upgrading the generic message to
-   * an operator-actionable hint when the Admin API answered {@code 401}/{@code 403}. A persistent
-   * authorization rejection is a permission misconfiguration, not a transient outage: since the
-   * role-indexed refactor (ADR-0085 / REQ-SEC-043) the sync lists realm roles ({@code GET
-   * /admin/realms/{realm}/roles}) and reads their members ({@code GET /roles/{name}/users}), which
-   * require the {@code view-realm} realm-management role on top of the {@code view-users} the
-   * roster listing already needs — so a service account provisioned with only {@code view-users}
-   * fails every run once role-indexing shipped. Naming the missing grant makes the daily failure
-   * diagnosable from a single log line; any other failure keeps the original generic message.
+   * Logs a swallowed {@link #fetchUsers(Collection, Set)} failure, naming the missing {@code
+   * view-realm} / {@code view-users} grant when the Admin API answered {@code 401} or {@code 403}
+   * (REQ-SEC-043).
    *
-   * @param e the exception caught while fetching users; never {@code null}.
+   * @param e the exception caught while fetching users; never {@code null}
    */
   private void logFetchFailure(@NotNull Exception e) {
     if (e instanceof RestClientResponseException rcre
@@ -268,16 +213,11 @@ public class KeycloakService {
   }
 
   /**
-   * Pages through the Keycloak Admin API {@code GET /users} endpoint and accumulates the full user
-   * list. The endpoint caps each response at a server-side maximum (~100 by default), so a single
-   * unpaged call would return only the first page — and {@link
-   * de.greluc.krt.profit.basetool.backend.task.UserSyncTask} would then wrongly flag every user
-   * beyond that page as missing (a silent soft-delete past the cap). This loops {@code
-   * first}/{@code max} (page size from {@link KeycloakSyncProperties#getPageSize()}) until a short
-   * or empty page signals the end.
+   * Pages through {@code GET /users} with {@code first}/{@code max} until a short or empty page, so
+   * users beyond the server's page cap are never mistaken for missing.
    *
-   * @param token a valid admin access token.
-   * @return every Keycloak user across all pages; never {@code null}, possibly empty.
+   * @param token a valid admin access token
+   * @return every Keycloak user; never {@code null}, possibly empty
    */
   @NotNull
   private List<KeycloakUserDto> fetchAllUsers(String token) {
@@ -314,44 +254,17 @@ public class KeycloakService {
 
   /**
    * Builds the {@code userId -> realm role names} index by listing the members of each app-relevant
-   * realm role once, rather than reading every user's role mappings individually.
+   * realm role once, plus the roles granted through the default-role composite via {@link
+   * #fetchDefaultRoleGrants(String)} (REQ-SEC-053).
    *
-   * <p>This is the role-indexed inverse of the old per-user {@code GET
-   * /users/{id}/role-mappings/realm} fan-out (which cost one Admin-API call per user). Both views
-   * report <em>directly-assigned</em> realm roles — only far cheaper: the call count is bounded by
-   * the number of mappable roles (a handful) times their page count, not by the user count.
+   * <p>Local role names are matched case-insensitively against {@link #fetchRealmRoleNames(String)}
+   * and queried in Keycloak's casing; local-only roles simply find no members.
    *
-   * <p><strong>Directly-assigned is not the whole truth, and REQ-SEC-053 made the gap
-   * load-bearing.</strong> The realm's default-role composite ({@code default-roles-iri}) grants
-   * {@code KRT Member} to every account created in it, and a role held only through a composite
-   * appears in <em>neither</em> view above. Until ADR-0159 that cost nothing visible: such an
-   * account came back with an empty set, was mapped onto the authority-less {@code Guest} fallback,
-   * and healed at its owner's next web login. With a role-less account now refused outright, the
-   * same run would lock every composite-only member out overnight. {@link
-   * #fetchDefaultRoleGrants(String)} therefore resolves what the default role grants and folds it
-   * into every one of its members.
-   *
-   * <p>The mappable role names come from the local catalog ({@link
-   * UserService#getMappableRoleNames()}); they are matched <em>case-insensitively</em> against the
-   * realm's actual role names (resolved once via {@link #fetchRealmRoleNames(String)}) and only the
-   * matches are queried, using Keycloak's own casing. This mirrors the interactive JWT path (which
-   * maps via {@code findByNameIgnoreCase}) and removes the scheduled-vs-interactive casing
-   * asymmetry: Keycloak's {@code /roles/{name}/users} lookup is case-sensitive, so passing a
-   * differently-cased local name straight through would silently miss the role. Ubiquitous
-   * default/technical realm roles ({@code default-roles-*}, {@code offline_access}, {@code
-   * uma_authorization}) are not in the app's mappable set and are therefore never queried (no
-   * wasteful full-membership page walk). The mappable set may contain local-only roles, because it
-   * is simply the local catalog's names; those find no realm counterpart, which is expected and
-   * must not be reported as an anomaly (see the intersection logging below).
-   *
-   * @param appRoleNames the realm role names to index; never {@code null}.
-   * @param token a valid admin access token.
-   * @return a mutable map of user id to the subset of {@code appRoleNames} each user holds (stored
-   *     under the local catalog's casing); users with none simply do not appear and the caller
-   *     defaults them to the empty set, which is now a refusal rather than a fallback role
-   *     (REQ-SEC-053).
-   * @throws IllegalStateException when the realm matches none of the app's roles — the run must be
-   *     skipped rather than write a role-strip for every account (see below).
+   * @param appRoleNames the realm role names to index; never {@code null}
+   * @param token a valid admin access token
+   * @return a mutable map of user id to held role names in local casing; users with none are absent
+   * @throws IllegalStateException when the realm matches none of the app's roles, so the run is
+   *     skipped
    */
   @NotNull
   private Map<UUID, Set<String>> fetchRoleMemberships(
@@ -396,19 +309,11 @@ public class KeycloakService {
   }
 
   /**
-   * Lists the realm's actual role names via the paged {@code GET /admin/realms/{realm}/roles}
-   * endpoint, so {@link #fetchRoleMemberships(Collection, String)} can match the local catalog
-   * against Keycloak's own casing rather than assuming the two agree. The endpoint caps each
-   * response at a server-side maximum, so this loops {@code first}/{@code max} (page size from
-   * {@link KeycloakSyncProperties#getPageSize()}) until a short or empty page signals the end —
-   * mirroring {@link #fetchAllUsers(String)}.
+   * Lists all realm role names via the paged {@code GET /admin/realms/{realm}/roles} endpoint. Not
+   * best-effort: a failure propagates so the whole sync run is skipped.
    *
-   * <p>Not best-effort: any failure propagates to {@link #fetchUsers(Collection, Set)}'s top-level
-   * catch, which returns an empty roster so the run is <em>skipped</em> (never a wipe, never a
-   * degraded write) rather than proceeding with an unknown role set.
-   *
-   * @param token a valid admin access token.
-   * @return every realm role name across all pages; never {@code null}, possibly empty.
+   * @param token a valid admin access token
+   * @return every realm role name; never {@code null}, possibly empty
    */
   @NotNull
   private List<String> fetchRealmRoleNames(String token) {
@@ -448,15 +353,10 @@ public class KeycloakService {
   }
 
   /**
-   * The realm's default-role composite, whose members are every account created in the realm.
+   * Returns the name of the realm's default-role composite, derived by Keycloak's {@code
+   * default-roles-<realm>} convention; a renamed default role simply contributes no members.
    *
-   * <p>Keycloak names it {@code default-roles-<realm>} and exposes it on the realm representation
-   * as {@code defaultRole.name}. Derived rather than read, because reading it would cost a call to
-   * {@code GET /admin/realms/{realm}} on every run for a value that is a documented naming
-   * convention; a realm whose default role was renamed simply contributes no members here, which
-   * degrades to the pre-ADR-0159 behaviour for composite-only members rather than to a wrong grant.
-   *
-   * @return the default role's name for the configured realm; never {@code null}.
+   * @return the default role's name for the configured realm; never {@code null}
    */
   @NotNull
   private String defaultRoleName() {
@@ -464,21 +364,13 @@ public class KeycloakService {
   }
 
   /**
-   * Reads which of the app's mappable roles the realm's default-role composite grants.
+   * Returns which of the app's mappable roles the realm's default-role composite grants, read from
+   * {@code GET /roles/{defaultRole}/composites/realm}. A {@code 404} (no composite) yields an empty
+   * set; any other failure propagates.
    *
-   * <p>{@code GET /roles/{defaultRole}/composites/realm} lists the realm roles the composite
-   * confers. Only the ones the app maps are returned, under the local catalog's casing, so the
-   * caller can credit them exactly like a directly-assigned role.
-   *
-   * <p>Best-effort by design, and it is the one call here that is: a realm without a default-role
-   * composite answers {@code 404}, which is a legitimate configuration rather than a failure, and
-   * neither test realm modelled the composite before WP-K1. Any other failure propagates, so a
-   * broken Admin API still skips the run instead of writing a set that silently lacks every
-   * composite-only grant.
-   *
-   * @param token a valid admin access token.
-   * @param canonicalByLower the app's mappable role names, keyed by their lower-cased form.
-   * @return the granted app role names under the local catalog's casing; never {@code null}.
+   * @param token a valid admin access token
+   * @param canonicalByLower the app's mappable role names, keyed by lower-cased form
+   * @return the granted app role names in local casing; never {@code null}
    */
   @NotNull
   private Set<String> fetchDefaultRoleGrants(String token, Map<String, String> canonicalByLower) {
@@ -522,27 +414,14 @@ public class KeycloakService {
   }
 
   /**
-   * Pages through {@code GET /roles/{queryRoleName}/users} and records {@code storedRoleName}
-   * against every member id in {@code byUser}. The endpoint caps each response at a server-side
-   * maximum, so this loops {@code first}/{@code max} (page size from {@link
-   * KeycloakSyncProperties#getPageSize()}) until a short or empty page signals the end — mirroring
-   * {@link #fetchAllUsers(String)}.
+   * Pages through {@code GET /roles/{queryRoleName}/users} and records {@code storedRoleName} for
+   * every member. A {@code 404} (role vanished) contributes nothing; every other failure propagates
+   * so the run is skipped rather than persisting a degraded role set.
    *
-   * <p><strong>Fault isolation (issue #1202 audit).</strong> Only a {@code 404} — the role vanished
-   * between the realm-role listing and this member query (a benign TOCTOU) — is swallowed: the role
-   * contributes no members and the run continues. Every <em>other</em> failure (5xx, 401/403,
-   * timeout, connection reset, malformed body) is deliberately <em>not</em> caught here; it
-   * propagates to {@link #fetchUsers(Collection, Set)}'s top-level catch, which returns an empty
-   * roster so the whole run is <em>skipped</em>. This is a fail-safe: the earlier
-   * swallow-every-exception behaviour turned a transient single-role failure into a silent
-   * role-strip of every holder — mapping a brand-new admin onto the {@code Guest} fallback of the
-   * time and creating it {@code PENDING} instead of {@code ACTIVE}, and mass-downgrading existing
-   * admins — because the degraded role set was then persisted as a normal successful run.
-   *
-   * @param queryRoleName the realm role name as Keycloak spells it (used in the request path).
-   * @param storedRoleName the local catalog's canonical name to record for each member.
-   * @param token a valid admin access token.
-   * @param byUser the accumulator to populate (user id &#8594; role names).
+   * @param queryRoleName the role name as Keycloak spells it
+   * @param storedRoleName the local canonical name to record
+   * @param token a valid admin access token
+   * @param byUser the accumulator (user id &#8594; role names)
    */
   private void accumulateRoleMembers(
       String queryRoleName, String storedRoleName, String token, Map<UUID, Set<String>> byUser) {
@@ -550,12 +429,8 @@ public class KeycloakService {
   }
 
   /**
-   * Same, crediting <b>several</b> stored role names from one membership walk.
-   *
-   * <p>The default-role composite is why this overload exists. Its membership is, by definition,
-   * every account in the realm, and calling the single-name form once per granted role re-walked
-   * that whole list each time - the largest page walk the sync makes, repeated. One walk credits
-   * them all.
+   * Credits several stored role names from one walk of a role's members, used for the default-role
+   * composite whose membership is every account.
    *
    * @param queryRoleName the realm role to read members of, in Keycloak's own casing
    * @param storedRoleNames the local catalogue names to credit each member with
@@ -614,21 +489,13 @@ public class KeycloakService {
   }
 
   /**
-   * Reads the user's {@code discord} federated-identity link from {@code GET
-   * /users/{id}/federated-identity} and returns its Discord snowflake, or {@code null} when the
-   * user has no Discord link. The federated-identity link exists for <em>every</em> user who linked
-   * Discord regardless of how (Discord registration, first-broker-login link, or account-console
-   * linking) — which is why reading it here back-fills the local {@code discord_user_id} for
-   * accounts that linked Discord <em>after</em> creation, the ones the import-time attribute never
-   * covered (REQ-DATA-006). Best-effort: any failure (network, auth, malformed) is logged without
-   * the id and yields {@code null}, so a transient Admin-API hiccup never throws — and {@link
-   * UserService#syncUser(KeycloakUserDto)} treats a {@code null} as "leave the existing link
-   * alone", never clearing it, so a hiccup cannot wipe a real link. The raw snowflake is never
-   * logged.
+   * Reads the user's Discord snowflake from their {@code discord} federated identity, back-filling
+   * the local link (REQ-DATA-006). Best-effort: any failure is logged without the id and yields
+   * {@code null}, which the sync treats as "keep the existing link".
    *
-   * @param userId the Keycloak user id whose federated identities to read.
-   * @param token a valid admin access token.
-   * @return the linked Discord user id (snowflake), or {@code null} when absent or unreadable.
+   * @param userId the Keycloak user id
+   * @param token a valid admin access token
+   * @return the linked Discord snowflake, or {@code null} when absent or unreadable
    */
   @Nullable
   private String fetchDiscordFederatedId(UUID userId, String token) {
@@ -641,25 +508,13 @@ public class KeycloakService {
   }
 
   /**
-   * Reads a Keycloak user's {@code discord} federated-identity link (the snowflake plus the stored
-   * Discord username), fetching its own admin token. This is the <em>write-path</em> counterpart of
-   * the best-effort {@link #fetchDiscordFederatedId}: it is <strong>not</strong> best-effort — any
-   * Admin-API failure propagates so the account-linking flow (REQ-SEC-026) surfaces a truthful
-   * error rather than silently proceeding without a snowflake. It is the authoritative source of
-   * the incoming Discord snowflake for a pending registration, so linking works even when the
-   * optional {@code discord_user_id} claim mapper is absent (the id never reached {@code app_user})
-   * — the federated link is always present for an account that logged in via Discord.
+   * Reads a Keycloak user's {@code discord} federated identity (snowflake and username) for the
+   * account-linking flow (REQ-SEC-026). Not best-effort: failures propagate, except a {@code 404}
+   * for a missing user, which yields empty.
    *
-   * <p>A {@code 404} (the Keycloak user itself no longer exists) is deliberately mapped to {@link
-   * Optional#empty()} rather than propagated: it means there is no federated identity to read,
-   * which lets the account-linking flow (REQ-SEC-026) fall back to the locally persisted {@code
-   * discord_user_id} and recover a registration whose throwaway Keycloak user was already deleted
-   * by an earlier partial failure. Every other Admin-API failure still propagates so a transient
-   * hiccup surfaces a truthful error instead of silently discarding a link that does exist.
-   *
-   * @param keycloakUserId the Keycloak user id (== the app user id / JWT subject) to read
-   * @return the {@code discord} link, or {@link Optional#empty()} when the user has no Discord link
-   *     or no longer exists
+   * @param keycloakUserId the Keycloak user id (equal to the app user id / JWT subject)
+   * @return the {@code discord} link, or {@link Optional#empty()} when the user has no link or no
+   *     longer exists
    * @throws ExternalServiceException when the admin URL is unconfigured
    */
   public Optional<DiscordLink> readDiscordLink(@NotNull UUID keycloakUserId) {
@@ -674,18 +529,15 @@ public class KeycloakService {
   }
 
   /**
-   * Attaches the {@code discord} federated identity to a Keycloak user via {@code POST
-   * /users/{id}/federated-identity/discord}, requiring the {@code manage-users} realm-management
-   * role. Idempotent: a {@code 409} is treated as success <em>only</em> when the user is already
-   * linked to the <em>same</em> snowflake (a retry of this very link); a {@code 409} for a
-   * <em>different</em> Discord account is a genuine conflict and is raised. The raw snowflake is
-   * never logged.
+   * Attaches the {@code discord} federated identity to a Keycloak user. Idempotent: a {@code 409}
+   * is success only if the user is already linked to the same snowflake. The snowflake is never
+   * logged.
    *
-   * @param keycloakUserId the target Keycloak user id (the surviving existing account)
-   * @param discordSnowflake the Discord user id (snowflake) to link; never {@code null}/blank
-   * @param discordUsername the Discord username stored on the link; may be {@code null}/blank
-   * @throws ExternalServiceException when the admin URL is unconfigured, or when the user is
-   *     already linked to a different Discord account
+   * @param keycloakUserId the target Keycloak user id
+   * @param discordSnowflake the Discord snowflake to link; never {@code null} or blank
+   * @param discordUsername the Discord username stored on the link; may be {@code null} or blank
+   * @throws ExternalServiceException when the admin URL is unconfigured or the user is linked to a
+   *     different Discord account
    */
   public void linkDiscordIdentity(
       @NotNull UUID keycloakUserId,
@@ -724,22 +576,9 @@ public class KeycloakService {
   }
 
   /**
-   * Detaches the {@code discord} federated identity from a Keycloak user via {@code DELETE
-   * /users/{id}/federated-identity/discord}, requiring the same {@code manage-users}
-   * realm-management role as {@link #linkDiscordIdentity}.
-   *
-   * <p><strong>Why this exists: Keycloak does not enforce that one Discord identity belongs to one
-   * user.</strong> {@code FEDERATED_IDENTITY} is keyed on (user, provider) — which stops one user
-   * holding two Discord accounts, not two users holding one — the index on {@code
-   * FEDERATED_USER_ID} is not unique, and {@code addFederatedIdentity} checks only whether the
-   * <em>target</em> user is already linked. Nothing refuses the second link (read at Keycloak
-   * 26.7.0, the pinned version). What does happen is worse than a refusal: with two holders, {@code
-   * getUserByFederatedIdentity} throws {@code IllegalStateException("More results found ...")}, so
-   * every later Discord login of that member fails outright. The identity therefore has to be taken
-   * off the old holder <em>before</em> it is put on the new one.
-   *
-   * <p>Idempotent: a {@code 404} — the user is gone, or carries no Discord link — is success. There
-   * is nothing to detach in either case, which is exactly the state the caller wants.
+   * Detaches the {@code discord} federated identity from a Keycloak user. Must precede linking the
+   * identity to another user, because Keycloak does not prevent two holders and then fails every
+   * Discord login of that member. Idempotent: a {@code 404} is success.
    *
    * @param keycloakUserId the Keycloak user to detach the identity from
    * @throws ExternalServiceException when the admin URL is unconfigured
@@ -765,21 +604,14 @@ public class KeycloakService {
   }
 
   /**
-   * Live existence probe against {@code GET /admin/realms/{realm}/users/{id}} — the authoritative
-   * answer to "does this account still exist in Keycloak?", as opposed to the locally cached {@code
-   * app_user.in_keycloak} flag that a swallowed sync error can leave stale.
+   * Live check whether a Keycloak user still exists. Fail-closed: only a {@code 404} reports
+   * absence; every other failure propagates.
    *
-   * <p>Read-only and deliberately <b>fail-closed</b>: only a clean {@code 404} reports absence.
-   * Every other outcome — an unreachable Keycloak, an expired admin token, an unconfigured admin
-   * URL, a {@code 5xx} — propagates, so a caller that gates an irreversible action on "the account
-   * is gone" refuses instead of proceeding on a guess. {@link UserDeletionService#deleteUser(UUID)}
-   * is that caller.
-   *
-   * @param keycloakUserId the Keycloak user id (== the app user id / JWT subject) to probe
-   * @return {@code true} iff Keycloak positively confirms the user still exists
+   * @param keycloakUserId the Keycloak user id (equal to the app user id / JWT subject)
+   * @return {@code true} iff Keycloak confirms the user exists
    * @throws ExternalServiceException when the admin URL is unconfigured
    * @throws org.springframework.web.client.RestClientException when Keycloak cannot be reached or
-   *     answers with anything other than a success or a {@code 404}
+   *     answers other than success or {@code 404}
    */
   public boolean userExists(@NotNull UUID keycloakUserId) {
     requireAdminUrl();
@@ -798,25 +630,12 @@ public class KeycloakService {
   }
 
   /**
-   * Reads a user's Keycloak username by id, or empty when Keycloak does not have that user.
-   *
-   * <p>Deliberately a <strong>users</strong>-scope call. The obvious way to identify a service
-   * account is to ask the client that owns it ({@code GET /clients?clientId=…} then {@code
-   * /clients/{id}/service-account-user}), and that is what this class did first — until production
-   * answered {@code 403 Forbidden} on the clients endpoint: the backend's admin client is granted
-   * user management, not client inspection. That 403 surfaced as an unexpected 500 on the member
-   * deletion, which is a worse outcome than the problem it was solving.
-   *
-   * <p>The username is enough, <em>for an exactly-named configured client</em>. Measured against
-   * Keycloak 26.7: creating an ordinary user called {@code service-account-foo} succeeds when no
-   * client {@code foo} exists ({@code 201}), so the prefix alone proves nothing — but creating one
-   * whose name collides with an existing service account is refused ({@code 409}), because
-   * usernames are unique per realm and the real service account already holds it. So {@code
-   * service-account-<configured clientId>} cannot be occupied by a hand-made account, which is the
-   * property the caller needs.
+   * Reads a user's Keycloak username by id through the users scope, which the admin client is
+   * granted. Since usernames are realm-unique, {@code service-account-<clientId>} cannot be taken
+   * by a hand-made account.
    *
    * @param keycloakUserId the Keycloak user id
-   * @return the username Keycloak reports, or empty when the user is absent
+   * @return the username, or empty when the user is absent
    * @throws ExternalServiceException when the admin URL is unconfigured
    */
   @NotNull
@@ -840,10 +659,8 @@ public class KeycloakService {
   }
 
   /**
-   * Hard-deletes a Keycloak user via {@code DELETE /users/{id}}, requiring the {@code manage-users}
-   * realm-management role. Idempotent: a {@code 404} (the user is already gone) is treated as
-   * success. Used by the account-linking flow to dispose of the throwaway Discord-registered user
-   * once its identity has been moved onto the surviving existing account (REQ-SEC-026).
+   * Hard-deletes a Keycloak user, used to dispose of the throwaway Discord-registered user after
+   * account linking (REQ-SEC-026). Idempotent: a {@code 404} is success.
    *
    * @param keycloakUserId the Keycloak user id to delete
    * @throws ExternalServiceException when the admin URL is unconfigured
@@ -863,14 +680,12 @@ public class KeycloakService {
   }
 
   /**
-   * Reads and parses a user's {@code discord} federated-identity entry from {@code GET
-   * /users/{id}/federated-identity}, shared by the best-effort sync read and the write-path {@link
-   * #readDiscordLink}. Propagates Admin-API failures to the caller (the sync read wraps this in its
-   * own swallow).
+   * Reads and parses a user's {@code discord} federated-identity entry; Admin API failures
+   * propagate to the caller.
    *
-   * @param userId the Keycloak user id whose federated identities to read
+   * @param userId the Keycloak user id
    * @param token a valid admin access token
-   * @return the {@code discord} link, or {@link Optional#empty()} when the user has no Discord link
+   * @return the {@code discord} link, or {@link Optional#empty()} when the user has none
    */
   private Optional<DiscordLink> fetchDiscordLink(UUID userId, String token) {
     List<Map<String, Object>> identities =

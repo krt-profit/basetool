@@ -22,25 +22,16 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.util.UUID;
 
 /**
- * Frontend mirror of the backend {@code OrgUnitMembershipOptionDto} wire shape returned by {@code
- * GET /api/v1/users/{id}/memberships}. Drives the R5.d owner-picker fragment: each row becomes a
- * {@code <option>} in the picker dropdown, with {@link #orgUnitId} as the option value and {@link
- * #orgUnitName} as the visible label. {@link #kind} lets the fragment partition the options into
- * "Staffel" and "Spezialkommandos" {@code <optgroup>} headers.
+ * Frontend mirror of the backend {@code OrgUnitMembershipOptionDto}: one option of the
+ * owning-org-unit picker, as returned by {@code GET /api/v1/users/{id}/memberships}.
  *
  * @param orgUnitId Identifier of the org unit (used as the {@code <option value="...">}).
  * @param orgUnitName Visible name (used as the option label).
  * @param orgUnitShorthand Abbreviated badge text; may be {@code null}.
  * @param kind Discriminator string ({@code SQUADRON} / {@code SPECIAL_COMMAND} / {@code BEREICH} /
- *     {@code ORGANISATIONSLEITUNG}) — kept as a plain string so the frontend does not need a
- *     parallel enum that drifts out of sync with the backend. The {@code
- *     /api/v1/org-units/active-all-kinds} payload (the bank account-create picker, epic #692 Phase
- *     6) carries all four kinds; the {@code /users/{id}/memberships} owner-picker only ever sees
- *     {@code SQUADRON} / {@code SPECIAL_COMMAND}.
- * @param isProfitEligible Whether the org unit may process Job Orders (be the responsible unit).
- *     {@code true} for the entries the Job Order create form keeps in its responsible picker; the
- *     requesting picker offers every entry regardless. {@code null} on the {@code
- *     /users/{id}/memberships} payload paths that predate the flag — treat null as "not eligible".
+ *     {@code ORGANISATIONSLEITUNG}); the membership picker only ever sees the first two.
+ * @param isProfitEligible Whether the org unit may be the responsible unit of a Job Order; {@code
+ *     null} counts as not eligible.
  */
 public record OrgUnitMembershipOptionDto(
     UUID orgUnitId,

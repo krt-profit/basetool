@@ -6,14 +6,6 @@
  * SPDX-License-Identifier: GPL-3.0-only
  */
 
-/*
- * Admin consent overview: in-place filter and paging (REQ-SEC-028, REQ-FE-001).
- *
- * The GET form and the paging links are the no-JS fallback and stay functional; this script
- * intercepts them and swaps only `#admin-terms-results`. Paging is delegated from the container
- * rather than bound to the links directly, because the links live INSIDE the fragment that the
- * swap replaces - binding them once would leave the second page's links dead.
- */
 (function () {
     'use strict';
 
@@ -50,8 +42,6 @@
 
         const filterSelect = filterForm.querySelector('#admin-terms-filter');
         if (filterSelect) {
-            // Changing the selection applies immediately; the Apply button stays for the no-JS path
-            // and for keyboard users who expect to confirm.
             filterSelect.addEventListener('change', function () {
                 filterForm.requestSubmit();
             });

@@ -22,10 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.util.UUID;
 
 /**
- * Create payload for a Bereich, posted by the admin org-structure page and relayed to the backend
- * {@code POST /api/v1/org-hierarchy/bereiche} (epic #692, REQ-ORG-014). Its JSON shape is a subset
- * of the backend {@code BereichDto} (server-stamped id/active/version omitted): the backend
- * validates {@code name}/{@code shorthand} as non-blank.
+ * Create payload for a Bereich, relayed to {@code POST /api/v1/org-hierarchy/bereiche}
+ * (REQ-ORG-014).
  *
  * @param name the Bereich's display name; required, unique across all org units.
  * @param shorthand the Bereich's short tag; required.

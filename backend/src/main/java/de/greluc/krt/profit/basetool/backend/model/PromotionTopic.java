@@ -67,12 +67,10 @@ public class PromotionTopic extends AbstractEntity<UUID> {
   private int sortOrder;
 
   /**
-   * Squadron that owns this promotion topic. Set at creation time from the caller's active squadron
-   * context and immutable afterwards. Cascades the squadron scope to every child ({@link
-   * PromotionCategory}, {@code PromotionLevelContent}, {@code RankRequirement}, {@code
-   * MemberEvaluation}) which derive their squadron via this reference rather than carrying their
-   * own (Plan §3.2 "no denormalisation"). Kept JPA-nullable for Phase 1 until Flyway V86 tightens
-   * the column to NOT NULL.
+   * Squadron that owns this promotion topic, stamped at creation from the caller's active squadron
+   * context and immutable afterwards. Every child ({@link PromotionCategory}, {@code
+   * PromotionLevelContent}, {@code RankRequirement}, {@code MemberEvaluation}) derives its squadron
+   * scope through this reference.
    */
   @ToString.Exclude
   @ManyToOne(fetch = FetchType.LAZY)

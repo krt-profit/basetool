@@ -29,12 +29,10 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Data transfer record carrying Create Job Order Material payload.
+ * One material line of a material job order create / update payload.
  *
- * <p>Implements {@link QuantityAware} and carries {@link ValidQuantityAmount} so the per-material
- * amount is enforced server-side (same as inventory book-in): {@code > 0} for both quantity types,
- * whole numbers for {@code PIECE}, and SCU fractional precision rounded to three decimals at
- * persistence. Used for both order creation and the same-shape update endpoint.
+ * <p>The amount is validated like an inventory book-in: {@code > 0}, whole for {@code PIECE}, SCU
+ * rounded to three decimals at persistence.
  */
 @ValidQuantityAmount
 public record CreateJobOrderMaterialDto(

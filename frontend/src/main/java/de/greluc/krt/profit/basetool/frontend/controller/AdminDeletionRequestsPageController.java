@@ -45,15 +45,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
- * The admin queue for the members' Art. 17 erasure requests ({@code /admin/deletion-requests},
- * REQ-SEC-061).
- *
- * <p>Modelled on the Discord-registration queue, deliberately: an admin who has decided one of
- * these should not have to learn a second interaction pattern for the other.
- *
- * <p><b>The queue is ordered oldest first, and that is not cosmetic.</b> Art. 12(3) gives the
- * controller one month to respond to a data-subject request, so the top of the list is the one
- * closest to a deadline. The {@code DeletionRequestOverdue} alert watches the same number.
+ * Admin queue for members' Art. 17 erasure requests ({@code /admin/deletion-requests},
+ * REQ-SEC-061), ordered oldest first because each request has a one-month response deadline.
  */
 @Controller
 @UsesLayoutModel
@@ -68,11 +61,7 @@ public class AdminDeletionRequestsPageController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Renders the queue.
-   *
-   * <p>A backend failure renders the page with an error banner and an empty list rather than an
-   * error page: the admin area's other queues behave the same way, and a half-loaded admin page is
-   * more useful than none.
+   * Renders the queue; a backend failure renders an error banner with an empty list.
    *
    * @param model the view model
    * @return the view name
@@ -93,17 +82,8 @@ public class AdminDeletionRequestsPageController {
   }
 
   /**
-   * Re-renders the queue table as a fragment, for the in-place refresh after a decision
-   * (REQ-FE-001).
-   *
-   * <p><b>A failure is re-thrown, not swallowed.</b> This used to catch and render an empty list,
-   * which paints "Keine offenen Löschanträge" — telling the admin the Art. 12(3) queue is empty
-   * when the backend is simply unreachable. The banner its {@code page()} sibling sets could not
-   * have helped: it sits outside {@code th:fragment="rows"} and would never have rendered here.
-   *
-   * <p>Letting it propagate gives {@code krtFetch} a non-2xx to work with, so the client shows its
-   * error toast and leaves the table it already has on screen. Stale-but-labelled beats
-   * empty-and-confident on a queue with a statutory deadline.
+   * Re-renders the queue table as a fragment for the in-place refresh (REQ-FE-001). A backend
+   * failure is re-thrown so the client keeps the current table and shows an error toast.
    *
    * @param model the view model
    * @return the fragment view name
@@ -118,12 +98,10 @@ public class AdminDeletionRequestsPageController {
   }
 
   /**
-   * Refuses a request. The reason is mandatory — Art. 12(4) requires the requester to be told it —
-   * and is rejected here as well as by the backend and the database, so a client bug cannot produce
-   * an unexplained refusal.
+   * Refuses a request. A non-blank reason is mandatory, as the requester must be told it.
    *
    * @param id the request to refuse
-   * @param request the client payload; {@code note} must be present and non-blank
+   * @param request the client payload; {@code note} must be non-blank
    * @return {@code 200} on success, {@code 400} without a reason, else the relayed backend status
    */
   @ResponseBody
@@ -150,12 +128,9 @@ public class AdminDeletionRequestsPageController {
   }
 
   /**
-   * Carries a request out. Irreversible: the local row and the Keycloak account both go, and with
-   * {@code grantHistoryErasure} the member's surviving handle snapshots are anonymised first.
-   *
-   * <p>The flag is read from the payload rather than from the request row, because it is the
-   * <b>admin's</b> answer to the member's wish and not the wish itself — a wish is not an
-   * instruction (decision 6, {@literal @}greluc).
+   * Carries a request out, irreversibly deleting the local user and the Keycloak account; with
+   * {@code grantHistoryErasure} the member's handle snapshots are anonymised first. The flag comes
+   * from the admin's payload, not from the request row.
    *
    * @param id the request to carry out
    * @param request the client payload; only {@code grantHistoryErasure} is read

@@ -45,17 +45,12 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST surface over material claims ("Eintragungen") nested under a job order (Job-Order rework
- * #340, Phase 4 / #344). Claims let profit squadrons sign up for partial quantities of a material
- * bucket on a public Spezialkommando order.
+ * REST surface over material claims ("Eintragungen") nested under a job order, letting profit
+ * squadrons sign up for partial quantities of a material bucket on a Spezialkommando order.
  *
- * <p>Reads are open to anyone who may see the order ({@code canSeeJobOrder}) — SK orders are public
- * to profit-eligible viewers, so the claim transparency ("all see all") falls out of the order's
- * own visibility scope. Writes require LOGISTICIAN or above at the role gate <em>and</em> that the
- * caller belongs to a profit-eligible org unit ({@code canViewJobOrders}) — a non-profit member is
- * outside the order workflow and may neither see nor act on the SK queue. The fine-grained
- * permission matrix (own squadron vs. responsible-SK authority vs. admin) plus the SK-only /
- * no-overclaim / terminal-freeze invariants are enforced in {@link MaterialClaimService}.
+ * <p>Reads require {@code canSeeJobOrder}; writes require LOGISTICIAN or above and {@code
+ * canViewJobOrders}. The fine-grained permissions and claim invariants are enforced in {@link
+ * MaterialClaimService}.
  */
 @RestController
 @RequestMapping("/api/v1/orders/{jobOrderId}/claims")
@@ -87,9 +82,8 @@ public class MaterialClaimController {
   }
 
   /**
-   * Creates or updates the calling context's claim for a bucket (upsert keyed on {@code (bucket,
-   * squadron)}). A squadron raising its stake re-posts with a new amount; the existing claim is
-   * updated rather than duplicated.
+   * Creates or updates the calling context's claim for a bucket, upserting on {@code (bucket,
+   * squadron)}.
    *
    * @param jobOrderId the order id.
    * @param dto the claim payload.

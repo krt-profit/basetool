@@ -31,42 +31,11 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Single scheduler bean that drives the periodic UEX-data refresh.
+ * Drives the periodic UEX sync every {@code krt.uex.scheduler-delay} (default 24 h) on the bounded
+ * executor of {@link AsyncConfig#uexExecutor()}.
  *
- * <p>{@code @Scheduled} fixed-delay of {@code krt.uex.scheduler-delay} (default 86400000 ms = 24
- * h). The {@code @Async(AsyncConfig.UEX_EXECUTOR)} pulls execution off the scheduler thread onto
- * the dedicated bounded executor declared in {@link AsyncConfig#uexExecutor()}, so a slow UEX
- * response cannot delay other scheduled tasks AND cannot spawn unbounded threads (the previous
- * unqualified {@code @Async} fell back to the unbounded {@code SimpleAsyncTaskExecutor}).
- * {@code @ConditionalOnProperty(matchIfMissing = true)} keeps the bean active by default but lets
- * the {@code test} profile disable it without touching the rest of the wiring.
- *
- * <p>R2 expansion: the original chain (universe topology → commodities → manufacturers → vehicles →
- * refinery) is extended with {@code UexCategoryRefService.syncCategories()} and {@code
- * UexItemSyncService.syncItems()} between manufacturers and refinery. The order matters: categories
- * must land before items (the item walk reads them); manufacturers must land before items (the item
- * upsert resolves the manufacturer FK); vehicles must land before items because vehicle-bound items
- * (paints, components) resolve {@code linked_ship_type_id} via {@code
- * ShipTypeRepository.findByUexVehicleId}.
- *
- * <p>R7 expansion: {@code UexItemPriceSyncService.syncItemPrices()} runs after the item catalogue
- * (it resolves {@code game_item} + {@code terminal} FKs, both synced earlier in the tick), behind
- * its own {@code krt.uex.item-price-sync-enabled} flag (default off) so it stays a no-op until an
- * operator opts in.
- *
- * <p>Terminals lead the chain (REQ-REFINERY-020). They are the one topology step with no FK into
- * any other — the upsert touches only {@code terminal} and stores UEX's denormalised parent names —
- * so nothing is lost by hoisting them, and {@code terminal.type} is the sole source the whole
- * refinery feature derives from. Behind the rest of the topology (their former position) any single
- * failing endpoint aborted the tick before terminals were fetched; against a 24h {@code fixedDelay}
- * that left the refinery-order picker empty for a full day. The derived flags are then reconciled
- * in the sweep's {@code finally}, so a later abort cannot cost them either.
- *
- * <p>Cross-scheduler exclusion: the sweep runs through a shared {@link SyncCoordinator} so it never
- * overlaps the SC Wiki sync. UEX starts at boot ({@code initialDelay = 0}) and SC Wiki is staggered
- * an hour later; should their daily cadences ever align, whichever fires second waits for the first
- * to finish instead of running concurrently (which previously caused {@code game_item} write
- * races).
+ * <p>Steps run in dependency order, terminals first (REQ-REFINERY-020), and the sweep is serialised
+ * against the SC Wiki sync through {@link SyncCoordinator}.
  */
 @Slf4j
 @Component
@@ -92,11 +61,9 @@ public class UexScheduler {
   private final MasterDataCacheEvictionService masterDataCacheEvictionService;
 
   /**
-   * Periodic UEX sync entry point on a fixed delay, started immediately on boot ({@code
-   * initialDelay = 0}) so it leads the staggered SC Wiki tick. Funnels the whole sweep through
-   * {@link SyncCoordinator#runExclusively(String, Runnable)} so it never runs at the same time as
-   * the SC Wiki sync: if that sync is in progress this tick waits for it to finish and then runs
-   * (it is not dropped), bounded by the coordinator's hung-sync wait cap.
+   * Periodic UEX sync entry point, started at boot and serialised against the SC Wiki sync through
+   * {@link SyncCoordinator#runExclusively(String, Runnable)}; a tick waits for a running Wiki sync
+   * rather than being dropped.
    */
   @Async(AsyncConfig.UEX_EXECUTOR)
   @Scheduled(
@@ -108,28 +75,11 @@ public class UexScheduler {
   }
 
   /**
-   * Runs the full UEX sync sweep. Order matters — topology imports first so later imports can
-   * resolve parent locations. A failure aborts the remaining steps (best-effort tick); the sweep is
-   * wrapped by {@link TaskMetrics} at the call site (see {@link #scheduleCommodityPriceUpdate()}),
-   * which records the run as a {@code failure} and swallows the exception so the scheduler thread
-   * survives. Only invoked through {@link SyncCoordinator#runExclusively(String, Runnable)}, so it
-   * holds the cross-scheduler lock for its full duration — the SC Wiki sync waits behind it.
+   * Runs the full UEX sync sweep in dependency order; the first failing step aborts the rest.
    *
-   * <p>The sweep evicts the master-data caches it can make stale in a {@code finally} ({@link
-   * MasterDataCacheEvictionService#evictUexSyncedMasterData()}), so a freshly-synced catalogue is
-   * visible on the next read instead of lagging the 12-hour TTL (CACHE-SYNC-EVICT-001) — and
-   * committed steps are still reconciled when a later step aborts the sweep. {@code
-   * UexUniverseSyncService#reconcileRefineryTerminalFlags()} shares that block for the same reason,
-   * guarded by its own catch so a failure there cannot replace the sweep's exception or skip the
-   * eviction.
-   *
-   * <p>Returns the item-catalogue upsert count from {@link UexItemSyncService#syncItems()} — the
-   * representative "rows processed" tally for the whole sweep — which {@link
-   * #scheduleCommodityPriceUpdate()} records into {@code
-   * basetool_scheduled_job_items_total{job="uex_sync"}} via {@code TaskMetrics.recordCounting}.
-   * When a step throws the count is discarded (the run is recorded as a {@code failure}, no items
-   * counted); a clean run that upserted zero rows records {@code 0}, which is what the {@code
-   * SyncZeroItems} alert watches for (#1041 item 2).
+   * <p>A {@code finally} block evicts the master-data caches via {@link
+   * MasterDataCacheEvictionService#evictUexSyncedMasterData()} and reconciles the refinery terminal
+   * flags, even after an abort.
    *
    * @return the number of {@code game_item} rows the item sync upserted this run ({@code 0} if the
    *     sweep aborted before the item step ran)
@@ -177,11 +127,8 @@ public class UexScheduler {
   /**
    * Publishes {@code basetool_scheduled_job_enabled{task="uex_sync"} = 1}.
    *
-   * <p>This bean is {@code @ConditionalOnProperty}-gated, so a UEX sync switched off via {@code
-   * krt.uex.scheduler-enabled=false} creates no bean and publishes nothing — and that absence is
-   * what lets {@code ExternalSyncStale}'s {@code absent()} leg tell "switched off on purpose" from
-   * "has never succeeded". Without it the leg could not distinguish the two, because the
-   * last-success gauge is registered lazily on first success and never appears in either case.
+   * <p>A disabled UEX sync creates no bean and publishes nothing, which lets the {@code
+   * ExternalSyncStale} alert tell "switched off" from "never succeeded".
    */
   @PostConstruct
   void publishEnabledGauge() {

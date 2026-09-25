@@ -52,20 +52,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Regression for the Thymeleaf 3.1 JS-inline truncation bug on {@code /admin/materials}.
- *
- * <p>Pre-fix, the template called {@code /*[[${materials.![name]}]]*&#47;} inside a {@code
- * th:inline="javascript"} script. That inline expression truncated the rest of the script body, so
- * the {@code data-krt-confirm} form delete-confirmation handler binding, the {@code
- * 'admin-materials-update'} delegated event registration, and the row-update {@code fetch} flow
- * never executed. The fix moves the names into a sibling {@code <datalist id="materialNames-data">}
- * read at runtime, while keeping {@code th:inline="javascript"} alive on the script tag so the
- * remaining single-primitive translation lookups (toast keys) still resolve.
- *
- * <p>This test pins both halves: (a) the page loads the extracted {@code
- * static/js/admin-materials.js} page module (ADR-0069) whose tail carries the {@code
- * 'admin-materials-update'} delegated binding, and (b) the response ends with the closing {@code
- * </html>} tag — the pre-fix bug truncated the body before that.
+ * Regression test for the Thymeleaf JS-inline truncation on {@code /admin/materials}: the page
+ * loads the {@code static/js/admin-materials.js} module (ADR-0069) and the response ends with the
+ * closing {@code </html>} tag.
  */
 @SpringBootTest
 class AdminMaterialsPageControllerMvcTest {

@@ -71,19 +71,13 @@ public class NotificationController {
   private final NotificationStreamService streamService;
 
   /**
-   * Opens a Server-Sent-Event stream for the caller (REQ-NOTIF-010). Best-effort real-time push;
-   * the frontend falls back to polling if the stream is unavailable. The recipient is the JWT
-   * {@code sub}, so a caller only ever streams their own notifications.
+   * Opens a Server-Sent-Event stream of the caller's own notifications (REQ-NOTIF-010); the
+   * frontend falls back to polling when it is unavailable.
    *
-   * <p><strong>{@code X-Accel-Buffering: no} is part of the response, not decoration.</strong> An
-   * nginx with response buffering on holds a trickling body in its buffers, and an SSE stream is
-   * exactly that: a few bytes every twenty seconds. The events then arrive late, in bursts, or —
-   * for a client that gives up first — not at all, and the failure looks like "push does not work
-   * on this network" rather than like a proxy setting. nginx honours this header per response, so
-   * the guarantee travels with the endpoint instead of depending on a vhost's defaults; the API
-   * vhost the Android app uses is a second proxy host whose defaults nobody verified.
+   * <p>The response sets {@code X-Accel-Buffering: no} so an nginx proxy does not buffer the
+   * stream.
    *
-   * @param recipientUserId the caller's id, resolved from the JWT subject claim
+   * @param recipientUserId the caller's id, from the JWT subject claim
    * @param response the servlet response, used only to set the no-buffering header
    * @return the SSE emitter registered for the caller
    */

@@ -64,26 +64,12 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
- * REST surface for the personal hangar (own ships), the squadron-wide overview, the admin per-user
- * hangar, and the third-party ship-export JSON import (CCU Game Fleetview / HangarXPLOR Shiplist /
- * Fleetyards / StarJump FleetViewer "Hangar Link").
+ * REST surface for the personal hangar, the squadron-wide overview, the admin per-user hangar and
+ * the third-party ship-export JSON import.
  *
- * <p>{@code /my-ships} reads the calling user's JWT to derive the owner id — never accepts it from
- * the URL — so a caller cannot view another user's hangar via this endpoint. The admin-only {@code
- * /users/{userId}/ships} surface takes the user id from the path explicitly and is gated by {@code
- * hasRole('ADMIN')}. The {@code /squadron-overview} endpoint shapes its response based on the
- * caller's role: only ADMIN/OFFICER see the per-ship owner details, every other authenticated
- * caller gets just the aggregated counts.
- *
- * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor, not the
- * ceiling — it is stated here so an endpoint added later inherits it rather than relying on a URL
- * matcher elsewhere being right, and a method-level gate still wins where one is present.
- *
- * <p><b>It is weaker than the URL rule above it, and that is not a licence to delete either.</b>
- * The chain gates {@code /api/v1/hangar/**} on {@code hasAnyAuthority(HANGAR_READ, HANGAR_WRITE,
- * ROLE_ADMIN)}, which every request must pass as well — the two are ANDed. Reading this annotation
- * as the whole rule and removing the matcher as "redundant" would widen the surface from that set
- * to any authenticated caller.
+ * <p>{@code /my-ships} derives the owner from the JWT; {@code /users/{userId}/ships} is ADMIN-only.
+ * The class-level {@code isAuthenticated()} gate is only the floor (REQ-SEC-052) and is ANDed with
+ * the URL rule requiring {@code HANGAR_READ}, {@code HANGAR_WRITE} or {@code ROLE_ADMIN}.
  */
 @RestController
 @RequestMapping("/api/v1/hangar")
@@ -98,12 +84,8 @@ public class HangarController {
   private final AuthHelperService authHelperService;
 
   /**
-   * One server-side page of the calling user's own ships (REQ-HANGAR-002). The page is ordered by
-   * the rich personal-hangar comparator (manufacturer, ship type, insurance tier/amount, location,
-   * fitted, name) entirely in the repository, so the order — and the optional {@code search} filter
-   * — span the user's whole fleet rather than a single fetched page. There is no caller-supplied
-   * {@code sort}: the ordering is fixed and includes a computed insurance-tier bucket that no
-   * column {@code Sort} could express, so the request carries page/size/search only.
+   * Returns one page of the calling user's own ships in the fixed personal-hangar order, with the
+   * order and the optional search spanning the whole fleet (REQ-HANGAR-002).
    *
    * @param jwt caller's JWT — its {@code sub} claim derives the owner; never read from the URL
    * @param page zero-based page index
@@ -145,12 +127,8 @@ public class HangarController {
   }
 
   /**
-   * Per-ship-type aggregated count across the squadron. Admins and officers additionally see the
-   * per-ship owner / location / fitted breakdown; everyone else sees only the totals — the
-   * role-driven shaping happens at the HTTP boundary so the service stays free of {@code
-   * SecurityContextHolder} reads (the ArchUnit rule). The optional {@code search} term filters the
-   * ship types server-side (case-insensitive contains on ship-type or manufacturer name), so a
-   * filtered result is still correctly paginated across the whole scoped fleet (REQ-HANGAR-001).
+   * Returns per-ship-type counts across the squadron; admins and officers additionally see the
+   * per-ship owner, location and fitted breakdown (REQ-HANGAR-001).
    *
    * @param page zero-based page index
    * @param size page size
@@ -286,10 +264,8 @@ public class HangarController {
   }
 
   /**
-   * Imports a ship-export JSON file (CCU Game Fleetview, HangarXPLOR Shiplist, Fleetyards or
-   * StarJump FleetViewer / "Hangar Link" — the format is auto-detected from the payload shape).
-   * Parses the file via {@code HangarImportService} and creates only the missing rows so existing
-   * hangar contents are never lost or duplicated. The caller's JWT is the owner of the new rows.
+   * Imports a ship-export JSON file (CCU Game Fleetview, HangarXPLOR, Fleetyards or StarJump
+   * FleetViewer; format auto-detected), creating only missing rows owned by the caller.
    *
    * @param jwt caller's JWT — its {@code sub} claim becomes the new rows' owner id
    * @param file uploaded JSON file
@@ -304,17 +280,14 @@ public class HangarController {
   }
 
   /**
-   * Legacy path for the ship-import endpoint, kept for one year so existing automation does not
-   * break. Delegates to the same service as {@link #importShips(Jwt, MultipartFile)}; the response
-   * is identical. New clients should target {@code /api/v1/hangar/import/ships} which is
-   * format-neutral (the original {@code /import/fleetview} name predates HangarXPLOR support).
+   * Alias of {@link #importShips(Jwt, MultipartFile)} under the {@code /import/fleetview} path,
+   * with an identical response.
    *
    * @param jwt caller's JWT — its {@code sub} claim becomes the new rows' owner id
    * @param file uploaded JSON file
    * @return import summary (created / skipped / duplicate counts plus the unmatched-ship list)
-   * @deprecated use {@link #importShips(Jwt, MultipartFile)} via {@code
-   *     /api/v1/hangar/import/ships} instead — the {@code Sunset} and {@code Link} response headers
-   *     carry the same hint.
+   * @deprecated use {@code /api/v1/hangar/import/ships}; the {@code Sunset} and {@code Link}
+   *     response headers carry the same hint
    */
   @PostMapping("/import/fleetview")
   @PreAuthorize("isAuthenticated()")

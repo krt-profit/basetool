@@ -33,17 +33,15 @@ public class RateLimitedException extends RuntimeException {
   private static final long serialVersionUID = 1L;
 
   /**
-   * Seconds until the caller's bucket refills enough for one more request; surfaced verbatim in the
-   * {@code Retry-After} response header. Read through the Lombok-generated {@code
-   * getRetryAfterSeconds()}.
+   * Seconds until the caller's bucket refills enough for one more request; sent as the {@code
+   * Retry-After} header.
    */
   private final long retryAfterSeconds;
 
   /**
    * Creates the exception with the time the client should wait before retrying.
    *
-   * @param retryAfterSeconds seconds until the caller's bucket refills enough for one more request;
-   *     surfaced verbatim in the {@code Retry-After} response header.
+   * @param retryAfterSeconds seconds until the caller's bucket refills enough for one more request
    */
   public RateLimitedException(long retryAfterSeconds) {
     super("Ingest per-subject rate limit exceeded");

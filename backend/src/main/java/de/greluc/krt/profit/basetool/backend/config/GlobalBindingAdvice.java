@@ -26,21 +26,14 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.InitBinder;
 
 /**
- * Global {@code @ControllerAdvice} that registers the {@link NormalizedStringEditor} for every
- * {@code String} property bound on incoming requests.
- *
- * <p>The editor trims leading/trailing whitespace, NFC-normalizes and caps every string at the
- * shared free-text limit ({@link StringNormalization#MAX_FREE_TEXT_LENGTH}). Applied globally so
- * individual controllers and DTOs do not need to repeat the normalization — and so that a forgotten
- * {@code @NotBlank} combined with an all-whitespace input still ends up rejected.
+ * Registers the {@link NormalizedStringEditor} for every bound {@code String} request property:
+ * trimmed, NFC-normalized and capped at {@link StringNormalization#MAX_FREE_TEXT_LENGTH}.
  */
 @ControllerAdvice
 public class GlobalBindingAdvice {
   /**
-   * Registers {@link NormalizedStringEditor} for every {@code String} binding target. The editor's
-   * {@code maxLength} ({@link StringNormalization#MAX_FREE_TEXT_LENGTH}) matches the longest
-   * free-text field stored in the database and {@code trim=true} is what callers of every
-   * controller expect.
+   * Registers a trimming {@link NormalizedStringEditor} capped at {@link
+   * StringNormalization#MAX_FREE_TEXT_LENGTH} for every {@code String} binding target.
    *
    * @param binder Spring's data binder for the current request
    */

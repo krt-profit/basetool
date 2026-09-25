@@ -29,12 +29,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Shared query-parameter maths for the two account-detail surfaces (bank-staff {@code
- * /bank/accounts/{id}} and org-unit {@code /org-unit-bank/accounts/{id}}) so both resolve the
- * booking-history period, the page-size options and the balance-chart range identically
- * (REQ-BANK-049/-051). Both controllers own their own model wiring and fragment view names; only
- * the time-window arithmetic lives here, mirroring how {@link BankSparkline} / {@link
- * BankBalanceChart} are shared pure helpers.
+ * Shared time-window arithmetic for the bank-staff and org-unit account-detail pages: booking
+ * history period, page-size options and balance-chart range (REQ-BANK-049, REQ-BANK-051).
  */
 public final class BankAccountDetailSupport {
 
@@ -69,13 +65,12 @@ public final class BankAccountDetailSupport {
       LocalDate fromDate, LocalDate toDate, Instant fromInstant, Instant toInstant) {}
 
   /**
-   * Resolves the booking-history period from the optional {@code from}/{@code to} date parameters,
-   * defaulting to the last {@value #DEFAULT_HISTORY_DAYS} days (REQ-BANK-051). A blank or
-   * unparseable value falls back to its default; an inverted range (from after to) is repaired to
-   * the default look-back ending at {@code to} so the query never sees {@code from > to}.
+   * Resolves the booking-history period from the optional {@code from} / {@code to} parameters,
+   * defaulting to the last {@value #DEFAULT_HISTORY_DAYS} days (REQ-BANK-051). Blank or invalid
+   * values use their default; an inverted range becomes the default look-back ending at {@code to}.
    *
-   * @param from the raw {@code from} date parameter ({@code yyyy-MM-dd}), or {@code null}
-   * @param to the raw {@code to} date parameter ({@code yyyy-MM-dd}), or {@code null}
+   * @param from the raw {@code from} date ({@code yyyy-MM-dd}), or {@code null}
+   * @param to the raw {@code to} date ({@code yyyy-MM-dd}), or {@code null}
    * @return the resolved period
    */
   @NotNull
@@ -103,13 +98,12 @@ public final class BankAccountDetailSupport {
   }
 
   /**
-   * The inclusive start instant of a chart range: {@code now} minus the range's span, or the
-   * account's creation instant for {@code "all"} (a five-year fallback when the creation instant is
-   * unknown, e.g. the account could not be loaded).
+   * Returns the inclusive start of a chart range: {@code now} minus the range's span, or for {@code
+   * "all"} the account's creation instant (five years back when unknown).
    *
    * @param range a valid range key (see {@link #normalizeChartRange})
    * @param createdAt the account's creation instant, used for {@code "all"}; may be {@code null}
-   * @param now the period end (the current instant)
+   * @param now the period end
    * @return the chart's inclusive start instant
    */
   @NotNull

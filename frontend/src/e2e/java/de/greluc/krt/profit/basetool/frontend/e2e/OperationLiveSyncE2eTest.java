@@ -35,21 +35,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Two-context live-sync coverage for the operation detail page (#1115, REQ-FE-015 / ADR-0094): a
- * core-data save one viewer makes on the Verwaltung tab must appear on another viewer's sticky
- * header without a manual reload — the {@code overview} section key crossing the {@code
- * operation:{id}} room.
+ * Verifies that a core-data save on an operation's Verwaltung tab reaches another viewer's header
+ * without a reload, via the {@code overview} section of the {@code operation:{id}} room
+ * (REQ-FE-015, ADR-0094).
  *
- * <p>The operation surface is the first non-mission consumer of the multiplexed {@code /ws/sync}
- * transport, so the deterministic pre-mutation wait is {@code
- * window.krtLiveSync.subscribedTopics()} becoming non-empty (a subscribe, unlike the mission legacy
- * socket, is only registered once its async server authorization has acked). Two browser contexts
- * as the same test user are two distinct {@code /ws/sync} sockets — exactly what the relay fans out
- * between.
- *
- * <p>The payout-toggle path drives the same {@code operation:{id}} receiver but needs a seeded
- * payout row (a linked mission with a checked-in participant and actual times); the core-data save
- * exercises the receiver end-to-end without that setup, so it is the mutation chosen here.
+ * <p>Waits for {@code window.krtLiveSync.subscribedTopics()} to be non-empty before mutating.
  */
 @Tag("e2e")
 class OperationLiveSyncE2eTest {

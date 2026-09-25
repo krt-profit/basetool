@@ -32,23 +32,11 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * The tolerant {@code ShipType} resolver behind the hangar import: it folds a snapshot of the
- * {@code ship_type} table into a multi-key lookup index once, then resolves an upload entry's name
- * (and optional slug) against it through five progressively-looser stages. Extracted verbatim from
- * {@code HangarImportService} (audit L-tier import-engine split, #16) so the service keeps the
- * transactional orchestration while this holds the pure, in-memory matching that has no repository,
- * transaction or security concern.
+ * Tolerant, in-memory {@code ShipType} resolver for the hangar import.
  *
- * <p>The five stages, in order (see {@link #resolve}): (1) exact case-insensitive {@code
- * ShipType.name}; (2) normalised (lowercased, non-alphanumeric stripped) name; (3) upload-tokens ⊆
- * uex-tokens, uniquely; (4) uex-tokens ⊆ upload-tokens, uniquely; (5) slug fallback (source slug
- * folded and matched against {@code uexSlug} then {@code scwikiSlug}). Stages 3 and 4 require a
- * <em>unique</em> candidate — ambiguity leaves the entry unresolved on purpose rather than guessing
- * a variant. All stages read the pre-built {@link ShipTypeIndex}, so per-entry resolution is
- * in-memory with no N+1 database round-trips.
- *
- * <p>Stateless and static-only; {@link #normalizeForMatching} is public because the import's
- * custom-name echo heuristic reuses the exact same alphanumeric folding.
+ * <p>Resolves in five stages: exact case-insensitive name, normalised name, upload tokens ⊆ ship
+ * tokens, ship tokens ⊆ upload tokens, then slug against {@code uexSlug} and {@code scwikiSlug}.
+ * The token-subset stages require a unique candidate. Stateless and static-only.
  */
 public final class ShipTypeMatcher {
 
@@ -61,12 +49,8 @@ public final class ShipTypeMatcher {
   private ShipTypeMatcher() {}
 
   /**
-   * Loads every {@code ShipType} form into the multi-key lookup index in a single pass: exact
-   * case-insensitive key, normalised key, an alphanumeric token set used by the token-subset
-   * stages, and the normalised UEX / SC Wiki slug keys used by the slug-fallback stage. The hash
-   * maps use {@code putIfAbsent} so that if two ship types collapse to the same key (very unlikely
-   * — the {@code name} column has a unique constraint and slugs are effectively unique) the first
-   * one encountered wins deterministically.
+   * Builds the multi-key lookup index (exact, normalised, token-set and slug keys) from the given
+   * ship types; on a key collision the first ship type wins.
    *
    * @param shipTypes a snapshot of the {@code ship_type} table (typically {@code
    *     shipTypeRepository.findAll()})
@@ -121,12 +105,9 @@ public final class ShipTypeMatcher {
   }
 
   /**
-   * Slug-fallback stage (StarJump FleetViewer and Fleetyards). Folds the source slug with the same
-   * alphanumeric normalisation used for names and matches it against {@code ShipType.uexSlug}
-   * first, then {@code ShipType.scwikiSlug}. Exact-equality only — these slug schemes diverge from
-   * UEX's enough that fuzzy slug matching would be unsafe. A {@code null}/blank slug or an empty
-   * normalised form short-circuits to {@code null} so the slugless formats (Fleetview, HangarXPLOR)
-   * skip the stage cleanly.
+   * Resolves a normalised source slug by exact match against {@code ShipType.uexSlug}, then {@code
+   * ShipType.scwikiSlug}. A {@code null}, blank or empty-after-normalisation slug yields {@code
+   * null}.
    *
    * @param index lookup index produced by {@link #buildIndex(List)}
    * @param slug source-provided ship slug, or {@code null}
@@ -251,11 +232,8 @@ public final class ShipTypeMatcher {
   }
 
   /**
-   * Folds a ship name to a case-insensitive, punctuation-free comparison form. {@code "L-21 Wolf"}
-   * and {@code "L21 Wolf"} both collapse to {@code "l21wolf"}; {@code "Cyclone-AA"} and {@code
-   * "Cyclone AA"} both collapse to {@code "cycloneaa"}. ASCII-only by design — Star Citizen ship
-   * names contain no diacritics, so we deliberately strip anything outside {@code [a-z0-9]}. Public
-   * so the import's custom-name echo heuristic can reuse the identical folding.
+   * Folds a ship name to lower-case ASCII alphanumerics, e.g. {@code "L-21 Wolf"} to {@code
+   * "l21wolf"}.
    *
    * @param name raw name (nullable)
    * @return the normalised form (never null; empty string for null/empty input)

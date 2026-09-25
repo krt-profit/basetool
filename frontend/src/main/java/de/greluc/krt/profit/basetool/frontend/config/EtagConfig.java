@@ -29,32 +29,11 @@ import org.springframework.core.Ordered;
 import org.springframework.web.filter.ShallowEtagHeaderFilter;
 
 /**
- * Registers Spring's {@link ShallowEtagHeaderFilter} on the routes whose response can actually
- * carry an ETag, and on nothing else (FE-PERF-03, ADR-0161 §8.3).
+ * Registers {@link ShallowEtagHeaderFilter} only on {@link #ETAG_URL_PATTERNS}, the routes whose
+ * response can carry an ETag (ADR-0161).
  *
- * <p>The filter buffers the whole response body in memory before a byte reaches the client, and
- * only then decides whether to hash it. Spring refuses to generate an ETag once {@code
- * Cache-Control} carries {@code no-store} ({@code isEligibleForEtag}), and Spring Security's
- * default cache-control writer puts {@code no-store} on every response that has not set its own
- * header. So on every page, fragment, JSON write and the notification SSE relay the filter did the
- * buffering and never produced an ETag — pure cost, paid on each render, and a streaming response
- * only escaped it because Spring MVC's emitter handler opts out of the buffer per request.
- *
- * <p>The filter covers exactly {@link #ETAG_URL_PATTERNS}, the two routes where an ETag is what
- * makes revalidation cheap:
- *
- * <ul>
- *   <li>{@code /manifest.webmanifest} ({@code public, max-age=3600}), re-read by browsers hourly;
- *   <li>{@code /.well-known/assetlinks.json} ({@code public, max-age=86400}).
- * </ul>
- *
- * <p><b>The static asset trees are deliberately outside it</b> (owner decision 2026-09-23). Every
- * asset URL {@link WebMvcConfig} serves is content-hashed and sent {@code public, max-age=31536000,
- * immutable}, so a browser never revalidates it, and the resource handler answers an {@code
- * If-Modified-Since} from {@code Last-Modified} on its own. An ETag there bought nothing and cost a
- * full in-memory copy of every font, image and script on the way out. {@code
- * StaticResourcesCachingTest} pins both halves: assets keep their cache headers and carry no ETag,
- * the manifest keeps its ETag and {@code 304}.
+ * <p>These are {@code /manifest.webmanifest} and {@code /.well-known/assetlinks.json}; the
+ * immutable, content-hashed static assets served by {@link WebMvcConfig} are excluded.
  */
 @Configuration
 public class EtagConfig {

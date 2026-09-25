@@ -47,13 +47,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
 
 /**
- * Unit tests for {@link OrgUnitContextAdvice}. Two groups: (1) the slow-changing catalogue reads —
- * both {@code availableSquadrons()} and the admin switcher's {@code availableOrgUnits()} must route
- * the Squadron / SpecialCommand catalogues through the URI-keyed {@code getCached} path
- * (REQ-DATA-007), never a plain per-render GET; (2) the {@code activeSquadronId} resolver and its
- * four branches (session pin, admin-without-pin → all-scopes null, non-admin → backend
- * active-org-unit fallback, and backend-failure → null) — the value every OrgUnit-derived attribute
- * (title, badge, all-squadrons mode, promotion visibility) hangs off.
+ * Unit tests for {@link OrgUnitContextAdvice}: the catalogue reads go through the cached path
+ * (REQ-DATA-007), and {@code activeSquadronId} resolves correctly in its four branches.
  */
 @ExtendWith(MockitoExtension.class)
 class OrgUnitContextAdviceTest {

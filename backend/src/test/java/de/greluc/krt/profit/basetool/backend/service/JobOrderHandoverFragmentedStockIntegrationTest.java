@@ -50,21 +50,10 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Worst-case reproduction of the JobOrder handover Optimistic-Locking bug for <b>fragmented
- * stock</b>: two materials, each split across {@value #STACKS_PER_MATERIAL} separate {@link
- * InventoryItem} rows, all handed over (and thus the JobOrder fully completed) in a SINGLE handover
- * request as a MEMBER+LOGISTIKER.
- *
- * <p>This is the constellation that the live-log MEMBER failure (JobOrder #40) actually had —
- * multiple {@link InventoryItem}s per {@link Material} cause the per-item loop in {@link
- * JobOrderHandoverService#createHandover(UUID, JobOrderHandoverCreateDto)} to iterate multiple
- * times over the SAME {@link JobOrderMaterial}, which (before the fix) was the trigger for a
- * mid-loop persistence-context detach + implicit {@code merge()} → second {@code @Version} bump →
- * 409.
- *
- * <p>Earlier integration tests used a 1:1 mapping (one InventoryItem per Material) and therefore
- * could not reproduce this exact failure path. This test guarantees the structural fix holds even
- * when stocks are fragmented as they typically are in production after multiple mining sessions.
+ * Integration test: a single handover by a Logistiker of two materials, each split across {@value
+ * #STACKS_PER_MATERIAL} {@link InventoryItem} rows, completes the job order without an optimistic
+ * lock conflict, although {@link JobOrderHandoverService#createHandover(UUID,
+ * JobOrderHandoverCreateDto)} visits the same {@link JobOrderMaterial} several times.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -188,10 +177,8 @@ class JobOrderHandoverFragmentedStockIntegrationTest {
   }
 
   /**
-   * Splits {@code total} into {@code n} non-equal positive doubles whose sum equals {@code total}.
-   * We deliberately use varying chunk sizes to stress the per-iteration delete-vs-update branch of
-   * the handover service (some chunks are fully consumed, some are partially consumed within the
-   * same handover request).
+   * Splits {@code total} into {@code n} unequal positive parts summing to {@code total}, so a
+   * handover consumes some rows fully and others partially.
    */
   private static List<Double> splitEvenly(double total, int n) {
     List<Double> result = new ArrayList<>(n);

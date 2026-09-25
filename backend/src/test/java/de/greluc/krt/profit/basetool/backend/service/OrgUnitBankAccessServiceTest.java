@@ -85,12 +85,10 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 /**
- * Unit tests for {@link OrgUnitBankAccessService} (REQ-BANK-021/-027/-028/-035..038). Covers the
- * card list ({@code canView} per account type), the read-only drill-in with Halter redaction, the
- * balance-target gate, and a visibility grant. The derived responsible-holder reverse-resolution
- * and its change-audit moved to {@link OrgUnitBankResponsibilityServiceTest} with their service.
- * Lenient strictness keeps the shared per-test stubs (e.g. {@code isAdmin=false}, empty grant
- * batch) from tripping the unnecessary-stubbing check across the many independent scenarios.
+ * Unit tests for {@link OrgUnitBankAccessService} (REQ-BANK-021): visibility per account type, the
+ * holder-redacted drill-in, the balance-target gate and view grants.
+ *
+ * <p>Lenient strictness allows shared per-test stubs.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -125,16 +123,9 @@ class OrgUnitBankAccessServiceTest {
   }
 
   /**
-   * Wires the L3-split (#922) write-mechanics collaborators into the {@link
-   * OrgUnitBankAccessService} facade under test. Mockito does not inject one {@code @InjectMocks}
-   * target into another, so the facade's two collaborator fields are built here as REAL instances
-   * fed with the same mocks the scenarios stub (view-grant repo, approval-limit repo, user repo,
-   * audit service, and — for the limit row lock — the bank-account repo), then set via {@link
-   * ReflectionTestUtils}. The facade still loads + authorizes + validates and re-reads the settings
-   * snapshot; the collaborators run the actual grant/revoke and upsert/clear against those mocks,
-   * so the existing {@code verify(...)} assertions on save / delete / audit hold unchanged.
-   * Constructor-arg order matches each service's {@code @RequiredArgsConstructor} field-declaration
-   * order.
+   * Sets real visibility and approval-limit collaborators, built on the scenario mocks, into the
+   * {@link OrgUnitBankAccessService} under test via {@link ReflectionTestUtils}, since Mockito does
+   * not inject one {@code @InjectMocks} target into another.
    */
   private void wireDelegates() {
     OrgUnitBankVisibilityService visibilityService =
@@ -1109,8 +1100,8 @@ class OrgUnitBankAccessServiceTest {
   }
 
   /**
-   * Builds an active KRT (CARTEL) account with the two approval-ladder thresholds set, viewable via
-   * {@code isMemberOrAbove}, and stubs the common request-create preconditions.
+   * Builds an active KRT account with both approval thresholds set and stubs the request-create
+   * preconditions.
    *
    * @param accountId the KRT account id
    * @param t1 the bank-employee ceiling
@@ -1777,11 +1768,8 @@ class OrgUnitBankAccessServiceTest {
   }
 
   /**
-   * REQ-BANK-056, the security-critical path: an edit re-derives the approval snapshot from the NEW
-   * amount through the very same resolution the create path uses. Raising a request from below the
-   * requester's ceiling to above it must flip {@code requiresOwnerApproval} to true — otherwise a
-   * requester could file 100 aUEC under a 1000 limit and then edit it to 100000, arriving at the
-   * bank employee still carrying the original "no approval needed" snapshot.
+   * Raising a request's amount past the requester's ceiling in an edit sets {@code
+   * requiresOwnerApproval} (REQ-BANK-056).
    */
   @Test
   void updateOwnBookingRequest_raisingPastTheLimit_reArmsTheApprovalGate() {

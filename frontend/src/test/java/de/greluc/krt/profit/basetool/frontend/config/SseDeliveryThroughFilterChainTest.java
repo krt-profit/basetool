@@ -51,23 +51,11 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
- * Bytes written into an {@link SseEmitter} must reach a socket through the frontend's real servlet
- * filter chain (FE-PERF-03) — the frontend twin of the backend's test of the same name (#1653).
+ * Verifies that bytes written into an {@link SseEmitter} reach a client through the frontend's real
+ * servlet filter chain while the stream is still open (FE-PERF-03).
  *
- * <p>The frontend relays the notification stream to the browser ({@code GET
- * /notifications/stream}). Until 2026-09-22 a {@link
- * org.springframework.web.filter.ShallowEtagHeaderFilter} sat on {@code /*} in front of it, which
- * buffers a response until it completes; the relay only escaped because Spring MVC's emitter
- * handler opts each streaming request out of that buffer. {@link EtagConfig} now limits the filter
- * to the cacheable routes, and this test pins the property that matters regardless of which
- * component would break it: a streaming response's first frame arrives at a client while the stream
- * is still open.
- *
- * <p>The stream under test is a test-only endpoint under {@code /sm/**}, a {@code permitAll} path,
- * because the real relay needs an OAuth2 session and an upstream backend stream that a test cannot
- * open over a real port. Every servlet filter registered for all paths runs in front of it exactly
- * as it runs in front of the relay; the relay's own first write is the same request-thread {@code
- * ready} comment (ADR-0113).
+ * <p>Uses a test-only {@code permitAll} stream under {@code /sm/**}, which sends the same
+ * request-thread {@code ready} comment as the notification relay (ADR-0113).
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
@@ -124,8 +112,7 @@ class SseDeliveryThroughFilterChainTest {
     }
 
     /**
-     * Commits the stream on the request thread with a {@code ready} comment and never completes it,
-     * so a buffering component would hold the frame for the stream's whole lifetime.
+     * Commits the stream on the request thread with a {@code ready} comment and never completes it.
      *
      * @return the open emitter
      * @throws IOException if the first frame cannot be written

@@ -29,23 +29,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
- * Subscribes to Resilience4j event publishers (circuit breaker, retry, bulkhead, time limiter) and
- * mirrors every event onto the application log. This is crucial for production debugging because
- * state transitions and rejections otherwise happen silently: a circuit breaker opens, all backend
- * calls start failing with {@code SERVICE_UNAVAILABLE}, but without this logger there is no direct
- * signal in the log file explaining <em>why</em>.
+ * Mirrors Resilience4j events (circuit breaker, retry, bulkhead, time limiter) onto the log.
  *
- * <p>Circuit-breaker <em>state transitions</em> are logged at WARN — the one-time "a downstream
- * dependency became (un)healthy" signal. Each individual call <em>rejected by an already-open
- * breaker</em> is logged at DEBUG only: {@code onCallNotPermitted} fires for <em>every</em>
- * short-circuited call for the whole open window, so at WARN a routine backend restart/deploy
- * floods the log with identical lines (issue #1203). The rejection is still metered as {@code
- * basetool_backend_client_errors_total{reason="circuit_open"}} at the {@code BackendApiClient}
- * boundary, so the count is never lost, and the {@code CircuitBreakerOpen} alert keys off the state
- * gauge — nothing depends on the per-call WARN. Individual retry attempts are logged at INFO (DEBUG
- * when they eventually succeed), bulkhead rejections at WARN, and time-limiter timeouts at WARN.
- * The information contained is purely technical (instance name, old/new state, attempt count) and
- * does not leak request-scoped data.
+ * <p>Circuit-breaker state transitions, bulkhead rejections and time-limiter timeouts log at WARN;
+ * calls rejected by an open breaker at DEBUG; retry attempts at INFO (DEBUG when they eventually
+ * succeed). Only technical data is logged.
  */
 @Slf4j
 @Component

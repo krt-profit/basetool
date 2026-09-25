@@ -35,14 +35,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Same-origin proxy for the admin-only Spezialkommando toggle endpoints. Currently exposes only the
- * per-SK profit-eligibility flip; the admin-settings page sends a PATCH here when the admin clicks
- * the "Auftragsbearbeitung" checkbox for an SK so the browser never has to know the backend
- * hostname and the CSRF-protected session is reused via {@link BackendApiClient}. Mirrors {@link
- * SquadronAdminProxyController}.
- *
- * <p>Endpoints carry their own {@code ADMIN}-role gate at the Spring Security layer; the backend
- * re-checks the role, so this proxy is defence-in-depth and not the sole guard.
+ * Same-origin proxy for the admin-only Spezialkommando toggles, currently the profit-eligibility
+ * flag, relayed via {@link BackendApiClient}; the counterpart of {@link
+ * SquadronAdminProxyController}. The backend re-checks the {@code ADMIN} role.
  */
 @RestController
 @RequestMapping("/api/proxy/special-commands")
@@ -52,9 +47,7 @@ public class SpecialCommandAdminProxyController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Forwards a "set Spezialkommando profit-eligible flag" request to the backend. Returns 204 No
-   * Content on success so the AJAX caller does not have to parse the SK payload — it already knows
-   * the new state from the checkbox event.
+   * Forwards a request to set a Spezialkommando's profit-eligible flag.
    *
    * @param id Spezialkommando primary key.
    * @param body request payload {@code { "eligible": true|false }}.

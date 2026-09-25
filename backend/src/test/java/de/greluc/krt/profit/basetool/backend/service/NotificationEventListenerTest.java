@@ -37,10 +37,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Unit tests for {@link NotificationEventListener}: the real-time SSE push must fire from here —
- * AFTER {@link NotificationCreationService#createFromEvent} returns (i.e. after its transaction
- * commits), targeting exactly the recipients it resolved (#1152) — and must never be attempted when
- * no recipient matched or creation failed (so a hiccup stays best-effort, REQ-NOTIF-010).
+ * Unit tests for {@link NotificationEventListener}: the SSE push follows {@link
+ * NotificationCreationService#createFromEvent} for exactly its recipients, and is skipped when none
+ * matched or creation failed (REQ-NOTIF-010).
  */
 @ExtendWith(MockitoExtension.class)
 class NotificationEventListenerTest {

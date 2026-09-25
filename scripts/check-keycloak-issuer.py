@@ -4,79 +4,17 @@
 # Copyright (C) 2026 Lucas Greuloch
 #
 # SPDX-License-Identifier: GPL-3.0-only
-#
 """Assert that the OIDC issuer the apps validate is the one Keycloak advertises.
 
-WHY THIS GATE EXISTS
---------------------
-The identity base URL is a literal on roughly 36 lines across 19 files, and until now **nothing
-checked that any two of them agreed**. ``.env.example`` stated the invariant as manual discipline --
-"SET BOTH OR NEITHER", the two values "must agree" -- which is a comment, not a check.
+Renders each stack with ``docker compose config`` and checks the result (ADR-0166):
 
-The failure it guards against is measured rather than imagined; ADR-0166 records the experiment.
-Keycloak's public base URL is decided by *two* settings that have to say the same thing::
-
-    KC_HOSTNAME         KC_HTTP_RELATIVE_PATH   serves at   advertised issuer
-    https://host        /auth                   /auth       https://host/realms/...    BROKEN
-    https://host/auth   /auth                   /auth       https://host/auth/realms/  correct
-    https://host/auth   (unset)                 /           --                         needs a
-                                                                                       stripping proxy
-
-The first row is the trap, and every part of it is quiet. Keycloak answers on ``/auth``, its
-discovery document parses, and the container reports **healthy** -- while backend, frontend and
-ingest each die at start-up on::
-
-    The Issuer "https://host/realms/iri" did not match the requested issuer
-    "https://host/auth/realms/iri"
-
-which reads as a backend fault and is in fact a topology mismatch. A first draft of ADR-0166
-specified exactly that combination, on the strength of the upstream reverse-proxy guide's wording;
-only running the smoke stack caught it. That is a failed deploy, found at deploy time, by a human,
-at the one moment nobody wants to be reading Keycloak's hostname documentation.
-
-WHY IT CHECKS THE RENDERED STACK RATHER THAN THE FILES
-------------------------------------------------------
-``docker-compose.yml`` no longer carries the issuer as an independent value: it *derives* it,
-``${IRI_KEYCLOAK_ISSUER_URI:-${IRI_KEYCLOAK_HOSTNAME:-...}/realms/iri}``. Re-implementing that
-nested interpolation here in order to check it would be asserting a copy of the thing under test
-against itself. So this gate renders the real stacks with ``docker compose config`` -- compose's own
-interpolation, the same code path the deploy uses -- and checks the *result*. Same principle as
-``check-edge-nginx.sh``, which renders the vhost templates and hands them to a real ``nginx -t``
-rather than pattern-matching the templates.
-
-Rendering also buys the property that matters most and is invisible in any single file: **that the
-derivation actually follows**. The ``prod-hostname-override`` scenario sets ``IRI_KEYCLOAK_HOSTNAME``
-alone and requires all three apps to move with it. Turn the issuer back into a second independent
-literal and that scenario fails at once -- the hostname moves, the issuer does not.
-
-The rules, in the order they are reported:
-
-* **Rule A -- the hostname's path is the serving path.** Only when ``KC_HOSTNAME`` is a full URL.
-  A *bare* hostname is not the broken row: scheme, port and context path all come from the request
-  when no full URL is configured, which is what the test stack relies on and what ADR-0166 measured
-  separately (``host.docker.internal`` + ``/auth`` advertises ``.../auth/realms/...`` correctly).
-* **Rule B -- every configured issuer is the one Keycloak will advertise.** With a full-URL
-  hostname that is exact, down to scheme and port. With a bare hostname, host and path are pinned
-  and scheme/port are left to the request, because that is genuinely what Keycloak does.
-* **Rule C -- the apps in one stack agree with each other.** Three services validating two
-  different issuers is the same outage as validating one wrong one.
-* **Rule D -- the Spring fallback defaults match the compose production default.** The
-  ``application*.yml`` files carry ``${KEYCLOAK_ISSUER_URI:<literal>}``. That literal is what an app
-  validates when the variable is absent, it sits nowhere near the compose file, and moving the
-  domain without it leaves a build that silently trusts the retired issuer.
-* **Rule E -- Grafana's three OIDC endpoints sit on the issuer the apps validate.** Grafana's
-  ``generic_oauth`` provider has no discovery option, so ``docker-compose.monitoring.yml`` names the
-  authorize, token and userinfo URLs one at a time. They derive from the same
-  ``IRI_KEYCLOAK_HOSTNAME`` now, and this rule checks both that they still do and that they follow an
-  override -- the monitoring project reads the same ``.env`` because it runs with the same
-  ``--project-directory``. A Grafana pointed at a realm other than the one minting the tokens fails
-  login with nothing wrong in any log.
-* **Rule F -- the Prometheus identity probes name the deployed identity base.** ``prometheus.yml``
-  is a **static file**: nothing interpolates it, so unlike everything above it cannot be derived, and
-  checking it is the only option available. Four targets live under the identity path -- the
-  discovery document twice (IPv4 and IPv6 blackbox jobs) and the two management-surface denies. A
-  domain move that misses them leaves probes that fail for the wrong reason, or, worse, a discovery
-  probe that quietly stops covering the endpoint every login depends on.
+* **Rule A.** A full-URL ``KC_HOSTNAME`` has the same path as ``KC_HTTP_RELATIVE_PATH``.
+* **Rule B.** Every configured issuer is the one Keycloak advertises (exact for a full URL; host
+  and path only for a bare hostname).
+* **Rule C.** The apps in one stack agree on the issuer.
+* **Rule D.** The Spring ``${KEYCLOAK_ISSUER_URI:<literal>}`` fallbacks match the production default.
+* **Rule E.** Grafana's three OIDC endpoints sit on the issuer and follow a hostname override.
+* **Rule F.** The identity probes in the static ``prometheus.yml`` name the deployed base.
 
 Usage:
     python scripts/check-keycloak-issuer.py [--repo-root DIR]
@@ -95,33 +33,19 @@ import sys
 from pathlib import Path
 from urllib.parse import urlsplit
 
-# The realm this project runs. Used only to build the EXPECTED issuer in the scenarios below; the
-# rules themselves split an issuer on "/realms/" instead, so a realm rename needs no edit here.
 REALM = "iri"
 
-# The production identity base URL, as baked into docker-compose.yml. Pinned back to that file by
-# check_prod_base_is_real() below, so this constant cannot drift away from the stack it checks.
 PROD_BASE = "https://profit-base.online/auth"
 
-# A throwaway domain for the override scenarios. RFC 2606 reserves .test and it resolves nowhere --
-# nothing here is deployed, contacted or trusted, only rendered.
 FAKE_BASE = "https://basetool.example.test/auth"
 FAKE_ISSUER_OVERRIDE = "https://identity.example.test/auth/realms/" + REALM
 
-# The two local-stack issuers, pinned so the android override's deliberate split-horizon (below) is
-# asserted in both directions rather than merely tolerated.
 TEST_ISSUER = "http://host.docker.internal:18080/auth/realms/" + REALM
 ANDROID_ISSUER = "http://127.0.0.1:18080/auth/realms/" + REALM
 
-# Every ${NAME:?...} in the compose files has to be set for `docker compose config` to render at
-# all. The names are harvested from the files rather than listed, so a new required variable does
-# not quietly break this gate. The VALUES are placeholders and must stay that way: a real credential
-# in a CI log is a leaked credential (CLAUDE.md, Testing).
 REQUIRED_VAR = re.compile(r"\$\{([A-Z0-9_]+):\?")
 PLACEHOLDER = "placeholder-not-a-real-value"
 
-# `issuer-uri: ${KEYCLOAK_ISSUER_URI:<default>}` in the Spring configs. The default is optional --
-# ingest's prod profile deliberately has none, which makes the variable required there.
 SPRING_ISSUER = re.compile(r"issuer-uri:\s*\$\{KEYCLOAK_ISSUER_URI(?::([^}]*))?\}")
 
 SPRING_CONFIGS = (
@@ -134,29 +58,14 @@ SPRING_CONFIGS = (
     "ingest/src/main/resources/application-dev.yml",
 )
 
-# Grafana names its three OIDC endpoints one at a time -- generic_oauth has no discovery option --
-# so each is `<issuer>/protocol/openid-connect/<endpoint>`. Mapped here rather than hardcoded three
-# times, for the same reason the compose file stopped spelling the base three times.
 GRAFANA_OIDC_ENDPOINTS = {
     "GF_AUTH_GENERIC_OAUTH_AUTH_URL": "auth",
     "GF_AUTH_GENERIC_OAUTH_TOKEN_URL": "token",
     "GF_AUTH_GENERIC_OAUTH_API_URL": "userinfo",
 }
 
-# Any absolute http(s) URL in prometheus.yml. The scan is deliberately URL-scoped: `config.alloy`
-# and the meta alerts reference `/hostlog/auth.log`, a filesystem path that shares the prefix and is
-# not an identity URL at all.
 PROM_URL = re.compile(r"https?://[^\s\"']+")
 
-# The identity probes that must EXIST, as suffixes of the deployed identity base. Scanning for
-# strays is only half a check: a domain move that relocates a probe to another host AND another path
-# shape -- `https://keycloak.example/health` -- leaves nothing under the identity path to object to,
-# so the target simply disappears and the gate would report success over a shrinking list. These are
-# the two-sided half. REQ-OBS-012: a public surface without a probe is incomplete.
-#
-#   discovery   what every login resolves first; its absence looks exactly like health
-#   /health     Keycloak's readiness detail, which must stay 404 on the PUBLIC connector
-#   /metrics    realm names, user and session counts, client ids -- likewise
 REQUIRED_PROBE_SUFFIXES = (
     "/realms/{realm}/.well-known/openid-configuration",
     "/health",
@@ -176,16 +85,11 @@ PROMETHEUS = "monitoring/prometheus/prometheus.yml"
 class Scenario:
     """One rendered stack: which compose files, which profile, which environment.
 
-    Every service in this repository carries a ``profiles:`` key, so a render without one produces
-    an empty service list and a gate that passes by checking nothing. ``profile`` is therefore
-    required, not optional -- and ``check_scenario`` fails loudly on an empty result rather than
-    reporting success.
-
     Attributes:
         name: what the scenario is called in the report.
         files: the compose files, in precedence order, exactly as that stack is started.
-        profile: the compose profile to render -- "prod" for the deployed services, "dev" for the
-            local stacks.
+        profile: the compose profile to render ("prod" or "dev"); required, since every service
+            carries a profile.
         env: environment overrides layered on top of the placeholder set.
         expect: the issuer every app must end up with, or a {service: issuer} mapping when the
             stack is deliberately not uniform, or None to apply only the rules.
@@ -193,8 +97,7 @@ class Scenario:
         enforce_pair: False for the documented escape hatch where the issuer is overridden to
             something that deliberately differs from KC_HOSTNAME.
         require_agreement: False for a stack that is deliberately split-horizon.
-        pair_services: when set, only these services are held to rule B; the rest are documented
-            casualties of a split-horizon override.
+        pair_services: when set, only these services are held to rule B.
     """
 
     def __init__(
@@ -255,14 +158,6 @@ SCENARIOS = [
         None,
         "the isolated local test stack: bare hostname plus /auth",
     ),
-    # The one stack that is deliberately NOT uniform, so the exemption is spelled out rather than
-    # left as a silent skip. docker-compose.android.yml pins Keycloak's advertised issuer to
-    # 127.0.0.1 (what the emulator reaches through `adb reverse`) and realigns ONLY backend-dev,
-    # which is the service that has to validate the app's tokens. frontend-dev and ingest-dev keep
-    # the test stack's host.docker.internal and therefore stop accepting logins -- the override's
-    # own header says so: "with this in effect the web frontend's own login no longer resolves the
-    # issuer from inside its container". Both halves are pinned below, so the day that arrangement
-    # changes this gate reports it instead of shrugging.
     Scenario(
         "android-stack",
         [BASE, TEST, ANDROID],
@@ -300,8 +195,7 @@ SCENARIOS = [
 def placeholder_env(root: Path, files) -> dict:
     """Builds the environment ``docker compose config`` needs in order to render at all.
 
-    Every ``${NAME:?...}`` in the given compose files gets a placeholder, so a render fails on a
-    real problem rather than on an unset password.
+    Every ``${NAME:?...}`` in the given compose files gets a placeholder.
 
     Args:
         root: the repository root.
@@ -334,8 +228,6 @@ def render_files(root: Path, files, profile, overrides) -> dict:
         RuntimeError: if ``docker compose config`` fails, with its stderr attached.
     """
     env = dict(os.environ)
-    # Drop any identity variables the CALLER exports, so a developer's own .env-shaped shell cannot
-    # make this gate pass or fail for a reason that is not in the repository.
     for key in ("IRI_KEYCLOAK_HOSTNAME", "IRI_KEYCLOAK_ISSUER_URI"):
         env.pop(key, None)
     env.update(placeholder_env(root, files))
@@ -389,8 +281,6 @@ def collect(services: dict):
         env = service.get("environment") or {}
         if env.get("KC_HOSTNAME"):
             hostname = env["KC_HOSTNAME"]
-            # Unset means Keycloak serves at the root; normalise that to "/" so the comparison
-            # below has something to compare.
             relative_path = env.get("KC_HTTP_RELATIVE_PATH") or "/"
         if env.get("KEYCLOAK_ISSUER_URI"):
             issuers[name] = env["KEYCLOAK_ISSUER_URI"]
@@ -398,10 +288,7 @@ def collect(services: dict):
 
 
 def norm_path(path: str) -> str:
-    """Normalises a URL path for comparison: no trailing slash, and root is the empty string.
-
-    ``/auth``, ``/auth/`` and ``auth`` all name the same mount point to Keycloak, and ``/`` and
-    ``""`` both mean the root. Comparing the raw strings would report a difference that is not one.
+    """Normalises a URL path for comparison: leading slash, no trailing slash, root is ``""``.
 
     Args:
         path: a path component, possibly empty or missing its leading slash.
@@ -460,8 +347,6 @@ def check_scenario(root: Path, scenario: Scenario, problems: list) -> str:
         )
         return "%s: NO ISSUERS" % scenario.name
 
-    # Rule C -- the apps in one stack have to agree with each other, unless the stack is one of the
-    # documented split-horizon overrides.
     distinct = sorted(set(issuers.values()))
     if scenario.require_agreement and len(distinct) > 1:
         problems.append(
@@ -494,8 +379,6 @@ def check_scenario(root: Path, scenario: Scenario, problems: list) -> str:
             )
 
     if hostname is None:
-        # Every stack listed here starts Keycloak. One that does not would mean the file list is
-        # wrong, and rules A and B would then pass by having nothing to test.
         problems.append(
             "%s: no service sets KC_HOSTNAME, so the issuer above is checked against nothing"
             % scenario.name
@@ -506,9 +389,6 @@ def check_scenario(root: Path, scenario: Scenario, problems: list) -> str:
     host_path = norm_path(urlsplit(hostname).path) if full_url else None
     rel = norm_path(relative_path)
 
-    # Rule A -- a full-URL hostname must carry the serving path. This is ADR-0166's broken row, and
-    # it applies whether or not the issuer is overridden, because it is Keycloak-internal: the
-    # server would advertise root links no matter what the apps had been told to expect.
     if full_url and host_path != rel:
         problems.append(
             "%s: KC_HOSTNAME=%s has path %r but KC_HTTP_RELATIVE_PATH=%r. Keycloak would SERVE "
@@ -524,8 +404,6 @@ def check_scenario(root: Path, scenario: Scenario, problems: list) -> str:
             distinct[0],
         )
 
-    # Rule B -- every issuer has to be the one this Keycloak will advertise. A split-horizon stack
-    # narrows this to the services that genuinely talk to the hostname configured above.
     for name, issuer in sorted(issuers.items()):
         if scenario.pair_services is not None and name not in scenario.pair_services:
             continue
@@ -537,7 +415,6 @@ def check_scenario(root: Path, scenario: Scenario, problems: list) -> str:
             )
             continue
         if full_url:
-            # Scheme, host, port and path are all pinned by the configured hostname.
             expected = hostname.rstrip("/")
             if base.rstrip("/") != expected:
                 problems.append(
@@ -545,8 +422,6 @@ def check_scenario(root: Path, scenario: Scenario, problems: list) -> str:
                     "%s" % (scenario.name, name, base, hostname, expected)
                 )
         else:
-            # A bare hostname takes scheme, port AND context path from the request, so only the
-            # host and the path are ours to assert (ADR-0166, measured for the test stack).
             parts = urlsplit(base)
             if parts.hostname != hostname:
                 problems.append(
@@ -595,7 +470,7 @@ def check_spring_defaults(root: Path, problems: list) -> str:
             continue
         for default in found:
             if not default:
-                continue  # No default: the variable is required there (ingest's prod profile).
+                continue
             checked += 1
             if default != expected:
                 problems.append(
@@ -609,10 +484,7 @@ def check_spring_defaults(root: Path, problems: list) -> str:
 def check_monitoring_oidc(root: Path, problems: list) -> str:
     """Rule E -- Grafana's three OIDC endpoints sit on the issuer the apps validate.
 
-    Checked twice: once on the production defaults, and once with ``IRI_KEYCLOAK_HOSTNAME``
-    overridden, because the second is the only one that can tell a derived value from three literals
-    that happen to agree today. The monitoring stack is its own compose project but runs with the
-    same ``--project-directory``, so it reads the same ``.env`` and the same variable reaches it.
+    Checked on the production defaults and with ``IRI_KEYCLOAK_HOSTNAME`` overridden.
 
     Args:
         root: the repository root.
@@ -665,13 +537,8 @@ def check_monitoring_oidc(root: Path, problems: list) -> str:
 def check_prometheus_targets(root: Path, problems: list) -> str:
     """Rule F -- the Prometheus identity probes name the deployed identity base.
 
-    ``prometheus.yml`` is static: nothing interpolates it, so this is the one identity surface that
-    cannot be derived and can only be compared. Every absolute URL whose path is the identity mount
-    point (or sits under it) must be on the deployed base, and the discovery document every login
-    depends on must still be probed.
-
-    The path test is segment-exact rather than a prefix match, which is the same trap ADR-0166 records
-    for the edge's ``location /auth``: a plain prefix would swallow ``/authors`` and ``/authorize``.
+    Every absolute URL at or under the identity path (segment-exact) must be on the deployed base,
+    and every :data:`REQUIRED_PROBE_SUFFIXES` target must be present.
 
     Args:
         root: the repository root.
@@ -705,7 +572,6 @@ def check_prometheus_targets(root: Path, problems: list) -> str:
         )
         return "prometheus-targets: NONE FOUND"
 
-    # Half one -- no strays: nothing probed under the identity path may sit on another base.
     for url in sorted(set(identity_targets)):
         if not url.startswith(PROD_BASE + "/") and url != PROD_BASE:
             problems.append(
@@ -714,8 +580,6 @@ def check_prometheus_targets(root: Path, problems: list) -> str:
                 % (url, PROD_BASE)
             )
 
-    # Half two -- nothing missing. Without this, relocating a probe to another host AND another path
-    # shape removes it from the scan entirely and the check above has nothing left to object to.
     present = set(identity_targets)
     for suffix in REQUIRED_PROBE_SUFFIXES:
         expected = PROD_BASE + suffix.format(realm=REALM)
@@ -769,8 +633,6 @@ def main() -> int:
     args = parser.parse_args()
     root = Path(args.repo_root).resolve()
 
-    # The checks that are not stack scenarios: one reads a separate compose project, one a static
-    # file, one a set of Spring configs. Named here so --only can address them like any other.
     extra_checks = {
         "spring-defaults": check_spring_defaults,
         "monitoring-oidc": check_monitoring_oidc,

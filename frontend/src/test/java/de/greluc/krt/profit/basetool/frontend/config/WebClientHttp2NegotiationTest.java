@@ -43,18 +43,8 @@ import reactor.netty.http.HttpProtocol;
 import reactor.netty.http.server.HttpServer;
 
 /**
- * What ADR-0161 §8.1 actually bought, asserted against a real TLS handshake.
- *
- * <p>The finding it fixes was invisible from configuration alone: both applications had set {@code
- * server.http2.enabled: true} since they were written, and the frontend's outbound client still
- * spoke HTTP/1.1 — because an {@code SslContext} built with no {@code applicationProtocolConfig}
- * advertises no ALPN protocol, so there was nothing for the server to select. A test that read
- * properties would have reported the system as already on HTTP/2. This one reads the protocol the
- * two ends agreed on, from the server's {@code SslHandler}, after the handshake.
- *
- * <p>The server is a real Reactor Netty HTTP/2 endpoint serving the committed test TLS material
- * (`docker/test-tls`, ADR-0139) — never a production artefact, and the `test` profile's client
- * trusts anything, so the handshake succeeds without installing a thing.
+ * Verifies over a real TLS handshake that the frontend's backend client negotiates HTTP/2 via ALPN
+ * (ADR-0161), using the committed test TLS material (ADR-0139).
  */
 @SpringBootTest
 class WebClientHttp2NegotiationTest {
@@ -82,13 +72,8 @@ class WebClientHttp2NegotiationTest {
   private final AtomicReference<String> negotiated = new AtomicReference<>("none");
 
   /**
-   * The distinct peer addresses the server saw, which is how many TCP connections were opened.
-   *
-   * <p>Counting {@code doOnConnection} callbacks does <b>not</b> work here and getting that wrong
-   * is how this test first "disproved" multiplexing that was in fact happening: under HTTP/2
-   * Reactor Netty raises a connection observation per <em>stream</em> channel, so forty calls on
-   * two sockets reported forty. A stream channel reports its parent's {@code remoteAddress()}, so
-   * distinct peers is the count that means what it says on both protocols.
+   * The distinct peer addresses the server saw, which counts the TCP connections opened on both
+   * protocols.
    */
   private final Set<SocketAddress> peers = ConcurrentHashMap.newKeySet();
 
@@ -171,11 +156,7 @@ class WebClientHttp2NegotiationTest {
   }
 
   /**
-   * Fires forty calls at the slow route at once and waits for the last of them.
-   *
-   * <p>{@code flatMap} with a concurrency of 40 plus {@code subscribeOn(parallel())} is what makes
-   * them overlap rather than queue behind one another; the route's own delay is what keeps them
-   * overlapping long enough for the pool to have to decide how many connections it needs.
+   * Fires forty overlapping calls at the slow route and waits for the last of them.
    *
    * @param client the client under test
    */
@@ -218,11 +199,7 @@ class WebClientHttp2NegotiationTest {
   }
 
   /**
-   * The absolute URI of the local probe endpoint.
-   *
-   * <p>Absolute on purpose: both clients carry a {@code baseUrl} pointing at the real backend, and
-   * an absolute URI overrides it — which is what lets this test exercise the production connector
-   * wiring rather than a connector it built itself.
+   * The absolute URI of the local probe endpoint, overriding the clients' {@code baseUrl}.
    *
    * @return the probe URI on the ephemeral port the server bound
    */

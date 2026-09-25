@@ -25,11 +25,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 /**
- * Spring Data repository for {@link InventoryMissionAllocation} — the per-entry mission quantity
- * slices of the Variante-C split (REQ-INV-027), the mission counterpart of {@link
- * InventoryJobOrderAllocationRepository}. Mission-inventory reads that used to read the scalar
- * {@code inventory_item.mission_id} traverse the allocation collection from {@link
- * InventoryItemRepository}.
+ * Spring Data repository for {@link InventoryMissionAllocation}, the per-entry mission quantity
+ * slices (REQ-INV-027) and mission counterpart of {@link InventoryJobOrderAllocationRepository}.
  */
 @Repository
 public interface InventoryMissionAllocationRepository

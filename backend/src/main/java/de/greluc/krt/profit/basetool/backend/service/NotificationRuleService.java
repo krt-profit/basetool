@@ -47,13 +47,9 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Admin CRUD service for {@link NotificationRule}s.
  *
- * <p>Updates replace the selector collection wholesale (clear + re-add, relying on orphan removal)
- * and use an explicit optimistic-lock check mirrored from {@code SystemSettingService}; {@code
- * saveAndFlush} returns the bumped version so the admin form can write it straight back.
- *
- * <p>All six {@link SelectorKind}s are writable (REQ-NOTIF-007: every rule, seeded or not, is
- * editable at runtime). The three event-derived kinds ({@code ACCOUNT_GRANT}, {@code
- * EVENT_RECIPIENT}, {@code ACCOUNT_RESPONSIBLE}) are stored with every selector column null.
+ * <p>Updates replace the selectors wholesale under an optimistic-lock check. All {@link
+ * SelectorKind}s are writable (REQ-NOTIF-007); event-derived kinds are stored with every selector
+ * column null.
  */
 @Service
 @RequiredArgsConstructor
@@ -215,13 +211,12 @@ public class NotificationRuleService {
   }
 
   /**
-   * Tells whether a selector kind resolves its recipients purely from the event and therefore reads
-   * none of the selector columns ({@code userId}, {@code roleCode}, {@code orgRelativeRole}, {@code
-   * contextRole}).
+   * Tells whether a selector kind resolves its recipients purely from the event and reads no
+   * selector columns.
    *
    * @param kind the selector kind
    * @return {@code true} for {@code ACCOUNT_GRANT}, {@code EVENT_RECIPIENT} and {@code
-   *     ACCOUNT_RESPONSIBLE}, {@code false} for every kind that is configured through its columns
+   *     ACCOUNT_RESPONSIBLE}
    */
   private static boolean readsOnlyTheEvent(@NotNull SelectorKind kind) {
     return kind == SelectorKind.ACCOUNT_GRANT

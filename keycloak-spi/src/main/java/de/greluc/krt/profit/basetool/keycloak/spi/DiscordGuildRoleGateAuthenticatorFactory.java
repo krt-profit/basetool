@@ -32,14 +32,8 @@ import org.keycloak.models.KeycloakSessionFactory;
 import org.keycloak.provider.ProviderConfigProperty;
 
 /**
- * Factory for {@link DiscordGuildRoleGateAuthenticator}.
- *
- * <p>Registered via {@code META-INF/services/org.keycloak.authentication.AuthenticatorFactory} so
- * the gate can be added as a {@code REQUIRED} execution to a custom <em>First Broker Login</em>
- * flow and bound to the Discord IdP. The config properties (guild id, KRT-Mitglied role id, API
- * base URL) are declared here so they are editable in the admin console; {@link
- * DiscordGuildRoleGateAuthenticator} reads them at authentication time to enforce the membership
- * gate.
+ * Factory for {@link DiscordGuildRoleGateAuthenticator}, declaring its admin-console config
+ * properties (guild id, KRT-Mitglied role id, API base URL).
  */
 public class DiscordGuildRoleGateAuthenticatorFactory implements AuthenticatorFactory {
 

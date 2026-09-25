@@ -37,10 +37,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Bank dashboard + statement exports end to end (REQ-BANK-014/-015/-016, epic #556): the D1
- * management dashboard renders the totals strip and per-account cards with their inline sparkline,
- * the account statement PDF downloads for a granted viewer, and the management three-month report
- * is management-gated (employee → 403).
+ * End-to-end tests of the bank dashboard and statement exports (REQ-BANK-014, REQ-BANK-015,
+ * REQ-BANK-016): totals and account cards render, the statement PDF downloads, and the management
+ * report is refused to employees.
  */
 @Tag("e2e")
 class BankDashboardE2eTest {

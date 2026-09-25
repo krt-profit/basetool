@@ -4,70 +4,6 @@
 # Copyright (C) 2026 Lucas Greuloch
 #
 # SPDX-License-Identifier: GPL-3.0-only
-#
-# Provisions the Keycloak client `basetool-android` and the DPoP client policy that gives it
-# refresh-token-only sender-constraining. Idempotent: re-running converges on the same state.
-#
-# WHY THIS IS A SCRIPT AND NOT A RUNBOOK
-# --------------------------------------
-# The Admin Console clickpath for client policies is eleven steps deep and the two endpoints it
-# writes are **realm-global lists that are replaced wholesale**. A hand-edit that forgets to carry
-# an existing profile forward deletes it silently, and nothing in the console warns. The realm has
-# no client policies today, so today that risk is zero and tomorrow it is not.
-#
-# WHAT THE ORDER OF OPERATIONS IS FOR
-# -----------------------------------
-# Experiment E1 (2026-08-17, docs/archive/ANDROID_API_EXPOSURE_PLAN.md section 7) established that while
-# the DPoP policy is attached to a client, Keycloak refuses **every** admin update to that client
-# with `invalid_client_metadata: DPoP token is disabled` — down to a description change. So the
-# order below is load-bearing, not stylistic:
-#
-#   1. detach our policy (if attached)   <- makes the client editable at all
-#   2. write the client
-#   3. write the marker client role      <- the policy's scoping handle
-#   4. write the client profile
-#   5. attach the policy
-#   6. verify
-#
-# A failure between 1 and 5 leaves the client unbound rather than half-bound; the script says so
-# and re-running finishes the job.
-#
-# WHAT THIS SCRIPT DELIBERATELY DOES NOT DO
-# -----------------------------------------
-# It does not install the realm-wide "S256 for public clients" policy of Phase 0's D1. That policy
-# has realm-wide blast radius (every public client, including the desktop extractor) whereas
-# everything here is scoped to one client by a marker role. Mixing them into one script would mean
-# one mistake takes out unrelated logins. It also never touches production directly: it runs where
-# the operator runs it, against the container the operator names.
-#
-# USAGE
-# -----
-# Authenticate kcadm first, inside the container, so no password reaches this process.
-# NOTE THE /auth: Keycloak serves under that relative path since ADR-0166, so a --server
-# without it answers 404 and kcadm reports that as a credentials failure.
-#
-# The default kcadm prefix is `docker exec -i <--container> /opt/keycloak/bin/kcadm.sh`, which fits
-# a LOCAL Docker Compose stack only. The dev/test container serves plain HTTP on 18080:
-#
-#   docker exec -it keycloak /opt/keycloak/bin/kcadm.sh config credentials \
-#       --server http://localhost:18080/auth --realm master --user <admin>
-#   scripts/provision-keycloak-mobile-client.py --profile test --dry-run
-#
-# PRODUCTION is rootless Podman: the container belongs to the service user `iri`, has a read-only
-# root filesystem (kcadm needs `--config` on the unit's tmpfs), serves HTTPS only on 18443
-# (`--https-port=18443 --http-enabled=false`) and needs a truststore for the self-signed connector.
-# There, run as root from `/` and pass the whole invocation with --kcadm-command, e.g.
-#
-#   cd / && python3 provision-keycloak-mobile-client.py --realm iri --profile prod --dry-run \
-#       --kcadm-command "sudo -n -u iri podman exec -i keycloak sh -c '...kcadm.sh ... --config ...' kcadm"
-#
-# The complete, exact procedure (truststore, credentials, the KCADM string, rollback basis and
-# cleanup) is docs/keycloak/README.md -> "Runbook — provisioning the mobile client
-# `basetool-android`"; do not improvise it from this header.
-#
-#   --dry-run      print every payload, write nothing
-#   (no flag)      apply
-#   --verify-only  assert the live state, change nothing
 
 from __future__ import annotations
 
@@ -84,9 +20,6 @@ POLICY_NAME = "krt-mobile-dpop-policy"
 AUDIENCE_MAPPER = "backend-audience"
 BACKEND_AUDIENCE = "basetool-backend"
 
-# Verified App Link only in production — a custom scheme is claimable by any installed app.
-# The dev/test realm additionally registers the loopback + custom-scheme fallbacks so the app can
-# be run against a local stack without an assetlinks.json.
 REDIRECT_URIS = {
     "prod": ["https://profit-base.online/app/callback"],
     "test": [
@@ -96,52 +29,12 @@ REDIRECT_URIS = {
     ],
 }
 
-# Per-client session bounds, in seconds: idle 30 d, max 180 d — a phone that is used monthly must
-# not be logged out, and the refresh token is sender-constrained, so a long window is affordable.
 SESSION_IDLE_SECONDS = 30 * 24 * 3600
 SESSION_MAX_SECONDS = 180 * 24 * 3600
 ACCESS_TOKEN_LIFESPAN_SECONDS = 300
 
-# The realm roles the app's token may carry.
-#
-# `fullScopeAllowed` below is false, so this list is the whole of it: a realm role that is not
-# named here never reaches the app. That matters more than it looks, because the backend does not
-# read the token's roles directly — `UserReconciliationService` REPLACES the local role set from
-# `realm_access.roles` on every login. A client with `fullScopeAllowed: false` and no scope
-# mappings therefore does not merely narrow the app's rights; it strips every member who logs in
-# through it, in the database, for the web app too. Measured on the test stack before this list
-# existed: a fresh app login as an account holding Admin + Officer + KRT Member left it holding the
-# authority-less `Guest` role of the time.
-#
-# Since ADR-0159 that outcome is louder rather than quieter: `Guest` is gone, an account that maps
-# to no role is refused with `403 NO_ROLE` (REQ-SEC-053), and the same misconfiguration locks the
-# member out instead of silently demoting them. The list below is what stands between the two.
-#
-# `Admin` WAS absent, and was asserted absent, until 2026-09-01 (owner decision reversing the
-# original one, REQ-SEC-035). It is granted now because withholding it did not narrow the app so
-# much as break it for the one member it mattered to. An administrator holds no Staffel membership
-# by design, so with `Admin` stripped from the token their app had no org unit to pin, no way to
-# widen a list, and the „Alle Org-Einheiten" state — which IS `adminAllScope` — resolved to their
-# own (empty) reach instead of to everything. Measured on the test stack 2026-09-01: the same
-# account read 784.8 SCU of Lager through the app's scope and 1403.4 SCU with `Admin` present.
-#
-# The old comment justified the ban as containment, and it is worth being exact about what that
-# containment actually was. The same unlocked phone also holds a 720-hour web session carrying the
-# full role set against a UI genuinely built for admin work, so the ban never kept an
-# administrator's rights off the device. What it did buy — and what is being given up — is that a
-# *stolen access token* replayed from another machine within its 300-second lifetime was
-# member-scoped rather than admin-scoped. That is the entire trade; REQ-SEC-035 states it rather
-# than implying it.
 MEMBER_REALM_ROLES = ["KRT Member", "Officer", "Bank Employee", "Bank Management", "Admin"]
 
-# No realm role is asserted absent any more.
-#
-# The converge-in-both-directions behaviour below is unchanged and still load-bearing: the scope is
-# set to exactly MEMBER_REALM_ROLES, so a role added by hand in the Admin Console is still taken
-# back on the next run, and --verify-only now reports any role on the scope that this list does not
-# name. What is gone is only the extra assertion that singled one role out. Kept as an explicit
-# empty list rather than deleted, so re-banning a role stays a one-line change and reads as a
-# decision rather than as an oversight.
 FORBIDDEN_REALM_ROLES: list[str] = []
 
 
@@ -150,11 +43,10 @@ class KcadmError(RuntimeError):
 
 
 class Kcadm:
-    """Thin wrapper around `kcadm.sh`, invoked through whatever command prefix is configured.
+    """Thin wrapper around `kcadm.sh`, invoked through the configured command prefix.
 
-    The default prefix runs the CLI *inside* the Keycloak container, which keeps the Admin API off
-    the host network entirely and reuses the credentials the operator established with
-    `kcadm.sh config credentials`. Tests substitute a stub prefix.
+    The default prefix runs the CLI inside the Keycloak container with the operator's existing
+    `kcadm.sh config credentials`.
     """
 
     def __init__(self, prefix: list[str], realm: str, dry_run: bool):
@@ -213,11 +105,8 @@ class Kcadm:
 def session_bounds(kc: Kcadm) -> tuple[int, int]:
     """The per-client session bounds to write, clamped to what the realm permits.
 
-    Keycloak refuses a client whose session idle/max **exceeds** the realm's SSO values
-    ("Client session idle timeout cannot exceed realm SSO session idle timeout"), so the intended
-    30 d / 180 d only writes cleanly against a realm configured that way — which production is.
-    Rather than fail on a realm that is set tighter, clamp and say so out loud: a silently
-    shortened session would surface much later as unexplained logouts.
+    Keycloak rejects client bounds above the realm's SSO values, so the intended 30 d / 180 d are
+    clamped to them, with a printed note.
     """
     realm = kc.get_realm()
     realm_idle = int(realm.get("ssoSessionIdleTimeout") or 0)
@@ -233,11 +122,10 @@ def session_bounds(kc: Kcadm) -> tuple[int, int]:
 
 
 def client_representation(redirect_uris: list[str], idle: int, maximum: int) -> dict:
-    """The full desired state of the client, per the app repo's security concept section 3.
+    """The full desired state of the client.
 
-    `dpop.bound.access.tokens` is pinned to "false" on purpose and is the single most important
-    value here: setting it true overrides the refresh-only profile and re-binds the access token,
-    which Spring Security's bearer filter then rejects outright.
+    `dpop.bound.access.tokens` must stay "false": true would DPoP-bind the access token, which the
+    backend's bearer filter rejects.
     """
     return {
         "clientId": CLIENT_ID,
@@ -247,17 +135,13 @@ def client_representation(redirect_uris: list[str], idle: int, maximum: int) -> 
         "enabled": True,
         "publicClient": True,
         "standardFlowEnabled": True,
-        # One login path, through a Custom Tab. Direct grants would also mis-report the DPoP
-        # binding (E1: ROPC binds the access token on the initial grant), so they stay off.
         "directAccessGrantsEnabled": False,
         "implicitFlowEnabled": False,
         "serviceAccountsEnabled": False,
         "consentRequired": False,
         "frontchannelLogout": False,
-        # Least privilege: the app gets only the roles it is explicitly assigned.
         "fullScopeAllowed": False,
         "redirectUris": redirect_uris,
-        # A native app sends no Origin, and CORS on the API stays closed.
         "webOrigins": [],
         "attributes": {
             "pkce.code.challenge.method": "S256",
@@ -275,10 +159,7 @@ def client_representation(redirect_uris: list[str], idle: int, maximum: int) -> 
 def dpop_profile() -> dict:
     """The client profile carrying the refresh-token-only bind enforcer.
 
-    Only `allow-only-refresh-token-binding` is on. The other two options are spelled out rather
-    than omitted because their defaults are what a reader will assume, and E1 showed
-    `enforce-authorization-code-binding-to-dpop` silently requires the per-client "require DPoP"
-    switch — which would re-bind the access token.
+    Only `allow-only-refresh-token-binding` is on; the other two options are set off explicitly.
     """
     return {
         "name": PROFILE_NAME,
@@ -300,11 +181,7 @@ def dpop_profile() -> dict:
 
 
 def dpop_policy() -> dict:
-    """The policy binding the profile to whichever client carries the marker role.
-
-    Keycloak has no condition that names clients directly; a marker client role plus the
-    `client-roles` condition is the documented way to scope a policy to one client.
-    """
+    """The policy binding the profile to whichever client carries the marker role (`client-roles` condition)."""
     return {
         "name": POLICY_NAME,
         "description": (
@@ -322,8 +199,7 @@ def dpop_policy() -> dict:
 def merge_by_name(existing: list[dict], desired: dict) -> list[dict]:
     """Replace the entry named like `desired`, or append it, preserving every other entry.
 
-    Both client-policy endpoints replace the whole realm-global list on write, so anything not
-    carried forward here is deleted. Order is preserved so a diff of two consecutive runs is empty.
+    The client-policy endpoints replace the whole realm-global list on write. Order is preserved.
     """
     replaced = False
     merged = []
@@ -339,10 +215,7 @@ def merge_by_name(existing: list[dict], desired: dict) -> list[dict]:
 
 
 def read_list(kc: Kcadm, path: str, key: str) -> list[dict]:
-    """Read one of the client-policy lists, dropping Keycloak's read-only global entries.
-
-    `globalProfiles` / `globalPolicies` come back on read and are rejected on write.
-    """
+    """Read one client-policy list under `key`, leaving out the read-only `global*` entries."""
     body = kc.get(path) or {}
     return list(body.get(key) or [])
 
@@ -353,8 +226,7 @@ def find_client(kc: Kcadm) -> dict | None:
 
 
 def detach_policy(kc: Kcadm) -> bool:
-    """Remove our policy from the realm list so the client becomes editable. Returns True if it was
-    attached."""
+    """Remove our policy from the realm list so the client becomes editable; True if it was attached."""
     policies = read_list(kc, "client-policies/policies", "policies")
     remaining = [p for p in policies if p.get("name") != POLICY_NAME]
     if len(remaining) == len(policies):
@@ -374,7 +246,6 @@ def upsert_client(kc: Kcadm, redirect_uris: list[str]) -> str | None:
         kc.write("create", "clients", desired, "client created")
         created = find_client(kc)
         return created["id"] if created else None
-    # Merge onto the live representation so unrelated fields Keycloak maintains survive.
     merged = dict(existing)
     merged.update(desired)
     merged["attributes"] = {**(existing.get("attributes") or {}), **desired["attributes"]}
@@ -421,12 +292,7 @@ def upsert_audience_mapper(kc: Kcadm, client_uuid: str) -> None:
 
 
 def upsert_realm_role_scope(kc: Kcadm, client_uuid: str) -> None:
-    """Grant exactly [MEMBER_REALM_ROLES] to the client's scope, and take back anything else.
-
-    Converges in both directions on purpose. Granting is what makes the app usable at all; taking
-    back is what keeps a role added by hand in the Admin Console from surviving the next
-    provisioning run, which is precisely how a scope grows without a decision.
-    """
+    """Grant exactly [MEMBER_REALM_ROLES] to the client's scope, and take back anything else."""
     assigned = kc.get(f"clients/{client_uuid}/scope-mappings/realm") or []
     assigned_names = {role.get("name") for role in assigned}
 
@@ -454,11 +320,7 @@ def upsert_realm_role_scope(kc: Kcadm, client_uuid: str) -> None:
 
 
 def drop_offline_access(kc: Kcadm, client_uuid: str) -> None:
-    """Remove the `offline_access` optional scope Keycloak assigns by default.
-
-    An offline token outlives every session bound above; the concept withholds it until there is a
-    reason to grant it.
-    """
+    """Remove the `offline_access` optional scope Keycloak assigns by default."""
     scopes = kc.get(f"clients/{client_uuid}/optional-client-scopes") or []
     for scope in scopes:
         if scope.get("name") == "offline_access":
@@ -471,11 +333,7 @@ def drop_offline_access(kc: Kcadm, client_uuid: str) -> None:
 def verify(kc: Kcadm, profile: str = "prod") -> list[str]:
     """Assert the live state matches the intent. Returns a list of problems; empty means good.
 
-    :param profile: which redirect-URI set the realm was provisioned with. The loopback
-        wildcard the `test` profile installs is deliberate -- a native app cannot know its
-        loopback port in advance -- so it is only a problem on `prod`. Without this the
-        script flagged a URI it had just written itself, and `--verify-only` could never
-        come back clean against a test stack.
+    :param profile: the redirect-URI set provisioned; a wildcard URI is a problem only on `prod`.
     """
     problems: list[str] = []
 
@@ -503,11 +361,6 @@ def verify(kc: Kcadm, profile: str = "prod") -> list[str]:
         problems.append(f"marker role '{MARKER_ROLE}' is missing — the policy matches nothing")
 
     scope = {role.get("name") for role in (kc.get(f"clients/{client['id']}/scope-mappings/realm") or [])}
-    # Two consequences, because they are genuinely different failures and a message that names the
-    # wrong one sends the reader hunting the wrong thing. A missing MEMBER role empties the claim
-    # and demotes the account in the database; a missing `Admin` leaves the row alone and instead
-    # strands the administrator inside the app, with nothing to pin and „Alle Org-Einheiten"
-    # resolving to their own empty reach.
     for name in MEMBER_REALM_ROLES:
         if name in scope:
             continue

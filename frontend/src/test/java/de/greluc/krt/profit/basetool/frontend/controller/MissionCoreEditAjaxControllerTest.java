@@ -56,14 +56,17 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC tests for the #589 in-place mission core-edit twin {@link
- * MissionWriteController#updateMissionAjax}: the success path returns the four fresh versions
- * (incl. the schedule version re-read after the PLANNED→ACTIVE auto-bump), an unedited microsecond
- * zoneless schedule time round-trips through the schedule PATCH instead of being nulled, a
- * {@code @Valid} failure returns a {@code 422} {@code {field: message}} map (messages resolved
- * exactly as {@code th:errors}) with no backend call, a backend {@code 409} is propagated as {@code
- * problem+json} preserving the {@code code}, and a header-less POST falls back to the classic
- * redirect handler.
+ * MVC tests for the in-place mission core-edit twin {@link
+ * MissionWriteController#updateMissionAjax}.
+ *
+ * <ul>
+ *   <li>Success returns the four fresh versions, including the schedule version after the
+ *       PLANNED→ACTIVE auto-bump.
+ *   <li>An unedited schedule time round-trips unchanged.
+ *   <li>A validation failure returns a {@code 422} field map without a backend call.
+ *   <li>A backend {@code 409} is relayed as {@code problem+json} with its {@code code}.
+ *   <li>A POST without the AJAX header falls back to the redirect handler.
+ * </ul>
  */
 @SpringBootTest
 class MissionCoreEditAjaxControllerTest {

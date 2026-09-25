@@ -18,34 +18,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * My-evaluations page module (/promotion/my-evaluations), extracted verbatim from the former inline
- * script of promotion-my-evaluations.html (ADR-0069, follow-up to #924).
- *
- * Fills each eligibility card's progress bar client-side by scraping the already-rendered per-check
- * fraction texts (the aggregate achieved/required pair is not on the DTO), and drives the "only open
- * requirements" checkbox filter through the delegated window.krtEvents bus. The toggle persists per
- * browser in localStorage (REQ-UI-017) and is restored on load.
- *
- * The block carried no Thymeleaf interpolation, so there is no inline bootstrap: the whole script
- * moved here unchanged (its `th:unless="${isAllSquadronsMode}"` gate now rides on the th:src tag).
- */
-
-/*
- * Progress-bar fill: client-side because the aggregate "achievedTotal /
- * requiredTotal" pair across all checks is not on the DTO and recomputing
- * it server-side just to render a CSS width would be wasted work. We
- * scrape the per-check fraction texts (already rendered in the table)
- * with the same logic the user reads visually.
- */
 function meFillProgressBars() {
     const cards = document.querySelectorAll('.eligibility-card');
     cards.forEach(function (card) {
-        // Use class selectors instead of [class^="..."]: the spans are rendered by
-        // th:classappend on an element without an initial class attribute, which makes
-        // Thymeleaf emit class=" check-status-ok" with a leading space. The attribute
-        // prefix selector would then fail to match while the tokenised classList still
-        // works — so the aggregate read 0/0 even when individual rows had real values.
         const fractions = card.querySelectorAll(
             '.checks-table tbody tr .check-status-ok, .checks-table tbody tr .check-status-missing',
         );
@@ -72,11 +47,6 @@ function meFillProgressBars() {
     });
 }
 
-/*
- * Filter "nur offene Voraussetzungen": hides satisfied check rows when
- * checked. Acts on .checks-table rows, not whole cards — even an "almost
- * eligible" card may still have one missing check the user wants to see.
- */
 function meApplyOpenFilter() {
     const input = document.getElementById('me-filter-open');
     const onlyOpen = !!(input && /** @type {HTMLInputElement} */ (input).checked);
@@ -87,13 +57,6 @@ function meApplyOpenFilter() {
     });
 }
 
-/*
- * Per-browser persistence of the "nur offene Voraussetzungen" toggle (REQ-UI-017): one JSON
- * object {onlyOpen: bool} under a single localStorage key. The filter is pure client-side row
- * hiding, so the restore just re-checks the box and re-applies the filter — no re-fetch and no
- * URL involvement. Absent key = no saved preference = the default (unchecked, all rows shown).
- * Guarded so privacy modes that deny storage degrade to the default instead of breaking.
- */
 const ME_FILTER_PREF_KEY = 'promotion_my_evaluations_filter';
 
 function meReadFilterPref() {
@@ -108,9 +71,7 @@ function meReadFilterPref() {
 function meWriteFilterPref(value) {
     try {
         localStorage.setItem(ME_FILTER_PREF_KEY, JSON.stringify(value));
-    } catch (_e) {
-        /* storage unavailable */
-    }
+    } catch (_e) {}
 }
 
 function mePersistOpenFilter() {
@@ -128,7 +89,6 @@ function meRestoreOpenFilter() {
     }
 }
 
-/* Change handler for the toggle: persist the new state, then re-apply the row filter. */
 function meOnOpenFilterChange() {
     mePersistOpenFilter();
     meApplyOpenFilter();

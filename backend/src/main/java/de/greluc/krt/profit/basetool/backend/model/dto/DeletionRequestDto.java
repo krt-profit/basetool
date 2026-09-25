@@ -25,24 +25,18 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * A member's Art. 17 erasure request, as read by the member on their profile and by an admin in the
- * queue (REQ-SEC-061).
+ * A member's Art. 17 erasure request as read by the member and by an admin (REQ-SEC-061).
  *
- * <p><b>The handle is populated only for the admin projection.</b> A member reading their own
- * request already knows who they are, and an admin cannot act on an anonymous request. Nothing else
- * about the member rides this DTO — no e-mail address and no Discord id.
- *
- * @param id the request's id, echoed back by the admin decide actions
- * @param version the optimistic-lock version, echoed back on every write (REQ-API-*)
+ * @param id the request's id
+ * @param version the optimistic-lock version
  * @param userId the requesting member
- * @param handle the requesting member's effective name; {@code null} on the member's own projection
+ * @param handle the member's effective name; {@code null} on the member's own projection
  * @param status where the request stands
- * @param eraseHistoryRequested whether the member also asked for the surviving handle snapshots to
- *     be anonymised — a wish an admin decides deliberately
+ * @param eraseHistoryRequested whether the member also asked for the handle snapshots to be
+ *     anonymised
  * @param requestedAt when the member raised it
  * @param decidedAt when it was decided or withdrawn, or {@code null} while pending
- * @param decisionNote the admin's recorded reasoning; set on a refusal, where Art. 12(4) requires
- *     the requester to be told why
+ * @param decisionNote the admin's reason, set on a refusal
  */
 public record DeletionRequestDto(
     UUID id,

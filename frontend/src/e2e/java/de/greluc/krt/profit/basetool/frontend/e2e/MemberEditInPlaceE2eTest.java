@@ -35,22 +35,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Functional coverage for the ADMIN member-management edit page ({@code /members/{id}/edit}), whose
- * page-level in-place save had no end-to-end test — {@code RoleAppointmentMatrixE2eTest} exercises
- * only the backend appointment API, and {@code RolePermissionsE2eTest} only {@code sec:authorize}
- * gating on the orders view.
+ * Verifies the in-place rank save on the admin member edit page ({@code /members/{id}/edit},
+ * REQ-FE-007): no reload, no error, no 409, and the backend persists the new rank.
  *
- * <p>It saves a member's rank through the in-place form (REQ-FE-007: {@code POST
- * /members/{id}/edit} with {@code X-Requested-With} → backend {@code PUT
- * /api/v1/users/{id}/attributes}), which runs through {@code window.krtFetch} without a page
- * reload, and asserts the write landed: no error toast, no optimistic-lock reload-confirm dialog,
- * the no-reload marker survived, and the backend persisted the new rank.
- *
- * <p>Actor: {@code test-admin} (the {@code /members} controller is {@code ADMIN}-gated). The edited
- * user is {@code test-member}, materialised in the backend via {@code getUserId} so the edit page
- * resolves. Rank is a top-level attribute editable regardless of squadron membership, so the test
- * mutates no membership state that sibling suites depend on. Tagged {@code @Tag("e2e")}: it mutates
- * data, so it runs only against the ephemeral stack.
+ * <p>Runs as {@code test-admin} editing {@code test-member}; it mutates data, so it runs only
+ * against the ephemeral stack.
  */
 @Tag("e2e")
 class MemberEditInPlaceE2eTest {
@@ -143,14 +132,10 @@ class MemberEditInPlaceE2eTest {
   }
 
   /**
-   * Clicks "Zweite Staffel hinzufügen" and asserts the second Staffel slot is actually revealed
-   * (REQ-ORG-017). Regression guard for the class-vs-inline visibility trap (ADR-0093): slot 2
-   * starts hidden through the {@code krtm-hidden} class, so the toggle script must flip that class
-   * — a stale attempt to override it with an inline {@code style.display} left the button vanishing
-   * while the slot stayed hidden.
+   * Clicks "Zweite Staffel hinzufügen" and asserts the second Staffel slot is revealed by toggling
+   * its {@code krtm-hidden} class (REQ-ORG-017, ADR-0093).
    *
-   * <p>{@code test-member} is seeded with no squadron membership, so the add button renders visible
-   * and slot 2 hidden. This is a pure client-side toggle (no backend write), so it mutates nothing.
+   * <p>A pure client-side toggle; mutates nothing.
    */
   @Test
   void revealsSecondStaffelSlotOnAdd() {

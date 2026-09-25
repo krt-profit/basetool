@@ -18,20 +18,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * Squadron-hangar page module, extracted verbatim from the former inline script of
- * hangar-squadron.html (ADR-0069, follow-up to #924).
- *
- * Binds the per-<details> expand toggles that drive the companion detail row (idempotent via
- * a _sqBound guard, re-run on krt:swapped so swapped-in rows bind too) and the in-place ship
- * search + page-size + pagination that swaps the #squadron-results fragment (epic #571 / #573);
- * the GET form and page links stay the no-JS fallback.
- */
-
-// Details toggle drives the companion row via a class; a tr:has(details[open]) sibling
-// selector would force a table-wide style recalculation on every toggle and visibly jank on
-// large tables. Bound per-<details> (idempotent via the _sqBound guard), and re-run after a
-// fragment swap so swapped-in rows get the binding too (epic #571 / #573).
 function bindSquadronDetailsToggles(root) {
     (root || document).querySelectorAll('tr.sq-row details').forEach(function (details) {
         if (details._sqBound) {
@@ -51,8 +37,6 @@ function bindSquadronDetailsToggles(root) {
 document.addEventListener('DOMContentLoaded', function () {
     bindSquadronDetailsToggles(document);
 
-    // In-place search + page-size + pagination (the page-size/pagination links carry the
-    // .page-btn class, so krtFetch.swap intercepts them). The GET form is the no-JS fallback.
     const filterForm = /** @type {HTMLFormElement | null} */ (
         document.getElementById('squadron-filter-form')
     );

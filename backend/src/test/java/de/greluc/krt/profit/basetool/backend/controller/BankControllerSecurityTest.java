@@ -57,11 +57,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MockMvc gate matrix for the bank surface (REQ-BANK-010): the role checks of the URL matrix and
- * the method-level {@code @PreAuthorize} annotations — incl. the two carve-outs that matter most:
- * members see <em>nothing</em>, and bank management does NOT pass the admin-only {@code
- * /api/v1/bank/admin/**} URL gate. Capability gates delegate to the (mocked) {@code
- * BankSecurityService}; its real decision logic is covered by {@code BankSecurityServiceTest}.
+ * MockMvc gate matrix for the bank surface (REQ-BANK-010): URL and {@code @PreAuthorize} role
+ * checks, including that members see nothing and bank management does not pass the admin-only
+ * {@code /api/v1/bank/admin/**} gate. Capability checks use a mocked {@code BankSecurityService}.
  */
 @SpringBootTest
 @ActiveProfiles("test")

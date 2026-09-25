@@ -46,12 +46,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Security-focused MockMvc tests for {@link OperationController#setPayoutStatus} — the per-row
- * "Bezahlt" toggle behind {@code PUT /api/v1/operations/{id}/payouts/paid-out}. The endpoint
- * enforces an asymmetric authorization rule: any mission manager (or higher via the role hierarchy)
- * can flip {@code paidOut=true}, but only ADMIN or OFFICER may clear it back to {@code false}. The
- * tests pin each branch of that gate so a future refactor does not accidentally collapse the
- * asymmetry back to a symmetric {@code hasRole('MISSION_MANAGER')} check.
+ * Security tests for {@link OperationController#setPayoutStatus}: any mission manager may set
+ * {@code paidOut=true}, only ADMIN or OFFICER may clear it.
  */
 @SpringBootTest
 class OperationPayoutPaidOutSecurityTest {

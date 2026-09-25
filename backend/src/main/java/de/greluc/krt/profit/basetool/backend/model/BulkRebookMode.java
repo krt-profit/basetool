@@ -20,15 +20,12 @@
 package de.greluc.krt.profit.basetool.backend.model;
 
 /**
- * Discriminator of the bulk rebooking (Massen-Umbuchen, REQ-INV-036): which kind of move the whole
- * marked selection performs.
+ * The kind of move a bulk rebooking (Massen-Umbuchen) performs on the whole selection
+ * (REQ-INV-036).
  *
- * <p>Unlike the single-row Umbuchen modal — which infers the personal direction from the source
- * row's own {@code personal} flag — a bulk selection can mix personal and shared rows, so the two
- * personal directions are named <em>explicitly</em> as separate modes. That makes the outcome
- * independent of what happens to be selected: {@link #PERSONALIZE} always ends with personal stock,
- * {@link #DEPERSONALIZE} always with shared stock, and rows that already sit in the requested
- * target state are skipped rather than flipped back and forth.
+ * <p>The personal directions are explicit: {@link #PERSONALIZE} always ends with personal stock,
+ * {@link #DEPERSONALIZE} always with shared stock, and rows already in the target state are
+ * skipped.
  */
 public enum BulkRebookMode {
 

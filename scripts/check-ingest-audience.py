@@ -4,36 +4,18 @@
 # Copyright (C) 2026 Lucas Greuloch
 #
 # SPDX-License-Identifier: GPL-3.0-only
-#
 """Fail when the ingest gateway's audience is paired with the backend's audience again.
 
-WHY THIS GATE EXISTS
---------------------
-The ingest gateway checks the JWT audience ``basetool-ingest``; the backend checks
-``basetool-backend``. They are NOT a copy-paste pair (ADR-0018 amendment 1, REQ-INGEST-011): every
-frontend session token carries ``basetool-backend``, so a gateway configured with it admits exactly
-the web-session tokens the client-identity gate exists to refuse -- and it does so silently, because
-the check still *passes*.
+The gateway's audience is ``basetool-ingest``; every frontend session token carries
+``basetool-backend`` (ADR-0018, REQ-INGEST-011).
 
-It has gone wrong twice already. A runbook written for the backend's audience gate swept the gateway
-along on 2026-08-18 (fixed in 3be2f24b0 in four places), and the fifth place -- the comment on
-``expected-audiences`` in ``ingest/src/main/resources/application.yml`` -- kept telling operators to
-set the backend's value until 2026-09-22. Both containers read the same key inside
-(``APP_SECURITY_JWT_EXPECTED_AUDIENCES``), which is why nobody noticed; a human reading the config
-cannot tell the two apart either. This check can.
-
-THE RULES
----------
-* **Rule A -- the gateway's Spring config.** In ``ingest/src/main/resources/application*.yml``, the
-  value of every ``expected-audiences:`` key and the comment block directly above it must not name
-  ``basetool-backend``. The comment is in scope on purpose: the 2026-09 defect *was* a comment.
-  ``application.yml`` must carry the key at all, or there is nothing to check (vacuity guard).
-* **Rule B -- the gateway's environment.** No tracked file may assign ``basetool-backend`` to
-  ``IRI_INGEST_EXPECTED_AUDIENCES`` -- as ``NAME=value`` (.env, runbooks), ``NAME: value`` (YAML)
-  or a ``${NAME:-value}`` default (compose). Historical records are exempt: the CHANGELOGs and
-  ``docs/archive/`` / ``docs/adr/`` describe what was, not what to do.
-* **Rule C -- the rendered ingest environment template.** ``quadlet/env.d/ingest.env.tmpl`` must not
-  hand ``APP_SECURITY_JWT_EXPECTED_AUDIENCES`` the backend's audience as a literal or a default.
+* **Rule A.** In ``ingest/src/main/resources/application*.yml`` neither an ``expected-audiences:``
+  value nor the comment block above it may name ``basetool-backend``; ``application.yml`` must
+  carry the key.
+* **Rule B.** No tracked file may assign ``basetool-backend`` to ``IRI_INGEST_EXPECTED_AUDIENCES``
+  (``=``, ``:`` or a ``:-`` default). CHANGELOGs, ``docs/archive/`` and ``docs/adr/`` are exempt.
+* **Rule C.** ``quadlet/env.d/ingest.env.tmpl`` must not give ``APP_SECURITY_JWT_EXPECTED_AUDIENCES``
+  the backend's audience.
 
 Usage::
 
@@ -55,9 +37,7 @@ INGEST_CONFIG_GLOB = "ingest/src/main/resources/application*.yml"
 INGEST_MAIN_CONFIG = "ingest/src/main/resources/application.yml"
 INGEST_ENV_TEMPLATE = "quadlet/env.d/ingest.env.tmpl"
 
-# Paths that record history rather than prescribe configuration.
 EXEMPT_PREFIXES = ("docs/archive/", "docs/adr/", "CHANGELOG")
-# This checker and its selftest necessarily spell out the forbidden pairing.
 SELF = "scripts/check-ingest-audience.py"
 
 KEY_LINE = re.compile(r"^(\s*)expected-audiences\s*:(.*)$")

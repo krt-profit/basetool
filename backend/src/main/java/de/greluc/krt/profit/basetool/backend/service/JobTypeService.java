@@ -43,12 +43,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Cached CRUD service for the {@code job_type} reference table.
- *
- * <p>Job types form a tree (each row may have a parent); the {@code archetype} enum classifies the
- * top-level family. Soft-delete via {@code active=false} rather than row removal so missions that
- * reference a retired job type keep working. Case-insensitive uniqueness on name is enforced
- * explicitly (with a localized 409 message) instead of relying on the DB unique index.
+ * Cached CRUD service for the {@code job_type} reference tree. Deletion is a soft delete ({@code
+ * active=false}) so referencing missions keep working; name uniqueness is case-insensitive and
+ * reported as a localized 409.
  */
 @Service
 @RequiredArgsConstructor
@@ -58,9 +55,8 @@ public class JobTypeService {
   private final JobTypeRepository jobTypeRepository;
 
   /**
-   * Used to clear the derived {@code is_mission_lead_participant} flag on participants whose
-   * planned job type loses the Einsatzleiter designation, so a stale flag cannot falsely trip the
-   * {@code uq_mission_participant_single_lead} partial unique index (#1113).
+   * Clears the derived mission-lead flag on participants whose job type loses the Einsatzleiter
+   * designation, so a stale flag cannot violate the single-lead unique index.
    */
   private final MissionParticipantRepository missionParticipantRepository;
 
@@ -79,7 +75,7 @@ public class JobTypeService {
   }
 
   /**
-   * Paged variant for the admin list with an {@code includeInactive} flag for soft-deleted entries.
+   * Returns a page of job types for the admin list, optionally including soft-deleted entries.
    *
    * @param archetype optional archetype filter
    * @param pageable page request
@@ -105,14 +101,13 @@ public class JobTypeService {
   }
 
   /**
-   * Persists a new job type. Resolves the parent reference via id so the caller can pass a shallow
-   * parent (id-only stub from a DTO). Duplicate name throws {@link DuplicateEntityException} → 409.
+   * Persists a new job type, resolving the parent by id.
    *
    * @param jobType transient entity
    * @return the persisted job type
    * @throws DuplicateEntityException when the name collides with an existing row
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the supplied
-   *     parent id does not resolve
+   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the parent id
+   *     does not resolve
    */
   @Transactional
   @CacheEvict(cacheNames = CacheConfig.JOB_TYPES_CACHE, allEntries = true)
@@ -134,8 +129,8 @@ public class JobTypeService {
   }
 
   /**
-   * Updates an existing job type. Optimistic-lock check is explicit (the DTO carries the expected
-   * version), duplicate-name check excludes the row being edited so a self-rename is a no-op.
+   * Updates a job type with an explicit version check; the duplicate-name check ignores the row
+   * itself.
    *
    * @param id job type primary key
    * @param jobTypeDto update payload
@@ -173,8 +168,8 @@ public class JobTypeService {
   }
 
   /**
-   * Soft-deletes a job type by flipping {@code active=false}. Hard delete would orphan every
-   * mission participant that still references the job type — the soft-delete keeps history usable.
+   * Soft-deletes a job type by setting {@code active=false}, keeping referencing participants
+   * valid.
    *
    * @param id job type primary key
    */
@@ -204,16 +199,12 @@ public class JobTypeService {
   }
 
   /**
-   * Applies the single "Einsatzleiter" (mission lead) designation to a job type. When {@code wants}
-   * is {@code false} the flag is cleared. When {@code true} the job type must be a {@link
-   * JobTypeArchetype#MISSION} leadership role (else {@link IllegalArgumentException} → 400), and
-   * any other job type currently carrying the designation is cleared first so at most one type is
-   * the Einsatzleiter (the DB partial unique index is the backstop). Operates on managed entities
-   * and relies on the caller's enclosing transaction.
+   * Sets or clears the single Einsatzleiter designation on a job type. Setting it requires a {@link
+   * JobTypeArchetype#MISSION} leadership type and clears it from any other type first. Runs in the
+   * caller's transaction.
    *
-   * @param jobType the job type being created/updated (its archetype + leadership flag are already
-   *     set)
-   * @param wants whether the caller wants this job type to be the Einsatzleiter designation
+   * @param jobType the job type being saved, archetype and leadership flag already set
+   * @param wants whether this job type should carry the designation
    * @throws IllegalArgumentException when designating a non-MISSION or non-leadership job type
    */
   private void applyMissionLeadDesignation(@NotNull JobType jobType, boolean wants) {

@@ -51,13 +51,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC tests for the #575 no-reload AJAX twins on {@link RefineryOrderWriteController}: update /
- * store / cancel, each routed by the {@code X-Requested-With} header so the classic form-POST
- * handlers stay the no-JS fallback. Verifies the navigation-target JSON on success, the 400 on a
- * validation/empty-goods failure, and the {@code propagateBackendError} RFC 7807 passthrough (409
- * {@code OPTIMISTIC_LOCK} relayed as {@code application/problem+json} with the {@code code}
- * preserved) that {@code krt-fetch.js} needs to keep its reload-vs-toast conflict UX on this
- * profit/refinery editing surface.
+ * MVC tests for the AJAX twins of {@link RefineryOrderWriteController} (update, store, cancel):
+ * navigation-target JSON on success, 400 on a validation or empty-goods failure, and a backend 409
+ * {@code OPTIMISTIC_LOCK} relayed as {@code application/problem+json} with its {@code code}.
  */
 @SpringBootTest
 @ActiveProfiles("test")

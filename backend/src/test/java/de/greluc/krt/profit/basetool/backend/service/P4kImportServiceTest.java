@@ -61,12 +61,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Pure-Mockito unit tests for {@link P4kImportService}: no Spring context and no database. The five
- * repositories and {@link SyncReportService} are mocked; a real Jackson 3 {@link JsonMapper} parses
- * the synthetic catalogs. Covers the load-bearing reconciliation paths: a GUID match enriches
- * fill-if-null, the {@code class_name} fallback backfills a null {@code external_uuid}, a non-null
- * differing {@code external_uuid} is kept (conflict reported) while {@code p4k_uuid} is still
- * stamped, and an existing unresolved blueprint ingredient is resolved by its stored Wiki UUID.
+ * Unit tests for {@link P4kImportService} with mocked repositories and {@link SyncReportService}
+ * and a real {@link JsonMapper}: GUID match enrichment, the {@code class_name} fallback, conflict
+ * reporting for a differing {@code external_uuid}, and ingredient resolution by Wiki UUID.
  */
 @ExtendWith(MockitoExtension.class)
 class P4kImportServiceTest {

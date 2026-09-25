@@ -36,13 +36,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Same-origin HTTP proxy used by the promotion-system admin pages to reach the backend's {@code
- * /api/v1/promotion/...} endpoints. Every write operation goes through this controller so the
- * browser never has to know the backend's hostname and the CSRF-protected session cookie is reused
- * via {@link BackendApiClient}.
- *
- * <p>Every endpoint is gated by the {@code ADMIN} or {@code OFFICER} role at the Spring Security
- * layer; the backend re-checks authorization, so this proxy is defence-in-depth.
+ * Same-origin proxy through which the promotion admin pages reach the backend's {@code
+ * /api/v1/promotion/...} endpoints via {@link BackendApiClient}; restricted to ADMIN and OFFICER.
  */
 @RestController
 @RequestMapping("/api/proxy/promotion")
@@ -208,14 +203,12 @@ public class PromotionProxyController {
   }
 
   /**
-   * Forwards an "upsert member evaluation" request to the backend. Personal evaluations are not
-   * routed through this endpoint – the manage page targets a {@code (userId, categoryId)} pair so
-   * officers can edit any member's grades.
+   * Forwards an upsert of a member's evaluation in one category to the backend.
    *
-   * @param userId the JWT-sub identifier of the evaluated member
+   * @param userId the evaluated member's JWT subject
    * @param categoryId the category the evaluation applies to
-   * @param body the validated payload including the version for optimistic locking
-   * @return the backend's response body for the upserted evaluation
+   * @param body the validated payload including the optimistic-lock version
+   * @return the backend's response for the upserted evaluation
    */
   @PutMapping("/evaluations/user/{userId}/category/{categoryId}")
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)

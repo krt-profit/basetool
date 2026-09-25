@@ -62,29 +62,13 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
  * Spring MVC controller for the Spezialkommando member page ({@code
- * /organisation/special-commands/{id}}): the SK header, its member roster, adding and removing
- * members and setting their Logistiker / Einsatzmanager flags — each classic POST→redirect handler
- * with its {@code X-Requested-With} AJAX twin (#582) that the page's {@code
- * special-command-detail.js} calls through {@code krtFetch} before re-swapping the {@code
- * membersResults} fragment.
+ * /organisation/special-commands/{id}}): the roster, adding and removing members and setting their
+ * Logistiker / Einsatzmanager flags, each with an AJAX twin.
  *
- * <p>The page lives outside {@code /admin/**} because it is not admin-only: besides an admin, the
- * SK's own lead (a member whose membership on that SK carries {@code SK_LEAD}) manages its members,
- * and REQ-ORG-005 keeps the whole admin area admin-only. It used to be {@code
- * /admin/special-commands/{id}}; {@link AdminSpecialCommandsPageController} now only redirects that
- * URL here.
- *
- * <p>Authorisation mirrors {@link LeitungPageController}: the class-level gate is {@link
- * Roles#ADMIN_OR_OFFICER}, because every SK lead carries the operative {@code OFFICER} grant, and
- * it only keeps plain members out of the page shell. The real authority is the backend's per-SK
- * {@code SpecialCommandSecurityService#canManageMembers}, which gates the SK read and every
- * membership endpoint these handlers proxy — an officer who does not lead this SK gets a 403 from
- * the backend, which the detail page turns into the standard 403 page and the AJAX twins relay.
- *
- * <p>The SK-lead toggle is not here. The lead seat is appointed from the tier above (admin, or the
- * Bereichsleiter of the parent Bereich on the Leitung page), never from within the SK, so its form
- * stays on {@link AdminSpecialCommandsPageController} and the page renders it only for admins
- * ({@code canToggleLead}).
+ * <p>Gated to {@link Roles#ADMIN_OR_OFFICER}; the backend's per-SK {@code
+ * SpecialCommandSecurityService#canManageMembers} admits only admins and the SK's lead. The SK-lead
+ * toggle lives on {@link AdminSpecialCommandsPageController}. Also compare {@link
+ * LeitungPageController}.
  */
 @Controller
 @UsesLayoutModel
@@ -117,21 +101,15 @@ public class SpecialCommandMembersPageController {
   private final FrontendAuthHelperService authHelperService;
 
   /**
-   * Renders the SK member page with the roster. Loads the SK and its members in two sequential
-   * backend calls (the roster is small and serial latency is dominated by render time). The
-   * add-member picker is a server-side searchable combobox (remote-users, #1193) that fetches
-   * matches from {@code /users/search} on demand, so no user list is preloaded.
+   * Renders the SK member page with its roster.
    *
-   * <p>Besides {@code specialCommand} and {@code members} the model carries {@code canToggleLead}
-   * ({@code true} for admins only — the lead-toggle column and its form render only then) and
-   * {@code backUrl} ({@code /admin/special-commands} for admins, {@code /organisation/leitung}
-   * otherwise). A backend 403 — the caller is an officer but not the lead of this SK — becomes an
-   * {@link AccessDeniedException} so the standard 403 page renders; any other failure, or an empty
-   * SK read, redirects to {@code backUrl} with an {@code error} query parameter.
+   * <p>The model carries {@code canToggleLead} (admins only) and {@code backUrl}. A backend 403
+   * becomes an {@link AccessDeniedException}; any other failure or an empty SK read redirects to
+   * {@code backUrl} with an {@code error} parameter.
    *
    * @param id Spezialkommando id.
-   * @param fragment when {@code "members"} only the member-roster fragment is rendered (AJAX
-   *     re-swap after an in-place member mutation, REQ-FE-005); otherwise the full page.
+   * @param fragment {@code "members"} to render only the roster fragment (REQ-FE-005); otherwise
+   *     the full page.
    * @param model Thymeleaf model populated with the SK, the member roster, {@code canToggleLead}
    *     and {@code backUrl}.
    * @return the {@code organisation/special-command-detail} view name, its {@code membersResults}
@@ -234,15 +212,9 @@ public class SpecialCommandMembersPageController {
   }
 
   /**
-   * Sets the per-membership Logistician + Mission Manager flags (no-JS fallback). The form is bound
-   * as a model attribute onto a {@link MembershipFlagsForm} so Spring's data binder honours the
-   * {@code _<field>} hidden marker the form emits before each checkbox: an unchecked box surfaces
-   * as {@code false} instead of being missing from the payload, which the backend would read as "no
-   * change" and so silently break the demote-via-uncheck path.
-   *
-   * <p>Both flag values are forwarded as concrete {@code true} / {@code false}; the page never
-   * partial-updates, every submission carries both checkboxes and the optimistic-lock version. A
-   * 409 surfaces as the concurrency-conflict toast.
+   * Sets the per-membership Logistician and Mission Manager flags (no-JS fallback), always sending
+   * both values and the optimistic-lock version; an unchecked box binds as {@code false} via {@link
+   * MembershipFlagsForm}. A 409 surfaces as the concurrency-conflict toast.
    *
    * @param id Spezialkommando id.
    * @param userId user whose flags to set.
@@ -433,9 +405,7 @@ public class SpecialCommandMembersPageController {
   }
 
   /**
-   * Parses an ISO-8601 instant (or, as a fallback, long epoch millis) into {@link Instant}. The
-   * membership wire shape carries {@code joinedAt} as ISO-8601; the conservative branching keeps
-   * the page rendering if that format ever changes.
+   * Parses an ISO-8601 instant, or epoch millis as a fallback, into an {@link Instant}.
    *
    * @param o the raw {@code joinedAt} value.
    * @return the parsed instant, or {@code null} when absent or unparsable.
@@ -461,9 +431,8 @@ public class SpecialCommandMembersPageController {
   }
 
   /**
-   * Parses the {@code kind} string into the typed {@link OrgUnitKind} enum. Defaults to {@link
-   * OrgUnitKind#SPECIAL_COMMAND} on a missing or unknown value — this page only ever renders SK
-   * memberships, so a malformed payload still lands as the most plausible value.
+   * Parses the {@code kind} string into an {@link OrgUnitKind}, defaulting to {@link
+   * OrgUnitKind#SPECIAL_COMMAND} for a missing or unknown value.
    *
    * @param o the raw {@code kind} value.
    * @return the parsed kind; never {@code null}.

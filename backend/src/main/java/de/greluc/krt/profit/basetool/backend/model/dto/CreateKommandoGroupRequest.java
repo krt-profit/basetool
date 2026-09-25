@@ -23,10 +23,10 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 /**
- * Request body to create a Kommandogruppe within a Staffel (epic #800, REQ-ROLE-003). The squadron
- * is taken from the path; at most four groups per squadron are allowed (enforced by the service
- * pre-check and the V185 DB trigger). The new group is appended at the end of the squadron's order.
+ * Request body to create a Kommandogruppe within the Staffel named in the path (REQ-ROLE-003).
  *
- * @param name the group's display name; required, 1–120 chars.
+ * <p>At most four groups per squadron; the new group is appended last.
+ *
+ * @param name the group's display name; 1–120 chars
  */
 public record CreateKommandoGroupRequest(@NotBlank @Size(max = 120) String name) {}

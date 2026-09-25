@@ -39,11 +39,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
-/**
- * Pure-method unit tests for {@link ShipTypeController}. Ship-types are UEX-imported (see {@code
- * UexVehicleService}); only the {@code hidden} flag is mutable here. The list endpoint reuses the
- * {@link ShipMapper} that the ShipMapperTest already covers — here we only verify delegation.
- */
+/** Unit tests for {@link ShipTypeController}: delegation and the {@code hidden} flag update. */
 @ExtendWith(MockitoExtension.class)
 class ShipTypeControllerTest {
 

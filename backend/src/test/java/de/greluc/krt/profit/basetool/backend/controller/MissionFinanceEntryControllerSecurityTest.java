@@ -54,23 +54,15 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Security-focused MockMvc tests for {@link MissionFinanceEntryController#createFinanceEntry} and
- * the finance-read endpoints. The finance ledger is the mission's payout view and is restricted to
- * registered members and above ({@code isMemberOrAbove}): anonymous callers AND authenticated but
- * role-less {@code GUEST} accounts are blocked, mirroring the "treat guest like anonymous on the
- * mission surface" rule. The rules pinned here are:
+ * Security tests for {@link MissionFinanceEntryController#createFinanceEntry} and the finance
+ * reads, restricted to members and above:
  *
  * <ul>
- *   <li>anonymous create → 401 (URL gate requires authentication), no service call,
- *   <li>role-less GUEST create → 403 (method gate requires a member), no service call,
- *   <li>member / officer create on an in-scope mission → 201 with the nested participant's email
- *       stripped (H-1),
- *   <li>member create on a mission they may only <em>read</em> → 403, because the write gate is
- *       {@code canCreateFinanceEntry} and not the public-escape-granting {@code canSeeMission}
- *       (REQ-SEC-042),
- *   <li>GUEST read → 403; member / officer read → 200 with participant email stripped,
- *   <li>oversized {@code note} or out-of-range {@code amount} (member caller) → 400 before the
- *       service is hit.
+ *   <li>anonymous create → 401, role-less create → 403, no service call;
+ *   <li>member / officer create on an in-scope mission → 201 with participant e-mail stripped;
+ *   <li>member create on a mission they may only read → 403 (REQ-SEC-042);
+ *   <li>role-less read → 403; member / officer read → 200 with participant e-mail stripped;
+ *   <li>oversized {@code note} or out-of-range {@code amount} → 400 before the service.
  * </ul>
  */
 @SpringBootTest
@@ -99,10 +91,8 @@ class MissionFinanceEntryControllerSecurityTest {
   }
 
   /**
-   * An authenticated but role-less account — passes {@code isAuthenticated()} but not a member
-   * gate. It used to be {@code ROLE_GUEST}, the role every account with no realm role was mapped
-   * onto; {@code V239} deleted it and {@code ROLE_NO_ROLE} is the marker that replaced it
-   * (REQ-SEC-053).
+   * An authenticated but role-less authority that passes {@code isAuthenticated()} but no member
+   * gate (REQ-SEC-053).
    */
   private static SimpleGrantedAuthority roleLess() {
     return new SimpleGrantedAuthority("ROLE_NO_ROLE");
@@ -245,15 +235,7 @@ class MissionFinanceEntryControllerSecurityTest {
   }
 
   /**
-   * REQ-SEC-042: a member who may merely <em>see</em> the mission may not book into its ledger.
-   *
-   * <p>This is the regression the create gate shipped with: it was gated on {@code
-   * ownerScopeService.canSeeMission}, which deliberately grants the cross-squadron public escape on
-   * a non-internal mission. A member of another squadron could therefore post income/expense rows
-   * into that mission's payout ledger and attribute them to one of its participants — while editing
-   * or deleting the very same row required being its owner or an officer in scope. The stub below
-   * reproduces exactly that state: the read gate says yes, the write gate says no, and the write
-   * gate is the one that decides.
+   * Verifies that a member who may only see the mission may not book into its ledger (REQ-SEC-042).
    */
   @Test
   void createFinanceEntry_memberWhoMayOnlySeeTheMission_isForbidden() throws Exception {

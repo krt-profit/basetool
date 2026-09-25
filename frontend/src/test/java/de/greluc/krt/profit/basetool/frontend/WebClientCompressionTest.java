@@ -43,16 +43,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
- * Pins that neither backend connector of {@link
- * de.greluc.krt.profit.basetool.frontend.config.WebClientConfig} asks the backend for gzip
- * (BE-PERF-14, ADR-0161 §8.5 amendment 2026-09-23).
- *
- * <p>The frontend→backend hop is a container bridge on one host. Measured on the real embedded
- * Tomcat, gzip on a 210 KB page cost about 1.6 ms of CPU per response across both ends and made the
- * request 1.6–3.2 ms slower, while the byte saving it bought is worth nothing on that hop. So the
- * regular connector ({@code webClient}, {@code termsDocumentClient}) sends no {@code
- * Accept-Encoding}, exactly like the SSE relay connector ({@code sseWebClient}) always did — where
- * per-event gzip would only buffer the stream. A backend that is not asked never compresses.
+ * Verifies that no backend connector of {@link
+ * de.greluc.krt.profit.basetool.frontend.config.WebClientConfig} sends {@code Accept-Encoding}, so
+ * the backend never compresses its responses (BE-PERF-14, ADR-0161).
  */
 @SpringBootTest
 @ActiveProfiles("test")

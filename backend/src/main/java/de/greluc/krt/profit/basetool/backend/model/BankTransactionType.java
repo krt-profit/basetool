@@ -56,9 +56,9 @@ public enum BankTransactionType {
   WIPE_RESET,
 
   /**
-   * Correction booking: its legs are the negated mirror of the reversed transaction's legs on both
-   * ledgers, and it references the original via {@link BankTransaction#getReversedTransaction()}. A
-   * transaction can be reversed at most once (V153 unique constraint).
+   * Correction booking: its legs negate the reversed transaction's legs on both ledgers, and it
+   * references the original via {@link BankTransaction#getReversedTransaction()}. A transaction can
+   * be reversed at most once.
    */
   REVERSAL
 }

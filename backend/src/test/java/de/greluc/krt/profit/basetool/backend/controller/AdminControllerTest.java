@@ -49,12 +49,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
 /**
- * Pure-Mockito unit tests for {@link AdminController}. The controller is small but each endpoint
- * touches a different MapStruct mapper — the role/user-DTO conversion is the spot where an
- * accidental copy-paste during a future refactor would silently leak a JPA entity through the REST
- * boundary (the ArchUnit rule catches the static return type but not the entity *inside* the mapper
- * output). These tests pin the explicit toDto-call on the response path so the conversion stays in
- * place.
+ * Pure-Mockito unit tests for {@link AdminController}, pinning the mapper call on each response
+ * path so no JPA entity leaks through the REST boundary.
  */
 @ExtendWith(MockitoExtension.class)
 class AdminControllerTest {

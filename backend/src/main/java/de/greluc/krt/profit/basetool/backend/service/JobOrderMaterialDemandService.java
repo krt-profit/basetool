@@ -50,17 +50,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Builds the cross-order material-demand overview (REQ-ORDERS-034): the material still to be
- * gathered across <em>every</em> non-terminal job order the caller may see, folded into one row per
- * {@code (responsible org unit, material, quality)} bucket.
- *
- * <p>This is the aggregate sibling of the per-order material view. The order detail answers "what
- * does this order need"; this service answers "what does my unit still have to gather in total", a
- * question that previously required opening every order and adding up by hand. Both read the same
- * underlying figures — the same outstanding requirements and the same order-linked stock sums — so
- * a bucket here always reconciles with the orders behind it.
- *
- * <p>Read-only and side-effect free: it maps, sums and sorts, never mutating an entity.
+ * Builds the read-only cross-order material-demand overview (REQ-ORDERS-034): the material still to
+ * gather across every non-terminal job order the caller may see, one row per {@code (responsible
+ * org unit, material, quality)}.
  */
 @Slf4j
 @Service
@@ -95,18 +87,10 @@ public class JobOrderMaterialDemandService {
 
   /**
    * Aggregates the caller's visible, non-terminal job orders into the per-org-unit material demand.
+   * All lookups are batched for the whole result (REQ-DATA-003).
    *
-   * <p>The caller's visibility scope is pushed into SQL (including the SK-public escape), and the
-   * viewer-side profit gate is applied first, so a caller outside the order workflow gets an empty
-   * overview rather than a partial one. Every multi-order lookup is batched once for the whole
-   * result — the linked stock through {@link
-   * JobOrderStockProjectionService#loadOrderLinkedStockIndex(java.util.Collection)} and the claims
-   * through {@link MaterialClaimService#getClaimBucketsForOrders(List)} — so the aggregation adds
-   * no N+1 over orders, materials or inventory (REQ-DATA-003).
-   *
-   * @return the overview, its groups ordered by org-unit shorthand and each group's rows SCU-first
-   *     then by material name; empty (but never {@code null}) when the caller may see no
-   *     non-terminal order.
+   * @return the overview, grouped by org-unit shorthand with rows SCU first then by material name;
+   *     empty, never {@code null}, when the caller sees no non-terminal order.
    */
   @NotNull
   @Transactional(readOnly = true)
@@ -225,10 +209,7 @@ public class JobOrderMaterialDemandService {
   }
 
   /**
-   * Rounds an aggregated amount to the precision its material's unit can express, so a summed PIECE
-   * material never surfaces a fractional count and an SCU sum never shows floating-point noise
-   * (REQ-ORDERS-001/002). Rounding happens on the <em>sum</em>, not per contribution, so the group
-   * total and its drill-down shares stay consistent to the displayed precision.
+   * Rounds a summed amount to the precision of its material's quantity type (REQ-ORDERS-001/002).
    *
    * @param value the raw summed amount.
    * @param material the material whose quantity type selects the granularity.
@@ -239,9 +220,8 @@ public class JobOrderMaterialDemandService {
   }
 
   /**
-   * The grouping key of an order: its responsible org unit's id, or a nil UUID for the fallback
-   * group that collects orders whose responsible unit is absent. Using a sentinel rather than a
-   * {@code null} key keeps such demand visible instead of dropping it.
+   * Returns the grouping key of an order: its responsible org unit's id, or the nil UUID for orders
+   * without one.
    *
    * @param order the order to key.
    * @return the group key.
@@ -255,9 +235,7 @@ public class JobOrderMaterialDemandService {
   }
 
   /**
-   * Maps the responsible OrgUnit to its badge reference, tolerating the absent unit the fallback
-   * group exists for. Invoked once per group (from {@code computeIfAbsent}), not once per
-   * contributing order.
+   * Maps the responsible org unit to its badge reference.
    *
    * @param orgUnit the responsible org unit, possibly {@code null}.
    * @return the reference DTO, or {@code null} for the fallback group.

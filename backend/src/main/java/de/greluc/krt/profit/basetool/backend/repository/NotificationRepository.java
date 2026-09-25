@@ -124,14 +124,6 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
    * Deletes <em>unread</em> notifications created before the cutoff; the second half of the
    * scheduled retention sweep (REQ-NOTIF-009).
    *
-   * <p>Anchored on {@code createdAt} rather than {@code readAt}, which is {@code null} precisely
-   * because the row was never read — so an unread notification's only age is how long ago it was
-   * raised. Without this statement the sweep reached read rows only, and an inbox nobody opens kept
-   * the triggering member's handle indefinitely: the retention promise made to members applied to
-   * the diligent and not to the absent. The window is deliberately longer than the read one (a
-   * notification still waiting to be seen is worth more than one already consumed), but it is
-   * finite.
-   *
    * @param cutoff delete unread notifications created before this instant
    * @return the number of rows deleted
    */
@@ -140,20 +132,11 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
   int deleteUnreadOlderThan(@Param("cutoff") Instant cutoff);
 
   /**
-   * Deletes the complete notification history of one recipient, read and unread alike, as part of
-   * the hard account deletion (REQ-DATA-008). {@code recipient_user_id} was a loose reference with
-   * no foreign key to {@code app_user} (V155) until V235 added one with {@code ON DELETE CASCADE};
-   * the explicit delete stays so the purge is counted inside the deletion transaction.
+   * Deletes the complete notification history of one recipient, read and unread, as part of the
+   * hard account deletion (REQ-DATA-008).
    *
-   * <p>The stated reason for this method used to be that the retention sweep only ever reaps
-   * <em>read</em> rows, so a departed member's unread backlog would otherwise survive forever. That
-   * stopped being true when {@link #deleteUnreadOlderThan(Instant)} shipped (REQ-NOTIF-009). The
-   * method is still needed, for a different reason: the sweep's windows are 90 and 180 days, and a
-   * deleted account's inbox must go <em>now</em> rather than at the end of one of them.
-   *
-   * <p>Deliberately without {@code clearAutomatically}: this runs inside the user-deletion
-   * transaction, where evicting the persistence context would detach the {@code User} row that is
-   * about to be deleted.
+   * <p>Runs inside the user-deletion transaction and therefore does not clear the persistence
+   * context.
    *
    * @param recipientUserId Keycloak {@code sub} of the departing recipient (equal to {@code
    *     app_user.id})

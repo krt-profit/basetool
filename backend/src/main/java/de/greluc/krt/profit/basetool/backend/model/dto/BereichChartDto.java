@@ -24,23 +24,18 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * One Bereich tier of the multi-Bereich org chart (epic #692, REQ-ORG-026): its Bereichsleitung
- * sub-tree plus the Staffeln and Spezialkommandos that report into it, tinted by the Bereich's
- * frozen {@link Department Bereichsfarbe}.
+ * One Bereich tier of the org chart (REQ-ORG-026): its Bereichsleitung plus the Staffeln and
+ * Spezialkommandos reporting into it, tinted by its {@link Department Bereichsfarbe}.
  *
- * <p>The Bereichsleitung is carried as an {@link AreaLeadershipDto} (reused for layout symmetry
- * with the legacy area leadership): its {@code lead} is the Bereichsleiter, {@code coordinators}
- * the Bereichskoordinatoren and {@code operators} the Bereichsoperatoren; {@code commanders} is
- * always empty (a Bereich has no commander rank). The {@code squadrons} / {@code specialCommands}
- * are this Bereich's child units, reusing the existing {@link SquadronChartDto} / {@link
- * SpecialCommandChartDto} so the per-unit rendering (and the existing ARIA tree) is unchanged.
+ * <p>In the {@link AreaLeadershipDto}, {@code lead} is the Bereichsleiter, {@code coordinators} and
+ * {@code operators} the Bereichskoordinatoren and -operatoren; {@code commanders} is always empty.
  *
  * @param orgUnitId the Bereich's org-unit id.
  * @param name the Bereich's display name.
  * @param shorthand the Bereich's short tag.
- * @param department the Bereich's department / Bereichsfarbe, or {@code null} when unassigned (the
- *     chart renders the Bereich untinted).
- * @param leadership the Bereichsleitung sub-tree (Bereichsleiter + koordinatoren + operatoren).
+ * @param department the Bereich's Bereichsfarbe, or {@code null} when unassigned (rendered
+ *     untinted).
+ * @param leadership the Bereichsleitung sub-tree.
  * @param squadrons the Bereich's Staffeln, ordered by name.
  * @param specialCommands the Bereich's Spezialkommandos, ordered by name.
  */

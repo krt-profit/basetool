@@ -49,9 +49,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
- * Mockito unit tests for {@link OrgHierarchyService} (epic #692, REQ-ORG-014). Pins the Bereich/OL
- * creation contract (name uniqueness, the OL singleton guard, parent-kind validation on create) and
- * the set-parent kind pairing + optimistic-lock semantics.
+ * Unit tests for {@link OrgHierarchyService} (REQ-ORG-014): Bereich and OL creation, the OL
+ * singleton guard, and parent-kind and optimistic-lock checks on set-parent.
  */
 @ExtendWith(MockitoExtension.class)
 class OrgHierarchyServiceTest {

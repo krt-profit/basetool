@@ -23,18 +23,10 @@ import org.jetbrains.annotations.NotNull;
 
 /**
  * An {@link org.springframework.security.core.Authentication} that carries an OIDC subject without
- * a token behind it.
+ * a token behind it, such as the ingest gateway's acting-member authentication (ADR-0129).
  *
- * <p>Implemented by the acting-member authentication the ingest gateway's identity swap installs
- * (ADR-0129). {@link AuthenticatedSubject} needs some way to tell that apart from every other
- * token-less authentication, and the obvious candidate — {@code getName()} — is the one thing it
- * must <strong>not</strong> use: on a {@code UsernamePasswordAuthenticationToken} the name is the
- * member's callsign, and REQ-OBS-004 forbids that value from reaching a log line or an MDC field
- * because it is PII. A blanket name fallback would have leaked callsigns into the {@code userId}
- * field of every log line for such a caller.
- *
- * <p>So the promise is explicit rather than inferred: implementing this interface asserts that
- * {@link #subject()} is an OIDC {@code sub}, and nothing else opts in.
+ * <p>Implementing it asserts that {@link #subject()} is an OIDC {@code sub}; {@link
+ * AuthenticatedSubject} never falls back to {@code getName()}, which may be a callsign.
  */
 public interface SubjectAuthentication {
 

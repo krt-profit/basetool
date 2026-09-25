@@ -89,35 +89,14 @@ import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Spring MVC controller for every state-mutating {@code /missions} endpoint: participant
- * join/edit/delete/check-in/check-out (classic form posts and their slim AJAX twins), units and
- * crews, managers/owner/owning-org-unit, party lead, frequencies (typed and custom), Ablauf steps,
- * goals (Ziele), payout preference, actual-time stamping and the mission create/update/delete
- * flows.
+ * Spring MVC controller for every state-mutating {@code /missions} endpoint: participants, units
+ * and crews, managers and ownership, party lead, frequencies, Ablauf steps, goals, payout
+ * preference, actual times, and mission create/update/delete.
  *
- * <p>Carved out of {@link MissionPageController} in the #924 L5 read/write split. Every handler
- * body moved over verbatim - routes, security annotations and behaviour are unchanged; validation
- * failures of the classic form posts re-render the mission-detail or create view by delegating to
- * the injected read controller, and AJAX failures re-emit the upstream RFC 7807 problem through
- * {@link MissionPageController#propagateBackendError}. The participant endpoints (add,
- * check-in/check-out, payout preference and the participant slim-AJAX family) used to carry no
- * {@code @PreAuthorize} of their own, deliberately, so that a caller with no login could sign
- * themselves up for an Einsatz. That audience is gone (ADR-0159) and the class-level floor below
- * covers them; the sentence that used to stand here told the next reader that adding security to
- * them was a known regression, which would now be advice to re-open the surface.
- *
- * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor. Every
- * handler here used to sit under a {@code permitAll} URL rule, and thirteen of them across this
- * package carried no gate of their own at all — protected by a matcher two folders away rather than
- * by anything next to the code. A method-level gate still wins where one is present.
- *
- * <p><b>Which is why the method-level {@code isAuthenticated()} annotations were removed and the
- * template {@code sec:authorize} guards were not.</b> Redundancy with a gate in the same file is
- * noise: twenty-eight of them stood here restating the line above, and a reader scanning for the
- * handlers that are gated more strictly than the floor had to read every one to find out that most
- * were not. Redundancy with a URL matcher two folders away is defence in depth — the arrangement
- * this change set out to end — and that is the kind the floor itself is. The two look alike and are
- * opposites.
+ * <p>Classic form-post validation failures re-render through the injected {@link
+ * MissionPageController}; AJAX failures relay the upstream RFC 7807 problem through {@link
+ * MissionPageController#propagateBackendError}. The class-level {@code isAuthenticated()} gate is
+ * the floor for every handler (REQ-SEC-052).
  */
 @Controller
 @UsesLayoutModel
@@ -128,10 +107,8 @@ import tools.jackson.databind.json.JsonMapper;
 public class MissionWriteController {
 
   /**
-   * Response type for the single-mission {@code /api/v1/missions/{id}} read. Verbatim private
-   * mirror of the read-side {@code MissionPageController} constant (#924, L5): the party-lead and
-   * owning-org-unit AJAX writes re-read the mission after a successful mutation to return the
-   * refreshed payload to the in-place fragment update.
+   * Response type for the single-mission {@code /api/v1/missions/{id}} read that refreshes the
+   * payload after a party-lead or owning-org-unit write.
    */
   private static final ParameterizedTypeReference<MissionDto> MISSION =
       new ParameterizedTypeReference<MissionDto>() {};
@@ -144,33 +121,20 @@ public class MissionWriteController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Resolves Jakarta {@code @Valid} field-error messages for the {@link #updateMissionAjax} twin's
-   * {@code {field: message}} JSON contract, using the same {@code
-   * messageSource.getMessage(fieldError, locale)} resolution Thymeleaf's {@code th:errors} performs
-   * — so an inline validation message is byte-identical to the classic full-page re-render and the
-   * well-tested validation UX is preserved.
+   * Resolves {@code @Valid} field-error messages for {@link #updateMissionAjax} exactly as {@code
+   * th:errors} does.
    */
   private final MessageSource messageSource;
 
   /**
-   * Read-side mission controller. A Jakarta {@code @Valid} failure on one of the classic form posts
-   * must re-render the fully populated mission-detail (or create) view inline - the BindingResult
-   * stays request-scoped and the modal re-opens with the field errors - so those handlers delegate
-   * to {@code missionPageController.missionDetail(...)} / {@code createMissionForm(...)}, following
-   * the precedent set by {@link MissionFinancePageController}. The injected instance is a Spring
-   * proxy, so the read methods' own security annotations still fire when called via this
-   * delegation.
+   * Read-side mission controller, used to re-render the detail or create view inline on a
+   * validation failure of a classic form post.
    */
   private final MissionPageController missionPageController;
 
   /**
-   * Server-side live-sync publish seam (REQ-FE-015, ADR-0094, #1235). A mission create, core update
-   * or delete pokes the global {@code missions} list room from here rather than from the client
-   * because all three flows <b>navigate away</b> (redirect to the detail page or back to the list):
-   * a client-side broadcast issued just before that navigation races the socket teardown, while a
-   * server publish is ordered after the mutation actually succeeded. Section edits that do not
-   * surface on the list (participants, units, crew, party lead) deliberately do not publish here —
-   * they ride the per-mission {@code mission:&#123;id&#125;} room instead.
+   * Server-side live-sync publish seam that notifies the global {@code missions} list room after a
+   * mission create, core update or delete (REQ-FE-015).
    */
   private final LiveSyncLocalBus liveSyncLocalBus;
 
@@ -178,28 +142,15 @@ public class MissionWriteController {
   private static final List<String> MISSIONS_LIST_SECTION = List.of("list");
 
   /**
-   * Parses the create form's {@code objectivesJson} / {@code stepsJson} hidden carriers into the
-   * backend create request's nested {@code objectives} / {@code steps} lists. A controller-owned
-   * instance — the frontend application context registers no {@code ObjectMapper} bean, and
-   * Jackson's mapper is thread-safe once configured — initialised at declaration so Lombok's {@code
-   * RequiredArgsConstructor} keeps it out of the generated constructor signature.
-   *
-   * <p>Jackson 3, like every frontend class but the Thymeleaf JavaScript bridge (FE-MOD-04). It
-   * used to be a Jackson 2 {@code new ObjectMapper()}, which rejects an unknown property; Jackson
-   * 3's default ignores one. {@code FAIL_ON_UNKNOWN_PROPERTIES} is switched back on so a carrier
-   * row with a misspelt key still fails the create instead of silently dropping the value.
+   * Jackson mapper that parses the create form's {@code objectivesJson} / {@code stepsJson}
+   * carriers, failing on unknown properties.
    */
   private final JsonMapper objectMapper =
       JsonMapper.builder().enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build();
 
   /**
-   * Web binder configuration scoped to this controller. Registers any custom property editors
-   * needed for the mission forms (currently only the inherited default editors).
-   *
-   * <p>Verbatim duplicate of the read-side {@code MissionPageController} binder (#924, L5): the
-   * write handlers bind the mission forms and must keep the {@code StringTrimmerEditor(true)}
-   * semantics - the global {@code GlobalBindingAdvice} registers a different String editor, so
-   * dropping this local binder would silently change String binding on every form post.
+   * Registers a {@code StringTrimmerEditor(true)} for this controller's mission forms, overriding
+   * the global String editor.
    *
    * @param binder Spring data binder for the current request
    */
@@ -262,13 +213,10 @@ public class MissionWriteController {
   }
 
   /**
-   * Form-post endpoint that assigns or clears a mission's party lead (Partyleiter). Reuses the same
-   * resolution mechanic as participant-add: the autocomplete fills the hidden {@code userId} when a
-   * registered member is picked, otherwise the free-text {@code guestName} is submitted and
-   * resolved server-side (a unique member match is linked, an unknown name is kept as a guest
-   * handle). An empty submission clears the party lead. {@code version} carries the mission's
-   * current {@code partyLeadVersion} for optimistic-lock validation. A full reload follows so the
-   * freshly bumped version is re-rendered without manual DOM version sync.
+   * Assigns or clears a mission's party lead (Partyleiter) from a form post, then reloads the page.
+   *
+   * <p>A picked member arrives as {@code userId}; free text arrives as {@code guestName} and is
+   * resolved server-side. An empty submission clears the party lead.
    *
    * @param id mission id
    * @param userId resolved registered-user id from the autocomplete, or {@code null}
@@ -311,15 +259,12 @@ public class MissionWriteController {
   }
 
   /**
-   * AJAX variant of {@link #setPartyLead}: assigns or clears the party lead and returns the
-   * refreshed mission as JSON so the mission-detail page can patch the party-lead display + bumped
-   * {@code partyLeadVersion} in place without a full reload (#574). The classic form-POST above
-   * stays the no-JavaScript fallback; the 409 (ambiguous name / stale version) is passed through as
-   * RFC 7807 so the shared {@code krtFetch} conflict UX fires.
+   * AJAX variant of {@link #setPartyLead}, returning the refreshed mission as JSON; a 409 is
+   * relayed as RFC 7807.
    *
    * @param id mission id (path)
    * @param body party-lead JSON ({@code userId} and/or {@code guestName}, plus {@code version}); an
-   *     empty {@code userId}+{@code guestName} clears the lead
+   *     empty {@code userId} and {@code guestName} clear the lead
    * @return {@code 200} with the refreshed mission, or the upstream RFC 7807 error passed through
    */
   @PutMapping(value = "/{id}/party-lead/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -403,18 +348,15 @@ public class MissionWriteController {
   }
 
   /**
-   * AJAX endpoint that updates one participant's payout preference ({@code PAYOUT} / {@code
-   * DONATE}) through the slim backend endpoint and answers with that participant row alone — the
-   * {@code MissionParticipantDto}, carrying its bumped {@code version}, which {@code
-   * mission-detail.js} fans out to every element of the row. It used to call the deprecated
-   * full-Einsatz twin and pick the row out of the whole mission on the client.
+   * Updates one participant's payout preference ({@code PAYOUT} / {@code DONATE}) and returns that
+   * participant row with its bumped version.
    *
    * @param id mission id
    * @param participantId the participant row
    * @param request the new preference
    * @param principal the signed-in member (unused; the backend decides from the token)
    * @return the updated participant row, or the backend's status and RFC 7807 problem relayed
-   *     unchanged — a 403 for a row the caller may not touch, a 409 on a concurrent change
+   *     unchanged
    */
   @PostMapping("/{id}/participants/{participantId}/payout-preference")
   @ResponseBody
@@ -441,14 +383,8 @@ public class MissionWriteController {
   }
 
   /**
-   * Sets the actual start or end time of a mission to the supplied UTC instant and saves
-   * immediately. The client sends the current schedule-section counter ({@code scheduleVersion})
-   * from the DOM; this engages optimistic locking on the dedicated schedule section, which means a
-   * concurrent edit of the core or flags section never triggers a 409 here (and vice versa).
-   *
-   * <p>The endpoint fetches the current schedule values from the backend, overlays the single field
-   * the client requested ({@code actualStartTime} or {@code actualEndTime}) and dispatches a single
-   * {@code PATCH /api/v1/missions/{id}/schedule}.
+   * Sets the mission's actual start or end time to the supplied UTC instant via {@code PATCH
+   * /api/v1/missions/{id}/schedule}, locked on the client's {@code scheduleVersion}.
    */
   @PostMapping("/{id}/actual-time")
   @ResponseBody
@@ -869,12 +805,7 @@ public class MissionWriteController {
   }
 
   /**
-   * Parses one of the create form's JSON row carriers ({@code objectivesJson} / {@code stepsJson})
-   * into a nested create-request list. A blank carrier — the common case, no goals/steps entered —
-   * yields {@code null}, as does an empty array, so the backend seeds nothing. A malformed body
-   * propagates the (unchecked) {@link JacksonException} to the create handler's catch, which
-   * surfaces the generic create error and re-flashes the form (the carriers ride along, so nothing
-   * is lost).
+   * Parses one of the create form's JSON row carriers into a nested create-request list.
    *
    * @param json the hidden carrier's raw JSON, or {@code null}/blank when the section is empty
    * @param typeRef the target list element type
@@ -892,10 +823,8 @@ public class MissionWriteController {
   }
 
   /**
-   * Classic form-post endpoint that persists edits to a mission ({@code !isNew}). On a Jakarta
-   * {@code @Valid} failure it re-renders the whole detail page with inline {@code th:errors}; on
-   * success it fans the form out into the three section PATCHes via {@link #applyMissionUpdate} and
-   * flash-redirects. Stays the no-JavaScript fallback for {@link #updateMissionAjax} (#589).
+   * Saves mission edits from the classic form post, re-rendering the detail page on a validation
+   * failure; the no-JavaScript fallback for {@link #updateMissionAjax}.
    *
    * @return redirect to the mission detail page
    */
@@ -924,27 +853,12 @@ public class MissionWriteController {
   }
 
   /**
-   * Fans a validated {@link MissionForm} out into the three section-scoped PATCHes (schedule → core
-   * → flags), each carrying its own optimistic-lock counter ({@code scheduleVersion} / {@code
-   * coreVersion} / {@code flagsVersion}) so concurrent editors of other sections don't invalidate
-   * each other's saves. Shared by the classic {@link #updateMission} and its AJAX twin {@link
-   * #updateMissionAjax} so the two can never drift.
+   * Applies a validated {@link MissionForm} as up to three section PATCHes (schedule, core, flags),
+   * each with its own version counter.
    *
-   * <p>Schedule is patched first because the status-driven PLANNED → ACTIVE auto-transition in the
-   * core patch additionally bumps the schedule version — running schedule first lets the caller's
-   * plain time edits land before the auto-stamp kicks in, avoiding an internal 409. Because that
-   * auto-bump leaves {@code scheduleVersion} stale on the caller's side, the AJAX twin re-reads the
-   * mission afterwards to return the four fresh versions.
-   *
-   * <p><b>Dirty-section-aware (#1136, REQ-FE-014).</b> Each section's PATCH is skipped when {@code
-   * form.dirtyCore()} / {@code dirtySchedule()} / {@code dirtyFlags()} is explicitly {@code false};
-   * the edit page's JS sets these to whether the user actually touched that header section. This
-   * stops a peer's concurrent schedule bump from 409ing a name-only edit that never touched the
-   * schedule, and it never re-writes untouched schedule/flags values (so a PLANNED → ACTIVE
-   * auto-stamped {@code actualStartTime} is not silently erased by a later core-only save). A
-   * {@code null} flag (the no-JavaScript classic fallback, or an older cached page) means "save
-   * this section", preserving the pre-#1136 full-fan-out behaviour. The schedule-before-core
-   * ordering is kept for saves that genuinely touch both.
+   * <p>Schedule is patched first because the core patch's PLANNED → ACTIVE transition bumps the
+   * schedule version. A section whose dirty flag is {@code false} is skipped; a {@code null} flag
+   * means "save" (REQ-FE-014).
    *
    * @param id the mission id
    * @param form the validated submitted form
@@ -1011,15 +925,11 @@ public class MissionWriteController {
   }
 
   /**
-   * AJAX twin of {@link #updateMission} (#589): saves the mission core-edit form in place. Routed
-   * by the {@code X-Requested-With} header (the classic {@code POST /missions/{id}} stays the no-JS
-   * fallback). On a Jakarta {@code @Valid} failure it returns {@code 422} with a {@code {field:
-   * message}} JSON map (messages resolved exactly as {@code th:errors} via {@link #messageSource})
-   * so the client renders the errors inline without a navigation. On success it runs the three
-   * section PATCHes, re-reads the mission to capture the PLANNED → ACTIVE auto-bump, and returns
-   * the four fresh versions {@code {version, coreVersion, scheduleVersion, flagsVersion}} so the
-   * client writes them back and a second consecutive save does not 409. A backend {@code 409} /
-   * domain conflict is propagated as {@code problem+json} via {@link #propagateBackendError}.
+   * AJAX twin of {@link #updateMission}, selected by the {@code X-Requested-With} header.
+   *
+   * <p>Returns {@code 422} with a {@code {field: message}} map on a validation failure; on success
+   * returns the four fresh versions so a following save does not 409. Backend errors are relayed
+   * via {@link #propagateBackendError}.
    *
    * @param id the mission id
    * @param form the bound + validated edit form
@@ -1197,18 +1107,11 @@ public class MissionWriteController {
   }
 
   /**
-   * AJAX endpoint that hands a mission to another owner, version-checked (BE-SIMP-03). Forwards the
-   * JSON body — the new owner's {@code userId} and the {@code version} the page last read, i.e. the
-   * mission's {@code ownershipVersion} — to {@code PUT /api/v1/missions/{id}/owner}, then re-reads
-   * the mission and returns it, so the page can write the bumped {@code ownershipVersion} back onto
-   * the owner row before a second change is sent. The previous owner is not added to the
-   * co-managers.
+   * Hands a mission to another owner via {@code PUT /api/v1/missions/{id}/owner}, checked against
+   * its {@code ownershipVersion}, and returns the refreshed mission.
    *
-   * <p>It used to call the deprecated {@code PUT …/owner/{userId}}, which took no version: of two
-   * managers handing the same Einsatz to different people, the later one silently won. A stale
-   * version is now the backend's {@code 409} with the {@code OPTIMISTIC_LOCK} code, and it is
-   * relayed verbatim — status and RFC 7807 body — so {@code krtFetch} offers the conflict dialog
-   * instead of a generic error toast.
+   * <p>The previous owner is not added to the co-managers. A stale version is relayed as the
+   * backend's {@code 409}.
    *
    * @param id mission id (path)
    * @param body owner-change JSON: {@code userId} (a UUID string) plus {@code version}
@@ -1251,12 +1154,8 @@ public class MissionWriteController {
   }
 
   /**
-   * AJAX endpoint that reassigns a mission's owning org unit (REQ-ORG-018 / ADR-0050). Forwards the
-   * JSON body ({@code owningOrgUnitId} — possibly {@code null} for an ownerless leadership mission
-   * — plus the expected {@code version}, i.e. the mission's {@code owningOrgUnitVersion}) to the
-   * backend reassignment endpoint and passes the upstream RFC 7807 problem through on a 409 so the
-   * shared {@code krtFetch} conflict UX fires. The mission-detail page re-renders the {@code mgmt}
-   * fragment in place on success (no full reload).
+   * Reassigns a mission's owning org unit, checked against its {@code owningOrgUnitVersion}
+   * (REQ-ORG-018).
    *
    * @param id mission id (path)
    * @param body reassignment JSON: {@code owningOrgUnitId} (a UUID string, or blank/absent for
@@ -1381,9 +1280,7 @@ public class MissionWriteController {
   }
 
   /**
-   * AJAX endpoint that adds a custom (mission-specific) frequency (REQ-MISSION-014) via the slim
-   * backend endpoint and returns the resulting slim frequency list so the "Weitere Frequenzen"
-   * editor and the overview Funk panel refresh in place without a reload.
+   * Adds a custom mission frequency (REQ-MISSION-014) and returns the updated frequency list.
    *
    * @param id the mission id
    * @param body the JSON payload ({@code name} + {@code value})
@@ -1406,9 +1303,8 @@ public class MissionWriteController {
   }
 
   /**
-   * AJAX endpoint that updates a custom (mission-specific) frequency (REQ-MISSION-014) via the slim
-   * backend endpoint and returns the resulting slim frequency list. Optimistic-locked on the row's
-   * version; a stale echo surfaces as HTTP 409 from the backend and is propagated verbatim.
+   * Updates a custom mission frequency (REQ-MISSION-014) under its row version and returns the
+   * updated frequency list.
    *
    * @param id the mission id
    * @param frequencyId the custom frequency row id
@@ -1493,9 +1389,7 @@ public class MissionWriteController {
   }
 
   /**
-   * AJAX proxy: appends an Ablauf step via the backend slim endpoint and returns the resulting
-   * ordered step list. The page re-renders the editor + overview-checklist fragments in place; the
-   * backend's {@code stepsVersion} guard keeps the Ablauf section's optimistic lock narrow.
+   * Appends an Ablauf step and returns the ordered step list.
    *
    * @param id the mission id
    * @param body the step payload (title, optional meta, expected stepsVersion)
@@ -1541,12 +1435,11 @@ public class MissionWriteController {
   }
 
   /**
-   * AJAX proxy: removes an Ablauf step and returns the remaining ordered step list. The expected
-   * {@code stepsVersion} travels as a query parameter (DELETE carries no body).
+   * Removes an Ablauf step and returns the remaining ordered step list.
    *
    * @param id the mission id
    * @param stepId the step id
-   * @param stepsVersion the expected mission steps-section version (optimistic-lock guard)
+   * @param stepsVersion the expected steps-section version, passed as a query parameter
    * @return the ordered step list, or the propagated backend error
    */
   @DeleteMapping(value = "/{id}/steps/{stepId}/ajax", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -1595,9 +1488,7 @@ public class MissionWriteController {
   }
 
   /**
-   * AJAX proxy: toggles an Ablauf step's shared done flag and returns the ordered step list. Used
-   * by the overview checklist's click-to-complete control (edit-authorised users only — enforced by
-   * the backend's {@code canManageMission} gate).
+   * Sets an Ablauf step's shared done flag and returns the ordered step list.
    *
    * @param id the mission id
    * @param stepId the step id
@@ -1624,9 +1515,7 @@ public class MissionWriteController {
   }
 
   /**
-   * AJAX proxy: appends a goal (Ziel) via the backend slim endpoint and returns the resulting
-   * ordered goal list. The page re-renders the editor + overview Ziele fragments in place; the
-   * backend's {@code objectivesVersion} guard keeps the goals section's optimistic lock narrow.
+   * Appends a goal (Ziel) and returns the ordered goal list.
    *
    * @param id the mission id
    * @param body the goal payload (title, kind, expected objectivesVersion)
@@ -1677,12 +1566,11 @@ public class MissionWriteController {
   }
 
   /**
-   * AJAX proxy: removes a goal and returns the remaining ordered goal list. The expected {@code
-   * objectivesVersion} travels as a query parameter (DELETE carries no body).
+   * Removes a goal and returns the remaining ordered goal list.
    *
    * @param id the mission id
    * @param objectiveId the goal id
-   * @param objectivesVersion the expected mission goals-section version (optimistic-lock guard)
+   * @param objectivesVersion the expected goals-section version, passed as a query parameter
    * @return the ordered goal list, or the propagated backend error
    */
   @DeleteMapping(
@@ -1925,29 +1813,14 @@ public class MissionWriteController {
         });
   }
 
-  /**
-   * Display time zone for the mission schedule fields. The datetime-splitter renders/edits times in
-   * the browser's local zone; the server-side format/parse round trip uses this fixed zone for the
-   * zoneless local-datetime form the hidden input carries when a field is rendered but never
-   * re-edited. Verbatim private mirror of the read-side {@code MissionPageController} constant
-   * (#924, L5), kept because {@link #parseToInstant} moved here with the write handlers while
-   * {@code formatInstant} stayed read-side.
-   */
+  /** Time zone in which zoneless mission schedule values are interpreted. */
   private static final ZoneId MISSION_TIME_ZONE = ZoneId.of("Europe/Berlin");
 
   /**
-   * Parses a hidden datetime-input value back into an {@link Instant}, accepting every shape the
-   * datetime-splitter or {@link #formatInstant} can produce: a zone-bearing value (the splitter
-   * writes a UTC {@code toISOString()} with {@code Z} on edit, an explicit offset is equally
-   * absolute), a zoneless local datetime of <em>any</em> fractional-second precision (what {@link
-   * #formatInstant} renders for a field that was displayed but never re-edited, e.g. {@code
-   * 2026-06-21T11:59:58.222717}), or a bare date. A zoneless value is interpreted in {@link
-   * #MISSION_TIME_ZONE}.
+   * Parses a hidden datetime-input value into an {@link Instant}.
    *
-   * <p>The earlier fixed-length (16/19) checks rejected the microsecond local form and fell through
-   * to {@link Instant#parse}, which threw — silently nulling {@code plannedStartTime}/{@code
-   * meetingTime}/{@code plannedEndTime} on every save that did not re-touch the field (the #589 e2e
-   * regression).
+   * <p>Accepts a zone- or offset-bearing value, a zoneless local datetime of any fractional-second
+   * precision, or a bare date; zoneless values are interpreted in {@link #MISSION_TIME_ZONE}.
    *
    * @param dateTimeStr the hidden input value; {@code null}/blank yields {@code null}
    * @return the parsed instant, or {@code null} if the value is blank or unparseable

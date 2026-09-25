@@ -54,21 +54,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC render test for the read-only approval-limit display on the bank-staff account view ({@code
- * bank-account-detail.html}, REQ-BANK-041).
- *
- * <p>Two properties are pinned, both of which decide whether a <strong>plain
- * Bankmitarbeiter</strong> ever gets to see the ceilings they book against:
- *
- * <ol>
- *   <li><b>Role-blind.</b> The backend assembles this surface's limits with {@code canEdit=false}
- *       for every viewer, so the display must render for {@code BANK_EMPLOYEE} exactly as it does
- *       for {@code BANK_MANAGEMENT} — there is no management-only gate on this box.
- *   <li><b>Outside the collapsed Konto-Info tile.</b> The box used to live inside the {@code
- *       #bank-info-body} panel, which the server renders {@code hidden} and which re-collapses on
- *       every {@code accountBody} swap. It now sits above that tile so a configured limit is
- *       visible without expanding anything.
- * </ol>
+ * MVC render test for the read-only approval-limit box on the bank-staff account view
+ * (REQ-BANK-041): it renders identically for {@code BANK_EMPLOYEE} and {@code BANK_MANAGEMENT}, and
+ * outside the collapsed Konto-Info tile.
  */
 @SpringBootTest
 class BankAccountDetailLimitsMvcTest {
@@ -78,7 +66,7 @@ class BankAccountDetailLimitsMvcTest {
    */
   private static final String LIMITS_BOX = "data-testid=\"bank-approval-limits-display\"";
 
-  /** Marker of the collapsible Konto-Info tile the limits box must no longer be nested in. */
+  /** Marker of the collapsible Konto-Info tile the limits box must not be nested in. */
   private static final String INFO_PANEL = "data-testid=\"bank-info-panel\"";
 
   @Autowired private WebApplicationContext context;
@@ -177,8 +165,7 @@ class BankAccountDetailLimitsMvcTest {
   }
 
   /**
-   * Bank management sees the very same read-only box — the surface never offers the editor, so a
-   * regression that gates the box on the management role would be invisible to a one-role test.
+   * Bank management sees the same read-only limits box as a bank employee.
    *
    * @throws Exception when the MockMvc exchange fails
    */

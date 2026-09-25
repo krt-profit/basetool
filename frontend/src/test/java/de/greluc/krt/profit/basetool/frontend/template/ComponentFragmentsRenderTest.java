@@ -33,13 +33,8 @@ import org.thymeleaf.ITemplateEngine;
 import org.thymeleaf.context.Context;
 
 /**
- * Renders the reusable design-system component fragments ({@code fragments/components.html})
- * through the Spring Thymeleaf engine and asserts the produced markup matches the
- * krt-components.css / preview spec. Thymeleaf fragment errors surface only at render time (never
- * at compile/build time), so this test pins button/alert/table down the same way {@code
- * OperationPageControllerMvcTest} happens to cover the alert fragment via the operations list — but
- * here every fragment, including the otherwise-unexercised {@code dataTable} shell and the {@code
- * null}-message self-gating, is driven directly through a test-only harness template.
+ * Renders every design-system component fragment in {@code fragments/components.html} through a
+ * test-only harness template and asserts the markup matches the component spec.
  */
 @SpringBootTest
 class ComponentFragmentsRenderTest {
@@ -51,11 +46,8 @@ class ComponentFragmentsRenderTest {
   @MockitoBean private ClientRegistrationRepository clientRegistrationRepository;
 
   /**
-   * Drives the harness template and asserts each fragment emits its canonical classes/structure:
-   * the button carries {@code btn btn-danger} + a submit type, the alert carries the tinted {@code
-   * alert alert-danger} with its extra class, an alert fed a {@code null} message renders nothing
-   * (no stray {@code alert-success}), and the data table is wrapped responsively with the {@code
-   * krt-table} class plus the injected header cells and body rows.
+   * Verifies the canonical classes and structure of the button, alert and data-table fragments,
+   * including that an alert with a {@code null} message renders nothing.
    */
   @Test
   void rendersButtonAlertAndDataTableFragmentsToSpec() {

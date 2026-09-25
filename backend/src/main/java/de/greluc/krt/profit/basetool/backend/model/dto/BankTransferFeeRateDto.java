@@ -22,10 +22,8 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import java.math.BigDecimal;
 
 /**
- * The current in-game transfer-fee rate (ADR-0052, REQ-BANK-033) — the same runtime-editable rate
- * the operation payout uses ({@code operation.transfer_fee_rate}). The bank booking modals fetch it
- * to show a live "Gebühr / wird abgebucht" preview (fee plus the gross debited from the source) as
- * the staffer types the amount.
+ * The current in-game transfer-fee rate (REQ-BANK-033), shown as a live fee preview in the bank
+ * booking modals.
  *
  * @param rate the fee rate as a fraction in {@code [0, 1)} (e.g. {@code 0.005} = 0.5%)
  */

@@ -17,16 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * Admin blueprint-catalog page module (/admin/blueprints), extracted verbatim from the former
- * inline script of admin/blueprints.html (ADR-0069, follow-up to #924). One IIFE.
- *
- * Computes each blueprint modifier slider's live output from its segment / linear-band data
- * attributes (segmented vs stepped value-range types), and wires the in-place search that
- * swaps the #admin-bp-results fragment (REQ-FE-002); document-delegated listeners survive the
- * swap, and computeAll re-runs on krt:swapped so swapped-in sliders show their initial value.
- */
-
 (function () {
     function clamp01(t) {
         return t < 0 ? 0 : t > 1 ? 1 : t;
@@ -47,10 +37,6 @@
         let value = null;
         const segs = slider.querySelectorAll('.bp-seg');
         if (segs.length) {
-            // Segmented modifier: locate the segment containing q. How the value behaves *within* a
-            // segment depends on value_range_type: a 'linear' curve interpolates from start to end
-            // across the segment, whereas a stepped form (e.g. 'linear_integer_additive') holds a
-            // constant value inside the segment and only changes when q crosses into the next one.
             const stepped =
                 (slider.getAttribute('data-vrt') || 'linear').toLowerCase() !== 'linear';
             for (let i = 0; i < segs.length; i++) {
@@ -72,7 +58,6 @@
                 }
             }
         } else {
-            // Simple linear band between the two endpoints.
             const qmin = num(slider, 'data-qmin');
             const qmax = num(slider, 'data-qmax');
             const vmin = num(slider, 'data-vmin');
@@ -94,8 +79,6 @@
 
     const RESULTS_ID = 'admin-bp-results';
 
-    // Initial display for every slider in root: the range starts at max, so its output
-    // must be computed once even before the user drags it.
     function computeAll(root) {
         const sliders = (root || document).querySelectorAll('.bp-slider');
         for (let i = 0; i < sliders.length; i++) {
@@ -103,8 +86,6 @@
         }
     }
 
-    // Delegated slider input: ONE listener on document survives the AJAX table swap, so
-    // sliders in swapped-in rows stay live without per-element re-binding.
     document.addEventListener('input', function (e) {
         const t = e.target;
         if (t && t.classList && t.classList.contains('bp-range')) {
@@ -115,10 +96,6 @@
         }
     });
 
-    // Search submit -> in-place swap of the results block (REQ-FE-002). Delegated on
-    // document so it survives the form being re-rendered inside the swapped fragment.
-    // The page index is dropped so a new search lands on page 0. Reset and the prev/next
-    // pager are plain anchors marked data-swap; krtFetch intercepts them after bindSwap.
     document.addEventListener('submit', function (e) {
         const form = e.target;
         if (!form || form.id !== 'admin-bp-filter') {

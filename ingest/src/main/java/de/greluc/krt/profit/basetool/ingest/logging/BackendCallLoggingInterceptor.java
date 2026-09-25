@@ -31,35 +31,17 @@ import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.stereotype.Component;
 
 /**
- * Emits one log line per outbound backend relay — method, host, path, status and elapsed time — the
- * outbound twin of {@code RequestLoggingFilter}'s inbound access log and the ingest counterpart of
- * the frontend {@code WebClientLoggingFilter} (REQ-OBS-001). Without it a slow relay was invisible
- * in the gateway log: only a mapped failure produced a line, and it carried no duration.
- *
- * <p>A {@code RestClient} interceptor since the gateway left WebFlux (ADR-0204); it used to be a
- * {@code WebClient} exchange filter with the same levels and wording. It runs on the request
- * thread, so the MDC — correlation id, trace ids — is simply there; no Reactor context propagation
- * is involved any more.
- *
- * <p>Levels are chosen so a relay failure is still logged <b>exactly once at the level its status
- * warrants</b> (REQ-OBS-001). {@code GlobalExceptionHandler} already owns that decision — it WARNs
- * the backend 5xx it collapses into a 502 and the transport failure that opens the breaker, and
- * DEBUGs the short-circuit of an already-open breaker (the #1203 flood lesson). This interceptor
- * would otherwise double every one of those lines, so it logs:
+ * Logs each outbound backend relay with method, host, path, status and elapsed time until response
+ * headers (REQ-OBS-001).
  *
  * <ul>
- *   <li><b>INFO</b> for a completed relay, with the {@code Slow backend call} marker once it
- *       exceeds {@link LoggingProperties#slowBackendCallThresholdMs()}. Relay latency is alerted on
- *       through the {@code http.client.requests} p95 histogram, not this line, so a slow-but-
- *       successful call is never escalated to WARN (issue #1204).
- *   <li><b>DEBUG</b> for a 5xx response and for a transport failure — the diagnostic detail is
- *       welcome when the level is turned up, but the operator-facing line is the handler's.
+ *   <li>INFO for a completed relay, with the {@code Slow backend call} marker past {@link
+ *       LoggingProperties#slowBackendCallThresholdMs()}.
+ *   <li>DEBUG for a 5xx response and a transport failure, which {@code GlobalExceptionHandler} logs
+ *       at operator level.
  * </ul>
  *
- * <p>The elapsed time runs until the response headers arrive, as the exchange filter's did. Only
- * the method, host and path are logged; the query string and the request body are excluded (the
- * extract carries no PII, but the rule is unconditional — REQ-OBS-004), and the forwarded bearer
- * never appears at any level.
+ * <p>The query string, body and bearer token are never logged (REQ-OBS-004).
  */
 @Slf4j
 @Component
@@ -100,9 +82,8 @@ public class BackendCallLoggingInterceptor implements ClientHttpRequestIntercept
   }
 
   /**
-   * Logs a completed relay: INFO normally, INFO with the {@code Slow backend call} marker past the
-   * threshold, DEBUG for a 5xx (whose operator-facing WARN belongs to {@code
-   * GlobalExceptionHandler}).
+   * Logs a completed relay: INFO, with the {@code Slow backend call} marker past the threshold, or
+   * DEBUG for a 5xx.
    *
    * @param method the outbound HTTP method
    * @param host the backend host
@@ -134,9 +115,7 @@ public class BackendCallLoggingInterceptor implements ClientHttpRequestIntercept
   }
 
   /**
-   * Logs a failed relay at DEBUG with the exception class only — no message and no stack trace,
-   * since the error is propagated and {@code GlobalExceptionHandler} emits the operator-facing WARN
-   * (and the 502) for it.
+   * Logs a failed relay at DEBUG with the exception class only.
    *
    * @param method the outbound HTTP method
    * @param host the backend host

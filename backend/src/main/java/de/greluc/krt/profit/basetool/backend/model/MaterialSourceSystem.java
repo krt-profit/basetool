@@ -20,28 +20,15 @@
 package de.greluc.krt.profit.basetool.backend.model;
 
 /**
- * Tracks which external catalogues a {@link Material} row has been seen in. Written by the UEX and
- * (R3+) SC Wiki sync services; admin-created rows carry {@link #MANUAL} so the UI can badge them.
- *
- * <p>Transitions during sync (see SC_WIKI_SYNC_PLAN.md §6.1):
+ * Tracks which external catalogues a {@link Material} row has been seen in; admin-created rows
+ * carry {@link #MANUAL}.
  *
  * <ul>
- *   <li>{@link #UEX_ONLY} → {@link #BOTH} when the R3 Wiki commodity sync finds a match for an
- *       existing UEX row.
- *   <li>{@link #WIKI_ONLY} → {@link #BOTH} when a subsequent UEX commodity sync picks up a row Wiki
- *       imported first.
- *   <li>{@link #MANUAL} → {@link #UEX_ONLY} when a later UEX commodity sync adopts an admin-created
- *       row by name-match and backfills {@code id_commodity} — {@code UexCommodityService}'s
- *       manual-entry handover, pinned by {@code UexCommodityServiceTest}. {@link #MANUAL} is
- *       therefore <b>not</b> sticky, and the derived {@code MaterialDto.isManualEntry} badge
- *       disappears with it. The SC Wiki commodity sync is the exception: {@code
- *       ScWikiCommoditySyncService} promotes only {@link #UEX_ONLY} → {@link #BOTH}, so a
- *       Wiki-linked manual row keeps {@link #MANUAL} while Wiki columns are written on top of it.
+ *   <li>{@link #UEX_ONLY} → {@link #BOTH} when the Wiki sync matches an existing UEX row.
+ *   <li>{@link #WIKI_ONLY} → {@link #BOTH} when a UEX sync picks up a Wiki-imported row.
+ *   <li>{@link #MANUAL} → {@link #UEX_ONLY} when a UEX sync adopts the row by name; the Wiki sync
+ *       leaves {@link #MANUAL} unchanged.
  * </ul>
- *
- * <p>R1 only writes {@link #UEX_ONLY} (every existing row at migration time). The other values
- * become reachable in R3 (Wiki commodity sync) and R8 (post-soak V116 backfill of {@code
- * is_manual_entry → MANUAL}).
  */
 public enum MaterialSourceSystem {
 
@@ -49,19 +36,15 @@ public enum MaterialSourceSystem {
   UEX_ONLY,
 
   /**
-   * The row has only been seen in the SC Wiki commodity catalogue. Wiki-only rows are inserted with
-   * {@code is_visible = false} so they don't appear in trading flows until an admin reviews them
-   * (SC_WIKI_SYNC_PLAN.md §4.3).
+   * The row has only been seen in the SC Wiki catalogue; such rows are inserted with {@code
+   * is_visible = false} until an admin reviews them.
    */
   WIKI_ONLY,
 
   /** Both UEX and SC Wiki carry the row; merged via UUID, alias, or canonical-name match. */
   BOTH,
 
-  /**
-   * Admin-created row that has not (yet) been linked to either UEX or SC Wiki. The post-R8 V116
-   * backfill flips every legacy {@code is_manual_entry=true} row into this value.
-   */
+  /** Admin-created row not linked to either UEX or SC Wiki. */
   MANUAL,
 
   /**

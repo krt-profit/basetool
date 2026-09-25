@@ -54,10 +54,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Verifies the order-overview list (Auftragsverwaltung) renders an ITEM order's Materialien column
- * as its aggregated material list with collection progress ({@code currentStock / totalQuantity}),
- * mirroring MATERIAL orders, rather than the ordered items and their delivery count (#595). Renders
- * through the real Thymeleaf template so a broken expression fails the build, not only at runtime.
+ * Verifies that the order list renders an ITEM order's material column as its aggregated materials
+ * with collection progress ({@code currentStock / totalQuantity}).
  */
 @SpringBootTest
 @ActiveProfiles("test")

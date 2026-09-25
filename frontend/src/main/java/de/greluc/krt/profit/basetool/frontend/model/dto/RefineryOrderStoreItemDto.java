@@ -22,16 +22,11 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.util.UUID;
 
 /**
- * Data transfer record carrying Refinery Order Store Item payload.
+ * Frontend mirror of one refinery-order output to store in the Lager.
  *
- * <p>{@code owningOrgUnitId} is the per-item owning-OrgUnit picker output forwarded to the backend
- * store endpoint; {@code null} when the receiving member belongs to a single OrgUnit (the backend
- * auto-stamps) and otherwise the OrgUnit the user picked in the store dialog.
- *
- * <p>{@code personal} forwards the store dialog's personal-entry checkbox (REQ-INV-035): {@code
- * true} books the output as the receiver's private stock instead of shared squadron stock. The
- * backend rejects it in combination with {@code jobOrderId} (HTTP 400) and applies no mission
- * earmark to a personal row.
+ * <p>{@code owningOrgUnitId} is the picked owning OrgUnit, or {@code null} for the backend to stamp
+ * it. {@code personal} books the output as the receiver's private stock (REQ-INV-035) and cannot be
+ * combined with {@code jobOrderId}.
  */
 public record RefineryOrderStoreItemDto(
     UUID materialId,

@@ -26,48 +26,31 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Configuration properties under {@code app.discord.spi-precheck.*} (REQ-SEC-022).
+ * Configuration properties under {@code app.discord.spi-precheck.*} (REQ-SEC-022): the shared
+ * secret guarding the internal account-existence endpoint called by the Keycloak Discord SPI.
  *
- * <p>Guards the internal {@code POST /internal/discord/account-existence} endpoint that the
- * Keycloak Discord SPI calls during first-broker-login to learn whether a Basetool account already
- * exists for an incoming Discord identity. The shared secret is the only credential on that
- * endpoint (it sits outside the OAuth2 resource-server boundary), presented by the SPI in the
- * {@code X-KRT-SPI-Secret} header and compared in constant time by {@link
- * de.greluc.krt.profit.basetool.backend.controller.DiscordAccountExistenceController}.
+ * <p>The secret is checked by {@link
+ * de.greluc.krt.profit.basetool.backend.controller.DiscordAccountExistenceController}; {@link
+ * #toString()} redacts it.
  *
- * <p>The secret is <strong>optional</strong> (default blank) on purpose: a deployment that does not
- * use Discord login must still boot. A blank secret <em>disables</em> the endpoint (it answers
- * {@code 503}); the SPI treats any non-200 as unknown and fails open, so the collision precheck is
- * simply skipped. Never commit a real value — it is supplied via the {@code
- * KRT_DISCORD_SPI_SHARED_SECRET} environment variable.
- *
- * <p>An immutable record bound by {@code @ConfigurationPropertiesScan} (BE-MOD-04). Its {@link
- * #toString()} redacts the secret.
- *
- * @param sharedSecret the shared secret the Keycloak SPI must present to call the account-existence
- *     endpoint. Blank (the default) disables the endpoint, which fail-open-skips the precheck on
- *     the SPI side. Not {@code @NotBlank}, so a non-Discord deployment boots without it.
+ * @param sharedSecret the secret the SPI presents in {@code X-KRT-SPI-Secret}; blank (the default)
+ *     disables the endpoint with {@code 503}
  */
 @Validated
 @ConfigurationProperties(prefix = "app.discord.spi-precheck")
 public record DiscordSpiPrecheckProperties(@DefaultValue("") String sharedSecret) {
 
   /**
-   * Minimum accepted length of a configured (non-blank) shared secret. The account-existence
-   * endpoint is {@code permitAll} and deliberately exempt from the {@code /api/**} rate limiter, so
-   * the shared secret is its <em>only</em> credential; requiring at least this many characters
-   * keeps a short, online-guessable value from ever being deployed. {@code .env.example} already
-   * instructs operators to generate a long random value — this makes that a fail-fast invariant.
+   * Minimum length of a configured (non-blank) shared secret, which is the endpoint's only
+   * credential.
    */
   private static final int MIN_SECRET_LENGTH = 32;
 
   /**
-   * Enforces shared-secret strength at startup (via {@link Validated} on this properties record): a
-   * configured secret must be at least {@link #MIN_SECRET_LENGTH} characters, while a blank secret
-   * stays valid because it disables the endpoint. A weak operator-supplied secret therefore fails
-   * the context startup instead of shipping a brute-forceable sole-credential endpoint.
+   * Validates at startup that the secret is blank or at least {@link #MIN_SECRET_LENGTH} characters
+   * long.
    *
-   * @return {@code true} when the secret is blank (disabled) or meets the minimum length
+   * @return {@code true} when the secret is blank or long enough
    */
   @AssertTrue(
       message =

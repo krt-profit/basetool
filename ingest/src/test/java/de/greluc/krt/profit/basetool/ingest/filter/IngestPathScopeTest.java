@@ -25,14 +25,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 
 /**
- * Unit tests for {@link IngestPathScope}, the single scope decision the client-identity, payload,
- * rate-limit and access-log filters share.
- *
- * <p>The point of the class — and of these tests — is that the decision is made on the
- * <em>decoded</em> path, the same one {@code RequestMappingHandlerMapping} routes on. The raw
- * {@code getRequestURI().startsWith("/v1/")} test it replaced said "not an ingest path" for an
- * encoded spelling the dispatcher happily decoded and delivered, which silently switched off all
- * four filters at once.
+ * Unit tests for {@link IngestPathScope}, the scope decision shared by the client-identity,
+ * payload, rate-limit and access-log filters, which is made on the decoded path that Spring MVC
+ * routes on.
  */
 class IngestPathScopeTest {
 

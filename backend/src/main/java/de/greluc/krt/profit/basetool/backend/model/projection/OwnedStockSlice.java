@@ -22,17 +22,14 @@ package de.greluc.krt.profit.basetool.backend.model.projection;
 import java.util.UUID;
 
 /**
- * One pooled stock slice for the blueprint craftability calculation (#781): the caller's available
- * SCU of a single {@link de.greluc.krt.profit.basetool.backend.model.Material} at a single quality
- * tier, summed across all storage locations.
+ * One pooled stock slice for the blueprint craftability calculation: the caller's available SCU of
+ * one {@link de.greluc.krt.profit.basetool.backend.model.Material} at one quality tier, summed
+ * across locations.
  *
- * <p>Two sources produce slices, both normalized to SCU so they can be merged: the caller's "My
- * Inventory" stock (summed from {@link de.greluc.krt.profit.basetool.backend.model.InventoryItem}
- * via a grouped JPQL query) and — when the refinery toggle is on — the yield of the caller's {@code
- * OPEN}/{@code IN_PROGRESS} refinery orders (computed from {@link
- * de.greluc.krt.profit.basetool.backend.model.RefineryGood} after the units→SCU conversion). The
- * craftability calculator consumes the best-quality slices first, so the {@code quality} field is
- * load-bearing, not decorative.
+ * <p>Slices come from the caller's {@link
+ * de.greluc.krt.profit.basetool.backend.model.InventoryItem} stock and, optionally, the yield of
+ * their open {@link de.greluc.krt.profit.basetool.backend.model.RefineryGood} orders. The
+ * calculator consumes best-quality slices first.
  *
  * @param materialId the commodity this slice holds; never {@code null}
  * @param quality the quality tier (0..1000) shared by every unit in this slice

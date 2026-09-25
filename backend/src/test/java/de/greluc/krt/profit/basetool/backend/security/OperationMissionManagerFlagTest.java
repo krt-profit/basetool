@@ -57,13 +57,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Regression guard for {@link
- * de.greluc.krt.profit.basetool.backend.controller.OperationController}'s
- * {@code @PreAuthorize("hasRole('MISSION_MANAGER')")} gates. Two grant paths exist for that role:
- * the Keycloak realm role and the {@code app_user.is_mission_manager} DB flag. The DB-flag path is
- * wired in {@link CustomJwtGrantedAuthoritiesConverter} and is not visible from the controller
- * annotations alone; this test pins the integration end-to-end so a refactor of the converter
- * cannot silently lock out DB-flag managers from the operation endpoints.
+ * Verifies that the DB mission-manager flag, resolved by {@link
+ * CustomJwtGrantedAuthoritiesConverter}, passes the {@code hasRole('MISSION_MANAGER')} gates of
+ * {@link de.greluc.krt.profit.basetool.backend.controller.OperationController}.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -179,12 +175,7 @@ class OperationMissionManagerFlagTest {
     return resolved != null ? resolved : Collections.emptyList();
   }
 
-  /**
-   * Build the MockMvc JWT post-processor with the authorities we just resolved from the converter.
-   * Bypassing the converter on the MockMvc test JWT is the normal pattern in this codebase — the
-   * integration we are testing is "converter output + controller @PreAuthorize", so we call the
-   * converter explicitly and feed the result into the mocked JWT authentication.
-   */
+  /** Builds the MockMvc JWT post-processor carrying the authorities resolved by the converter. */
   private org.springframework.test.web.servlet.request.RequestPostProcessor jwtFor(
       User user, Collection<GrantedAuthority> authorities) {
     return jwt()

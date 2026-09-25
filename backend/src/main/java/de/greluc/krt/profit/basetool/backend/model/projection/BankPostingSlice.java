@@ -24,11 +24,8 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * JPQL constructor projection of one posting reduced to the dashboard-relevant columns. The
- * dashboard fetches all postings of the visible accounts inside the 30-day window in ONE query
- * (REQ-BANK-016, no N+1) and derives the per-account delta, in/out totals and the daily sparkline
- * series in memory — at org scale the window contains few rows, so shipping the slice beats three
- * extra grouped statements.
+ * JPQL projection of one posting reduced to the columns the bank dashboard needs to derive deltas,
+ * totals and sparklines in memory (REQ-BANK-016).
  *
  * @param accountId the account the posting belongs to
  * @param createdAt the booking instant (UTC), used for the daily bucketing

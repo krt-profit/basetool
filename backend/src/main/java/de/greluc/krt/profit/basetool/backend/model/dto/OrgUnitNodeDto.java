@@ -24,23 +24,16 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnitKind;
 import java.util.UUID;
 
 /**
- * Flat hierarchy-node projection of an {@link de.greluc.krt.profit.basetool.backend.model.OrgUnit}
- * for the admin org-structure management surface (epic #692, REQ-ORG-014). Unlike the per-kind DTOs
- * ({@code SquadronDto} / {@code SpecialCommandDto} / {@code BereichDto}) — which each expose only
- * their own tier — this carries the three fields the management table needs uniformly across all
- * four kinds: the current {@code parentOrgUnitId} (where the unit sits today) and the
- * optimistic-lock {@code version} (so the UI can PATCH a new parent edge without a stale-version
- * 409). {@code department} is populated only for {@code BEREICH} rows (the Bereichsfarbe,
- * REQ-ORG-026) and {@code null} for every other kind.
+ * Flat hierarchy-node view of an {@link de.greluc.krt.profit.basetool.backend.model.OrgUnit} of any
+ * kind for the admin org-structure page (REQ-ORG-014).
  *
- * @param id the org unit's id.
- * @param name the org unit's display name.
- * @param shorthand the org unit's short tag.
- * @param kind the org unit's kind (SQUADRON / SPECIAL_COMMAND / BEREICH / ORGANISATIONSLEITUNG).
- * @param parentOrgUnitId the id of the unit's current parent, or {@code null} if unparented / root.
- * @param department the Bereich's department (Bereichsfarbe), or {@code null} for non-Bereich
- *     kinds.
- * @param version the optimistic-lock version, required by the set-parent PATCH.
+ * @param id the org unit's id
+ * @param name the org unit's display name
+ * @param shorthand the org unit's short tag
+ * @param kind the org unit's kind
+ * @param parentOrgUnitId the current parent's id, or {@code null} for a root or unparented unit
+ * @param department the Bereich's department (REQ-ORG-026), or {@code null} for other kinds
+ * @param version the optimistic-lock version, required by the set-parent PATCH
  */
 public record OrgUnitNodeDto(
     UUID id,

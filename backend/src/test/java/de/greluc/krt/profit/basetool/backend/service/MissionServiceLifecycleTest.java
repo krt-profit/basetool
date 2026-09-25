@@ -68,15 +68,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Coverage for {@link MissionService} lifecycle / ownership methods that the existing focused test
- * files don't reach: {@code deleteMission}, {@code removeParticipant}, {@code updateMissionOwner},
- * {@code removeMissionFrequency}, and {@code findAllActiveReference}.
- *
- * <p>{@code deleteMission} performs two manual collection detachments (refinery orders,
- * sub-missions) before deleting the mission row — exactly the kind of multi-step transaction
- * CLAUDE.md flags as bug-prone; since Variante C (REQ-INV-027) the inventory earmarks cascade via
- * the mission-allocation FK instead of a manual null-out. {@code updateMissionOwner} is
- * privilege-escalation surface. None of these had dedicated tests before this PR.
+ * Tests the lifecycle and ownership methods of {@link MissionService}: {@code deleteMission},
+ * {@code removeParticipant}, {@code updateMissionOwner}, {@code removeMissionFrequency} and {@code
+ * findAllActiveReference}.
  */
 @ExtendWith(MockitoExtension.class)
 class MissionServiceLifecycleTest {

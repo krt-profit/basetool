@@ -39,63 +39,17 @@ import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 
 /**
  * The closed list of classes a value in the HTTP session may name in its {@code @class} type id,
- * and the switch that decides whether a class outside it is refused (REQ-SEC-067, ADR-0206).
+ * and the mode that decides whether a class outside it is refused (REQ-SEC-067, ADR-0206).
  *
- * <p><strong>What it closes.</strong> The session serializer activates Jackson's default typing, so
- * every non-final session value carries the fully-qualified name of the class it is read back as.
- * Until this list existed the type validator allowed every class ({@code allowIfBaseType(Object)}),
- * which makes Redis a deserialization sink: anybody able to write one field of one session hash
- * could name any class on the frontend's classpath and have Jackson instantiate it and call its
- * setters on the next request carrying that cookie — the shape of every Jackson "gadget" CVE. The
- * justification in the old Javadoc ("session data originates only from our own application") is
- * true of the <em>writer</em> and says nothing about the <em>store</em>, which three services
- * share.
+ * <p>Allowed: direct members of {@code java.util} and {@code java.time}, the {@link
+ * #ALLOWED_EXACT_NAMES}, {@code org.springframework.security.*}, the direct members of {@code
+ * org.springframework.validation}, {@code de.greluc.krt.profit.basetool.frontend.model.*} and
+ * {@link RedisSessionConfig#CONTAINER_WRITTEN_FINAL_SESSION_TYPES}. Names are matched before a
+ * class is loaded.
  *
- * <p><strong>What is on it</strong>, each entry matched by name before the class is ever loaded:
- *
- * <ul>
- *   <li>{@code java.util.*} and {@code java.time.*} — the collections, dates and durations Spring
- *       Session, Spring Security and our own filters write. Direct members only: a subpackage such
- *       as {@code java.util.logging} or {@code java.util.concurrent} is <em>not</em> covered;
- *   <li>the boxed scalars of {@code java.lang}, {@code java.math.BigDecimal} / {@code BigInteger}
- *       and {@code java.net.URL} / {@code URI} by exact name. A final type sitting in an {@code
- *       Object}-typed slot of a container is written with a type id after all, as a two-element
- *       array of class name and value — and a real OIDC login puts exactly such values in the
- *       session: the ID token's {@code iss} claim is a {@code URL}, a numeric claim a {@code Long},
- *       and the {@code creationTime} of Spring Session's session-created event payload a {@code
- *       Long} too;
- *   <li>{@code com.nimbusds.jose.shaded.gson.internal.LinkedTreeMap} by exact name — the map Nimbus
- *       decodes a nested JSON claim into ({@code realm_access}, {@code resource_access});
- *   <li>{@code com.nimbusds.oauth2.sdk.util.OrderedJSONObject} by exact name — the ordered map the
- *       Nimbus OAuth 2.0 SDK parses a token response's JSON objects into, which reaches the stored
- *       authorized client ({@code AUTHORIZED_CLIENTS}) on a real Keycloak login;
- *   <li>{@code org.springframework.security.*} — the security context, the OAuth2 login and
- *       authorized-client state, the CSRF token and the saved request. The Spring Security Jackson
- *       modules add their own exact types on top, and this prefix covers what they reach through
- *       {@code Object}-typed slots;
- *   <li>{@code org.springframework.web.servlet.FlashMap}, {@code
- *       org.springframework.util.LinkedMultiValueMap} and the direct members of {@code
- *       org.springframework.validation} — a redirect's flash attributes, including the form {@code
- *       BindingResult} a failed validation carries across the redirect;
- *   <li>{@code de.greluc.krt.profit.basetool.frontend.model.*} — the application's own forms and
- *       DTOs, which reach the session as flash attributes;
- *   <li>{@link RedisSessionConfig#CONTAINER_WRITTEN_FINAL_SESSION_TYPES} — the servlet-container
- *       class that already needed a forced type id (ADR-0154).
- * </ul>
- *
- * <p><strong>Three modes</strong>, chosen by {@code app.session.type-allow-list} ({@code
- * APP_SESSION_TYPE_ALLOW_LIST}):
- *
- * <ul>
- *   <li>{@link Mode#OFF} — the validator of before, byte for byte: every class allowed, nothing
- *       counted. The escape hatch if the reporting itself ever misbehaves;
- *   <li>{@link Mode#REPORT} (the default) — every class is still read, exactly as before, and a
- *       class outside the list is counted and named in the log. This is how the list is proven
- *       against production's real sessions before anything is refused;
- *   <li>{@link Mode#ENFORCE} — a class outside the list is refused. The read fails, {@code
- *       FaultTolerantSessionSerializer} drops that one attribute and counts it, and the member
- *       keeps the rest of the session.
- * </ul>
+ * <p>{@code app.session.type-allow-list} selects {@link Mode#OFF} (everything allowed, nothing
+ * counted), {@link Mode#REPORT} (default: everything read, outsiders counted and logged) or {@link
+ * Mode#ENFORCE} (outsiders refused, the affected attribute dropped).
  */
 @Slf4j
 public final class SessionTypeAllowList {
@@ -132,18 +86,9 @@ public final class SessionTypeAllowList {
       List.of("org.springframework.security.", "de.greluc.krt.profit.basetool.frontend.model.");
 
   /**
-   * Individually named classes, matched exactly, so a class sharing the prefix (for instance {@code
-   * FlashMapManager}) is not allowed by accident: the redirect flash map and the multi-value map it
-   * keeps its target parameters in; the arbitrary-precision numbers and the URL / URI a JSON claim
-   * or Spring's OIDC claim conversion can produce ({@code iss} becomes a {@code URL}); the map
-   * Nimbus decodes a nested claim object into; and the ordered map the Nimbus OAuth 2.0 SDK parses
-   * a token response into (a {@code LinkedHashMap} with nothing of its own to run).
-   *
-   * <p>{@code java.net.URL} is the one entry with a side effect worth naming: its {@code hashCode}
-   * resolves the host, so a {@code URL} placed into a set makes the frontend send a DNS query. A
-   * writer able to plant that could already forge any member's security context in the same hash;
-   * the query is not the risk this list exists for, and refusing {@code URL} would refuse every
-   * signed-in member's ID token.
+   * Individually allowed class names, matched exactly so a class sharing a prefix is not allowed by
+   * accident: the boxed scalars, {@code BigDecimal} / {@code BigInteger}, {@code URL} / {@code
+   * URI}, the flash-map classes and the Nimbus claim and token-response maps.
    */
   static final @Unmodifiable List<String> ALLOWED_EXACT_NAMES =
       List.of(
@@ -157,9 +102,8 @@ public final class SessionTypeAllowList {
           "com.nimbusds.oauth2.sdk.util.OrderedJSONObject");
 
   /**
-   * Upper bound on the distinct refused class names that are each logged once at {@code WARN}. A
-   * refused type id comes out of the stored payload, so its variety is bounded only by whoever
-   * wrote it; past this many names further refusals log at {@code DEBUG} and are still counted.
+   * Maximum number of distinct refused class names logged once at {@code WARN}; later ones log at
+   * {@code DEBUG} and are still counted.
    */
   private static final int MAX_DISTINCT_WARNINGS = 64;
 
@@ -176,12 +120,7 @@ public final class SessionTypeAllowList {
     ENFORCE;
 
     /**
-     * Parses a configured mode leniently, falling back to {@link #REPORT} on a value it does not
-     * recognise.
-     *
-     * <p>The fallback is the mode that reads exactly what the frontend read before the list
-     * existed, so a mistyped flag degrades to "nothing changes" rather than to "sessions start
-     * dropping" or "the frontend does not start".
+     * Parses a configured mode leniently, falling back to {@link #REPORT}, which reads every class.
      *
      * @param raw the configured value; case and surrounding whitespace are ignored.
      * @return the matching mode, or {@link #REPORT} when {@code raw} is blank or unrecognised.
@@ -231,15 +170,13 @@ public final class SessionTypeAllowList {
   }
 
   /**
-   * Returns the type-validator builder for the given mode, ready to be handed to {@code
-   * SecurityJacksonModules.getModules(loader, builder)}, which adds Spring Security's own exact
-   * types to it and activates the default typing with whatever it builds.
+   * Returns the type-validator builder for the given mode, to be handed to {@code
+   * SecurityJacksonModules.getModules(loader, builder)}.
    *
    * @param mode the configured mode.
    * @param listener told about each class outside the list; ignored in {@link Mode#OFF}.
-   * @return for {@link Mode#OFF} the permissive builder of before ({@code
-   *     allowIfBaseType(Object)}); otherwise a builder carrying the allow-list whose {@code
-   *     build()} produces the reporting or enforcing validator.
+   * @return for {@link Mode#OFF} a permissive {@code allowIfBaseType(Object)} builder; otherwise a
+   *     builder of the reporting or enforcing allow-list validator.
    */
   static BasicPolymorphicTypeValidator.@NotNull Builder validatorBuilder(
       @NotNull Mode mode, @NotNull RefusalListener listener) {
@@ -264,12 +201,8 @@ public final class SessionTypeAllowList {
 
   /**
    * A builder that produces an {@link AllowListValidator} instead of a plain {@link
-   * BasicPolymorphicTypeValidator}.
-   *
-   * <p>A subclass rather than a wrapper around the built validator, because {@code
-   * SecurityJacksonModules} calls {@code build()} itself, inside its own module set-up — the
-   * builder is the only object this configuration hands over, so it is the only place a different
-   * validator can come from.
+   * BasicPolymorphicTypeValidator}, since {@code SecurityJacksonModules} calls {@code build()}
+   * itself.
    */
   static final class AllowListBuilder extends BasicPolymorphicTypeValidator.Builder {
 
@@ -318,15 +251,8 @@ public final class SessionTypeAllowList {
   }
 
   /**
-   * The upstream validator with one decision changed: what happens to a class none of the matchers
-   * allowed.
-   *
-   * <p>Jackson asks in two steps. {@code validateSubClassName} sees only the name and answers
-   * <em>allowed</em> or <em>undecided</em>; for an undecided name Jackson loads the class and asks
-   * {@code validateSubType}, where anything but <em>allowed</em> is a refusal. Every entry of the
-   * allow-list is a name matcher, so an allowed class is settled in the first step; the second step
-   * is where Spring Security's class-based matchers answer, and where everything else ends up. That
-   * is the one place this class hooks.
+   * The upstream validator with one decision changed: what happens in {@code validateSubType} to a
+   * loaded class none of the matchers allowed.
    */
   static final class AllowListValidator extends BasicPolymorphicTypeValidator {
 
@@ -372,11 +298,8 @@ public final class SessionTypeAllowList {
      * Returns the upstream verdict for a class the matchers allow; for any other class tells the
      * listener, then refuses it under {@link Mode#ENFORCE} and allows it under {@link Mode#REPORT}.
      *
-     * <p>Under {@code REPORT} Jackson caches the deserializer it resolves for a type id, so the
-     * same class in the same slot reaches this method once per frontend lifetime, not once per
-     * read. The signal is therefore "this class occurs", not "this many values": exactly what
-     * deciding to enforce needs. A refusal under {@code ENFORCE} is never cached and is reported on
-     * every read.
+     * <p>Under {@code REPORT} Jackson caches the resolved deserializer, so each class is typically
+     * reported once per frontend lifetime; under {@code ENFORCE} on every read.
      *
      * @param ctxt the deserialization context.
      * @param baseType the declared type of the slot being read.
@@ -397,12 +320,8 @@ public final class SessionTypeAllowList {
   }
 
   /**
-   * The production listener: counts every refusal on {@code basetool_session_type_refused_total}
-   * and names each distinct class once at {@code WARN}.
-   *
-   * <p>The class name goes into the log, never into a tag. It is a loaded class's name, so it is
-   * not member data, but a type id comes out of a stored payload and its variety is set by whoever
-   * wrote it — an unbounded label (REQ-OBS-011). The tag is the mode alone.
+   * The production listener: counts every refusal on {@code basetool_session_type_refused_total},
+   * tagged by mode only, and logs each distinct class name once at {@code WARN}.
    */
   @RequiredArgsConstructor
   static final class MeteredRefusalListener implements RefusalListener {

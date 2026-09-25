@@ -38,12 +38,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Bank booking flows end to end (REQ-BANK-004/-006/-011, epic #556): deposit / withdrawal /
- * transfer happy paths plus the stable 409 rejections (holder overdraft, self-transfer), asserted
- * against the compute-on-read balances. Two consecutive deposits are additionally driven through
- * the real K1 modal to prove the AJAX → {@code /api/proxy/bank} → backend → in-place account-body
- * swap chain (#579, REQ-FE-001): the success path re-renders the money region without a reload, and
- * the immediate second deposit cannot 409 (money bookings carry no client {@code @Version}).
+ * End-to-end tests of bank bookings (REQ-BANK-004, REQ-BANK-006, REQ-BANK-011): deposit, withdrawal
+ * and transfer happy paths, the 409 rejections, and in-place UI updates of the balance
+ * (REQ-FE-001).
  */
 @Tag("e2e")
 class BankBookingE2eTest {
@@ -219,12 +216,8 @@ class BankBookingE2eTest {
   }
 
   /**
-   * Drives two consecutive deposits through the K1 modal as the granted employee and proves the
-   * #579 in-place behaviour: the success path swaps the account body via {@code
-   * fragment=accountBody} instead of reloading, so the {@code window.__krtNoReload} marker set
-   * before the first deposit survives BOTH writes, the visible balance updates in place each time,
-   * and the immediate second deposit (no reload between) is accepted — money bookings carry no
-   * client {@code @Version}, so a stale-version 409 is structurally impossible.
+   * Books two consecutive deposits through the K1 modal and asserts the balance updates in place
+   * without a reload and the second deposit is accepted.
    */
   @Test
   void uiDepositThroughModalUpdatesBalanceInPlace() {
@@ -266,15 +259,9 @@ class BankBookingE2eTest {
   }
 
   /**
-   * Drives the deposit/withdrawal counterparty picker end to end (REQ-BANK-044, #1193 follow-up):
-   * it is now a server-side searchable combobox (remote-bank-users → {@code /users/search-bank}),
-   * not a preloaded {@code <select>}. Proves the two interacting behaviours a straight conversion
-   * must not break: (1) picking a registered tool user drives the dependent Einheit select from
-   * that user's memberships — the combobox's hidden-input {@code change} still fires bank.js's
-   * {@code fillCounterpartyOrgUnits}, which enables the select and auto-selects a single
-   * membership; and (2) the "kein Tool-Account" external toggle swaps the registered combobox for
-   * the free-text name input and keeps the (now all-org-units-widened) Einheit select usable. The
-   * counterparty is add-only and optional, so this exercises only the picker — it does not submit.
+   * Drives the server-side searchable counterparty picker (REQ-BANK-044): picking a registered user
+   * fills the dependent Einheit select, and the "kein Tool-Account" toggle swaps in the free-text
+   * name input. Nothing is submitted.
    */
   @Test
   void counterpartyPickerRemoteSearchDrivesOrgUnitAndExternalToggle() {
@@ -310,11 +297,8 @@ class BankBookingE2eTest {
   }
 
   /**
-   * Opens the unified "Kontobewegung" modal (REQ-BANK-017, #997) — Einzahlung is the default type —
-   * books the given amount to the UI holder and waits for the account-body swap to repaint the
-   * balance in place, without any page navigation. Captures the pre-deposit balance text and waits
-   * on the XHR POST plus the post-swap DOM change, so the assertion is independent of locale number
-   * formatting.
+   * Books a deposit to the UI holder through the "Kontobewegung" modal and waits until the balance
+   * changes in place (REQ-BANK-017).
    *
    * @param page the active page
    * @param amount the whole-aUEC amount to deposit

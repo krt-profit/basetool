@@ -49,8 +49,6 @@
         const list = el('ul', 'bp-owners-list');
         owners.forEach(function (owner) {
             const item = el('li', 'bp-owner', owner.ownerName);
-            // Discreet marker for an owner who is visible only via global blueprint sharing
-            // (REQ-INV-018), i.e. not a member of the caller's oversight org unit.
             if (owner.orgUnitMember === false) {
                 const hint = el(
                     'span',
@@ -69,7 +67,6 @@
     }
 
     function showError(panel) {
-        // Reset the loaded flag so the next expand retries the fetch.
         panel.setAttribute('data-loaded', 'false');
         clear(panel);
         panel.appendChild(
@@ -111,10 +108,6 @@
     }
 
     function wireDetails(details) {
-        // Idempotent: the table is an AJAX swap target, so wireDetails runs again on
-        // krt:swapped over freshly rendered rows. The guard stops a re-swap from
-        // double-binding the toggle handler on rows that survived (none do today, but
-        // the marker keeps this safe if the swap ever becomes a partial update).
         if (details.dataset.bpWired === '1') {
             return;
         }
@@ -125,9 +118,6 @@
             if (!detailsRow || !detailsRow.classList.contains('details-row')) {
                 return;
             }
-            // Show/hide the companion row via a class on it directly — a CSS
-            // tr:has(details[open]) sibling rule re-evaluates style across the
-            // whole table per toggle and janks the UI (REQ-INV-012).
             detailsRow.classList.toggle('bp-expanded', details.open);
             if (!details.open) {
                 return;
@@ -149,14 +139,6 @@
         (root || document).querySelectorAll('details[data-product-key]').forEach(wireDetails);
     }
 
-    // The product search is server-side (REQ-INV-013): the table is paginated, so a
-    // client-side row filter would only ever see the current page. The form carries the
-    // active page size in a hidden input; submitting it (or typing, debounced) rebuilds
-    // the URL and swaps only the results block in place (REQ-FE-002) instead of reloading.
-    // The page-size picker sits INSIDE the swap container, so after a re-size the form's
-    // hidden size input is stale. Take the active size from the address bar (kept current
-    // by the history-synced swap) and fall back to the hidden input on first load. The
-    // page index is intentionally dropped so a new search always lands on page 0.
     function activeSize(form) {
         const fromUrl = new URLSearchParams(window.location.search).get('size');
         if (fromUrl) {
@@ -221,14 +203,11 @@
     document.addEventListener('DOMContentLoaded', function () {
         wireDetailsIn(document);
         wireFilter();
-        // Intercept the size picker / page-nav anchors inside the results block so paging
-        // swaps in place. No initial fetch — the server already rendered page 0.
         if (window.krtFetch) {
             window.krtFetch.bindSwap({ container: '#' + RESULTS_ID, history: true });
         }
     });
 
-    // Re-bind the per-element <details> toggle handlers over rows that came in via a swap.
     document.addEventListener('krt:swapped', function (event) {
         const container = event.detail && event.detail.container;
         if (container && container.id === RESULTS_ID) {

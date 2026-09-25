@@ -51,10 +51,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Management of the per-account capability grants (epic #556, REQ-BANK-009, ADR-0011). Grants are
- * created only for users currently holding the Bank Employee role (or above); whether the grantee
- * belongs to an org unit is deliberately irrelevant in both directions (REQ-BANK-008). Every
- * mutation appends exactly one audit row in the same transaction (REQ-BANK-012).
+ * Manages per-account capability grants (REQ-BANK-009, ADR-0011). Grantees must hold the Bank
+ * Employee role or above, org-unit membership is irrelevant (REQ-BANK-008), and every mutation is
+ * audited in the same transaction (REQ-BANK-012).
  */
 @Service
 @RequiredArgsConstructor
@@ -78,9 +77,8 @@ public class BankGrantService {
   private final AuthHelperService authHelperService;
 
   /**
-   * Lists grants for the matrix UI: per account, per employee, or all (G1/G2 mockups). Each row
-   * carries the inert marker — {@code false} when the grantee currently lacks the Bank Employee
-   * role.
+   * Lists grants for the matrix UI: per account, per employee, or all. Each row is marked inert
+   * when the grantee currently lacks the Bank Employee role.
    *
    * @param accountId filter on one account, or {@code null}
    * @param userId filter on one grantee, or {@code null}

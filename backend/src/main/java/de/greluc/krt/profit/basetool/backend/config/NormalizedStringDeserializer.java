@@ -29,13 +29,8 @@ import tools.jackson.databind.ValueDeserializer;
 /**
  * Jackson deserializer that trims, NFC-normalizes and length-caps every JSON string field.
  *
- * <p>Trimming is unconditional; an all-whitespace string deserializes as {@code null} rather than
- * an empty string so {@code @NotBlank} fires consistently. NFC normalization collapses Unicode
- * combining sequences into precomposed code points so {@code "café"} (one code point) and {@code
- * "cafe + ́"} (two code points) compare equal in the database. The length cap ({@link
- * StringNormalization#MAX_FREE_TEXT_LENGTH}) matches the longest free-text column in the schema; an
- * oversized payload throws {@link IllegalArgumentException} which {@code GlobalExceptionHandler}
- * maps to a 400.
+ * <p>An all-whitespace string becomes {@code null}. A string longer than {@link
+ * StringNormalization#MAX_FREE_TEXT_LENGTH} throws {@link IllegalArgumentException}, mapped to 400.
  */
 public class NormalizedStringDeserializer extends ValueDeserializer<String> {
 

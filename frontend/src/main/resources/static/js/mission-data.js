@@ -17,27 +17,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * Mission-data admin page module (/admin/mission-data), extracted verbatim from the former inline
- * script of admin/mission-data.html (ADR-0069, follow-up to #924).
- *
- * In-place CRUD (#582) for the three sections (squadrons, job-types, frequency-types): the create/edit
- * modals, the shared delete-confirm modal, the section activate toggles and the frequency-type
- * drag-and-drop reorder all go through window.krtFetch and re-swap the affected section fragment in
- * place; the classic POST->redirect forms stay the no-JS fallback. Also the box-collapse persistence
- * and the include-inactive filter swaps.
- *
- * The Thymeleaf-interpolated toast/conflict strings (MISSION_MSG, MISSION_CONFLICT) and the modal
- * titles (MISSION_TITLES, holding the six inline create/edit title expressions) stay inline in the page
- * bootstrap this module reads.
- */
-
 /* global MISSION_MSG, MISSION_CONFLICT, MISSION_TITLES */
 
-// ---- In-place CRUD helpers (#582) ----------------------------------------------------
-
-// The include-inactive filter values, sent on every section re-swap so the swapped fragment
-// keeps the same inactive-visibility as the rest of the page.
 function missionFilterParams() {
     function checked(id) {
         const el = document.getElementById(id);
@@ -60,9 +41,6 @@ function missionSectionForAction(action) {
     return null;
 }
 
-// Re-renders the section the just-saved entity belongs to, picking up the new/edited/removed
-// row with correct derived state (active badges, frequency ordering) and fresh @Version
-// attributes for the next edit.
 function reswapMissionSection(action) {
     const section = missionSectionForAction(action);
     if (section && window.krtFetch) {
@@ -75,17 +53,6 @@ function reswapMissionSection(action) {
     }
 }
 
-// FormData POST to a mission-data AJAX twin (keeps the @ModelAttribute binding the classic
-// forms use) with X-Requested-With + CSRF + retry-once-on-403. On success runs onSuccess and
-// re-swaps the section; on failure delegates to krtFetch.handleProblem for the conflict UX
-// (duplicate-name / in-use toast, or OPTIMISTIC_LOCK reload-confirm).
-// Migrated to krtFetch.submitForm (S10, REQ-FE-009): the shared foundation owns the CSRF header
-// (no Content-Type so the browser sets the multipart boundary), the bare-403 refresh-and-retry,
-// X-Reauthenticate, the double-submit guard (submitter), the success toast and the !ok
-// handleProblem (duplicate-name / in-use toast, or OPTIMISTIC_LOCK reload-confirm). This helper
-// keeps only its page behaviour: run onSuccess and re-swap the affected section in place.
-// Callers guard with if (!window.krtFetch) form.submit() so the classic POST->redirect stays the
-// no-JS fallback.
 function missionWrite(form, successMessage, onSuccess) {
     const action = form.getAttribute('action');
     window.krtFetch.submitForm({
@@ -104,7 +71,6 @@ function missionWrite(form, successMessage, onSuccess) {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-    // Squadron Modal
     const sqModal = document.getElementById('squadron-modal');
     const sqForm = document.getElementById('squadron-form');
     const sqTitle = document.getElementById('squadron-modal-title');
@@ -126,7 +92,6 @@ document.addEventListener('DOMContentLoaded', function () {
         };
     }
 
-    // Delegated on document so swapped-in rows (AJAX filter) keep working with zero re-init.
     document.addEventListener('click', function (e) {
         const btn = e.target.closest('.edit-squadron-btn');
         if (!btn) return;
@@ -141,7 +106,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (sqClose) sqClose.onclick = () => window.krtModal.close(sqModal);
 
-    // JobType Modal
     const jtModal = document.getElementById('jobtype-modal');
     const jtForm = document.getElementById('jobtype-form');
     const jtTitle = document.getElementById('jobtype-modal-title');
@@ -152,9 +116,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const jtLeadership = document.getElementById('jt-leadership');
     const jtMissionLeadGroup = document.getElementById('jt-missionlead-group');
 
-    // The Einsatzleiter (mission-lead) designation only makes sense for a MISSION leadership
-    // role, so its checkbox is shown only then; hiding it also clears it (the backend rejects a
-    // mission-lead designation on a non-MISSION or non-leadership role anyway).
     function updateMissionLeadVisibility() {
         const eligible =
             jtArchetypeSelect.value === 'MISSION' && jtLeadership && jtLeadership.checked;
@@ -168,7 +129,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function updateLeadershipVisibility() {
-        // Leadership flag is now supported for both archetypes MISSION and CREW.
         if (jtArchetypeSelect.value === 'MISSION' || jtArchetypeSelect.value === 'CREW') {
             jtLeadershipGroup.style.display = 'block';
         } else {
@@ -203,7 +163,6 @@ document.addEventListener('DOMContentLoaded', function () {
         };
     }
 
-    // Delegated on document so swapped-in rows (AJAX filter) keep working with zero re-init.
     document.addEventListener('click', function (e) {
         const btn = e.target.closest('.edit-jobtype-btn');
         if (!btn) return;
@@ -223,7 +182,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (jtClose) jtClose.onclick = () => window.krtModal.close(jtModal);
 
-    // FrequencyType Modal
     const ftModal = document.getElementById('frequency-type-modal');
     const ftForm = document.getElementById('freqtype-form');
     const ftTitle = document.getElementById('freqtype-modal-title');
@@ -244,7 +202,6 @@ document.addEventListener('DOMContentLoaded', function () {
         };
     }
 
-    // Delegated on document so swapped-in rows (AJAX filter) keep working with zero re-init.
     document.addEventListener('click', function (e) {
         const btn = e.target.closest('.edit-freqtype-btn');
         if (!btn) return;
@@ -263,13 +220,11 @@ document.addEventListener('DOMContentLoaded', function () {
         if (event.target === jtModal) window.krtModal.close(jtModal);
         if (event.target === ftModal) window.krtModal.close(ftModal);
     };
-    // Delete Modal Logic
     const deleteModal = document.getElementById('delete-confirm-modal');
     const deleteForm = document.getElementById('delete-confirm-form');
     const deleteClose = document.querySelectorAll('.close-delete-modal');
 
     if (deleteModal) {
-        // Delegated: one listener serves all three sections' swapped-in delete buttons.
         document.addEventListener('click', function (e) {
             const btn = e.target.closest('.delete-btn');
             if (!btn) return;
@@ -293,7 +248,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Box collapse logic
     ['squadrons-box', 'jobtypes-box', 'freqtypes-box'].forEach((boxId) => {
         const isCollapsed = localStorage.getItem(boxId + '-collapsed') === 'true';
         if (isCollapsed) {
@@ -309,10 +263,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // ---- In-place CRUD interceptors (#582) --------------------------------------------
-    // Create/edit share one modal form per section; on success the modal closes and the
-    // section re-swaps. Delete uses the shared confirm modal. Activate forms live inside the
-    // swappable sections, so they are document-delegated to survive a re-swap.
     function wireModalSave(form, modal) {
         if (!form) {
             return;
@@ -389,8 +339,6 @@ function toggleBox(event, boxId) {
     }
 }
 
-// Drag and Drop Logic. Bound on the STABLE swap container (#freqtypes-results) — NOT the
-// swapped inner <tbody> — so reorder survives the include-inactive filter swap with no re-init.
 function setupDragAndDrop(containerId, reorderUrl) {
     const container = document.getElementById(containerId);
     if (!container) return;
@@ -412,10 +360,6 @@ function setupDragAndDrop(containerId, reorderUrl) {
         const rows = Array.from(container.querySelectorAll('tr.draggable-row'));
         const newOrderIds = rows.map((row) => row.dataset.id);
 
-        // #582: persist via the existing AJAX endpoint, then re-swap the frequency-type
-        // section in place instead of reloading. The swap refreshes every row's order/priority
-        // on success and reverts the optimistic drag move on failure. The write goes through
-        // krtFetch.write (REQ-FE-002: CSRF, the 403 retry, re-auth).
         const reswapFreqTypes = function () {
             if (window.krtFetch) {
                 window.krtFetch.swap({
@@ -436,8 +380,6 @@ function setupDragAndDrop(containerId, reorderUrl) {
                     errorMessage: MISSION_MSG.error,
                     conflict: MISSION_CONFLICT,
                     onError(status) {
-                        // A 409 gets krtFetch's conflict handling; every other failure keeps the
-                        // page's own generic error toast.
                         if (status === 409) {
                             return false;
                         }
@@ -477,17 +419,12 @@ document.addEventListener('DOMContentLoaded', () => {
     setupDragAndDrop('freqtypes-results', '/admin/mission-data/frequency-types/reorder');
 });
 
-// CSP-safe delegated bindings (replaces onclick="toggleBox(event, '<box>')" and
-// onchange="document.getElementById('<form>').submit();" inline handlers).
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('click', 'mission-data-toggle-box', function (el, event) {
         toggleBox(event, el.getAttribute('data-box-id'));
     });
 }
 
-// Per-browser persistence of the three include-inactive toggles (REQ-UI-017): one JSON object
-// under a single key; absence = the server default (all unchecked). Guarded so privacy modes
-// that deny storage degrade to the defaults instead of breaking the page.
 const MISSION_FILTER_PREF_KEY = 'admin_mission_data_filters';
 
 function readMissionFilterPref() {
@@ -514,14 +451,9 @@ function persistMissionFilters() {
                 frequencyTypes: checked('includeInactiveFrequencyTypes'),
             }),
         );
-    } catch (_e) {
-        /* storage unavailable */
-    }
+    } catch (_e) {}
 }
 
-// Include-inactive filters -> in-place swap of just the affected section (REQ-FE-002),
-// replacing the former data-trigger="submit-form-by-id" full reload. Each swap URL carries
-// all three include-inactive values so the address bar / no-JS refresh reproduce full state.
 if (window.krtFetch) {
     const wireFilter = function (checkboxId, sectionId) {
         const cb = document.getElementById(checkboxId);
@@ -540,12 +472,6 @@ if (window.krtFetch) {
     wireFilter('includeInactiveJobTypes', 'jobtypes-results');
     wireFilter('includeInactiveFrequencyTypes', 'freqtypes-results');
 
-    // On load, reconcile the saved toggles with the server-rendered checkboxes (REQ-UI-017).
-    // Explicit includeInactive* query params (deep link / the no-JS GET forms) win and are
-    // re-persisted from the server-checked boxes. Otherwise every checkbox is set FIRST — so each
-    // replayed handler sends the full three-param state — and then the EXISTING change handler
-    // above fires once per section that actually differs (there is no combined all-sections
-    // swap, so a differing section costs exactly one fragment swap).
     (function () {
         const toggles = [
             { id: 'includeInactiveSquadrons', pref: 'squadrons' },

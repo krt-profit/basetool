@@ -23,14 +23,10 @@ import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 
 /**
- * Request body for the set-parent endpoint (epic #692, REQ-ORG-014): assigns the org unit
- * identified by the path id to a new parent in the hierarchy — a Staffel/SK to a Bereich, or a
- * Bereich to the Organisationsleitung. The parent kind is validated server-side (and pinned by the
- * {@code validate_org_unit_parent} V164 trigger as the DB backstop).
+ * Request body assigning an org unit a new parent in the hierarchy (REQ-ORG-014); the parent kind
+ * is validated server-side.
  *
- * @param parentOrgUnitId the new parent's id, or {@code null} to detach the unit from its current
- *     parent (e.g. before moving it). When non-null, its kind must match the child's level.
- * @param version the <em>child</em> org unit's optimistic-lock version; required so a concurrent
- *     edit surfaces as a 409 instead of silently overwriting another admin's change.
+ * @param parentOrgUnitId the new parent's id, or {@code null} to detach the unit
+ * @param version the child org unit's optimistic-lock version
  */
 public record OrgUnitParentUpdateRequest(UUID parentOrgUnitId, @NotNull Long version) {}

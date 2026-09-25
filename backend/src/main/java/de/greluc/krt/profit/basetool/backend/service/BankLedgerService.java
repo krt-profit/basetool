@@ -68,35 +68,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The bank's booking engine (epic #556): books deposits, withdrawals, account-to-account transfers,
- * holder→holder Umbuchungen, reversals and the admin wipe reset onto the <strong>two</strong>
- * append-only ledgers (REQ-BANK-004, ADR-0010/0039) — account legs in {@code bank_posting}, holder
- * legs in {@code bank_holder_posting}.
+ * The bank's booking engine: books deposits, withdrawals, transfers, holder Umbuchungen, reversals
+ * and the wipe reset onto the account ledger ({@code bank_posting}) and the holder ledger ({@code
+ * bank_holder_posting}) (REQ-BANK-004, ADR-0039).
  *
- * <p>This orchestrator owns the booking flow, fee arithmetic, counterparty resolution and the audit
- * trail; the mechanical persistence (row locking, holder resolution, ledger inserts) is delegated
- * to {@link BankPostingWriter} and every pre-persist validation to {@link BankBookingGuards}
- * (#1253). Both collaborators run inside the transaction each {@code book*} / {@code reverse} /
- * {@code reset} entry point opens, so the concurrency contract below is unchanged by the split.
- *
- * <p><strong>Concurrency &amp; overdraft contract.</strong> Every booking that touches an account
- * first locks the affected account row(s) via {@link BankPostingWriter#lockAccount} — multi-account
- * bookings in ascending id order so concurrent flows cannot deadlock — and only then reads the
- * balance it validates against. Because all value movement on an account serializes on that lock,
- * the <strong>account</strong> no-overdraft invariant (REQ-BANK-006) cannot be raced. The
- * <strong>holder</strong> dimension is deliberately <em>unconstrained</em> (ADR-0039): a holder
- * balance may go negative — a custodian fronts his own money, reconciled later by a {@link
- * #bookHolderTransfer} Umbuchung — so no booking path checks holder coverage. The ledger rows
- * themselves are insert-only: no {@code @Version} churn, no {@code save()}-on-managed-entity traps.
- *
- * <p><strong>Holder activity.</strong> Postings that ADD money to a holder's stash require the
- * holder to be active (deposit receiver, transfer destination); postings that REMOVE money are
- * allowed on deactivated holders so a stash can be wound down. The holder→holder Umbuchung — the
- * reconciliation tool — ignores the active flag in both directions so a deactivated holder can be
- * brought back to zero. Reversals are exempt — they restore a prior, already-audited state.
- *
- * <p>Every booking appends exactly one audit row in the same transaction ({@link
- * BankAuditService}); an audit failure rolls the booking back (REQ-BANK-012).
+ * <p>Persistence is delegated to {@link BankPostingWriter} and validation to {@link
+ * BankBookingGuards}. Bookings lock the affected account rows in ascending id order before reading
+ * balances, so the account no-overdraft rule (REQ-BANK-006) cannot be raced; holder balances may go
+ * negative. Every booking appends one audit row via {@link BankAuditService} in the same
+ * transaction.
  */
 @Service
 @RequiredArgsConstructor
@@ -178,24 +158,12 @@ public class BankLedgerService {
   }
 
   /**
-   * Books a <strong>split</strong> deposit (REQ-BANK-043): one {@code DEPOSIT} transaction whose
-   * gross lands once on the named holder's stash (a single positive holder leg, REQ-BANK-003/-004)
-   * but is distributed across several account legs — a percentage slice spread evenly by count over
-   * every active squadron account (excluding the named account), with the named account credited
-   * the remainder. A deposit is fee-free (REQ-BANK-033), so no in-game fee applies.
+   * Books a split deposit (REQ-BANK-043): one {@code DEPOSIT} with a single holder leg for the
+   * gross and account legs distributing {@code round(gross × percent / 100)} evenly over the other
+   * active squadron accounts, the named account receiving the remainder.
    *
-   * <p>The slice is {@code round(gross × percent / 100)} to whole aUEC (HALF_UP). It is split with
-   * the largest-remainder rule: {@code base = floor(slice / N)}, and the leftover {@code slice −
-   * base·N} aUEC go one each to the first accounts by ascending id, so the per-account amounts are
-   * as even as possible, stay whole and sum back to the slice exactly. The named account is
-   * credited {@code gross − slice}, so every account leg plus the named leg sums to the gross —
-   * equal to the single holder leg. Zero-amount legs are dropped (a 100 % split books no named leg;
-   * a slice smaller than the target count credits only the first {@code slice} accounts).
-   *
-   * <p>All affected accounts (named + squadrons) are pessimistically locked in ascending id order —
-   * the same global lock order every other multi-account flow uses (transfer, reversal, wipe) — so
-   * concurrent bookings cannot deadlock. The named account must be active; squadron accounts that
-   * closed in the race window are dropped from the distribution.
+   * <p>All affected accounts are locked in ascending id order; zero-amount legs are dropped and
+   * squadron accounts closed in the meantime are skipped.
    *
    * @param request the validated split deposit payload ({@code splitEnabled} set, {@code
    *     splitPercent} present)
@@ -328,23 +296,12 @@ public class BankLedgerService {
   }
 
   /**
-   * Books a withdrawal (REQ-BANK-004): one negative account leg on the paying account and one
-   * negative holder leg naming the holder who physically paid the money out. Guarded by the
-   * no-overdraft rule at <strong>account</strong> level only (REQ-BANK-006) — the holder may go
-   * negative.
+   * Books a withdrawal (REQ-BANK-004): one negative account leg and one negative holder leg,
+   * guarded against overdraft at account level only (REQ-BANK-006).
    *
-   * <p>By default (on-top, ADR-0052 superseding ADR-0041, REQ-BANK-033) the entered amount is what
-   * the external recipient must <strong>receive</strong>; the in-game transfer fee is added on top
-   * and the account and holder's stash are debited the gross ({@code amount + fee}). With the
-   * <strong>fee-inclusive</strong> mode ({@code request.feeInclusive()}, #999) the entered amount
-   * is instead the gross <strong>debited</strong> and the recipient receives {@code amount - fee}
-   * (rejected with {@code BANK_FEE_EXCEEDS_AMOUNT} when {@code amount - fee <= 0}). The overdraft
-   * guard runs against whatever is actually debited, so the account may not be driven negative; the
-   * holder is not out of pocket — the fee is borne by the debited account, not their private money.
-   *
-   * <p>Optionally records the <strong>counterparty</strong> — the Empf&auml;nger who received the
-   * payout, and the org unit they belong to — on the transaction header (REQ-BANK-044), distinct
-   * from the paying holder.
+   * <p>By default the in-game fee is added on top of the entered amount; in fee-inclusive mode the
+   * entered amount is the gross debited (REQ-BANK-033). An optional counterparty (Empf&auml;nger)
+   * is recorded on the transaction header (REQ-BANK-044).
    *
    * @param request validated withdrawal payload
    * @return acknowledgement of the created transaction
@@ -402,28 +359,16 @@ public class BankLedgerService {
   }
 
   /**
-   * Books an account-to-account transfer (REQ-BANK-011): two account legs and two holder legs —
-   * value moves between two <strong>different</strong> accounts and the physical custody moves with
-   * it. The caller's {@code can_transfer} on the source is gated at the controller; the
-   * <em>destination visibility</em> rule (the employee must hold any grant on the destination
-   * account) is enforced here via the supplied check. The source account is guarded against
-   * overdraft; the holder dimension is not (ADR-0039).
+   * Books an account-to-account transfer (REQ-BANK-011): two account legs and two holder legs. The
+   * source account is guarded against overdraft, and the destination must be visible to the caller.
    *
-   * <p>When the custody actually changes hands (source holder ≠ destination holder), a real in-game
-   * transfer happens, so the in-game fee (ADR-0052 superseding ADR-0041, REQ-BANK-033) applies. By
-   * default (on-top) the source account and holder are debited the gross ({@code amount + fee})
-   * while the destination is credited the full entered amount. With the
-   * <strong>fee-inclusive</strong> mode ({@code request.feeInclusive()}, #999) the source is
-   * debited exactly the entered amount and the destination is credited {@code amount - fee}
-   * (rejected with {@code BANK_FEE_EXCEEDS_AMOUNT} when {@code amount - fee <= 0}). Either way the
-   * account legs net to {@code -fee}, preserving the ledger-integrity invariant. The source
-   * overdraft guard runs against the actual debit. A same-holder transfer moves no money in-game
-   * (the holder merely re-labels which account owns it), so it is fee-free — {@code feeInclusive}
-   * has no effect — and both legs net to zero as before.
+   * <p>When custody changes hands the in-game fee applies, on top by default or included in
+   * fee-inclusive mode (REQ-BANK-033); a same-holder transfer is fee-free. The account legs always
+   * net to {@code -fee}.
    *
    * @param request validated transfer payload (source and destination accounts must differ)
-   * @param destinationVisible whether the caller may see the destination account (pre-computed by
-   *     the controller from {@code BankSecurityService.canSee})
+   * @param destinationVisible whether the caller may see the destination account (from {@code
+   *     BankSecurityService.canSee})
    * @return acknowledgement of the created transaction
    * @throws NotFoundException when an account or holder does not exist
    * @throws AccessDeniedException when the destination is not visible to the caller
@@ -504,21 +449,12 @@ public class BankLedgerService {
   }
 
   /**
-   * Books a holder→holder Umbuchung (REQ-BANK-031, ADR-0039): two holder legs and
-   * <strong>no</strong> account leg — pure custody reconciliation between two players so the bank
-   * staff stay payout-capable. The source holder may go negative; the active flag is ignored in
-   * both directions so a deactivated holder's residual can be reconciled to zero.
+   * Books a holder-to-holder Umbuchung (REQ-BANK-031, ADR-0039): two holder legs and no account
+   * leg, ignoring the holders' active flags.
    *
-   * <p><strong>The Umbuchung fee is borne by the KRT ({@code CARTEL}) account</strong>
-   * (REQ-BANK-031, #998 — supersedes the fee-free ADR-0052/ADR-0039 clause). {@code fee =
-   * round(amount × rate)}: the <strong>source</strong> holder's custody is reduced by the fee
-   * ({@code -(amount + fee)}), the destination is credited the full {@code amount}, and the fee is
-   * <strong>debited from the CARTEL account</strong> ({@code -fee}) — so the holder ledger nets to
-   * {@code -fee} and the CARTEL account bears the real aUEC lost to the game. The CARTEL account is
-   * locked + overdraft-guarded and is never driven negative; a <em>missing or closed</em> CARTEL
-   * account rejects the Umbuchung ({@code BANK_ACCOUNT_CLOSED}), and a fee it cannot cover is a
-   * {@code BANK_OVERDRAFT}. A tiny amount whose fee rounds to {@code 0} keeps the legacy fee-free
-   * shape (no account leg, holder legs net to zero).
+   * <p>A non-zero fee {@code round(amount × rate)} reduces the source holder by {@code amount +
+   * fee} and is debited from the KRT ({@code CARTEL}) account, which is locked and
+   * overdraft-guarded.
    *
    * @param request validated holder-transfer payload (source and destination holders must differ)
    * @return acknowledgement of the created transaction
@@ -738,28 +674,12 @@ public class BankLedgerService {
   }
 
   /**
-   * Resolves the optional deposit/withdrawal counterparty (REQ-BANK-044, #994) into a snapshot
-   * stamped on the transaction header. The counterparty is either a <strong>registered</strong>
-   * tool user or an <strong>external</strong> free-text name (mutually exclusive; supplying both is
-   * a 400). With neither, no counterparty is recorded (a lone org unit is a 400).
-   *
-   * <ul>
-   *   <li><strong>Registered</strong> ({@code userId}): the handle is snapshotted from the user's
-   *       effective name; a named org unit is validated to be one of the user's own memberships
-   *       across all four kinds (via the shared, kind-safe {@link
-   *       OrgUnitMembershipService#listDirectMembershipOptions}) and its name snapshotted.
-   *   <li><strong>External</strong> ({@code externalName}, #994): the handle is snapshotted from
-   *       the free-text name and <em>no</em> {@code counterparty_user_id} FK is stored; a named org
-   *       unit may be <em>any</em> active org unit (the membership check is skipped, since there is
-   *       no linked user), resolved to its name snapshot via {@link
-   *       OrgUnitMembershipService#listAllActiveOrgUnitOptionsAllKinds}.
-   * </ul>
-   *
-   * <p>Either way the org-unit name is snapshotted so a later user/org-unit deletion leaves the
-   * recorded booking intact.
+   * Resolves the optional deposit/withdrawal counterparty (REQ-BANK-044) into a header snapshot:
+   * either a registered user, whose org unit must be one of their memberships, or an external
+   * free-text name, whose org unit may be any active one.
    *
    * @param userId the registered counterparty user id, or {@code null}
-   * @param externalName the external free-text counterparty name (#994), or {@code null}/blank
+   * @param externalName the external free-text counterparty name, or {@code null}/blank
    * @param orgUnitId the counterparty's chosen org unit, or {@code null}
    * @return the resolved snapshot, or {@code null} when no counterparty was chosen
    * @throws BadRequestException when both a user and an external name are given, when an org unit
@@ -812,12 +732,9 @@ public class BankLedgerService {
   }
 
   /**
-   * Renders the audit-detail suffix naming the deposit/withdrawal counterparty (REQ-BANK-044):
-   * {@code " <- handle (OrgUnit)"} for a deposit (money came FROM the Einzahler) or {@code " ->
-   * handle (OrgUnit)"} for a withdrawal (money went TO the Empf&auml;nger); empty when no
-   * counterparty was recorded. The org-unit segment is omitted when none was chosen. Only the
-   * handle and org-unit name — both system identifiers, not user free text — appear, consistent
-   * with the existing holder-handle detail.
+   * Renders the audit-detail suffix naming the counterparty (REQ-BANK-044): {@code " <- handle
+   * (OrgUnit)"} for a deposit or {@code " -> handle (OrgUnit)"} for a withdrawal, omitting the org
+   * unit when none was chosen.
    *
    * @param counterparty the resolved counterparty, or {@code null}
    * @param arrow the direction marker ({@code "<-"} deposit, {@code "->"} withdrawal)
@@ -835,14 +752,12 @@ public class BankLedgerService {
   }
 
   /**
-   * Renders the audit-detail suffix for a fee-bearing transaction (ADR-0052, REQ-BANK-033): {@code
-   * " (fee N aUEC)"} — or {@code " (fee N aUEC, incl)"} in the fee-inclusive mode (#999) so the
-   * mode is auditable — when the fee is positive, empty otherwise. No PII — only the numeric fee
-   * and the mode marker.
+   * Renders the audit-detail fee suffix (REQ-BANK-033): {@code " (fee N aUEC)"}, or {@code " (fee N
+   * aUEC, incl)"} in fee-inclusive mode, when the fee is positive.
    *
-   * @param fee the transfer fee (round(entered x rate)) recorded on the transaction
-   * @param feeInclusive whether the entered amount was the gross debited (inclusive) rather than
-   *     the amount that arrives (on-top); only distinguishes when the fee is positive
+   * @param fee the transfer fee recorded on the transaction
+   * @param feeInclusive whether the entered amount was the gross debited rather than the amount
+   *     that arrives
    * @return the fee suffix, or an empty string when there is no fee
    */
   @NotNull

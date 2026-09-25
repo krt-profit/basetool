@@ -24,10 +24,8 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Read DTO for {@code PromotionTopic}. Includes a {@link SquadronReferenceDto} mini-record for the
- * owning squadron so the admin / officer UI can render the squadron column without a dedicated
- * lookup; {@code null} only on legacy rows that pre-date the squadron stamp (post-V88 every row
- * carries a value via the IRIDIUM backfill).
+ * Read DTO for {@code PromotionTopic}, including a {@link SquadronReferenceDto} for the owning
+ * squadron.
  */
 public record PromotionTopicResponse(
     UUID id,

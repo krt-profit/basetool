@@ -54,19 +54,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Regression MVC render test for the read-only approval-limit display on the org-unit account
- * drill-in ({@code org-unit-bank-account-detail.html}, REQ-BANK-041) against a Thymeleaf
- * attribute-precedence bug.
- *
- * <p>The read-only {@code limitsDisplay} block ({@code fragments/bank-approval-limits.html},
- * rendered as {@code data-testid="bank-approval-limits-display"} when the limits are non-empty and
- * not editable) is meant for the plain viewer only — a manager sees the editor in the settings tab
- * instead. The bug put {@code th:if="${settings == null}"} on the <em>same</em> element as {@code
- * th:replace}; because {@code th:replace} (attribute precedence 1) runs before {@code th:if} (3),
- * the guard was dead and the display rendered for the manager too, duplicating the editor. Both
- * tests supply a non-empty, non-editable {@code detail.detail().approvalLimits()} payload and only
- * flip whether {@code settings} is null; a pure view-name unit test would not catch the resurrected
- * duplicate box.
+ * MVC render test for the read-only approval-limit display on the org-unit account drill-in
+ * (REQ-BANK-041): it renders for a plain viewer but not for a manager, who sees the editor instead.
  */
 @SpringBootTest
 class OrgUnitBankLimitsDisplayMvcTest {
@@ -86,11 +75,8 @@ class OrgUnitBankLimitsDisplayMvcTest {
   }
 
   /**
-   * Builds the read-only approval-limits payload that feeds {@code
-   * detail.detail().approvalLimits()} and drives the {@code limitsDisplay} fragment: non-editable
-   * ({@code canEdit=false}, invariant on this read-only surface) with a single all-members ceiling
-   * so {@code hasAny()} is {@code true} and the display block would render whenever its outer
-   * {@code settings == null} guard lets it.
+   * Builds a non-editable approval-limits payload with a single all-members ceiling, so {@code
+   * hasAny()} is {@code true}.
    *
    * @return an approval-limits DTO with {@code hasAny()==true} and {@code canEdit()==false}
    */
@@ -100,14 +86,12 @@ class OrgUnitBankLimitsDisplayMvcTest {
   }
 
   /**
-   * Builds the ORG_UNIT account-detail payload for the drill-in, carrying the given read-only
-   * approval limits and enough facts (balance, target, 30-day delta, booking count) for the page to
-   * render its KPI tiles without a Thymeleaf dereference error.
+   * Builds the ORG_UNIT account-detail payload with read-only approval limits and the facts the KPI
+   * tiles need.
    *
    * @param accountId the account id
-   * @param canManage whether the caller may manage the account, which flips the controller's {@code
-   *     settings != null} branch — mapped onto {@code canSetTarget} here
-   * @return the org-unit account-detail DTO wrapping the shared detail
+   * @param canManage whether the caller may manage the account, mapped onto {@code canSetTarget}
+   * @return the org-unit account-detail DTO
    */
   private static OrgUnitBankAccountDetailDto detailDto(UUID accountId, boolean canManage) {
     BankAccountDto account =
@@ -136,9 +120,8 @@ class OrgUnitBankLimitsDisplayMvcTest {
   }
 
   /**
-   * Stubs the account-detail and booking-history reads the drill-in makes, and — when {@code
-   * canManage} — the {@code /settings} read that populates the non-null {@code settings} model
-   * attribute driving the settings tab.
+   * Stubs the account-detail and booking-history reads and, when {@code canManage}, the {@code
+   * /settings} read that makes the {@code settings} model attribute non-null.
    *
    * @param accountId the account id used in every backend URI
    * @param canManage whether to also stub the manager-only {@code /settings} read
@@ -234,15 +217,8 @@ class OrgUnitBankLimitsDisplayMvcTest {
   }
 
   /**
-   * REQ-BANK-041: the all-members limit row is labelled "Alle Mitglieder der Org-Einheit", from its
-   * own {@code bank.approvalLimit.tier.allMembers} key — the tier binds only an actual member of
-   * the account's owning org unit, so the bare "Alle Mitglieder" understated its scope.
-   *
-   * <p>The label must NOT come from the visibility bundle's {@code
-   * bank.orgUnit.settings.visibility.allMembers}: that same key also labels the visibility bucket,
-   * where {@code ALL_MEMBERS} on a {@code SPECIAL} account means <em>all KRT members</em> — so a
-   * shared string cannot be correct for both. Asserting the resolved German text (rather than the
-   * key) also catches a missing bundle entry, which Thymeleaf would render as {@code ??key_de??}.
+   * Verifies that the all-members limit row is labelled "Alle Mitglieder der Org-Einheit" from its
+   * own {@code bank.approvalLimit.tier.allMembers} key, not the visibility key (REQ-BANK-041).
    *
    * @throws Exception if the MockMvc exchange fails
    */

@@ -31,14 +31,11 @@ import org.springframework.security.oauth2.client.registration.ClientRegistratio
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 
 /**
- * Pins how the frontend authenticates to Keycloak's token endpoint (REQ-SEC-069, ADR-0001): the
+ * Verifies how the frontend authenticates to Keycloak's token endpoint (REQ-SEC-069, ADR-0001): the
  * client type follows the secret, and PKCE is on either way.
  *
- * <p>Runs Spring Boot's real OAuth2 client auto-configuration with the properties {@code
- * application.yml} sets, so what is asserted is the {@link ClientRegistration} the login and the
- * token refresh actually use — not the properties they were built from. A regression to "the secret
- * is set but never sent", or a confidential client that silently stopped sending PKCE (which
- * Keycloak's {@code S256} requirement would turn into a failed login for everyone), breaks here.
+ * <p>Asserts the {@link ClientRegistration} built by Spring Boot's real OAuth2 client
+ * auto-configuration.
  */
 class FrontendClientAuthenticationConfigTest {
 

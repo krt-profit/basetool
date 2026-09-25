@@ -52,12 +52,9 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
- * Spring MVC controller for the ship-data admin page ({@code /ship-data}).
- *
- * <p>Renders the manufacturer + ship-type catalogs side by side (both include hidden entries so
- * admins can un-hide), with PUT actions to toggle visibility on individual entries and a global
- * reset that clears the {@code fitted} flag on every ship in the squadron. The reset is a
- * destructive bulk op gated to ADMIN/OFFICER.
+ * Spring MVC controller for the ship-data admin page ({@code /ship-data}): the manufacturer and
+ * ship-type catalogs including hidden entries, visibility toggles, and a squadron-wide reset of
+ * every ship's {@code fitted} flag.
  */
 @Controller
 @UsesLayoutModel
@@ -77,12 +74,11 @@ public class ShipDataPageController {
       new ParameterizedTypeReference<>() {};
 
   /**
-   * Loads the <em>complete</em> manufacturer and ship-type catalogs — every page, not one capped
-   * chunk, including hidden entries (REQ-ADMIN-001, ADR-0102) — and seeds empty forms when not
-   * already in the model. Both lists are sorted case-insensitively by name. A backend failure
-   * leaves an error key in the model rather than blanking the page; a page walk that hits its
-   * safety cap sets {@code catalogTruncated} so the template shows a loud warning banner instead of
-   * silently presenting a partial list (REQ-ADMIN-002).
+   * Loads the complete manufacturer and ship-type catalogs including hidden entries
+   * (REQ-ADMIN-001), sorted case-insensitively by name, and seeds empty forms.
+   *
+   * <p>A backend failure sets an error key; a page walk that hits its safety cap sets {@code
+   * catalogTruncated} so the template warns (REQ-ADMIN-002).
    *
    * @param model Thymeleaf model populated with both forms, both lists and the optional error key
    * @return the {@code ship-data} view name
@@ -133,9 +129,7 @@ public class ShipDataPageController {
   }
 
   /**
-   * Toggles a manufacturer's hidden flag via the backend visibility endpoint. Failure redirects
-   * with an error query param so the page renders an explicit "update failed" banner instead of
-   * silently keeping the old state.
+   * Toggles a manufacturer's hidden flag; a failure redirects with an error query parameter.
    *
    * @param id manufacturer id
    * @param hidden desired new flag value
@@ -188,11 +182,8 @@ public class ShipDataPageController {
   }
 
   /**
-   * Squadron-wide bulk reset of the {@code fitted} flag on every ship.
-   *
-   * <p>The flag tracks whether a ship is currently outfitted for a mission; admins reset it after a
-   * major event (e.g. patch wipe). Restricted to ADMIN/OFFICER because the operation cannot be
-   * undone — every fleet member would otherwise have to manually re-mark their ships.
+   * Resets the {@code fitted} flag on every ship of the squadron; irreversible, restricted to
+   * ADMIN/OFFICER.
    *
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /ship-data}
@@ -212,10 +203,7 @@ public class ShipDataPageController {
   }
 
   /**
-   * Header-gated AJAX twin of {@link #resetAllFitted}: clears the {@code fitted} flag on every ship
-   * and returns {@code 204} so {@code ship-data.html} surfaces a toast and closes the confirm modal
-   * without the classic POST→redirect reload (the reset has no per-row effect on this page). The
-   * classic handler stays the no-JS fallback.
+   * AJAX twin of {@link #resetAllFitted}: clears the {@code fitted} flag on every ship.
    *
    * @return {@code 204} on success, or the relayed backend {@code problem+json}
    */
@@ -233,9 +221,7 @@ public class ShipDataPageController {
   }
 
   /**
-   * Header-gated AJAX twin of {@link #toggleShipTypeVisibility}: flips a ship type's hidden flag
-   * and returns {@code 204} so the page toggles just that row (button label, secondary style,
-   * dimmed opacity) in place instead of reloading. The classic handler stays the no-JS fallback.
+   * AJAX twin of {@link #toggleShipTypeVisibility}: flips a ship type's hidden flag.
    *
    * @param id ship type id
    * @param hidden the desired new flag value
@@ -257,9 +243,7 @@ public class ShipDataPageController {
   }
 
   /**
-   * Header-gated AJAX twin of {@link #toggleManufacturerVisibility}: flips a manufacturer's hidden
-   * flag and returns {@code 204} so the page toggles just that row in place instead of reloading.
-   * The classic handler stays the no-JS fallback.
+   * AJAX twin of {@link #toggleManufacturerVisibility}: flips a manufacturer's hidden flag.
    *
    * @param id manufacturer id
    * @param hidden the desired new flag value

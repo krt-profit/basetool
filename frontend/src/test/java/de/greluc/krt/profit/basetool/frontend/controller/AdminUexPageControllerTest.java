@@ -50,13 +50,9 @@ import org.springframework.ui.ConcurrentModel;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
 /**
- * Mockito tests for {@link AdminUexPageController}.
- *
- * <p>Pins the three behaviour buckets that carry real risk in this controller: (1) the override
- * dispatcher fans out to the correct backend URL per kind/action, (2) {@code listData} parses the
- * raw UEX mirror fields and computes the global "latest UEX sync" header attribute, and (3) the
- * hierarchy builder buckets terminals onto the right parent city/station and routes free-floating
- * terminals to the orphans list instead of dropping them.
+ * Mockito tests for {@link AdminUexPageController}: the override dispatcher's backend URL per
+ * kind/action, {@code listData}'s parsing and "latest UEX sync" header, and the hierarchy builder's
+ * placement of terminals, including orphans.
  */
 class AdminUexPageControllerTest {
 

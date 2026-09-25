@@ -54,16 +54,11 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
- * The app's live-sync bridge: one SSE stream to receive {@code changed} frames, one endpoint to
- * emit them (ADR-0143).
+ * The app's live-sync bridge: one SSE stream to receive {@code changed} frames and one endpoint to
+ * emit them over the frontend's Redis channel (ADR-0143).
  *
- * <p>Together they close the gap the web has been covering alone since ADR-0094 — a browser's edit
- * now reaches the app, and the app's edit now reaches every open browser, because both directions
- * ride the frontend's own Redis channel with the frontend's own payload.
- *
- * <p>Neither endpoint carries domain data. The stream emits room names and opaque section keys; the
- * publish endpoint accepts the same. Everything a client does with a frame goes through the
- * ordinary, separately authorized read it would have performed anyway.
+ * <p>Neither endpoint carries domain data, only room names and opaque section keys; clients
+ * re-fetch through the ordinary authorized reads.
  */
 @RestController
 @RequestMapping("/api/v1/live-sync")
@@ -75,21 +70,11 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public class LiveSyncController {
 
   /**
-   * Topics one stream may name.
+   * Maximum number of topics one stream may name.
    *
-   * <p><strong>This is a per-client budget, not a per-screen one.</strong> The first revision sized
-   * it at 8 against "what the busiest screen needs — a detail room, its list room and the global
-   * inventory room", and that reasoning was wrong about the client it serves: the app holds
-   * <em>one</em> stream and asks for the union of every screen currently observing, so a member
-   * moving through the app accumulates rooms from screens still on the back stack. In production
-   * one member's app crossed 8, and because the endpoint refuses the whole request rather than the
-   * surplus, live sync was dead on <em>every</em> screen for as long as the app stayed open — it
-   * re-asked on the reconnect backoff and was refused each time.
-   *
-   * <p>16 matches {@code LiveSyncWebSocketHandler.MAX_TOPICS_PER_SESSION}, the web relay's cap for
-   * the same multiplexed-union shape. Both exist for the same reason — a crafted request must not
-   * make the server run unbounded authorization reads for one connection — and they should not
-   * disagree about the number, because the two clients subscribe alike.
+   * <p>A per-client budget covering the union of all rooms the app observes; it matches {@code
+   * LiveSyncWebSocketHandler.MAX_TOPICS_PER_SESSION} and bounds the authorization reads one
+   * connection can trigger.
    */
   static final int MAX_TOPICS_PER_STREAM = 16;
 
@@ -98,32 +83,20 @@ public class LiveSyncController {
   private final LiveSyncRelayService relayService;
 
   /**
-   * Opens the caller's live-sync stream over the topics they name and are allowed to join.
+   * Opens the caller's live-sync stream over the named topics the caller may join.
    *
-   * <p>The topic set is fixed for the stream's life; a client that navigates closes this stream and
-   * opens another. That is the whole subscription protocol, and it is why there is no {@code
-   * subscribe} frame to get out of sync after a reconnect.
-   *
-   * <p>A topic the caller may not join, or that names no room this backend serves, is <b>dropped
-   * from the set</b> and the stream opens without it — the accepted list goes out in the first
-   * {@code subscribed} event so a client can tell a live room from one it will never hear about,
-   * and fall back to polling for that screen rather than trusting a stream that will stay silent.
-   * Only a request where <em>nothing</em> was accepted is refused, because an emitter with no rooms
-   * is a connection held open for nothing.
-   *
-   * <p><strong>{@code X-Accel-Buffering: no} is load-bearing</strong>, for the same reason it is on
-   * the notification stream: an nginx buffering the response holds a body that trickles a few bytes
-   * every twenty seconds, and the symptom is "live sync does not work on this network" rather than
-   * a proxy setting.
+   * <p>The topic set is fixed for the stream's life. Topics the caller may not join, or that name
+   * no room this backend serves, are dropped; the accepted list is sent in the first {@code
+   * subscribed} event. The response carries {@code X-Accel-Buffering: no} so proxies do not buffer
+   * the stream.
    *
    * @param sub the caller's id, from the JWT subject claim
    * @param topics the rooms to join, comma-separated
    * @param response the servlet response, used only for the no-buffering header
    * @return the SSE emitter, already carrying its {@code subscribed} event
-   * @throws ResponseStatusException 400 if more topics than {@link #MAX_TOPICS_PER_STREAM} are
-   *     named — refused rather than truncated, because silently dropping the tail would leave a
-   *     screen half-live with nothing to notice it by
-   * @throws AccessDeniedException if not one named topic was accepted
+   * @throws ResponseStatusException 400 if more than {@link #MAX_TOPICS_PER_STREAM} topics are
+   *     named
+   * @throws AccessDeniedException if no named topic was accepted
    */
   @GetMapping("/stream")
   @Operation(summary = "Subscribe to live change signals for a set of topics (Server-Sent Events).")
@@ -163,18 +136,13 @@ public class LiveSyncController {
   /**
    * Announces that the caller changed a room, so its other viewers re-fetch.
    *
-   * <p>Answers {@code 202} — the frame is a best-effort signal, not a transaction. The caller's own
-   * mutation has already succeeded by the time this is sent, and whether peers were reached says
-   * nothing about it; a client that treated a failure here as a failed write would show an error
-   * for a change that is in the database.
-   *
-   * <p>A rate-limited frame is {@code 429} and a client must simply drop it rather than retry: the
-   * buckets exist to bound the re-fetch herd, and a retry would defeat exactly the bound it hit.
+   * <p>Best-effort signal sent after the caller's mutation succeeded; a {@code 429} must be
+   * dropped, not retried.
    *
    * @param sub the caller's id, from the JWT subject claim
    * @param request the room and the regions that changed
-   * @return {@code 202} when relayed, {@code 400} when nothing in it named a real room or region,
-   *     {@code 429} when a bucket refused it
+   * @return {@code 202} when relayed, {@code 400} when it named no real room or region, {@code 429}
+   *     when rate-limited
    */
   @PostMapping("/changed")
   @Operation(summary = "Announce a change so other viewers of the same room re-fetch.")

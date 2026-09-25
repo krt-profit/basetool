@@ -35,11 +35,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 /**
- * Bean Validation contract tests for the mission-finance write DTOs. They pin the whole-aUEC rule
- * (REQ-MISSION-001): an operator-entered finance amount must be a whole number, so the
- * {@code @Digits(fraction = 0)} constraint rejects fractional input at the {@code @Valid} boundary
- * and a non-browser API client cannot store sub-aUEC precision. Zero stays valid — finance amounts
- * are whole, not strictly positive, so the existing {@code @DecimalMin("0.0")} lower bound is kept.
+ * Bean Validation tests for the mission-finance write DTOs: amounts must be whole and non-negative
+ * (REQ-MISSION-001).
  */
 class MissionFinanceEntryValidationTest {
 

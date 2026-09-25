@@ -44,11 +44,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
-/**
- * Pure-method unit tests for {@link SquadronController}. The Spring-MVC binding (`@PreAuthorize`,
- * JSON) is covered by integration tests; here we verify the controller's delegation contract and
- * pagination wrapping.
- */
+/** Unit tests for {@link SquadronController}: delegation and pagination wrapping. */
 @ExtendWith(MockitoExtension.class)
 class SquadronControllerTest {
 

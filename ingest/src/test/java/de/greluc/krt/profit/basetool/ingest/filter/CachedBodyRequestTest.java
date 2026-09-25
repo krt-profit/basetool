@@ -38,11 +38,8 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Covers the request wrapper the size filter installs for a chunked ({@code Content-Length: -1})
- * body: the controller must be able to read that body again, through either the byte stream or the
- * reader, exactly as it was sent. The wrapper is what makes the INGEST-DOS-1 streaming guard
- * transparent to Spring MVC — if it mis-serves the body, every chunked ingest silently 400s on a
- * truncated payload.
+ * Unit tests for the request wrapper the size filter installs for a chunked body: the body can be
+ * read again, through the byte stream or the reader, exactly as sent.
  */
 class CachedBodyRequestTest {
 

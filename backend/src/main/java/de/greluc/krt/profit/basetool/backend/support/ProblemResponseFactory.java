@@ -29,22 +29,11 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.stereotype.Component;
 
 /**
- * Single builder for the RFC&nbsp;7807 {@link ProblemDetail} bodies the application emits. It
- * centralises the assembly sequence — {@code forStatusAndDetail} + title + {@code type} ({@link
- * AppProblemProperties#getBaseUri()} + suffix) + optional {@code instance} + the stable {@code
- * code} and {@code correlationId} extension properties — that the {@code GlobalExceptionHandler}
- * and the servlet-level error surfaces (the identity-provider-unavailable and pending-approval
- * filters, the container error controller) previously hand-rolled four times over. Keeping it in
- * one place means the wire shape of every problem body (property names, ordering, the {@code type}
- * URI derivation) cannot drift between those surfaces.
+ * Builder for the RFC&nbsp;7807 {@link ProblemDetail} bodies of every error surface: title, {@code
+ * type} (from {@link AppProblemProperties#getBaseUri()}), optional {@code instance}, and the {@code
+ * code} and {@code correlationId} extensions.
  *
- * <p>It lives in the dependency-leaf {@code support} package so the {@code exception}, {@code
- * config} (filter) and {@code controller} layers can all depend on it without any of them forming a
- * package cycle through {@code config} (where {@link AppProblemProperties} used to be reached
- * from). The {@code correlationId} is passed in by the caller rather than minted here, because the
- * sourcing differs by surface (MDC-or-generate for the advice, a freshly minted UUID for the
- * pending-approval filter) and callers also need the value for their own log line / response
- * header.
+ * <p>The caller supplies the {@code correlationId}.
  */
 @Component
 @RequiredArgsConstructor
@@ -58,16 +47,14 @@ public class ProblemResponseFactory {
   /**
    * Builds the base {@link ProblemDetail} shared by every problem surface.
    *
-   * @param status the HTTP status; drives both {@code status} and the response status
-   * @param title the localized human-readable summary
-   * @param detail the localized human-readable explanation
-   * @param instanceUri the request URI to record as {@code instance}, or {@code null}/blank to omit
-   *     it (the pending / container surfaces may not have a usable URI)
+   * @param status the HTTP status
+   * @param title the localized summary
+   * @param detail the localized explanation
+   * @param instanceUri the request URI for {@code instance}, or {@code null}/blank to omit it
    * @param typeSuffix appended to {@link AppProblemProperties#getBaseUri()} to form the {@code
    *     type}
-   * @param code the stable, machine-readable {@code code} extension the frontend branches on
-   * @param correlationId the per-request correlation id echoed as the {@code correlationId}
-   *     extension
+   * @param code the stable, machine-readable {@code code} extension
+   * @param correlationId the correlation id echoed as the {@code correlationId} extension
    * @return the assembled problem detail
    */
   public ProblemDetail problem(

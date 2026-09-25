@@ -48,17 +48,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC-level render test guarding the account-detail "Kontobewegung" movement-modal capability gate
- * (REQ-BANK-017). The modal's presence marker is the fragment root's {@code
- * id="bank-movement-modal"} ({@code fragments/bank-movement-modal :: movementModal}). It must
- * render only when the caller can do at least one of deposit/withdraw/transfer.
- *
- * <p>This pins the fix for the Thymeleaf attribute-precedence bug where the guard {@code caps !=
- * null and (caps.canDeposit() or caps.canWithdraw() or caps.canTransfer())} sat on the same element
- * as {@code th:replace}: since {@code th:replace} (precedence 1) runs before {@code th:if} (3), the
- * guard was dead and the modal rendered unconditionally. A view-only employee (all caps false) must
- * see no modal; a caller with any cap must see it. A pure unit test only pins the view name and
- * would miss this template-only regression.
+ * MVC render test for the account-detail movement-modal gate (REQ-BANK-017): the modal ({@code
+ * id="bank-movement-modal"}) renders only when the caller can deposit, withdraw or transfer, which
+ * requires the guard not to share an element with {@code th:replace}.
  */
 @SpringBootTest
 class BankAccountDetailMovementModalMvcTest {
@@ -102,10 +94,7 @@ class BankAccountDetailMovementModalMvcTest {
   }
 
   /**
-   * Positive control: a caller with at least one movement capability (here canWithdraw) must get
-   * the movement modal — the fragment root's {@code id="bank-movement-modal"} is present in the
-   * full-page HTML. This proves the marker is not simply always-absent and that the fix still
-   * renders the modal when the guard passes.
+   * A caller with at least one movement capability gets the movement modal.
    *
    * @throws Exception if the request dispatch fails
    */
@@ -122,12 +111,9 @@ class BankAccountDetailMovementModalMvcTest {
   }
 
   /**
-   * Stubs the single backend read the full-page render strictly needs — the account-detail
-   * aggregate — with a minimal, non-null {@link BankAccountDetailDto} so the {@code <main
-   * th:if="${detail != null}">} body renders and the movement-modal guard is actually evaluated.
-   * Every other read the handler makes (holders, transfer-target accounts, user lookup, org-unit
-   * picklist, transfer-fee rate) is left unstubbed: Mockito returns {@code null} and the controller
-   * null-guards each, so the page still renders HTTP 200.
+   * Stubs only the account-detail aggregate with a minimal {@link BankAccountDetailDto}, so the
+   * page body renders and the movement-modal guard is evaluated; every other read returns {@code
+   * null}.
    *
    * @param id the account id echoed into the detail's account
    * @param caps the caller's evaluated capabilities that drive the movement-modal guard

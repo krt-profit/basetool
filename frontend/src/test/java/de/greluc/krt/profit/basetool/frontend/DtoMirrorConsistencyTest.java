@@ -38,29 +38,12 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
- * Static-analysis safety net for the recurring Backend-DTO &harr; Frontend-DTO mirror drift bug:
- * the backend evolves a record by adding a field, the frontend mirror is forgotten, a Thymeleaf
- * template later references the field and the page 500s with {@code Property or field 'X' cannot be
- * found} - typically only in a conditional render branch that everyday testing misses. Recurring
- * incident history lives in {@code CHANGELOG.md} (multiple "warf 500" entries) and is the reason
- * the {@code feedback_backend_frontend_dto_mirror} memory entry exists.
+ * Verifies that every frontend {@code *Dto} record mirrors all record components of the same-named
+ * backend record, by parsing both sources.
  *
- * <p>The check runs at source level (no compile-time cross-module dependency between frontend and
- * backend exists), enumerates every {@code *Dto.java} record in the frontend dto package, looks for
- * a same-named file in the backend dto package and compares the parsed record component names.
- * "Backend has component, frontend missing" is the failure direction - that is the one that
- * produces an HTTP 500 at render time. The opposite direction (frontend has component, backend
- * missing) is loud-but-harmless dead code and is reported as a soft warning via stdout rather than
- * a build break, because some frontend records carry deliberately client-side fields that the
- * backend never speaks (e.g. derived display helpers expressed as record components by accident).
- *
- * <p>Files where either side is not actually a {@code record} declaration (e.g. plain enum mirrors)
- * are silently skipped, as are frontend DTOs without a backend counterpart by name (request-only
- * payloads, frontend-private wrappers).
- *
- * <p>If you intentionally want to omit a backend field from the frontend mirror, list the pair in
- * {@link #ALLOWED_BACKEND_ONLY_FIELDS} with a short reason so future drift on the SAME field stays
- * silent but a NEW backend-only field still trips the test.
+ * <p>A backend-only component fails the test; a frontend-only one is only reported. Non-record
+ * files and frontend DTOs without a backend counterpart are skipped. Deliberate omissions go in
+ * {@link #ALLOWED_BACKEND_ONLY_FIELDS}.
  */
 class DtoMirrorConsistencyTest {
 
@@ -71,14 +54,8 @@ class DtoMirrorConsistencyTest {
           "../backend/src/main/java/de/greluc/krt/profit/basetool/backend/model/dto");
 
   /**
-   * Per-DTO whitelist of backend-only record components that the frontend deliberately does not
-   * mirror. Keep the value list explicit so a NEW backend-only field on the same DTO still trips
-   * the assertion - we want the whitelist to grow only on conscious decisions.
-   *
-   * <p>Empty as of PR #229: the three known asymmetries that existed when the test was introduced
-   * (OperationDto createdAt/updatedAt, StarSystemDto's six backend extras, JobOrderHandoverItemDto
-   * locationName) were all fixed by mirroring the fields. Add new entries only when there is a real
-   * reason a backend field cannot/should not surface on the frontend mirror.
+   * Per-DTO whitelist of backend-only record components the frontend deliberately does not mirror.
+   * Each field is listed explicitly so a new backend-only field still fails.
    */
   private static final Map<String, Set<String>> ALLOWED_BACKEND_ONLY_FIELDS = Map.of();
 
@@ -170,11 +147,9 @@ class DtoMirrorConsistencyTest {
   }
 
   /**
-   * Parses a Java source file and returns the record-component names of the first {@code public
-   * record Foo(...)} declaration found, or {@code null} if the file does not declare a record at
-   * top level. Annotations, generics and nested parenthesised expressions inside component
-   * declarations are skipped via depth-tracked scanning - the regex anchor only spots the start of
-   * the record header, the rest is bracket-balanced.
+   * Returns the record-component names of the first top-level {@code public record Foo(...)} in the
+   * source, or {@code null} if there is none. Annotations, generics and nested parentheses are
+   * skipped by depth-tracked scanning.
    */
   private static List<String> extractRecordComponentNames(String source) {
     Pattern anchor = Pattern.compile("public\\s+record\\s+(\\w+)\\s*(?:<[^>]+>)?\\s*\\(");

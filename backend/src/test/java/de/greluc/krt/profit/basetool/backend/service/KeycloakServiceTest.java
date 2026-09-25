@@ -180,11 +180,8 @@ class KeycloakServiceTest {
   }
 
   /**
-   * The Keycloak Admin {@code GET /users} endpoint caps each response at a server-side maximum, so
-   * the sync must page through {@code first}/{@code max}. Regression guard for the truncation bug:
-   * with a page size of 2 and three users spread across two pages, {@code fetchUsers} must return
-   * all three — not just the first page — otherwise {@code UserSyncTask} would wrongly flag the
-   * third user as missing and soft-delete it.
+   * {@code fetchUsers} pages through the Keycloak Admin {@code GET /users} endpoint and returns
+   * users from every page, not just the first.
    */
   @Test
   void fetchUsers_pagesThroughAllUsers_notJustTheFirstPage() throws Exception {
@@ -421,11 +418,9 @@ class KeycloakServiceTest {
   }
 
   /**
-   * Regression guard for issue #1202 finding 2: Keycloak's {@code /roles/{name}/users} lookup is
-   * case-sensitive, so the sync resolves the realm's actual role names and matches the local
-   * catalog against them case-insensitively. With the realm role spelled {@code admin} (lower case)
-   * but the app passing the canonical {@code ADMIN}, member A must still resolve — stored under the
-   * local casing — and the member query must use Keycloak's own casing.
+   * Role names are matched case-insensitively: a realm role spelled {@code admin} still resolves
+   * for the local {@code ADMIN}, is stored under the local casing, and is queried with Keycloak's
+   * casing.
    *
    * @throws Exception if the mock server cannot be started or stopped.
    */
@@ -487,12 +482,8 @@ class KeycloakServiceTest {
   }
 
   /**
-   * Regression guard for issue #1202 finding 1: a transient (non-404) failure while reading one
-   * role's members must SKIP the whole run (empty result → the scheduler treats it as "skip")
-   * rather than persisting a degraded, role-stripped set. Otherwise a 5xx on {@code
-   * /roles/ADMIN/users} would silently strip {@code ADMIN} from every holder — creating a brand-new
-   * admin {@code PENDING} instead of {@code ACTIVE} and mass-downgrading existing admins to no role
-   * at all — which, since REQ-SEC-053, is an outright refusal rather than a reduced view.
+   * A non-404 failure while reading one role's members skips the whole run (empty result) instead
+   * of persisting a roster stripped of that role.
    *
    * @throws Exception if the mock server cannot be started or stopped.
    */
@@ -596,12 +587,8 @@ class KeycloakServiceTest {
   }
 
   /**
-   * Production regression guard (REQ-SEC-043): a {@code 403} on the realm-role listing ({@code GET
-   * /admin/realms/{realm}/roles}) — the exact failure seen when the {@code backend-service} service
-   * account holds {@code view-users} but not {@code view-realm} — must skip the whole run (empty
-   * roster, never a degraded persist) and increment the fetch-failure counter, exactly like any
-   * other transient role-read failure. The roster page succeeds first, so this isolates the
-   * realm-role listing as the rejecting call.
+   * A {@code 403} on the realm-role listing ({@code GET /admin/realms/{realm}/roles}) skips the
+   * whole run and increments the fetch-failure counter (REQ-SEC-043).
    *
    * @throws Exception if the mock server cannot be started or stopped.
    */
@@ -964,10 +951,8 @@ class KeycloakServiceTest {
   }
 
   /**
-   * {@code readDiscordLink} maps a {@code 404} (the Keycloak user itself no longer exists) to an
-   * empty result rather than propagating it, so the account-linking flow can fall back to the local
-   * {@code discord_user_id} and recover a registration whose throwaway Keycloak user was already
-   * deleted by an earlier partial failure (the stranded case the fix was written for).
+   * {@code readDiscordLink} maps a {@code 404} for a missing Keycloak user to an empty result, so
+   * the account-linking flow can fall back to the local {@code discord_user_id}.
    *
    * @throws Exception if the mock server cannot be started or stopped.
    */
@@ -1021,14 +1006,8 @@ class KeycloakServiceTest {
   }
 
   /**
-   * The role index must state how many of the app's roles the realm still knows — and must NOT
-   * escalate merely because one of them found no counterpart. The local catalog can hold roles the
-   * realm does not (this case uses {@code Bereichsleitung}, which is granted through the OrgUnit
-   * membership rather than the realm), so a per-role "missing from the realm" warning would fire on
-   * every single run and be tuned out long before a real rename happened.
-   *
-   * <p>The case used to be written around the seeded {@code Guest} fallback, which {@code V239}
-   * deleted (ADR-0159). The behaviour under test is unchanged; only the example role is.
+   * The role index logs how many app roles the realm knows at INFO and does not warn about a
+   * local-only role such as {@code Bereichsleitung}.
    *
    * @throws Exception if the mock server cannot be started or stopped.
    */
@@ -1082,12 +1061,8 @@ class KeycloakServiceTest {
   }
 
   /**
-   * REQ-SEC-053 / the roster-sync precondition: {@code KRT Member} is granted through the realm's
-   * {@code default-roles-iri} composite, and a role held only through a composite appears in
-   * <em>neither</em> the per-user nor the role-indexed view. Until ADR-0159 that cost nothing —
-   * such an account came back empty, was mapped onto the authority-less {@code Guest} fallback and
-   * healed at its owner's next web login. With a role-less account refused outright, the same run
-   * would lock every composite-only member out overnight, so the composite's grants are folded in.
+   * Roles granted only through the realm's {@code default-roles-iri} composite, such as {@code KRT
+   * Member}, are folded into each user's roles (REQ-SEC-053).
    *
    * @throws Exception if the mock server cannot be started or stopped.
    */
@@ -1158,12 +1133,8 @@ class KeycloakServiceTest {
   }
 
   /**
-   * REQ-SEC-053: a run in which the realm matches <em>none</em> of the app's roles is a realm-side
-   * rename or a broken query, never a legitimate state — and writing it would strip every account
-   * of every role and refuse the whole organisation with {@code NO_ROLE} at once. It aborts, so the
-   * scheduler skips the run. Deliberately narrow: a <em>single</em> account resolving to no role is
-   * a leaver and is still written through, which {@code
-   * fetchUsers_roleMemberFetchNotFound_keepsRosterWithoutTheRole} pins.
+   * A run in which the realm matches none of the app's roles aborts so the scheduler skips it
+   * (REQ-SEC-053); a single account without a role is still written through.
    *
    * @throws Exception if the mock server cannot be started or stopped.
    */
@@ -1217,11 +1188,8 @@ class KeycloakServiceTest {
   }
 
   /**
-   * BE-MOD-02 / REQ-OBS-009: the admin client is built once from the observed builder, so every
-   * Keycloak Admin API call records an {@code http.client.requests} observation — the per-call
-   * {@code RestClient.builder()} it replaced recorded none. Two calls (token grant, one roster
-   * page) must land on the timer with the default client key values, among them {@code
-   * client.name}, the {@code client_name} label of {@code http_client_requests_seconds}.
+   * Every Keycloak Admin API call records an {@code http.client.requests} observation with the
+   * default client key values, including {@code client.name} (REQ-OBS-009).
    *
    * @throws Exception if the mock server cannot be started or stopped.
    */

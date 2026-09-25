@@ -59,16 +59,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Renders the management three-month report PDF (REQ-BANK-015, epic #556 Phase 3): every bank
- * account over the rolling three-month window ending now, each with a summary block (opening
- * balance, inflow, outflow, closing balance) and the itemized bookings of the window, followed by a
- * single <strong>global holder-balance section</strong> (ADR-0039 — holders are decoupled from
- * accounts, so the report ends with each holder's bank-wide custody, not a per-account
- * distribution). Management-only at the endpoint gate; each export writes one {@code
- * MANAGEMENT_REPORT_EXPORTED} audit event (REQ-BANK-012).
+ * Renders the management three-month report PDF (REQ-BANK-015): per account a summary block and the
+ * itemized bookings of the rolling window, followed by one global holder-balance section.
  *
- * <p>Labels are German from the backend message bundle; the visual layer is the shared {@link
- * KrtPdfSupport}.
+ * <p>Each export writes a {@code MANAGEMENT_REPORT_EXPORTED} audit event (REQ-BANK-012).
  */
 @Service
 @RequiredArgsConstructor
@@ -163,16 +157,14 @@ public class BankManagementReportService {
 
   /**
    * Adds one account's report section: header, summary block, balance chart and the itemized
-   * bookings of the window (with the per-booking holder derived from the holder ledger). The
-   * closing holder distribution is gone (ADR-0039) — the report's single global holder section
-   * replaces it.
+   * bookings of the window with the per-booking holder.
    *
    * @param krt the open document handle
    * @param account the account to render
    * @param from window start (inclusive)
    * @param to window end (inclusive)
    * @param stamp the zone-bound timestamp formatter
-   * @param dateOnly the zone-bound date-only formatter for the chart's x-axis labels
+   * @param dateOnly the zone-bound date-only formatter for the chart's x-axis
    */
   private void addAccountSection(
       @NotNull KrtPdfSupport.KrtDocument krt,
@@ -283,15 +275,12 @@ public class BankManagementReportService {
   }
 
   /**
-   * Renders the "Quell-/Zielkonto" cell for a report row (REQ-BANK-044) — the far side of the
-   * booking: for a {@code DEPOSIT}/{@code WITHDRAWAL} the recorded counterparty (Einzahler /
-   * Empf&auml;nger) with their org unit in parentheses; for a {@code TRANSFER} the counter
-   * account's number; empty otherwise. The type column and amount sign convey the direction, so no
-   * arrow glyph is rendered.
+   * Renders the "Quell-/Zielkonto" cell of a report row (REQ-BANK-044): the counterparty with org
+   * unit for a {@code DEPOSIT}/{@code WITHDRAWAL}, the counter account's number for a {@code
+   * TRANSFER}, empty otherwise.
    *
    * @param row the report row
-   * @param accountLegsByTx the section's account legs grouped by transaction (transfer counter
-   *     accounts)
+   * @param accountLegsByTx the section's account legs grouped by transaction
    * @return the cell text, never {@code null}
    */
   private static @NotNull String counterpartyCell(
@@ -319,12 +308,12 @@ public class BankManagementReportService {
   }
 
   /**
-   * Adds the report's single global holder-balance section (ADR-0039): each holder's bank-wide
-   * custody total, largest first, on its own page. Replaces the old per-account distribution.
+   * Adds the global holder-balance section (ADR-0039): each holder's bank-wide custody total,
+   * largest first.
    *
    * @param krt the open document handle
-   * @param noAccounts whether the report had no accounts (then the section is appended inline
-   *     rather than on a fresh page)
+   * @param noAccounts whether the report had no accounts, in which case the section is appended
+   *     inline rather than on a fresh page
    */
   private void addGlobalHolderSection(@NotNull KrtPdfSupport.KrtDocument krt, boolean noAccounts) {
     if (!noAccounts) {

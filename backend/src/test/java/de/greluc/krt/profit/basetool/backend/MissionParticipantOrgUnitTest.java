@@ -47,12 +47,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Verifies the org-unit stamping of mission participants. Replaces the former {@code
- * MissionParticipantSquadronTest}: a registered participant's affiliations are derived from their
- * {@code org_unit_membership} rows (none / one Staffel / one SK / both), with no IRIDIUM fallback,
- * while a guest's affiliation honours the caller-submitted org units verbatim — guest labeling is
- * mission-scoped roster metadata open to any caller (including anonymous sign-ups), so no
- * authorization filter strips it.
+ * Verifies org-unit stamping of mission participants: a registered participant's affiliations come
+ * from their memberships, while a guest's affiliation uses the submitted org units verbatim.
  */
 @SpringBootTest
 @Transactional

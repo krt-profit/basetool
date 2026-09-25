@@ -66,22 +66,14 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Manages the lifecycle of job orders — the central work units of the logistics workflow.
+ * Manages the lifecycle of job orders: create, full and per-field update, status transitions (OPEN
+ * → IN_PROGRESS → COMPLETED / REJECTED), priority reorder, assignees and material/inventory
+ * unlinking.
  *
- * <p>A job order names a target material at a target quantity, optionally pinned to a minimum
- * quality, and accumulates inventory items as members of the squadron contribute. The service
- * covers create, update (full and per-field), status transitions (OPEN → IN_PROGRESS → COMPLETED /
- * REJECTED), priority reorder, assignee management, material/inventory unlinking, and the priority
- * cleanup helpers.
- *
- * <p>This is one of the services that has shipped concurrency bugs before — the rules in
- * CLAUDE.md's Concurrency section exist because of real incidents on this codepath. The {@link
- * #completeJobOrderWithinTransaction(de.greluc.krt.profit.basetool.backend.model.JobOrder)} method
- * is the canonical example of the {@code …WithinTransaction} pattern: a {@code @Transactional}
- * outer method calls this {@code @Transactional(propagation = MANDATORY)} inner method on an
- * already-managed entity without {@code save()/flush()}, relying on dirty-checking — this avoids a
- * double {@code @Version} bump that would otherwise surface as a 409 to a clean caller. See the
- * rule reference in {@link JobOrderHandoverService#createHandover}.
+ * <p>{@link
+ * #completeJobOrderWithinTransaction(de.greluc.krt.profit.basetool.backend.model.JobOrder)} works
+ * on an already-managed entity inside the caller's transaction, so completion never causes a second
+ * {@code @Version} bump.
  */
 @Service
 @RequiredArgsConstructor
@@ -104,13 +96,12 @@ public class JobOrderService {
   private final JobOrderPriorityService jobOrderPriorityService;
 
   /**
-   * Persists a new job order from the create DTO. The next available priority slot is taken
-   * automatically (priority 1 is highest); each material's minimum quality is taken verbatim from
-   * the DTO (650 or null = Keine).
+   * Persists a new job order in the next free priority slot (1 is highest), taking each material's
+   * minimum quality verbatim from the DTO (650 or {@code null} for none).
    *
    * @param createDto create payload
    * @return the persisted order
-   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when any referenced
+   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when a referenced
    *     material or user id is unknown
    */
   @Transactional
@@ -166,18 +157,16 @@ public class JobOrderService {
   }
 
   /**
-   * Persists a new {@code ITEM} job order from the create DTO. Org-unit stamping and priority
-   * assignment mirror {@link #createJobOrder(CreateJobOrderDto)}; the finished-item lines are built
-   * (and their required materials derived + snapshotted from each line's blueprint) by {@link
-   * JobOrderItemService}. Sub-assembly provenance is reconstructed from the transient {@code
-   * clientLineId} / {@code parentClientLineId} hints after every line exists.
+   * Persists a new {@code ITEM} job order; org-unit stamping and priority match {@link
+   * #createJobOrder(CreateJobOrderDto)}, and each line's materials are derived from its blueprint
+   * by {@link JobOrderItemService}.
    *
    * @param createDto item-order create payload
-   * @return the persisted order as a DTO (with derived per-item materials + aggregation)
+   * @return the persisted order with derived materials and aggregation
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when a referenced
    *     game item or blueprint id is unknown
-   * @throws BadRequestException when a chosen blueprint does not produce its line's game item, or
-   *     when org-unit stamping cannot be resolved
+   * @throws BadRequestException when a blueprint does not produce its line's item, or org-unit
+   *     stamping cannot be resolved
    */
   @Transactional
   public JobOrderDto createItemJobOrder(CreateJobOrderItemRequestDto createDto) {
@@ -219,10 +208,8 @@ public class JobOrderService {
   }
 
   /**
-   * Publishes a {@link JobOrderCreatedEvent} for a freshly persisted job order so the notification
-   * pipeline can fan out after commit. Reads only managed-entity scalars (ids, kinds, shorthand,
-   * display id) and never re-saves the order, so it adds no second {@code @Version} bump. The actor
-   * is the current authenticated user (empty for anonymous/guest creates).
+   * Publishes a {@link JobOrderCreatedEvent} for after-commit notification, reading only scalars
+   * and never re-saving the order. The actor is the current user, empty for anonymous creates.
    *
    * @param jobOrder the persisted, flushed job order
    */
@@ -242,12 +229,9 @@ public class JobOrderService {
   }
 
   /**
-   * Publishes a {@link JobOrderUpdatedByRequesterEvent} for a job order a requesting owner just
-   * edited, so the notification pipeline can notify the processing (responsible) org unit's
-   * officers and leads after commit (REQ-ORDERS-023). Reads only managed-entity scalars and never
-   * re-saves the order, so it adds no second {@code @Version} bump. The actor is the current
-   * authenticated user — a requester edit is always authenticated (the endpoint is not {@code
-   * permitAll()}).
+   * Publishes a {@link JobOrderUpdatedByRequesterEvent} so the responsible org unit's officers and
+   * leads are notified after commit (REQ-ORDERS-023). Reads only scalars and never re-saves the
+   * order.
    *
    * @param jobOrder the persisted, flushed job order after the requester edit
    */
@@ -267,27 +251,18 @@ public class JobOrderService {
   }
 
   /**
-   * Updates the status of a JobOrder. This method performs its own {@code findById()} + {@code
-   * save()} + {@code flush()} and therefore MUST only be called from a context where the target
-   * {@link JobOrder} entity is NOT already managed/dirty in the current persistence context (i.e.
-   * called directly from a Controller, not from within another {@code @Transactional} service
-   * method that has already modified the same entity).
-   *
-   * <p><strong>WARNING:</strong> Calling this method from within a running transaction that has
-   * already modified the same {@code JobOrder} (e.g. via cascade after {@code
-   * jobOrderHandoverRepository.save()}) will cause a double-save that collides with the
-   * already-incremented {@code @Version} field, resulting in an {@link
-   * org.springframework.orm.ObjectOptimisticLockingFailureException} (HTTP 409). Use {@link
-   * #completeJobOrderWithinTransaction(JobOrder)} instead in such cases.
+   * Updates the status of a job order with its own load, save and flush. Must not be called inside
+   * a transaction that already modified the same order, since the double save fails the version
+   * check; use {@link #completeJobOrderWithinTransaction(JobOrder)} there.
    *
    * @param id job order primary key
-   * @param dto status update DTO (carries the new status + expected version)
+   * @param dto the new status and expected version
    * @return the persisted order
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no match
    * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException for illegal
    *     transitions
-   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the supplied
-   *     version is stale
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the version is
+   *     stale
    */
   @Transactional
   public JobOrderDto updateJobOrderStatus(UUID id, UpdateJobOrderStatusDto dto) {
@@ -343,12 +318,8 @@ public class JobOrderService {
   }
 
   /**
-   * Reorders a job order to a new priority position.
-   *
-   * <p>Backend uses {@code @Lock(LockModeType.PESSIMISTIC_WRITE)} on the whole priority sequence
-   * (see {@code JobOrderRepository.lockAllJobOrders}) to serialize concurrent reorders — without
-   * it, two simultaneous drag-and-drops would produce duplicate priorities. Adjacent orders shift
-   * up or down to make room for the moved row.
+   * Moves a job order to a new priority position, shifting adjacent orders. Concurrent reorders are
+   * serialized by a pessimistic lock on the whole priority sequence.
    *
    * @param id job order primary key
    * @param newPriority target slot (1-based)
@@ -361,24 +332,19 @@ public class JobOrderService {
   }
 
   /**
-   * Toggles whether the item order's blueprint-coverage view counts cosmetic variants of the
-   * ordered items toward availability (REQ-ORDERS-021, issue #822). {@code true} keeps family-key
-   * matching (a member owning any cosmetic variant of an ordered item is counted); {@code false}
-   * switches to exact-name matching, so an order for one specific variant counts only owners of
-   * that exact blueprint and excludes the family's other variants. A no-op call (the order already
-   * carries the requested mode) returns the order unchanged, without bumping its {@code @Version}
-   * or recording an audit event.
+   * Sets whether the item order's blueprint coverage counts cosmetic variants of the ordered items
+   * ({@code true}) or only exact-name blueprints ({@code false}) (REQ-ORDERS-021). A call that
+   * requests the current mode changes nothing and records no audit event.
    *
-   * @param id the order id.
-   * @param countWithVariants the requested counting mode.
-   * @param version the order's expected optimistic-lock version; a stale value triggers a 409.
-   * @return the persisted order DTO (carries the bumped version when the mode actually changed).
+   * @param id the order id
+   * @param countWithVariants the requested counting mode
+   * @param version the expected optimistic-lock version
+   * @return the order DTO, with the bumped version if the mode changed
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no order matches
-   *     the id.
    * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when the order is
-   *     not an item order.
-   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the supplied
-   *     version is stale.
+   *     not an item order
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the version is
+   *     stale
    */
   @Transactional
   public JobOrderDto updateBlueprintVariantCounting(
@@ -409,15 +375,15 @@ public class JobOrderService {
   }
 
   /**
-   * Full update of the order's metadata + materials list. Replaces the materials wholesale —
-   * removed materials are orphan-removed, kept materials retain their accumulated inventory links.
+   * Fully updates the order's metadata and replaces its materials; removed materials are deleted,
+   * kept ones retain their inventory links.
    *
    * @param id job order primary key
-   * @param updateDto update payload (carries the expected version)
+   * @param updateDto update payload with the expected version
    * @return the persisted order
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no match
-   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the supplied
-   *     version is stale
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the version is
+   *     stale
    */
   @Transactional
   public JobOrderDto updateJobOrder(UUID id, CreateJobOrderDto updateDto) {
@@ -448,29 +414,17 @@ public class JobOrderService {
   }
 
   /**
-   * Shared, concurrency-safe material full-replace used by both the logistician {@link
-   * #updateJobOrder(UUID, CreateJobOrderDto)} and the requester {@link
-   * #updateJobOrderAsRequester(UUID, CreateJobOrderDto)}. It diffs the current material lines
-   * against the new set, rebuilds the collection on the managed aggregate, and unlinks the
-   * inventory of every removed material.
+   * Replaces the order's material lines and unlinks the inventory of every removed material, shared
+   * by the logistician and requester edits.
    *
-   * <p>Ordering follows the canonical {@code createHandover} pattern (CLAUDE.md "Bulk updates
-   * inside loops"): the aggregate is mutated and {@code saveAndFlush}ed <em>first</em>, and only
-   * <em>then</em> are the {@code @Modifying(clearAutomatically = true)} {@code
-   * unlinkJobOrderMaterial} bulk updates run — once each, after the persist — so the context clear
-   * can never degrade the aggregate save into a stale merge (a second {@code @Version} bump → 409).
-   * Because those bulk updates detach the context, a fresh managed instance is re-fetched for the
-   * post-clear reads (claim reconciliation, audit label, DTO mapping). There is no FK from {@code
-   * InventoryItem} to {@code JobOrderMaterial}, so deleting the removed requirement rows before
-   * unlinking the stock rows is safe. The re-fetched {@code @Version} is the flushed value (the
-   * unlink UPDATE touches {@code InventoryItem}, never the order), so the in-place AJAX writeback
-   * (REQ-FE-003) still receives a fresh version.
+   * <p>The aggregate is saved and flushed before the context-clearing bulk unlinks run, and the
+   * order is then re-fetched, so the save never degrades into a stale merge and the returned
+   * version is current.
    *
-   * @param id the order id (used for the post-clear re-fetch and the bulk unlink).
-   * @param managed the managed job order whose scalars the caller has already set.
-   * @param materials the new material lines (full replacement).
-   * @return the re-fetched managed order plus the removed-count and withdrawn-claim count for
-   *     audit.
+   * @param id the order id, used for the re-fetch and the bulk unlink
+   * @param managed the managed order whose scalars the caller has already set
+   * @param materials the new material lines
+   * @return the re-fetched order plus the removed-line and withdrawn-claim counts
    */
   @NotNull
   private MaterialReplaceOutcome replaceMaterialsWithinTransaction(
@@ -514,41 +468,31 @@ public class JobOrderService {
 
   /**
    * Outcome of {@link #replaceMaterialsWithinTransaction(UUID, JobOrder, List)}: the re-fetched
-   * managed order and the two counts the callers record in their audit payload.
+   * order and the counts recorded in the audit payload.
    *
-   * @param order the re-fetched managed job order after the replace + unlink
-   * @param removedCount how many material lines were removed by the replace
-   * @param orphanedClaimsWithdrawn how many now-orphaned claims the reconciliation withdrew
+   * @param order the re-fetched managed job order
+   * @param removedCount number of removed material lines
+   * @param orphanedClaimsWithdrawn number of orphaned claims withdrawn
    */
   private record MaterialReplaceOutcome(
       JobOrder order, int removedCount, int orphanedClaimsWithdrawn) {}
 
   /**
-   * Full edit of an {@code ITEM} order's ordered-item lines plus its metadata. Reconciles the item
-   * lines against the payload ({@link #reconcileItemLines}): a line the payload identifies by
-   * {@code id} is re-derived and re-snapshotted from its chosen blueprint <b>in place</b>, so its
-   * booked {@code manufacturedAmount} survives the edit (REQ-ORDERS-032); lines the payload no
-   * longer carries are removed, and lines without a matching id are added. Sub-assembly provenance
-   * is reconstructed from the transient {@code clientLineId}/{@code parentClientLineId} hints.
-   * Editing is only permitted while the order has <strong>no item-handover</strong> yet — once any
-   * partial delivery has been recorded the lines are frozen, because reconciling delivered
-   * quantities against a changed line set is out of scope (decision from the item-edit follow-up).
+   * Fully edits an {@code ITEM} order's lines and metadata via {@link #reconcileItemLines}; matched
+   * lines are updated in place so booked production survives (REQ-ORDERS-032). Allowed only while
+   * the order has no item handover.
    *
-   * <p>Because the derived buckets can change, the orphaned-claim reconciliation hook runs
-   * afterwards: a claim on a material+quality bucket that the new lines no longer require is
-   * withdrawn (decision #6). Claims are an independent aggregate, so this never bumps the order's
-   * {@code @Version} (see {@code MaterialClaimService}). The responsible org unit is not touched
-   * here — it is mutated only through the reassignment endpoint, exactly like {@link
-   * #updateJobOrder}.
+   * <p>Claims on buckets the new lines no longer require are withdrawn afterwards, without bumping
+   * the order's version. The responsible org unit is not changed here.
    *
-   * @param id the order id.
-   * @param updateDto the new item lines + metadata (carries the expected version).
-   * @return the persisted order DTO with re-derived materials + aggregation.
-   * @throws NotFoundException when the order, a game item or a blueprint id is unknown.
-   * @throws BadRequestException when the order is not an item order, already has item-handovers, or
-   *     a chosen blueprint does not produce its line's game item.
-   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the supplied
-   *     version is stale.
+   * @param id the order id
+   * @param updateDto the new item lines and metadata with the expected version
+   * @return the persisted order DTO with re-derived materials and aggregation
+   * @throws NotFoundException when the order, a game item or a blueprint id is unknown
+   * @throws BadRequestException when the order is not an item order, has item handovers, or a
+   *     blueprint does not produce its line's item
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the version is
+   *     stale
    */
   @Transactional
   public JobOrderDto updateItemJobOrder(UUID id, CreateJobOrderItemRequestDto updateDto) {
@@ -591,24 +535,17 @@ public class JobOrderService {
   }
 
   /**
-   * Reconciles the order's ordered-item lines against the given create-line DTOs and wires up each
-   * line's sub-assembly provenance from the transient {@code clientLineId}/{@code
-   * parentClientLineId} hints. Each line's required materials are (re-)derived + re-snapshotted
-   * from its chosen blueprint. Shared by {@link #createItemJobOrder}, {@link #updateItemJobOrder}
-   * and {@link #updateItemJobOrderAsRequester} so the three treat the lines identically; on create
-   * the order simply has no existing lines and every payload line is new.
+   * Reconciles the order's item lines against the payload, re-deriving each line's materials from
+   * its blueprint and wiring sub-assembly provenance from the {@code clientLineId} / {@code
+   * parentClientLineId} hints.
    *
-   * <p><b>Matched lines are mutated in place, never recreated</b> (REQ-ORDERS-032). A payload line
-   * carrying an {@code id} that belongs to this order updates that very row, so its booked {@code
-   * manufacturedAmount} / {@code deliveredAmount} survive the edit. This replaced an earlier {@code
-   * getItems().clear()} + rebuild, which orphan-removed every line and silently reset all recorded
-   * production to zero on every save. An {@code id} that is {@code null} or foreign means "new
-   * line"; an existing line the payload no longer mentions is removed — but only when nothing has
-   * been produced on it yet, see {@link #assertLineRemovable}.
+   * <p>A line whose {@code id} belongs to this order is updated in place, keeping its booked
+   * amounts (REQ-ORDERS-032); a {@code null} or foreign id adds a line; an omitted line is removed
+   * only if {@link #assertLineRemovable} allows it.
    *
-   * @param jobOrder the order whose lines to reconcile (mutated in place).
-   * @param lines the ordered-item line DTOs describing the desired end state.
-   * @throws BadRequestException when the payload would discard or under-run booked production.
+   * @param jobOrder the order whose lines to reconcile (mutated in place)
+   * @param lines the desired end state of the item lines
+   * @throws BadRequestException when the payload would discard or under-run booked production
    */
   private void reconcileItemLines(JobOrder jobOrder, List<CreateJobOrderItemLineDto> lines) {
     Map<UUID, JobOrderItem> existingById = new HashMap<>();
@@ -663,17 +600,13 @@ public class JobOrderService {
   }
 
   /**
-   * Guards an in-place line update against invalidating production that was already booked on it
-   * (REQ-ORDERS-032). Once {@code manufacturedAmount > 0} the line's ordered item is frozen — the
-   * produced units are physically that item — and the amount may not fall below what has been
-   * produced, which would break the {@code deliveredAmount <= manufacturedAmount <= amount}
-   * invariant. The <b>blueprint may still change</b>: re-pointing a line at a corrected recipe is
-   * exactly how a line whose blueprint went stale is repaired, and it does not invalidate units
-   * already made.
+   * Guards an in-place line update against booked production (REQ-ORDERS-032): once {@code
+   * manufacturedAmount > 0} the ordered item is frozen and the amount may not drop below it; the
+   * blueprint may still change.
    *
-   * @param existing the managed line being updated.
-   * @param line the payload describing its new state.
-   * @throws BadRequestException when the update would orphan or under-run booked production.
+   * @param existing the managed line being updated
+   * @param line the payload with its new state
+   * @throws BadRequestException when the update would orphan or under-run booked production
    */
   private static void assertLineEditable(
       @NotNull JobOrderItem existing, CreateJobOrderItemLineDto line) {
@@ -702,14 +635,12 @@ public class JobOrderService {
   }
 
   /**
-   * Guards the removal of a line the edit payload no longer carries: a line with booked production
-   * (or, defensively, a recorded delivery) may not be deleted, because the produced units were
-   * already booked into stock and deleting the line would lose that record with no way to reconcile
-   * it (REQ-ORDERS-032). Lines with nothing produced are removed as before.
+   * Refuses to remove a line that carries booked production or a recorded delivery
+   * (REQ-ORDERS-032).
    *
-   * @param gone the line the payload dropped.
-   * @param orderId the owning order id, for the error message.
-   * @throws BadRequestException when the line carries production or delivery.
+   * @param gone the line the payload dropped
+   * @param orderId the owning order id, for the error message
+   * @throws BadRequestException when the line carries production or delivery
    */
   private static void assertLineRemovable(@NotNull JobOrderItem gone, UUID orderId) {
     int manufactured = gone.getManufacturedAmount() == null ? 0 : gone.getManufacturedAmount();
@@ -725,28 +656,21 @@ public class JobOrderService {
   }
 
   /**
-   * Requester-side full edit of a {@code MATERIAL} order (REQ-ORDERS-023): a member of the order's
-   * requesting org unit changes quantities, adds/removes material lines, edits the min-quality
-   * within the fixed choices, and edits the comment — all as one full-replace, permitted only while
-   * the order is still fully undelivered (the whole-order freeze). The requester may NOT change the
-   * handle, the requesting/responsible org unit, the status or the priority; those DTO inputs are
-   * ignored. Removed materials have their linked inventory unlinked via the shared safe ordering
-   * ({@link #replaceMaterialsWithinTransaction}). On commit the processing (responsible) org unit's
-   * officers/leads are notified ({@link #publishJobOrderUpdatedByRequester}). Audited as {@code
-   * JOB_ORDER_UPDATED} with a {@code byRequester=true} discriminator.
+   * Requester-side full edit of a {@code MATERIAL} order (REQ-ORDERS-023): quantities, material
+   * lines, min-quality and comment, allowed only while the order is fully undelivered. Handle, org
+   * units, status and priority in the DTO are ignored.
    *
-   * <p>Authorisation (member of the requesting org unit + undelivered) is enforced by the {@code
-   * @ownerScopeService.canEditJobOrderAsRequester} gate on the endpoint; the freeze is re-asserted
-   * here to close the TOCTOU window where a handover could land between the gate and the commit.
+   * <p>Removed materials are unlinked from inventory, the responsible org unit is notified on
+   * commit, and the edit is audited as {@code JOB_ORDER_UPDATED} with {@code byRequester=true}. The
+   * delivery freeze is re-checked here in addition to the endpoint gate.
    *
-   * @param id the order id.
-   * @param updateDto the new material lines + comment (carries the expected version); org-unit /
-   *     status / priority fields are ignored.
-   * @return the persisted order DTO.
-   * @throws NotFoundException when the order or a material id is unknown.
-   * @throws BadRequestException when the order is not a material order or already has a delivery.
+   * @param id the order id
+   * @param updateDto the new material lines and comment with the expected version
+   * @return the persisted order DTO
+   * @throws NotFoundException when the order or a material id is unknown
+   * @throws BadRequestException when the order is not a material order or already has a delivery
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the version is
-   *     stale.
+   *     stale
    */
   @Transactional
   public JobOrderDto updateJobOrderAsRequester(UUID id, CreateJobOrderDto updateDto) {
@@ -778,27 +702,21 @@ public class JobOrderService {
   }
 
   /**
-   * Requester-side full edit of an {@code ITEM} order (REQ-ORDERS-023): a member of the order's
-   * requesting org unit replaces the ordered-item lines (change quantity, add/remove lines) and
-   * edits the comment, permitted only while the order is still fully undelivered (the whole-order
-   * freeze). Each line's required materials are re-derived from its blueprint, in place for lines
-   * the payload identifies by {@code id} so booked production survives (REQ-ORDERS-032, {@link
-   * #reconcileItemLines}). Unlike the logistician {@link #updateItemJobOrder} — which leaves
-   * now-unrequired links as REQ-ORDERS-019 orphan warnings — the requester path unlinks the
-   * inventory of every material no longer required by any surviving line <em>and</em> drops the
-   * game-item allocation slices of every game item the rebuilt line set no longer requests
-   * (REQ-INV-031), honouring the issue's "removing an item unlinks the linked inventory" rule, via
-   * the same safe post-persist unlink ordering. On commit the processing org unit's officers/leads
-   * are notified. Audited as {@code JOB_ORDER_ITEM_UPDATED} with {@code byRequester=true}.
+   * Requester-side full edit of an {@code ITEM} order (REQ-ORDERS-023): item lines and comment,
+   * allowed only while the order is fully undelivered; lines are reconciled in place via {@link
+   * #reconcileItemLines}.
    *
-   * @param id the order id.
-   * @param updateDto the new item lines + comment (carries the expected version); org-unit / status
-   *     / priority fields are ignored.
-   * @return the persisted order DTO with re-derived materials.
-   * @throws NotFoundException when the order, a game item or a blueprint id is unknown.
-   * @throws BadRequestException when the order is not an item order or already has a delivery.
+   * <p>Unlike {@link #updateItemJobOrder}, it unlinks inventory of materials no longer required and
+   * drops game-item allocations of items no longer ordered (REQ-INV-031). Notifies the responsible
+   * org unit on commit; audited as {@code JOB_ORDER_ITEM_UPDATED} with {@code byRequester=true}.
+   *
+   * @param id the order id
+   * @param updateDto the new item lines and comment with the expected version
+   * @return the persisted order DTO with re-derived materials
+   * @throws NotFoundException when the order, a game item or a blueprint id is unknown
+   * @throws BadRequestException when the order is not an item order or already has a delivery
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the version is
-   *     stale.
+   *     stale
    */
   @Transactional
   public JobOrderDto updateItemJobOrderAsRequester(
@@ -852,14 +770,11 @@ public class JobOrderService {
   }
 
   /**
-   * Re-asserts the whole-order delivery freeze at the top of a requester edit (REQ-ORDERS-023): a
-   * requesting owner may edit an order only while it has no material handover and no item handover
-   * yet. The {@code canEditJobOrderAsRequester} gate already checks this, but re-checking here
-   * closes the TOCTOU window where a handover could be recorded between the gate evaluation and the
-   * commit.
+   * Re-checks that the order has neither a material nor an item handover before a requester edit
+   * (REQ-ORDERS-023), closing the gap between the endpoint gate and the commit.
    *
-   * @param jobOrder the managed order being edited.
-   * @throws BadRequestException when the order already has a delivery and is therefore frozen.
+   * @param jobOrder the managed order being edited
+   * @throws BadRequestException when the order already has a delivery
    */
   private static void assertRequesterEditable(@NotNull JobOrder jobOrder) {
     boolean hasDelivery =
@@ -903,11 +818,11 @@ public class JobOrderService {
   }
 
   /**
-   * Adds an assignee to a job order. Idempotent: re-adding the same user is a no-op.
+   * Adds an assignee to a job order; re-adding the same user is a no-op.
    *
    * @param jobOrderId job order primary key
    * @param userId user to add
-   * @return the persisted order with refreshed assignee list
+   * @return the persisted order with the refreshed assignee list
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when either id is
    *     unknown
    */
@@ -917,10 +832,8 @@ public class JobOrderService {
   }
 
   /**
-   * Removes a material requirement from the order. Inventory items previously linked to this
-   * material on this order are unlinked via {@code @Modifying} bulk update — see the {@code
-   * clearAutomatically} note in {@link JobOrderHandoverService#createHandover} for why the
-   * bulk-update-in-a-loop antipattern matters here.
+   * Removes a material requirement from the order and unlinks the inventory items linked to it via
+   * a bulk update.
    *
    * @param jobOrderId job order primary key
    * @param materialId material to unlink
@@ -996,15 +909,13 @@ public class JobOrderService {
   }
 
   /**
-   * Sets (creates or replaces) the note on a user's assignee entry. The note is the assignee's own
-   * free-text context — when they work on the order, which part they take. Optimistic-locked on the
-   * assignee edge's own version, so a stale client edit surfaces as HTTP 409 without ever bumping
-   * the parent order's version.
+   * Creates or replaces the free-text note on a user's assignee entry, locked on the assignee
+   * entry's own version so the order's version is never bumped.
    *
    * @param jobOrderId job order primary key
    * @param userId the assignee whose note is changed
-   * @param note the new note text (already length-validated at the controller boundary)
-   * @param version the assignee edge version the client last saw, or {@code null} to skip the check
+   * @param note the new note text, already length-validated
+   * @param version the assignee entry version last seen, or {@code null} to skip the check
    * @return the persisted order with the refreshed assignee list
    * @throws NotFoundException when the order or the assignee entry is unknown
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code version} is
@@ -1016,12 +927,12 @@ public class JobOrderService {
   }
 
   /**
-   * Clears the note on a user's assignee entry. Same optimistic-locking semantics as {@link
+   * Clears the note on a user's assignee entry, with the same locking as {@link
    * #updateAssigneeNote}.
    *
    * @param jobOrderId job order primary key
    * @param userId the assignee whose note is cleared
-   * @param version the assignee edge version the client last saw, or {@code null} to skip the check
+   * @param version the assignee entry version last seen, or {@code null} to skip the check
    * @return the persisted order with the refreshed assignee list
    * @throws NotFoundException when the order or the assignee entry is unknown
    * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when {@code version} is
@@ -1033,12 +944,8 @@ public class JobOrderService {
   }
 
   /**
-   * Marks a JobOrder as COMPLETED within an already-running transaction. This method MUST be called
-   * from within an active transaction (e.g. from {@code JobOrderHandoverService}) so that the
-   * passed {@code jobOrder} entity is already managed by the current persistence context. Using the
-   * managed entity directly avoids the double-save / optimistic-lock conflict that occurs when
-   * {@link #updateJobOrderStatus} is called with its own {@code findById} inside the caller's
-   * transaction.
+   * Marks a managed job order as COMPLETED inside the caller's active transaction, relying on dirty
+   * checking instead of a second load and save.
    *
    * @param jobOrder the managed {@link JobOrder} entity to complete
    */
@@ -1068,27 +975,22 @@ public class JobOrderService {
   }
 
   /**
-   * Reassigns the responsible (processing) org unit of an existing order. Permission model:
+   * Reassigns the responsible org unit of an order; the target must be profit-eligible.
    *
    * <ul>
-   *   <li>Admins may reassign freely to any profit-eligible org unit (squadron or SK), in any
-   *       direction (escalation, SK→SK, or SK→squadron de-escalation).
-   *   <li>A non-admin Logistician/Officer may only <em>escalate</em> a squadron-responsible order
-   *       to an SK, and only when they may edit the order's current responsible squadron ({@link
-   *       AuthHelperService#canEditOrgUnit}). They cannot hand an order to another squadron, nor
-   *       touch an order already responsible to an SK.
+   *   <li>Admins may reassign to any profit-eligible squadron or SK, in any direction.
+   *   <li>A non-admin Logistician/Officer may only escalate a squadron-responsible order to an SK,
+   *       and only if they may edit its current squadron ({@link
+   *       AuthHelperService#canEditOrgUnit}).
    * </ul>
    *
-   * <p>The target must be profit-eligible in every case. Visibility consequences of the move are
-   * enforced from Phase 3 (#343) on; this method only changes the field and its permission gate.
-   *
-   * @param id job order id.
-   * @param newResponsibleOrgUnitId the target responsible org unit id.
-   * @return the updated order DTO.
-   * @throws NotFoundException when the order does not exist.
-   * @throws BadRequestException when the target is unknown or not profit-eligible.
+   * @param id job order id
+   * @param newResponsibleOrgUnitId the target responsible org unit id
+   * @return the updated order DTO
+   * @throws NotFoundException when the order does not exist
+   * @throws BadRequestException when the target is unknown or not profit-eligible
    * @throws org.springframework.security.access.AccessDeniedException when the caller may not
-   *     perform the requested reassignment.
+   *     perform the reassignment
    */
   @Transactional
   public JobOrderDto reassignResponsibleOrgUnit(UUID id, UUID newResponsibleOrgUnitId) {
@@ -1148,19 +1050,9 @@ public class JobOrderService {
   }
 
   /**
-   * Composes the audit subject label for a job order — {@code #<displayId> '<handle>'}, the
-   * deletion-proof identity snapshot stored on each audit event (REQ-AUDIT-001).
-   *
-   * <p><b>The handle names a person.</b> It is the order's contact — {@code orders.create.handle}
-   * renders it as "Handle des Ansprechpartners" — and is frequently somebody outside the
-   * organisation with no account at all. The snapshot itself stays, because the trail has to remain
-   * readable once the order is gone; but it is why {@code audit_event.subject_label} is registered
-   * as a person-name surface in {@code PersonSearchTargets} and why the Art. 15 export does not
-   * select it (REQ-SEC-058).
-   *
-   * <p>Corrected 2026-09-16: this said the handle was "a non-personal order title and is safe to
-   * snapshot". It is neither non-personal nor safe to disclose, and that claim is why the export
-   * shipped without a guard on the column.
+   * Composes the audit subject label {@code #<displayId> '<handle>'} for a job order
+   * (REQ-AUDIT-001). The handle names the order's contact person, so the label is personal data and
+   * is excluded from the data-subject export (REQ-SEC-058).
    *
    * @param jobOrder the order
    * @return the {@code #<displayId> '<handle>'} label

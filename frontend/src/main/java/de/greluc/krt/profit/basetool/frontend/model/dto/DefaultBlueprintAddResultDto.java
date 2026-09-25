@@ -24,10 +24,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * Outcome of one staged add on the admin default-blueprints page (REQ-INV-017), returned by the
- * in-place add so the page can pick the right toast and keep only the failed keys staged for a
- * retry. The list itself is not carried: the page re-renders it from the server afterwards, which
- * also picks up a default another admin added in the meantime.
+ * Outcome of one staged add on the admin default-blueprints page (REQ-INV-017), used to choose the
+ * toast and keep only the failed keys staged for a retry.
  *
  * @param added how many keys the backend accepted as new defaults
  * @param skipped how many keys were already a default (the backend's {@code 409}), silently skipped
@@ -37,8 +35,7 @@ public record DefaultBlueprintAddResultDto(
     int added, int skipped, @NotNull @Unmodifiable List<String> failedKeys) {
 
   /**
-   * Freezes {@code failedKeys} so the record's {@link Unmodifiable} contract holds whatever list
-   * the caller built it from.
+   * Copies {@code failedKeys} into an unmodifiable list.
    *
    * @param added how many keys the backend accepted as new defaults
    * @param skipped how many keys were already a default and were skipped

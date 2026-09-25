@@ -40,19 +40,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 /**
- * Pure-Mockito unit tests for {@link PromotionProxyController}.
- *
- * <p>This controller is intentionally a thin pass-through: each endpoint forwards exactly one verb
- * to a deterministic backend URI. The tests therefore focus on the *contract* — URI shape, body
- * propagation, response body propagation, and the {@code 204 No Content} convention on DELETE —
- * rather than on any business logic. The five resource families (topics, categories,
- * rank-requirements, level-contents, evaluations) plus the single PUT endpoint for evaluations
- * yield 13 endpoints total, each covered by a targeted test below.
- *
- * <p>The {@code @PreAuthorize("hasAnyRole('ADMIN', 'OFFICER')")} guard on every endpoint is
- * enforced by Spring Security at the framework layer and is not exercised by these unit tests; the
- * authorization wiring is verified in {@code MissionSecurityRenderingTest} and similar MockMvc
- * tests for the broader stack.
+ * Mockito unit tests for the pass-through {@link PromotionProxyController}: URI shape, body and
+ * response propagation, and {@code 204 No Content} on DELETE for all 13 endpoints. Authorization is
+ * not exercised here.
  */
 @SuppressWarnings("rawtypes")
 @ExtendWith(MockitoExtension.class)

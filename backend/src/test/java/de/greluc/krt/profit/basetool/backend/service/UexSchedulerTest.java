@@ -36,18 +36,9 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Unit tests for {@link UexScheduler}. The scheduler is pure orchestration: it dispatches the
- * per-resource UEX sync services in a specific order. The tests guard two contracts:
- *
- * <ol>
- *   <li>Every dependency is invoked exactly once per tick (no silent drop-outs after a refactor).
- *   <li>The dispatch order matches the documented sequence — universe basics first (factions,
- *       jurisdictions, planets, ...), then star systems / commodities / vehicles, finally
- *       refineries. Reordering this matters because later syncs depend on the FK targets being
- *       present.
- *   <li>An exception inside one of the services must not propagate out of the scheduled task;
- *       otherwise the {@code @Scheduled} task suppresses subsequent invocations.
- * </ol>
+ * Unit tests for {@link UexScheduler}: every sync service runs exactly once per tick, in the
+ * dependency order (universe basics, then star systems / commodities / vehicles, then refineries),
+ * and an exception in one service does not escape the scheduled task.
  */
 @ExtendWith(MockitoExtension.class)
 class UexSchedulerTest {

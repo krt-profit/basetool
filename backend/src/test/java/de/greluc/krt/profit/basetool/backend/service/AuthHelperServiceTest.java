@@ -53,15 +53,10 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
 /**
- * Unit tests for {@link AuthHelperService} — the sole sanctioned reader of {@link
- * SecurityContextHolder} in this codebase. ArchUnit forbids every other service / mapper /
- * controller from touching the static security context, so the behaviour of this class is
- * load-bearing for every {@code @PreAuthorize} decision in the backend. The previous test coverage
- * of these branches was effectively zero; this suite exercises each one.
+ * Unit tests for {@link AuthHelperService}, the only sanctioned reader of {@link
+ * SecurityContextHolder}.
  *
- * <p>{@link SecurityContextHolder} state is bound to the calling thread, so every test must restore
- * an empty context on teardown to avoid cross-test leakage when the suite is run with a shared
- * thread.
+ * <p>Each test restores an empty security context on teardown.
  */
 @ExtendWith(MockitoExtension.class)
 class AuthHelperServiceTest {
@@ -131,15 +126,8 @@ class AuthHelperServiceTest {
     }
 
     /**
-     * A caller whose {@code getName()} is a UUID but who carries no subject yields empty.
-     *
-     * <p>The behaviour this accessor changed. It used to read {@link Authentication#getName()} and
-     * parse it, so this returned the id; since ADR-0129 it asks {@code AuthenticatedSubject}, which
-     * accepts a JWT subject or an authentication that opts in via {@code SubjectAuthentication} and
-     * nothing else. That narrowing is the point: {@code getName()} is a callsign on such a token,
-     * and REQ-OBS-004 keeps callsigns out of everything this id feeds. Unreachable in production —
-     * the backend is a pure resource server — but this is the accessor with ~53 call sites behind
-     * it, so the contract is pinned rather than assumed.
+     * A caller whose {@link Authentication#getName()} is a UUID but who carries no subject yields
+     * empty (ADR-0129).
      */
     @Test
     void yieldsEmptyForAPrincipalNameThatMerelyLooksLikeAnId() {

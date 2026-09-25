@@ -1,44 +1,10 @@
 // @ts-check
 /* exported krtSearchableSelect */
-/*
- * KRT searchable select (combobox).
- *
- * Progressively enhances a native <select> into a type-to-filter dropdown that
- * keeps the DAS KARTELL HUD look. The original <select> is the data source and
- * the no-JS fallback; after enhancement a hidden <input> carries the value, so
- * the surrounding page keeps working unchanged:
- *
- *   - the hidden input inherits the select's `name` (form submission) and its
- *     `data-role` (existing change-delegation + dependent loaders read it);
- *   - selecting an option dispatches a bubbling `change` on the hidden input,
- *     exactly as a native <select> would;
- *   - the selected option's extra `data-*` (e.g. `data-quantity-type` on a
- *     material option) is mirrored onto the hidden input on every value-set
- *     path, replacing `selectedOptions[0].dataset.*` reads (REQ-FE-016);
- *   - `required` is mirrored onto the visible textbox and a custom validity
- *     message is set while the typed text matches no option, so the browser's
- *     own constraint-validation bubble keeps gating submit at the right field;
- *   - the committed selection is tracked as a label/value/item TRIPLE and the
- *     two abandon paths (Escape, blur) restore all three through
- *     restoreCommitted(). Restoring the label alone would leave the value that
- *     reconcile() cleared empty behind a filled-looking box — a required picker
- *     that passes `required` and submits nothing.
- *
- * Follows the WAI-ARIA editable-combobox-with-list-autocomplete pattern
- * (role=combobox textbox + role=listbox popup, aria-activedescendant, keyboard
- * navigation). Reuses the design tokens / option styling defined in styles.css
- * (.krt-combobox*).
- */
 (function () {
     'use strict';
 
-    // Monotonic counter for collision-free ARIA ids across every combobox on a page.
     let comboboxSeq = 0;
 
-    // dataset keys (camelCased) the combobox owns itself and must NOT copy onto the hidden input
-    // during the generic data-* passthrough: the enhancement marker/guard, the text/behaviour
-    // config, and `testid` (which moves to the visible textbox instead). `data-search` lives on the
-    // <option>s, never the <select>, but is listed for safety.
     const COMBOBOX_DATA_KEYS = [
         'krtCombobox',
         'krtComboboxDone',
@@ -53,10 +19,8 @@
     ];
 
     /**
-     * Locates the <label> describing a control: first via an explicit
-     * `for="<id>"`, then by falling back to a label inside the same .form-group
-     * (the item-line markup uses an unbound previous-sibling label). Ensures the
-     * label carries an id so it can be referenced via aria-labelledby.
+     * Locates the <label> of a control, first via `for="<id>"`, then as the first label inside
+     * the same .form-group, and gives it an id for aria-labelledby when it has none.
      *
      * @param {HTMLElement} select the control whose label is wanted
      * @param {string} uid the instance id used to mint a label id when missing
@@ -103,11 +67,8 @@
     }
 
     /**
-     * Builds a combobox option model. The {@code search} haystack folds the visible label
-     * together with the optional secondary terms (a {@code data-search} attribute on the source
-     * {@code <option>}, e.g. a user's login name when the label shows the display name) so the
-     * local filter matches text the label alone does not surface — the requirement that user
-     * pickers search both username and display name. Highlighting still keys off the label only.
+     * Builds a combobox option model whose lower-cased `search` haystack combines the label with
+     * optional extra terms (e.g. a login name from `data-search`); highlighting uses the label only.
      *
      * @param {string} value the option value (submitted via the hidden input)
      * @param {string} label the visible option label
@@ -123,11 +84,8 @@
     }
 
     /**
-     * Harvests an option's extra data-* attributes (everything outside the combobox-owned keys)
-     * into a plain map, so option-level metadata like {@code data-quantity-type} survives the
-     * enhancement — the native {@code <option>} elements are removed together with the
-     * {@code <select>}, and consumers instead read the mirrored keys off the hidden input
-     * (REQ-FE-016).
+     * Collects an option's data-* attributes outside the combobox-owned keys into a plain map,
+     * later mirrored onto the hidden input while the option is selected (REQ-FE-016).
      *
      * @param {HTMLOptionElement} option the source option
      * @returns {Object|undefined} the metadata map, or undefined when the option carries none
@@ -147,21 +105,15 @@
     }
 
     /**
-     * Enhances a native <select> in place into a searchable combobox. Safe to
-     * call once per control; a no-op on a non-select or an already-enhanced one.
+     * Enhances a native <select> in place into a searchable combobox; a no-op on a non-select or
+     * an already-enhanced one.
      *
      * @param {HTMLSelectElement} select the select to upgrade
-     * @param {Object} [config] optional text/behaviour overrides; each text key also has a
-     *     `data-combobox-*` attribute fallback on the select:
-     *     `placeholder`, `noResultsText`, `hintText` (shown when the result list
-     *     is capped), `invalidText` (custom validity for unmatched text),
-     *     `loadingText` (shown while a remote fetch is in flight), `maxResults`
-     *     (render cap, default 50) and `remoteSource` — an optional
-     *     `(query) => Promise<Array<{value,label,data?}>>` that, when supplied, makes
-     *     the combobox fetch its options from the backend on demand (debounced) instead
-     *     of filtering a preloaded static list (no data-attribute fallback). A result's
-     *     optional `data` map is mirrored onto the hidden input while selected, exactly
-     *     like a local option's extra `data-*` attributes.
+     * @param {Object} [config] optional overrides, each text key with a `data-combobox-*`
+     *     fallback: `placeholder`, `noResultsText`, `hintText` (shown when capped),
+     *     `invalidText` (custom validity for unmatched text), `loadingText`, `maxResults`
+     *     (default 50) and `remoteSource`, a `(query) => Promise<Array<{value,label,data?}>>`
+     *     that fetches options on demand (debounced) instead of filtering the static list
      */
     function krtSearchableSelect(select, config) {
         if (!select || select.tagName !== 'SELECT') {
@@ -186,29 +138,12 @@
             invalid: opts.invalidText || data.comboboxInvalid || '',
             loading: opts.loadingText || data.comboboxLoading || '',
         };
-        // Optional remote (backend-backed) option source: a function (query) -> Promise<[{value,
-        // label}]>. When supplied the combobox fetches its options on demand instead of filtering a
-        // preloaded static list, so it scales to catalogues far larger than one page can hold.
         const remoteSource = typeof opts.remoteSource === 'function' ? opts.remoteSource : null;
         const maxResults = Math.max(
             1,
             parseInt(opts.maxResults || data.comboboxMax || '50', 10) || 50,
         );
 
-        // Harvest the option set; the empty-value option (if any) seeds the placeholder. In remote
-        // mode only a seeded preselected option is harvested (edit mode); the rest arrives per fetch.
-        //
-        // A non-required <select> with an empty-value option is an OPTIONAL picker whose value can be
-        // reset to none. There are TWO independent paths back to empty, and both matter (the native
-        // <select> the combobox replaces let you re-pick the empty option; swallowing it entirely
-        // into the placeholder removed every way back — the "can't remove the responsible person"
-        // bug):
-        //   • `optional` gates DELETE-TO-CLEAR — emptying the textbox clears the value, and reconcile
-        //     drops the committed label so blur no longer restores the removed entry. Enabled for
-        //     every optional picker, regardless of the empty option's text, because users who miss
-        //     the dropdown row reach for the delete key instead.
-        //   • `clearLabel` (the empty option's descriptive text, when present) additionally seeds a
-        //     selectable "clear" ROW in the list (see renderOptions) — the discoverable path.
         let items = [];
         let placeholder = opts.placeholder || data.comboboxPlaceholder || '';
         let optional = false;
@@ -246,18 +181,9 @@
         if (select.name) {
             hidden.name = select.name;
         }
-        // Carry the original control's id and its generic data-* attributes (data-role,
-        // data-trigger, page-specific hooks, …) onto the hidden input. The hidden input is what
-        // submits the value and what dispatches `change`, so existing page JS that looks the
-        // control up by id (`getElementById`) or that delegates on `data-trigger`/`data-role`
-        // keeps working unchanged after the <select> is replaced. The combobox's own config
-        // attributes and the per-option `data-search` are skipped, and `data-testid` moves to the
-        // visible textbox below so a single element matches a test locator.
         if (select.id) {
             hidden.id = select.id;
         }
-        // Keys copied from the SELECT are reserved: option-level metadata mirrored later must
-        // never clobber a control-level contract like data-role / data-trigger (REQ-FE-016).
         const reservedKeys = [];
         Object.keys(data).forEach(function (key) {
             if (COMBOBOX_DATA_KEYS.indexOf(key) === -1) {
@@ -293,9 +219,6 @@
         const labelEl = findLabel(select, uid);
         if (labelEl) {
             input.setAttribute('aria-labelledby', labelEl.id);
-            // The original <select> id now lives on the hidden input (see the passthrough above),
-            // so a label bound via for="<select-id>" would focus the hidden field on click.
-            // Repoint it to the visible textbox so clicking the label opens the combobox.
             /** @type {HTMLLabelElement} */ (labelEl).htmlFor = input.id;
         }
 
@@ -309,15 +232,6 @@
         wrapper.appendChild(input);
         wrapper.appendChild(listbox);
 
-        // Option-level metadata mirror (REQ-FE-016). The native <option>s vanish with the
-        // <select>, so consumers that used to read `selectedOptions[0].dataset.*` (e.g. the
-        // material pickers' data-quantity-type) instead read the selected option's extra data-*
-        // straight off the hidden input. ONE helper serves every value-set path — click/keyboard
-        // commit, enhance-time preselect seeding, reconcile()'s typed-exact-match, and the
-        // programmatic setValue() API — so no path can leave stale metadata behind: previously
-        // mirrored keys are removed before the new option's map is applied (an option lacking a
-        // key the previous one carried must not inherit the old value), and keys copied from the
-        // select itself (reservedKeys above) are never overwritten by option metadata.
         let mirroredKeys = [];
 
         function mirrorItemData(item) {
@@ -342,13 +256,6 @@
             });
         }
 
-        // Seed the display from a preselected value (edit mode / adopted sub-assembly).
-        //
-        // The committed selection is tracked as a TRIPLE — label, value and the item itself — and
-        // every one of them is restored together by restoreCommitted(). Tracking only the label (the
-        // original shape) made the two restore paths (Escape, blur) put the visible text back while
-        // leaving the submitted value cleared by reconcile(): a required picker then looked correctly
-        // filled, passed its `required` check, and submitted nothing. See restoreCommitted().
         let committedLabel = '';
         let committedValue = '';
         /** @type {any} */
@@ -365,11 +272,8 @@
             mirrorItemData(preselected);
         }
 
-        // The parent is never null here: `select` was just found by querySelectorAll
-        // over the live document and nothing detaches it between there and here.
         /** @type {Node} */ (select.parentNode).replaceChild(wrapper, select);
 
-        // ---- per-instance state + behaviour ---------------------------------
         let rendered = [];
         let activeIndex = -1;
         let remoteSeq = 0;
@@ -382,20 +286,10 @@
             return listbox.hidden === false;
         }
 
-        // Anchor the open popup to the textbox in viewport space (position: fixed)
-        // instead of relying on the in-flow `top: 100%` (position: absolute) from
-        // the stylesheet. A fixed-positioned box is laid out against the viewport,
-        // so an ancestor's overflow clip — e.g. a scrolling `.krt-modal-body`,
-        // whose `overflow-y: auto` would otherwise crop the list at the modal
-        // foot — no longer applies to it. The list flips above the field when
-        // there is more room there, and its height is capped to the space on the
-        // chosen side so no row ends up off-screen (the viewport can't scroll
-        // behind a fixed modal). Must run while the list is visible so
-        // `scrollHeight` measures the rendered content.
         function positionListbox() {
             const rect = input.getBoundingClientRect();
             const gap = 4;
-            const cap = 288; // mirrors the .krt-combobox__listbox max-height (18rem @16px)
+            const cap = 288;
             const below = window.innerHeight - rect.bottom;
             const above = rect.top;
             const flipUp = below < Math.min(cap, listbox.scrollHeight) && above > below;
@@ -415,8 +309,6 @@
             }
         }
 
-        // Clears the inline positioning so the stylesheet's defaults apply again
-        // on the next open (and the flip-up modifier never sticks).
         function resetListboxPosition() {
             listbox.classList.remove('krt-combobox__listbox--above');
             listbox.style.position = '';
@@ -428,9 +320,6 @@
             listbox.style.maxHeight = '';
         }
 
-        // While the popup is open, keep it glued to the textbox as either the
-        // window or any scroll container (the modal body) scrolls or resizes —
-        // capture phase catches scrolls on inner containers, which do not bubble.
         function attachReposition() {
             if (repositionHandler) {
                 return;
@@ -488,8 +377,6 @@
             rendered = [];
             activeIndex = -1;
 
-            // Remote mode: the backend already filtered to the query, so render the fetched set
-            // as-is (highlighting still keys off the typed term); local mode filters in place.
             const matches = remoteSource
                 ? items.slice()
                 : q
@@ -499,11 +386,6 @@
                   : items.slice();
             const truncated = matches.length > maxResults;
 
-            // Lead the UNFILTERED list with a selectable "clear" row when the optional picker's empty
-            // option carries descriptive text (`clearLabel`), so a committed value can be reset to
-            // none via the dropdown too. Hidden while a query is typed (the user is searching for an
-            // entry, not clearing). Its value is '' so commit() treats picking it as a clear, and it
-            // carries no highlight query. (Delete-to-clear works even without this row — see reconcile.)
             const rows = clearLabel && !q ? [makeItem('', clearLabel)] : [];
             Array.prototype.push.apply(rows, matches.slice(0, maxResults));
 
@@ -511,20 +393,13 @@
                 const li = document.createElement('li');
                 li.id = listboxId + '-opt-' + idx;
                 li.className = 'krt-combobox__option';
-                // The clear row reads as "no selection": muted styling, and commit() below drops the
-                // committed label/metadata for its empty value.
                 if (it.value === '') {
                     li.classList.add('krt-combobox__option--clear');
                 }
                 li.setAttribute('role', 'option');
                 li.setAttribute('aria-selected', it.value === hidden.value ? 'true' : 'false');
-                // Expose the option value in the DOM (as a native <option value> did), so callers /
-                // tests can target a specific option without relying on its visible label.
                 li.dataset.value = it.value;
                 appendHighlighted(li, it.label, q);
-                // mousedown keeps focus on the textbox so blur does not pre-empt the
-                // pick; the commit runs on click so a programmatic .click() (tests)
-                // still resolves on a visible target before the list closes.
                 li.addEventListener('mousedown', function (event) {
                     event.preventDefault();
                 });
@@ -537,13 +412,6 @@
                     }
                 });
                 listbox.appendChild(li);
-                // Keep the WHOLE option model, not a value/label copy. commit() mirrors
-                // `item.data` onto the hidden input, so a row that carried only value+label made
-                // every KEYBOARD pick (Enter on the active row, Enter on a sole match) commit an
-                // option with no metadata — the refinery create form's output material fell back
-                // to "-" and the amount-unit mirror kept the previous option's unit, while the
-                // mouse path (which commits the model itself) worked. It also became the
-                // committedItem, so the later blur/Escape restore re-cleared the metadata.
                 rendered.push({ item: it, el: li });
             });
 
@@ -572,7 +440,6 @@
             highlightCommitted();
         }
 
-        // Renders a transient "loading" row while a remote fetch is in flight.
         function renderLoading() {
             listbox.textContent = '';
             rendered = [];
@@ -580,8 +447,6 @@
             listbox.appendChild(noticeRow(texts.loading || texts.hint || ''));
         }
 
-        // Remote mode: fetch the option set for `query` from the backend, then render it. A
-        // monotonic token drops a slow earlier response so it cannot overwrite a newer query.
         function loadRemote(query) {
             const token = ++remoteSeq;
             Promise.resolve(remoteSource(query))
@@ -604,7 +469,6 @@
                 });
         }
 
-        // Opens the popup in remote mode: shows a loading row at once, then debounces the fetch.
         function openRemote(query, delay) {
             renderLoading();
             listbox.hidden = false;
@@ -633,10 +497,6 @@
             const next = item ? item.value : '';
             const changed = hidden.value !== next;
             hidden.value = next;
-            // An empty value is the "clear" row / no selection: it carries no committed label or
-            // mirrored option metadata, so the textbox falls back to its placeholder. Mirror before
-            // the change event below, so change listeners reading the hidden input's dataset
-            // (unit/step refreshers) already see the new option's metadata.
             mirrorItemData(next ? item : null);
             committedLabel = next ? item.label : '';
             committedValue = next;
@@ -650,21 +510,8 @@
         }
 
         /**
-         * Puts the committed selection back on screen AND back into the submitted value.
-         *
-         * Both abandon paths (Escape while open, blur without a pick) used to assign
-         * {@code input.value = committedLabel} and clear the custom validity, but never restored
-         * {@code hidden.value}. Since {@link reconcile} empties the hidden input on any non-matching
-         * keystroke — and {@code focus} does {@code input.select()}, so a single keystroke replaces
-         * the whole label — that combination silently desynced the two halves of the control: the
-         * textbox showed the previously picked entry, the browser's `required` check passed, the
-         * arming custom-validity message was dropped, and the form submitted an EMPTY value. On the
-         * bank withdrawal confirm that surfaced as an unactionable "some fields are invalid" while
-         * the holder was visibly filled in.
-         *
-         * Restores the mirrored option metadata too, and re-fires {@code change} when the value
-         * actually moves, because reconcile() already fired one when it cleared the value — without
-         * the symmetric event, dependent loaders (unit/step refreshers) would keep the cleared state.
+         * Restores the committed selection to the textbox, the hidden value and the mirrored option
+         * metadata, and fires `change` when the hidden value moves.
          */
         function restoreCommitted() {
             const changed = hidden.value !== committedValue;
@@ -677,9 +524,6 @@
             }
         }
 
-        // Keep the hidden value (and thus form validity) in step with free text:
-        // an exact label match commits silently, anything else clears the value and
-        // arms the custom-validity message so submit stays blocked until resolved.
         function reconcile() {
             const typed = input.value.trim().toLowerCase();
             /** @type {any} */
@@ -709,12 +553,6 @@
                 mirrorItemData(null);
                 hidden.dispatchEvent(new Event('change', { bubbles: true }));
             }
-            // Emptying the textbox of an OPTIONAL picker is an explicit clear (delete-to-clear): drop
-            // the committed label so blur (which snaps the box back to committedLabel) leaves it empty
-            // instead of restoring the just-removed entry — the core of the "can't remove the
-            // responsible person" bug, and the path users take when they miss the dropdown clear row.
-            // Required pickers keep the snap-back so a stray keystroke never loses a mandatory
-            // selection.
             if (optional && !input.value.trim()) {
                 committedLabel = '';
                 committedValue = '';
@@ -754,7 +592,6 @@
                         if (remoteSource) {
                             openRemote('', 0);
                         } else {
-                            // Opening lands on the committed row (set by open()), else the first.
                             open('');
                             if (activeIndex < 0) {
                                 setActive(0);
@@ -814,9 +651,6 @@
             }
         });
 
-        // Leaving the field (tab / click away) closes the popup and discards any
-        // stray free text, snapping the box back to the committed label. Deferred
-        // so an option click resolves first; skipped if focus stayed on the input.
         input.addEventListener('blur', function () {
             window.setTimeout(function () {
                 if (document.activeElement === input) {
@@ -828,23 +662,14 @@
         });
 
         /**
-         * Programmatically selects the option with the given value and syncs BOTH the hidden value
-         * and the visible label, WITHOUT firing a `change` event. This is the supported way for page
-         * JS to preselect a combobox after enhancement (e.g. when an edit modal opens and seeds the
-         * current value) — assigning to the hidden input's `.value` directly would update the
-         * submitted value but leave the textbox showing the wrong (or empty) text.
-         *
-         * In remote mode the loaded item set holds only what the last fetch returned, so a value
-         * cannot be resolved to a label locally: callers that know the entry pass `label` (and
-         * optionally the option `data` map, mirrored like a picked option's metadata) and the pick
-         * is trusted as-is. Without a resolvable label the selection is cleared — never a value
-         * with a blank textbox.
+         * Selects the option with the given value, syncing the hidden value and the visible label
+         * without firing `change`. A value outside the loaded items is accepted only with a
+         * non-blank `label`; otherwise the selection is cleared.
          *
          * @param {string} value the option value to select, or empty/unknown to clear
-         * @param {string} [label] the visible label for a value outside the loaded item set
-         *     (remote mode / programmatic fills); ignored when the value resolves locally
-         * @param {Object} [data] optional option metadata mirrored onto the hidden input while
-         *     this value is selected (camelCased dataset keys, REQ-FE-016)
+         * @param {string} [label] the label for a value outside the loaded items; ignored when the
+         *     value resolves locally
+         * @param {Object} [data] option metadata mirrored onto the hidden input (REQ-FE-016)
          */
         function setValue(value, label, data) {
             const v = value == null ? '' : String(value);
@@ -868,29 +693,11 @@
             input.setCustomValidity('');
         }
 
-        // Expose a tiny controller on both the hidden input (what `getElementById` returns) and the
-        // wrapper, so page code can drive the value without reaching into the internals.
         const controller = { setValue };
         hidden.krtCombobox = controller;
         wrapper.krtCombobox = controller;
     }
 
-    // Builds the config for an auto-initialised combobox: shared i18n defaults from
-    // `window.krtComboboxI18n`, each overridable per-control by a `data-combobox-*` attribute. Keeps
-    // the shared picker strings in ONE place (head.html) while still letting a single control
-    // customise its wording. The placeholder and no-results text additionally honour a per-kind
-    // default keyed by the marker value (`krtComboboxI18n.kinds['remote-materials']` etc.), so a
-    // material/location/item/account picker announces what it searches instead of inheriting the
-    // user-picker wording — precedence: data-combobox-* attribute > kinds[marker] > top-level
-    // default (the user wording: every bare `data-krt-combobox` picker is a user/holder picker).
-    //
-    // A backend-backed picker opts in declaratively via the MARKER VALUE: `data-krt-combobox` set to
-    // a key registered in `window.krtComboboxRemoteSources` (e.g. `remote-users` /
-    // `remote-bank-users`, defined in krt-user-search.js) makes the picker fetch its options on
-    // demand from that source instead of filtering a preloaded list (REQ-FE-011, ADR-0053/0089,
-    // #1193). Keeps this module generic — the search URLs live in the registry, not here. (A page
-    // may still pass an explicit `remoteSource` via the direct krtSearchableSelect API — e.g. the
-    // orders item search.)
     function autoConfig(select) {
         const i18n = window.krtComboboxI18n || {};
         const d = select.dataset;
@@ -900,10 +707,6 @@
         return {
             placeholder: d.comboboxPlaceholder || kind.placeholder || i18n.placeholder,
             noResultsText: d.comboboxNoResults || kind.noResults || i18n.noResults,
-            // A kind may also raise its RENDER CAP. Only the location picker does: its catalog is
-            // small and bounded by the game universe, so a booking user expects to scroll it whole
-            // rather than guess a search term. Every other kind keeps the 50-row default and relies
-            // on the hint below. Precedence mirrors the wording keys: attribute > kind > default.
             maxResults: d.comboboxMax || kind.maxResults,
             hintText: d.comboboxHint || i18n.hint,
             invalidText: d.comboboxInvalid || i18n.invalid,
@@ -912,10 +715,6 @@
         };
     }
 
-    // Enhances every opted-in `select[data-krt-combobox]` inside a root (the document on load, or a
-    // freshly swapped fragment on `krt:swapped`). krtSearchableSelect is idempotent, so re-running
-    // over already-enhanced controls is a no-op. This is the single global mechanism that powers the
-    // searchable user pickers across the app without per-page wiring.
     function enhanceWithin(root) {
         if (!root || typeof root.querySelectorAll !== 'function') {
             return;
@@ -935,15 +734,11 @@
     } else {
         enhanceWithin(document);
     }
-    // Live update (REQ-FE-*): re-enhance user pickers inside any fragment swapped in via krtFetch.
     document.addEventListener('krt:swapped', function (event) {
         const detail = /** @type {CustomEvent} */ (event).detail;
         enhanceWithin((detail && detail.container) || document);
     });
 
     window.krtSearchableSelect = krtSearchableSelect;
-    // Enhance every select[data-krt-combobox] within a root. Exposed for pages that build picker DOM
-    // dynamically (e.g. duplicating a row) and need to upgrade the freshly inserted controls without
-    // dispatching a synthetic krt:swapped (which would also trigger unrelated swap listeners).
     window.krtEnhanceComboboxes = enhanceWithin;
 })();

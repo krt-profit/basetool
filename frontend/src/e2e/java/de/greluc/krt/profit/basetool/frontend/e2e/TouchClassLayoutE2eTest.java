@@ -42,88 +42,26 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Layout guard for the two <b>touch</b> device classes of REQ-UI-009 — Smartphone (≤768px) and
- * Tablet (768–1024px) — across the pages a member actually works on.
+ * Layout guard for the touch device classes of REQ-UI-009 (Smartphone and Tablet), plus desktop and
+ * ultra-wide, across every page a member works on.
  *
- * <p><b>Why this exists.</b> REQ-UI-009 has required both classes since it was written, and nothing
- * measured them: {@code MissionDatetimeSplitLayoutE2eTest}, the only other geometric layout guard,
- * sweeps 1280–1800px, and the smoke suite loads pages at the default desktop viewport and asserts
- * that the sidebar rendered. So "works on a phone" was review-enforced on a UI nobody opens on a
- * phone. It became load-bearing with REQ-UI-020: the web app is now installable to a home screen
- * and <b>is</b> the mobile client for iPhone and iPad, which have no native app.
- *
- * <p><b>What it asserts</b>, one check per thing that actually goes wrong on a narrow screen:
+ * <p>Per page and device class it asserts:
  *
  * <ol>
- *   <li><b>The page does not scroll sideways.</b> REQ-UI-009 says <i>wide tables</i> scroll
- *       horizontally — not the document. A page-level horizontal scrollbar means something is wider
- *       than the viewport and the member has to pan the whole layout to read it.
- *   <li><b>The chrome does not eat the screen.</b> Only chrome that actually holds viewport space
- *       counts: the sticky header always, the footer only where it is pinned. Together they must
- *       stay under {@value #MAX_CHROME_SHARE_PERCENT}% of the viewport height.
- *   <li><b>The footer behaves per device class.</b> On the phone class it must be {@code static} —
- *       it scrolls with the page so the viewport belongs to the content (owner decision 2026-09-13)
- *       — and {@code --krt-footer-height} must then be {@code 0px}, because its eight consumers all
- *       mean "how much of the viewport bottom is covered" and a scrolling footer covers nothing.
- *       Above that class it must still be {@code fixed}, and then {@code main}'s bottom padding
- *       must cover its measured height, or the last rows of a long page can never be scrolled clear
- *       of it.
- *   <li><b>Nothing is cut off.</b> Any element whose right edge lies beyond the viewport and that
- *       sits in no horizontally scrollable ancestor is unreachable, not merely ugly.
- *   <li><b>Wide tables scroll inside their own container.</b> The positive form of check 1: a table
- *       wider than the viewport is fine, provided some ancestor scrolls it.
- *   <li><b>Inputs fit.</b> A form control wider than the viewport cannot be filled in, and one
- *       whose EFFECTIVE HIT AREA is shorter than the 44px touch floor cannot be hit reliably
- *       (REQ-UI-009's floor; its documented exception for dense row actions is honoured).
- *       Effective, not the border box: a control may reach the floor through a positioned {@code
- *       ::after} overlay or through the {@code <label>} that activates it, and both are real
- *       targets to a finger. Measuring the border box alone reported 15 compliant org-chart
- *       chevrons as defects.
+ *   <li>the document does not scroll sideways;
+ *   <li>header and pinned footer stay under {@value #MAX_CHROME_SHARE_PERCENT}% of the viewport
+ *       height;
+ *   <li>the footer is {@code static} with {@code --krt-footer-height: 0px} on phones, and {@code
+ *       fixed} with matching {@code main} bottom padding above;
+ *   <li>no element is cut off beyond the viewport outside a fitting scroll container;
+ *   <li>wide tables scroll inside their own container;
+ *   <li>form controls fit the viewport and reach the 44px touch floor by their effective hit area
+ *       (dense row actions excepted).
  * </ol>
  *
- * <p><b>What this class measures depends on data other classes create, and nothing enforces the
- * order.</b> Carrying the {@code e2e} tag is what puts it in the destructive suite where the CRUD
- * flows have populated the tables — and that is where it found 118 defects a fresh stack hid. But
- * the ordering that currently runs it after those classes is JUnit's unspecified discovery order:
- * it used to rest on JUnit's unspecified discovery order. {@code junit-platform.properties} now
- * selects {@code ClassOrderer.OrderAnnotation} and this class carries
- * {@code @Order(Integer.MAX_VALUE)}, so it runs after every class that has no {@code @Order} —
- * which is all 93 of them. Belt and braces: the coverage report below still names any list page
- * that rendered no row, so if the ordering is ever defeated the degradation shows in the log
- * instead of passing quietly.
- *
- * <p><b>Artifacts come from one engine, assertions from all three.</b> Every engine measures every
- * page at every device class and fails on its own findings; only the Chromium shard writes the
- * screenshots. They are review evidence rather than assertions, and paying for ~430 captures three
- * times over cost the Firefox shard its 45-minute job timeout — it was cancelled on every run of a
- * branch whose other two engines reported green.
- *
- * <p><b>Bounding rectangles, not {@code scrollWidth} alone.</b> The same lesson {@code
- * MissionDatetimeSplitLayoutE2eTest} records: overflow that lands inside a container's padding does
- * not show up in {@code scrollWidth - clientWidth}. Checks 4 and 6 therefore compare rectangles
- * against the viewport, and check 1 takes the larger of the document element's and the body's
- * scroll width, since either can carry it.
- *
- * <p><b>Two mistakes this file made first, kept as comments where they were made.</b> Check 4
- * excused any element with a horizontally scrollable ancestor, without asking whether that ancestor
- * itself fits — so five pages that overflowed the phone by 10–159px reported clean, and were caught
- * only because Playwright's full-page screenshots came out wider than the viewport. And an earlier
- * check flagged every element that happened to lie under the fixed footer at scroll 0, which
- * produced 60 findings and no defects: that is what a fixed footer does, and the reserve above is
- * the invariant that makes it harmless.
- *
- * <p><b>Every finding is collected before anything fails.</b> A layout audit that stops at the
- * first offending page is worth much less than one that names all of them, so each page/width
- * combination appends to one list and the assertion happens at the end. Screenshots of every
- * combination land in {@code build/e2e-artifacts/touch-layout/} whether the run passes or fails —
- * the point is to look at them, not only to read a diff.
- *
- * <p><b>Tagged {@code e2e} only, and deliberately not {@code smoke}</b> (owner decision 2026-09-13;
- * the comment on the class says why). The {@code e2e} tag puts it on every pull request carrying
- * the {@code e2e} label, which is exactly the set that touches frontend flows, auth or controllers,
- * at a cost of roughly five minutes on those runs. It opens every modal on every route and needs
- * the rows the destructive CRUD flows create, which is more than the non-destructive smoke contract
- * allows.
+ * <p>Geometry is measured with bounding rectangles. All findings are collected before failing, and
+ * only the Chromium run writes screenshots to {@code build/e2e-artifacts/touch-layout/}. The class
+ * runs last ({@code @Order(Integer.MAX_VALUE)}) so the CRUD flows have populated the tables.
  */
 @Order(Integer.MAX_VALUE)
 @Tag("e2e")
@@ -148,24 +86,8 @@ class TouchClassLayoutE2eTest {
   private static final int MAX_CHROME_SHARE_PERCENT = 33;
 
   /**
-   * Ceiling for the header's own height on the phone class, in px.
-   *
-   * <p>Separate from {@link #MAX_CHROME_SHARE_PERCENT} because that ceiling cannot see this: a
-   * header of 110px on an 812px phone is 13% of the viewport and sails through, which is exactly
-   * what happened. The compact header (REQ-UI-009, owner decision 2026-09-13) took it from 76px to
-   * about 48px by putting the wordmark on one line; a later structural wrap rule then matched the
-   * header's own nav — it has a button and a link as direct children — and wrapped the brand onto a
-   * second line again, undoing it silently in the same release.
-   *
-   * <p>72px is measured-plus-slack: the fixed header renders at 62px at both 375px and 412px, and
-   * the ceiling sits below the 76px the compact-header change removed, so this guard would have
-   * caught the state before that change AND the regression after it.
-   *
-   * <p>It has since caught a second, unrelated way into the same 108px: {@code sidebar.js} appends
-   * an "ADMIN" chip into the header nav on every {@code /admin/*} page, and the two-column grid
-   * that fixed the wrap above placed that third child in row 2. Worth knowing because the height is
-   * the only symptom the two share — the ceiling is deliberately a bound on the outcome, not a test
-   * for either cause.
+   * Ceiling for the header's own height on the phone class, in px; the chrome-share ceiling alone
+   * does not catch a too-tall header.
    */
   private static final int MAX_PHONE_HEADER_HEIGHT_PX = 72;
 
@@ -189,85 +111,32 @@ class TouchClassLayoutE2eTest {
   private static final int PHONE_MAX_WIDTH = 768;
 
   /**
-   * Dense row actions REQ-UI-009 exempts from the 44px floor at 32px.
-   *
-   * <p>Owner-approved 2026-08-01; density is what keeps a wide Lager or bank table readable.
-   * Mirrors {@code --touch-target-dense} in {@code styles.css}; the two must move together.
+   * Height floor for the dense row actions REQ-UI-009 exempts from the 44px floor; mirrors {@code
+   * --touch-target-dense} in {@code styles.css}.
    */
   private static final int DENSE_ACTION_FLOOR = 32;
 
   /** Sub-pixel slack, for the same reason the sibling layout guard carries one. */
   private static final double SLACK_PX = 1.0;
 
-  /**
-   * The engine that WRITES the screenshots. Every engine still measures and still asserts.
-   *
-   * <p>The sweep takes a full-page capture per page per device class plus one per modal on the two
-   * phone classes — around 430 images — and in Firefox that is the dominant cost. Growing the route
-   * list from 47 to 64 pushed the Firefox shard from ~18 minutes past the workflow's {@code
-   * timeout-minutes: 45}, where it was cancelled on every run of the branch while Chromium finished
-   * in 20 and WebKit in 23. Chromium and WebKit reported green and the third of the matrix that
-   * never finished went unnoticed for six runs.
-   *
-   * <p>The images are review evidence, and one engine's set is what a reviewer opens; three
-   * near-identical copies buy nothing. This is the same distinction {@link #screenshotSafely}
-   * already draws — the measurement is the assertion, the picture is what lets a reader check it —
-   * applied to which shard pays for the picture. A local run defaults to this engine, so nobody
-   * loses artifacts by accident.
-   */
+  /** The only engine that writes screenshots; every engine still measures and asserts. */
   private static final String SCREENSHOT_ENGINE = "chromium";
 
   /**
-   * Prefix marking a finding as a HIT-AREA one rather than a geometry one.
-   *
-   * <p>The two are filtered differently: above the touch classes only geometry matters, because a
-   * 44px floor is a touch rule and a mouse has no thumb. That filter used to substring-match {@code
-   * "px tall, floor"} out of the probe's own prose, so reformatting a message — adding a unit,
-   * rewording the floor — would silently turn the desktop filter into a pass-through. The comment
-   * on it records that getting this wrong once cost 490 false findings.
-   *
-   * <p>Interpolated into the probe script, so there is one spelling and the compiler moves it.
+   * Prefix marking a hit-area finding, so hit-area findings can be filtered out above the touch
+   * classes. Interpolated into the probe script.
    */
   private static final String HIT_AREA_MARK = "hit-area: ";
 
   /**
-   * The modal ROOT selector the templates use, and the inner parts to measure in it.
+   * A modal shape: the root selector the templates use and the inner parts to measure in it.
    *
-   * <p><b>There is one shape, and this list is how that is visible from the test side.</b> It held
-   * three until #1891: the canonical {@code .krt-modal-overlay} shell (42 instances) and two legacy
-   * shapes that predated it — {@code .modal} / {@code .modal-content} (47) and its promotion-admin
-   * sister {@code .modal-overlay} / {@code .modal-box} (7). This sweep saw none of the 54 legacy
-   * roots until 2026-09-13, while the comment on the measurement loop called 42 "the full set".
-   *
-   * <p>All 54 were ported onto the canonical shell and both legacy shapes deleted (ADR-0177), so
-   * the entry that used to be "canonical first" is now the only one. The list stays a list, and the
-   * four call sites still derive from it, because that is what makes a second shape cheap to
-   * measure on the day one is deliberately introduced — the point was never that three was too many
-   * to write down, it was that each one multiplied every dialog fix.
-   *
-   * <p>Declared ONCE because the selector has to agree at four sites — {@code modalCount}, the
-   * probe's own measurement loop, and the Java-side un-hide and restore around the screenshot.
-   * Widening one alone does nothing: if the probe measured a wider set than the un-hide reveals,
-   * the extra modals are still {@code display: none}, are skipped by the zero-rect guards, and the
-   * change looks harmless while buying nothing.
-   *
-   * <p><b>A FOURTH shape is now detected, but not here.</b> This list is still hand-maintained and
-   * still cannot report a family nobody entered — the failure mode {@link #PAGES} had. What closed
-   * it is {@code SingleModalShapeTest} in the frontend {@code test} source set: it reads the
-   * templates and the stylesheets as text and fails the build when any dialog class outside this
-   * shape appears, on every push rather than only on a PR carrying the {@code e2e} label. That is
-   * the {@code check}-time guard this comment used to ask for; it did not need {@code test-support}
-   * after all, because reading templates as text needs no browser.
-   *
-   * @param root the overlay or scrim element — the thing that is hidden and shown
-   * @param box the framed dialog inside it, whose geometry is the assertion
-   * @param body the scrolling region, or {@code null} where the family has no such class
-   * @param foot the button row, or {@code null} where the family has no such class
-   * @param openClass a class the family's own JS adds to open it, or {@code null} when display
-   *     alone opens it. No current shape needs one — it existed for {@code .modal-overlay}, which
-   *     centred its box in {@code .active} only, so revealing it with display alone would have
-   *     stretched the dialog and measured a shape no user is ever shown. The parameter stays for
-   *     the next shape that opens by a class rather than by display.
+   * @param root the overlay element that is hidden and shown
+   * @param box the framed dialog whose geometry is asserted
+   * @param body the scrolling region, or {@code null} when the shape has none
+   * @param foot the button row, or {@code null} when the shape has none
+   * @param openClass a class the shape's JS adds to open it, or {@code null} when display alone
+   *     opens it
    */
   private record ModalShape(String root, String box, String body, String foot, String openClass) {}
 
@@ -277,11 +146,7 @@ class TouchClassLayoutE2eTest {
           new ModalShape(
               ".krt-modal-overlay", ".krt-modal", ".krt-modal-body", ".krt-modal-foot", null));
 
-  /**
-   * {@link #MODAL_SHAPES} as one selector, for the three sites that only need to find the roots.
-   *
-   * <p>Derived rather than written out, so a family added above reaches all four sites at once.
-   */
+  /** The roots of {@link #MODAL_SHAPES} joined into one selector. */
   private static final String MODAL_ROOT_SELECTOR =
       MODAL_SHAPES.stream().map(ModalShape::root).collect(Collectors.joining(", "));
 
@@ -309,40 +174,18 @@ class TouchClassLayoutE2eTest {
     return selector == null ? "null" : "'" + selector + "'";
   }
 
-  /**
-   * The engine this run drives, as {@code e2e.browser}.
-   *
-   * <p>Read once instead of at each of the three call sites that used to inline the property and
-   * its default, which is how they can drift.
-   */
+  /** The engine this run drives, from the {@code e2e.browser} system property. */
   private static final String ENGINE = System.getProperty("e2e.browser", "chromium");
 
   /**
-   * Whether this engine accepts {@code isMobile}.
-   *
-   * <p><b>Firefox does not.</b> Playwright's own documentation says so for both {@code newContext}
-   * and {@code newPage} — "Defaults to false and is not supported in Firefox" — and its Firefox
-   * backend throws rather than ignoring it. Gating on the width alone made the phone class the one
-   * context Firefox refuses to open, and the {@code browser x device} matrix then gave that its own
-   * job: {@code firefox / 375x812} could not get past its first {@code newContext}, while the four
-   * wider Firefox jobs passed because {@code width <= 768} was false for them and the option was
-   * never set. With {@code fail-fast: false} that is a permanently red E2E gate that looks like a
-   * flake.
-   *
-   * <p>What is lost on Firefox is the mobile-device emulation (the meta viewport being honoured);
-   * {@code setHasTouch(true)} and the viewport size still apply, so the touch-class media queries
-   * and every geometry assertion in this class still hold. Chromium and WebKit keep the full
-   * emulation, so the property is still measured on two engines out of three.
+   * Whether this engine accepts {@code isMobile}; Firefox does not, so it runs without mobile
+   * emulation but with touch and the viewport size.
    */
   private static final boolean ENGINE_SUPPORTS_IS_MOBILE = !"firefox".equals(ENGINE);
 
   /**
-   * How many of {@link FrontendPageRoutes#PAGES} a device class must actually measure before the
-   * run counts.
-   *
-   * <p>A floor, not a target: it exists so a sweep that skipped everything cannot report clean. The
-   * relative check in {@link #reportCoverage} is the real guard; this only catches the case where
-   * every class is equally empty, which the relative check cannot see.
+   * Minimum number of {@link FrontendPageRoutes#PAGES} each device class must measure, so a sweep
+   * that skipped everything cannot pass.
    */
   private static final int MIN_MEASURED_ROUTES = 30;
 
@@ -355,37 +198,15 @@ class TouchClassLayoutE2eTest {
   private static final int MAX_REASON_CHARS = 600;
 
   /**
-   * Restricts the sweep to one device class, as {@code WxH}.
-   *
-   * <p>Set by CI, which fans the five classes out across runners ({@code browser x device}) rather
-   * than walking them one after another in a single job — the shape that put the Firefox shard on
-   * its job timeout. Unset locally and in the smoke suite, where all five run as before.
-   *
-   * <p>It changes what {@link #reportCoverage} can assert, and that is worth stating rather than
-   * discovering: the relative check compares each class against the union across classes, so with
-   * exactly one class the union IS that class and the comparison is vacuous. The absolute floor is
-   * what still catches a sweep that skipped everything, and the five runners together still cover
-   * the same routes — the cross-class comparison simply moves from inside one JVM to a reader
-   * comparing five job logs.
+   * Restricts the sweep to one device class ({@code WxH}); unset runs all classes. With a single
+   * class, {@link #reportCoverage}'s cross-class comparison is vacuous and only the absolute floor
+   * applies.
    */
   private static final String DEVICE_FILTER = System.getProperty("e2e.device", "").trim();
 
   /**
-   * The five device classes of REQ-UI-009, with the tablet taken at both orientations.
-   *
-   * <p>375×812 is the iPhone viewport the phone class is written for. 810×1080 and 1024×768 are the
-   * tablet class at both orientations, and they really are different layouts here because every
-   * breakpoint is width-only ({@code width <= 768px} / {@code <= 1024px}), so a rotation crosses
-   * them. 1280×800 is the desktop class and 1600×900 the ultra-wide one, where {@code main} gains
-   * its {@code max-width} — the two classes that were already covered by review and by {@code
-   * MissionDatetimeSplitLayoutE2eTest} but never by a whole-page sweep.
-   *
-   * <p>Ordered narrow to wide so the output reads as a ladder.
-   *
-   * <p>This block sat ABOVE {@link #DEVICE_FILTER} as a second consecutive Javadoc comment, which
-   * javac discards — so it documented nothing, and what it said had stopped being true: "all four
-   * device classes" for a five-entry list, and 768×1024 for the entry deliberately changed to
-   * 810×1080. `REQ-UI-009` and the ADR named the same retired number and are corrected with it.
+   * The five device classes of REQ-UI-009, ordered narrow to wide: the phone (375×812), the tablet
+   * in both orientations (810×1080, 1024×768), desktop (1280×800) and ultra-wide (1600×900).
    */
   private static final List<int[]> DEVICE_CLASSES =
       List.of(
@@ -422,11 +243,8 @@ class TouchClassLayoutE2eTest {
   }
 
   /**
-   * Sweeps every page at every touch device class, collects every finding, then fails once.
-   *
-   * <p>One browser context per device class rather than a {@code setViewportSize} per page: the
-   * media queries are evaluated at load time by some of the page scripts (the footer measurement
-   * among them), and resizing an already-rendered page exercises a state a phone never reaches.
+   * Sweeps every page at every device class, collects every finding, then fails once. Each device
+   * class gets its own browser context.
    */
   @Test
   void touchClassesRenderWithoutOverflowOrOverlap() {
@@ -488,21 +306,12 @@ class TouchClassLayoutE2eTest {
   }
 
   /**
-   * Turns what the sweep actually looked at into an assertion.
+   * Asserts that every device class measured the same set of routes and at least {@link
+   * #MIN_MEASURED_ROUTES}, adding a finding otherwise.
    *
-   * <p>Two ways to pass without measuring anything were possible before this, and the suite's only
-   * assertion — {@code findings.isEmpty()} — cannot tell "clean" from "never looked". The check is
-   * deliberately RELATIVE rather than a magic number: every device class must have measured the
-   * same set of routes. A route with no app shell (a fragment, a JSON endpoint, a redirect) skips
-   * at all five classes and cancels out, while a session that expires during the third class
-   * shrinks that class's set and is named here. One absolute floor guards the degenerate case where
-   * nothing is measured anywhere.
-   *
-   * @param measuredByDevice per device class, the {@link FrontendPageRoutes#PAGES} routes that
-   *     reached the measurement
-   * @param detailsByDevice per device class, the detail views reached by following a list link —
-   *     reported but never compared, since which one a list renders varies per run
-   * @param uncoveredLists list pages that rendered no row, so their detail view went unmeasured
+   * @param measuredByDevice per device class, the {@link FrontendPageRoutes#PAGES} routes measured
+   * @param detailsByDevice per device class, the detail views reached from a list; reported only
+   * @param uncoveredLists list pages that rendered no row
    * @param findings the sweep's findings, appended to when coverage is short
    */
   private static void reportCoverage(
@@ -557,7 +366,7 @@ class TouchClassLayoutE2eTest {
   }
 
   /**
-   * Runs {@link #measure} and turns any failure to measure into a finding instead of an abort.
+   * Runs {@link #measure}, turning a failure to measure into a finding instead of an abort.
    *
    * @param page the page to navigate
    * @param baseUrl origin of the stack under test
@@ -565,8 +374,7 @@ class TouchClassLayoutE2eTest {
    * @param deviceLabel {@code WxH}
    * @param width viewport width in CSS pixels
    * @param height viewport height in CSS pixels
-   * @param measured collects the paths this device class actually measured, for the coverage
-   *     assertion; a path that skips or throws is deliberately absent from it
+   * @param measured collects the paths actually measured; skipped or failed paths are absent
    * @return the page's findings, or a single line naming why it could not be measured
    */
   private static List<String> measureSafely(
@@ -594,11 +402,7 @@ class TouchClassLayoutE2eTest {
   }
 
   /**
-   * Takes a screenshot, and reports rather than throws when the browser will not produce one.
-   *
-   * <p>The audit's assertion is the measurement; the picture is what lets a reader check the
-   * measurement against something. Losing the picture costs review convenience, losing the
-   * measurement costs the audit — so the two may not share a failure.
+   * Takes a screenshot on the screenshot engine, reporting instead of throwing when it fails.
    *
    * @param page the page to photograph
    * @param options where and how to write the PNG
@@ -622,17 +426,12 @@ class TouchClassLayoutE2eTest {
   }
 
   /**
-   * Finds the first detail link a list page renders under the given prefix — the list's own path,
-   * or the one {@link FrontendPageRoutes#detailPrefixOf} names for a list whose rows link out of
-   * it.
-   *
-   * <p>Matches {@code <listPath>/<id>} where the id looks like a UUID or a number — the two shapes
-   * the frontend's detail routes use — and deliberately ignores the {@code /create}, {@code /new}
-   * and {@code /search} siblings, which are pages in their own right and already in the sweep.
+   * Finds the first detail link {@code <listPath>/<id>} (UUID or numeric id) a list page renders,
+   * ignoring {@code /create}, {@code /new} and {@code /search}.
    *
    * @param page the page currently showing the list
-   * @param listPath the href prefix the detail links carry: the list's own app-relative path, or
-   *     its override from {@link FrontendPageRoutes#DETAIL_PREFIX_OVERRIDES}
+   * @param listPath the href prefix of the detail links, possibly from {@link
+   *     FrontendPageRoutes#DETAIL_PREFIX_OVERRIDES}
    * @return the app-relative path of the first detail view, or {@code null} when the list is empty
    */
   private static String firstDetailLink(Page page, String listPath) {
@@ -797,12 +596,7 @@ class TouchClassLayoutE2eTest {
   }
 
   /**
-   * Prints what was measured, pass or fail.
-   *
-   * <p>The first version of this guard reported clean on five pages whose screenshots were 10-159px
-   * wider than the viewport, and the only reason that was caught is that somebody measured the
-   * PNGs. A guard whose measurements are invisible until it fails cannot be sanity-checked against
-   * the artifacts it writes beside them.
+   * Prints the page-side measurements, whether the page passed or failed.
    *
    * @param where {@code WxH /path}
    * @param probe the page-side measurement
@@ -833,8 +627,7 @@ class TouchClassLayoutE2eTest {
   }
 
   /**
-   * The whole-page geometry rules: does the page fit, does the footer behave, is the chrome budget
-   * respected.
+   * Applies the whole-page geometry rules: page fit, footer behavior and chrome budget.
    *
    * @param where {@code WxH /path}
    * @param probe the page-side measurement
@@ -941,7 +734,7 @@ class TouchClassLayoutE2eTest {
   }
 
   /**
-   * The per-element offender lists the probe collected.
+   * Turns the per-element offender lists the probe collected into findings.
    *
    * @param where {@code WxH /path}
    * @param probe the page-side measurement
@@ -994,12 +787,8 @@ class TouchClassLayoutE2eTest {
   }
 
   /**
-   * The measurement, as one page-side pass.
-   *
-   * <p>It runs in the page rather than through many Playwright round trips because the element set
-   * is large (every element for the cut-off scan) and a per-element {@code boundingBox()} call over
-   * a phone-sized Lager table costs seconds. Elements are described by a short CSS-ish label so a
-   * finding names something a developer can find.
+   * The page-side measurement script, run in one pass; elements are named by a short CSS-like
+   * label.
    */
   private static final String PROBE_JS =
       """

@@ -22,12 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.util.UUID;
 
 /**
- * Frontend mirror of the backend {@code OrgUnitNodeDto}: a flat hierarchy node read by the admin
- * org-structure management page (epic #692, REQ-ORG-014). Carries each org unit's current parent
- * edge ({@code parentOrgUnitId}) and optimistic-lock {@code version} so the management table can
- * render the structure and PATCH a new parent edge from a single read. {@code kind} and {@code
- * department} are plain strings (the backend serialises its enums by name); {@code department} is
- * non-null only for {@code BEREICH} rows.
+ * Frontend mirror of the backend {@code OrgUnitNodeDto}: one org unit with its parent edge and
+ * version, for the admin org-structure page (REQ-ORG-014).
  *
  * @param id the org unit's id.
  * @param name the org unit's display name.

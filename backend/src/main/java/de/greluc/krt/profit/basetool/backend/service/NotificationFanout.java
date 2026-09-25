@@ -24,26 +24,16 @@ import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Cross-replica fan-out seam for the real-time notification push (ADR-0094).
+ * Fan-out of the real-time notification push across backend replicas (ADR-0094).
  *
- * <p>{@link NotificationEventListener} pushes through this seam instead of calling {@link
- * NotificationStreamService#publish(Collection)} directly. The default binding ({@code
- * LocalNotificationFanout}) delivers only to this instance's SSE emitters — byte-for-byte the
- * previous behaviour. The Redis binding ({@code RedisNotificationFanout}) delivers locally first,
- * then publishes the recipient subs on a Redis channel so every backend replica delivers to its own
- * emitters; because local delivery happens first, a Redis outage degrades to exactly the
- * single-instance behaviour and the frontend polling fallback (REQ-NOTIF-006) remains the
- * correctness guarantee.
+ * <p>{@code LocalNotificationFanout} delivers to this instance only; {@code
+ * RedisNotificationFanout} delivers locally first, then via Redis to the other replicas.
  */
 public interface NotificationFanout {
 
   /**
-   * Pushes a real-time notification signal to the given recipients across all backend replicas.
-   * Best-effort: an implementation must not throw to the caller (the originating transaction has
-   * already committed).
-   *
-   * <p>Called once per {@link NotificationSignal}: one event can raise different notification types
-   * for different audiences, so the recipients of one call are the ones being told the same thing.
+   * Pushes a notification signal to the given recipients across all backend replicas; must not
+   * throw.
    *
    * @param recipientUserIds the Keycloak subjects of the users to notify
    * @param signal what those recipients are being told, or {@link NotificationSignal#refreshOnly()}

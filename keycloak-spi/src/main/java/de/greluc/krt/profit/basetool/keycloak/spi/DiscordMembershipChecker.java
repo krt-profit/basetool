@@ -33,18 +33,11 @@ import org.jetbrains.annotations.Nullable;
 import org.keycloak.util.JsonSerialization;
 
 /**
- * Pure, side-effect-free decision logic for the Discord guild + KRT-Mitglied membership gate
- * (REQ-SEC-016). Calls {@code GET {apiBaseUrl}/users/@me/guilds/{guildId}/member} with the user's
- * own brokered access token and decides whether the login may proceed.
+ * Decision logic of the Discord guild and KRT-Mitglied membership gate (REQ-SEC-016).
  *
- * <p><strong>Fails closed.</strong> The login is admitted ({@link Result#ALLOWED}) <em>only</em> on
- * HTTP 200 whose {@code roles[]} contains the configured role id (matched by numeric id as a JSON
- * string). A clean HTTP 404 means "not in the guild" ({@link Result#DENIED_NOT_MEMBER}). Every
- * other outcome — 5xx, 401/403, a malformed body, a network error or timeout, or a 429 once the
- * retry budget is exhausted — is a fail-closed denial ({@link Result#DENIED_ERROR}). All three
- * non-allow results deny access; the distinction exists only for non-PII logging.
- *
- * <p>This class never logs the token, the response body, or any Discord id.
+ * <p>Fails closed: only HTTP 200 whose {@code roles[]} contains the configured role id yields
+ * {@link Result#ALLOWED}; 404 yields {@link Result#DENIED_NOT_MEMBER}, anything else {@link
+ * Result#DENIED_ERROR}. Never logs the token, the body or any Discord id.
  */
 @JBossLog
 @RequiredArgsConstructor
@@ -90,24 +83,17 @@ public class DiscordMembershipChecker {
   }
 
   /**
-   * Performs the one guild-member read of a first login and returns the membership decision
-   * together with the member object it was taken from.
+   * Reads the guild member once and returns the membership decision with the member JSON it was
+   * based on, so a first login needs exactly one Discord call.
    *
-   * <p>Exists so the first-login gate needs exactly one Discord call. It used to read the same
-   * {@code /users/@me/guilds/{guildId}/member} twice — once here for the roles, once more through
-   * {@link DiscordGuildNicknameReader} for the nickname — which doubled the rate-limit budget a
-   * login spends and let the two answers disagree. The body is handed back only on an {@link
-   * Result#ALLOWED} decision, i.e. only from a clean HTTP 200 that parsed; a caller derives the
-   * nickname from it with {@link DiscordGuildNicknameReader#extractNick(String)}.
-   *
-   * <p>The fail-closed contract is unchanged: every outcome other than a 200 carrying the role is a
-   * denial, and a denial carries no body.
+   * <p>The body is returned only on {@link Result#ALLOWED}; the caller can derive the nickname with
+   * {@link DiscordGuildNicknameReader#extractNick(String)}.
    *
    * @param apiBaseUrl Discord API base URL, e.g. {@code https://discord.com/api/v10}
-   * @param guildId the required guild (server) id
-   * @param roleId the required role id (numeric snowflake, as a string)
-   * @param accessToken the user's brokered Discord access token (scope {@code guilds.members.read})
-   * @return the decision, plus the member JSON when (and only when) the login is allowed
+   * @param guildId the required guild id
+   * @param roleId the required role id, as a string
+   * @param accessToken the user's brokered Discord access token
+   * @return the decision, plus the member JSON only when the login is allowed
    */
   public @NotNull MemberLookup lookup(
       @NotNull String apiBaseUrl,
@@ -160,8 +146,7 @@ public class DiscordMembershipChecker {
   }
 
   /**
-   * The outcome of one guild-member read: the membership decision and, on an allowed login only,
-   * the raw member JSON it was decided from. Never logged — the body carries Discord ids and names.
+   * Outcome of one guild-member read; never logged.
    *
    * @param result the fail-closed membership decision
    * @param memberBody the guild-member JSON on {@link Result#ALLOWED}; {@code null} on any denial

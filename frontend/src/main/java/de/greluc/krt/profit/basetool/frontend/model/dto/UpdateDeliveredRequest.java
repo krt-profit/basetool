@@ -23,9 +23,8 @@ import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 
 /**
- * Frontend mirror of the backend delivered-toggle request. Since Variante C (REQ-INV-027) {@code
- * delivered} lives on the per-order job-order slice, so {@code jobOrderId} names the earmarked
- * order whose slice to flip; {@code version} is the owning entry's optimistic-locking token.
+ * Frontend mirror of the backend delivered-toggle request, flipping the delivered state of one job
+ * order's slice of an inventory entry (REQ-INV-027).
  *
  * @param delivered the new delivered state of the order's slice
  * @param jobOrderId the earmarked job order whose slice to toggle

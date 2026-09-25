@@ -49,13 +49,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Builds the bank dashboard payload (epic #556, REQ-BANK-016): one KPI card per visible account
- * with balance, 30-day delta and the daily balance series for the server-rendered sparkline, plus
- * the management-only totals strip. Everything derives from THREE statements — the account list,
- * one grouped balance query and one windowed posting-slice query — never from per-account
- * round-trips (REQ-DATA-003). The per-account delta and sparkline series are derived via {@link
- * BankTrendCalculator}, the same helper the org-unit balance page uses, so both surfaces show an
- * identical 30-day trend.
+ * Builds the bank dashboard payload (REQ-BANK-016): a KPI card per visible account with balance,
+ * 30-day delta and sparkline series, plus the management-only totals strip.
+ *
+ * <p>Uses three statements regardless of account count (REQ-DATA-003) and derives trends via {@link
+ * BankTrendCalculator}.
  */
 @Service
 @RequiredArgsConstructor

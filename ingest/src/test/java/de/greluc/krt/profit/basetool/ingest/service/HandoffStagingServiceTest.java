@@ -88,9 +88,8 @@ class HandoffStagingServiceTest {
   }
 
   /**
-   * The single-use consume, as the frontend performs it: an atomic {@code GETDEL} on {@code
-   * ingest:handoff:<sub>:<id>}. It lived on the gateway's service although only these tests called
-   * it; it now lives here, reading the frontend's key schema (ING-PERF-02).
+   * Consumes a staged handoff the way the frontend does: an atomic {@code GETDEL} on {@code
+   * ingest:handoff:<sub>:<id>}.
    *
    * @param sub the subject to consume under
    * @param handoffId the handoff id
@@ -145,11 +144,8 @@ class HandoffStagingServiceTest {
   }
 
   /**
-   * Audit HIGH-2: the staging store shares the Redis instance that holds the frontend's Spring
-   * Session store, and that instance runs {@code --maxmemory-policy noeviction} - reaching the
-   * ceiling refuses writes, so the symptom is that nobody can log in. Staging had no per-subject
-   * quota at all: only a rate limit of 30 requests/minute against a 30-minute TTL, i.e. up to 900
-   * live entries of up to the 2 MiB ingress cap each.
+   * Staging beyond the per-subject cap evicts the oldest handoffs, bounding the memory used in the
+   * shared, non-evicting Redis instance.
    */
   @Test
   void shouldEvictTheOldestHandoffsBeyondThePerSubjectCap() {

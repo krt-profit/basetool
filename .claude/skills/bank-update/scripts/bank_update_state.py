@@ -1,12 +1,7 @@
 #!/usr/bin/env python3
 """Remember which month the last bank update covered, so the next run needs no argument.
 
-The marker lives in the **shared git directory** (``git rev-parse --git-common-dir``),
-which is the same location from the main checkout and from every ``git worktree`` and
-sits outside every working tree. That matters here for the same reason it does for the
-release notes: each session runs in a throwaway worktree, and git-ignored files do not
-travel between worktrees — a marker in the working tree would be invisible to the next
-run and the resume would fail silently.
+The marker lives in the shared git directory, so every worktree sees the same one.
 
 Usage:
     python .claude/skills/bank-update/scripts/bank_update_state.py --show

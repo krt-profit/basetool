@@ -39,13 +39,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
- * Page controller for the org-unit blueprint availability overview (#364): renders which blueprints
- * are available among the members of the caller's oversight org units, and proxies the lazy owner
- * drill-down. The backend ({@code /api/v1/personal-blueprints/overview}) is the security boundary —
- * it returns data only to admins, officers (their Staffel) and Spezialkommando leads (their SK);
- * the sidebar entry is hidden from everyone else via the {@code canSeeBlueprintOverview} model
- * attribute. A direct hit by a non-eligible caller degrades to an empty page rather than a stack
- * trace.
+ * Page controller for the org-unit blueprint availability overview and its lazy owner drill-down.
+ * The backend enforces access; a non-eligible caller gets an empty page.
  */
 @Controller
 @UsesLayoutModel
@@ -76,23 +71,17 @@ public class BlueprintOverviewPageController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Renders one server-side page of the blueprint availability list (one row per product, with the
-   * owning-member count and a lazy owner drill-down). {@code size} is restricted to {@link
-   * #PAGE_SIZES} so the query string cannot turn the page into the unbounded fetch this view used
-   * to do; the optional {@code search} is relayed to the backend, which filters before pagination
-   * so the search spans every entry. A backend failure collapses to an empty list plus an error
-   * banner.
+   * Renders one page of the blueprint availability list. {@code size} is limited to {@link
+   * #PAGE_SIZES}; {@code search} is filtered by the backend before pagination. A backend failure
+   * yields an empty list plus an error banner.
    *
    * @param page zero-based page index, defaulted/clamped to 0
    * @param size requested page size; only {@link #PAGE_SIZES} are honoured
    * @param search optional case-insensitive product-name fragment
-   * @param fragment when {@code "results"} only the table + pagination fragment is rendered (AJAX
-   *     filter/paging swap, REQ-FE-002); otherwise the full page is returned
-   * @param model Thymeleaf model populated with the page content, the page envelope ({@code
-   *     overviewPage}), and the echoed {@code search}/{@code pageSizes} for the filter form and
-   *     size picker
-   * @return the {@code blueprint-overview} view name, or its {@code results} fragment for an AJAX
-   *     swap request
+   * @param fragment {@code "results"} renders only the table + pagination fragment (REQ-FE-002)
+   * @param model model populated with the page content, {@code overviewPage}, {@code search} and
+   *     {@code pageSizes}
+   * @return the {@code blueprint-overview} view name, or its {@code results} fragment
    */
   @NotNull
   @GetMapping
@@ -129,9 +118,7 @@ public class BlueprintOverviewPageController {
   }
 
   /**
-   * Lazy owner drill-down proxy: relays to the backend owners endpoint for one product and returns
-   * the in-scope owners' display names as JSON. Failures collapse to an empty list so the expand
-   * panel renders a graceful "no data" state rather than a stack trace.
+   * Relays the lazy owner drill-down for one product as JSON.
    *
    * @param productKey the normalized product key whose owners to list
    * @return the owning in-scope members, or an empty list on any backend failure

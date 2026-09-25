@@ -30,9 +30,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
- * Unit tests for {@link OptimisticLock}, the version-check helper family (S2, #908). One nested
- * class per null/equality shape pins the exact skip-vs-409 semantics the migrated call sites relied
- * on, plus the entity-type + identifier carried on the thrown 409.
+ * Unit tests for {@link OptimisticLock}, pinning the skip-vs-409 semantics per null/equality shape
+ * and the entity type and identifier carried on the thrown 409.
  */
 class OptimisticLockTest {
 
@@ -82,9 +81,8 @@ class OptimisticLockTest {
   }
 
   /**
-   * A primitive-{@code long} client version autoboxes to {@code Long} and flows through {@link
-   * OptimisticLock#check(Long, Long, Class, Object)} with byte-identical results — the path the
-   * former primitive-{@code !=} call sites (e.g. the org-unit bank access helper) now take.
+   * A primitive {@code long} client version autoboxes and flows through {@link
+   * OptimisticLock#check(Long, Long, Class, Object)} with identical results.
    */
   @Nested
   class PrimitiveClientVersion {

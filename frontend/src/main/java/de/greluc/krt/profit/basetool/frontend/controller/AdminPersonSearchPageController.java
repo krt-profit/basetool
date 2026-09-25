@@ -37,19 +37,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 /**
- * The admin Personensuche page ({@code /admin/person-search}, REQ-SEC-060).
+ * The admin Personensuche page ({@code /admin/person-search}, REQ-SEC-060), which finds every place
+ * a name appears so a rectification or erasure request can cover all of them.
  *
- * <p>Find every place a name appears, so an Art. 16 rectification or an Art. 17 erasure can cover
- * all of them. {@code docs/privacy/data-subject-requests.md} tells the reader to run it for
- * <b>every</b> such request, including from a member — a member's handle can sit in a free-text
- * field that no foreign key connects to their account.
- *
- * <p>ADMIN only, and not only because the sweep is expensive: the result is a profile of one person
- * assembled across the whole system.
- *
- * <p><b>The search term never reaches a log line here.</b> It is somebody's name, and the request
- * log already records the path; a debug line quoting the term would put the name of every searched
- * person into the log stream, which the observability rules forbid outright (REQ-OBS-004).
+ * <p>ADMIN only. The search term is a person's name and is never logged (REQ-OBS-004).
  */
 @Controller
 @UsesLayoutModel

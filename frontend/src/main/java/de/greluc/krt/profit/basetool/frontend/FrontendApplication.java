@@ -24,24 +24,11 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 
 /**
- * Spring Boot entry point for the Frontend module.
+ * Spring Boot entry point for the frontend module.
  *
- * <p>Excludes two auto-configurations pulled in only transitively:
- *
- * <ul>
- *   <li>{@code SpringBoot3VerifierAutoConfiguration} — the Resilience4j startup verifier, not
- *       wanted here.
- *   <li>{@code DataWebAutoConfiguration} — Spring Data's {@code @EnableSpringDataWebSupport},
- *       dragged in transitively via {@code spring-data-redis} (session store). This module does no
- *       Spring Data web binding at all (no {@code Pageable}/{@code Sort}/projection parameters; the
- *       backend is paged through the module's own {@code PageResponse} DTO), so its {@code
- *       ProxyingHandlerMethodArgumentResolver} is dead weight — and it emits a WARN ("not annotated
- *       with @ProjectedPayload") for every interface-typed {@code @ModelAttribute} parameter, which
- *       {@link de.greluc.krt.profit.basetool.frontend.config.OrgUnitContextAdvice} legitimately
- *       uses to cross-inject its already-loaded {@code List<…>} catalogues. Dropping the unused
- *       auto-config removes that false-positive at the source rather than muting the logger
- *       (REQ-OBS-015, #1202).
- * </ul>
+ * <p>Excludes the Resilience4j startup verifier and Spring Data's {@code DataWebAutoConfiguration},
+ * both unused here; the latter logs false-positive warnings for interface-typed
+ * {@code @ModelAttribute} parameters (REQ-OBS-015).
  */
 @SpringBootApplication(
     exclude = {

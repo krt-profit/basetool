@@ -24,12 +24,9 @@ import jakarta.validation.constraints.Size;
 import java.util.UUID;
 
 /**
- * Inbound request payload for the Add Unit operation.
- *
- * <p>{@code name} is the required display name of the unit (owner decision 2026-07-03): it is the
- * unit's single mandatory field, while the ship type and ship stay optional. {@code
- * responsibleUserId} optionally pins an explicit responsible person (otherwise the UI falls back to
- * the ship owner); {@code note} is a free-text planning note.
+ * Request payload to add a unit: a required display {@code name}, optional ship type and ship, an
+ * optional explicit {@code responsibleUserId} (otherwise the ship owner applies) and a free-text
+ * {@code note}.
  */
 public record AddUnitRequest(
     @NotBlank @Size(max = 255) String name,

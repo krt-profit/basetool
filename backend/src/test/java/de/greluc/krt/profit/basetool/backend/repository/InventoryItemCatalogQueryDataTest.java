@@ -49,18 +49,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Data-level regressions for the §4.4 remediation list of the item-inventory design (V220,
- * REQ-INV-029, ADR-0101) against the real Postgres test schema: with {@code material_id} nullable,
- * every historically material-only read seam must exclude game-item rows explicitly, and the
- * runtime {@code material.name} sort — smuggled in via the Pageable rather than the JPQL — must not
- * decide row visibility through its implicit-join trap. Each test seeds a NULL-material (item) row
- * next to a material row and pins the seam to its own catalog population; before the remediation
- * several of these queries silently dropped rows (releasable picker, flat lists under the default
- * sort) or would have 500ed their consumer with a null material (Materialsammlung, order stock
- * index).
- *
- * <p>{@link Transactional} so each method rolls back — the seeded rows never commit to the shared
- * Testcontainers database.
+ * Verifies against PostgreSQL that material-only inventory reads exclude game-item rows and that a
+ * {@code material.name} sort does not drop rows (REQ-INV-029). Each test rolls back.
  */
 @SpringBootTest
 @ActiveProfiles("test")

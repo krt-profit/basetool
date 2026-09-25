@@ -51,17 +51,14 @@ import org.springframework.validation.BindingResult;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
- * Pure-Mockito unit tests for {@link ProfileController}. The full Thymeleaf-rendering MVC
- * integration is covered separately in {@code ProfileControllerMvcTest}; here we focus on:
+ * Mockito unit tests for {@link ProfileController}.
  *
  * <ul>
- *   <li>The unauthenticated branch (no principal → redirect home).
- *   <li>OIDC-claim-vs-backend precedence: backend overwrites token claims.
- *   <li>Join-date parsing and the months-in-squadron computation.
- *   <li>POST /profile/description happy / validation-error / optimistic- lock / generic-error
- *       branches — these decide which toast the user sees and whether the form re-renders or
- *       redirects.
- *   <li>Multi-valued OIDC claim handling (Keycloak returns lists for some custom claims).
+ *   <li>Unauthenticated callers are redirected home.
+ *   <li>Backend data overrides OIDC token claims.
+ *   <li>Join-date parsing and months-in-squadron computation.
+ *   <li>POST /profile/description success, validation, optimistic-lock and generic-error branches.
+ *   <li>Multi-valued OIDC claims.
  * </ul>
  */
 @ExtendWith(MockitoExtension.class)

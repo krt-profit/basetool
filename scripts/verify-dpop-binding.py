@@ -1,37 +1,23 @@
 #!/usr/bin/env python3
 """Verify that the realm's refresh-token DPoP binding actually holds.
 
-`provision-keycloak-mobile-client.py` asserts the client's **configuration**: the profile exists,
-the executor is right, `dpop.bound.access.tokens` is false. None of that proves the realm *behaves*
-that way, and the difference is the entire security value of ADR-0131 / REQ-SEC-030.
-
-This script measures the behaviour, end to end, the way the app performs it — authorization code
-with PKCE S256 and `dpop_jkt`, then four token calls:
+Runs authorization code with PKCE S256 and `dpop_jkt`, then four token calls (ADR-0131,
+REQ-SEC-030):
 
   1. code exchange with the key         -> expect a grant, `token_type: Bearer`
   2. refresh with the same key          -> expect a grant
   3. refresh with NO proof              -> expect a refusal
   4. refresh with a DIFFERENT key       -> expect a refusal
 
-3 and 4 are the point. If either is granted, the binding is decoration: a refresh token lifted off
-a device would work anywhere — exactly what a sender-constrained token exists to prevent. RFC 9700
-requires a public client's refresh token to be rotated or sender-constrained, and rotation is off
-realm-wide (REQ-SEC-012 / ADR-0019 amendment 4), so this binding is the only thing standing there.
+The refresh token must carry `cnf.jkt` and the access token must not.
 
-The run also prints the `cnf.jkt` of both tokens. The refresh token must carry one and the access
-token must not: Spring Security's bearer filter rejects a `cnf`-bound access token outright, so that
-split is what lets the backend stay unchanged.
-
-Run it against a **test** realm — it performs a real login and needs a password:
+Run it against a test realm; it performs a real login:
 
     python scripts/verify-dpop-binding.py \\
         --issuer http://127.0.0.1:18080/auth/realms/iri \\
         --username test-member --password test-member-pw
 
-Exit code 0 when all measurements match, 1 otherwise, so it can gate a release once the client is
-provisioned in production.
-
-Requires `requests` and `cryptography`.
+Exit code 0 when all measurements match, 1 otherwise. Requires `requests` and `cryptography`.
 """
 
 import argparse
@@ -53,7 +39,7 @@ HTTP_TIMEOUT_SECONDS = 15
 
 
 def b64url(raw: bytes) -> str:
-    """Encodes bytes the only way JOSE does.
+    """Encodes bytes as JOSE base64url.
 
     :param raw: bytes to encode
     :returns: base64url without padding
@@ -132,10 +118,6 @@ def authorization_code(issuer: str, client_id: str, redirect_uri: str,
     )
     page.raise_for_status()
 
-    # Keycloak marks its session cookies Secure. A browser still sends those to http://127.0.0.1,
-    # because localhost counts as a secure context; `requests` implements no such exception, drops
-    # them silently, and Keycloak then refuses the login POST with `cookie_not_found`. Cleared in
-    # this client's own jar only — nothing about the server changes, and over https it is a no-op.
     for cookie in session.cookies:
         cookie.secure = False
 

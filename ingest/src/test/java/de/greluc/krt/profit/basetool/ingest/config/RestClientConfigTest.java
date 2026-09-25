@@ -45,16 +45,10 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 /**
- * Covers the profile-gated TLS trust of the gateway's two outbound clients (audit finding M-13)
- * after the move from WebClient to {@code RestClient} on the JDK client (ADR-0204), against a real
- * HTTPS server.
- *
- * <p>The certificates are throwaways minted in memory for {@code backend} — deliberately NOT for
- * {@code localhost}, the name the tests dial — so every case separates the two checks the old
- * Reactor Netty client made independently: whether the chain is trusted, and whether the hostname
- * is verified. The backend relay must accept a pinned-but-misnamed certificate (the service-alias
- * cert has no matching SAN) and still refuse an unpinned one; the Keycloak client must refuse the
- * misnamed one even though its chain is pinned, because it verifies the hostname.
+ * Integration tests for the profile-gated TLS trust of the gateway's two outbound {@code
+ * RestClient}s (ADR-0204) against a real HTTPS server with a certificate issued for {@code
+ * backend}: the backend relay accepts a pinned but misnamed certificate and refuses an unpinned
+ * one, while the Keycloak client also verifies the hostname.
  */
 class RestClientConfigTest {
 

@@ -78,14 +78,10 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 
 /**
- * Coverage for {@link InventoryItemService#bookOutInventoryItem} — the money- and security-critical
- * "check out" flow that combines optimistic locking, owner-vs-admin authorisation, amount
- * validation, CheckoutType inference (DISCARD / TRANSFER / SELL), partial-vs-full deletion, and the
- * {@code MissionFinanceEntry} side effect for SELL.
- *
- * <p>Coverage analysis flagged this as the largest concentrated branch gap in the service package
- * (19/28 branches uncovered). A bug here means wrong ownership decisions, lost inventory, or
- * double-counted income.
+ * Unit tests for {@link InventoryItemService#bookOutInventoryItem}: optimistic locking,
+ * owner-versus-admin authorisation, amount validation, {@code CheckoutType} inference (DISCARD /
+ * TRANSFER / SELL), partial versus full deletion, and the {@code MissionFinanceEntry} side effect
+ * of a SELL.
  */
 @ExtendWith(MockitoExtension.class)
 class InventoryItemServiceBookOutTest {
@@ -1329,8 +1325,8 @@ class InventoryItemServiceBookOutTest {
   }
 
   /**
-   * Builds a game-item stock row sharing the fixture identity (owner, location, non-personal):
-   * gameItem set, material and quality {@code null} — the V220 catalog shape (REQ-INV-029).
+   * Builds a game-item stock row with the fixture identity: game item set, material and quality
+   * {@code null} (REQ-INV-029).
    *
    * @param amount the row's amount
    * @param version the row's optimistic-lock version

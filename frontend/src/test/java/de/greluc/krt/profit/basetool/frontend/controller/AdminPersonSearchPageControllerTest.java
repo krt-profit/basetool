@@ -40,21 +40,9 @@ import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 
 /**
- * Mockito tests for {@link AdminPersonSearchPageController} (REQ-SEC-060).
- *
- * <p>The behaviours pinned here are the ones a later refactor could quietly break without any page
- * looking wrong: the too-short term never reaches the backend, the term is bound as a URI-template
- * variable so it is percent-encoded exactly once, the casing the admin typed is relayed untouched
- * (the backend matches case-insensitively — normalising it here would make that guarantee depend on
- * two places instead of one), and a backend failure leaves {@code searched} false so the page says
- * "failed" rather than "no mentions found".
- *
- * <p>The encoding test is a regression. The term used to be run through {@code URLEncoder} and then
- * concatenated into the URI, which WebClient's default {@code TEMPLATE_AND_VALUES} mode encoded a
- * second time: the backend received the literal escape sequence, its wildcard escaping turned those
- * {@code %} into {@code \\%}, and {@code ILIKE} matched nothing. Every term with an umlaut returned
- * no hits — and on this surface no hits reads as "this person appears nowhere", which is the answer
- * an admin acts on when serving an Art. 16 rectification.
+ * Mockito tests for {@link AdminPersonSearchPageController} (REQ-SEC-060): a too-short term never
+ * reaches the backend, the term is sent once-encoded as a URI-template variable with its casing
+ * untouched, and a backend failure leaves {@code searched} false.
  */
 class AdminPersonSearchPageControllerTest {
 

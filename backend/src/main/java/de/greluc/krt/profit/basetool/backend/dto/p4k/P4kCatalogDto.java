@@ -23,16 +23,11 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.List;
 
 /**
- * Root of the single JSON catalog the external "KRT P4K Reader" tool produces from the game's
- * {@code Data/Game2.dcb} (DataForge). An admin uploads this object and {@code P4kImportService}
- * enriches the matching {@code game_item} / {@code ship_type} / {@code manufacturer} / {@code
- * material} / {@code blueprint} rows by the DataForge {@code __ref} GUID — it never mass-seeds
- * rows.
+ * Root of the P4K catalog JSON that the external "KRT P4K Reader" builds from the game's {@code
+ * Data/Game2.dcb}; {@code P4kImportService} uses it to enrich existing rows by GUID, never to seed
+ * new ones.
  *
- * <p>Field names are camelCase and map 1:1 to the JSON keys, so no {@code @JsonProperty} is needed.
- * {@code @JsonIgnoreProperties(ignoreUnknown = true)} ignores the {@code meta} block (and any
- * forward-compatible additions) the importer does not consume. Any array may be {@code null} or
- * absent; the service treats a missing array as empty.
+ * <p>Any array may be {@code null} or absent and is then treated as empty.
  *
  * @param manufacturers manufacturer records (joined on {@code scwiki_uuid} / {@code abbreviation})
  * @param items item records (joined on {@code game_item.external_uuid} / {@code class_name})

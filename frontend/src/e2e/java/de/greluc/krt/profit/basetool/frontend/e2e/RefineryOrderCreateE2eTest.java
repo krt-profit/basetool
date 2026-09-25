@@ -137,14 +137,8 @@ class RefineryOrderCreateE2eTest {
   }
 
   /**
-   * Regression: narrowing the input-material picker by typing and committing the sole match with
-   * ENTER — without clicking the dropdown row — must prefill the read-only output material, exactly
-   * as a mouse pick does.
-   *
-   * <p>The combobox's rendered-row list used to carry only each option's value and label, so the
-   * keyboard commit paths mirrored an option with no metadata onto the hidden input and {@code
-   * updateOutputMaterial} read an empty {@code data-refined-name}, leaving the output display at
-   * its "-" placeholder while the input showed a correctly picked material.
+   * Verifies that committing the sole match of the input-material picker with ENTER prefills the
+   * read-only output material, as a mouse pick does.
    */
   @Test
   void keyboardPickPrefillsTheOutputMaterial() {

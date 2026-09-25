@@ -43,18 +43,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * The member's own side of the Art. 17 erasure request (REQ-SEC-061): raise one, read it, take it
- * back.
+ * The caller's own side of the Art. 17 erasure request: raise, read and withdraw it (REQ-SEC-061).
  *
- * <p>Every endpoint derives the subject from the caller's token and <b>never</b> accepts a user id.
- * That is not a convenience — it is what makes the surface safe to expose to every member: there is
- * no parameter with which one member could raise, read or withdraw another member's request, so
- * there is nothing for an authorization check to get wrong.
- *
- * <p>Nothing here deletes anything. The request lands in an admin queue ({@code
- * AdminDeletionRequestController}), because the deletion removes the Keycloak account and purges
- * the member's warehouse stock and hangar while reassigning their missions and refinery orders
- * (REQ-DATA-008) — irreversibly, and a mis-click must not start it (ADR-0181).
+ * <p>The subject is always derived from the token; no endpoint accepts a user id. Nothing here
+ * deletes anything: the request lands in the admin queue ({@code AdminDeletionRequestController}).
  */
 @RestController
 @RequestMapping("/api/v1/users/me/deletion-request")
@@ -65,16 +57,8 @@ public class DeletionRequestController {
   private final UserService userService;
 
   /**
-   * Returns the caller's most recent erasure request, or {@code 204 No Content} when they have
-   * never made one.
-   *
-   * <p>{@code 204} rather than an empty body with {@code 200}: "I have never asked" is the normal
-   * state for almost every member almost all of the time, and the profile page renders a different
-   * control for it.
-   *
-   * <p><b>Not restricted to pending requests.</b> A refused request carries the admin's reasoning,
-   * and Art. 12(4) obliges the controller to tell the requester why — so the refusal has to be
-   * readable somewhere, and this is that somewhere.
+   * Returns the caller's most recent erasure request in any state, including a refused one with its
+   * reasoning, or {@code 204 No Content} when they have never made one.
    *
    * @param jwt the caller's validated token
    * @return the caller's latest request, or no content
@@ -100,14 +84,11 @@ public class DeletionRequestController {
   }
 
   /**
-   * Raises the caller's erasure request.
-   *
-   * <p>Idempotent: a member who submits twice gets their existing request back rather than a second
-   * queue entry, guaranteed by a partial unique index rather than by a check.
+   * Raises the caller's erasure request; idempotent, returning the existing open request on a
+   * repeat submit.
    *
    * @param jwt the caller's validated token
-   * @param request whether the surviving handle snapshots should be anonymised as well — a wish an
-   *     admin decides deliberately
+   * @param request whether the surviving handle snapshots should be anonymised as well
    * @return the caller's open request
    */
   @NotNull
@@ -148,12 +129,11 @@ public class DeletionRequestController {
   }
 
   /**
-   * Projects a request for the wire.
+   * Maps a deletion request to its wire DTO.
    *
    * @param request the persisted request
-   * @param handle the requesting member's handle, or {@code null} to leave it out (the member's own
-   *     projection does not need to be told who they are)
-   * @return the DTO
+   * @param handle the requesting member's handle, or {@code null} to leave it out
+   * @return the request DTO
    */
   @NotNull
   static DeletionRequestDto toDto(@NotNull DeletionRequest request, @Nullable String handle) {

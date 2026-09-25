@@ -44,12 +44,11 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.UnmodifiableView;
 
 /**
- * An admin-managed rule mapping a {@link #eventType} to the recipients (via {@link #selectors}) who
- * should receive a {@link #notificationType} notification when that event fires.
+ * An admin-managed rule that maps an {@link #eventType} to the recipients resolved by {@link
+ * #selectors}, who receive a {@link #notificationType} notification when that event fires
+ * (REQ-NOTIF-007).
  *
- * <p>Rules are data, not code: admins create, edit, enable/disable and delete them at runtime
- * (REQ-NOTIF-007), which is what makes the system extensible without redeploys. {@link
- * #excludeActor} drops the user who triggered the event from the resolved recipients.
+ * <p>{@link #excludeActor} drops the triggering user from the recipients.
  */
 @Entity
 @Table(name = "notification_rule")

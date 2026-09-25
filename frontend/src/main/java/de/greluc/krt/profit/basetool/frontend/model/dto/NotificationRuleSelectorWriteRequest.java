@@ -22,8 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.util.UUID;
 
 /**
- * Frontend mirror of the backend {@code NotificationRuleSelectorWriteRequest}. Enum-typed fields
- * are sent as {@link String}; field names match the backend record (mirror-DTO rule).
+ * Frontend mirror of the backend {@code NotificationRuleSelectorWriteRequest}; enum fields are sent
+ * as {@link String}.
  *
  * @param kind selector kind
  * @param userId target user for {@code SPECIFIC_USER}

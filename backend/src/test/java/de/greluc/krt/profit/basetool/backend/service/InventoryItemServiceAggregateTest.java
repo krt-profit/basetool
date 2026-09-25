@@ -62,28 +62,16 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Coverage for {@link InventoryItemService#getAllAggregatedInventory} and the private assembly
- * helpers ({@code buildGroupedFromStacks} / {@code buildMaterialGroup} / {@code mapAggregateRefs}).
- * Since the append-only Lager moved its grouping and aggregate math into SQL (ADR-0003,
- * REQ-INV-002), the database now returns one {@link InventoryStackAggregate} per stock identity
- * with {@code SUM(amount)}, the amount-weighted quality sum, {@code MAX(quality)} and the entry
- * count already computed. This unit test therefore verifies the two remaining service
- * responsibilities over a mocked repository:
+ * Unit tests for {@link InventoryItemService#getAllAggregatedInventory} over a mocked repository
+ * returning SQL-computed {@link InventoryStackAggregate}s (ADR-0003, REQ-INV-002):
  *
  * <ul>
- *   <li>filter routing: each of {@code materialIds} / {@code minQuality} / {@code jobOrderIds} /
- *       {@code missionIds} flips the corresponding {@code hasX} flag and is or isn't forwarded to
- *       {@link InventoryItemRepository#findGlobalStacks};
- *   <li>assembly: the per-stack aggregates are grouped into materials, each stack's mean quality is
- *       derived as {@code weightedQualitySum / totalAmount} (rounded HALF_UP to two decimals), the
- *       stacks are ordered quality-desc / location-asc / amount-desc, and the materials are ordered
- *       alphabetically — with the material-wide totals accumulated from the raw SQL sums.
+ *   <li>filter routing: each filter sets its {@code hasX} flag and is forwarded to {@link
+ *       InventoryItemRepository#findGlobalStacks} as appropriate;
+ *   <li>assembly: stacks group into materials, mean quality is {@code weightedQualitySum /
+ *       totalAmount} rounded HALF_UP to two decimals, stacks sort quality desc / location asc /
+ *       amount desc, and materials sort alphabetically.
  * </ul>
- *
- * <p>The correctness of the SQL grouping itself (that two rows differing only in owning squadron or
- * the personal flag form separate stacks, that the {@code GROUP BY} executes on Postgres) is a
- * data-layer concern covered by {@code InventoryItemStackQueryTest} and the seeded integration
- * tests, not by this mocked unit.
  */
 @ExtendWith(MockitoExtension.class)
 class InventoryItemServiceAggregateTest {

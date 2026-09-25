@@ -25,9 +25,8 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Frontend mirror of the backend's bank-account payload (epic #556). The type and status arrive as
- * enum names rendered through i18n keys ({@code bank.account.type.*} / {@code
- * bank.account.status.*}); the balance is the backend's compute-on-read sum.
+ * Frontend mirror of the backend's bank-account payload; type and status arrive as enum names
+ * rendered through {@code bank.account.type.*} and {@code bank.account.status.*} keys.
  *
  * @param id the account's id
  * @param accountNo server-generated display number ({@code KB-0042})
@@ -38,7 +37,7 @@ import org.jetbrains.annotations.Nullable;
  * @param orgUnit owning org unit reference for org-unit accounts, else {@code null}
  * @param areaName free-form Bereich name for area accounts, else {@code null}
  * @param balance current balance (signed whole aUEC)
- * @param balanceTarget aspirational balance goal (REQ-BANK-036), or {@code null} when none is set
+ * @param balanceTarget balance goal (REQ-BANK-036), or {@code null} when none is set
  * @param employeeApprovalCeiling the KRT-account bank-employee approval ceiling T1 (REQ-BANK-047),
  *     or {@code null} for a non-CARTEL / unconfigured account
  * @param areaLeadApprovalCeiling the KRT-account Bereichsleiter-Profit ceiling T2 (REQ-BANK-047),

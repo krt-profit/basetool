@@ -39,18 +39,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The bank's booking validation guards (extracted from {@link BankLedgerService}, #1253): the
- * pre-persist checks a booking must pass before {@link BankPostingWriter} writes any ledger row —
- * account/holder status, the conditional Begr&uuml;ndung requirement, the account-level
- * no-overdraft invariant (REQ-BANK-006), the fee-inclusive {@code amount > fee} rule (#999) and the
- * KRT-account direct-booking cap (REQ-BANK-047). Each throws a {@link BankConflictException} (or
- * {@link de.greluc.krt.profit.basetool.backend.exception.BadRequestException}) with a stable code;
- * none mutates state, so the guards leave the ledgers untouched and only reject or pass.
+ * Pre-persist validation guards a booking must pass before {@link BankPostingWriter} writes any
+ * ledger row: account and holder status, the conditional Begr&uuml;ndung, the account-level
+ * no-overdraft rule (REQ-BANK-006), the fee-inclusive {@code amount > fee} rule and the KRT-account
+ * direct-booking cap (REQ-BANK-047).
  *
- * <p>The overdraft guard ({@link #requireAccountCoverage}) reads the balance while the account row
- * is locked by the surrounding {@code BankLedgerService} booking transaction, so concurrent
- * bookings cannot jointly overdraw. The <strong>holder</strong> dimension is deliberately unguarded
- * (ADR-0039) — a holder balance may go negative — so no method here checks holder coverage.
+ * <p>Each guard throws a {@link BankConflictException} (or {@link
+ * de.greluc.krt.profit.basetool.backend.exception.BadRequestException}) with a stable code and
+ * never mutates state. Holder balances may go negative and are not guarded (ADR-0039).
  */
 @Service
 @RequiredArgsConstructor
@@ -77,12 +73,9 @@ public class BankBookingGuards {
   }
 
   /**
-   * Enforces the conditional Begr&uuml;ndung rule (REQ-BANK-045) for a debit (withdrawal/transfer)
-   * leaving the given account: when the account type {@linkplain
-   * BankAccountType#requiresDebitJustification() mandates a reason} ({@code CARTEL}, {@code
-   * CARTEL_BANK}, {@code SPECIAL}) the justification must be present and non-blank. Shared by the
-   * direct-booking paths in {@link BankLedgerService} and the booking-request create path (after
-   * its own type guard). A deposit never reaches this check.
+   * Enforces the conditional Begr&uuml;ndung rule (REQ-BANK-045): a debit from an account whose
+   * type {@linkplain BankAccountType#requiresDebitJustification() mandates a reason} needs a
+   * non-blank justification.
    *
    * @param account the debited (source/paying) account
    * @param justification the supplied justification, or {@code null}
@@ -153,15 +146,12 @@ public class BankBookingGuards {
   }
 
   /**
-   * Guards the fee-inclusive fee mode (REQ-BANK-033, #999): the entered gross must exceed the
-   * in-game fee so something actually arrives at the recipient/destination. Rejects with {@code
-   * BANK_FEE_EXCEEDS_AMOUNT} when {@code amount - fee <= 0}. Called only in the inclusive mode; in
-   * the default on-top mode the fee rides on top and the full amount always arrives, so the guard
-   * never applies.
+   * Guards the fee-inclusive mode (REQ-BANK-033): the entered gross must exceed the in-game fee so
+   * something arrives. Called only in the inclusive mode.
    *
    * @param amount the entered gross debited from the source
    * @param fee the in-game fee skimmed from it
-   * @throws BankConflictException {@code BANK_FEE_EXCEEDS_AMOUNT} when nothing would arrive
+   * @throws BankConflictException {@code BANK_FEE_EXCEEDS_AMOUNT} when {@code amount - fee <= 0}
    */
   public void requireAmountExceedsFee(@NotNull BigDecimal amount, @NotNull BigDecimal fee) {
     if (amount.subtract(fee).signum() <= 0) {
@@ -174,24 +164,18 @@ public class BankBookingGuards {
   }
 
   /**
-   * Reports whether a plain bank employee's <em>direct</em> withdrawal / transfer leaving the KRT
-   * ({@code CARTEL}) account exceeds the bank-employee approval ceiling {@code T1} ({@link
-   * BankAccount#getEmployeeApprovalCeiling()}, an unset ceiling treated as {@code 0}) and so must
-   * be re-routed to the booking-request → external-approval flow instead of hitting the ledger
-   * (REQ-BANK-047, ADR-0109). Since ADR-0109 the direct-booking controller no longer rejects such
-   * an attempt with {@code BANK_CARTEL_APPROVAL_REQUIRED}; it files a {@code PENDING} request
-   * routed to the amount-band approver (Bankleitung for {@code T1..T2}, Organisationsleitung above
-   * {@code T2}) and answers {@code 202}. Bank management and admins (management-or-above) are
-   * uncapped, and every non-CARTEL account returns {@code false}. Called by the
-   * <em>direct-booking</em> controller only — NOT the request-confirmation path, whose over-limit
-   * approval was already attested via the confirm checkbox, so {@link
-   * BankLedgerService#bookWithdrawal}/{@link BankLedgerService#bookTransfer} stay uncapped and
-   * reusable there.
+   * Reports whether a plain bank employee's direct withdrawal or transfer from the KRT ({@code
+   * CARTEL}) account exceeds the approval ceiling {@link BankAccount#getEmployeeApprovalCeiling()}
+   * (unset counts as {@code 0}) and must become an approval request instead (REQ-BANK-047,
+   * ADR-0109).
+   *
+   * <p>Management and admins are uncapped, and non-CARTEL accounts always return {@code false}.
+   * Used only by the direct-booking controller, not by request confirmation.
    *
    * @param accountId the (source) account the direct booking debits
    * @param amount the entered whole-aUEC amount leaving the account
-   * @return {@code true} when the attempt must become an approval request (plain employee, CARTEL
-   *     account, amount above {@code T1}); {@code false} when it may book directly
+   * @return {@code true} when the attempt must become an approval request; {@code false} when it
+   *     may book directly
    */
   @Transactional(readOnly = true)
   public boolean exceedsCartelDirectBookingCeiling(

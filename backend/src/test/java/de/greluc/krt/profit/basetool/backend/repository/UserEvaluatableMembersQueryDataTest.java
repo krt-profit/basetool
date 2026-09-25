@@ -40,22 +40,11 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Data-level coverage for {@link UserRepository#findEvaluatableMembers(UUID,
- * org.springframework.data.domain.Pageable)} — the query that supplies the row set of the promotion
- * Bewertungsverwaltung matrix — run against the real Postgres test schema (Testcontainers + Flyway
- * via the {@code test} profile).
+ * Integration tests for {@link UserRepository#findEvaluatableMembers(UUID,
+ * org.springframework.data.domain.Pageable)} against real Postgres: squadron members with the
+ * {@code ADMIN} or {@code OFFICER} realm role are excluded from the promotion matrix.
  *
- * <p>The behaviour under test is issue #817: the promotion system assesses only the <em>simple
- * members</em> of a squadron, so a squadron member who carries the {@code ADMIN} or the {@code
- * OFFICER} realm role must never surface in the matrix even though they hold a Staffel membership.
- * Officers run the evaluation rather than being its subject. The exclusion is expressed as a {@code
- * NOT EXISTS ... UPPER(r.name) IN ('ADMIN', 'OFFICER')} sub-query that only the real dialect proves
- * end-to-end, so a Mockito stub of the repository cannot catch a regression here.
- *
- * <p>{@link Transactional} so each method rolls back: the seeded users and memberships must never
- * commit to the shared Testcontainers database. The query still observes them because they are
- * flushed within the test transaction before the read, and every assertion is scoped to the freshly
- * created user ids, so rows other suites committed cannot perturb it.
+ * <p>Each test rolls back and asserts only on its own user ids.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -69,9 +58,8 @@ class UserEvaluatableMembersQueryDataTest {
   @PersistenceContext private EntityManager entityManager;
 
   /**
-   * Seeds four IRIDIUM members — a {@code KRT_MEMBER}, a role-less member, an {@code OFFICER} and
-   * an {@code ADMIN} — and asserts the squadron-scoped query returns the two ordinary members while
-   * dropping both the officer and the admin (issue #817).
+   * The squadron-scoped query returns a {@code KRT_MEMBER} and a role-less member but drops an
+   * {@code OFFICER} and an {@code ADMIN}.
    */
   @Test
   void findEvaluatableMembers_squadronScope_keepsSimpleMembersDropsOfficersAndAdmins() {
@@ -123,12 +111,8 @@ class UserEvaluatableMembersQueryDataTest {
   }
 
   /**
-   * Persists a user carrying the seeded role with the given {@code code} (or none when {@code
-   * roleCode} is {@code null}) and grants them a membership in the canonical IRIDIUM squadron so
-   * the matrix query's {@code kind = SQUADRON} predicate matches. Roles are looked up by their
-   * stable {@code code} rather than their display {@code name} (e.g. code {@code KRT_MEMBER}
-   * carries the display name {@code "KRT Member"}). The membership {@code kind} column is populated
-   * by the V95 trigger on insert.
+   * Persists a user with the seeded role of the given code and a membership in the IRIDIUM
+   * squadron.
    *
    * @param roleCode the seeded role code to assign (e.g. {@code OFFICER}, {@code ADMIN}, {@code
    *     KRT_MEMBER}), or {@code null} for a role-less ordinary member.

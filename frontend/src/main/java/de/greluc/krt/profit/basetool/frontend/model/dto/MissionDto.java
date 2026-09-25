@@ -25,35 +25,13 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Data transfer record carrying mission payload.
+ * Frontend mirror of a mission's detail payload.
  *
- * <p>{@code version} is the global mission counter (legacy full-update path). The dedicated section
- * counters {@code coreVersion}, {@code scheduleVersion} and {@code flagsVersion} drive the
- * section-scoped patch endpoints; carrying them on the frontend DTO lets the mission detail page
- * pin the correct counter into each hidden form input independently.
- *
- * <p>{@code owningSquadron} mirrors the backend's squadron reference so the detail template can
- * render the owner-squadron badge consistently with the list view (MULTI_SQUADRON_PLAN.md section
- * 4.5). {@code null} for historic rows persisted before V82.
- *
- * <p>{@code partyLeadUser} / {@code partyLeadGuestName} mirror the backend's optional party lead
- * (Partyleiter) — a registered user reference or a free-text handle, mutually exclusive — so the
- * detail template can render and edit it. {@code partyLeadVersion} is the dedicated section-scoped
- * optimistic-lock counter echoed back into the party-lead edit form.
- *
- * <p>{@code owningOrgUnitVersion} mirrors the backend's section-scoped optimistic-lock counter for
- * the owning-org-unit reassignment control in the Verwaltung tab (REQ-ORG-018); the detail template
- * pins it into the reassignment form so a concurrent change surfaces a 409.
- *
- * <p>{@code ownershipVersion} mirrors the backend's optimistic-lock counter for the owner change
- * ({@code MissionOwnership.version}, {@code 0} before the first change); the detail template pins
- * it onto the owner row so the owner change can echo it and a concurrent change surfaces a 409.
- *
- * <p><strong>Slimmed detail payload (#1138).</strong> The formerly-embedded {@code subMissions}
- * (rendered nowhere), {@code inventoryEntries} and {@code refineryOrders} were removed from the
- * mission detail DTO. The Wirtschaft block fetches the mission economy on demand instead — refinery
- * via the finance section's existing {@code refineryOrders} model attribute and inventory via a
- * dedicated {@code inventoryEntries} fetch ({@code GET /api/v1/inventory/mission/{id}}).
+ * <p>{@code version} guards the full-update path; the section counters ({@code coreVersion}, {@code
+ * scheduleVersion}, {@code flagsVersion}, {@code partyLeadVersion}, {@code owningOrgUnitVersion},
+ * {@code ownershipVersion}) are echoed by the matching section forms. {@code partyLeadUser} and
+ * {@code partyLeadGuestName} are mutually exclusive. The mission's inventory and refinery orders
+ * are not included and are fetched separately.
  */
 public record MissionDto(
     UUID id,

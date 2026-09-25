@@ -1,63 +1,12 @@
-/*
- * Shared CSP-safe event handlers — registered globally so every template can
- * declare a logical action via `data-trigger="<name>"` instead of an inline
- * `onclick="…"` (which would require the dropped `script-src-attr 'unsafe-inline'`
- * CSP allowance).
- *
- * Pattern: each entry pairs a short, kebab-case action name with a function that
- * receives the matched element and the original DOM event. State (URL templates,
- * form ids, table ids, …) comes from `data-*` attributes on the element itself
- * so the JS stays declarative and free of hard-coded selectors.
- *
- * Naming: the prefix is left off for actions that are genuinely page-agnostic
- * ("navigate-href", "close-modal-display"). Page-specific actions still live in
- * dedicated `<template>.js` modules with their own short prefix
- * (e.g. `pi-` for personal-inventory) so a refactor of one page cannot trip a
- * collision across the codebase.
- *
- * It also hosts the one global page-lifecycle handler the app needs (bfcache
- * restore — see below); that listener is registered independently of the
- * `data-trigger` registry so it survives even a missing `krtEvents`.
- */
 (function () {
     'use strict';
 
-    /*
-     * Force a fresh server render when the browser restores this document from its
-     * back/forward cache (bfcache). A bfcache restore reinstates the in-memory DOM
-     * snapshot taken when the user navigated away — NOT a fresh GET — so any
-     * server-rendered aggregate baked into that snapshot (a bank account-card
-     * balance, a list count, a status pill) still shows whatever it was BEFORE the
-     * user's edit on the page they had navigated forward to. The in-place mutation
-     * foundation (`krtFetch`, REQ-FE-001..007) only keeps the *active* document
-     * fresh; it cannot touch a sibling document the browser later replays from
-     * bfcache. Reloading on `event.persisted` re-runs the GET so the restored
-     * overview reflects current state. This is the second — and only other —
-     * sanctioned reload beside the optimistic-lock conflict confirm (spec
-     * REQ-FE-008, ADR-0013).
-     *
-     * It cannot loop: the document the reload produces is a fresh load, whose own
-     * `pageshow` fires with `persisted === false`, so the reload only ever fires for
-     * a genuine bfcache restore, never on the page it itself produced. Registered
-     * before the `krtEvents` guard below so it is unaffected by the delegation
-     * registry's presence.
-     */
     window.addEventListener('pageshow', function (event) {
         if (event.persisted) {
             window.location.reload();
         }
     });
 
-    /*
-     * Keep a "?" field-hint tooltip (fragments/scu-hint) inside its clipping container. The bubble is
-     * a pure-CSS tooltip centred on its disc; inside a scrolling `.krt-modal-body` (overflow-y: auto,
-     * which per the CSS overflow spec also computes overflow-x to auto) it is clipped horizontally, so
-     * a disc near the container's left/right edge had its tooltip text cut off. On hover/focus of a
-     * `.scu-hint` we measure the bubble against its nearest overflow-clipping ancestor (or the
-     * viewport) and, if it would overflow, set `--hint-shift` to slide it back inside; the CSS bubble
-     * transform and its arrow honour that variable (the arrow counter-shifts so it still points at the
-     * disc). Registered before the `krtEvents` guard so it works even without the delegation registry.
-     */
     function hintClippingAncestor(el) {
         let node = el.parentElement;
         while (node && node !== document.body && node !== document.documentElement) {
@@ -75,7 +24,6 @@
         if (!bubble) {
             return;
         }
-        // Reset before measuring so the rect reflects the un-shifted (centred) position.
         bubble.style.setProperty('--hint-shift', '0px');
         const rect = bubble.getBoundingClientRect();
         const pad = 6;
@@ -113,37 +61,22 @@
     });
 
     if (!window.krtEvents || typeof window.krtEvents.on !== 'function') {
-        // event-delegation.js has not loaded — abort silently. Production fragments/head.html
-        // wires event-delegation.js BEFORE this file, so the guard only fires if a test slice
-        // bypasses the fragment.
         return;
     }
     const on = window.krtEvents.on;
 
     /**
-     * Strict whitelist regex for same-origin path URLs. Matches a string that starts with
-     * {@code '/'}, whose second character is neither {@code '/'} nor {@code '\\'} (rejects
-     * protocol-relative {@code //attacker} and Windows UNC {@code /\\share}), and whose
-     * remainder contains no whitespace, angle brackets, quotes, or backticks (HTML/JS
-     * meta-characters). Capture groups split the input into path / search / hash so each part
-     * can be assigned to the corresponding {@link HTMLAnchorElement} setter, which validates
-     * its argument structurally and cannot be tricked into changing the URL's scheme.
+     * Whitelist for same-origin path URLs: a leading `/` not followed by `/` or a backslash, and no
+     * whitespace, angle brackets, quotes or backticks; the groups capture path, search and hash.
      */
     const SAFE_PATH_REGEX = /^(\/[^/\\][^?#\s<>"'`]*)(\?[^#\s<>"'`]*)?(#[^\s<>"'`]*)?$/;
 
     /**
-     * Navigate to a same-origin path safely. Sets {@code pathname} / {@code search} /
-     * {@code hash} on a freshly-created {@code <a>} anchored at the current origin, then reads
-     * back the validated {@code href} for navigation. The {@link HTMLAnchorElement.pathname},
-     * {@link HTMLAnchorElement.search}, and {@link HTMLAnchorElement.hash} setters are
-     * structurally narrower than {@code location.href}: they can only mutate their respective
-     * URL components, so even if the regex check were somehow bypassed they could never change
-     * the scheme to {@code javascript:} (the structural-safety pattern from the CodeQL
-     * {@code js/xss-through-dom} docs — analogue of {@code $.find} versus {@code $()}).
+     * Navigates to a same-origin path, rebuilding the URL through the path, search and hash setters
+     * of an anchor at the current origin so the scheme can never change.
      *
-     * @param raw  the candidate URL string (typically a {@code data-*} attribute value)
-     * @return {@code true} if navigation was triggered, {@code false} if the input was
-     *     rejected (caller may then leave the default-action in place)
+     * @param raw  the candidate URL, typically a `data-*` attribute value
+     * @return `true` if navigation was triggered, `false` if the input was rejected
      */
     function navigateSafe(raw) {
         if (typeof raw !== 'string') return false;
@@ -160,9 +93,7 @@
     }
 
     /**
-     * Navigate to the URL in {@code data-href}. Delegated to {@link navigateSafe} so the
-     * actual navigation sink only ever receives a URL re-built from the structural
-     * {@link HTMLAnchorElement} setters.
+     * Navigates to the same-origin URL in `data-href` through {@link navigateSafe}.
      */
     on('click', 'navigate-href', function (el, event) {
         if (navigateSafe(el.getAttribute('data-href'))) {
@@ -171,10 +102,8 @@
     });
 
     /**
-     * Navigate to a URL templated against the selected value. Element declares
-     * {@code data-url-template} containing a {@code {value}} placeholder; the placeholder is
-     * substituted with the input's URL-encoded current value, then handed to
-     * {@link navigateSafe} for the structural same-origin guard.
+     * Navigates to `data-url-template` with its `{value}` placeholder replaced by the URL-encoded
+     * selected value, through {@link navigateSafe}.
      */
     on('change', 'navigate-select', function (el) {
         if (!el.value) return;
@@ -184,9 +113,7 @@
     });
 
     /**
-     * Browser-history back. {@code preventDefault} so the surrounding {@code <a>} with a real
-     * href does not also navigate forward — this keeps the "go back" behaviour identical to
-     * the historical {@code onclick="history.back(); return false;"} pattern.
+     * Goes back in browser history, preventing the element's own default navigation.
      */
     on('click', 'history-back', function (el, event) {
         event.preventDefault();
@@ -194,17 +121,14 @@
     });
 
     /**
-     * Pure {@link Event#stopPropagation}. Used on inner buttons / forms inside clickable
-     * container rows so a nested action does not bubble up to the row's own click handler.
+     * Stops click propagation so a nested action does not trigger a clickable row's handler.
      */
     on('click', 'stop-propagation', function (el, event) {
         event.stopPropagation();
     });
 
     /**
-     * Submit the closest surrounding {@code <form>} whenever the bound input changes. Mirrors
-     * the historical {@code onchange="this.form.submit()"} pattern used by filter dropdowns
-     * and auto-applying selects.
+     * Submits the control's form whenever the control changes.
      */
     on('change', 'submit-form', function (el) {
         if (el.form && typeof el.form.submit === 'function') {
@@ -213,15 +137,8 @@
     });
 
     /**
-     * Submit a form by id. Element declares {@code data-form-id} pointing at the form's id.
-     * Used by buttons placed outside the form (e.g. in a toolbar) that need to trigger one of
-     * the inline forms on the page. Registered on {@code click} (for buttons) and {@code
-     * change} (for filter-checkbox / filter-select patterns that historically used
-     * {@code onchange="getElementById('…').submit()"}). The duplicate registration is safe
-     * because the two event types fire on disjoint sets of elements in practice — buttons
-     * fire {@code click}, form controls fire {@code change} (the {@code click} that a mouse
-     * also fires on a checkbox is suppressed via {@code event.preventDefault()} below, which
-     * leaves the {@code change} handler as the single submit trigger).
+     * Submits the form named by `data-form-id`; bound to `click` for buttons (whose default action
+     * is prevented) and to `change` for form controls.
      */
     function submitFormByIdHandler(el, event) {
         const id = el.getAttribute('data-form-id');
@@ -237,9 +154,8 @@
     on('change', 'submit-form-by-id', submitFormByIdHandler);
 
     /**
-     * Call the global {@code filterTable(tableId, query)} helper on every keystroke. Element
-     * declares {@code data-table-id} naming the target table. Bound to {@code input} (covers
-     * paste / autofill) and {@code keyup} (legacy keyboard-only flows).
+     * Calls the global `filterTable` with the table named by `data-table-id` and the control's
+     * value; bound to `input` and `keyup`.
      */
     function filterTableHandler(el) {
         if (typeof window.filterTable !== 'function') return;
@@ -251,11 +167,8 @@
     on('keyup', 'filter-table', filterTableHandler);
 
     /**
-     * Toggle a target element's visibility via the {@code krtm-hidden} class ({@code display:none}
-     * in inline-migration.css). {@code data-target} carries the target element's id. Migrated from
-     * the former inline {@code style.display} toggle so no inline style attribute is written (CSP:
-     * {@code style-src-attr} no longer needs {@code 'unsafe-inline'}). Used for collapsible
-     * info-boxes and "show details" reveals; the shown state is the element's own CSS display.
+     * Toggles the `krtm-hidden` class on the element whose id is in `data-target`, without writing
+     * an inline style.
      */
     on('click', 'toggle-display', function (el, event) {
         const id = el.getAttribute('data-target');
@@ -267,12 +180,7 @@
     });
 
     /**
-     * "Open this modal": {@code data-modal-id} names a {@code .krt-modal-overlay} dialog, and
-     * {@code window.krtModal.open} does the rest — the class state ({@code krtm-modal-open} over the
-     * default-none overlay), {@code showModal()} on the native {@code <dialog>}, focus into it, and
-     * clearing any stale inline {@code style.display} a page script once wrote (an inline
-     * declaration outranks the class rule, so such a dialog could otherwise never reopen). One
-     * contract for every dialog since FE-SIMP-04; the copies each page carried are gone.
+     * Opens the dialog named by `data-modal-id` through `window.krtModal.open`.
      */
     on('click', 'open-modal-display', function (el, event) {
         const id = el.getAttribute('data-modal-id');
@@ -282,8 +190,7 @@
     });
 
     /**
-     * "Close this modal": the symmetric half, through {@code window.krtModal.close} — class state,
-     * {@code dialog.close()}, and focus back to the control that opened it.
+     * Closes the dialog named by `data-modal-id` through `window.krtModal.close`.
      */
     on('click', 'close-modal-display', function (el, event) {
         const id = el.getAttribute('data-modal-id');

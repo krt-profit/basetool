@@ -33,10 +33,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Pure-method unit tests for {@link SystemSettingController}. The Spring-MVC binding (path params,
- * request-body validation, {@code @PreAuthorize}) is covered by the integration test suite; here we
- * only verify the controller-to-service delegation. A regression here means the wrong key gets
- * persisted (the only real failure mode the controller has).
+ * Unit tests for {@link SystemSettingController}: controller-to-service delegation with the right
+ * key.
  */
 @ExtendWith(MockitoExtension.class)
 class SystemSettingControllerTest {

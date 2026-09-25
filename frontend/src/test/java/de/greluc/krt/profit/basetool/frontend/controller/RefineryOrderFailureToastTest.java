@@ -26,12 +26,9 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins which toast the classic (no-JS) refinery create and edit handlers flash when the backend
- * refuses the write, via {@link RefineryOrderWriteController#failureToastKey}.
- *
- * <p>REQ-SEC-042 made a mission the order's owner does not take part in a {@code 400} with its own
- * problem code. The handlers must name that cause; every other backend failure keeps the handler's
- * generic message, so the new branch cannot swallow an unrelated refusal.
+ * Tests which toast the no-JS refinery create and edit handlers flash on a backend refusal, via
+ * {@link RefineryOrderWriteController#failureToastKey}: a mission the owner does not take part in
+ * gets its own message (REQ-SEC-042), every other failure the generic one.
  */
 class RefineryOrderFailureToastTest {
 

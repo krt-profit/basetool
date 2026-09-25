@@ -30,23 +30,12 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * TestContainers-backed migration test for {@code V239__drop_guest_role_and_guest_edit_token.sql}
- * (REQ-SEC-052 / REQ-SEC-053, ADR-0159).
+ * Migration test for {@code V239__drop_guest_role_and_guest_edit_token.sql} (REQ-SEC-052,
+ * REQ-SEC-053): the {@code GUEST} role and {@code guest_edit_token_hash} are gone.
  *
- * <p>Two removals in one file because they are one decision: {@code GUEST} was the role a token
- * mapped to when its realm roles matched nothing the application knows, and {@code
- * guest_edit_token_hash} was the per-row capability token that let the unauthenticated creator of a
- * participant row edit it. Neither has an audience once the tool needs a login.
- *
- * <p>Flyway runs the file once at boot, so the post-conditions ({@link #v239RemovesTheGuestRole()},
- * {@link #v239DropsTheGuestEditTokenColumn()}) are read off the migrated schema. The interesting
- * half — what happens to an account that held <em>only</em> {@code GUEST} — cannot be produced that
- * way, because there is no such row left to migrate. {@link
- * #theDeleteLeavesAGuestOnlyAccountWithNoRolesAtAll()} therefore re-seeds the exact pre-migration
- * shape and runs the file's own delete statements against it. That case is the one worth having:
- * the migration deliberately does <b>not</b> promote such an account to member, because deciding a
- * membership question belongs to an administrator, and "left with no roles" is what {@code
- * PendingApprovalAccessFilter} then refuses with {@code 403 NO_ROLE}.
+ * <p>{@link #theDeleteLeavesAGuestOnlyAccountWithNoRolesAtAll()} re-seeds a guest-only account and
+ * runs the migration's delete statements, verifying the account is left with no roles rather than
+ * promoted.
  */
 @SpringBootTest
 @ActiveProfiles("test")

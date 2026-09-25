@@ -36,20 +36,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
- * Makes the account merge's table enumeration exhaustive <b>by construction</b>.
- *
- * <p>{@code UserAccountMergeService} decides, table by table, what follows a member onto their
- * surviving account and what stays with the act it records. A list like that rots the moment
- * someone adds a column: the merge would silently leave those rows behind, and the only way to find
- * out would be a member noticing something of theirs is missing.
- *
- * <p>So the list is not trusted. This reads every foreign key into {@code app_user} out of the live
- * schema and requires each one to appear in exactly one of the two classifications. A new
- * user-referencing column cannot be forgotten — it can only be classified, deliberately, by someone
- * who had to think about which side it belongs on.
- *
- * <p>The reverse direction is checked too: a classification entry naming a column that no longer
- * exists is a stale decision, and a stale decision reads as a considered one.
+ * Verifies that every column referencing {@code app_user} appears in exactly one of {@code
+ * UserAccountMergeService}'s two classifications, and that no classification names a missing
+ * column.
  */
 @SpringBootTest
 class UserAccountMergeCoverageTest {
@@ -61,24 +50,15 @@ class UserAccountMergeCoverageTest {
   @Autowired private DataSource dataSource;
 
   /**
-   * Columns that reference {@code app_user} without a foreign key, and so are invisible to the
-   * catalogue sweep below.
-   *
-   * <p>The two audit <em>target</em> columns are deliberately FK-less so the trail outlives the
-   * account (REQ-AUDIT-001, stated in a {@code COMMENT ON COLUMN} by V235). They still have to be
-   * classified — an audit row must not follow a member — so they are added to the swept set by hand
-   * rather than left out of it.
+   * Columns referencing {@code app_user} without a foreign key, added to the swept set by hand: the
+   * audit target columns (REQ-AUDIT-001).
    */
   private static final List<String> FK_LESS_BY_DESIGN =
       List.of("audit_event.target_user_id", "bank_audit_event.target_user_id");
 
   /**
-   * Columns the sweep finds that are not a reference to a member at all.
-   *
-   * <p>{@code app_user.approved_by_id} <em>is</em> one and is classified as staying. This set is
-   * for the opposite case and is currently empty; it exists so a future {@code
-   * some_table.system_user_id} can be excluded with a reason rather than by being quietly dropped
-   * into one of the two lists.
+   * Columns the sweep finds that do not reference a member, each excluded with a reason; currently
+   * empty.
    */
   private static final Set<String> NOT_A_MEMBER_REFERENCE = Set.of();
 

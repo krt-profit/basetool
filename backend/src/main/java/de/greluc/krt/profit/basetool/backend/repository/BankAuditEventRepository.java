@@ -33,19 +33,16 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
- * Spring Data repository for the append-only bank audit trail (epic #556, REQ-BANK-012). Rows are
- * only ever inserted and read during normal operation; the single exception is the admin-triggered
- * retention purge (REQ-AUDIT-004), a deliberate, itself-audited bulk delete of rows older than a
- * chosen cutoff — there is no automatic retention sweep. Read and purge access are admin-only and
- * enforced at the controller/URL layer, not here.
+ * Spring Data repository for the append-only bank audit trail (REQ-BANK-012).
+ *
+ * <p>Rows are only inserted and read, except for the retention purge (REQ-AUDIT-004) and the Art.
+ * 17 handle anonymisation. Access control lives in the controller/URL layer.
  */
 @Repository
 public interface BankAuditEventRepository extends JpaRepository<BankAuditEvent, UUID> {
 
   /**
-   * One filtered page of the audit log for the admin viewer (A2 mockup): every filter is optional,
-   * combinable, and applied via the {@code (:param IS NULL OR ...)} pattern established by the
-   * inventory queries.
+   * Returns one filtered page of the bank audit log for the admin viewer; every filter is optional.
    *
    * @param from period start (inclusive), or {@code null}
    * @param to period end (inclusive), or {@code null}
@@ -86,8 +83,7 @@ public interface BankAuditEventRepository extends JpaRepository<BankAuditEvent, 
   boolean existsByTransactionId(UUID transactionId);
 
   /**
-   * All bank audit events in a period, oldest first — the chronological feed the period PDF export
-   * renders (REQ-AUDIT-001 unified viewer). Unpaged: the export is admin-only and period-bounded.
+   * Returns all bank audit events in a period, oldest first, for the period PDF export. Unpaged.
    *
    * @param from period start (inclusive)
    * @param to period end (inclusive)
@@ -101,9 +97,7 @@ public interface BankAuditEventRepository extends JpaRepository<BankAuditEvent, 
   List<BankAuditEvent> findForExport(@Param("from") Instant from, @Param("to") Instant to);
 
   /**
-   * Counts bank audit rows in a period — the export size guard. The export query is unpaged (one
-   * document per period), so the report service checks this count first and rejects a period that
-   * would still load a pathologically large result set into memory.
+   * Counts bank audit rows in a period, used as the size guard before the unpaged export.
    *
    * @param from period start (inclusive)
    * @param to period end (inclusive)
@@ -114,9 +108,8 @@ public interface BankAuditEventRepository extends JpaRepository<BankAuditEvent, 
   long countForExport(@Param("from") Instant from, @Param("to") Instant to);
 
   /**
-   * Bulk-deletes bank audit rows strictly older than a cutoff — the admin retention purge
-   * (REQ-AUDIT-004). The purge is itself audit-logged by the caller <em>after</em> this delete (its
-   * row is newer than the cutoff, so it survives).
+   * Bulk-deletes bank audit rows strictly older than a cutoff, for the retention purge
+   * (REQ-AUDIT-004).
    *
    * @param before the exclusive cutoff; rows with {@code occurredAt < before} are removed
    * @return the number of rows deleted
@@ -126,9 +119,8 @@ public interface BankAuditEventRepository extends JpaRepository<BankAuditEvent, 
   int deleteByOccurredAtBefore(@Param("before") Instant before);
 
   /**
-   * Whether any bank audit row is older than a cutoff. Asked by the scheduled retention sweep
-   * (REQ-AUDIT-006) before it purges, so the unconditional {@code AUDIT_LOG_PURGED} marker that is
-   * right for an admin's deliberate purge is not minted daily by a job that found nothing.
+   * Whether any bank audit row is older than a cutoff; checked by the scheduled retention sweep
+   * (REQ-AUDIT-006) so it only purges, and writes its purge marker, when something matches.
    *
    * @param before the exclusive cutoff
    * @return {@code true} when at least one row is older than the cutoff
@@ -136,18 +128,12 @@ public interface BankAuditEventRepository extends JpaRepository<BankAuditEvent, 
   boolean existsByOccurredAtBefore(Instant before);
 
   /**
-   * Replaces this member's handle snapshot with the erasure sentinel, for a granted Art. 17 request
-   * (REQ-SEC-062).
+   * Replaces this member's actor handle snapshot with the erasure sentinel for a granted Art. 17
+   * request (REQ-SEC-062).
    *
-   * <p><b>This is the only mutation of an otherwise append-only table, and it is deliberate.</b>
-   * The trail's worth rests on rows never being rewritten, so the operation is admin-gated, is
-   * itself audit-logged (a {@code HANDLE_SNAPSHOTS_ANONYMISED} marker written afterwards, which the
-   * update therefore does not touch), and changes nothing about <em>what happened</em> — only who
-   * it names. Row counts, timestamps, event types and subjects are untouched.
-   *
-   * <p>Matched by {@code actorUserId}, so it only reaches rows while the account still exists. Once
-   * the FK has nulled out, the handle is the only remaining link and the admin Personensuche
-   * (REQ-SEC-060) is the way to find those rows.
+   * <p>The only mutation of this otherwise append-only table besides the purge; it changes who a
+   * row names, nothing else. Matched by {@code actorUserId}, so it reaches rows only while the
+   * account still exists.
    *
    * @param userId the member whose handle snapshots are erased
    * @param sentinel {@code HandleAnonymisation#SENTINEL}

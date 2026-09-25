@@ -35,11 +35,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
- * Tests for {@link LiveSyncSubscriptionAuthorizer} driven by {@link MockWebServer}: a 2xx probe
- * allows the subscribe (replaying the captured bearer + pin), an explicit 403/404 denies it, and a
- * 401 / 5xx / transport error / missing token all fail open (ADR-0094) — or, for a presence-enabled
- * class, fail closed as {@link Decision#DENY_INDETERMINATE} rather than as a plain {@link
- * Decision#DENY}, which is what keeps an outage distinguishable from a permission verdict.
+ * Tests {@link LiveSyncSubscriptionAuthorizer} against {@link MockWebServer}: 2xx allows, 403/404
+ * deny, and 401 / 5xx / transport error / missing token fail open (ADR-0094), or for a
+ * presence-enabled class yield {@link Decision#DENY_INDETERMINATE} rather than {@link
+ * Decision#DENY}.
  */
 class LiveSyncSubscriptionAuthorizerTest {
 

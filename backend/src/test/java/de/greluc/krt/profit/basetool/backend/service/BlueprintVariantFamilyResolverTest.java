@@ -32,13 +32,8 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
- * Tests {@link BlueprintVariantFamilyResolver} against the real Star Citizen naming corpus that
- * drove its design: cosmetic-variant merging in both directions, the deliberately-conservative
- * non-merging of unquoted sub-models and cross-family names, the magazine exclusion (atomic,
- * capacity-sensitive, energy/ballistic/throwable spellings), the normalization traps (double-space
- * re-collapse, apostrophes inside a nickname, curly quotes), and the curated alias overrides. The
- * real {@link BlueprintNameNormalizer} and {@link BlueprintVariantAliasOverrides} are wired in so
- * the derivation runs end-to-end exactly as production does.
+ * Tests {@link BlueprintVariantFamilyResolver} on real Star Citizen names: variant merging,
+ * conservative non-merging, magazine exclusion, normalization edge cases and alias overrides.
  */
 class BlueprintVariantFamilyResolverTest {
 

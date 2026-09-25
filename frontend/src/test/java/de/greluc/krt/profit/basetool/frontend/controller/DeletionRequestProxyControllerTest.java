@@ -41,17 +41,9 @@ import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 
 /**
- * Mockito tests for {@link DeletionRequestProxyController} (REQ-SEC-061, ADR-0181).
- *
- * <p>The property worth a test rather than a comment: <b>the proxy accepts no user id and relays
- * none.</b> The backend derives the subject from the token, and that is precisely what makes these
- * three endpoints safe to expose to every authenticated member without a scope check of their own.
- * An id sneaking into the relayed URI would turn a self-service surface into one member erasing
- * another, so each test asserts the literal URI.
- *
- * <p>The flag coercion is the other one: a missing or malformed {@code eraseHistory} means "did not
- * ask for the extra erasure", because that erasure is irreversible and a parse failure must not
- * grant it.
+ * Mockito tests for {@link DeletionRequestProxyController} (REQ-SEC-061, ADR-0181): the proxy
+ * relays no user id, asserted on the literal URI, and a missing or malformed {@code eraseHistory}
+ * flag means {@code false}.
  */
 class DeletionRequestProxyControllerTest {
 

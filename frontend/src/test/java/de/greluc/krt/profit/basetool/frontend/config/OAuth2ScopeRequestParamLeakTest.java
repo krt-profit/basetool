@@ -50,16 +50,9 @@ import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.web.context.request.RequestContextHolder;
 
 /**
- * Regression guard for the OAuth2 refresh-token {@code invalid_scope} failure (REQ-SEC-012): any
- * request parameter literally named {@code scope} reaching {@code
- * DefaultOAuth2AuthorizedClientManager} is, under Spring's default mapper, copied into the
- * refresh-token grant — which Keycloak then rejects ("Invalid scopes: ..."), bouncing the SSO
- * session into re-authentication. The original trigger was the job-orders "Staffel" filter, which
- * once submitted {@code scope=all} / {@code scope=mine}; that filter now narrows by {@code
- * squadronId} and no longer sends {@code scope}, but the guard stays because {@link
- * WebClientConfig#NO_REQUEST_DERIVED_ATTRIBUTES} must sever the path for <em>any</em> stray {@code
- * scope} parameter, whatever its source. These tests pin both the bug (default mapper leaks) and
- * the fix (configured mapper drops the parameter).
+ * Verifies that a request parameter named {@code scope} never reaches the refresh-token grant
+ * (REQ-SEC-012): Spring's default mapper leaks it, while {@link
+ * WebClientConfig#NO_REQUEST_DERIVED_ATTRIBUTES} drops it.
  */
 class OAuth2ScopeRequestParamLeakTest {
 
@@ -84,14 +77,11 @@ class OAuth2ScopeRequestParamLeakTest {
 
   /**
    * Drives {@code DefaultOAuth2AuthorizedClientManager.authorize(...)} down its reauthorize branch
-   * (an existing authorized client is present) with the current request carrying {@code
-   * scope=<scopeValue>}, capturing the {@link OAuth2AuthorizationContext} handed to the provider so
-   * the test can assert what the refresh-token grant would carry.
+   * with a {@code scope} request parameter and captures the context handed to the provider.
    *
-   * @param applyFixMapper whether to install {@link WebClientConfig#NO_REQUEST_DERIVED_ATTRIBUTES};
-   *     {@code false} exercises Spring's leaking default
-   * @param scopeValue the value of the {@code scope} request parameter to simulate
-   * @return the authorization context the provider received (never {@code null})
+   * @param applyFixMapper whether to install {@link WebClientConfig#NO_REQUEST_DERIVED_ATTRIBUTES}
+   * @param scopeValue the simulated {@code scope} parameter value
+   * @return the authorization context the provider received, never {@code null}
    */
   private static OAuth2AuthorizationContext captureContext(
       boolean applyFixMapper, String scopeValue) {

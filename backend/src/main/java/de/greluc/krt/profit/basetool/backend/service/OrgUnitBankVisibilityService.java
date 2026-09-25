@@ -34,24 +34,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * View-grant write mechanics of {@link OrgUnitBankAccessService} (L3 split, #922): the idempotent
- * grant / revoke of the four {@code bank_account_grant} tiers (membership-role bucket, all-members,
- * individual user) plus the {@link #createViewGrant} factory that dedupes the former three
- * copy-pasted grant-insert blocks. Each mutation records its {@code BALANCE_VISIBILITY_GRANTED} /
- * {@code BALANCE_VISIBILITY_REVOKED} audit event (REQ-AUDIT-001).
+ * Persists and audits the bank balance-visibility grants (role bucket, all members, area members,
+ * individual user) on behalf of {@link OrgUnitBankAccessService} (REQ-BANK-035).
  *
- * <p>This collaborator holds <em>only</em> the persistence + audit mechanics; the account
- * resolution, the org-unit authorization ({@code requireCanConfigureVisibility}) and the
- * role-bucket validation stay in {@link OrgUnitBankAccessService}, which is the single sanctioned
- * {@code OwnerScopeService}↔bank bridge (ADR-0020, {@code
- * orgUnitAwareBankSeamIsContainedToOneClass}). By design this service depends on neither {@link
- * OwnerScopeService} nor {@link
- * de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository}, so it never becomes a
- * second bridge; the caller passes the already-loaded, already-authorized {@link BankAccount}.
- *
- * <p>Each mutation is {@code @Transactional} (propagation {@code REQUIRED}) so it joins the
- * read-write transaction the facade already opened — the caller re-reads the account's settings
- * snapshot in the same transaction after the grant lands.
+ * <p>Callers pass an already-loaded, already-authorized {@link BankAccount}; the service depends on
+ * neither {@link OwnerScopeService} nor {@link
+ * de.greluc.krt.profit.basetool.backend.repository.BankAccountRepository} (ADR-0020). Each mutation
+ * joins the caller's transaction.
  */
 @Service
 @RequiredArgsConstructor
@@ -62,10 +51,8 @@ public class OrgUnitBankVisibilityService {
   private final BankAuditService bankAuditService;
 
   /**
-   * Adds a role-bucket view grant to an account if it is not already granted, then records the
-   * grant audit event (REQ-BANK-035). Idempotent: an already-granted bucket is a no-op with no
-   * audit line. The {@code kind} is the pre-resolved grant kind ({@code MEMBERSHIP_ROLE} for an
-   * org-unit account, {@code GLOBAL_ROLE} for a Sonderkonto) validated by the caller.
+   * Adds a role-bucket view grant to an account and records the grant audit event (REQ-BANK-035);
+   * an existing grant is a no-op without audit.
    *
    * @param account the already-loaded, already-authorized account
    * @param kind the grant kind the role bucket maps to
@@ -147,11 +134,8 @@ public class OrgUnitBankVisibilityService {
   }
 
   /**
-   * Enables or disables the "Mitglieder des Bereichs" cascade view grant of a Bereichskonto
-   * (REQ-BANK-048): every member of the whole area cascade — the Bereichsleitung plus every member
-   * of the Bereich's child Staffeln/SKs — may view it. Records the matching grant/revoke audit
-   * event only when the grant state actually changes. Idempotent; area-members support was
-   * validated by the caller.
+   * Enables or disables the "Mitglieder des Bereichs" view grant of a Bereichskonto (REQ-BANK-048),
+   * auditing only an actual state change.
    *
    * @param account the already-loaded, already-authorized account
    * @param enabled whether the whole area cascade may view the account
@@ -218,12 +202,8 @@ public class OrgUnitBankVisibilityService {
   }
 
   /**
-   * Inserts one {@code bank_account_grant} row for the given account, tier kind and
-   * (kind-dependent) role code / user id — the dedup of the three previously copy-pasted
-   * grant-insert blocks (addRoleVisibility / setAllMembersVisibility / addUserVisibility). Setting
-   * {@code roleCode} / {@code granteeUserId} to {@code null} for the tiers that do not use them is
-   * a no-op on the fresh entity (both default to {@code null}), so the persisted row is identical
-   * to the former inline inserts.
+   * Inserts one {@code bank_account_grant} row for the account, tier kind and kind-dependent role
+   * code or user id.
    *
    * @param account the owning account
    * @param kind the grantee tier kind

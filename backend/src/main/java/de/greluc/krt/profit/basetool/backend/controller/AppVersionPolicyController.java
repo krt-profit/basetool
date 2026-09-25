@@ -34,23 +34,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * States which Android builds the server still serves (REQ-API-010, app issue #67).
+ * States which Android builds the server still serves (REQ-API-010).
  *
- * <p><strong>Anonymous, decided by the owner on 2026-08-24.</strong> The API vhost's stance is to
- * open no anonymous paths (plan Q8), and this is the one exception, taken with the reason written
- * down: a version gate that only answers after a successful login is silent in precisely the case
- * it exists for. When the breaking change is in the auth flow itself — a token shape, a scope, a
- * client-id — the old build cannot log in, and an authenticated policy endpoint would leave it
- * showing an authentication error instead of „Update erforderlich". The member would then be told
- * their credentials are wrong, which they are not.
- *
- * <p>It publishes nothing: three integers and the URL of a public GitHub release page. There is no
- * caller identity in the request and none in the answer, so it is also the rare {@code /api} path
- * with nothing to redact.
- *
- * <p>The values come from configuration rather than a table — see {@link AndroidClientProperties}
- * for why. Raising the floor is an env var and a restart, which is what an operator can do at the
- * moment a contract breaks.
+ * <p>Anonymous by design, so a build that can no longer log in still learns it must update. It
+ * exposes only configured version integers from {@link AndroidClientProperties} and a public
+ * release URL.
  */
 @RestController
 @RequestMapping("/api/v1/app/version-policy")
@@ -63,9 +51,7 @@ public class AppVersionPolicyController {
   /**
    * Returns the served-version floor, the newest published build and where to get it.
    *
-   * <p>Always {@code 200}, including on a server that has never configured the policy: an unset
-   * floor answers {@code 0}, which the app reads as "no floor". A failure here must never present
-   * as a forced update, so there is no error branch to get that wrong.
+   * <p>Always {@code 200}; an unset floor answers {@code 0}, meaning no floor.
    *
    * @return the policy in force, never {@code null}
    */

@@ -35,12 +35,8 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 import org.springframework.web.util.pattern.PathPatternParser;
 
 /**
- * The enumeration both anonymous-surface sweeps stand on.
- *
- * <p><b>Why this file exists.</b> A sweep that enumerates nothing passes every assertion it makes.
- * Before #1804 this engine lived twice and was only ever exercised through its two callers — so a
- * bug in it would have turned both guards green at the same moment, on a surface whose whole point
- * is exhaustiveness. Each case below is one way that could happen.
+ * Unit tests for the endpoint enumeration both anonymous-surface sweeps rely on, since a sweep that
+ * enumerates nothing passes every assertion.
  */
 class EndpointEnumerationTest {
 
@@ -229,13 +225,8 @@ class EndpointEnumerationTest {
   }
 
   /**
-   * Builder options that produce a parsed {@code PathPattern} condition.
-   *
-   * <p>Spelled out rather than left to a default: the enumeration reads {@code
-   * getPathPatternsCondition()}, and a {@link RequestMappingInfo} built by hand without a parser
-   * carries none — so the fixture would hand it an empty pattern set and every assertion here would
-   * pass against zero calls. That is the exact failure this class exists to prevent, and a fixture
-   * is no better a place for it than the engine.
+   * Builder options that give a hand-built {@link RequestMappingInfo} a parsed path-pattern
+   * condition, without which the enumeration would see no patterns.
    *
    * @return options pinned to the {@link PathPatternParser}
    */

@@ -46,12 +46,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Cached CRUD service for the {@code location} reference table (manually maintained, not UEX).
+ * Cached CRUD service for the admin-curated {@code location} reference table.
  *
- * <p>Locations are the high-level "where" of a ship or refinery order — admins curate the list; UEX
- * terminals link into them. {@code hidden} flag keeps the row but takes it out of normal dropdowns.
- * {@code delete} is rejected when any ship or refinery order still references the location ({@link
- * EntityInUseException} → 409 with localized message).
+ * <p>{@code hidden} removes a row from normal dropdowns; {@code delete} is rejected with {@link
+ * EntityInUseException} while any ship or refinery order references the location.
  */
 @Service
 @RequiredArgsConstructor
@@ -78,23 +76,18 @@ public class LocationService {
   }
 
   /**
-   * Lightweight projection used by typeaheads and dropdowns — only id + name, no description or
-   * hidden flag. Deliberately complete (no silent bound): the catalogue is admin-curated plus UEX
-   * universe sync, and a truncated list would make locations beyond the bound unreachable in every
-   * consumer. Payload-bounded pickers use {@link #searchReference(String, Pageable)} instead.
+   * Returns all non-hidden locations as id + name reference DTOs, unbounded; payload-bounded
+   * pickers use {@link #searchReference(String, Pageable)}.
    *
-   * @return all non-hidden locations as reference DTOs (no caching — pre-projected by the
-   *     repository)
+   * @return all non-hidden locations as reference DTOs
    */
   public List<LocationReferenceDto> findAllReference() {
     return locationRepository.findAllReference();
   }
 
   /**
-   * Live search for the location pickers (REQ-FE-016): pages non-hidden locations whose name
-   * contains {@code search} (case-insensitive, LIKE metacharacters escaped so user input matches
-   * literally). Deliberately uncached: query strings are user-typed and would pollute the shared
-   * {@code locations} cache, and the repository projection is a cheap indexed read.
+   * Uncached live search for the location pickers (REQ-FE-016): pages non-hidden locations whose
+   * name contains {@code search}, case-insensitive and literal.
    *
    * @param search the raw name fragment, or {@code null}/blank for the unfiltered first page
    * @param pageable page request from the whitelisted picker sort
@@ -188,8 +181,7 @@ public class LocationService {
   }
 
   /**
-   * Hard-deletes a location. Pre-checks the two foreign-key sources explicitly so the user gets a
-   * localized {@link EntityInUseException} → 409 instead of a generic DB error.
+   * Hard-deletes a location after checking it is unreferenced.
    *
    * @param id location primary key
    * @throws EntityInUseException when at least one ship or refinery order still references the

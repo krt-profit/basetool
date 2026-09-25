@@ -70,9 +70,8 @@ public class RankRequirementService {
   private final AuditService auditService;
 
   /**
-   * Returns a paginated slice of every {@link RankRequirementResponse} across all rank transitions.
-   * The controller validates the caller-supplied sort against {@link #SORTABLE_FIELDS} before this
-   * method is invoked.
+   * Pages every rank requirement across all rank transitions; the sort is validated against {@link
+   * #SORTABLE_FIELDS} by the controller.
    *
    * @param pageable Spring Data paging and sorting parameters
    * @return a page of rank requirements
@@ -87,9 +86,7 @@ public class RankRequirementService {
   }
 
   /**
-   * Returns every {@link RankRequirementResponse} that applies to the promotion path from {@code
-   * fromRank} to {@code toRank}, used by the eligibility engine to evaluate whether a member
-   * qualifies for that rank step.
+   * Returns the rank requirements for the promotion from {@code fromRank} to {@code toRank}.
    *
    * @param fromRank ordinal of the current rank
    * @param toRank ordinal of the rank being promoted to
@@ -123,15 +120,8 @@ public class RankRequirementService {
   }
 
   /**
-   * Persists a new {@link RankRequirement}, wiring optional topic and category associations from
-   * the request. Restricted to ADMIN or OFFICER callers via {@link PreAuthorize}.
-   *
-   * <p>Auto-stamps the owning squadron from the caller's active context ({@link
-   * OwnerScopeService#currentSquadron()}) so Officers always tag their own squadron and Admins must
-   * focus the sidebar switcher before creating (Admin in "all squadrons" mode is rejected with HTTP
-   * 400, mirroring the {@code PromotionTopic} create contract). When the request references a topic
-   * or category, that reference must belong to the same squadron — a cross-squadron reference is
-   * rejected with HTTP 400.
+   * Persists a new {@link RankRequirement} stamped with the caller's active squadron, with optional
+   * topic and category references from that same squadron.
    *
    * @param request validated payload describing the new rank requirement
    * @return the persisted rank requirement in response form
@@ -182,18 +172,13 @@ public class RankRequirementService {
   }
 
   /**
-   * Updates the rank requirement identified by {@code id} and re-resolves its optional topic and
-   * category references. The caller-supplied {@code version} is compared against the loaded entity
-   * and a mismatch produces an {@link ObjectOptimisticLockingFailureException} that surfaces as
-   * HTTP 409.
+   * Updates a rank requirement and re-resolves its optional topic and category references.
    *
    * @param id identifier of the rank requirement to update
-   * @param request validated payload with the new field values and the previously fetched {@code
-   *     version}
+   * @param request validated payload with the new field values and the expected {@code version}
    * @return the updated rank requirement in response form
    * @throws NotFoundException if the requirement or any referenced topic/category does not exist
-   * @throws ObjectOptimisticLockingFailureException if the request's {@code version} no longer
-   *     matches the persisted entity
+   * @throws ObjectOptimisticLockingFailureException if the {@code version} is stale
    */
   @Transactional
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
@@ -283,14 +268,12 @@ public class RankRequirementService {
   }
 
   /**
-   * Asserts that an optional topic and category both belong to {@code squadron}. A {@code null}
-   * topic or category is allowed (a requirement may be topic-scoped, category-scoped, or global); a
-   * non-null reference owned by a different squadron is rejected so a requirement can never link to
-   * another squadron's catalog.
+   * Asserts that the optional topic and category belong to {@code squadron}; {@code null}
+   * references are allowed.
    *
    * @param topic the resolved topic reference, or {@code null}
    * @param category the resolved category reference, or {@code null}
-   * @param squadron the squadron the requirement is (being) owned by; never {@code null}
+   * @param squadron the squadron owning the requirement; never {@code null}
    * @throws BadRequestException if a non-null reference belongs to a different squadron
    */
   private static void assertReferencesBelongToSquadron(
@@ -313,13 +296,8 @@ public class RankRequirementService {
   }
 
   /**
-   * Enforces that a rank requirement always describes a single-step promotion ({@code fromRank -
-   * toRank == 1}), e.g. {@code 20 -> 19}. Multi-step transitions like {@code 20 -> 18} would be
-   * structurally ambiguous for the eligibility evaluator (which rules apply, the source or the
-   * target rank's?) and are therefore rejected at the service boundary.
-   *
-   * <p>Lower {@code rank} ordinals denote higher ranks in this codebase, so a valid promotion
-   * always decreases the ordinal by exactly one.
+   * Enforces a single-step promotion, {@code fromRank - toRank == 1}; lower ordinals denote higher
+   * ranks.
    *
    * @param fromRank ordinal of the current rank
    * @param toRank ordinal of the rank being promoted to

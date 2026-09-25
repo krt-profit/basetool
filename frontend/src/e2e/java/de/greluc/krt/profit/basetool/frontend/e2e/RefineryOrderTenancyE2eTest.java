@@ -37,34 +37,16 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Multi-org-unit tenancy matrix for refinery orders (UC-21, REQ-ORG-002/003/004): who may SEE,
- * CREATE, EDIT and STORE a refinery order across every membership profile. Refinery is a
- * <em>strict-staffel</em> aggregate (REQ-ORG-003) — an order is scoped to its {@code
- * owning_org_unit_id} pool and never escapes it, not even via a public mission it is linked to
- * (BAC-004). The einlagern flow then stamps each stored Lager row onto the <em>assignee's</em> org
- * unit, not the order's (REQ-ORG-004).
+ * Multi-org-unit tenancy matrix for refinery orders (UC-21, REQ-ORG-003): who may see, create, edit
+ * and store an order across every membership profile.
  *
- * <p><b>Fixtures.</b> Four membership profiles, assigned via the REST seeder: {@code test-admin}
- * (ADMIN, IRIDIUM = Staffel A), {@code test-member} (Staffel A only — the reliably
- * single-membership user), {@code test-both} (Staffel B + SK X — the dedicated multi-membership
- * user), {@code test-none} (no membership). One refinery order is seeded per owning scope — Staffel
- * A, Staffel B, SK X and an ownerless one — plus a dedicated Staffel-B order for the store-stamping
- * probe and an A-owned order linked to a public A-mission for the BAC-004 probe.
+ * <p>Refinery is strict-staffel, so an order never escapes its owning org unit, not even via a
+ * linked public mission; stored Lager rows are stamped onto the assignee's org unit (REQ-ORG-004).
  *
- * <p><b>No shared-user leakage.</b> The suite deliberately does <em>not</em> touch {@code test-sk}:
- * a sibling tenancy suite ({@code InventoryTenancyE2eTest}) relies on {@code test-sk} being a
- * single-SK member, and SK memberships accumulate across the sequentially-run shared stack (a
- * member added to an SK is never removed). The SK pool is therefore represented through {@code
- * test-both} (which belongs to this suite's own SK X), and {@code test-both} / {@code test-none}
- * are the dedicated multi / membershipless profiles whose membership shape is theirs to own. Every
- * create passes an explicit org-unit pick wherever the caller's membership count could be
- * ambiguous.
- *
- * <p><b>Drive via UI, verify via API.</b> The visibility / stamping / gate matrix is asserted by
- * calling the scoped backend endpoints as each user through {@link BackendSeeder} — the
- * established, race-free way to assert tenancy boundaries — with the org-scoped list additionally
- * driven through the real {@code /refinery-orders} UI for a representative member. The admin pin is
- * exercised via the {@code X-Active-Org-Unit-Id} header the frontend relays.
+ * <p>Profiles: {@code test-admin} and {@code test-member} (Staffel A), {@code test-both} (Staffel B
+ * + SK X) and {@code test-none} (no membership). {@code test-sk} is not touched, because another
+ * suite relies on its membership shape. Assertions call the scoped backend endpoints as each user
+ * through {@link BackendSeeder}.
  */
 @Tag("e2e")
 class RefineryOrderTenancyE2eTest {

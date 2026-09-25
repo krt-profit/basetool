@@ -32,21 +32,9 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * TestContainers-backed migration test for {@code V108__create_material_external_alias.sql}. The
- * migration creates the curated cross-reference table plus a seed INSERT that is conditional on the
- * target UEX material existing (see V108 header comment). On a clean test DB no materials exist at
- * Flyway-run time, so the seed inserts zero rows; this test asserts:
- *
- * <ul>
- *   <li>the table + columns + check constraint + index exist; the original V108 case-sensitive
- *       UNIQUE constraint is gone, superseded by the V146 case-insensitive unique index (covers
- *       REQ-REFINERY-010)
- *   <li>the seed INSERT statements are idempotent — when the test pre-populates the 6 target
- *       materials and re-runs the SELECT-driven INSERTs by hand (conflict target adjusted to the
- *       post-V146 index expression), exactly 6 alias rows are created, all stamped {@code
- *       created_by = 'system'} and pointing at the right material — and a case-variant replay
- *       inserts nothing
- * </ul>
+ * Migration test for {@code V108__create_material_external_alias.sql}: the table, columns, check
+ * constraint and index exist, and the seed INSERTs create exactly six alias rows when the target
+ * materials exist and are idempotent (REQ-REFINERY-010).
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -84,10 +72,9 @@ class V108MigrationTest {
   }
 
   /**
-   * The V108 case-sensitive UNIQUE constraint was dropped by {@code
-   * V146__make_material_alias_uniqueness_case_insensitive.sql} in favour of a unique index on
-   * {@code (source_system, LOWER(external_name))} — covers REQ-REFINERY-010. This test pins both
-   * sides of that supersession plus the (unchanged) source-system CHECK constraint.
+   * Alias uniqueness is enforced by the case-insensitive {@code (source_system,
+   * LOWER(external_name))} index rather than a case-sensitive constraint, alongside the
+   * source-system CHECK (REQ-REFINERY-010).
    */
   @Test
   void v108UniqueConstraintSupersededByV146CaseInsensitiveIndex() {
@@ -137,12 +124,8 @@ class V108MigrationTest {
   }
 
   /**
-   * Replays the V108 seed INSERTs against a freshly-populated material set and verifies that
-   * exactly 6 alias rows are created — the round-trip catches the case where the seed SQL is
-   * accidentally trimmed in a future refactor (the file would still parse but the migration test
-   * catches the missing rows). The replay uses the post-V146 conflict target {@code (source_system,
-   * LOWER(external_name))} because V146 replaced the constraint V108's original {@code ON CONFLICT}
-   * clause inferred; a second, case-variant replay must insert nothing (covers REQ-REFINERY-010).
+   * Replaying the V108 seed INSERTs against populated materials creates exactly six alias rows, and
+   * a case-variant replay inserts nothing (REQ-REFINERY-010).
    */
   @Test
   void v108SeedInsertsCreateSixAliasRowsWhenTargetMaterialsExist() {

@@ -30,13 +30,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins the "Raffinerie" dropdown's preservation rule on the refinery-order detail page
- * (REQ-REFINERY-020).
- *
- * <p>The backend picker source drops hidden locations, so an order created before an admin hid its
- * refinery would otherwise lose its own option. Because that {@code <select>} is {@code required},
- * a dropped option leaves the field on "-- please choose --" and blocks every later save of an
- * order that was valid when it was created — hence the preserved entry.
+ * Tests that the refinery-order detail page keeps the order's own refinery in the "Raffinerie"
+ * dropdown even after an admin hid that location (REQ-REFINERY-020).
  */
 class RefineryOrderLocationDropdownTest {
 

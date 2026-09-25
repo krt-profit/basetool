@@ -28,30 +28,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Authenticated endpoint that hands the current CSRF token to the {@code krtCsrf} client helper
- * (see {@code krt-fetch.js}) so a write that failed with a bare {@code 403} can self-heal.
+ * Hands the current CSRF token to the {@code krtCsrf} client helper, so a write rejected with
+ * {@code 403} for a stale token can refresh the {@code _csrf} meta tags and retry once.
  *
- * <p>A {@code 403} on an AJAX write means Spring Security's {@code CsrfFilter} rejected the token
- * the page started with — the usual causes are a stale browser tab, the session-id rotation that
- * {@code sessionFixation(changeSessionId)} performs on re-login, or eviction by {@code
- * maximumSessions(10)} (all configured in {@link
- * de.greluc.krt.profit.basetool.frontend.config.SecurityConfig}). {@code krtFetch.write} reacts by
- * calling {@code GET /csrf} once, updating the {@code _csrf} meta tags, and retrying the request,
- * so the user never sees a spurious "action failed".
- *
- * <p>The endpoint is deliberately left under the {@code anyRequest().authenticated()} catch-all: an
- * anonymous caller is redirected to the OIDC entry point rather than handed a token, and {@code
- * krtCsrf.refresh()} treats that non-{@code 2xx} as "could not refresh" and surfaces the original
- * error. Decision 1 of epic #571 keeps the session/{@code
- * XorCsrfTokenRequestAttributeHandler}-based repository unchanged; {@link CsrfToken#getToken()}
- * returns the same BREACH-masked value the {@code _csrf} meta tag is rendered from, so the token
- * this returns is valid for the very next submit.
- *
- * <p>REQ-SEC-010 has always said an anonymous caller is never handed a token, and the {@code
- * anyRequest().authenticated()} catch-all is what enforced it — a matcher two folders away, which
- * is the arrangement REQ-SEC-052 set out to end. The class-level {@code isAuthenticated()} says the
- * same thing next to the code. It changes no response: the URL layer still refuses first, with the
- * OIDC redirect rather than a 403.
+ * <p>Authenticated only; an anonymous caller is redirected to the OIDC entry point and never gets a
+ * token (REQ-SEC-010).
  */
 @RestController
 @PreAuthorize("isAuthenticated()")
@@ -60,11 +41,9 @@ public class CsrfTokenController {
   /**
    * Returns the active CSRF header name and token for the authenticated session.
    *
-   * @param token the request-scoped {@link CsrfToken}, resolved by Spring Security's argument
-   *     resolver from the {@code CsrfFilter}-populated request attribute; never {@code null} on
-   *     this CSRF-protected, authenticated route
-   * @return a JSON object {@code {"headerName": "...", "token": "..."}} the client writes back into
-   *     the {@code _csrf_header} / {@code _csrf} meta tags before retrying a 403'd write
+   * @param token the request-scoped {@link CsrfToken}; never {@code null} on this route
+   * @return {@code {"headerName": "...", "token": "..."}} for the {@code _csrf_header} / {@code
+   *     _csrf} meta tags
    */
   @NotNull
   @Unmodifiable

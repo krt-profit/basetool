@@ -36,35 +36,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Regression for the {@code krt-searchable-select.js} abandon paths restoring only <em>half</em> of
- * a committed combobox selection (REQ-FE-017).
+ * Asserts that abandoning a searchable combobox edit restores both the committed label and the
+ * submitted value (REQ-FE-017).
  *
- * <p>The enhancer splits a native {@code <select>} into a hidden input (carries the {@code name}
- * and the submitted value) plus a visible textbox (carries {@code required}). {@code reconcile()}
- * empties the hidden input on every keystroke that matches no option and arms a custom-validity
- * message so submit stays blocked — and because {@code focus} does {@code input.select()}, a single
- * keystroke replaces the whole committed label. The blur and Escape handlers then used to assign
- * {@code input.value = committedLabel} and {@code setCustomValidity('')} <em>without</em> restoring
- * {@code hidden.value}, so both guards were dropped at once: the textbox showed the previously
- * picked entry, the browser's {@code required} check passed, and the form submitted an EMPTY value.
- *
- * <p>A bank employee hit this confirming an over-limit withdrawal request: the over-limit gate
- * disables the submit button until the "approval obtained" checkbox is ticked, and that forced
- * extra click is the blur that desynced the holder picker. {@code holderId} was dropped from the
- * JSON body ({@code submitBankForm} omits empty fields), the backend rejected it on
- * {@code @NotNull}, and the employee saw an unactionable "some fields are invalid" next to a
- * visibly filled-in holder.
- *
- * <p>Asserted on the {@code /inventory/input} material picker rather than the bank modal because
- * the defect lives in the shared enhancer and every {@code required} combobox in the app carries it
- * — this surface reaches it without a bank-employee grant plus a pending over-limit request. The
- * test deliberately asserts the <em>cleared</em> intermediate state too: without it a regression
- * that stopped clearing the value in {@code reconcile()} would also make the final assertion pass,
- * and that would silently re-open the "submits an unresolved free-text pick" hole the clearing
- * exists to close.
- *
- * <p>The actor is {@code test-admin}; the material dropdown is fed by a freshly seeded material so
- * the picker always has at least one option to commit.
+ * <p>Runs on the {@code /inventory/input} material picker as {@code test-admin}, with a freshly
+ * seeded material.
  */
 @Tag("e2e")
 class ComboboxBlurRestoresValueE2eTest {
@@ -105,9 +81,8 @@ class ComboboxBlurRestoresValueE2eTest {
   }
 
   /**
-   * Commits a pick, overwrites the textbox with non-matching text (which must clear the submitted
-   * value), then blurs — and asserts the blur restores the value <em>and</em> the label together,
-   * leaving the control valid. Before the fix the value stayed empty while the label came back.
+   * Commits a pick, types non-matching text (which must clear the value), blurs, and asserts value
+   * and label are restored together and the control is valid.
    */
   @Test
   void blurAfterNonMatchingTextRestoresValueNotOnlyLabel() {

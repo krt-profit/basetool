@@ -51,12 +51,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC tests for the catalog pickers' live-search JSON proxies ({@code GET /catalog/material-search}
- * and {@code GET /catalog/location-search}, REQ-FE-016). The pickers search the catalog on the
- * backend per keystroke instead of preloading a full (or silently capped) list, so these cover the
- * happy mapping — including the nested refined-material metadata the refinery pickers mirror — the
- * fail-soft empty-list behaviour that keeps a picker usable when the backend is unavailable, and
- * the anonymous reachability the guest order form relies on.
+ * MVC tests for the catalog pickers' live-search proxies ({@code GET /catalog/material-search} and
+ * {@code GET /catalog/location-search}, REQ-FE-016): the mapping including refined-material
+ * metadata, the empty-list fallback on backend failure, and anonymous access.
  */
 @SpringBootTest
 @org.springframework.security.test.context.support.WithMockUser
@@ -177,10 +174,8 @@ class CatalogSearchControllerMvcTest {
   }
 
   /**
-   * Regression: the location relay must request MORE rows than the picker renders, or the cap is
-   * silent. It shipped at {@code size=25} against a 50-row render cap, which put 28 of the 53
-   * visible locations — MIC-L5, Patch City, New Babbage, Orison among them — permanently out of
-   * reach in the Lager Einbuchen picker, with no hint on screen that the list was cut.
+   * The location relay requests more rows than the picker renders, so the render cap is never
+   * silently hit.
    *
    * @throws Exception if the MockMvc request fails
    */

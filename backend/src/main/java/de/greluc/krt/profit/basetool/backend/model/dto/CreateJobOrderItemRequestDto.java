@@ -27,15 +27,11 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Create payload for an {@code ITEM} job order. Mirrors {@link CreateJobOrderDto}'s org-unit
- * stamping contract ({@code responsibleOrgUnitId} = required profit-eligible processor, {@code
- * requestingOrgUnitId} = mandatory customer) but carries finished-item lines instead of raw
- * materials. The required materials are derived and snapshotted from each line's blueprint
- * server-side; the client never sends quantities, only the per-material Gut/Keine choices.
+ * Create payload for an {@code ITEM} job order: finished-item lines whose required materials the
+ * server derives from each line's blueprint.
  *
  * @param responsibleOrgUnitId the profit-eligible org unit that processes the order; required
- * @param requestingOrgUnitId the customer/Auftraggeber org unit the order is placed for (any kind:
- *     Staffel/SK/Bereich/OL, epic #692); mandatory
+ * @param requestingOrgUnitId the customer org unit of any kind; mandatory
  * @param handle optional contact handle (≤ 200 chars)
  * @param comment optional free-text note (≤ 1000 chars), HTML-escaped on display
  * @param items the ordered finished-item lines (1..50)

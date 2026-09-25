@@ -31,11 +31,7 @@ import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/**
- * Pins that the prod JSON sink of all three applications scrubs PII (e-mail / JWT / bearer token)
- * before it is written. Each module's JSON appender once used the stock {@code LogstashEncoder} and
- * was an unmasked log output (audit M-5, epic #936 Phase 1).
- */
+/** Tests that the prod JSON sink encoder scrubs e-mails, JWTs and bearer tokens before writing. */
 class PiiMaskingLogstashEncoderTest {
 
   private PiiMaskingLogstashEncoder encoder;

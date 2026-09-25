@@ -45,11 +45,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Verifies the job-order overview status filter after it moved off the {@code orders_filter_status}
- * server cookie onto client-side localStorage: the selected statuses now arrive only as repeatable
- * {@code status} query parameters (echoed by {@code orders-index.js}), are validated against the
- * known statuses, and default to {@code OPEN}+{@code IN_PROGRESS} when nothing valid is selected —
- * and the controller never sets a status cookie any more.
+ * Verifies the order-list status filter: statuses arrive as repeatable {@code status} query
+ * parameters, are validated, default to {@code OPEN} and {@code IN_PROGRESS}, and no status cookie
+ * is set.
  */
 @SpringBootTest
 @ActiveProfiles("test")

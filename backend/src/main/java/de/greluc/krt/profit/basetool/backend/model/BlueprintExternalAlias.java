@@ -38,27 +38,12 @@ import lombok.Setter;
 import lombok.ToString;
 
 /**
- * Curated cross-reference row mapping an external catalogue's blueprint name onto a local product.
+ * Curated mapping of an external catalogue's blueprint name onto a local product, used by the
+ * personal-blueprint import when a normalized exact match fails.
  *
- * <p>The SCMDB log-watcher export carries only a blueprint {@code productName} string, while the
- * local master list (table {@code blueprint}, synced from the SC Wiki) keys products by output
- * name. Names drift between the two sources, so the personal-blueprint import (#327) consults this
- * table as its alias-resolution step: after a normalized exact match against the master product
- * list fails, it looks up the {@code (source_system, external_name)} pair here and dereferences
- * {@link #productKey} to the product. When a user/admin resolves an unmatched name manually, that
- * decision is persisted here so future imports auto-match. Mirrors the {@link
- * MaterialExternalAlias} pattern.
- *
- * <p>The alias points at a product by its normalized {@link #productKey} (plus a {@link
- * #productName} snapshot and the optional resolved {@link #outputItem}) rather than at a single
- * recipe row, because ownership is per product.
- *
- * <p>Uniqueness on {@code (source_system, LOWER(external_name))} guarantees that an external name
- * resolves deterministically for the case-insensitive resolution lookup — a duplicate add
- * (including a case-only variant) returns HTTP 409. The constraint lives in the DB as the
- * functional unique index {@code uq_blueprint_external_alias_source_lower_name} (V176); it cannot
- * be expressed as a JPA {@code @UniqueConstraint} because of the {@code LOWER()} expression, so
- * there is intentionally no {@code uniqueConstraints} declaration here (REQ-INV-020).
+ * <p>Points at a product by its normalized {@link #productKey} rather than a single recipe. {@code
+ * (source_system, LOWER(external_name))} is unique in the database, so a duplicate add, including a
+ * case-only variant, returns HTTP 409 (REQ-INV-020).
  */
 @Entity
 @Table(name = "blueprint_external_alias")

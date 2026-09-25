@@ -43,26 +43,11 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.dataformat.cbor.CBORMapper;
 
 /**
- * CBOR must encode the <em>same document</em> as JSON, and by default it does not.
+ * Verifies that the registered CBOR converter encodes the same document as the JSON converter
+ * (REQ-API-011), notably UUIDs as strings rather than native binary.
  *
- * <p>REQ-API-011 says "same object model, same field names — only the bytes differ". That sentence
- * is the whole justification for offering a second encoding without a second contract, and it is
- * <b>false out of the box</b>: Jackson's {@code UUIDSerializer} asks the generator {@code
- * canWriteBinaryNatively()} and writes sixteen raw bytes when the answer is yes. JSON says no and
- * gets a string; CBOR says yes and gets binary. Every one of the 209 {@code string/uuid} properties
- * in the frozen contract changes representation.
- *
- * <p><b>It reached CI before it was caught, and the test that should have caught it was
- * vacuous.</b> {@code ApiCborNegotiationTest} compares the decoded trees of {@code
- * /api/v1/job-types} — whose {@code JobTypeDto} does carry a UUID — but that list is empty in the
- * test context, so it compared two empty arrays and passed. Five E2E write flows found it instead,
- * as ids rendering into the DOM as {@code AAAAAAAAAAAAAAAAAAAAAQ==}: base64 of the sixteen bytes of
- * {@code 00000000-0000-0000-0000-000000000001}.
- *
- * <p>So this test does not go through an endpoint at all. It takes the two converters Spring
- * actually registered and asks them to encode one value that deliberately carries every type whose
- * wire form could plausibly diverge — which is the only way to state the requirement rather than
- * sample it.
+ * <p>Encodes one value carrying every type whose wire form could diverge through the two converters
+ * Spring actually registered, without going through an endpoint.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -75,14 +60,14 @@ class CborJsonFidelityTest {
   /**
    * One value carrying every type whose CBOR form could differ from its JSON form.
    *
-   * @param id a UUID — the one that actually broke, and the reason this test exists
-   * @param ids a collection of them, because a list is the shape most responses use
+   * @param id a UUID, which CBOR would otherwise write as binary
+   * @param ids a list of UUIDs, the shape most responses use
    * @param money a {@code BigDecimal}, which CBOR can encode as a native decimal fraction
    * @param count a long, to catch a width or tagging difference
-   * @param when an {@code Instant}, which the time module may render as a number or a string
+   * @param when an {@code Instant}, which may render as a number or a string
    * @param kind an enum, whose name must survive as a name
-   * @param flag a boolean, as the trivial control
-   * @param text a string, likewise
+   * @param flag a boolean control value
+   * @param text a string control value
    */
   private record WireSample(
       UUID id,
@@ -161,13 +146,10 @@ class CborJsonFidelityTest {
   }
 
   /**
-   * Rewrites every numeric node to a canonical decimal so numbers compare by value.
+   * Rewrites every numeric node to a canonical decimal so numbers compare by value, since the two
+   * readers may produce different node types for the same decimal.
    *
-   * <p>Needed because the two readers disagree about the NODE TYPE of a decimal without disagreeing
-   * about its value, and a raw tree comparison would report that as a document difference. It is
-   * asserted on its own in {@link #decimalsDifferInScaleButNotInValue()} rather than hidden here.
-   *
-   * @param node the tree to normalise; modified in place and returned for convenience
+   * @param node the tree to normalise; modified in place
    * @return the same tree with numbers canonicalised
    */
   private static JsonNode normalise(JsonNode node) {
@@ -233,18 +215,14 @@ class CborJsonFidelityTest {
   }
 
   /**
-   * Writes a value with the converter Spring actually registered, and returns the bytes.
-   *
-   * <p>Through the converter rather than through a mapper this test built itself, because the
-   * mapper is the thing under test: a fidelity assertion against a locally constructed mapper would
-   * prove something true about a mapper nobody uses. The converters expose no accessor for theirs,
-   * so the way in is to make one write.
+   * Encodes a value with the converter Spring actually registered, so the mapper under test is the
+   * production one.
    *
    * @param type the converter class to use
    * @param mediaType the media type to write
    * @param value the value to encode
    * @return the encoded bytes
-   * @throws Exception if the converter refuses the value, which is itself a failure worth seeing
+   * @throws Exception if the converter refuses the value
    */
   @SuppressWarnings("unchecked")
   private byte[] encode(Class<?> type, MediaType mediaType, Object value) throws Exception {

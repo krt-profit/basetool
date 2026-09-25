@@ -24,16 +24,10 @@ import java.util.List;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * The seam that carries an app-originated {@code changed} frame beyond this JVM (ADR-0143).
+ * Carries an app-originated {@code changed} frame beyond this JVM (ADR-0143).
  *
- * <p>Two implementations: {@link LocalLiveSyncFanout} does nothing, which is correct because the
- * relay has already delivered to this instance's own streams before calling here; {@link
- * RedisLiveSyncFanout} additionally publishes onto the channel the web frontend both publishes to
- * and consumes, which is what makes an app write refresh open browsers.
- *
- * <p>Implementations must not throw. A fan-out failure is a degradation — peers keep their old view
- * until they refresh on their own cadence — and must never turn a successful mutation's follow-up
- * signal into a failed request.
+ * <p>Implementations must not throw: a fan-out failure only leaves peers with a stale view and must
+ * never fail the originating request.
  */
 public interface LiveSyncFanout {
 

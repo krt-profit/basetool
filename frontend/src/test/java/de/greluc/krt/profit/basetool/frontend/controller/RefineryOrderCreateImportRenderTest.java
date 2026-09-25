@@ -61,10 +61,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Full-template-render test of the refinery create page with a flashed import draft (#435): the
- * pre-filled goods rows (incl. duplicate materials), the inline row flags with suggestion chips,
- * and the summary banner must all survive Thymeleaf rendering — pure controller tests miss
- * render-time 500s, which has bitten this project before.
+ * Full-render test of the refinery create page with a flashed import draft: pre-filled goods rows
+ * (including duplicate materials), inline row flags with suggestion chips and the summary banner.
  */
 @SpringBootTest
 class RefineryOrderCreateImportRenderTest {
@@ -255,14 +253,9 @@ class RefineryOrderCreateImportRenderTest {
   }
 
   /**
-   * Graceful-degradation guard for the parallelized create-form catalog fan-out (#769): the lookups
-   * run concurrently through the real {@link de.greluc.krt.profit.basetool.frontend.service
-   * .ParallelPageLoader}, but each fetch helper swallows its own failure, so {@code
-   * allOf(...).join()} must never propagate an exception. Post-#1193 the owner picker no longer
-   * preloads the roster — it seeds only the owner's name via a single-user lookup — so this pins
-   * the seed path: with the owner-name resolution failing (the {@code /users/me} id fallback
-   * throws), the page still renders {@code 200} with an empty {@code seedUserNames} map and the
-   * populated {@code materials} attribute, exactly as the serial version degraded.
+   * Verifies that the create page still renders {@code 200} with an empty {@code seedUserNames} map
+   * and populated {@code materials} when the owner-name lookup fails during the parallel catalog
+   * fetch via {@link de.greluc.krt.profit.basetool.frontend.service .ParallelPageLoader}.
    */
   @Test
   void createPage_WhenOwnerSeedLookupFails_StillRendersWithEmptyMap() throws Exception {

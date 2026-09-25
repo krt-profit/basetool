@@ -49,31 +49,12 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Verifies the result contract of {@link JobOrderRepository#findAllActiveWithMaterials} — the query
- * behind {@code /api/v1/orders/lookup} that feeds the Auftrag (job-order) filter and the per-row
- * job-order selects of the warehouse (Lager) views. Two invariants are covered:
+ * Verifies {@link JobOrderRepository#findAllActiveWithMaterials} against PostgreSQL.
  *
  * <ul>
- *   <li><b>Ordering.</b> The pickers must rank orders the same way the Auftragsverwaltung does
- *       (default {@code priority,asc}): most-important priority first, orders without a priority
- *       last, with a stable {@code displayId DESC} tiebreaker.
- *   <li><b>Distinct roots (REQ-ORDERS-018).</b> Because the lookup eager-fetches the order's
- *       material requirements, an active order carrying several child rows across the fetched
- *       collections — material or item lines plus a handover — must still be returned <em>exactly
- *       once</em>, so a picker never renders a duplicated {@code <option>}. Hibernate de-duplicates
- *       fetch-join roots automatically; the query additionally no longer eager-fetches the unused
- *       MATERIAL handover collections, which on a MATERIAL order formed a {@code materials ×
- *       handovers} SQL cartesian. The two cases below lock the exactly-once invariant for both
- *       order kinds and confirm the reduced fetch graph still loads the lines it must.
+ *   <li>Ordering: priority ascending, nulls last, then {@code displayId} descending.
+ *   <li>Each order is returned exactly once despite fetched child collections (REQ-ORDERS-018).
  * </ul>
- *
- * <p>Run against the real Postgres test container (Flyway-migrated schema), so the {@code NULLS
- * LAST} semantics and the DB-generated {@code display_id} sequence are exercised at production
- * parity. The de-duplication cases {@link jakarta.persistence.EntityManager#clear() clear} the
- * persistence context before querying, so the lookup reads cold (as production does) instead of
- * resolving every result-set row back to the just-saved managed instance. The Testcontainer is
- * shared and other suites commit job-order rows, so each assertion filters the result down to the
- * ids created here rather than asserting a suite-global list.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -88,10 +69,8 @@ class JobOrderRepositoryActiveLookupOrderingTest {
   @PersistenceContext private EntityManager entityManager;
 
   /**
-   * Priorities are persisted out of order (30, 10, 20) so the result cannot pass by coincidence of
-   * insertion order, and two priority-less orders pin down the NULLS-LAST branch plus the {@code
-   * displayId DESC} tiebreaker: each is saved-and-flushed in turn, so the later one gets the higher
-   * generated {@code display_id} and must therefore sort ahead of the earlier one.
+   * Orders sort by priority ascending with nulls last, and priority-less orders by {@code
+   * displayId} descending.
    */
   @Test
   void findAllActiveWithMaterials_ordersByPriorityAscNullsLastThenDisplayIdDesc() {
@@ -118,12 +97,8 @@ class JobOrderRepositoryActiveLookupOrderingTest {
   }
 
   /**
-   * A {@code MATERIAL} order that carries several material lines <em>and</em> a handover is the
-   * case the removed {@code handovers} branch made wasteful: eager-fetching both the {@code
-   * materials} and the {@code handovers} collections multiplied the SQL result set into a {@code
-   * materials × handovers} cartesian. Hibernate de-duplicates the fetch-join roots, so the order
-   * must appear exactly once — and now that the handover branch is gone, its two material lines
-   * must still be fetched for the picker's required-material projection.
+   * A {@code MATERIAL} order with several lines and a handover is returned once with its material
+   * lines fetched.
    */
   @Test
   void findAllActiveWithMaterials_materialOrderWithLinesAndHandover_returnsRootExactlyOnce() {
@@ -153,13 +128,8 @@ class JobOrderRepositoryActiveLookupOrderingTest {
   }
 
   /**
-   * The {@code ITEM}-order counterpart of {@link
-   * #findAllActiveWithMaterials_materialOrderWithLinesAndHandover_returnsRootExactlyOnce}: an item
-   * order with two ordered lines (each nesting its derived material), plus a handover. The fetched
-   * {@code items}/{@code items.materials} nesting is a cartesian too, but a necessary one (the
-   * derived materials feed the picker); the order must be returned exactly once with both item
-   * lines fetched, so {@code JobOrderItemService.requiredMaterialIds}/{@code requiredGameItemIds}
-   * resolve without an N+1.
+   * An {@code ITEM} order with two lines and a handover is returned once with both item lines
+   * fetched.
    */
   @Test
   void findAllActiveWithMaterials_itemOrderWithLinesAndHandover_returnsRootExactlyOnce() {
@@ -191,8 +161,7 @@ class JobOrderRepositoryActiveLookupOrderingTest {
   }
 
   /**
-   * Persists one {@code OPEN} (hence active) job order owned by {@code owner} on both org-unit FKs
-   * and flushes immediately, so the DB assigns its {@code display_id} in call order.
+   * Persists and flushes an {@code OPEN} job order, so {@code display_id} follows call order.
    *
    * @param owner the responsible and requesting org unit (both {@code NOT NULL} FKs).
    * @param priority the manual priority rank, or {@code null} to exercise the NULLS-LAST branch.
@@ -284,10 +253,7 @@ class JobOrderRepositoryActiveLookupOrderingTest {
   }
 
   /**
-   * Attaches a single MATERIAL {@link JobOrderHandover} (with one handover item for {@code
-   * material}) to {@code order}, keeping the bidirectional link in sync so the cascade persists it.
-   * A structurally valid handover is enough to reproduce the former cartesian product with the
-   * order's other fetched collections.
+   * Attaches a material handover with one item for {@code material} to {@code order}.
    *
    * @param order the order to attach the handover to.
    * @param material the delivered material.

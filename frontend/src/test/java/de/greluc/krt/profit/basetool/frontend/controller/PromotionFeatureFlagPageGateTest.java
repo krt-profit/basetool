@@ -47,18 +47,11 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * End-to-end frontend assertion for the per-squadron promotion-feature flag's deny path.
+ * Verifies that every {@code /promotion/...} URL returns HTTP 403 for a non-admin whose home
+ * squadron has the promotion feature flag off, despite satisfying the role check.
  *
- * <p>When a non-admin caller's home squadron has the flag OFF, every {@code /promotion/...} URL the
- * user could still try (typed by hand, stale bookmark, stale tab) must come back as HTTP 403 — even
- * though the regular {@code @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")} on the admin- subpath
- * is satisfied. The gate runs inside the page-controller method body, layered on top of the role
- * check, by reading the {@code promotionFeatureEnabled} model attribute populated by {@link
- * OrgUnitContextAdvice}.
- *
- * <p>Sidebar visibility is enforced by a single {@code th:if="${promotionFeatureEnabled}"} on the
- * fragments/sidebar.html group; the model attribute that drives it is the same one the controller
- * gate reads, so verifying the deny path here also covers the hide path on the rendered sidebar.
+ * <p>The gate reads the {@code promotionFeatureEnabled} model attribute from {@link
+ * OrgUnitContextAdvice}, which also hides the sidebar group.
  */
 @SpringBootTest
 class PromotionFeatureFlagPageGateTest {

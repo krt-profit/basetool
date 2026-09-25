@@ -41,12 +41,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 /**
- * Unit tests for {@link InventoryItemCatalogService#findBookableItems} — the Lager item-catalog
- * picker read (REQ-INV-029, design §5.3/§5.4). Two behaviours need a pin: the blank-search
- * normalisation to the empty string (a {@code null} bind into the query's {@code
- * LOWER(CONCAT(...))} makes PostgreSQL infer {@code bytea} and fail at runtime — invisible to a
- * mock unless the argument is captured), and the projection through {@code
- * InventoryItemMapper.gameItemToReferenceDto}.
+ * Unit tests for {@link InventoryItemCatalogService#findBookableItems}, the Lager item-catalog
+ * picker read (REQ-INV-029): a blank search binds the empty string rather than {@code null}, and
+ * results map through {@code InventoryItemMapper.gameItemToReferenceDto}.
  */
 @ExtendWith(MockitoExtension.class)
 class InventoryItemCatalogServiceTest {

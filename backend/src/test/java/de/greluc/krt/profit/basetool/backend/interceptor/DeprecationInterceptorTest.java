@@ -144,10 +144,7 @@ class DeprecationInterceptorTest {
     assertNull(response.getHeader("Link"));
   }
 
-  /**
-   * A malformed {@code sunset} value warns at most once per handler, not on every request — {@code
-   * sunset()} is a compile-time constant, so re-warning per call would be pure noise.
-   */
+  /** A malformed {@code sunset} value warns at most once per handler, not on every request. */
   @Test
   void preHandle_withInvalidSunsetDate_warnsAtMostOncePerHandler() throws Exception {
     Logger logger = (Logger) LoggerFactory.getLogger(DeprecationInterceptor.class);

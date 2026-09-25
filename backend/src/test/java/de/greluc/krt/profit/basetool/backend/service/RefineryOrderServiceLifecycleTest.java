@@ -78,30 +78,9 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 
 /**
- * Lifecycle / CRUD test for {@link RefineryOrderService}, complementing the existing {@code
- * RefineryOrderServiceTest} which focuses on {@code storeRefineryOrder}. Covers:
- *
- * <ul>
- *   <li>{@link RefineryOrderService#getRefineryOrder} not-found path.
- *   <li>{@link RefineryOrderService#getMyRefineryOrders} (self list, with/without status filter).
- *   <li>{@link RefineryOrderService#getUserRefineryOrdersScoped} (cross-user oversight list — the
- *       org-unit-scoped path that closes finding SEC-01).
- *   <li>{@link RefineryOrderService#getAllRefineryOrders} (both overloads and with/without status
- *       filter).
- *   <li>{@link RefineryOrderService#getMissionRefineryOrdersScoped} (org-unit-scoped logistician
- *       path) and {@link RefineryOrderService#getMissionRefineryOrders(UUID, UUID)} (owner-filtered
- *       path).
- *   <li>{@link RefineryOrderService#createRefineryOrder} — every validation branch (User / Location
- *       / Mission / RefiningMethod lookups, location-must-have-refinery, goods validation including
- *       RAW-input-only, output-must-match-refined-of-input, output fallback chain), plus the {@code
- *       zeroToNull} normalisation of the optional money fields.
- *   <li>{@link RefineryOrderService#updateRefineryOrder} — version-check (which fires
- *       <em>before</em> the owner check), owner-check (non-logistician), logistician bypass,
- *       partial-update semantics (Location / Mission / RefiningMethod set or cleared), goods
- *       replacement.
- *   <li>{@link RefineryOrderService#deleteRefineryOrder} — actually a status flip to CANCELED, plus
- *       owner-check / logistician bypass.
- * </ul>
+ * Lifecycle and CRUD tests for {@link RefineryOrderService}: the not-found read, the self,
+ * cross-user, all-orders and mission lists, create validation, update with version and owner checks
+ * and partial semantics, and delete as a status flip to CANCELED.
  */
 @ExtendWith(MockitoExtension.class)
 class RefineryOrderServiceLifecycleTest {

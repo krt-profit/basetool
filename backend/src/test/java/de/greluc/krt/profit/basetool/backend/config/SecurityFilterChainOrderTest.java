@@ -37,31 +37,11 @@ import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
 /**
- * The order of the gates, which is a decision and not an accident.
+ * Asserts the order of the security gates: pending approval, then terms acceptance, then the
+ * per-subject rate limiter, so a refused caller is told what they can act on and never spends or
+ * dodges a rate token.
  *
- * <p><strong>Why this test exists at all.</strong> {@code SubjectRateLimitingFilter} used to be
- * anchored on {@code AnonymousPageSizeFilter} rather than on the terms filter, and the comment
- * beside it said why: {@code addFilterAfter} inserts directly after its anchor, so <em>two</em>
- * calls naming one anchor end up in reverse registration order. Naming the page-size filter was
- * what stated this filter's position instead of leaving it to the order the calls happen to appear
- * in. ADR-0159 deleted that filter — there is no unauthenticated caller left on a paginated path to
- * bound — and the limiter moved onto {@code TermsAcceptanceAccessFilter}, which today has exactly
- * one filter after it.
- *
- * <p>"Exactly one today" is a property of the current registrations, not of the code, and the next
- * filter registered on that anchor would silently swap the two. So the order is asserted here
- * rather than argued for in a comment: {@code ApiClientMetricsChainTest} pins the
- * bearer/metrics/acting-member edge at the top of the chain, and this pins the gate sequence below
- * it.
- *
- * <p>The sequence itself is load-bearing in both directions. Pending-approval before terms, so a
- * member who is both pending and unconsented is told the thing they can act on. Both before the
- * per-subject limiter, so a refused caller is turned away on its own terms rather than spending a
- * token first — and, symmetrically, so a client cannot hide from the rate counter behind its own
- * 403s.
- *
- * <p>The same context also sweeps the mapped endpoints for the limiter's export carve-out
- * (APPSEC-10): every handler that renders a document must be covered by it.
+ * <p>Also checks that every document-rendering endpoint is covered by the limiter's export budget.
  */
 @SpringBootTest
 class SecurityFilterChainOrderTest {
@@ -116,14 +96,9 @@ class SecurityFilterChainOrderTest {
   }
 
   /**
-   * Every API handler that renders a document — it answers with a raw {@code byte[]} body, which is
-   * how each PDF, statement and audit export in this codebase is returned — must fall under the
-   * per-subject export budget (REQ-SEC-033 carve-out, APPSEC-10).
-   *
-   * <p>The criterion is deliberately independent of the filter's own segment list: a new document
-   * endpoint whose path the list does not recognise fails here instead of silently riding the loose
-   * per-IP budget. Path variables are replaced by a placeholder before matching, since the filter
-   * sees concrete request paths.
+   * Every API handler returning a raw {@code byte[]} body must fall under the per-subject export
+   * budget (REQ-SEC-033), judged independently of the filter's own path list; path variables are
+   * replaced by a placeholder before matching.
    */
   @Test
   @DisplayName("every document-rendering endpoint spends from the export budget")

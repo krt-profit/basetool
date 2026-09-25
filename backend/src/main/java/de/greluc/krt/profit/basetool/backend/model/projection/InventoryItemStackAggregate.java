@@ -25,16 +25,11 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.User;
 
 /**
- * Read-only GROUP BY projection of one game-item inventory <em>stack</em> — the item-catalog
- * sibling of {@link InventoryStackAggregate} (REQ-INV-029, ADR-0101). Game-item rows carry no
- * quality dimension, so the stack key is ({@code gameItem}, {@code user}, {@code location}, {@code
- * personal}, {@code owningOrgUnit}) and the quality aggregates of the material projection have no
- * counterpart here. One row of this projection equals one display stack of the Lager item views;
- * the underlying append-only entries are fetched lazily and paginated on expand (REQ-INV-005), the
- * same as material stacks.
+ * Read-only GROUP BY projection of one game-item inventory stack, the item counterpart of {@link
+ * InventoryStackAggregate} (REQ-INV-029). The stack key has no quality dimension; entries are
+ * loaded lazily on expand (REQ-INV-005).
  *
- * @param gameItem the grouping game item shared by every entry in the stack; never {@code null} —
- *     the producing queries filter on {@code gameItem IS NOT NULL}
+ * @param gameItem the grouping game item shared by every entry in the stack; never {@code null}
  * @param user the owning user shared by every entry
  * @param location the storage location shared by every entry
  * @param personal whether the stack holds private (owner-only) stock

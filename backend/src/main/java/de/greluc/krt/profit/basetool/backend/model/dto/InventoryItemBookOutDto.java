@@ -30,53 +30,17 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Data transfer record carrying Inventory Item Book Out payload.
+ * Book-out request for an inventory entry: discard, sell or transfer an amount.
  *
- * <p>R5.d.g added the trailing {@link #targetOwningOrgUnitId} picker output. Applies only to the
- * {@link CheckoutType#TRANSFER} branch — the cross-user transfer flow lands the new {@link
- * de.greluc.krt.profit.basetool.backend.model.InventoryItem} row on the picked org unit instead of
- * the pool the destination user would otherwise be auto-stamped into. The service routes the stamp
- * through {@code OwnerScopeService.resolveOrgUnitForPickerOutputNullable(targetUser,
- * targetOwningOrgUnitId)} — which delegates to {@code OrgUnitStampingService.resolveStampedOrgUnit}
- * and therefore accepts <b>all four</b> org-unit kinds: Staffel, Spezialkommando, Bereich and
- * Organisationsleitung. (The strict, Staffel-only {@code resolveSquadronForPickerOutput} is
- * <em>not</em> on this path, so its "Spezialkommando ownership of this aggregate is not yet
- * supported" rejection never fires here.) The Umbuchen picker matches that acceptance rule by
- * fetching {@code /users/&#123;id&#125;/memberships?allKinds=true}.
+ * <p>{@link #targetOwningOrgUnitId}, {@link #mergeStock} and the transfer target apply only to
+ * {@link CheckoutType#TRANSFER}. A non-null org-unit pick must be a direct membership of the
+ * destination user or an org unit the caller may edit (REQ-ORG-016); {@code null} auto-stamps
+ * (REQ-ORG-017). {@link #mergeStock} is a non-persisted per-action opt-in (REQ-INV-026).
  *
- * <p>A non-null pick is honoured when it is one of the <em>destination</em> user's DIRECT
- * memberships — intentional cross-org-unit semantics per plan §D4: User A from Staffel-X may book
- * out into User B's Spezialkommando-Y stock as long as User B is a member of Y — <em>or</em> when
- * it is an org unit the current <b>caller</b> may edit ({@code AccessGateService.canEditOrgUnit},
- * cascade-aware), the create-on-behalf widening of epic #692 Phase 4 / REQ-ORG-016 that lets a
- * Bereichsleitung/OL place the recipient's row in a subordinate unit they oversee. A pick that is
- * neither is rejected with 400.
- *
- * <p>When {@code null}, the resolver auto-stamps a single-membership target, honours an
- * active-context pin onto one of the target's own units (REQ-ORG-017 "pin, else choose"), rejects a
- * multi-membership target that has neither with 400, and yields an ownerless row ({@code
- * owningOrgUnit == null}, legal since V132) for a membershipless target.
- *
- * <p>Ignored for {@link CheckoutType#DISCARD} and {@link CheckoutType#SELL} — both terminate the
- * inventory row and never create a new ownership stamp.
- *
- * <p>{@link #mergeStock} is the per-action stock-merge opt-in (REQ-INV-026) and applies only to the
- * {@link CheckoutType#TRANSFER} branch — the moved quantity lands as a new row at the target, and a
- * {@code PIECE} material merges it into a matching target stack unconditionally while an {@code
- * SCU} material merges only when this flag is {@code true}. It is never persisted and governs only
- * this one transfer.
- *
- * <p>{@link #jobOrderReductions} and {@link #missionReductions} are the Variante-C "deduct from"
- * plan (REQ-INV-027): because an entry's job-order and mission splits are two independent taggings
- * of the same stock, the single deducted {@link #amount} is sourced separately per dimension. Each
- * list names the earmark slices to shrink and by how much; whatever a dimension's reductions leave
- * uncovered is taken from that dimension's not-yet-assigned rest. A {@code null} / empty list means
- * "take it all from the rest" (the legacy behaviour, which 422s when the rest is too small). On a
- * {@link CheckoutType#TRANSFER} the reduced tags move to the new target row (the moved stock stays
- * earmarked); on a {@link CheckoutType#SELL} the mission reductions additionally drive the proceeds
- * split — mission {@code j} is credited {@code sellAmount × amount_j / amount} of the sale (for
- * missions the seller participates in), the rest staying the seller's personal proceeds, so no
- * separate income-attribution input exists any more.
+ * <p>{@link #jobOrderReductions} and {@link #missionReductions} name how much of {@link #amount}
+ * comes out of each earmark slice per dimension; the remainder, or everything when a list is {@code
+ * null} or empty, comes from that dimension's unassigned rest (REQ-INV-027). On a sell, the mission
+ * reductions also split the proceeds among the missions.
  */
 public record InventoryItemBookOutDto(
     @NotNull @Min(0) Double amount,

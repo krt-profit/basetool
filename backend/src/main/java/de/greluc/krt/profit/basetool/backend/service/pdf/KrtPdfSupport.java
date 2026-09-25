@@ -44,22 +44,11 @@ import org.openpdf.text.pdf.PdfPageEventHelper;
 import org.openpdf.text.pdf.PdfWriter;
 
 /**
- * Shared KRT-corporate-design layer for every PDF the backend renders (handover reports, bank
- * statement, bank three-month report — epic #556 Phase 3). Centralizes what the two handover
- * services used to duplicate: the DAS KARTELL color palette, the page-background event (dark fill,
- * a thin orange top-accent bar, bottom-right logo), the meta/table cell helpers and — new with this
- * layer — the embedded Lato fonts (design-system typography, REQ-BANK-017).
+ * Shared KRT corporate-design layer for every backend PDF: the color palette, the page background,
+ * the meta and table cell helpers and the embedded Lato fonts (REQ-BANK-017).
  *
- * <p>Colour usage follows the design system's action hierarchy (REQ-UI-002 / REQ-UI-003): orange is
- * an <em>accent</em> for headings and identity only (title, section headers, the single line under
- * a table header, the chart line, the top bar, the logo); surfaces are black / {@link
- * #COLOR_DARK_GRAY} / {@link #COLOR_SURFACE_INPUT} and every data-cell grid line is the neutral
- * {@link #COLOR_HAIRLINE}, so the orange never overwhelms the document.
- *
- * <p>Lato is embedded with {@link BaseFont#WINANSI} encoding on purpose: WinAnsi keeps the text
- * operators byte-readable in the (uncompressed, see {@link #open(OutputStream)}) content stream, so
- * the existing plain-byte content assertions and {@code PdfTextExtractor} both keep working, while
- * the glyphs still come from the bundled OFL-licensed TTFs ({@code fonts/OFL.txt}).
+ * <p>Orange is an accent only (REQ-UI-002); surfaces and grid lines are neutral. Lato is embedded
+ * with {@link BaseFont#WINANSI} so the uncompressed content stream stays text-extractable.
  */
 @Slf4j
 public final class KrtPdfSupport {
@@ -71,12 +60,8 @@ public final class KrtPdfSupport {
   public static final Color COLOR_DARK_GRAY = new Color(0x14, 0x14, 0x14);
 
   /**
-   * DAS KARTELL primary orange (design token {@code --color-primary}). Per the design system's
-   * action hierarchy (REQ-UI-002) orange marks <em>action and identity</em> only: the title, the
-   * section headings, the single accent line under each table header, the balance-chart line, the
-   * thin page top-accent bar and the logo. It is deliberately <strong>not</strong> used for surface
-   * fills or the borders framing plain data cells — those are {@link #COLOR_SURFACE_INPUT} and
-   * {@link #COLOR_HAIRLINE} — so the orange stays an accent and never overwhelms the page.
+   * DAS KARTELL primary orange ({@code --color-primary}), used only for titles, headings, header
+   * accent lines, the chart line, the top bar and the logo (REQ-UI-002).
    */
   public static final Color COLOR_ORANGE = new Color(0xE7, 0x7E, 0x23);
 
@@ -266,10 +251,8 @@ public final class KrtPdfSupport {
   }
 
   /**
-   * Adds a header cell to a data table: white bold uppercase text on the dark half-step surface
-   * fill, framed by the neutral hairline grid, with the table's single orange brand accent drawn as
-   * a thicker line along the bottom edge. This keeps the header readable and on-brand without the
-   * full orange fill that would make orange dominate the page (REQ-UI-002 / REQ-UI-003).
+   * Adds a header cell to a data table: white bold text on the dark surface, hairline border and an
+   * orange accent line along the bottom (REQ-UI-002).
    *
    * @param table the data table
    * @param text the (uppercase) column label
@@ -343,25 +326,20 @@ public final class KrtPdfSupport {
   }
 
   /**
-   * Adds a full-width detail sub-row directly beneath the booking row it belongs to
-   * (REQ-BANK-044/-045): the Begr&uuml;ndung and Notiz of a booking, carved out of the main row
-   * into an indented secondary line so the row above stays narrow (the account views have little
-   * horizontal room). The reason is rendered <em>first</em> — it is the more important field — each
-   * value behind a muted bold label. The cell is visually tied to its booking: it drops its top
-   * border so it butts against the row above, keeps that row's alternating background band and
-   * hangs from a left indent. Call it only for a booking that actually has a reason and/or a note.
+   * Adds a full-width, indented detail sub-row under a booking row with its Begr&uuml;ndung, Notiz
+   * and staff note (REQ-BANK-044), sharing the parent row's background. Call it only when the
+   * booking has at least one of them.
    *
    * @param table the data table
    * @param reasonLabel the localized "Begr&uuml;ndung" label
-   * @param reason the justification text, or an empty string when the booking has none
+   * @param reason the justification text, or an empty string
    * @param noteLabel the localized "Notiz" label
-   * @param note the note text, or an empty string when the booking has none
+   * @param note the note text, or an empty string
    * @param staffNoteLabel the localized "Notiz Bankmitarbeiter" label
-   * @param staffNote the booking employee's own note (REQ-BANK-054), or an empty string when the
-   *     booking has none or the caller must not see it (the Halter-redacted member statement)
-   * @param background the parent row's background ({@link #rowBackground(boolean)}) so the sub-row
-   *     reads as the same zebra band
-   * @param colspan the number of columns to span (the full table width)
+   * @param staffNote the employee's note (REQ-BANK-054), or an empty string when absent or hidden
+   *     from the caller
+   * @param background the parent row's background ({@link #rowBackground(boolean)})
+   * @param colspan the number of columns to span
    */
   public static void addDetailSubRow(
       @NotNull PdfPTable table,
@@ -410,11 +388,7 @@ public final class KrtPdfSupport {
   }
 
   /**
-   * Adds a small italic explanatory note paragraph.
-   *
-   * <p>For a sentence the document has to say about itself rather than about its data — why a
-   * summary is a summary, or that third-party names were removed. Rendered small and italic so it
-   * reads as an annotation and not as content.
+   * Adds a small italic note paragraph for a statement about the document itself.
    *
    * @param krt the open document handle
    * @param text the localized note
@@ -427,10 +401,8 @@ public final class KrtPdfSupport {
   }
 
   /**
-   * Adds the centered footer line {@code "Generiert von Profit Basetool am <date> <time> UTC"},
-   * preceded by a spacer. The generation timestamp is always rendered in UTC — independent of any
-   * per-request user zone used for the document's other timestamps — so the footer is an
-   * unambiguous audit stamp.
+   * Adds the centered footer {@code "Generiert von Profit Basetool am <date> <time> UTC"} after a
+   * spacer; the timestamp is always UTC.
    *
    * @param krt the open document handle
    */
@@ -477,9 +449,8 @@ public final class KrtPdfSupport {
   }
 
   /**
-   * PdfPageEvent painting the KRT corporate-design background on every page: black fill, a single
-   * thin orange top-accent bar (the brand marker — the bottom/left bars were dropped so orange
-   * stays an accent, not a frame) and the KRT logo bottom-right — identical on pages 2+.
+   * Page event painting the KRT background on every page: black fill, a thin orange top bar and the
+   * logo bottom-right.
    */
   private static class KrtPageBackground extends PdfPageEventHelper {
 

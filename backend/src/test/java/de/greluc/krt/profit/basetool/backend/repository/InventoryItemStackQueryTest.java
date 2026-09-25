@@ -31,15 +31,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
- * Boots the real Postgres test schema (Testcontainers + Flyway via the {@code test} profile) and
- * executes every group-on-read stack query introduced for the append-only lazy-load Lager
- * (ADR-0003, REQ-INV-002) against an empty table. The point is to validate that the JPQL actually
- * parses and runs on Postgres — in particular the entity-argument constructor expression and the
- * eight-dimension {@code GROUP BY} of {@link InventoryItemRepository#findGlobalStacks} / {@link
- * InventoryItemRepository#findUserStacks}, plus the null-safe stack-key matching of the two
- * paginated entry drill-downs. Aggregate-math and grouping correctness is covered by the
- * service-level tests; this is the SQL smoke test that fails loudly if a query is malformed for the
- * real dialect.
+ * Runs every group-on-read stack query against an empty PostgreSQL table to verify that the JPQL
+ * parses and executes on the real dialect (REQ-INV-002).
  */
 @SpringBootTest
 class InventoryItemStackQueryTest {

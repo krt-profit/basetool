@@ -22,12 +22,11 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import java.util.UUID;
 
 /**
- * Outbound projection of one job-order slice of an inventory entry (Variante C, REQ-INV-027): the
- * earmarked order plus the {@code amount} of the entry's stock allocated to it. Rendered as an
- * orange chip with its amount; the sum of an entry's slices stays ≤ the entry amount.
+ * One job-order slice of an inventory entry: the earmarked order and the amount allocated to it
+ * (REQ-INV-027).
  *
  * @param jobOrderId the earmarked job order's id
- * @param jobOrderDisplayId the order's human display id (the {@code #NNNN} shown on the chip)
- * @param amount the quantity of the entry's stock allocated to this order (SCU, 3-decimal)
+ * @param jobOrderDisplayId the order's human display id
+ * @param amount the quantity allocated to this order (SCU, 3-decimal)
  */
 public record JobOrderAllocationDto(UUID jobOrderId, Integer jobOrderDisplayId, Double amount) {}

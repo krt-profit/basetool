@@ -22,14 +22,11 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import java.util.UUID;
 
 /**
- * One ranked master-data candidate offered for a raw screen name that the refinery screenshot
- * import could not (or only fuzzily) match (#434, plan §7.5). The review UI lists these highest
- * score first so the user assigns the intended material with one click instead of searching the
- * full catalogue — the refinery counterpart of {@link BlueprintImportSuggestionDto}.
+ * One ranked material candidate for a raw screen name the refinery screenshot import could not
+ * match exactly.
  *
- * @param id id of the candidate {@code Material} (echoed back when the user picks it)
- * @param name display name of the candidate, e.g. {@code "Stileron (Raw)"}
- * @param score similarity to the raw screen name in {@code [0.0, 1.0]} (1.0 = identical after
- *     canonical folding)
+ * @param id id of the candidate {@code Material}
+ * @param name display name of the candidate
+ * @param score similarity in {@code [0.0, 1.0]}
  */
 public record ImportSuggestionDto(UUID id, String name, double score) {}

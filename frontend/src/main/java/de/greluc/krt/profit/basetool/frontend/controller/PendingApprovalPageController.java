@@ -36,21 +36,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
- * Renders the account-status page that a registration without access is routed to (epic #720, Track
- * 1, REQ-SEC-017). A brand-new Discord user lands here — they are authenticated but their only
- * authority is {@code ROLE_PENDING_APPROVAL}, so {@link BackendRoleSyncFilter} redirects every
- * other request here until an admin decides. The page itself is exempt from that redirect (else it
- * would loop), as is the {@link #status()} poll it drives.
- *
- * <p><b>The filter routes {@code PENDING} and {@code REJECTED} to the same path; this controller
- * splits them again for the render.</b> The two states are deliberately equivalent for access
- * control (both carry no authorities), but they owe the user opposite messages. A {@code REJECTED}
- * registration is terminal — {@code UserRegistrationService} answers a decision on anything but a
- * still-{@code PENDING} row with a {@code 409} — so showing it the waiting copy tells a user whose
- * decision has already been made against them to keep waiting for it. That is how a rejection from
- * 2026-06-29 was still being reported as a stuck approval weeks later, and with {@code
- * app.mail.enabled=false} on production the rejection mail (REQ-NOTIF-014) that would otherwise
- * have closed the loop never went out either, leaving this page as the user's only channel.
+ * Renders the account-status page to which {@link BackendRoleSyncFilter} routes a registration
+ * without access (REQ-SEC-017). The page and its {@link #status()} poll are exempt from that
+ * redirect. Pending, rejected and role-less registrations each get their own copy.
  */
 @Controller
 @UsesLayoutModel
@@ -77,13 +65,8 @@ public class PendingApprovalPageController {
   static final String MODEL_REJECTED = "registrationRejected";
 
   /**
-   * Model attribute selecting the role-less copy (REQ-SEC-053) and suppressing the status poll.
-   *
-   * <p>Its own attribute rather than a third value of {@link #MODEL_REJECTED}, because the three
-   * states are not degrees of the same thing: a pending member waits for a decision that has been
-   * asked for, a rejected one has been answered, and a role-less one has already been approved and
-   * is waiting for a role nobody has been asked to grant. Telling the third to wait for approval
-   * points them at an administrator who has already acted.
+   * Model attribute selecting the copy for an approved account without a role (REQ-SEC-053) and
+   * suppressing the status poll.
    */
   static final String MODEL_NO_ROLE = "registrationNoRole";
 
@@ -92,33 +75,16 @@ public class PendingApprovalPageController {
   /**
    * Renders the account-status page, choosing its copy from the caller's live approval status.
    *
-   * <p>{@code ACTIVE} alone does not belong here: the approval redirect fires only for a
-   * non-approved registration, so such a caller normally arrived via a stale bookmark or a tab left
-   * open across the approval — and is sent to the dashboard rather than shown a waiting page for an
-   * approval they already hold. {@code REJECTED} renders the rejection copy and suppresses the poll
-   * script. Every other outcome — {@code PENDING}, and an unreadable backend — renders the waiting
-   * copy, so a backend outage can never tell a still-pending member they were declined.
-   *
-   * <p><b>A role-less caller is the exception, and it is not a corner case — it is this page's
-   * other reason to exist.</b> Such an account IS approved, so the registration endpoint answers
-   * {@code ACTIVE} for it; sending it to the dashboard on that alone hands it straight back to
-   * {@link BackendRoleSyncFilter}, which meets the same {@code 403 NO_ROLE} and returns it here.
-   * Because the redirect also clears the cached verdict, neither side ever settles: the browser
-   * gives up with a redirect-cap error, which is how the E2E suite found it. The role-less verdict
-   * is therefore read <em>before</em> the redirect and suppresses it.
-   *
-   * <p>The {@code ACTIVE} redirect MUST invalidate the session's cached approval verdict first.
-   * This page is reached because {@link BackendRoleSyncFilter} believes the caller is not approved,
-   * and that belief is served from the session for up to its re-check interval — so redirecting
-   * without clearing it makes the two disagree and bounces the browser between {@code /} and here
-   * until the cache expires. Neither hop costs a backend read, so the loop runs at full speed into
-   * the browser's redirect cap rather than merely being slow.
+   * <p>{@code REJECTED} renders the rejection copy without the poll; a role-less caller renders the
+   * role-less copy; any other {@code ACTIVE} caller is redirected to the dashboard after the
+   * session's cached approval verdict is cleared. {@code PENDING} and an unreadable backend render
+   * the waiting copy.
    *
    * @param model receives {@link #MODEL_REJECTED}
-   * @param request supplies the session whose stale verdict the {@code ACTIVE} redirect clears; no
-   *     session is created if there is none
+   * @param request supplies the session whose cached verdict the {@code ACTIVE} redirect clears; no
+   *     session is created
    * @return the {@code pending-approval} view name, or a redirect to the dashboard when the caller
-   *     turns out to be approved
+   *     is approved
    */
   @GetMapping("/pending-approval")
   @NotNull
@@ -135,13 +101,8 @@ public class PendingApprovalPageController {
   }
 
   /**
-   * Backs the waiting page's status poll (REQ-SEC-017): returns the caller's live approval status
-   * so the page can send them into the tool the moment an admin approves, instead of leaving them
-   * to discover it by logging out and back in — and so a decision that lands while the page is open
-   * replaces the waiting copy in place rather than leaving stale text on screen.
-   *
-   * <p>A backend failure is reported as an unknown status rather than an error, so the page simply
-   * keeps polling.
+   * Returns the caller's live approval status for the waiting page's poll (REQ-SEC-017); a backend
+   * failure yields an unknown status so the page keeps polling.
    *
    * @return the caller's approval status, or a {@code null} status when the backend could not be
    *     read
@@ -154,15 +115,9 @@ public class PendingApprovalPageController {
   }
 
   /**
-   * Reads the caller's own approval status from the backend, degrading a backend failure to an
-   * unknown status. Shared by the render and the poll so the two can never disagree about what an
-   * unreadable backend means.
-   *
-   * <p>A dead token is deliberately NOT swallowed: {@code ReauthenticationRequiredException}
-   * propagates to {@code GlobalExceptionHandler}, which answers the poll with the {@code 401} +
-   * {@code X-Reauthenticate} contract and the page render with a redirect into the Keycloak login
-   * flow (REQ-SEC-012), so the browser re-authenticates instead of polling a session that can no
-   * longer reach the backend.
+   * Reads the caller's approval status from the backend, mapping a backend failure to {@code null}.
+   * A {@code ReauthenticationRequiredException} propagates so the browser re-authenticates
+   * (REQ-SEC-012).
    *
    * @return {@code PENDING} / {@code ACTIVE} / {@code REJECTED}, or {@code null} when the backend
    *     could not be read

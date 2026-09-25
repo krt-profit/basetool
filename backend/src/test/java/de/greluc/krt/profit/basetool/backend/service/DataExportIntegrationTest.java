@@ -45,19 +45,10 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Integration coverage for the Art. 15 / Art. 20 data export against the real Postgres test
- * container (REQ-SEC-058).
+ * Integration tests for the data export against real Postgres (REQ-SEC-058).
  *
- * <p>The property this class exists for is the one the handover plan called the hardest thing to
- * get subtly wrong, and asked to be treated as a test rather than a review comment: <b>no other
- * member's handle appears in an export.</b> It is asserted here across the whole document, not per
- * section, because a leak introduced by a future section would otherwise only be caught by somebody
- * re-reading that section's SQL.
- *
- * <p>It also runs all ~29 statements against the real schema. A registry of hand-written SQL is
- * exactly the kind of thing that compiles and type-checks while naming a column that was renamed
- * two migrations ago, and the first person to find out must not be somebody answering a legal
- * request.
+ * <p>Asserts across the whole document that no other member's handle appears, and runs every export
+ * statement against the real schema.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -70,12 +61,8 @@ class DataExportIntegrationTest {
   private static final String OTHER_HANDLE = "ZzzOtherMemberHandleZzz";
 
   /**
-   * A person who has <em>no account</em> — a job order's external contact, which is the common case
-   * for {@code job_order.handle}.
-   *
-   * <p>The distinction is the point of {@link #anAuditSubjectLabelNeverReachesTheExport()}: {@link
-   * HandleScrubber} is built from the roster, so it can never match this name. Only the projection
-   * can keep it out, which is why the column is dropped rather than scrubbed.
+   * An external contact without an account, which {@link HandleScrubber} cannot match, so only the
+   * projection can keep it out of the export.
    */
   private static final String EXTERNAL_CONTACT = "ZzzExternalContactZzz";
 
@@ -150,12 +137,11 @@ class DataExportIntegrationTest {
   }
 
   /**
-   * Creates a committed audit row carrying a subject label, in the shape the job-order trails
-   * write: {@code #<displayId> '<handle>'}.
+   * Creates a committed audit row with a job-order style subject label.
    *
    * @param actor the acting member, or {@code null} when the member is only the target
    * @param target the member the action was performed on, or {@code null}
-   * @param subjectLabel the label to snapshot, which is what this test is about
+   * @param subjectLabel the subject label to snapshot
    */
   private void auditEvent(UUID actor, UUID target, String subjectLabel) {
     transactionTemplate.executeWithoutResult(

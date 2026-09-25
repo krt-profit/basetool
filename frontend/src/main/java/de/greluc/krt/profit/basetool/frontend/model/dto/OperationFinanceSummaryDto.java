@@ -24,10 +24,8 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Frontend mirror of the backend {@code OperationFinanceSummaryDto}: the lightweight operation
- * finance roll-up (operation-wide total + one total line per mission) that drives the
- * operation-detail "Ergebnis je Einsatz" bars and the Gesamtergebnis. Each mission's per-entry
- * breakdown loads lazily via {@code GET /operations/{id}/finance/{missionId}} (#1121).
+ * Frontend mirror of the backend {@code OperationFinanceSummaryDto}: the operation-wide total plus
+ * one total line per mission; per-mission breakdowns load separately.
  *
  * @param operationId the operation the roll-up belongs to
  * @param totalSum operation-wide signed bottom line — the sum of the returned mission totals

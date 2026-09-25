@@ -40,42 +40,18 @@ import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * A single wanted-listing (Gesuch) on the Materialbörse — something its owner is <b>looking for</b>
- * (REQ-MARKET-015…). It is the inverse of a {@link MaterialExchangeOffer}: instead of releasing
- * owned stock, a member advertises what they want, in which minimum quality and quantity, so other
- * members can signal they can supply it. Negotiation and handover happen off-tool between the
- * players, exactly like an offer (REQ-MARKET-003, signal-only).
- *
- * <p>A request is one of two {@link MaterialExchangeRequestKind kinds}, discriminated by {@link
- * #kind}:
+ * A wanted-listing (Gesuch) on the Materialbörse (REQ-MARKET-015): what a member is looking for, in
+ * which minimum quality and quantity; negotiation happens off-tool.
  *
  * <ul>
- *   <li>A {@link MaterialExchangeRequestKind#MATERIAL} request names a catalogue {@link Material}
- *       ({@link #requestedMaterial}) the member wants, in a stated {@link #requestedAmount} (SCU or
- *       Stück per the material's {@link Material#getQuantityType() quantity type}); {@link
- *       #itemProductKey}/{@link #itemName}/{@link #itemQuantity} are {@code null}.
- *   <li>An {@link MaterialExchangeRequestKind#ITEM} request names a craftable item ("an item for
- *       which a blueprint exists") by its normalized {@link #itemProductKey} — with the display
- *       {@link #itemName} snapshotted at posting — in a stated whole-piece {@link #itemQuantity};
- *       {@link #requestedMaterial}/{@link #requestedAmount} are {@code null}.
+ *   <li>A {@link MaterialExchangeRequestKind#MATERIAL} request names {@link #requestedMaterial} and
+ *       {@link #requestedAmount}.
+ *   <li>An {@link MaterialExchangeRequestKind#ITEM} request names a craftable item by {@link
+ *       #itemProductKey} with {@link #itemQuantity}.
  * </ul>
  *
- * <p>Either kind may carry an optional {@link #minQuality} (0–1000) the requester desires; unlike
- * an offer's live-read quality this is a stated preference and is kept even for an item request
- * (items carry no intrinsic quality, so it is purely the requester's wish, REQ-MARKET-015). There
- * is deliberately <b>no backing {@code InventoryItem}</b>: the member states the identity and
- * quantity directly (closest to a free-stated item offer), so none of the offer's stock-derived
- * rules (clamp-on-read, ratchet-on-decrement, one-active-per-Lager-row) apply.
- *
- * <p>{@link #owner} (the requester) and {@link #owningOrgUnit} are stamped from the acting member
- * at posting time so the board list and the "Meine Gesuche" filter never have to join for ownership
- * or the squadron badge.
- *
- * <p>Requests are <b>signal-only</b>: posting one never moves inventory. Fulfilment signals ("Ich
- * kann liefern") are an independent aggregate ({@link MaterialExchangeRequestInterest}, no mapped
- * collection here), so signalling or withdrawing never bumps this request's {@code @Version}. There
- * is no one-active-per-row uniqueness — a member may list the same material or item several times
- * (REQ-MARKET-015).
+ * <p>An optional {@link #minQuality} applies to either kind. There is no backing Lager row.
+ * Requests are signal-only; supply signals live in {@link MaterialExchangeRequestInterest}.
  */
 @Entity
 @Getter
@@ -92,33 +68,25 @@ public class MaterialExchangeRequest extends AbstractEntity<UUID> {
   private UUID id;
 
   /**
-   * Which kind of request this is — a catalogue {@link MaterialExchangeRequestKind#MATERIAL}
-   * request or a blueprint-product {@link MaterialExchangeRequestKind#ITEM} request. Drives which
-   * of the two mutually-exclusive branches ({@link #requestedMaterial}/{@link #requestedAmount} vs
-   * {@link #itemProductKey}/{@link #itemName}/{@link #itemQuantity}) is populated; the DB {@code
-   * CHECK} (V224) enforces the exclusivity.
+   * The request kind, deciding whether {@link #requestedMaterial}/{@link #requestedAmount} or
+   * {@link #itemProductKey}/{@link #itemName}/{@link #itemQuantity} is populated; a DB {@code
+   * CHECK} enforces the exclusivity.
    */
   @Enumerated(EnumType.STRING)
   @Column(name = "request_kind", nullable = false, length = 16)
   private MaterialExchangeRequestKind kind;
 
   /**
-   * The catalogue material this request is for — always set for a {@link
-   * MaterialExchangeRequestKind#MATERIAL} request, {@code null} for an {@link
-   * MaterialExchangeRequestKind#ITEM} request. {@code ON DELETE CASCADE} (V224) removes the request
-   * if the material is ever deleted, so the board never lists a request whose material no longer
-   * exists.
+   * The requested catalogue material: set for a material request, {@code null} for an item request.
+   * Deleting the material cascades to the request.
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "requested_material_id")
   private Material requestedMaterial;
 
   /**
-   * The normalized blueprint {@code product_key} of an {@link MaterialExchangeRequestKind#ITEM}
-   * request ({@code null} for a material request). This is the canonical identity of a craftable
-   * item, shared with {@code personal_blueprint} / {@code default_blueprint}; a posting validates
-   * it against {@code BlueprintProductService.resolveByProductKey(...)} so only items an active
-   * blueprint produces can be requested (mirroring REQ-MARKET-012).
+   * The normalized blueprint {@code product_key} of an item request ({@code null} for a material
+   * request), validated on posting so only items an active blueprint produces can be requested.
    */
   @Column(name = "item_product_key", length = 255)
   private String itemProductKey;
@@ -141,22 +109,15 @@ public class MaterialExchangeRequest extends AbstractEntity<UUID> {
   private Integer itemQuantity;
 
   /**
-   * The desired quantity of a {@link MaterialExchangeRequestKind#MATERIAL} request, in the
-   * material's own unit (SCU for bulk materials, Stück for {@code PIECE} materials); {@code null}
-   * for an {@link MaterialExchangeRequestKind#ITEM} request, which states its quantity in {@link
-   * #itemQuantity} instead. Stored as a {@link Double} to carry SCU fractions, rounded to
-   * three-decimal SCU precision on write. The DB {@code CHECK} (V224) requires it to be positive.
+   * The desired quantity of a material request in the material's own unit (SCU or Stück), rounded
+   * to three decimals and positive; {@code null} for an item request.
    */
   @Column(name = "requested_amount")
   private Double requestedAmount;
 
   /**
-   * The optional minimum desired quality (0–1000) the requester is looking for. May be set for
-   * <b>either</b> kind (REQ-MARKET-015): a material request naturally has a desired quality, and an
-   * item request may carry one as a pure requester preference even though items have no intrinsic
-   * quality. {@code null} when the requester states no quality floor. The 0–1000 bound is enforced
-   * by the DB {@code CHECK} (V224), which — unlike an offer — the request owns directly, since
-   * there is no backing Lager row to inherit it from.
+   * Optional minimum desired quality (0–1000) for either request kind; {@code null} when no floor
+   * is stated.
    */
   @Column(name = "min_quality")
   private Integer minQuality;
@@ -171,19 +132,16 @@ public class MaterialExchangeRequest extends AbstractEntity<UUID> {
   private User owner;
 
   /**
-   * The requesting player's org unit at posting, used to render the squadron badge. Nullable for a
-   * requester who belongs to no Staffel/SK; {@code ON DELETE SET NULL} (V224) drops the badge if
-   * the org unit is later removed.
+   * The requesting player's org unit at posting, used for the squadron badge; {@code null} when the
+   * requester belongs to no Staffel/SK or the org unit was removed.
    */
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "owning_org_unit_id")
   private OrgUnit owningOrgUnit;
 
   /**
-   * The free-form Markdown description ("was bietest du im Gegenzug? / weitere Details"), up to 20
-   * 000 characters. Stored raw; rendered server-side through the sanitizing {@code @markdown}
-   * renderer on display (never a client-side Markdown library). Never copied into an audit details
-   * payload — only its length is recorded.
+   * Free-form Markdown description, up to 20 000 characters, rendered server-side through the
+   * sanitizing {@code @markdown} renderer. Only its length ever enters an audit payload.
    */
   @Column(name = "remark", length = 20000)
   private String remark;
@@ -193,19 +151,15 @@ public class MaterialExchangeRequest extends AbstractEntity<UUID> {
   @Column(name = "status", nullable = false, length = 16)
   private MaterialExchangeRequestStatus status;
 
-  /** The instant the request was (last) posted to the board — drives "Gesucht vor X". */
+  /** The instant the request was last posted to the board; drives "Gesucht vor X". */
   @Column(name = "posted_at", nullable = false)
   private Instant postedAt;
 
   /**
-   * Renders the request using only safe scalar identifiers — its own id, the kind/status, and the
-   * (null-safe) foreign-key ids of the associated entities. Deliberately does <b>not</b> call
-   * {@code toString()} on the {@code @ManyToOne} associations: those are {@code FetchType.LAZY}, so
-   * dereferencing them could trigger a lazy load (or fail outside a session), and the {@link
-   * #owner} must never surface as a name/email in a log line. Reading only the foreign-key id off a
-   * lazy proxy does not initialise it.
+   * Renders the request from its id, kind, status and associated ids only, so logging it never
+   * triggers a lazy load or exposes the owner's name or e-mail.
    *
-   * @return a stable, PII-free single-line representation of this request.
+   * @return a PII-free single-line representation
    */
   @NotNull
   @Override

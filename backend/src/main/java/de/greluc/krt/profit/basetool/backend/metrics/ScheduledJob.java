@@ -26,10 +26,8 @@ import org.jetbrains.annotations.NotNull;
  * The closed set of backend {@code @Scheduled} batch jobs that report health through {@link
  * TaskMetrics}.
  *
- * <p>Each constant's {@link #label()} is the bounded value of the {@code job} Prometheus tag on the
- * {@code basetool_scheduled_job_*} meters (REQ-OBS-006 / -011): a fixed, low-cardinality, PII-free
- * enumeration. The high-frequency {@code NotificationStreamService} SSE heartbeat is deliberately
- * excluded — it is a liveness ping, not a batch job with success/failure semantics.
+ * <p>Each {@link #label()} is the bounded, PII-free value of the job tag on the {@code
+ * basetool_scheduled_job_*} meters (REQ-OBS-006, REQ-OBS-011).
  */
 @RequiredArgsConstructor
 public enum ScheduledJob {

@@ -118,16 +118,7 @@ class MissionPeerRedactorTest {
   }
 
   /**
-   * A peer who may manage the mission is shown the list the same response says they may edit.
-   *
-   * <p>The case exists because the combination is reachable and was self-contradictory: a bare
-   * {@code MISSION_MANAGER} is below Logistician — the hierarchy puts ADMIN/OFFICER above both
-   * roles but never MISSION_MANAGER above LOGISTICIAN — so they read through this pass, and it
-   * answered {@code canManageManagers: true} with {@code managers: null}. The detail view rendered
-   * the Verwaltung panel with the owner as {@code -}, no co-manager chips, and add/remove controls
-   * operating on a list nobody could see. {@code UserReferenceDto} carries no PII to begin with:
-   * id, username, display name, effective name, rank — the same tuple every participant on the same
-   * mission already carries.
+   * A peer who may manage the mission keeps the managers list the same response says they may edit.
    */
   @Test
   void cleanupMissionForPeer_forAManagingPeer_keepsTheListItSaysTheyMayEdit() {
@@ -144,13 +135,8 @@ class MissionPeerRedactorTest {
   }
 
   /**
-   * REQ-SEC-040: the nested ship owner must be redacted like any other user leaving the API.
-   *
-   * <p>{@code assignedUnits} is forwarded to guests as mission planning data, and each unit's
-   * {@code ship} carries a full {@link UserDto} owner. Because {@code UserMapper} nulls only the
-   * email, an un-redacted pass-through handed an <em>unauthenticated</em> caller of the public
-   * mission detail the owner's roles and permissions — i.e. who holds ADMIN/OFFICER — plus their
-   * free-text description, org-unit memberships, join date and Discord-link status.
+   * The owner of each assigned unit's ship is redacted like any other user leaving the API
+   * (REQ-SEC-040).
    */
   @Test
   void cleanupMissionForPeer_redactsTheOwnerOfEachAssignedUnitsShip() {
@@ -265,9 +251,8 @@ class MissionPeerRedactorTest {
    * @param participant the single roster row, carrying the nested user whose PII is stripped
    * @param steps the mission steps, forwarded by identity so a test can assert on sameness
    * @param assignedUnits the assigned units, whose nested ship owner is redacted separately
-   * @param managing what {@code MissionMapper} resolved for THIS caller — both {@code canEdit} and
-   *     {@code canManageManagers}, which travel together in every case this class needs to tell
-   *     apart: a peer who may change the mission, and one who may only read it
+   * @param managing the value for both {@code canEdit} and {@code canManageManagers} for this
+   *     caller
    * @return a fully populated {@link MissionDto}
    */
   private static MissionDto mission(

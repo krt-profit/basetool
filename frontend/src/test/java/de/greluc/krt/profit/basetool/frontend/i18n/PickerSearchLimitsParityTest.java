@@ -31,22 +31,11 @@ import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 /**
- * Build-time enforcement of the REQ-FE-016 "a picker relay fetches more than the combobox renders"
- * rule, whose two halves live on opposite sides of the wire.
+ * Tests that a picker relay fetches more rows than the combobox renders (REQ-FE-016), pinning the
+ * render caps in the shipped JS and {@code fragments/head.html} against the {@link PickerSearch}
+ * constants.
  *
- * <p>The render cap is a browser-side value ({@code krt-searchable-select.js}'s {@code maxResults}
- * default, plus the per-kind override in {@code fragments/head.html}); the page size is a
- * server-side one ({@link PickerSearch}). Nothing at compile time relates them, and when they drift
- * the failure is <b>completely silent</b>: the component gates its "keep typing to narrow the list"
- * hint on {@code matches.length > maxResults}, so a relay fetching the render cap or fewer rows can
- * never trip it. The user then sees a list that looks complete and is not. That is exactly how 28
- * of the 53 visible locations — MIC-L5, Patch City, New Babbage, Orison among them — became
- * unbookable in the Lager Einbuchen picker: a 25-row relay against a 50-row cap.
- *
- * <p>This test reads the shipped JS and the head fragment off the test-runtime classpath ({@code
- * src/main/resources} is on it), extracts the two literals, and pins them against the Java
- * constants — the same technique as {@code ComboboxKindsParityTest} and {@code
- * LiveSyncSectionMapParityTest}.
+ * <p>Otherwise the overflow hint never shows and a truncated list looks complete.
  */
 class PickerSearchLimitsParityTest {
 
@@ -72,11 +61,8 @@ class PickerSearchLimitsParityTest {
       Pattern.compile("opts\\.maxResults\\s*\\|\\|\\s*data\\.comboboxMax\\s*\\|\\|\\s*'(\\d+)'");
 
   /**
-   * Matches the {@code maxResults} override inside the {@code 'remote-locations'} kinds entry. The
-   * lookahead stops the (lazy, DOTALL) scan at the next marker key, so the value can only come from
-   * this entry and never from a later kind's. A brace-excluding class would be wrong here: the
-   * property values are Thymeleaf inline expressions ({@code /*[[#{…}]]* /}) and carry literal
-   * braces of their own.
+   * Matches the {@code maxResults} override inside the {@code 'remote-locations'} kinds entry,
+   * stopping at the next marker key so no later entry's value is picked up.
    */
   private static final Pattern LOCATION_KIND_MAX =
       Pattern.compile(
@@ -109,10 +95,8 @@ class PickerSearchLimitsParityTest {
   }
 
   /**
-   * Pins the mission page's two user autocompletes (participant add, party lead) to {@link
-   * PickerSearch#RENDER_CAP}: they render at most that many rows of the {@code /users/search}
-   * relay, which fetches {@link PickerSearch#PAGE_SIZE}, and show the overflow hint on the extra
-   * row. A drift either way would hide users behind a list that looks complete.
+   * Pins the mission page's two user autocompletes to {@link PickerSearch#RENDER_CAP}, below the
+   * {@link PickerSearch#PAGE_SIZE} the relay fetches.
    *
    * @throws IOException if the mission module cannot be read from the classpath
    */
@@ -140,18 +124,11 @@ class PickerSearchLimitsParityTest {
 
   /**
    * Extracts the single capture group of {@code pattern} from a classpath resource as an int,
-   * failing loudly when the anchor is gone (a refactor that renames the chain must break this gate,
-   * not silently skip it).
-   *
-   * <p>The patterns capture {@code \d+}, so the group can only ever be digits — but not necessarily
-   * digits that fit an {@code int}. A cap literal long enough to overflow would otherwise surface
-   * as a bare {@link NumberFormatException} stack trace naming neither the file nor the value;
-   * translating it into an assertion keeps a nonsense edit as readable as a drifted one, which is
-   * the entire point of this gate.
+   * failing with a readable assertion when the anchor is missing or the number does not fit an int.
    *
    * @param pattern the anchored pattern whose group 1 is the number
    * @param resource the absolute classpath resource path to scan
-   * @param what human-readable name of the literal, used in the failure message
+   * @param what human-readable name of the literal, for the failure message
    * @return the matched number
    * @throws IOException if the resource stream cannot be read
    */
@@ -167,11 +144,10 @@ class PickerSearchLimitsParityTest {
   }
 
   /**
-   * Reads a classpath resource as UTF-8 text, failing the test if it is missing (a moved or renamed
-   * asset must break this gate loudly rather than silently empty the scanned text).
+   * Reads a classpath resource as UTF-8 text, failing the test when it is missing.
    *
    * @param resource the absolute classpath resource path
-   * @return the resource content as a UTF-8 string
+   * @return the resource content
    * @throws IOException if the resource stream cannot be read
    */
   private static String readResource(String resource) throws IOException {

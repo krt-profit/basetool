@@ -25,19 +25,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
- * Collapses the repeated Post/Redirect/Get mutation boilerplate in the page controllers — {@code
- * try &#123; call(); flash successToast &#125; catch (Exception) &#123; log; flash errorToast
- * &#125; return "redirect:…"} — into a single call.
+ * Runs a Post/Redirect/Get mutation: flashes a success toast, or on any exception logs it and
+ * flashes an error toast, then redirects (REQ-FE-002).
  *
- * <p>The contract mirrors the plain single-catch handlers it replaces exactly: it runs the action,
- * maps success to a {@code successToast} flash and <em>any</em> failure to a single {@code
- * errorToast} flash (catching {@link Exception} broadly, as those handlers did — the mutation is a
- * best-effort action whose failure is surfaced as a toast, never an error page), and it never
- * inspects the problem status. Handlers that additionally repopulate a form, branch on a {@code
- * 409}/concurrency-conflict problem type, or split a {@code BackendServiceException} case from a
- * generic {@code Exception} fallback keep their bespoke logic — those cases are intentionally out
- * of scope (REQ-FE-002 hybrid rule: the helper carries only the generic toast, form re-population
- * stays handler-specific).
+ * <p>Handlers that repopulate a form or branch on the problem type keep their own logic.
  */
 @Component
 @Slf4j

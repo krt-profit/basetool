@@ -169,17 +169,14 @@ public class PromotionCategoryService {
   }
 
   /**
-   * Updates the category identified by {@code id} and rebinds it to the topic referenced by the
-   * request. The caller-supplied {@code version} is compared against the loaded entity and a
-   * mismatch produces an {@link ObjectOptimisticLockingFailureException} that surfaces as HTTP 409.
+   * Updates the category and rebinds it to the topic referenced by the request, with the
+   * optimistic-lock check.
    *
    * @param id identifier of the category to update
-   * @param request validated payload with the new field values and the previously fetched {@code
-   *     version}
+   * @param request validated payload with the new field values and the expected {@code version}
    * @return the updated category in response form
    * @throws NotFoundException if the category or referenced topic does not exist
-   * @throws ObjectOptimisticLockingFailureException if the request's {@code version} no longer
-   *     matches the persisted entity
+   * @throws ObjectOptimisticLockingFailureException if the request's {@code version} is stale
    */
   @Transactional
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)

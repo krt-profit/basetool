@@ -47,13 +47,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Pins the C-3 mass-assignment fix at the HTTP layer: write endpoints for missions accept the
- * dedicated {@link CreateMissionRequest} record, so dangerous fields a client might smuggle into
- * the JSON ({@code id}, {@code version}, {@code owningSquadron}, {@code parent}, {@code owner},
- * {@code managers}, collections) are physically absent from the binding target and never reach the
- * service. The tests use Jackson's default lenient behaviour (unknown JSON fields are silently
- * dropped) and verify via {@link ArgumentCaptor} that the service was invoked with a request record
- * carrying only the caller-supplied {@code name}/{@code description}/etc.
+ * Verifies that the mission write endpoints bind {@link CreateMissionRequest}, so server-managed
+ * fields smuggled into the JSON never reach the service.
  */
 @SpringBootTest
 class MissionControllerCreatePathTest {

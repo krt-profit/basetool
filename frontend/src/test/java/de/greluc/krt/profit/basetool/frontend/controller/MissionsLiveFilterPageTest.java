@@ -45,14 +45,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Verifies the live-filter behaviour of the mission overview page:
- *
- * <ul>
- *   <li>the legacy "Filtern" submit button is no longer rendered,
- *   <li>the reset control and the AJAX results container are present,
- *   <li>the {@code fragment=results} query parameter returns only the results fragment (no outer
- *       page chrome).
- * </ul>
+ * Verifies the mission overview's live filter: no "Filtern" submit button, a reset control and AJAX
+ * results container are present, and {@code fragment=results} returns only the results fragment.
  */
 @SpringBootTest
 class MissionsLiveFilterPageTest {

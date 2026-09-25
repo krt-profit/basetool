@@ -27,42 +27,31 @@ import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Data transfer record carrying Job Order payload. The same record serves both order kinds (see
- * {@code type}): a {@code MATERIAL} order populates {@code materials}; an {@code ITEM} order
- * populates {@code items} (ordered finished items) and {@code aggregatedMaterials} (the internal
- * material requirements derived from the items, grouped by material + quality). The unused list is
- * empty for the respective kind, so the detail UI can render both with one shared shell.
+ * Job order of either kind: a {@code MATERIAL} order fills {@code materials}, an {@code ITEM} order
+ * fills {@code items} and {@code aggregatedMaterials}; the unused lists are empty.
  *
  * @param id job order primary key
  * @param displayId human-readable sequential id
- * @param responsibleOrgUnit processing org unit (slim reference); {@code null} only on pre-rework
- *     rows not yet backfilled (Phase 3)
+ * @param responsibleOrgUnit processing org unit (slim reference)
  * @param requestingOrgUnit customer org unit the order is placed for (slim reference)
  * @param handle contact handle
  * @param comment optional free-text note
- * @param priority queue priority (null when terminal)
+ * @param priority queue priority ({@code null} when terminal)
  * @param status lifecycle status
  * @param type order kind ({@code MATERIAL} or {@code ITEM})
- * @param countBlueprintsWithVariants whether the item-order blueprint-coverage view counts cosmetic
- *     variants of the ordered items toward availability ({@code true}, family matching) or matches
- *     blueprints exactly ({@code false}); relevant only to {@code ITEM} orders
- * @param materials material lines (populated for {@code MATERIAL} orders; empty for {@code ITEM})
- * @param items ordered finished-item lines (populated for {@code ITEM} orders; empty for {@code
- *     MATERIAL})
- * @param aggregatedMaterials derived material requirements grouped by material + quality (populated
- *     for {@code ITEM} orders; empty for {@code MATERIAL})
- * @param assignees assignees of the order, each carrying the user, their optional note and the
- *     assignee edge's own version
- * @param handovers material-handover events (populated for {@code MATERIAL} orders)
- * @param itemHandovers item-handover events (populated for {@code ITEM} orders)
+ * @param countBlueprintsWithVariants whether the blueprint-coverage view counts cosmetic variants
+ *     ({@code ITEM} orders only)
+ * @param materials material lines ({@code MATERIAL} orders)
+ * @param items ordered finished-item lines ({@code ITEM} orders)
+ * @param aggregatedMaterials derived material requirements grouped by material and quality ({@code
+ *     ITEM} orders)
+ * @param assignees assignees, each with note and edge version
+ * @param handovers material-handover events ({@code MATERIAL} orders)
+ * @param itemHandovers item-handover events ({@code ITEM} orders)
  * @param createdAt creation instant (UTC)
  * @param version optimistic-lock version
- * @param redacted whether this DTO is the requesting-owner redacted view (REQ-ORDERS-023): {@code
- *     true} when the caller reached the order via the requesting-org-unit escape rather than as a
- *     full (responsible-side / admin) viewer, so the processing-side surfaces
- *     (Bearbeiter/aggregated/handovers, per-line collection progress) have been stripped. Lets a
- *     client key its rendering off THIS order's per-order signal instead of a global capability.
- *     {@code false} for the full view.
+ * @param redacted {@code true} when this is the requesting-owner view with processing-side data
+ *     stripped (REQ-ORDERS-023)
  */
 public record JobOrderDto(
     UUID id,
@@ -87,9 +76,7 @@ public record JobOrderDto(
     boolean redacted) {
 
   /**
-   * Returns a copy of this DTO with the assignee rows replaced and every other component unchanged.
-   * Used by the read path to apply the shared peer projection to each assignee's nested {@code
-   * UserDto}, which otherwise carries the full member record to every viewer of the order.
+   * Returns a copy of this DTO with the assignee rows replaced.
    *
    * @param value the replacement assignee rows
    * @return a copy differing only in {@code assignees}
@@ -120,10 +107,7 @@ public record JobOrderDto(
   }
 
   /**
-   * Returns a copy of this DTO with the {@link #redacted()} flag overridden and every other
-   * component unchanged. Used by the read path to stamp the per-order redaction decision onto an
-   * otherwise-complete projection without re-listing all eighteen preceding fields at the call
-   * site.
+   * Returns a copy of this DTO with the {@link #redacted()} flag replaced.
    *
    * @param value the new {@code redacted} flag
    * @return a copy differing only in {@code redacted}

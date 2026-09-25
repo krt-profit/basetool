@@ -52,13 +52,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Behaviour of the Terms-of-Use consent gate page (REQ-SEC-028).
- *
- * <p>Two of these are about not locking people out. A backend hiccup on the status read must still
- * render the page — the gate's job is to obtain consent, and failing closed there would mean nobody
- * can get through until the backend recovers. Conversely, a failure to <em>record</em> consent must
- * report an error rather than a silent success, because a user waved through without a stored row
- * is asked again on the next request and never understands why.
+ * Tests the Terms-of-Use consent gate page (REQ-SEC-028): a failed status read still renders the
+ * page, and a failure to record consent reports an error.
  */
 @SpringBootTest
 class TermsAcceptancePageControllerTest {
@@ -125,10 +120,8 @@ class TermsAcceptancePageControllerTest {
   }
 
   /**
-   * A gate whose wording cannot be read is an error, not an emptier gate.
-   *
-   * <p>Deliberately the opposite tolerance from the status read above: a stale "not accepted" costs
-   * one extra click, but consent to a text that was never displayed is not consent at all.
+   * A failure to load the terms wording is an error, because consent to text never shown is not
+   * consent.
    */
   @Test
   @WithMockUser

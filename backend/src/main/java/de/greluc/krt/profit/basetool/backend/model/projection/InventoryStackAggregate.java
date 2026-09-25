@@ -25,17 +25,9 @@ import de.greluc.krt.profit.basetool.backend.model.OrgUnit;
 import de.greluc.krt.profit.basetool.backend.model.User;
 
 /**
- * Read-only GROUP BY projection of one inventory <em>stack</em> — the rows that share the inventory
- * natural key (stock identity) collapsed by the database for the group-on-read Lager views
- * (ADR-0003, REQ-INV-002). One row of this projection equals one display stack; the underlying
- * individual entries are <em>not</em> loaded here — they are fetched lazily and paginated when a
- * stack is expanded. Since Variante C (REQ-INV-027) moved the job-order/mission link off the row
- * into per-entry quantity allocations, they are no longer part of the stock identity: the shared
- * key is ({@code material}, {@code user}, {@code location}, {@code quality}, {@code personal},
- * {@code owningOrgUnit}) and each leaf entry carries its own allocation chips. {@code
- * weightedQualitySum} is {@code SUM(amount * quality)} so the service can derive the
- * amount-weighted mean quality as {@code weightedQualitySum / totalAmount} without re-reading the
- * entries.
+ * Read-only GROUP BY projection of one inventory stack for the group-on-read Lager views
+ * (REQ-INV-002), keyed by material, user, location, quality, personal flag and owning org unit.
+ * Entries are loaded lazily on expand.
  *
  * @param material the grouping material shared by every entry in the stack
  * @param user the owning user shared by every entry

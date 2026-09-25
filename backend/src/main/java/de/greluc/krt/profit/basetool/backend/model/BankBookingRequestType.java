@@ -20,12 +20,9 @@
 package de.greluc.krt.profit.basetool.backend.model;
 
 /**
- * The kind of value movement a caller requests via a {@link BankBookingRequest} (REQ-BANK-022,
- * REQ-BANK-040). Anyone who may view an account may raise a request (REQ-BANK-039); on confirmation
- * the bank employee books the matching {@link BankTransactionType} ({@code DEPOSIT} / {@code
- * WITHDRAWAL} / {@code TRANSFER}) through the ledger. Reversals stay a pure bank-staff operation
- * and never originate from a request. V159/V193 mirror this set with a {@code CHECK} constraint
- * (stable, unlike the open-ended audit/notification type sets).
+ * The kind of value movement requested via a {@link BankBookingRequest} (REQ-BANK-040). On
+ * confirmation the matching {@link BankTransactionType} is booked; reversals never originate from a
+ * request.
  */
 public enum BankBookingRequestType {
 

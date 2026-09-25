@@ -62,14 +62,9 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 /**
- * Covers the outstanding per-material need the order lookup projects for the Lager allocation
- * pickers (REQ-INV-039, #1740).
- *
- * <p>The two collaborators that decide the figure — {@link JobOrderMaterialRequirementResolver} and
- * {@link JobOrderStockProjectionService} — are wired as <b>real</b> instances rather than mocks:
- * what is under test is precisely that both order kinds reduce to the same buckets and that stock
- * is summed at each bucket's own quality floor, and a mocked resolver would assert only that the
- * service calls something.
+ * Tests the outstanding per-material need the order lookup projects for the Lager allocation
+ * pickers (REQ-INV-039), with real {@link JobOrderMaterialRequirementResolver} and {@link
+ * JobOrderStockProjectionService} instances.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)

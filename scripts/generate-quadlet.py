@@ -1,27 +1,10 @@
 #!/usr/bin/env python3
 """Profit Basetool - generate Quadlet units from the Compose files, and detect drift between them.
 
-Phase 2 of ``docs/archive/PODMAN_MIGRATION_PLAN.md``. The two compose files become thirty-nine
-unit files -- eighteen containers, eighteen networks and three volumes (counted 2026-09-22; the
-services not translated are listed in ``DISPOSITION``). Transcribing that by hand is how a digest
-pin or a network membership goes quietly wrong, and nothing would notice: a unit that starts is
-not a unit that is right.
-
-So this generates them, and the same code detects drift. ``--check`` regenerates into memory and
-diffs against the tree, which is what keeps the two representations honest for as long as both
-exist. The plan was for the compose file to retire at the cutover and the units to become the
-source; the cutover (2026-09-22) kept it instead, because the local and test stacks still run on
-Compose. So the compose file stays authoritative and this tool stays the bridge.
-
-What it refuses to do
----------------------
-It **fails rather than guessing**, because a plausible-looking wrong unit is worse than no unit:
-
-- an unresolved ``${VAR}`` in a volume path (Quadlet does not expand them - see the plan's §3.1);
-- a multi-line ``command:``, which cannot become a single ``Exec=`` line and has to be extracted
-  into a script file first;
-- a service with no recorded disposition, so adding one to compose fails the build until somebody
-  says whether it is a container, a host service, or deleted.
+The compose files stay authoritative; the ``.container``, ``.network`` and ``.volume`` units and
+the ``env.d`` templates are generated from them, and ``--check`` diffs a regeneration against the
+tree. The generator refuses rather than guesses, e.g. on an unresolved ``${VAR}`` in a path, a
+multi-line ``command:``, or a service with no entry in ``DISPOSITION``.
 
 Usage
 -----
@@ -55,68 +38,12 @@ OUT_VARS = os.path.join(REPO, "quadlet", "env.d")
 COMPOSE_APP = os.path.join(REPO, "docker-compose.yml")
 COMPOSE_MON = os.path.join(REPO, "docker-compose.monitoring.yml")
 
-#: Where the per-service environment files land on the host. The compose `environment:` maps are
-#: CLOSED ALLOW-LISTS -- each service sees only the variables its own map names -- and that property
-#: has to survive the translation. `EnvironmentFile=` with the whole `.env` would hand every
-#: container every secret, so the deployer renders one file per service from the `.env.tmpl`
-#: template this tool emits. See render_vars for why it is a template and not a list of names.
 ENV_DIR_ON_HOST = "/var/iri/code/env.d"
 
-#: Host paths the compose files reach through a variable. Quadlet units are static, so these are
-#: resolved here -- to the values the production `.env` already sets. The plan's §3.1 records the
-#: alternative (render the units at bundle-build time) and why this one was taken.
-# ADR-0187: the edge does not publish its ports to the world any more. A host-level
-# haproxy binds :80 and :443 and forwards with PROXY protocol, so the container is
-# reachable ONLY from that front end -- which is precisely what makes the header
-# unforgeable, since PROXY protocol asserts a source address rather than proving one.
-#
-# Compose keeps "80:8080" and "443:8443" because the Docker deployment still serves
-# them directly; this override is what makes the Quadlet shape differ, deliberately
-# and in one readable place rather than by a second copy of the compose file.
-#
-# The address is PINNED, and that is not neatness. Measured on Rocky 10.2: the peer
-# the edge sees is the container's OWN address, and without a pin it moved from
-# .2 to .3 across a recreation -- so `set_real_ip_from`, which must name a single
-# address, would have been broken by the first restart. Three recreations with the
-# pin produced the same peer every time. `IP=` also requires a user-defined bridge
-# network, which net-edge-ingress is.
-#
-# EVERY network the edge is on is pinned, since 2026-09-22, and the sentence above is right about
-# the mechanism while being wrong about WHICH of the container's own addresses rootlessport
-# presents. It is not always the ingress one, and it is not always the same one.
-#
-# Measured on the production host across three recreations with nothing else changed: the peer
-# appeared on net-proxy-frontend, then net-proxy-grafana, then net-proxy-api. Pinning one network
-# only moves the choice to another -- pinning net-proxy-frontend made the next peer show up on
-# net-proxy-grafana, and pinning that would have moved it again.
-#
-# What it cost while only the ingress address was pinned: `set_real_ip_from` never matched, nginx
-# discarded the PROXY header and fell back to the TCP peer, and the edge logged EVERY request from
-# one bridge address -- 2340 in ten minutes, a probe issued over the public internet among them.
-# One rate-limit bucket for the whole internet, and every $remote_addr allow-list keyed on it: the
-# 2026-07-20 outage's shape, reached by a different road. It was not a recreate that caused it --
-# the first deploy after the cutover happened to produce a matching peer, and every recreate since
-# would not have, so the next release would have done it unattended.
-#
-# So the candidate set is made FINITE AND FIXED rather than guessed at: six pins, and
-# EDGE_TRUSTED_PROXY names all six. That is not a relaxation of ADR-0187, whose rule is "never a
-# prefix, name the address" -- six named addresses are no more a range than one is, and each is the
-# edge itself. render-and-run.sh validates each entry separately and still refuses a prefix or a
-# wildcard.
-#
-# The pins are .250 on purpose. netavark allocates from the low end and these networks are shared
-# with the upstream each one fronts, which drift upward on every recreate (the frontend container
-# held .9 while the edge went .10 -> .11 -> .12), so a low pin is a collision waiting to happen.
-# net-edge-ingress keeps .10: the edge is its only member and the address is already in the .env of
-# a running deployment.
 FRONT_END = {
     "edge": {
         "publish": ["127.0.0.1:8080:8080", "[::1]:8080:8080",
                     "127.0.0.1:8443:8443", "[::1]:8443:8443"],
-        # network -> the address the edge is pinned to on it. Every one of these is a candidate for
-        # the peer rootlessport presents, so every one of them belongs in EDGE_TRUSTED_PROXY.
-        # The role variable that becomes EDGE_TRUSTED_PROXY. It must name exactly the addresses
-        # below, and _verify_front_end refuses the build when it does not.
         "role_var": "basetool_host_edge_trusted_proxies",
         "pins": {
             "net-edge-ingress": "172.28.15.10",
@@ -129,88 +56,18 @@ FRONT_END = {
     }
 }
 
-# ADR-0189: the stateful services run AS their own uid instead of dropping to it.
-#
-# Measured on Rocky 10.2 / Podman 5.8.2 with the real digests, data mounts and persistence
-# (plan section 20). Each of these images boots as root, chowns its data directory and steps down
-# with gosu; giving it the uid up front removes the root phase, and with it every capability:
-#
-#   postgres   five capabilities -> none.  Four were load-bearing; FOWNER never was.
-#   redis      five capabilities -> none.  Only SETGID/SETUID were load-bearing.
-#
-# The reason this is an override rather than a `user:` in compose is the same as FRONT_END's: the
-# Docker deployment still runs these containers, and changing how IT starts a live database is a
-# separate change with its own deploy. Compose stays authoritative for everything else.
-#
-# It is emitted as a SET -- User, Group, ReadOnly, DropCapability=ALL -- because that is the
-# combination that was measured. Shipping half of it would ship something nobody ran.
-#
-# What it costs: the root phase also REPAIRS. If a data directory's ownership is ever wrong, root
-# fixes it and `User=` merely fails. That trade is deliberate, and it is safe only because the
-# ownership is not a hope: the bootstrap role owns each directory as
-# `basetool_host_subuid_base + container_uid - 1`, and `_verify_run_as_against_role` below refuses to
-# generate anything if these numbers and the role's stop agreeing.
-#
-# And the reason it matters more than a tidier unit file: dropping redis's capabilities WITHOUT
-# giving it a uid does not fail. Its entrypoint tests `has_cap setuid && has_cap setgid` and
-# silently skips the privilege drop, so redis runs as root, answers PING, and writes AOF files as
-# 0:0 that the correct configuration can no longer open. A partial capability set is the dangerous
-# state here, which is why there is no way to express one.
 RUN_AS = {
     "db-backend":  {"uid": 70,  "role_path": "db-backend"},
     "db-keycloak": {"uid": 70,  "role_path": "db-keycloak"},
     "redis":       {"uid": 999, "role_path": "redis"},
 }
 
-#: The bootstrap role's own view of those uids. Read at generation time, never transcribed.
 ROLE_DEFAULTS = os.path.join(REPO, "ansible", "roles", "basetool_host", "defaults", "main.yml")
 
-# ADR-0190: every remaining container gets a read-only root filesystem, except one.
-#
-# Measured service by service on Rocky 10.2 / Podman 5.8.2 (plan section 21), in two arms each: the
-# image run WRITABLE, with `podman diff` asked what it put on its own root filesystem, and then the
-# same thing `--read-only` to see whether it still comes up. Nine of the ten public images write
-# NOTHING outside their mounts, or write only under /tmp -- which podman mounts as tmpfs under
-# `--read-only` anyway. The application modules were measured the same way against their built
-# images: a healthy Spring Boot service writes Tomcat's work directory, its docbase and the JVM
-# perf data, all three under /tmp, and nothing else. Their own code contains no filesystem write
-# at all.
-#
-# It is a Quadlet-side table and not `read_only: true` in compose for a reason that is not
-# stylistic: **podman mounts /run, /tmp and /var/tmp as tmpfs under `--read-only` and Docker does
-# not**. The same line in the compose file would break most of these services on the Docker host
-# that still runs them. What was measured is podman's behaviour, so it is expressed where podman
-# reads it.
-#
-# `keycloak` is here too, and it took two passes to get right. `kc.sh start` without `--optimized`
-# re-augments the Quarkus application at every boot, and plain read-only stops it dead with
-# `FileSystemException: /opt/keycloak/lib/quarkus/transformed-...`. The first reading of that was
-# that keycloak simply cannot be read-only. It was wrong on both halves:
-#
-#   * podman's tmpfs takes `tmpcopyup`, so the image content IS present under the mount; and
-#   * the augmentation is ALREADY thrown away -- it lands in the container's writable layer and is
-#     redone at every start -- so a tmpfs has exactly the lifetime it already had.
-#
-# Measured with the real SPI provider JAR staged the way deploy.sh stages it: read-only plus a
-# tmpfs over `lib/quarkus` alone -- 4.7M of the 172M tree -- comes up ready, and the augmentation
-# compiles the provider in (generated-bytecode.jar differs by 768 bytes against an empty
-# providers/, same configuration, one variable). The 476 paths podman diff reported across `lib/`
-# were overlay metadata, not writes.
-#
-# This keeps ADR-0055 intact, which is the point: the provider JAR stays its own signed promotable
-# artifact, a provider-only change still auto-applies and still recreates only keycloak, and the
-# rollback is still JAR-level. Baking the provider into a custom image and running
-# `start --optimized` would buy the same read-only property by dismantling all of that.
 READ_ONLY: dict[str, dict[str, Any]] = {
     "prometheus": {},
     "loki": {},
     "tempo": {},
-    # Grafana's background installer tries to refresh a BUNDLED plugin inside its own installation
-    # directory and logs `unlinkat /usr/share/grafana/data/plugins-bundled/elasticsearch:
-    # read-only file system` at every start. It serves regardless -- measured, HTTP 200 on /login --
-    # but an error line per boot is exactly what the log-based alerting reads. Disabling the
-    # preinstaller removes it and changes nothing this deployment uses: the datasources are
-    # provisioned from files and elasticsearch is not one of them. Measured both ways.
     "grafana": {"environment": {"GF_PLUGINS_PREINSTALL_DISABLED": "true"}},
     "alertmanager": {},
     "blackbox-exporter": {},
@@ -218,21 +75,6 @@ READ_ONLY: dict[str, dict[str, Any]] = {
     "postgres-exporter-keycloak": {},
     "redis-exporter": {},
     "acme": {},
-    # The third entry was missing until 2026-09-17 and cost the login page its
-    # styling -- silently, because Keycloak stayed HEALTHY throughout.
-    #
-    # Keycloak serves a static theme resource two ways. Asked with
-    # `Accept-Encoding: identity` it streams the file: 200. Asked with `gzip` --
-    # which every browser sends, and which Go's http.Transport adds on its own, so
-    # a Go reverse proxy in front sends it too -- it serves a compressed copy from
-    # a cache under /opt/keycloak/data/tmp/kc-gzip-cache. On a read-only root
-    # filesystem that directory cannot be created, and the response is **404**, not
-    # a fallback to the uncompressed file.
-    #
-    # So: `curl` without the header said 200 and a browser said 404 on the same
-    # URL, which reads as a proxy fault and is not one. Measured both ways against
-    # the same image, with and without this line: gzip 404 -> gzip 200, and
-    # kc-gzip-cache appears.
     "keycloak": {"tmpfs": ["/opt/keycloak/lib/quarkus:rw,tmpcopyup",
                            "/opt/keycloak/data/transaction-logs:rw",
                            "/opt/keycloak/data/tmp:rw"]},
@@ -241,17 +83,6 @@ READ_ONLY: dict[str, dict[str, Any]] = {
     "ingest": {},
 }
 
-#: The per-service keystores and the internal truststore (REQ-SEC-070, ADR-0211) point at the
-#: material the owner minted into /var/iri/secrets/tls/ in step 2 of the rollout
-#: (docs/deployment.md, "Internal TLS"). A release carrying these must not be promoted to a host
-#: without that directory: deploy.sh refuses it before anything is applied, because a unit naming
-#: a file the host lacks would not start.
-#:
-#: IRI_TRUSTSTORE_HOST_PATH (the REQ-OPS-022 JVM-truststore mount, /run/secrets/truststore.p12)
-#: moves to the CA-only truststore as well. Its old source was the shared keystore -- private key
-#: included -- mounted into all three apps, which would have left the old key in every container
-#: after the switch. Production's JVM truststore is the role's separate jvm-truststore.p12 drop-in,
-#: so nothing reads this mount there; the shared keystore stays on the host only as the rollback.
 PATH_VARS = {
     "IRI_KEYSTORE_HOST_PATH": "/var/iri/secrets/keystore.p12",
     "IRI_BACKEND_KEYSTORE_HOST_PATH": "/var/iri/secrets/tls/backend.p12",
@@ -265,38 +96,13 @@ PATH_VARS = {
     "IRI_GRAFANA_UPSTREAM_CERT_HOST_PATH": "/var/iri/monitoring/certs/grafana.crt",
 }
 
-#: Relative bind-mount sources in compose resolve against the project directory.
 PROJECT_DIR_ON_HOST = "/var/iri/code"
 
-#: Non-path compose interpolations, resolved to the value the PROMOTED BUNDLE carries.
-#:
-#: `IRI_KEYCLOAK_HOST_ALIAS` exists so a non-production environment can point the public Keycloak
-#: name at its own host (REQ-OPS-022). Production sets nothing and takes the no-op default, which
-#: is what is baked here -- the units are one artifact for every environment, so a host-specific
-#: alias cannot live in them.
-#:
-#: A host that needs a real alias supplies a systemd DROP-IN beside the unit, which is host
-#: configuration exactly like the `.env` and belongs to Ansible:
-#:
-#:     ~/.config/containers/systemd/frontend.container.d/10-host-alias.conf
-#:     [Container]
-#:     AddHost=basetool.greluc.me:10.98.0.13
-#:
-#: That is written down here rather than left to be rediscovered, because the failure it prevents
-#: is a container timing out against its own issuer at start-up -- which reads as a Keycloak
-#: outage and is a missing line.
 VALUE_VARS = {
     "IRI_KEYCLOAK_HOST_ALIAS": "localhost:127.0.0.1",
 }
 
-#: What becomes of each service. Every service in either compose file must appear here, or the tool
-#: fails -- adding one to compose then blocks the build until somebody decides, which is the point.
-#:
-#: `cadvisor` and `socket-proxy` were listed as "deleted" until 2026-09-22, when they were removed
-#: from docker-compose.monitoring.yml itself (OPS-SIMP-02): a disposition for a service that no
-#: longer exists would be a line that decides nothing.
 DISPOSITION: dict[str, tuple[str, str]] = {
-    # --- the application stack ---------------------------------------------------------------
     "edge": ("container", ""),
     "acme": ("container", ""),
     "keycloak": ("container", ""),
@@ -306,7 +112,6 @@ DISPOSITION: dict[str, tuple[str, str]] = {
     "db-backend": ("container", ""),
     "db-keycloak": ("container", ""),
     "redis": ("container", ""),
-    # --- the monitoring plane ----------------------------------------------------------------
     "prometheus": ("container", ""),
     "grafana": ("container", ""),
     "loki": ("container", ""),
@@ -330,9 +135,6 @@ DISPOSITION: dict[str, tuple[str, str]] = {
         "read stops working. Running it on the host restores it and removes the last consumer of "
         "the container socket.",
     ),
-    # Not a compose service at all: it exists only on the Podman side, installed as a host service
-    # by ansible/roles/basetool_host (tasks/27-observability.yml) and scraped through the alias
-    # below. Recorded here so PODMAN_HOST_ALIASES can be cross-checked against one table.
     "podman-exporter": (
         "host-service",
         "a Podman-only exporter with no Compose counterpart; the role installs it as a user unit "
@@ -340,38 +142,6 @@ DISPOSITION: dict[str, tuple[str, str]] = {
     ),
 }
 
-#: Host aliases that exist ONLY under Quadlet, because the name they resolve belongs to a CONTAINER
-#: under Compose and to a HOST SERVICE here.
-#:
-#: node-exporter and alloy are translated to "host-service" above, so on a Podman host nothing
-#: answers to those names on the container network and `prometheus.yml`'s `node-exporter:9100` and
-#: `alloy:12345` targets go permanently down. Measured on the testing host 2026-09-20: two of the
-#: five down targets were exactly those.
-#:
-#: The alias goes in the UNIT rather than into prometheus.yml, and that survives the decision that
-#: there is no soak. It keeps the scrape configuration readable -- `node-exporter:9100` says what it
-#: scrapes, not where the host happens to be -- and it keeps the one runtime-specific fact in the
-#: one file that is generated per runtime. Writing `host.containers.internal` into prometheus.yml
-#: would work too and would put a Podman concept in a file that has never had one.
-#:
-#: `host-gateway` is podman's own token for "the host this container runs on"; verified on the
-#: testing host that an arbitrary name maps through it, including from the monitoring network.
-#:
-#: NOT expressed as compose `extra_hosts:`, which the generator already translates: that would apply
-#: to Docker too, where it would override DNS for a container that is right there.
-#: The application containers need the SAME alias, for the opposite reason: they PUSH to Alloy.
-#: `MONITORING_OTLP_ENDPOINT=http://alloy:4318/v1/traces` (backend, frontend, ingest) and
-#: `KC_TRACING_ENDPOINT=http://alloy:4317` (keycloak) are container-network names, and on a Podman
-#: host nothing answers to them. Measured on the testing host 2026-09-20, before this entry:
-#: `alloy` did not resolve inside the backend container, and BOTH
-#: `otelcol_receiver_accepted_spans_total` and `tempo_distributor_spans_received_total` were absent
-#: -- not zero, absent. The trace pipeline had never carried a single span, and nothing said so:
-#: every span was dropped in the app's own exporter, where no alert looks.
-#:
-#: The scrape direction was translated when this table was written and the push direction was not,
-#: which is the same omission in both halves of one boundary. When a service moves to the host,
-#: BOTH directions need an answer -- and the one that cannot be solved with an alias at all (host
-#: reaching a container) is handled by publishing a loopback port, see PODMAN_LOOPBACK_PUBLISH.
 PODMAN_HOST_ALIASES = {
     "prometheus": ("node-exporter", "alloy", "podman-exporter"),
     "backend": ("alloy",),
@@ -380,109 +150,30 @@ PODMAN_HOST_ALIASES = {
     "keycloak": ("alloy",),
 }
 
-#: Ports published on LOOPBACK so a host service can reach a container. `AddHost=` solves the
-#: container-to-host direction; nothing solves the reverse, because rootless Podman keeps the
-#: container network inside a user namespace and the host has no route into it. A published port is
-#: the only way in, and 127.0.0.1 keeps it off every other interface.
-#:
-#: Both entries exist for the host-native Alloy: it WRITES logs to Loki and EXPORTS spans to Tempo,
-#: and on the testing host it could reach neither -- `loki` and `tempo` did not resolve, and neither
-#: container published anything. config.alloy reads the resulting addresses from
-#: IRI_ALLOY_LOKI_ENDPOINT / IRI_ALLOY_TEMPO_ENDPOINT, which default to the container-network names
-#: so the Docker shape is untouched.
-#:
-#: Tempo's OTLP port is published on 4327, NOT 4317: the host-native Alloy binds 0.0.0.0:4317 for
-#: its own OTLP receiver, which includes loopback, so 4317 is already taken on the host. Loki's 3100
-#: is free and keeps its own number.
 PODMAN_LOOPBACK_PUBLISH = {
     "loki": ("127.0.0.1:3100:3100",),
     "tempo": ("127.0.0.1:4327:4317",),
 }
 
-#: Compose profiles whose services are translated. `dev` and `rollback` are local-stack and
-#: rollback-only and have no place in a host's unit directory.
 TRANSLATED_PROFILES = {"prod"}
 
 
-#: A compose interpolation. Used to refuse one in a place Quadlet cannot expand it.
 VAR_RE = r"\$\{([A-Za-z_][A-Za-z0-9_]*)"
 
-#: A COMPLETE compose interpolation, closing brace and all. VAR_RE above finds the NAME at the
-#: start of one; this matches the whole reference, which is what _sh_quote needs in order to tell
-#: "every dollar in this word belongs to a reference" from "there is a $( in this word".
 VAR_REF_RE = re.compile(r"\$\{[A-Za-z_][A-Za-z0-9_]*(?:[:-][^{}]*)?\}")
 
 
-#: Names a Quadlet container receives that the compose service deliberately does NOT put in its
-#: ``environment:``.
-#:
-#: There is exactly one. It was introduced because the two deployments needed the value in
-#: different places: compose expanded ``${REDIS_PASSWORD:?}`` inside the healthcheck **on the
-#: host**, while Quadlet's ``HealthCmd=`` is expanded by a shell **inside** the container. Since
-#: REQ-SEC-068 the health probe is an unauthenticated ``PING`` and needs no password; the
-#: container keeps ``REDIS_PASSWORD`` because it is the operator's ``admin`` ACL user, used for
-#: ``ACL LOAD`` from inside the container so the value never reaches a host command line.
-#:
-#: Carrying it in compose's ``environment:`` to satisfy Quadlet put the password into the running
-#: Docker container's environment -- readable from ``/proc/1/environ`` and ``docker inspect`` --
-#: for a deployment that has no use for it. That is the exposure class the ``--requirepass``
-#: removal was justified by removing, so it is declared here instead: the env.d template carries
-#: it, the Docker container does not.
-#:
-#: Values are compose-shaped and go through the same renderer, so a missing host value still fails
-#: the render rather than producing a container that starts and cannot authenticate.
 QUADLET_ONLY_ENV: dict[str, dict[str, str]] = {
     "redis": {"REDIS_PASSWORD": "${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}"},
 }
 
 
-#: Added to the worst case podman allows before systemd may call a start timed out.
-#:
-#: The worst case is ``start_period + retries x (interval + timeout)`` -- what podman itself waits
-#: before it gives up on a health check. Between ``systemctl start`` and the first probe there is
-#: also an image pull, a network join and the container's own creation, and none of those are in
-#: podman's health budget. Sixty seconds covers a cold pull on this link with room to spare; the
-#: number is deliberately generous because the cost of it being too big is a slow failure report,
-#: and the cost of it being too small is a restart loop that never reports healthy.
 START_TIMEOUT_MARGIN_SEC = 60
 
 
-#: Added to a service's stop grace before systemd may call its stop timed out.
-#:
-#: Compose's ``stop_grace_period`` is TWO values under Quadlet, and until 2026-09-22 only one of them
-#: was generated. ``[Service] TimeoutStopSec=`` bounds how long systemd waits for the whole stop --
-#: but the stop itself is Quadlet's ``ExecStop``, a ``podman rm -f``, and that sends SIGKILL after
-#: the CONTAINER's own stop timeout, which ``[Container] StopTimeout=`` sets and which defaults to
-#: podman's 10 s. So every container was killed after 10 s whatever compose said: the JVMs' 20 s
-#: graceful-shutdown phase, Tempo's and Loki's 30 s drains and PostgreSQL's clean shutdown were all
-#: cut off, and the longer ``TimeoutStopSec=`` only described a wait that never happened.
-#:
-#: ``StopTimeout=`` now carries the grace itself and ``TimeoutStopSec=`` the grace plus this margin.
-#: podman-systemd.unit(5) asks for exactly that ordering -- the stop timeout "should be lower than
-#: the actual systemd unit timeout to make sure the podman rm command is not killed by systemd" --
-#: and fifteen seconds covers podman's own teardown after the SIGKILL (the ``rm``, the network
-#: detach, the cidfile) on this host.
 STOP_TIMEOUT_MARGIN_SEC = 15
 
 
-#: Networks that are ``Internal=true`` under Quadlet although compose declares them without
-#: ``internal:`` (ADR-0162, as extended on 2026-09-22 for OPS-SEC-05).
-#:
-#: These five carry the databases and Redis and nothing that needs the internet: ``db-backend``,
-#: ``db-keycloak`` and ``redis`` are members of these networks ONLY, so an internal network takes
-#: their outbound path away entirely, and every other member (the three JVMs, Keycloak and the
-#: three exporters) keeps a non-internal network of its own for whatever egress it has. Name
-#: resolution survives: aardvark-dns answers on an internal network, which the five
-#: ``net-proxy-*`` networks have relied on since ADR-0162 made them internal.
-#:
-#: Quadlet-side and not ``internal: true`` in compose, for the same reason ``READ_ONLY`` is: the
-#: compose file also runs the LOCAL stacks, and there the ``-dev`` twins of these three services
-#: publish ``127.0.0.1:15432``, ``:15433`` and ``:6379`` on these very networks so a developer's
-#: ``bootRun`` can reach them. An internal network carries no DNAT, so the same line in compose would
-#: silently break every local database connection. Production publishes nothing on them.
-#:
-#: ``_verify_internal_networks`` refuses a unit whose every network is internal while it publishes a
-#: port or dials the host gateway, because on such a container both would be dead ends.
 QUADLET_INTERNAL_NETWORKS = frozenset({
     "net-db-backend",
     "net-db-keycloak",
@@ -492,17 +183,6 @@ QUADLET_INTERNAL_NETWORKS = frozenset({
 })
 
 
-#: Compose service keys this tool actually reads and turns into a unit directive.
-#:
-#: THIS LIST IS NOT A LIST OF NAMES THE TOOL HAS SEEN. Until 2026-09-17 there was one set, called
-#: "known", and the refusal below told the reader to add a key to it *once it is translated*.
-#: Eleven keys had been added without that second half, so the guard against silent loss was
-#: itself the thing losing them: `extra_hosts` and `init` were declared by the three JVM services
-#: and dropped without a word. `init` is the zombie-reaping fix for the 2026-07-12 native-thread
-#: OOM, so its silent loss re-creates a production incident the repository has a post-mortem for.
-#:
-#: The split is the fix. A key belongs here only when code below emits something for it, and in
-#: IGNORED_SERVICE_KEYS only with a reason. A key in neither fails the run.
 TRANSLATED_SERVICE_KEYS = {
     "image", "profiles", "user", "read_only", "cap_drop", "cap_add",
     "security_opt", "tmpfs", "ports", "networks", "volumes", "environment", "command",
@@ -511,9 +191,6 @@ TRANSLATED_SERVICE_KEYS = {
     "extra_hosts", "init",
 }
 
-#: Compose service keys that deliberately produce no unit directive, each with the reason. A key
-#: here is a decision on the record, not an omission -- which is the whole difference between this
-#: and what the single "known" set used to express.
 IGNORED_SERVICE_KEYS = {
     "container_name": (
         "the generator derives ContainerName= from the service name, and the two are asserted "
@@ -530,19 +207,12 @@ IGNORED_SERVICE_KEYS = {
     ),
 }
 
-#: Anything in neither set fails. Keys that were previously listed and never implemented --
-#: dns, group_add, hostname, labels, shm_size, sysctls, working_dir -- are deliberately absent:
-#: no translated service declares one today, and if one ever does, the refusal must fire rather
-#: than the control vanish. Podman 5.8.2 supports DNS=, GroupAdd=, ShmSize=, Sysctl= and
-#: WorkingDir= (checked against `man 5 podman-systemd.unit` on the target host), so implementing
-#: one is a small change -- which is exactly why it should be made deliberately.
 KNOWN_SERVICE_KEYS = TRANSLATED_SERVICE_KEYS | set(IGNORED_SERVICE_KEYS)
 
 assert not (TRANSLATED_SERVICE_KEYS & set(IGNORED_SERVICE_KEYS)), \
     "a compose key cannot be both translated and ignored"
 assert all(IGNORED_SERVICE_KEYS.values()), "every ignored key needs a stated reason"
 
-#: The resource limits understood under `deploy.resources.limits`. Same rule, same reason.
 KNOWN_LIMIT_KEYS = {"memory", "cpus", "pids"}
 
 
@@ -550,9 +220,6 @@ class Refusal(Exception):
     """Raised when a service cannot be translated faithfully."""
 
 
-# ============================================================================================
-# Helpers
-# ============================================================================================
 def _resolve(value: str, where: str) -> str:
     """Resolve the compose interpolations that appear in **paths**.
 
@@ -566,9 +233,7 @@ def _resolve(value: str, where: str) -> str:
         The resolved string.
 
     Raises:
-        Refusal: when a variable has no recorded value. Guessing here would produce a unit that
-            mounts a directory literally named ``${IRI_...}``, which starts fine and serves
-            nothing.
+        Refusal: when a variable has no recorded value.
     """
     previous = None
     while previous != value:
@@ -588,9 +253,7 @@ def _resolve(value: str, where: str) -> str:
 def _resolve_value(value: str, where: str) -> str:
     """Resolve a compose interpolation that is a **value** rather than a path.
 
-    Same contract as :func:`_resolve` and a separate table, because the two answer different
-    questions: ``PATH_VARS`` records where something lives on the host, ``VALUE_VARS`` records what
-    the promoted bundle carries for a setting an environment may override.
+    Same contract as :func:`_resolve`, against :data:`VALUE_VARS`.
 
     Args:
         value: the raw compose string.
@@ -621,18 +284,8 @@ def _resolve_value(value: str, where: str) -> str:
 def _image_defaults(image: str, service: str) -> str:
     """Resolve the compose interpolations in an image reference to their own defaults.
 
-    ``ghcr.io/${IRI_IMAGE_NAMESPACE:-krt-profit}/basetool-backend:${IRI_BASETOOL_VERSION:-stable}``
-    is resolved by compose when it loads the file. Quadlet does not expand variables in ``Image=``
-    either, so the literal string would reach podman and the pull would fail on a repository named
-    after the variable.
-
-    Resolving each to the default written in the compose file itself is faithful rather than
-    invented: it is exactly what compose produces on a host that does not set them, which is what
-    the production ``.env`` does -- it leaves ``IRI_BASETOOL_VERSION`` unset so ``stable`` applies.
-
-    The tag is in any case not what runs. ``REQ-OPS-003`` has the deployer resolve the rolling tag
-    to a **digest** and apply that, so this value is the starting point the deployer overrides, not
-    the pin.
+    Quadlet does not expand variables in ``Image=``; the deployer later pins the tag to a digest
+    (REQ-OPS-003).
 
     Args:
         image: the compose image reference.
@@ -658,13 +311,7 @@ def _image_defaults(image: str, service: str) -> str:
 
 
 def _qualify(image: str) -> str:
-    """Make a short image name fully qualified.
-
-    Docker resolves a short name to Docker Hub implicitly. Podman does not: it consults
-    ``unqualified-search-registries`` and ``short-name-aliases.conf``, so the same string can
-    resolve to a different registry on a differently configured host. Podman's own quadlet
-    generator warns about every one of these, and it is right to -- a digest pin does not help if
-    the name in front of it resolved somewhere unexpected.
+    """Make a short image name fully qualified, defaulting to ``docker.io``.
 
     Args:
         image: the compose image reference, possibly with a tag and a digest.
@@ -672,13 +319,9 @@ def _qualify(image: str) -> str:
     Returns:
         The reference with an explicit registry.
     """
-    # No slash at all means a bare Docker Hub name -- `redis:8-alpine`, `postgres:18-alpine`.
-    # Checking the colon first would be wrong here: that colon is the TAG, not a registry port.
     if "/" not in image:
         return "docker.io/" + image
     first = image.split("/")[0]
-    # With a slash, the first segment is a registry only if it looks like a host: a dot, a port,
-    # or the literal localhost. Otherwise it is a Docker Hub namespace -- `grafana/loki:3.7.8`.
     if "." in first or ":" in first or first == "localhost":
         return image
     return "docker.io/" + image
@@ -695,7 +338,8 @@ def _volume(spec: str, service: str) -> str:
         The ``Volume=`` value, with a named volume rewritten to its ``.volume`` unit.
 
     Raises:
-        Refusal: when a variable in the source cannot be resolved.
+        Refusal: when a variable in the source cannot be resolved, or a mount from the config
+            tree is not ``:ro``.
     """
     spec = _resolve(spec, f"{service}.volumes")
     parts = spec.split(":")
@@ -703,14 +347,7 @@ def _volume(spec: str, service: str) -> str:
     if source.startswith("./"):
         source = PROJECT_DIR_ON_HOST + source[1:]
     elif not source.startswith("/"):
-        # a named volume -- Quadlet references the unit, not the raw name
         source = f"{source}.volume"
-    # The CONFIG TREE is mounted read-only, always. /var/iri/code is what the deployer rewrites on
-    # every release from the signed config bundle; a container that can write into it can change
-    # what the next release applies, or plant a file the next backup carries off the host. Until
-    # 2026-09-22 keycloak mounted its theme, its provider directory and realm-export.json writable,
-    # and nothing noticed, because a writable mount that is never written looks exactly like a
-    # read-only one. Refused here so the next such line fails the build instead of shipping.
     if source == PROJECT_DIR_ON_HOST or source.startswith(PROJECT_DIR_ON_HOST + "/"):
         options = parts[2].split(",") if len(parts) > 2 else []
         if "ro" not in options:
@@ -725,10 +362,8 @@ def _volume(spec: str, service: str) -> str:
 def _seconds(value: Any, where: str) -> int:
     """Parse a compose duration into whole seconds.
 
-    Compose accepts ``1h2m3s`` style durations as well as a bare number of seconds. Only the units
-    that can plausibly appear in a health check are honoured; anything finer than a second rounds
-    **up**, because this feeds a timeout and rounding a budget down is how a unit gets killed just
-    before it would have succeeded.
+    Accepts a bare number or ``1h2m3s``-style units (``us``/``ms``/``s``/``m``/``h``); fractions
+    round up, since the result feeds a timeout.
 
     Args:
         value: the compose value -- an int, or a string such as ``30s`` or ``1m30s``.
@@ -758,17 +393,8 @@ def _seconds(value: Any, where: str) -> int:
 def _escape_percent(value: str) -> str:
     """Escape ``%`` so systemd does not read it as a specifier.
 
-    Every ``[Container]`` key Quadlet translates lands inside the generated ``ExecStart=``, and
-    systemd expands ``%`` specifiers there. Measured on the testing host, podman 5.8.2 / systemd
-    257, 2026-09-18: Quadlet does **not** escape, and both postgres units were running with
-    ``log_line_prefix`` expanded to ``5e63b03b… [db-backend] basetool-rocky10iri@/run/user/992/…``
-    -- the machine id, the unit name, the pretty hostname, the user, the credentials directory and
-    the architecture, in place of the six literals postgres was configured with. The Alloy/Loki
-    postgres pipeline keys off that prefix, so it had silently stopped matching.
-
-    The same measurement settled the fix: ``%%`` written into a ``.container`` survives Quadlet
-    into ``ExecStart=`` unchanged, and systemd renders it as one literal ``%``. A probe unit with
-    ``%%m [%%p] %%q%%u@%%d/%%a`` handed its process exactly ``%m [%p] %q%u@%d/%a``.
+    Quadlet folds ``[Container]`` keys into ``ExecStart=`` without escaping; ``%%`` reaches the
+    process as one literal ``%``.
 
     Args:
         value: the text as compose wrote it.
@@ -782,26 +408,9 @@ def _escape_percent(value: str) -> str:
 def _sh_quote(word: str) -> str:
     """Quote one exec-form argv element for the shell podman runs ``HealthCmd=`` through.
 
-    Compose's exec form (``test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:?}", …]``) passes
-    each element as one argv slot whatever it contains. ``HealthCmd=`` is a single string that
-    podman hands to ``/bin/sh -c``, so re-joining the elements on a space silently converts argv
-    boundaries into shell syntax: a password containing a space becomes two arguments and the
-    probe fails forever, and one containing ``;`` or ``$(`` runs whatever follows, inside the
-    container, on every interval.
-
-    Quoting restores the boundary. Which quote depends on whether the element is *meant* to
-    expand:
-
-    * an element made of literal text and **well-formed** ``${NAME}`` / ``${NAME:?…}`` references
-      is a deliberate interpolation -- the whole reason the Quadlet health command is a shell
-      string at all -- so it gets **double** quotes, which keep the expansion live. A
-      double-quoted expansion is not re-scanned by the shell, so the VALUE can no longer break out
-      however it is shaped.
-    * anything else gets **single** quotes, which are literal, and are the safe default. That
-      includes ``$(…)`` and a backtick, which stay live inside double quotes: a rule keyed on a
-      bare ``"$" in word`` re-creates the very injection this function exists to close, and did --
-      ``sh -c "echo $(id -u)"`` still substitutes. Single quotes are also the faithful
-      translation, because compose's exec form never passed those through a shell either.
+    An element whose only ``$`` uses are well-formed ``${NAME...}`` references (and no backtick
+    or backslash) gets double quotes, keeping the expansion live; a plain safe word stays bare;
+    anything else gets single quotes.
 
     Args:
         word: one element of the compose exec-form list.
@@ -812,7 +421,6 @@ def _sh_quote(word: str) -> str:
     if not word:
         return "''"
     if "${" in word and not re.search(r"[`\\]", word):
-        # Every `$` in here accounted for by a complete reference: nothing else can expand.
         if "$" not in VAR_REF_RE.sub("", word):
             return '"' + word.replace('"', '\\"') + '"'
     if re.fullmatch(r"[A-Za-z0-9_@%+=:,./-]+", word):
@@ -825,21 +433,8 @@ def _health(
 ) -> tuple[list[str], list[str]]:
     """Translate a compose healthcheck into Quadlet ``Health*`` keys.
 
-    A ``CMD-SHELL`` test keeps its shell, and its ``$VAR`` references are left for the **container**
-    to expand rather than baked in here. That is deliberate and is an improvement on the compose
-    form: compose interpolates them at file-load time from the host `.env`, which would put values
-    such as the database user into a unit file on disk.
-
-    It only works if the NAME is one the container receives, and that is not automatic. Compose
-    writes host-side names in a health command because compose expands them on the host;
-    ``db-keycloak`` asks for ``@DOLLAR@{KC_POSTGRES_USER}`` while the container is handed that value as
-    ``POSTGRES_USER``. Passed through unchanged, the shell inside the container answers
-    ``KC_POSTGRES_USER: parameter not set or null`` and the service never reports healthy --
-    measured on the testing host, 2026-09-17, which is how this was found. ``db-backend`` survives
-    only because its two names happen to match.
-
-    So references are rewritten to the container-side name, taken from the service's own
-    environment map.
+    Variable references are left for the container to expand, rewritten from host-side names to
+    the container-side names in the service's environment map.
 
     Args:
         hc: the compose ``healthcheck`` mapping.
@@ -847,27 +442,21 @@ def _health(
         service: the service name, for the refusal message.
 
     Returns:
-        A pair. The ``[Container]`` lines -- ``Health…=`` plus ``Notify=healthy``, so systemd's
-        readiness matches what ``depends_on: condition: service_healthy`` meant -- and the
-        ``[Service]`` lines, which is the ``TimeoutStartSec=`` that readiness now needs.
+        The ``[Container]`` lines (``Health…=`` plus ``Notify=healthy``) and the ``[Service]``
+        lines (``TimeoutStartSec=``).
 
     Raises:
-        Refusal: when the command names a variable the container is handed under no name at all,
-            which cannot be translated and would fail only at health-check time; or when the
-            ``test:`` is a list whose first element is not one of compose's three keywords, which
-            means the form it is written in is a guess.
+        Refusal: when the command names a variable the container does not receive, or a list
+            ``test:`` does not start with ``NONE``, ``CMD`` or ``CMD-SHELL``.
     """
     test = hc.get("test")
     if not test or test == ["NONE"]:
         return [], []
     if isinstance(test, str):
-        cmd = test                        # a bare string IS a shell command, per the compose spec
+        cmd = test
     elif test[0] == "CMD-SHELL":
         cmd = " ".join(str(w) for w in test[1:])
     elif test[0] == "CMD":
-        # Exec form: each element is one argv slot. `HealthCmd=` is a single string podman runs
-        # through `/bin/sh -c`, so the elements have to be QUOTED back into one -- joining them on
-        # a space turns argv boundaries into shell syntax. See _sh_quote.
         cmd = " ".join(_sh_quote(str(w)) for w in test[1:])
     else:
         raise Refusal(
@@ -877,14 +466,13 @@ def _health(
             "probe that never passes or a shell injection on every interval."
         )
 
-    # Rewrite host-side names to the names the container actually receives -- see the note above.
     inside = {}
     for container_key, value in (env or {}).items():
         for host in re.findall(r"\$\{([A-Z_0-9]+)", str(value)):
             inside.setdefault(host, container_key)
     for host in sorted(set(re.findall(r"\$\{([A-Z_0-9]+)", cmd))):
         if host in (env or {}):
-            continue                      # the container gets this very name
+            continue
         if host not in inside:
             raise Refusal(
                 f"{service}: the health command names ${{{host}}}, and the container is handed that "
@@ -892,12 +480,6 @@ def _health(
                 "container cannot. Add it to the service's environment, or write the health command "
                 "in terms of a name the container receives."
             )
-        # Bounded, not a bare-prefix replace. `cmd.replace("${" + host, …)` has no closing
-        # delimiter, and the loop runs over sorted() so a shorter name is always rewritten before
-        # a longer one that starts with it: with both ${POSTGRES_USER} and ${POSTGRES_USER_EXTRA}
-        # present, the second becomes ${<mapped>_EXTRA} -- a name the container is handed under no
-        # name at all, so the probe fails at run time with `parameter not set` and the unit never
-        # reports healthy. The refusal above runs BEFORE the replacement, so it cannot catch it.
         cmd = re.sub(
             r"\$\{" + re.escape(host) + r"(?![A-Za-z0-9_])",
             lambda m, name=inside[host]: "${" + name,
@@ -914,22 +496,8 @@ def _health(
     ):
         if compose_key in hc:
             lines.append(f"{quadlet_key}={hc[compose_key]}")
-    # The readiness half of compose's `depends_on: condition: service_healthy`. Requires= alone
-    # orders startup; this is what makes a dependent wait for HEALTHY rather than for EXISTS.
     lines.append("Notify=healthy")
 
-    # And the start budget that readiness now needs. Notify=healthy makes the unit Type=notify, so
-    # systemd's DefaultTimeoutStartSec -- 90s -- begins to bound how long a container may take to
-    # report healthy. Compose's `depends_on: condition: service_healthy` had no such cap, so the
-    # default is a behaviour change smuggled in by the translation, and a silent one: together with
-    # the Restart=always + StartLimitIntervalSec=0 block, a start slower than 90s is not a failure
-    # that stops but a restart loop that never gives up and never reports healthy.
-    #
-    # Four of the eight services exceed 90s on their own numbers -- keycloak allows
-    # 30 + 15 x (10 + 10) = 330s and re-runs the whole Quarkus augmentation on every start, because
-    # ADR-0190 puts a tmpfs over lib/quarkus. So the budget is DERIVED from the same values podman
-    # gives the health check, not picked: anything podman is still willing to wait for, systemd is
-    # too, and the compose file stays the single place the timing is written.
     budget = _seconds(hc.get("start_period", 0), f"{service}.healthcheck.start_period") + int(
         hc.get("retries", 3)
     ) * (
@@ -942,11 +510,7 @@ def _health(
 def _exec(service: str, spec: dict[str, Any]) -> list[str]:
     """Translate ``entrypoint`` and ``command``.
 
-    Both are run through :func:`_escape_percent`, because systemd expands ``%`` specifiers in the
-    ``ExecStart=`` Quadlet builds out of them. Both postgres services carry
-    ``log_line_prefix='%m [%p] %q%u@%d/%a '``, which without the escape reached the running database
-    as the machine id, the unit name, the pretty hostname, the user and the architecture -- measured,
-    live, on the testing host.
+    Both are run through :func:`_escape_percent`.
 
     Args:
         service: the service name.
@@ -956,7 +520,7 @@ def _exec(service: str, spec: dict[str, Any]) -> list[str]:
         The ``Entrypoint=`` / ``Exec=`` lines.
 
     Raises:
-        Refusal: on a multi-line command, which cannot become a single ``Exec=``.
+        Refusal: on a command that interpolates a variable or spans several lines.
     """
     lines: list[str] = []
     entrypoint = spec.get("entrypoint")
@@ -990,9 +554,6 @@ def _exec(service: str, spec: dict[str, Any]) -> list[str]:
     return lines
 
 
-# ============================================================================================
-# Unit rendering
-# ============================================================================================
 def render_network(name: str, spec: dict[str, Any]) -> str:
     """Render a ``.network`` unit.
 
@@ -1002,6 +563,9 @@ def render_network(name: str, spec: dict[str, Any]) -> str:
 
     Returns:
         The unit file's contents.
+
+    Raises:
+        Refusal: when compose and :data:`QUADLET_INTERNAL_NETWORKS` both mark it internal.
     """
     spec = spec or {}
     real = spec.get("name", name)
@@ -1035,8 +599,6 @@ def render_network(name: str, spec: dict[str, Any]) -> str:
             "# ones, so with no default route anywhere it has no egress. Measured 2026-09-16",
             "# (docs/archive/PODMAN_MIGRATION_PLAN.md section 13): a plain network reaches the",
             "# internet, this option blocks it, and the container keeps only a link-scope route.",
-            # Quadlet's own key for `podman network create --opt`, not a raw PodmanArgs= line: a
-            # key is validated by the generator, an argument string is passed through unread.
             "Options=no_default_route=true",
         ]
     return "\n".join(lines) + "\n"
@@ -1090,24 +652,6 @@ def render_container(service: str, spec: dict[str, Any]) -> str:
 
     container.append(f"Image={_qualify(_image_defaults(spec['image'], service))}")
     container.append(f"ContainerName={service}")
-    # STATED, not left to podman's default, because the whole log pipeline depends on the answer
-    # and the default is not the same on every host.
-    #
-    # REQ-OBS-019 moved Alloy's container-stdout streams from the Docker API to the JOURNAL when
-    # Alloy became a host service: `loki.source.journal` is what ships `<svc>-stdout`, `mon-*`,
-    # `postgres-*`, `edge` and `ops-cleanup` to Loki. A container whose driver is `k8s-file` writes
-    # into podman's own storage instead and Alloy never sees it.
-    #
-    # That is not hypothetical. Measured on the production host 2026-09-22, hours after the
-    # cutover: every container resolved `k8s-file`, `journalctl CONTAINER_NAME=<any>` had never
-    # returned a line, and Loki held only the FILE-based streams -- the application JSON logs and
-    # the host's auth/audit logs. The edge's access log, which check-conformance.py calls "the only
-    # record of a refused request's origin", was reachable by SSH and nowhere else, and every alert
-    # that reads a container's stdout could not have fired. `log-streams` stayed green throughout,
-    # because it measures Loki's total ingest RATE and the file streams alone produce one.
-    #
-    # The testing host defaulted to `journald` and the production host to `k8s-file`, from the same
-    # release. A promotable artifact cannot depend on which one it lands on.
     container.append("LogDriver=journald")
 
     run_as = RUN_AS.get(service)
@@ -1118,7 +662,6 @@ def render_container(service: str, spec: dict[str, Any]) -> str:
                 f"{run_as['uid']}. Two answers to one question -- delete one of them rather "
                 "than letting the generator pick."
             )
-        # Emitted together because it was measured together; see RUN_AS.
         container += [
             f"User={run_as['uid']}",
             f"Group={run_as['uid']}",
@@ -1147,13 +690,8 @@ def render_container(service: str, spec: dict[str, Any]) -> str:
         for cap in spec.get("cap_add", []) or []:
             container.append(f"AddCapability={cap}")
         for entry in READ_ONLY.get(service, {}).get("tmpfs") or []:
-            # The one or two paths a read-only service still has to write. Compose's own `tmpfs:`
-            # is emitted below; these exist only because the root filesystem became read-only.
             container.append(f"Tmpfs={entry}")
         for key, value in (READ_ONLY.get(service, {}).get("environment") or {}).items():
-            # A literal value, set because the unit is read-only -- it never belongs in the host's
-            # .env, and it is not a secret, so it is written into the unit rather than routed
-            # through EnvironmentFile.
             container.append(f"Environment={key}={value}")
     if any("no-new-privileges" in str(o) for o in spec.get("security_opt", []) or []):
         container.append("NoNewPrivileges=true")
@@ -1161,15 +699,11 @@ def render_container(service: str, spec: dict[str, Any]) -> str:
         container.append(f"Tmpfs={tmpfs}")
     front = FRONT_END.get(service)
     if front:
-        # Deliberately NOT spec["ports"]: see FRONT_END. The compose value is the
-        # Docker deployment's, and translating it faithfully here would publish the
-        # edge to the world behind a front end that trusts a forgeable header.
         for port in front["publish"]:
             container.append(f"PublishPort={port}")
     else:
         for port in spec.get("ports", []) or []:
             container.append(f"PublishPort={port}")
-    # ...and the loopback publishes a host service depends on. See PODMAN_LOOPBACK_PUBLISH.
     for port in PODMAN_LOOPBACK_PUBLISH.get(service, ()):
         container.append(f"PublishPort={port}")
 
@@ -1178,8 +712,6 @@ def render_container(service: str, spec: dict[str, Any]) -> str:
     for net in names:
         pinned = (front or {}).get("pins", {}).get(net)
         if pinned:
-            # Quadlet takes the address as an option on the Network= line. See FRONT_END for why
-            # every one of the edge's networks carries one.
             container.append(f"Network={net}.network:ip={pinned}")
         else:
             container.append(f"Network={net}.network")
@@ -1187,9 +719,6 @@ def render_container(service: str, spec: dict[str, Any]) -> str:
     for vol in spec.get("volumes", []) or []:
         container.append(f"Volume={_volume(str(vol), service)}")
 
-    # QUADLET_ONLY_ENV counts: a service whose whole environment is Quadlet-only still needs the
-    # file mounted, and redis is exactly that case since its password was taken back out of the
-    # compose map. Keying this off `spec["environment"]` alone emitted a template nothing read.
     if spec.get("environment") or QUADLET_ONLY_ENV.get(service):
         container.append(f"EnvironmentFile={ENV_DIR_ON_HOST}/{service}.env")
 
@@ -1213,46 +742,19 @@ def render_container(service: str, spec: dict[str, Any]) -> str:
         )
     if "memory" in limits:
         container.append(f"Memory={limits['memory']}")
-    # The pids cap bounds a fork bomb and a worker/zombie leak. It is not decoration: the
-    # 2026-07-12 native-thread-OOM accumulated one <defunct> per 30s health probe until this cap
-    # stopped it, and ContainerPidsHigh measures against it. Compose spells it under
-    # deploy.resources.limits, NOT as the top-level `pids_limit` key -- reading only the latter is
-    # how all nineteen units lost it once.
     if "pids" in limits:
         container.append(f"PidsLimit={limits['pids']}")
     if "cpus" in limits:
         podman_args.append(f"--cpus={limits['cpus']}")
-    # All nine monitoring containers carry oom_score_adj: 500 -- deliberately MORE attractive to
-    # the OOM killer than the application, so that under memory pressure the kernel takes Grafana
-    # before it takes the backend. Quadlet has no key for it (podman-systemd.unit(5) for 5.8, read
-    # 2026-09-22, lists none, and none for --cpus either); podman run does. A POSITIVE adjustment
-    # is what an unprivileged process is allowed to set, so this survives rootless.
     if "oom_score_adj" in spec:
         podman_args.append(f"--oom-score-adj={spec['oom_score_adj']}")
-    # `init: true` runs a minimal init as PID 1 so orphaned children get reaped. This is not a
-    # nicety: the JVM runs as PID 1 and does NOT reap, the health probe's BusyBox wget forks an
-    # `ssl_client` helper it never waits on, and each probe left one <defunct> until the pids cap
-    # was reached -- the 2026-07-12 native-thread OOM, at roughly 17h uptime.
-    #
-    # Quadlet's own `RunInit=` key, which is `podman run --init`. This went through PodmanArgs until
-    # 2026-09-22 on the belief that Quadlet had no key for it; the key is `RunInit=`, not `Init=`,
-    # and podman-systemd.unit(5) for 5.8 documents it ("a minimal init process inside the container
-    # that forwards signals and reaps processes"). A key is parsed and validated by the generator; a
-    # PodmanArgs string is appended unread, so a typo in it ships.
     if spec.get("init"):
         container.append("RunInit=true")
-    # `extra_hosts` -> AddHost=, which Podman 5.8.2 documents with the same `hostname:ip` form
-    # compose uses and allows more than once. The value is a VALUE_VARS interpolation rather than
-    # a path, so it resolves against that table and refuses on anything unrecorded -- a literal
-    # `${IRI_...}` in an /etc/hosts entry would be a hostname nothing ever matches.
     for entry in spec.get("extra_hosts") or []:
         resolved = _resolve_value(str(entry), f"{service}.extra_hosts")
         container.append(f"AddHost={resolved}")
-    # ...and the Quadlet-only ones, for names that are host services here. See PODMAN_HOST_ALIASES.
     for alias in PODMAN_HOST_ALIASES.get(service, ()):
         container.append(f"AddHost={alias}:host-gateway")
-    # `Ulimit=` is Quadlet's key for `podman run --ulimit` (podman-systemd.unit(5), 5.8). It went
-    # through PodmanArgs until 2026-09-22 for the same wrong reason RunInit= did.
     ulimits = spec.get("ulimits") or {}
     unknown_ulimits = set(ulimits) - {"nofile"}
     if unknown_ulimits:
@@ -1271,48 +773,19 @@ def render_container(service: str, spec: dict[str, Any]) -> str:
         container.append("PodmanArgs=" + " ".join(podman_args))
 
     if spec.get("restart"):
-        # compose says `unless-stopped` (or `always`), which means: retry indefinitely, with a
-        # backoff that grows and caps out. Restart=always alone does NOT mean that. systemd stops a
-        # unit for good after StartLimitBurst starts inside StartLimitIntervalSec -- five starts in
-        # ten seconds by default -- and with systemd's default RestartSec=100ms a container that
-        # fails fast burns all five within a second. Measured on the testing VM 2026-09-16: the edge
-        # reached "Start request repeated too quickly" and stayed down. A database that is merely
-        # slow to come up is survivable under Compose and terminal under Quadlet without the three
-        # keys below.
         service_section += [
             "Restart=always",
-            # The backoff itself: 1s, doubling-ish through RestartSteps intervals, capped at 60s --
-            # the shape Docker's restart policy has. RestartSteps=/RestartMaxDelaySec= need
-            # systemd >= 254; the target platform ships 257.
             "RestartSec=1",
             "RestartSteps=6",
             "RestartMaxDelaySec=60",
         ]
-        # And the give-up rule, stated as ONE decision rather than left to interact.
-        #
-        # Backoff and the start limiter quietly cancel each other out: once the interval reaches the
-        # 60s cap, at most ten starts fit in a ten-minute window, so a burst of 60 is never reached
-        # and the limit never fires. The unit would still CARRY a limit that reads as if it applied.
-        # So the choice is made explicitly here: never give up. That is what `unless-stopped` means,
-        # it is what this deployment does today, and it is defensible because this stack is
-        # monitored -- a service that is down raises an alert, so a `failed` unit is not the only
-        # signal anyone would get. An edge that stays down after five minutes is a total outage; one
-        # that keeps retrying every 60s recovers by itself when the cause clears.
         unit.append("StartLimitIntervalSec=0")
-    # Two keys, not one -- see STOP_TIMEOUT_MARGIN_SEC. `StopTimeout=` is what podman waits before
-    # the SIGKILL; `TimeoutStopSec=` is what systemd waits for podman.
     grace = spec.get("stop_grace_period")
     if grace:
         stop = _seconds(grace, f"{service}.stop_grace_period")
         container.append(f"StopTimeout={stop}")
         service_section.append(f"TimeoutStopSec={stop + STOP_TIMEOUT_MARGIN_SEC}")
 
-    # Everything in [Container] is folded by Quadlet into one ExecStart=, where systemd expands
-    # `%` specifiers. Exec=, Entrypoint= and HealthCmd= are escaped at the point they are built;
-    # the rest are refused rather than escaped, because a `%` in a volume path or a label is far
-    # more likely to be a mistake than an intention, and the only two that carry one today are the
-    # postgres commands. This is the guard that stops the next `command:` from reintroducing
-    # quietly what finding 4 found running.
     for line in container:
         key, _, value = line.partition("=")
         if key in ("Exec", "Entrypoint", "HealthCmd"):
@@ -1328,9 +801,6 @@ def render_container(service: str, spec: dict[str, Any]) -> str:
 
     out = ["# Generated by scripts/generate-quadlet.py -- do not edit. Run the generator."]
     if unit:
-        # StartLimitIntervalSec= belongs in [Unit]. systemd.service(5) does not mention it at all --
-        # in [Service] it is silently ignored, which is the failure mode where the unit reads as
-        # limited and is not. Checked against systemd 257's own man pages on the target host.
         out += ["[Unit]"] + unit + [""]
     out += ["[Container]"] + container + [""]
     out += ["[Service]"] + (service_section or ["Restart=always"]) + [""]
@@ -1341,28 +811,9 @@ def render_container(service: str, spec: dict[str, Any]) -> str:
 def render_vars(service: str, spec: dict[str, Any]) -> str:
     """Render the per-service environment TEMPLATE the deployer fills in.
 
-    This emitted a list of NAMES until 2026-09-17, on the theory that the deployer would look each
-    one up in the host ``.env``. Measured against the compose files before the units were ever
-    started, that theory covers **25 of 168** entries. The other 143 are not names to look up:
-
-    * **58 are literal values** -- ``PGPORT: 15432``, ``PGDATA: /var/lib/postgresql/data/pgdata``,
-      ``KC_DB: postgres``. They exist only in the compose file and are in no ``.env`` anywhere, so
-      a name list hands the container nothing. Postgres would have started on its built-in
-      defaults: a new empty cluster in the wrong directory, on the wrong port, behind a health
-      check that can never pass.
-    * **85 are composite or defaulted** -- ``jdbc:postgresql://db-keycloak:15433/${KC_POSTGRES_DB}``
-      interpolates INTO a longer string, and ``${KC_METRICS_ENABLED:-false}`` carries a default that
-      the name alone does not.
-
-    So the artifact is a template: the compose right-hand side, verbatim, one ``KEY=value`` per
-    line. The deployer renders it by interpolating against the host ``.env`` -- which is what
-    compose itself did, and is why the values survive the translation.
-
-    The closed-allow-list property that motivated the original design is unchanged, and is still
-    why this is one file per service: a service sees only the variables its own compose map names,
-    and one shared ``EnvironmentFile=`` would hand every container every secret. **No secret is in
-    this file.** A secret appears as the same ``${NAME:?...}`` reference compose carries, and its
-    value exists only on the host.
+    Each line is the compose ``KEY=value`` verbatim, interpolated later against the host ``.env``.
+    One file per service keeps each environment a closed allow-list; secrets appear only as
+    ``${NAME:?...}`` references.
 
     Args:
         service: the service name.
@@ -1379,9 +830,6 @@ def render_vars(service: str, spec: dict[str, Any]) -> str:
         items = [(k, str(v)) for k, v in env.items()]
     else:
         items = [tuple(str(e).split("=", 1)) for e in env]
-    # Plus the names only the Quadlet shape needs -- see QUADLET_ONLY_ENV for why they are not in
-    # the compose `environment:` map. They are part of this service's closed allow-list, so they
-    # belong in its template and nowhere else.
     declared = {k for k, _ in items}
     for key, value in QUADLET_ONLY_ENV.get(service, {}).items():
         if key not in declared:
@@ -1410,17 +858,10 @@ def render_vars(service: str, spec: dict[str, Any]) -> str:
     return header + body + "\n"
 
 
-
-# ============================================================================================
-# Driving
-# ============================================================================================
 def _verify_run_as_against_role() -> None:
     """Refuse if the hardening tables disagree with the bootstrap role, or with each other.
 
-    ``User=70`` in a unit and a data directory owned as if the container were uid 70 are the same
-    fact written in two repositories' worth of tooling. They agree today. This is what notices the
-    day one of them is edited and the other is not -- at generation time, where the answer is a
-    failed build, rather than at boot, where it is a database that will not start.
+    :data:`RUN_AS` uids must match ``basetool_host_container_owners`` in the role defaults.
 
     Raises:
         Refusal: when a service in RUN_AS has no owner entry in the role or has one with a
@@ -1470,27 +911,9 @@ def _verify_front_end(
 ) -> None:
     """Refuse if the front end's pinned addresses and its trusted ones are not the same set.
 
-    Under rootless Podman the PROXY header the edge receives comes from the edge's *own* address:
-    ``rootlessport`` dials the container's published port from inside its netns, so the peer nginx
-    sees is whichever of the container's addresses podman chose. Two facts follow.
-
-    **The address moves unless it is pinned** -- netavark allocates from the low end and these
-    networks are shared with the upstream they front. **And which network it comes from is not ours
-    to choose**: measured on the production host 2026-09-22, three recreations with nothing else
-    changed, the peer appeared on ``net-proxy-frontend``, then ``net-proxy-grafana``, then
-    ``net-proxy-api``. Pinning one only moves the choice to the next.
-
-    So every network the front end joins is pinned -- which is what keeps the candidate set finite
-    -- and the role's trusted list names all of those addresses. Three things have to agree and
-    nothing compared them: this table, the emitted unit (which ``--check`` covers) and
-    ``basetool_host_edge_trusted_proxies``.
-
-    The failure this prevents is silent in the worst way. nginx does not reject a
-    ``set_real_ip_from`` that never matches -- it discards the PROXY header and falls back to the
-    TCP peer, so the edge starts clean, serves traffic, and logs **every** request from one bridge
-    address. That happened: 2340 requests in ten minutes attributed to a single address, with the
-    per-IP rate limiter and the admin allow-list collapsed onto it the whole time, a valid
-    configuration and a green build (ADR-0187).
+    Podman may present the PROXY header from the edge's address on any network it joins, so every
+    joined network needs a pinned address inside its subnet, and the role's trusted list must be
+    exactly those addresses (ADR-0187).
 
     Args:
         service_networks: for each front-end service, the networks it actually joins.
@@ -1577,12 +1000,8 @@ def _verify_internal_networks(
 ) -> None:
     """Refuse a container that an internal network would silently cut off.
 
-    An ``Internal=true`` network has no gateway route and no DNAT. A container whose EVERY network
-    is internal therefore cannot be reached through a published port and cannot dial the host
-    gateway -- and neither failure is loud: the unit starts, the health check (which runs inside the
-    container) passes, and the port or the host service simply never answers. ADR-0162 met the first
-    half of that once already, when the edge's published ports sat on an internal network and served
-    nothing.
+    An ``Internal=true`` network has no gateway route and no DNAT, so a container on internal
+    networks only can neither publish a port nor reach the host gateway.
 
     Args:
         units: service name -> rendered ``.container`` text.
@@ -1675,9 +1094,6 @@ def generate() -> tuple[dict[str, str], list[str]]:
                 continue
             files[f"quadlet/systemd/{service}.container"] = render_container(service, spec)
             rendered_units[service] = files[f"quadlet/systemd/{service}.container"]
-            # QUADLET_ONLY_ENV counts here for the same reason it counts for EnvironmentFile=:
-            # redis's whole environment is Quadlet-only now, and keying off the compose map alone
-            # made --check report its template as stale on the very run that wrote it.
             if spec.get("environment") or QUADLET_ONLY_ENV.get(service):
                 files[f"quadlet/env.d/{service}.env.tmpl"] = render_vars(service, spec)
 
@@ -1691,10 +1107,6 @@ def generate() -> tuple[dict[str, str], list[str]]:
                 if not source.startswith(("/", "./", "$")):
                     used_volumes.add(source)
 
-    # Networks and volumes are derived from the containers that were actually emitted, never from
-    # the compose top-level blocks. Otherwise a dev-only volume -- or a network whose only members
-    # were deleted services, as `net-docker-proxy` was -- follows the stack onto a production host,
-    # and nothing would ever notice a bridge that exists for nobody.
     for name in sorted(used_networks):
         if name in net_defs:
             files[f"quadlet/systemd/{name}.network"] = render_network(name, net_defs[name])
@@ -1714,7 +1126,7 @@ def generate() -> tuple[dict[str, str], list[str]]:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Entry point.
+    """Write the generated files, check them for drift, or list the service dispositions.
 
     Args:
         argv: arguments without the program name, or ``None`` to read ``sys.argv``.

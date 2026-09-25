@@ -58,11 +58,9 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
 import org.springframework.web.servlet.ModelAndView;
 
 /**
- * Unit tests for {@link SecurityProblemResponseHandler}: filter-level 401/403 rejections are handed
- * to the MVC {@code handlerExceptionResolver} (so {@code GlobalExceptionHandler} renders the
- * RFC&nbsp;7807 body), with a {@code sendError} fallback only when the resolver does not handle the
- * exception or the response is already committed — plus the {@code userId} MDC stamping that keeps
- * a filter-level 403 from claiming {@code anonymous} for an authenticated caller.
+ * Unit tests for {@link SecurityProblemResponseHandler}: filter-level 401/403 rejections go to the
+ * MVC {@code handlerExceptionResolver} for an RFC&nbsp;7807 body, falling back to {@code sendError}
+ * when unresolved or committed, with the caller's {@code userId} stamped into the MDC.
  */
 class SecurityProblemResponseHandlerTest {
 
@@ -109,11 +107,10 @@ class SecurityProblemResponseHandlerTest {
   }
 
   /**
-   * Builds a resolver whose {@code resolveException} records the {@code userId} MDC value visible
-   * at the moment the problem body would be rendered — i.e. exactly what the logback pattern would
-   * print on the rejection line.
+   * Builds a resolver that records the {@code userId} MDC value visible when the problem body would
+   * be rendered.
    *
-   * @param seen receives the observed MDC value ({@code null} when the key is unset)
+   * @param seen receives the observed MDC value ({@code null} when unset)
    * @return the stubbed resolver
    */
   private static HandlerExceptionResolver resolverCapturingUserId(AtomicReference<String> seen) {

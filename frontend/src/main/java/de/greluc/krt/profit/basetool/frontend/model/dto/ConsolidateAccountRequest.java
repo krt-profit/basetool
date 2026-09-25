@@ -23,12 +23,8 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Frontend mirror of the backend consolidate-account request body (REQ-SEC-055, #1828): fold the
- * duplicate account named in the path into the account the member keeps.
- *
- * <p>Bound from the member administration's consolidate dialog and relayed verbatim to {@code POST
- * /api/v1/users/{id}/consolidate}. Kept as a record rather than a map so the contract test ({@code
- * DtoOpenApiContractTest}) can check it against the committed {@code openapi.json}.
+ * Frontend mirror of the backend consolidate-account request (REQ-SEC-055): folds the duplicate
+ * account in the path into the account the member keeps.
  *
  * @param targetUserId the account the member keeps and everything moves onto
  * @param version the duplicate's optimistic-lock version the admin last read; {@code null} bypasses

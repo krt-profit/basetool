@@ -477,12 +477,8 @@ class HangarIntegrationTest {
   }
 
   /**
-   * Regression for the hangar squadron-overview scope leak: an admin pinned to a squadron must NOT
-   * see the owner-detail rows of a ship owned by a different OrgUnit (here a Spezialkommando the
-   * admin's pinned squadron has nothing to do with), even when that foreign ship shares its ship
-   * type with the pinned squadron. Before the fix the aggregated counts were squadron-scoped but
-   * the per-owner breakdown was loaded by ship type alone, so a member who belonged only to an SK
-   * leaked into the pinned squadron's overview.
+   * Verifies that an admin pinned to a squadron does not see owner rows of a foreign OrgUnit's ship
+   * in the hangar squadron overview, even when that ship shares a ship type with the squadron.
    */
   @Test
   void testSquadronOverviewAsPinnedAdmin_doesNotLeakForeignSkShipsOfSharedType() throws Exception {

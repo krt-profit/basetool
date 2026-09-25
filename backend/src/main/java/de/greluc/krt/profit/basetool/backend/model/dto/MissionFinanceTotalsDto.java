@@ -22,26 +22,18 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import java.math.BigDecimal;
 
 /**
- * Aggregated totals for a mission's "Finanzen" summary strip (Gesamtsumme / Einnahmen / Ausgaben /
- * je Anteil), served by {@code GET /api/v1/missions/{id}/finance-entries/summary}.
+ * Aggregated totals for a mission's finance summary strip, served by {@code GET
+ * /api/v1/missions/{id}/finance-entries/summary} and computed by a single SQL aggregate.
  *
- * <p>Distinct from {@link MissionFinanceSummaryDto}, which is the operation-rollup per-mission
- * summary carrying the full entry + refinery lists. This record carries ONLY sums and counts: it
- * replaces the previous "fetch the whole ledger ({@code size=1000}) and sum it in the frontend"
- * pattern with a single SQL aggregate (ADR-0078 mission-scale hardening), so the strip's per-render
- * cost no longer scales with the number of ledger entries. Carries no participant PII, so it needs
- * no redaction. The {@code expense*} figures fold in refinery orders' raw expenses (matching the
- * legacy strip), while {@code total} folds in refinery <em>profit</em> (sales − expenses − other),
- * identical to the {@code /finance-entries/sum} value.
+ * <p>The {@code expense*} figures include refinery-order expenses, while {@code total} includes
+ * refinery profit and equals the {@code /finance-entries/sum} value. Carries no participant PII.
  *
- * @param total signed mission bottom line: finance income − finance expense + refinery profit
- * @param incomeSum summed amount of all {@code INCOME} finance entries (never {@code null}; 0 when
- *     none)
- * @param incomeCount number of {@code INCOME} finance entries
- * @param expenseSum summed amount of all {@code EXPENSE} finance entries plus refinery-order
- *     expenses (never {@code null}; 0 when none)
- * @param expenseCount number of {@code EXPENSE} finance entries plus refinery orders carrying an
- *     expense
+ * @param total signed bottom line: finance income − finance expense + refinery profit
+ * @param incomeSum sum of all {@code INCOME} entries; never {@code null}, 0 when none
+ * @param incomeCount number of {@code INCOME} entries
+ * @param expenseSum sum of all {@code EXPENSE} entries plus refinery-order expenses; never {@code
+ *     null}, 0 when none
+ * @param expenseCount number of {@code EXPENSE} entries plus refinery orders with an expense
  */
 public record MissionFinanceTotalsDto(
     BigDecimal total,

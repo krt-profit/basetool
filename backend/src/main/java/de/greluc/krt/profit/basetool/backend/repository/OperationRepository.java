@@ -67,27 +67,21 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
   Optional<Operation> findWithMissionsAndParticipantsById(UUID id);
 
   /**
-   * Multi-tenant variant of {@link #findAll(org.springframework.data.domain.Pageable)}: returns
-   * every operation whose owning OrgUnit is in the caller's scope, or every operation when {@code
-   * isAdminAllScope} is {@code true} (admin "all squadrons" mode). Operations are a strict-staffel
-   * aggregate with two read-only escapes:
+   * Scoped variant of {@link #findAll(org.springframework.data.domain.Pageable)}: every operation
+   * owned by an OrgUnit in the caller's scope, or all of them when {@code isAdminAllScope} is
+   * {@code true}. Two read-only escapes apply:
    *
    * <ul>
-   *   <li><b>Ownerless leadership operation</b> ({@code owning_org_unit_id IS NULL}, V145) —
-   *       surfaces to organisation members-or-above via {@code viewerIsMemberOrAbove} (operations
-   *       have no public escape; see REQ-ORG-009).
-   *   <li><b>Participant escape</b> (#500) — any authenticated user who participated in one of the
-   *       operation's linked missions sees the operation regardless of owning OrgUnit, gated by a
-   *       non-null {@code viewerUserId} matching a {@code mission_participant.user_id}. A caller
-   *       with no resolvable subject ({@code viewerUserId == null}) never matches.
+   *   <li><b>Ownerless leadership operation</b> ({@code owning_org_unit_id IS NULL}) — visible to
+   *       organisation members-or-above (REQ-ORG-009).
+   *   <li><b>Participant escape</b> — visible to a user who participated in one of the operation's
+   *       linked missions.
    * </ul>
    *
-   * @param viewerIsMemberOrAbove {@code true} iff the caller is an authenticated organisation
-   *     member-or-above ({@code AuthHelperService.isMemberOrAbove()}); gates the ownerless branch
-   *     so a non-member never sees ownerless operations. Since ADR-0159 the only authenticated
-   *     non-member is an integration identity, but the gate is the predicate, not the audience.
-   * @param viewerUserId the caller's user id ({@code AuthHelperService.currentUserId()}), or {@code
-   *     null} when no subject resolves; gates the participant escape.
+   * @param viewerIsMemberOrAbove {@code true} iff the caller is an organisation member-or-above;
+   *     gates the ownerless branch
+   * @param viewerUserId the caller's user id, or {@code null} when no subject resolves; gates the
+   *     participant escape
    */
   @EntityGraph(attributePaths = {"owningOrgUnit"})
   @Query("SELECT o FROM Operation o WHERE " + ScopeSpecifications.OPERATION_SCOPE_PREDICATE)
@@ -100,31 +94,23 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
       Pageable pageable);
 
   /**
-   * Slim id + name projection of every operation visible to the caller, sorted by name. Drives the
-   * {@code /lookup} endpoint that feeds the mission-detail page's operation-picker dropdown -
-   * pulling the full {@code OperationDto} payload via the regular list endpoint with {@code
-   * size=1000} was the previous shape and exhausted DB and serialisation budget on every mission
-   * page render. Uses the same R6.c scope-predicate triple as {@link #findAllScoped}.
+   * Slim id + name projection of every operation visible to the caller, sorted by name, for the
+   * mission-detail operation picker.
    *
-   * <p><b>Status / recency bound (#1124).</b> The picker returns {@code PLANNED} / {@code ACTIVE}
-   * operations always, but {@code COMPLETED} / {@code CANCELED} ones only when created on or after
-   * {@code cutoff}. Without this the lookup grew unbounded with the total operation count and was
-   * re-fetched on every mission-detail render — mirrors {@link
-   * MissionRepository#findAllActiveReference}. Operations have no {@code plannedStartTime} of their
-   * own (it lives on the linked missions), so recency is bounded on {@code createdAt}.
+   * <p>Uses the same scope predicate as {@link #findAllScoped}. {@code PLANNED} / {@code ACTIVE}
+   * operations are always returned, {@code COMPLETED} / {@code CANCELED} ones only when created on
+   * or after {@code cutoff}.
    *
    * @param isAdminAllScope {@code true} iff the caller is admin without an active OrgUnit selection
-   *     — disables the scope filter entirely.
-   * @param activeOrgUnitId the single OrgUnit the caller is pinned to, or {@code null}.
-   * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin path); empty for
-   *     admins and anonymous callers.
-   * @param viewerIsMemberOrAbove {@code true} iff the caller is an authenticated organisation
-   *     member-or-above; surfaces ownerless leadership operations ({@code owning_org_unit_id IS
-   *     NULL}, V145) in the picker for members-or-above only.
-   * @param viewerUserId the caller's user id, or {@code null} for an anonymous caller; surfaces
-   *     operations the caller participated in (#500) in the picker.
+   * @param activeOrgUnitId the OrgUnit the caller is pinned to, or {@code null}
+   * @param memberOrgUnitIds the caller's OrgUnits (non-admin path); empty for admins and anonymous
+   *     callers
+   * @param viewerIsMemberOrAbove {@code true} iff the caller is an organisation member-or-above;
+   *     surfaces ownerless leadership operations
+   * @param viewerUserId the caller's user id, or {@code null}; surfaces operations the caller
+   *     participated in
    * @param cutoff inclusive lower bound on {@code createdAt} for {@code COMPLETED} / {@code
-   *     CANCELED} operations; {@code PLANNED} / {@code ACTIVE} operations are returned regardless.
+   *     CANCELED} operations
    * @return slim reference DTOs, sorted by name ascending
    */
   @Query(
@@ -146,48 +132,25 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
       @Param("cutoff") Instant cutoff);
 
   /**
-   * Free-text + status + time-range + scope search across operations. Mirrors the contract of
-   * {@code MissionRepository.searchMissions} within the limits of the operation aggregate. {@code
-   * query} is optional - a {@code null} cast removes the corresponding clause; the {@code status IN
-   * (:status)} list is always applied (pass the full enum set to disable status filtering).
+   * Free-text, status, time-range and scope search across operations.
    *
-   * <p><strong>Time-range filter.</strong> An operation has no {@code plannedStartTime} of its own
-   * — that field lives on the underlying missions — so its effective span is derived from its
-   * linked missions: the operation "starts" at the planned start of its earliest mission ({@code
-   * MIN(plannedStartTime)}) and "ends" at the planned end of its latest mission ({@code
-   * MAX(plannedEndTime)}). The {@code start} bound (inclusive) keeps operations whose earliest
-   * mission starts at or after it; the {@code end} bound (inclusive) keeps operations whose latest
-   * mission ends at or before it. Both are optional ({@code null} cast removes the clause) and are
-   * evaluated via correlated subqueries so the main query still returns one row per operation and
-   * SQL-level pagination is preserved. An operation with no linked missions yields {@code NULL} for
-   * both aggregates and is therefore excluded whenever either bound is supplied — consistent with
-   * how the missions search drops missions with a {@code null plannedStartTime}.
-   *
-   * <p>Operations are a strict-staffel aggregate: the scope triple restricts the result to
-   * operations owned by the caller's OrgUnit(s); {@code isAdminAllScope} means "all squadrons"
-   * (admin mode). Unlike missions, there is no cross-staffel <em>public</em> escape - an owned
-   * operation of another squadron is never visible to non-admins. The one exception is an
-   * <em>ownerless leadership operation</em> ({@code owning_org_unit_id IS NULL}, V145), which
-   * surfaces to organisation members-or-above via {@code viewerIsMemberOrAbove} (see REQ-ORG-009).
-   *
-   * <p>Status values are passed as strings to keep the contract consistent with the missions
-   * search; the JPA layer matches them against the {@code OperationStatus} enum's string
-   * representation.
+   * <p>A {@code null} argument drops its clause; {@code status} is always applied. The time range
+   * applies to the span of the operation's linked missions ({@code MIN(plannedStartTime)} to {@code
+   * MAX(plannedEndTime)}), so an operation without missions is excluded whenever a bound is set.
+   * Scope is strict-staffel, except that ownerless leadership operations are visible to
+   * members-or-above (REQ-ORG-009).
    *
    * @param query free-text name/description fragment, may be {@code null}
-   * @param start inclusive lower bound on the operation's earliest mission planned start ({@code
-   *     MIN(plannedStartTime)}), or {@code null} to disable
-   * @param end inclusive upper bound on the operation's latest mission planned end ({@code
-   *     MAX(plannedEndTime)}), or {@code null} to disable
-   * @param status status list (string names of {@code OperationStatus}); always applied
+   * @param start inclusive lower bound on the earliest mission's planned start, or {@code null}
+   * @param end inclusive upper bound on the latest mission's planned end, or {@code null}
+   * @param status status names of {@code OperationStatus}; always applied
    * @param isAdminAllScope {@code true} iff the caller is admin without an active selection
    * @param activeOrgUnitId pinned OrgUnit id, or {@code null}
-   * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin path)
-   * @param viewerIsMemberOrAbove {@code true} iff the caller is an authenticated organisation
-   *     member-or-above; surfaces ownerless leadership operations ({@code owning_org_unit_id IS
-   *     NULL}, V145) for members-or-above only
-   * @param viewerUserId the caller's user id, or {@code null} for an anonymous caller; surfaces
-   *     operations the caller participated in (#500)
+   * @param memberOrgUnitIds the caller's OrgUnits (non-admin path)
+   * @param viewerIsMemberOrAbove {@code true} iff the caller is an organisation member-or-above;
+   *     surfaces ownerless leadership operations
+   * @param viewerUserId the caller's user id, or {@code null}; surfaces operations the caller
+   *     participated in
    * @param pageable page request
    * @return paged matching operations
    */
@@ -214,16 +177,13 @@ public interface OperationRepository extends JpaRepository<Operation, UUID> {
       Pageable pageable);
 
   /**
-   * {@code true} iff the given user is a participant of at least one mission linked to the
-   * operation (#500). Backs the participant-visibility escape in {@code
-   * OwnerScopeService.canSeeOperation}: an authenticated user who flew in one of the operation's
-   * missions may view the operation (and their payout) regardless of its owning OrgUnit. Guest-name
-   * participants (no {@code user}) never match.
+   * Whether the given user participated in at least one mission linked to the operation; backs the
+   * participant escape of {@code OwnerScopeService.canSeeOperation}. Guest participants never
+   * match.
    *
-   * @param operationId the operation to test; never {@code null}.
-   * @param userId the caller's user id ({@code AuthHelperService.currentUserId()} == {@code
-   *     app_user.id}); never {@code null} (the caller guards the anonymous case).
-   * @return {@code true} iff {@code userId} participated in any of the operation's missions.
+   * @param operationId the operation to test; never {@code null}
+   * @param userId the caller's {@code app_user.id}; never {@code null}
+   * @return {@code true} iff {@code userId} participated in any of the operation's missions
    */
   @Query(
       """

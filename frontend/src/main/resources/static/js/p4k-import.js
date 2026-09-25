@@ -1,24 +1,4 @@
 // @ts-check
-/*
- * Admin - P4K catalog import flow (asynchronous background jobs).
- *
- * Responsibilities:
- *  - "Datei wählen" + "Hochladen & analysieren" -> POST the picked file (multipart `file`) to the
- *    jobs proxy, which enqueues a background PREVIEW job and returns immediately.
- *  - Poll the job list every few seconds while any job is PENDING/RUNNING; render the table.
- *  - "Details" -> show the per-type count table for a finished job (from the polled result).
- *  - "Anwenden" -> open the apply panel (seed opt-in), then POST .../apply to enqueue a background
- *    APPLY job from the finished preview's stored upload (no re-upload).
- *
- * The page never blocks on the heavy import: it only enqueues and polls. CSP-safe (no inline
- * handlers; wiring via addEventListener + delegation). Strings from window.krtP4kImportI18n;
- * the jobs base URL from window.krtP4kImportEndpoints.
- *
- * Every read of the jobs proxy goes through readJson(), and every write (upload, apply) through
- * krtFetch plus jobFromWrite(); together they are this module's "is this actually job data?" test.
- * `resp.ok` is NOT that test — see readJson for why, and why getting it wrong mattered more here
- * than on any click-driven surface.
- */
 (function () {
     'use strict';
 
@@ -49,9 +29,6 @@
     /** @type {number | null} */
     let pollTimer = null;
 
-    // Set once a gate (re-authentication or the Terms-of-Use consent gate) has taken the page over.
-    // From then on every handler falls silent: the browser is already navigating away, so an error
-    // toast would be both unreadable and wrong about what happened.
     let gated = false;
 
     function $(id) {
@@ -67,16 +44,10 @@
     }
 
     /**
-     * The headers every call to the jobs proxy carries.
+     * The headers every read of the jobs proxy carries.
      *
-     * X-Requested-With is not decoration: the frontend gates answer an XHR and a browser navigation
-     * differently. The Terms-of-Use consent gate replies `403` + `X-Terms-Acceptance-Required` to a
-     * marked request and a `302` to an unmarked one (REQ-SEC-028), and a lost OAuth2 session behaves
-     * the same way with `401` + `X-Reauthenticate` (REQ-SEC-012). Without the marker these calls get
-     * the redirect branch, fetch follows it, and the consent page arrives as a `200 text/html` that
-     * looks like a successful answer.
-     *
-     * The two writes (upload, apply) go through krtFetch, which sends the same marker itself.
+     * X-Requested-With makes the consent and re-auth gates answer with a status code instead of a
+     * redirect (REQ-SEC-028, REQ-SEC-012).
      *
      * @returns {Record<string, string>} a fresh header object for the job-list poll
      */
@@ -87,17 +58,8 @@
     /**
      * Reads a jobs-proxy answer as JSON, or resolves to null when the answer is not job data.
      *
-     * `resp.ok` is the wrong test on principle, not just for one gate: fetch follows redirects
-     * transparently, so any redirect-to-HTML answer — the consent gate, an expired-session login
-     * bounce, an error-handler redirect — arrives as a 200 whose body is a whole document, with
-     * `resp.ok` true. For the 3 s poll this was worse than a silent failure: pollControl only runs
-     * after a successful parse, so a gated answer left the interval armed forever and the page went
-     * on fetching and re-parsing the consent page every tick, indefinitely.
-     *
-     * So the two gate contracts are honoured first, exactly as every krtFetch-driven surface does —
-     * both navigate the browser — and anything redirected or not OK is then rejected outright. An
-     * unparseable 200 resolves to null as well rather than rejecting, so the callers' "not job data"
-     * path (which disarms the poll) sees it instead of the transient-error catch (which does not).
+     * The re-auth and consent gates are honoured first; a redirected, non-OK or unparseable answer
+     * yields null, which makes the callers disarm the poll.
      *
      * @param {Response} resp the jobs-proxy response
      * @returns {Promise<any> | null} the parsed body, or null when the answer is not job data
@@ -160,8 +122,6 @@
         loadJobs();
     }
 
-    /* ------------------------------------------------------------------ upload */
-
     function pickFile() {
         if (fileInput) fileInput.click();
     }
@@ -185,11 +145,9 @@
 
     /**
      * Interprets a krtFetch write outcome against the jobs proxy: the job DTO on success, or null
-     * when the answer was not job data. A 2xx whose body is not an object (a followed redirect to
-     * an HTML page) counts as not-job-data too — see readJson for why `ok` alone is not the test.
-     * When the request failed without reaching the caller's onError / onNetworkError hook, a gate
-     * (re-authentication or the Terms-of-Use consent gate) handled it and is navigating the page
-     * away, so the page falls silent exactly as readJson's gate branch makes it.
+     * when the answer was not job data (including a 2xx whose body is not an object).
+     *
+     * An unreported failure means a gate is navigating the page away, so the poll is disarmed.
      *
      * @param {KrtWriteResult} result the krtFetch outcome
      * @param {boolean} reported whether an onError / onNetworkError hook already surfaced the failure
@@ -218,9 +176,6 @@
         const fd = new FormData();
         fd.append('file', file);
         let reported = false;
-        // krtFetch.submitForm (REQ-FE-002): CSRF header, the bare-403 refresh-and-retry and both
-        // gate redirects; Content-Type stays unset so the browser writes the multipart boundary.
-        // The upload button is disabled for the in-flight request (double-submit guard).
         window.krtFetch
             .submitForm({
                 url: jobsUrl(),
@@ -251,8 +206,6 @@
             });
     }
 
-    /* -------------------------------------------------------------- job list */
-
     function loadJobs() {
         fetch(jobsUrl(), {
             method: 'GET',
@@ -262,11 +215,6 @@
             .then(readJson)
             .then(function (jobs) {
                 if (!Array.isArray(jobs)) {
-                    // The answer was not job data: a gate took the page over, a redirect was
-                    // followed, the status was an error, or the body did not parse. Disarm the
-                    // timer — pollControl below is reached only on the success path, so this is the
-                    // one place a refused poll can stop itself. Leaving it armed is what turned a
-                    // single gated answer into an endless 3 s loop against the consent page.
                     stopPolling();
                     return;
                 }
@@ -274,10 +222,7 @@
                 renderJobs(jobs);
                 pollControl(jobs);
             })
-            .catch(function () {
-                // Network-level failure only (a refused or unparseable answer resolves to null
-                // above): genuinely transient, so an armed poll keeps retrying on the next tick.
-            });
+            .catch(function () {});
     }
 
     function isActive(job) {
@@ -294,8 +239,7 @@
     }
 
     /**
-     * Disarms the poll timer, idempotently. Every "this answer was not job data" path funnels here,
-     * so the timer can never outlive the condition that armed it.
+     * Disarms the poll timer; idempotent.
      */
     function stopPolling() {
         if (pollTimer) {
@@ -307,8 +251,6 @@
     function renderJobs(jobs) {
         if (!jobsBody) return;
         if (jobsEmptyEl) jobsEmptyEl.hidden = jobs.length > 0;
-        // Accumulated from literals and escapeHtml / escapeAttr calls only, so the innerHTML sink
-        // provably sees escaped values (FE-SEC-05).
         let html = '';
         jobs.forEach(function (job) {
             html +=
@@ -329,7 +271,6 @@
                 escapeHtml(summaryText(job)) +
                 '</td>' +
                 '<td>';
-            // Row actions: only a finished job has any; only a finished PREVIEW can be applied.
             if (job.status === 'SUCCEEDED') {
                 html +=
                     '<button type="button" class="btn btn-ghost" data-action="view" data-job-id="' +
@@ -435,8 +376,6 @@
         else if (action === 'apply') openApply(id);
     }
 
-    /* --------------------------------------------------------------- details */
-
     function viewDetails(id) {
         const job = findJob(id);
         if (!job || !job.result) return;
@@ -480,8 +419,6 @@
             ],
         ];
         const body = $('krt-p4k-rows');
-        // Accumulated from literals and escapeHtml calls only (FE-SEC-05); declared at function
-        // level because the lint rule only traces an accumulator in the sink's own function scope.
         let html = '';
         rows.forEach(function (pair) {
             const c = pair[1] || {};
@@ -518,8 +455,6 @@
         }
     }
 
-    /* ----------------------------------------------------------------- apply */
-
     function openApply(id) {
         const job = findJob(id);
         if (!job) return;
@@ -548,8 +483,6 @@
             (seed ? 'true' : 'false');
         if (!window.krtFetch) return;
         let reported = false;
-        // krtFetch.write (REQ-FE-002): a body-less POST with CSRF, the 403 retry and both gate
-        // redirects. The confirm button is disabled for the in-flight request.
         window.krtFetch
             .write({
                 method: 'POST',

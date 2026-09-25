@@ -35,23 +35,10 @@ import org.springframework.core.env.PropertySource;
 import org.springframework.core.io.ClassPathResource;
 
 /**
- * Guards the one distinction that took the whole E2E gate down on 2026-08-19: the split-horizon
- * JWKS override belongs to the application's <b>own</b> {@code app.security.jwt.jwk-set-uri}
- * namespace and must never be declared under Spring Boot's {@code
- * spring.security.oauth2.resourceserver.jwt.jwk-set-uri}.
- *
- * <p>The two keys look interchangeable and behave oppositely when blank. {@link
- * SecurityConfig#resourceServerJwtDecoder} reads the app key behind an
- * {@code @ConditionalOnExpression} that leaves the bean absent while the value is blank, so an
- * unset environment variable simply keeps Boot's issuer-location decoder. Boot's own key has no
- * such tolerance: a {@code ${VAR:}} default binds as present-but-empty, the resource-server
- * auto-configuration takes its jwk-set-uri branch, and the context dies with {@code jwkSetUri
- * cannot be empty} — the backend container never becomes healthy and every E2E test class fails on
- * stack bring-up rather than on anything it asserts.
- *
- * <p>Asserting on the YAML rather than on a booted context is deliberate: the failure happens
- * during context refresh of the {@code dev} profile, which no test profile exercises, so only the
- * declaration itself can be checked cheaply.
+ * Asserts the JWKS override lives under the application's own {@code app.security.jwt.jwk-set-uri}
+ * and never under Boot's {@code spring.security.oauth2.resourceserver.jwt.jwk-set-uri}, where an
+ * empty {@code ${VAR:}} default aborts context startup. Checks the declared YAML rather than a
+ * booted context.
  */
 class JwkSetUriNamespaceTest {
 
@@ -62,13 +49,11 @@ class JwkSetUriNamespaceTest {
   private static final String APP_KEY = "app.security.jwt.jwk-set-uri";
 
   /**
-   * No profile may declare Boot's resource-server {@code jwk-set-uri}. A real URL would be
-   * survivable; the trap is that the only way anyone has ever wanted to write it here is with an
-   * empty {@code ${VAR:}} default, which is fatal — so the key is banned outright and the override
-   * goes through {@link #APP_KEY} instead.
+   * No profile may declare Boot's resource-server {@code jwk-set-uri}; the override must use {@link
+   * #APP_KEY}.
    *
-   * @param yaml the profile configuration file to inspect.
-   * @throws IOException if the configuration file cannot be read.
+   * @param yaml the profile configuration file to inspect
+   * @throws IOException if the configuration file cannot be read
    */
   @ParameterizedTest
   @ValueSource(
@@ -101,11 +86,9 @@ class JwkSetUriNamespaceTest {
   }
 
   /**
-   * The prod profile carries the same knob (REQ-SEC-024, internal JWKS fetch) and is the template
-   * dev now mirrors; a change that moved it would silently re-open the hairpin through the public
-   * edge.
+   * The prod profile keeps the JWKS override on the application's own namespace (REQ-SEC-024).
    *
-   * @throws IOException if the configuration file cannot be read.
+   * @throws IOException if the configuration file cannot be read
    */
   @Test
   void prodKeepsTheEscapeHatchOnTheApplicationsOwnNamespace() throws IOException {
@@ -115,14 +98,10 @@ class JwkSetUriNamespaceTest {
   }
 
   /**
-   * Production actually passes the knob to the backend (added 2026-09-23). {@code
-   * application-prod.yml} read {@code KEYCLOAK_JWK_SET_URI} from the start, but neither the compose
-   * file nor the Quadlet environment it generates ever set it, so REQ-SEC-024's internal JWKS could
-   * not be switched on in production at all. The default must stay empty: that keeps the
-   * issuer-location decoder exactly as before, so shipping the wiring changes nothing until the
-   * owner sets {@code IRI_BACKEND_KEYCLOAK_JWK_SET_URI}.
+   * Production passes {@code IRI_BACKEND_KEYCLOAK_JWK_SET_URI} to the backend with an empty
+   * default, which keeps the issuer-location decoder until it is set (REQ-SEC-024).
    *
-   * @throws IOException if the environment template cannot be read.
+   * @throws IOException if the environment template cannot be read
    */
   @Test
   void productionPassesTheKnobToTheBackendWithAnEmptyDefault() throws IOException {
@@ -149,13 +128,13 @@ class JwkSetUriNamespaceTest {
   }
 
   /**
-   * Reads one raw property from a profile's YAML without booting a context or resolving
-   * placeholders, so the assertion is about what is <em>declared</em>.
+   * Reads one raw declared property from a profile's YAML without booting a context or resolving
+   * placeholders.
    *
-   * @param yaml the classpath name of the configuration file.
-   * @param key the fully-qualified property key to look up.
-   * @return the declared value, or {@code null} when the file does not declare the key.
-   * @throws IOException if the configuration file cannot be read.
+   * @param yaml the classpath name of the configuration file
+   * @param key the fully-qualified property key
+   * @return the declared value, or {@code null} when the key is not declared
+   * @throws IOException if the configuration file cannot be read
    */
   private static Object propertyOf(String yaml, String key) throws IOException {
     List<PropertySource<?>> sources =

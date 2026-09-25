@@ -35,18 +35,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Same-origin proxy for the admin-only squadron toggle endpoints — the per-squadron
- * promotion-feature flag and the profit-eligibility flag. The admin-settings page sends a PATCH
- * here when the admin flips either checkbox so the browser never has to know the backend hostname
- * and the CSRF-protected session is reused via {@link BackendApiClient}.
+ * Same-origin proxy for the admin-only squadron toggles (promotion feature and profit eligibility),
+ * relayed via {@link BackendApiClient}.
  *
- * <p>Both flags live on the cached {@code SquadronDto} that {@code OrgUnitContextAdvice} reads on
- * every authenticated render, so each toggle evicts the {@code CacheDomain.SQUADRON} and {@code
- * CacheDomain.ORG_UNIT} caches (REQ-DATA-007) to keep the shared squadron catalogue truthful rather
- * than stale up to the cache TTL.
- *
- * <p>Endpoints carry their own {@code ADMIN}-role gate at the Spring Security layer; the backend
- * re-checks the role, so this proxy is defence-in-depth and not the sole guard.
+ * <p>Each toggle evicts the {@code CacheDomain.SQUADRON} and {@code CacheDomain.ORG_UNIT} caches
+ * (REQ-DATA-007). The backend re-checks the {@code ADMIN} role.
  */
 @RestController
 @RequestMapping("/api/proxy/squadrons")
@@ -56,9 +49,7 @@ public class SquadronAdminProxyController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Forwards a "set squadron promotion-enabled flag" request to the backend. Returns 204 No Content
-   * on success so the AJAX caller does not have to parse the squadron payload — it already knows
-   * the new state from the checkbox event.
+   * Forwards a request to set a squadron's promotion-enabled flag.
    *
    * @param id squadron primary key
    * @param body request payload {@code { "enabled": true|false }}
@@ -74,9 +65,7 @@ public class SquadronAdminProxyController {
   }
 
   /**
-   * Forwards a "set squadron profit-eligible flag" request to the backend. Returns 204 No Content
-   * on success so the AJAX caller does not have to parse the squadron payload — it already knows
-   * the new state from the checkbox event.
+   * Forwards a request to set a squadron's profit-eligible flag.
    *
    * @param id squadron primary key
    * @param body request payload {@code { "eligible": true|false }}

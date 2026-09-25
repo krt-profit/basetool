@@ -24,40 +24,16 @@ import java.util.Set;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Carries the names of the session attributes that {@link SessionAttributeDiagnosticMapper} had to
- * drop on the current thread, from the session <em>read</em> to {@link
- * SessionAttributeRepairFilter} which repairs them on the same request (REQ-SEC-050).
+ * Thread-local hand-off of the session attribute names {@link SessionAttributeDiagnosticMapper}
+ * dropped, to {@link SessionAttributeRepairFilter}, which removes them on the same request
+ * (REQ-SEC-050).
  *
- * <p><strong>Why a hand-off is needed at all.</strong> The mapper is the only layer that sees which
- * hash field failed, and it is deliberately read-only — repairing from inside the deserializer
- * would mean writing to Redis from the session read path, which is the subsystem that took the
- * whole application down twice inside two releases (ADR-0154). The filter, by contrast, repairs
- * through {@code HttpSession#removeAttribute}, the same public API that {@code
- * BackendRoleSyncFilter} and {@code TermsAcceptanceGateFilter} already use on every request. All
- * this class does is get the attribute name from the one to the other; the repository sits in
- * between and offers no seam.
- *
- * <p>A thread-local rather than a request attribute because the session is loaded lazily, deep
- * inside {@code SessionRepositoryFilter}'s wrapper, where no {@code HttpServletRequest} of ours is
- * in scope. The idiom matches {@code ActiveSquadronContext} and {@code CorrelationContext}, which
- * cross the same kind of gap.
- *
- * <p><strong>Bounded and cleared on both edges.</strong> Tomcat pools request threads, so a name
- * left behind would be applied to the <em>next</em> request's session — a different member's.
- * {@link SessionAttributeRepairFilter} therefore clears the queue before it enters the chain as
- * well as draining it on the way out, and {@link #MAX_PENDING} caps what a thread that never
- * reaches the filter (the repository's keyspace-notification listener) can accumulate.
+ * <p>Cleared on entry to and drained on exit from the filter chain, and capped at {@link
+ * #MAX_PENDING}, so a name never reaches another request's session.
  */
 public final class SessionAttributeRepairQueue {
 
-  /**
-   * Largest number of attribute names held for one thread.
-   *
-   * <p>A session hash carries a handful of attributes and only the unreadable ones land here, so
-   * the cap is never reached in practice. It exists because the key is a name read out of Redis and
-   * because a thread that never passes through {@link SessionAttributeRepairFilter} never drains —
-   * an unbounded set on either count is a slow leak with a patient trigger.
-   */
+  /** Largest number of attribute names held for one thread, bounding a thread that never drains. */
   private static final int MAX_PENDING = 16;
 
   /** Attribute names dropped on this thread and not yet repaired; absent when nothing failed. */
@@ -95,11 +71,8 @@ public final class SessionAttributeRepairQueue {
   }
 
   /**
-   * Discards anything left on this thread without repairing it.
-   *
-   * <p>Called on the way <em>into</em> the filter chain: a name that survived a previous request on
-   * this pooled thread belongs to a session that is no longer the current one, and applying it here
-   * would remove an attribute from the wrong member's session.
+   * Discards anything left on this thread without repairing it; called on entry to the filter
+   * chain.
    */
   static void clear() {
     PENDING.remove();

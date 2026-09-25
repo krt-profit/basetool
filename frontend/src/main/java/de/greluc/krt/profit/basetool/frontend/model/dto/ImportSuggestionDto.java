@@ -22,10 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.util.UUID;
 
 /**
- * Frontend mirror of the backend {@code ImportSuggestionDto} (#434/#435): one ranked master-data
- * candidate offered for an unmatched or fuzzily matched raw screen name. The create page renders
- * these as one-click pick chips on the flagged goods row. Fields must stay in lockstep with the
- * backend record (mirror-DTO rule).
+ * Frontend mirror of the backend {@code ImportSuggestionDto}: one ranked candidate material for an
+ * unmatched or fuzzily matched screen name, rendered as a pick chip.
  *
  * @param id id of the candidate material (applied to the row's material select on pick)
  * @param name display name of the candidate, e.g. {@code "Stileron (Raw)"}

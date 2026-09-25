@@ -39,20 +39,10 @@ import org.springframework.web.server.ResponseStatusException;
 import reactor.netty.http.client.HttpClientRequest;
 
 /**
- * Streams the member's own Art. 15 / Art. 20 export to the browser as a download (REQ-SEC-058).
+ * Streams a member's Art. 15 / Art. 20 data export to the browser as a download (REQ-SEC-058).
  *
- * <p><b>The member's own endpoints accept no user id and relay none.</b> The backend derives the
- * subject from the token, so they cannot be talked into fetching somebody else's export — which is
- * what makes them safe to expose to every member rather than needing a scope check of their own.
- * The endpoints that <em>do</em> take an id are {@code hasRole(ADMIN)} here and again at the
- * backend.
- *
- * <p>These are plain {@code GET} links rather than {@code krtFetch} writes: a download is a
- * navigation, not a mutation, and routing it through the AJAX layer would mean buffering the whole
- * document in JavaScript to hand it back to the browser.
- *
- * <p>The admin variant lives here too, under its own ADMIN-gated paths, so both downloads share one
- * attachment-wrapping seam rather than growing a second copy of it.
+ * <p>The self-service endpoints take no user id; the backend derives the subject from the token.
+ * The admin endpoints that take an id are ADMIN-gated here and at the backend.
  */
 @RestController
 @RequiredArgsConstructor
@@ -86,12 +76,8 @@ public class DataExportProxyController {
   }
 
   /**
-   * Another member's export as a PDF download, for an admin serving a request from somebody who
-   * cannot sign in.
-   *
-   * <p>ADMIN-gated here and again at the backend. The backend applies the <b>same</b> projections
-   * and the same third-party anonymisation as the self-service path: an admin export is not a
-   * fuller one.
+   * Another member's export as a PDF download, for an admin; the backend applies the same
+   * projections and anonymisation as for self-service.
    *
    * @param userId the member the export is about
    * @return the PDF attachment
@@ -121,20 +107,8 @@ public class DataExportProxyController {
   }
 
   /**
-   * Fetches one export document and re-wraps it with attachment headers.
-   *
-   * <p>The filename carries no <b>handle</b>. A download filename reaches the browser's download
-   * list, shells and mail clients, and a name there is a leak nobody chose. The member's own export
-   * needs no identifier at all; an admin export carries the subject's <em>id</em>, because an admin
-   * handling several requests has to be able to tell two files apart.
-   *
-   * <p><b>Its own response timeout.</b> This is the one backend call that is expected to take a
-   * long time: the export runs ~29 statements across the whole schema and then renders a PDF, so
-   * for an account with years of history the shared 5 s {@code app.http.response-timeout} turned a
-   * working export into a read timeout and a 500. Raised per request rather than globally, because
-   * every other call is a page render that should keep failing fast. It is deliberately <b>not</b>
-   * routed through {@code BackendApiClient}'s Resilience4j chain either: retrying a minute-long
-   * export on a timeout would multiply the very work that timed out.
+   * Fetches one export document with an extended response timeout and no retries, and re-wraps it
+   * with attachment headers. The filename never carries a handle.
    *
    * @param uri the backend URI
    * @param filename the download filename

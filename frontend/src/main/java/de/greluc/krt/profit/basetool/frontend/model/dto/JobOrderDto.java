@@ -24,15 +24,12 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Frontend mirror of the backend {@code JobOrderDto}. Serves both order kinds: {@code MATERIAL}
- * orders populate {@code materials} + {@code handovers}; {@code ITEM} orders populate {@code
- * items}, {@code aggregatedMaterials} and {@code itemHandovers}. The unused lists are empty for the
- * respective kind, so the detail UI renders both through one shape.
+ * Frontend mirror of the backend {@code JobOrderDto} for both order kinds: {@code MATERIAL} orders
+ * fill {@code materials} and {@code handovers}; {@code ITEM} orders fill {@code items}, {@code
+ * aggregatedMaterials} and {@code itemHandovers}. The other kind's lists are empty.
  *
- * <p>{@code redacted} mirrors the backend's per-order requesting-owner redaction signal
- * (REQ-ORDERS-023): {@code true} when the caller reached the order via the requesting-org-unit
- * escape rather than as a full viewer, so the detail page keys its limited rendering off THIS order
- * rather than the caller's global capability.
+ * <p>{@code redacted} is {@code true} when the caller sees the order only as a member of the
+ * requesting org unit (REQ-ORDERS-023).
  */
 public record JobOrderDto(
     UUID id,

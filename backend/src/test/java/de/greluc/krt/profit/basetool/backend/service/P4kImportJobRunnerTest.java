@@ -44,12 +44,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Pure-Mockito unit tests for {@link P4kImportJobRunner}: {@link P4kImportJobService} and {@link
- * P4kImportService} are mocked and the runner is driven synchronously (the {@code @Async} dispatch
- * is a Spring concern, irrelevant to the orchestration logic). A real Jackson 3 {@link JsonMapper}
- * serializes the result. Verifies the run order (running → work → succeeded), that APPLY reclaims
- * its payload while PREVIEW keeps it, that a failure is recorded rather than thrown, and that
- * housekeeping never masks the outcome.
+ * Unit tests for {@link P4kImportJobRunner} with mocked {@link P4kImportJobService} and {@link
+ * P4kImportService} and a real {@link JsonMapper}: run order, payload reclaim for APPLY but not
+ * PREVIEW, failures recorded rather than thrown, and housekeeping never masking the outcome.
  */
 @ExtendWith(MockitoExtension.class)
 class P4kImportJobRunnerTest {

@@ -51,18 +51,10 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
 /**
- * Unit tests for {@link RateLimitingFilter}. Previously had no test file at all — 36% branch
- * coverage. The most security-critical path is {@code resolveClientKey}, which decides which
- * "bucket" a request lands in:
+ * Unit tests for {@link RateLimitingFilter}, focused on which bucket a request lands in.
  *
- * <ul>
- *   <li>If the immediate peer is on the trusted-proxies allow-list, the filter takes the
- *       original-client IP from {@code X-Forwarded-For}; otherwise the spoofable header is ignored.
- *   <li>The literal {@code "*"} is NOT a valid trust value (would let any client spoof the header
- *       and get a fresh bucket per request).
- * </ul>
- *
- * <p>The tests use Spring's {@link MockHttpServletRequest}/Response so no Spring context is needed.
+ * <p>{@code X-Forwarded-For} is honoured only from a trusted proxy, and {@code "*"} is not a valid
+ * trust value.
  */
 class RateLimitingFilterTest {
 
@@ -97,10 +89,8 @@ class RateLimitingFilterTest {
   }
 
   /**
-   * The filter under test, rebuilt whenever the test changed {@link #properties} since the last
-   * build. The properties are an immutable record (BE-MOD-04), so a changed configuration means a
-   * new filter, exactly as a restart would; the buckets survive for as long as the configuration
-   * does.
+   * Returns the filter under test, rebuilt whenever {@link #properties} changed since the last
+   * build.
    *
    * @return the filter over the current configuration
    */
@@ -116,14 +106,6 @@ class RateLimitingFilterTest {
 
   /**
    * Runs the production filter pair in order: client-IP resolution, then rate limiting.
-   *
-   * <p>They are only correct together. {@code ClientIpContextFilter} is the sole reader of the raw
-   * proxy chain — it runs ahead of {@code ForwardedHeaderFilter}, which would otherwise overwrite
-   * the peer and hide the header — and {@code RateLimitingFilter} is the sole consumer of its
-   * verdict. Driving the limiter alone would test a fallback path that production never takes.
-   *
-   * <p>The resolver is built per call because tests mutate {@code properties.trustedProxies} in
-   * their bodies and the allowlist is compiled once per instance.
    *
    * @param limiter the rate-limiting filter under test
    * @param request the request to send through the pair
@@ -791,12 +773,8 @@ class RateLimitingFilterTest {
   class KeySourceTests {
 
     /**
-     * Drains a capacity-1 bucket and returns the rejected second response.
-     *
-     * <p>Rebuilds the filter rather than reusing the {@code @BeforeEach} instance so each case
-     * starts with an empty bucket cache and the two requests below are the only ones in the bucket.
-     * The request goes through {@link #runChain}, so the {@code key_source} tag reflects the same
-     * resolution production performs.
+     * Drains a fresh capacity-1 bucket through {@link #runChain} and returns the rejected second
+     * response.
      */
     private MockHttpServletResponse drainAndReject(String remoteAddr, String xff) throws Exception {
       properties.setCapacity(1);
@@ -895,13 +873,7 @@ class RateLimitingFilterTest {
           "without a resolved attribute the peer is the only trustworthy key");
     }
 
-    /**
-     * REQ-OBS-004: the 429 short-circuits before {@code RequestLoggingFilter}, so this DEBUG line
-     * is the only log record of the rejection — and it must carry the branch, never the address.
-     * The backend stdout stream's 744h retention is predicated on "no client IPs by design". DEBUG
-     * is also the contract: the global bucket is anonymous-reachable, so a higher level would be a
-     * log-flood vector.
-     */
+    /** A rejection logs its key source at DEBUG and never the client IP (REQ-OBS-004). */
     @Test
     void rejection_logsTheKeySourceAtDebug_andNeverTheClientIp() throws Exception {
       properties.setTrustedProxies(List.of());
@@ -950,10 +922,8 @@ class RateLimitingFilterTest {
   }
 
   /**
-   * A mutable description of {@code app.rate-limit.*} for the tests to adjust, in the shape the
-   * JavaBean properties class used to have. {@link RateLimitProperties} is an immutable record
-   * since BE-MOD-04; {@link #toProperties()} turns the current description into one, and {@link
-   * RateLimitingFilterTest#filter()} rebuilds the filter whenever it changed.
+   * Mutable test description of {@code app.rate-limit.*}, turned into an immutable {@link
+   * RateLimitProperties} by {@link #toProperties()}.
    */
   private static final class Spec {
     /** The production per-subject budget, bound once; this filter does not read it. */

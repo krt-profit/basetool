@@ -41,14 +41,11 @@ import org.springframework.stereotype.Repository;
 public interface MaterialRepository extends JpaRepository<Material, UUID> {
 
   /**
-   * Returns slim {@code MaterialReferenceDto}s (id, name, quantity-type) for every <b>visible</b>
-   * material, ordered by name. Used to populate material pickers (inventory, alias targets) without
-   * pulling the full Material aggregate. Wiki-only commodities imported {@code is_visible = false}
-   * (§4.3) are excluded so unreviewed entries never appear in a picker — see {@code isVisible} on
-   * {@link Material}. The list is deliberately complete — never silently bounded — because a
-   * truncated list would make materials beyond the bound unreachable; pickers that must stay
-   * payload-bounded use {@link #searchPicker(String, boolean, MaterialType, boolean, Pageable)}
-   * instead.
+   * Returns slim {@code MaterialReferenceDto}s (id, name, quantity type) for every visible
+   * material, ordered by name, for material pickers.
+   *
+   * <p>The list is complete and unbounded; bounded pickers use {@link #searchPicker(String,
+   * boolean, MaterialType, boolean, Pageable)}.
    */
   @Query(
       """
@@ -58,18 +55,12 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
   List<MaterialReferenceDto> findAllReference();
 
   /**
-   * Live-search query for the material pickers (REQ-FE-016): visible materials whose name contains
-   * the (already LIKE-escaped) fragment, case-insensitively; a {@code null} fragment matches
-   * everything. {@code jobOrderOnly} narrows to the job-order subset (the orders material lines),
-   * and {@code rawOnly} to refinery inputs ({@code type = rawType} or manually raw-flagged — the
-   * refinery input pickers). The refined material is fetch-joined so the picker metadata
-   * (refined-id/-name) maps without an N+1. Paged so the picker's server-side search stays
-   * payload-bounded while every material remains reachable by typing a narrower term.
+   * Paged live search for the material pickers (REQ-FE-016): visible materials whose name contains
+   * the fragment, case-insensitively, with the refined material fetch-joined.
    *
    * @param q the LIKE-escaped name fragment, or {@code null} for no filter
    * @param jobOrderOnly when true, only {@code isJobOrder = true} materials
-   * @param rawType the {@link MaterialType#RAW} constant (bound as a parameter so the query needs
-   *     no HQL enum literal)
+   * @param rawType the {@link MaterialType#RAW} constant, bound as a parameter
    * @param rawOnly when true, only refinery inputs ({@code type = rawType} or manually raw-flagged)
    * @param pageable page request (sorted by the whitelisted picker sort, typically name ascending)
    * @return one page of matching visible materials with the refined material initialized
@@ -99,9 +90,8 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
       Pageable pageable);
 
   /**
-   * Paged list of materials with {@code is_visible = true}, used for the public/trading catalog
-   * list. Wiki-only commodities inserted invisible (§4.3) are filtered out here; the admin catalog
-   * uses the unfiltered {@link #findAll(Pageable)} instead so it can review and unhide them.
+   * Paged list of visible materials for the public trading catalog; the admin catalog uses {@link
+   * #findAll(Pageable)} instead.
    *
    * @param pageable page request
    * @return paged visible materials
@@ -121,11 +111,7 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
   Optional<Material> findByName(String name);
 
   /**
-   * Case-insensitive name lookup. Used to bridge a SC-Wiki blueprint ITEM ingredient (which the
-   * wiki counts in pieces and resolves to a {@code game_item}) to the shared {@code material}
-   * catalogue by name, so a non-craftable component that also exists as a material is treated as a
-   * procurement requirement rather than a (recipe-less) sub-assembly. {@code material.name} is
-   * unique, so at most one row matches.
+   * Finds a material by name, ignoring case; at most one row matches.
    *
    * @param name the material name to match ignoring case
    * @return the material if one exists with that name (any case)
@@ -134,18 +120,10 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
 
   /**
    * Batched case-insensitive name lookup: returns every material whose lower-cased name is in
-   * {@code lowerNames} (the caller lower-cases each name first). The bulk counterpart of {@link
-   * #findByNameIgnoreCase(String)}, used by the blueprint craftability calculation (#781) to bridge
-   * a recipe's PIECE-counted ITEM ingredients to their {@code material} rows across the caller's
-   * whole owned set in one query rather than one lookup per ingredient. {@code material.name} is
-   * unique, so at most one row matches each distinct lower-cased name.
+   * {@code lowerNames}.
    *
-   * <p>Unlike the derived {@link #findByNameIgnoreCase(String)} — which folds <em>both</em>
-   * operands with the database {@code LOWER()} — this folds the candidate names caller-side (JVM)
-   * and the column DB-side. The two folds are byte-identical for ASCII, which is all the SC
-   * commodity / gem names this bridge ever matches; a hypothetical non-ASCII material name (e.g.
-   * one with {@code ß} or a Turkish dotted/dotless {@code I}) could fold differently and miss.
-   * Callers must pass {@code Locale.ROOT}-lower-cased names so the JVM fold is deterministic.
+   * <p>Callers must lower-case the names with {@code Locale.ROOT}; matching is reliable for ASCII
+   * names only.
    *
    * @param lowerNames the already-{@code Locale.ROOT}-lower-cased material names to match
    * @return the materials whose lower-cased name is in the set; empty when none match or {@code
@@ -155,8 +133,7 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
   List<Material> findByNameInIgnoreCase(@Param("lowerNames") Collection<String> lowerNames);
 
   /**
-   * Resolution-chain step 1 for the R3 Wiki commodity sync (§8.1.1): match a Wiki commodity to a
-   * local material via the SC Wiki UUID written on a previous sync.
+   * Finds the material linked to an SC Wiki commodity by a previous sync.
    *
    * @param scwikiUuid the SC Wiki commodity UUID
    * @return the material if a previous sync linked it
@@ -164,10 +141,10 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
   Optional<Material> findByScwikiUuid(UUID scwikiUuid);
 
   /**
-   * Soft-deletes SC Wiki ownership of every material whose {@code scwiki_uuid} is set, NOT in
-   * {@code seenScwikiUuids}, and not already marked. Mirrors {@code
-   * MaterialPriceRepository.clearStalePrices}: the caller gates this on a non-empty seen set so a
-   * sync that fails to fetch the Wiki catalogue never wipes the merge state (§8.7).
+   * Marks as SC-Wiki-deleted every material whose {@code scwiki_uuid} is set, not in {@code
+   * seenScwikiUuids}, and not already marked.
+   *
+   * <p>Callers must not invoke it with an empty seen set.
    *
    * @param seenScwikiUuids the Wiki UUIDs successfully processed in the current run
    * @param now timestamp to stamp on the soft-deleted rows
@@ -185,13 +162,8 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
       @Param("seenScwikiUuids") Collection<UUID> seenScwikiUuids, @Param("now") Instant now);
 
   /**
-   * Counts the live SC Wiki-linked materials: every row that carries a {@code scwiki_uuid} and is
-   * not tombstoned ({@code scwiki_deleted_at IS NULL}) — the same population {@link
-   * #markScwikiDeleted} maintains, minus its {@code NOT IN seen} exclusion. Used by the R3
-   * commodity sync as the representative non-zero count to report when the Wiki catalogue comes
-   * back {@code 304 Not Modified}: a fully-cached healthy run merges nothing, so reporting {@code
-   * 0} would false-fire {@code SyncZeroItems}; reporting the live linked-row count instead keeps a
-   * genuine empty-200 outage (which reports 0) as the only zero-item signal (#1182).
+   * Counts the materials that carry an SC Wiki UUID and are not tombstoned; reported by the
+   * commodity sync when the Wiki catalogue answers {@code 304 Not Modified}.
    *
    * @return the number of non-tombstoned materials carrying a SC Wiki UUID
    */
@@ -204,14 +176,12 @@ public interface MaterialRepository extends JpaRepository<Material, UUID> {
   long countLiveScwikiMaterials();
 
   /**
-   * Candidate set of the refinery screenshot import's material matching (#434): every visible
-   * material the existing refinery-order create path accepts as an input — {@code type == RAW} or
-   * the admin-curated {@code isManualRawMaterial} escape hatch. The gate must mirror the create
-   * path exactly, otherwise the import drafts materials the save endpoint then rejects.
+   * Returns the visible materials the refinery-order create path accepts as input ({@code type ==
+   * RAW} or {@code isManualRawMaterial}), the candidate set for the screenshot import.
    *
-   * @param rawType always {@link de.greluc.krt.profit.basetool.backend.model.MaterialType#RAW};
-   *     parameterized so the JPQL stays free of a hardcoded enum literal
-   * @return visible refinery-input candidates, ordered by name for deterministic matching
+   * @param rawType always {@link de.greluc.krt.profit.basetool.backend.model.MaterialType#RAW},
+   *     bound as a parameter
+   * @return visible refinery-input candidates, ordered by name
    */
   @Query(
       """

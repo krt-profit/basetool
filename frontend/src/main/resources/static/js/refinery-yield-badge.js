@@ -1,18 +1,4 @@
 // @ts-check
-/*
- * Shared yield-bonus badge manager for refinery-order forms (create + detail page).
- *
- * Each material row hosts an optional ".yield-bonus-badge" <span> inside the
- * outputQuantity label that displays the UEX yield bonus/malus for the currently-
- * picked input material at the order's refinery. Page templates init this module
- * once with the server-rendered {materialId -> bonusPercent} map plus the i18n
- * help text; on every material/location change the page wires the relevant
- * helper from this module so the badge re-renders without a page reload.
- *
- * The /refinery-orders/locations/{id}/yields proxy endpoint exposed by the
- * frontend's RefineryOrderPageController is the canonical source for the map
- * when the location changes — onLocationChange() does the fetch + state update.
- */
 (function () {
     'use strict';
 
@@ -22,8 +8,7 @@
     };
 
     /**
-     * Replaces the in-memory yield map and help text. Page templates call this
-     * once on DOMContentLoaded with the server-rendered initial state.
+     * Replaces the in-memory yield map and help text with the server-rendered initial state.
      */
     function init(initialMap, helpText) {
         state.yieldByMaterialId = initialMap || {};
@@ -31,9 +16,8 @@
     }
 
     /**
-     * Sets / updates / removes the yield-bonus badge on the row identified by
-     * rowIndex. Passing undefined or null for bonus collapses the badge entirely
-     * (treated as "no UEX data for this material at this refinery").
+     * Sets, updates or removes the yield-bonus badge of a row; a null or undefined bonus
+     * removes it.
      */
     function setBadge(rowIndex, bonus) {
         const label = document.querySelector('label[for="outputQuantity_' + rowIndex + '"]');
@@ -64,9 +48,7 @@
     }
 
     /**
-     * Refreshes the badge of the row that owns the given input-material <select>.
-     * Reads the selected material id and looks it up in the in-memory map; a
-     * missing entry collapses the badge (no UEX row for this pair).
+     * Refreshes the badge of the row that owns the given input-material select from the yield map.
      */
     function refreshFor(inputMaterialSelect) {
         if (!inputMaterialSelect || !inputMaterialSelect.id) return;
@@ -81,19 +63,14 @@
 
     /** Re-renders every row's badge against the current map. */
     function refreshAll() {
-        // Attribute-only selector: after combobox enhancement (REQ-FE-016) the control's id
-        // lives on a hidden <input>, not a <select>; refreshFor only reads .id and .value,
-        // which both elements carry.
         document.querySelectorAll('[id^="inputMaterialId_"]').forEach(function (sel) {
             refreshFor(sel);
         });
     }
 
     /**
-     * Location dropdown changed -> refetch the new refinery's yield map from
-     * the page-controller proxy and re-render every row. Network / 4xx failures
-     * fall back to an empty map, matching the server-side fallback path, so the
-     * form stays usable when UEX or the backend is misbehaving.
+     * Re-fetches the yield map for the chosen refinery and re-renders every badge; any failure
+     * falls back to an empty map.
      */
     function onLocationChange(selectElement) {
         const locationId = selectElement && selectElement.value;

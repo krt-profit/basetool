@@ -29,31 +29,15 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * Published when a member's Art. 17 erasure request reaches a terminal state without producing a
- * notification of its own — a withdrawal, or the execution itself (REQ-SEC-061, REQ-NOTIF-018).
+ * Published when a member's Art. 17 erasure request is withdrawn or executed (REQ-SEC-061,
+ * REQ-NOTIF-018).
  *
- * <p><b>Directed at nobody.</b> Like {@link BankBookingRequestCancelledEvent}, its only effect on
- * the notification pipeline is to clear the now-stale {@code ACCOUNT_DELETION_REQUESTED} items the
- * administrators were shown. It seeds no rule, creates no notification, needs no message template.
+ * <p>Directed at nobody: its only effect is to clear the stale {@code ACCOUNT_DELETION_REQUESTED}
+ * notifications shown to administrators. Carries only the member's id, so the after-commit listener
+ * never touches a deleted entity.
  *
- * <p><b>Why it exists.</b> The request notification carries the member's handle in its render
- * parameters, one row per administrator, and none of the three terminal transitions superseded it:
- * the declined event had no {@code resolvesNotificationTypes()} override, and withdrawal and
- * execution published nothing at all. So every administrator's bell kept showing "X beantragt die
- * Löschung des eigenen Kontos" after the request was withdrawn, refused or carried out — and on
- * execution the departed member's name sat in {@code notification.params} until the 180-day unread
- * sweep reaped it, because {@code UserDeletionService} deletes notifications by <em>recipient</em>
- * and the recipients are other people.
- *
- * <p>Superseding is a better answer than rewriting the payload, which is what the erasure used to
- * do: the row is gone when the request is decided, on <b>every</b> path rather than only when the
- * member ticked the history checkbox and an admin granted it.
- *
- * <p>Carries only the member's id, so the after-commit listener never touches an entity the
- * execution has already deleted.
- *
- * @param userId the member whose request was resolved; also the loose entity id the {@code
- *     ACCOUNT_DELETION_REQUESTED} notifications were tagged with
+ * @param userId the member whose request was resolved; also the loose entity id of the superseded
+ *     notifications
  */
 public record AccountDeletionRequestResolvedEvent(UUID userId) implements NotificationEvent {
 
@@ -69,9 +53,8 @@ public record AccountDeletionRequestResolvedEvent(UUID userId) implements Notifi
   /**
    * The member themselves, whether they withdrew the request or an admin carried it out.
    *
-   * <p>On the execution path the account is already gone by the time the listener runs, which is
-   * harmless: the actor reference is a loose {@code sub} with no foreign key, and nothing here
-   * resolves a recipient from it.
+   * <p>On execution the account is already gone when the listener runs; the actor is a loose {@code
+   * sub} with no foreign key.
    *
    * @return the member's id
    */

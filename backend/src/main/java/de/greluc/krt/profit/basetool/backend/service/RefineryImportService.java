@@ -70,26 +70,12 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 /**
- * Turns a {@code RefineryExtract} JSON (frozen contract, plan §5) into a non-persisted {@link
- * RefineryImportDraftDto} by matching the verbatim screen reads against master data — Phase 1 of
- * the refinery screenshot import (#434, epic #439).
+ * Turns a {@code RefineryExtract} JSON into a non-persisted {@link RefineryImportDraftDto} by
+ * matching the screen reads against master data.
  *
- * <p><b>Error semantics (plan §8):</b> envelope-level problems (unsupported {@code schemaVersion},
- * non-SETUP {@code panelType}) throw {@link BadRequestException} with an i18n key. Every
- * content-level problem (unmatched name, skipped row, checksum mismatch) yields a draft plus {@link
- * ImportIssueDto}s — never a 400, so the user always sees what was read.
- *
- * <p><b>Material matching (plan §7.3, deterministic, stop at first hit):</b> both sides are folded
- * with {@link MaterialNameCanonicalizer} (master data stores {@code "Stileron (Raw)"}, the screen
- * shows {@code "STILERON (ORE)"}); the candidate set mirrors the create path's input gate ({@code
- * type == RAW || isManualRawMaterial}, visible only). Stages: unique canonical match → curated
- * {@code REFINERY_SCREEN} alias → unique suffix/contains for game-UI-truncated names, anchored on
- * both the candidate names and the canonicalized alias names → fuzzy via the reused {@link
- * BlueprintFuzzyMatcher} with a conservative accept threshold; fuzzy hits are never silent ({@code
- * LOW_CONFIDENCE_MATERIAL}), misses keep the row with ranked suggestions.
- *
- * <p>Matching never touches the security context (kept pure and unit-testable); the caller id is
- * passed in explicitly and used only to default the draft's owner to the uploading user (§7.4).
+ * <p>Envelope problems throw {@link BadRequestException}; content problems yield a draft with
+ * {@link ImportIssueDto}s. Materials are matched by canonical name, curated {@code REFINERY_SCREEN}
+ * alias, truncation match, then {@link BlueprintFuzzyMatcher}; fuzzy hits are always flagged.
  */
 @Slf4j
 @Service
@@ -128,15 +114,12 @@ public class RefineryImportService {
   private final UserMapper userMapper;
 
   /**
-   * Validates the extract envelope and assembles the best-effort draft: resolves location and
-   * method, walks the goods of {@code orders[0]} in on-screen order, matches materials per §7.3,
-   * skips rows the create path could never accept (refine-off, zero quantity, un-quoted) with a
-   * matching issue, reconciles the panel-header totals, and reports every finding as an {@link
-   * ImportIssueDto}. Nothing is persisted.
+   * Validates the extract envelope and builds the best-effort draft from {@code orders[0]},
+   * reporting skipped rows, unmatched names and total mismatches as {@link ImportIssueDto}s.
+   * Nothing is persisted.
    *
    * @param extract the validated {@code RefineryExtract} payload
-   * @param callerId id of the uploading user; the draft's owner defaults to this user (§7.4) when
-   *     the id resolves, and stays {@code null} otherwise
+   * @param callerId id of the uploading user; becomes the draft's owner when it resolves
    * @return the draft order plus issues and match counters
    * @throws BadRequestException with an i18n key when {@code schemaVersion != 1} or {@code
    *     orders[0].panelType} is not {@code SETUP}
@@ -318,9 +301,8 @@ public class RefineryImportService {
   }
 
   /**
-   * Resolves a raw screen material name against the refinery-input candidate set using the §7.3
-   * stages. Convenience view of {@link #matchMaterialDetailed(String, MatchContext)} for callers
-   * that only need the hit, not the score or suggestions.
+   * Resolves a raw screen material name against the refinery-input candidates; the hit-only view of
+   * {@link #matchMaterialDetailed(String, MatchContext)}.
    *
    * @param rawName verbatim screen read, e.g. {@code "STILERON (ORE)"}
    * @return the matched material, or empty when no stage produced a hit
@@ -331,26 +313,14 @@ public class RefineryImportService {
   }
 
   /**
-   * Resolves a raw method read against {@code refining_method} — the closed UEX enum of nine
-   * methods (title-cased master data, e.g. {@code "Ferron Exchange"}; the screen renders
-   * uppercase). Three deterministic-then-fuzzy stages, stopping at the first hit:
+   * Resolves a raw method read against {@code refining_method}, stopping at the first hit.
    *
    * <ol>
-   *   <li>exact case-insensitive name (the fast path; UEX title case vs. the uppercase screen);
-   *   <li>unique canonical-core fold (spacing / punctuation drift, mirroring {@link
-   *       #matchRefineryLocation});
-   *   <li>fuzzy NEAREST-match over the closed enum via the reused {@link BlueprintFuzzyMatcher},
-   *       accepting the top candidate at or above {@link
+   *   <li>exact case-insensitive name;
+   *   <li>unique canonical-core fold;
+   *   <li>best {@link BlueprintFuzzyMatcher} candidate at or above {@link
    *       RefineryImportProperties#getMethodFuzzyAcceptThreshold()}.
    * </ol>
-   *
-   * <p>Stage 3 is what recovers the VLM's one systematic method mis-read: the model autocorrects
-   * the game's {@code "DINYX SOLVENTATION"} to the real English word and emits {@code "DINYX
-   * SOLVATION"}, which no exact lookup can resolve. Because the nine methods are highly distinct,
-   * the intended method wins by a wide margin (~0.83 vs. ≤ ~0.36 for the runner-up), so a low
-   * threshold recovers the mis-read without risking a wrong silent snap; non-method text peaks near
-   * 0.4 and stays unresolved. The import is a review-before-save draft, so the user still confirms
-   * the pre-filled method before persisting.
    *
    * @param rawName verbatim screen read; null/blank yields empty
    * @return the matched refining method, or empty
@@ -398,15 +368,10 @@ public class RefineryImportService {
   }
 
   /**
-   * Resolves a raw location read against the refinery-equipped locations (the create-form picker
-   * source) by unique canonical name — e.g. screen {@code "LEVSKI"} to master {@code "Levski"}.
+   * Resolves a raw location read against the non-hidden refinery locations by unique canonical name
+   * (REQ-REFINERY-020).
    *
-   * <p>Inherits that source's exclusion of hidden locations (REQ-REFINERY-020), so a screenshot
-   * taken at a location an admin has since hidden yields {@code UNRESOLVED_LOCATION} instead of
-   * pre-filling a refinery the user could not have picked by hand.
-   *
-   * @param rawName verbatim terminal-header read; null/blank yields empty (the normal case for
-   *     pre-cropped panel input, which never contains the header)
+   * @param rawName verbatim terminal-header read; null/blank yields empty
    * @return the matched location, or empty when none or several candidates share the folded name
    */
   @NotNull
@@ -423,9 +388,8 @@ public class RefineryImportService {
   }
 
   /**
-   * Classifies a source row that must not become a draft good: REFINE toggle off, un-quoted YIELD
-   * ({@code outputQuantity == null}), or a zero quantity the create path's {@code @Min(1)} would
-   * reject anyway.
+   * Classifies a source row that must not become a draft good: REFINE off, un-quoted yield ({@code
+   * outputQuantity == null}), or zero quantity.
    *
    * @param good the source row
    * @return the skip reason, or {@code null} when the row is draftable
@@ -444,18 +408,9 @@ public class RefineryImportService {
   }
 
   /**
-   * Applies the frozen Phase-0 header checksum (one-sided; extractor repo {@code
-   * PHASE0_FINDINGS.md} §7, REQ-REFINERY-007): flags {@code SUM_MISMATCH} when the refine-ON row
-   * quantities sum past {@code rawToRefineTotal} beyond the ±1-per-row display rounding, or when a
-   * single row alone exceeds it by more than 1. The finding stays a WARNING because an excess is
-   * not proof of a mis-read: besides a mis-read quantity, a flipped REFINE toggle, or a duplicated
-   * capture, the header itself can be legitimately stale — the game freezes IN MANIFEST / TO REFINE
-   * at GET QUOTE while the row list and toggles stay live, so an order modified after quoting can
-   * truthfully sum past the frozen header ({@code PHASE0_FINDINGS.md} §7 addendum, sample order 10:
-   * pixel-verified Σ ON = 1724 vs. header 1645). A shortfall is never flagged (the materials list
-   * is a scrolling ~6-row viewport, so scrolled-out rows legitimately reduce the visible sum), and
-   * {@code rawInManifestTotal} is never validated — its composition is not reliably reconstructible
-   * from a single frame (e.g. it may exclude the inert row).
+   * Flags a {@code SUM_MISMATCH} warning when the refine-on row quantities exceed {@code
+   * rawToRefineTotal} beyond per-row rounding, or one row alone exceeds it by more than 1
+   * (REQ-REFINERY-007). A shortfall is never flagged.
    *
    * @param order the extracted order carrying the nullable header totals
    * @param sourceGoods all source rows (including skipped ones)
@@ -490,14 +445,9 @@ public class RefineryImportService {
   }
 
   /**
-   * Loads the candidate set once per request and pre-computes the canonical-core index plus the
-   * name-keyed lookup the fuzzy stage maps its results back through. Also folds the curated {@code
-   * REFINERY_SCREEN} alias names through the canonicalizer into an index of their own, so the
-   * truncation stage can use aliases as containment anchors — the game UI clips long names on both
-   * ends, and the master-data name (often the external-catalogue spelling) may not contain the
-   * clipped fragment while a curated alias of the on-screen spelling does. Aliases whose target
-   * material fails the create-path candidate gate are left out, mirroring the exact-alias stage's
-   * gate (REQ-REFINERY-012).
+   * Loads the candidate materials once per request and builds the canonical-name and alias indexes
+   * the matching stages use; aliases whose target fails the candidate gate are omitted
+   * (REQ-REFINERY-012).
    *
    * @return the per-request matching context
    */
@@ -536,11 +486,8 @@ public class RefineryImportService {
   }
 
   /**
-   * Runs the §7.3 stages against the prepared context: unique canonical match, curated {@code
-   * REFINERY_SCREEN} alias, unique suffix/contains for game-UI-truncated reads — tested against the
-   * candidate canonical names <em>and</em> the canonicalized alias names, unique across the union —
-   * then the fuzzy fallback. Fuzzy results at or above the accept threshold match (flagged);
-   * everything below leaves the row unmatched but carries the ranked suggestions.
+   * Runs the material matching stages (canonical match, alias, truncation, fuzzy) against the
+   * prepared context; fuzzy hits below the threshold leave the row unmatched with suggestions.
    *
    * @param rawName verbatim screen read
    * @param context the per-request candidate context
@@ -633,11 +580,9 @@ public class RefineryImportService {
   }
 
   /**
-   * Defaults the draft owner to the uploading user (§7.4 "owner defaults to the uploading user"). A
-   * caller id that does not resolve to a user row simply leaves the owner empty — the review form
-   * falls back to its own current-user default.
+   * Resolves the uploading user as the draft owner; an unknown id leaves the owner empty.
    *
-   * @param callerId id of the authenticated uploader; may be {@code null} in unit-test contexts
+   * @param callerId id of the authenticated uploader; may be {@code null}
    * @return the owner reference, or {@code null}
    */
   @Contract("null -> null")
@@ -649,14 +594,11 @@ public class RefineryImportService {
   }
 
   /**
-   * Derives the draft's start time from the screenshot capture metadata (REQ-REFINERY-017): the
-   * LATEST {@code capturedAt} across the order's source images — the user captures the SETUP panel
-   * right when starting the order, and a scrolled multi-capture sequence ends closest to the actual
-   * start. {@code null} when no image carries a capture instant (older extractor, or the file
-   * metadata was undeterminable); the create flow then keeps its "now" default at save time.
+   * Derives the draft's start time as the latest {@code capturedAt} across the order's source
+   * images (REQ-REFINERY-017).
    *
    * @param sourceImages the order's source-image provenance; {@code null}-safe
-   * @return the latest capture instant, or {@code null}
+   * @return the latest capture instant, or {@code null} when no image carries one
    */
   @Contract("null -> null")
   private static @Nullable Instant deriveStartedAt(
@@ -672,7 +614,7 @@ public class RefineryImportService {
   }
 
   /**
-   * Shorthand factory keeping the issue-creation call sites readable.
+   * Creates an {@link ImportIssueDto}.
    *
    * @param field dotted field path (see {@link ImportIssueDto})
    * @param rawValue verbatim read or compact diagnostic
@@ -694,14 +636,13 @@ public class RefineryImportService {
   }
 
   /**
-   * Per-request matching context: the create-path-gated candidate set plus the derived indexes.
+   * Per-request matching context: the gated candidate set plus the derived indexes.
    *
    * @param candidates visible {@code RAW || isManualRawMaterial} materials
-   * @param canonicalIndex canonical core → candidates sharing it
-   * @param candidateIds candidate primary keys — the alias stage validates its hit against this set
-   *     so a mis-curated alias can never bypass the create-path gate
-   * @param aliasCanonicalIndex canonicalized {@code REFINERY_SCREEN} alias name → gate-passing
-   *     target materials; containment anchors for the truncation stage
+   * @param canonicalIndex canonical core to the candidates sharing it
+   * @param candidateIds candidate primary keys, which an alias hit must belong to
+   * @param aliasCanonicalIndex canonicalized {@code REFINERY_SCREEN} alias name to its gate-passing
+   *     target materials
    */
   private record MatchContext(
       List<Material> candidates,

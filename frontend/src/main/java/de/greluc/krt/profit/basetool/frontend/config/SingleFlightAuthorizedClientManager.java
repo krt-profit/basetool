@@ -35,47 +35,13 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
- * A {@link OAuth2AuthorizedClientManager} decorator that collapses the concurrent token refreshes a
- * single user session triggers into exactly one refresh (REQ-SEC-012, ADR-0019).
+ * A {@link OAuth2AuthorizedClientManager} decorator that collapses the concurrent token refreshes
+ * of one user session into a single refresh, so Keycloak's refresh-token reuse detection never
+ * revokes the session (REQ-SEC-012, ADR-0019).
  *
- * <h2>Why this exists</h2>
- *
- * <p>A logged-in page fans out several backend-bound requests at once — the page render, the
- * notification SSE relay ({@code /notifications/stream}) and the periodic unread-count poll each
- * run on their own servlet thread but share one Spring session. With a 5-minute access-token
- * lifespan, the moment the token expires two or more of those requests independently ask the
- * underlying {@link
- * org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizedClientManager} to refresh,
- * and each presents the <i>same</i> stored refresh token. Under Keycloak's refresh-token rotation
- * with reuse detection ({@code Revoke Refresh Token = on}, {@code Refresh Token Max Reuse = 0}) the
- * first refresh rotates the token and the second — replaying the now-consumed token — trips reuse
- * detection, which revokes the whole token family. Every subsequent call then fails with {@code
- * client_authorization_required} until the user logs in again.
- *
- * <h2>How it fixes it</h2>
- *
- * <p>Refreshes are serialised per session (a striped {@link ReentrantLock}, keyed by session id)
- * and the result is held in a short-lived freshness cache. The first request through the gate
- * refreshes and caches the new client; the rest, while the cached access token is still valid,
- * return it <i>without</i> asking the delegate to refresh again — so only one refresh-token grant
- * ever leaves the frontend per expiry window, and reuse detection never fires for the in-session
- * race.
- *
- * <h2>Scope &amp; limitations</h2>
- *
- * <ul>
- *   <li>The lock and cache are JVM-local, so single-flight is complete for a single frontend
- *       instance. With the frontend scaled horizontally, two instances handling the same session
- *       concurrently could still race; that residual is absorbed by setting {@code Refresh Token
- *       Max Reuse} to a small value &gt; 0 on Keycloak (see {@code docs/INGEST_KEYCLOAK_SETUP.md}).
- *   <li>Cache-hit requests are not re-persisted into their own session: Spring Session writes only
- *       changed attributes (delta save), so the cache-hit request never rewrites the authorized
- *       client and cannot clobber the value the refreshing request already flushed to Redis.
- *   <li>Cached entries hold an access/refresh token in memory. They already live in Redis alongside
- *       the session; entries are replaced on the next refresh and the map is bounded (see {@link
- *       #MAX_CACHE_ENTRIES}). When no session can be derived (e.g. a background task with no bound
- *       request) the call delegates directly with no caching.
- * </ul>
+ * <p>Refreshes are serialised per session by a striped {@link ReentrantLock} and the result is held
+ * in a bounded freshness cache ({@link #MAX_CACHE_ENTRIES}). Lock and cache are JVM-local; calls
+ * without a derivable session or principal are delegated without caching.
  */
 public class SingleFlightAuthorizedClientManager implements OAuth2AuthorizedClientManager {
 
@@ -86,16 +52,8 @@ public class SingleFlightAuthorizedClientManager implements OAuth2AuthorizedClie
   private static final int MAX_CACHE_ENTRIES = 50_000;
 
   /**
-   * Safety margin subtracted from the access-token expiry: a token within this window of expiring
-   * is treated as stale so the next request refreshes proactively rather than relaying a token that
-   * dies mid-flight.
-   *
-   * <p><b>Invariant:</b> this MUST be &ge; the {@code RefreshTokenOAuth2AuthorizedClientProvider}
-   * clock skew (Spring's default is 60s), so a freshness-cache hit never hands back a token the
-   * provider would itself refresh on a cache-miss path. With a smaller margin (the prior 30s) the
-   * cache served tokens in the 30–60s-before-expiry band that a sibling refresh path treated as
-   * refreshable — an asymmetry that let two paths disagree on whether a refresh was due and widened
-   * the window for a redundant refresh-token grant (REQ-SEC-012, ADR-0019).
+   * Margin subtracted from the access-token expiry, within which a cached token counts as stale.
+   * Must be at least the refresh provider's clock skew (60 s by default).
    */
   private static final Duration EXPIRY_SKEW = Duration.ofSeconds(60);
 
@@ -118,13 +76,8 @@ public class SingleFlightAuthorizedClientManager implements OAuth2AuthorizedClie
   }
 
   /**
-   * Authorizes (or refreshes) the client for {@code authorizeRequest}, serialising concurrent
-   * requests of the same session so only one refresh-token grant is issued per expiry window.
-   *
-   * <p>When a session-scoped cache key cannot be derived the call is delegated directly (no
-   * locking, no caching). Otherwise the per-session stripe lock is held while the freshness cache
-   * is consulted and — on a miss or a stale entry — the delegate performs the grant and the result
-   * is cached.
+   * Authorizes or refreshes the client, serialising concurrent requests of the same session so only
+   * one refresh-token grant is issued per expiry window.
    *
    * @param authorizeRequest the authorize request supplied by the WebClient OAuth2 filter
    * @return the authorized client (with a usable access token), or {@code null} if the delegate
@@ -160,22 +113,9 @@ public class SingleFlightAuthorizedClientManager implements OAuth2AuthorizedClie
   }
 
   /**
-   * Builds the per-session cache / lock key from the authorize request: {@code
-   * <registrationId>|s:<sessionId>} when an HTTP session can be resolved (the common case), falling
-   * back to {@code <registrationId>|p:<principalName>} when only the principal is available, and
-   * {@code null} when neither can be derived (then the caller delegates without single-flight).
-   *
-   * <p><b>Key stability matters.</b> Two concurrent authorize calls for the <i>same</i> user must
-   * resolve to the <i>same</i> key, or they land on different stripe locks / cache buckets,
-   * serialise against nobody, and each fire a refresh-token grant off the same stored token — which
-   * Keycloak's reuse detection then punishes by revoking the whole session. The OAuth2 exchange
-   * filter normally carries the servlet request through as a request attribute, but a caller that
-   * resolved the authorized client on a thread where that attribute was not propagated would
-   * otherwise downgrade to the principal key while a sibling kept the session key — a split that
-   * breaks single-flight. To close that gap the session id is also recovered from {@link
-   * RequestContextHolder} (any servlet/virtual worker thread with bound request attributes) when
-   * the request attribute is missing, so the precise session key is used consistently and the
-   * principal fallback is reserved for genuinely request-less calls.
+   * Builds the per-session cache and lock key: {@code <registrationId>|s:<sessionId>} when a
+   * session can be resolved, from the request attribute or {@link RequestContextHolder}, else
+   * {@code <registrationId>|p:<principalName>}.
    *
    * @param request the authorize request
    * @return the cache key, or {@code null} if no session / principal context is available
@@ -198,9 +138,7 @@ public class SingleFlightAuthorizedClientManager implements OAuth2AuthorizedClie
 
   /**
    * Returns the {@link HttpServletRequest} bound to the current thread via {@link
-   * RequestContextHolder}, or {@code null} when no servlet request is bound (e.g. a true Reactor
-   * worker thread or a background task). Used only as a fallback to recover the session id when the
-   * authorize request did not carry the servlet request as an attribute.
+   * RequestContextHolder}.
    *
    * @return the current servlet request, or {@code null} if none is bound to this thread
    */

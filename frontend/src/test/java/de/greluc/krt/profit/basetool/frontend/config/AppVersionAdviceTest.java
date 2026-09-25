@@ -27,11 +27,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.info.BuildProperties;
 
 /**
- * Unit tests for {@link AppVersionAdvice}. The advice has three observable states - present
- * BuildProperties with a real version, present BuildProperties whose version field is blank, and a
- * missing BuildProperties bean entirely (no auto-config, typical for sliced @WebMvcTest runs) - and
- * each must produce a non-{@code null} string so the Thymeleaf sidebar fragment never renders an
- * empty version chip.
+ * Unit tests for {@link AppVersionAdvice}: a real version, a blank version and a missing {@code
+ * BuildProperties} bean must each yield a non-{@code null} string.
  */
 class AppVersionAdviceTest {
 

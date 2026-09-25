@@ -47,14 +47,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * Pins the holder live-display-name resolution (REQ-BANK-003) against the real Testcontainers
- * PostgreSQL: every bank surface shows the linked user's <em>current</em> effective name — display
- * name preferred, username only as fallback — rather than the {@code handle} snapshot frozen at
- * registration, and falls back to the snapshot only once the user is deleted. Covers both the
- * interactive registry read ({@link BankHolderService#getHolders()}) and a historical surface (the
- * account statement PDF, fed by the live holder-leg projection), so the {@code CASE} resolution in
- * the JPQL projections and the entity-level {@link BankHolder#getDisplayName()} are exercised on a
- * real database, not just mocked.
+ * Integration tests against real Postgres verifying that bank surfaces show a holder's current
+ * effective name, falling back to the stored handle once the user is deleted (REQ-BANK-003).
  */
 @SpringBootTest
 @ActiveProfiles("test")

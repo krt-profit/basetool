@@ -1,38 +1,3 @@
-/*
- * SCU / piece material-amount input normalisation and validation.
- *
- * Star-Citizen cargo amounts are entered in SCU and may be fractional
- * (cSCU = 0.01 SCU, microSCU = 0.001 SCU). A native <input type="number"> only
- * accepts the decimal separator of the *browser* locale (German Chrome takes
- * "0,01" but rejects "0.01", English Chrome the reverse), so a value typed with
- * the "wrong" separator is silently dropped. Every material-amount field is
- * therefore a plain <input type="text" inputmode="decimal" data-scu-decimal ...>
- * and this module both lets operators type EITHER "." or "," and enforces the
- * project's amount rules. The field's mode is read from its live `step` attribute,
- * which the quantity-type-aware page scripts toggle ("1" = PIECE, "0.001" = SCU):
- *
- *   - SCU (decimal) fields: a positive value (> 0) with at most three decimals,
- *     in steps of 0.001. A value typed with more decimals is rounded to three
- *     places with commercial rounding (round half up) when the field is committed
- *     (on blur) and again before its form is submitted.
- *   - PIECE (integer) fields: a positive whole number (>= 1) only - separators are
- *     stripped as they are typed.
- *
- * Positivity is enforced through the Constraint Validation API, so the browser
- * blocks the surrounding form's submit and shows the localised message from
- * window.krtScuI18n (populated in fragments/head.html). Fields that legitimately
- * accept 0 - the book-out target stock - opt out with data-scu-allow-zero.
- *
- * The backend binds Double via the locale-independent Double.valueOf (expects a
- * dot), and "normalise internally" means: the operator keeps seeing the separator
- * they typed while editing; only the value that leaves the field (on commit, on
- * submit, or via parse()) is canonicalised to a rounded dot value.
- *
- * window.krtScuInput.{normalize,parse,round} is exposed for the few inline page
- * scripts that read these fields live (book-out target<->amount sync, the AJAX
- * material claim, the handover amount check). fragments/head.html defines a
- * minimal inline stub so those stay callable even if this file is slow to load.
- */
 (function (root) {
     'use strict';
 
@@ -40,11 +5,8 @@
     const MAX_DECIMALS = 3;
 
     /**
-     * Canonicalises a user-entered amount to a dot-decimal string: trims, turns
-     * every comma into a dot and keeps only the first dot (so "1,2.3" -> "1.23").
-     * Returns "" when the input holds no digit (null, blank or a lone separator),
-     * which lets the backend's @NotNull report a clean "required" error rather
-     * than a number-format failure. Does NOT round - see {@link round}.
+     * Canonicalises a user-entered amount to a dot-decimal string: trims, turns every comma into a
+     * dot and keeps only the first dot ("1,2.3" -> "1.23"). Does not round.
      *
      * @param {*} raw the raw field value (or anything String()-able)
      * @returns {string} the canonical dot value, or "" when there is no number
@@ -65,11 +27,8 @@
     }
 
     /**
-     * Adds 1 to a non-negative integer string, propagating the carry (so "199"
-     * becomes "200" and "999" becomes "1000"). Used by {@link round} to round up
-     * without ever converting to a float, which would reintroduce the precision
-     * errors that make naive *1000/Math.round rounding wrong for values like
-     * 1.2345.
+     * Adds 1 to a non-negative integer string, propagating the carry ("999" -> "1000"), without
+     * converting to a float.
      *
      * @param {string} s a string of decimal digits
      * @returns {string} the incremented digit string
@@ -93,11 +52,8 @@
     }
 
     /**
-     * Commercially rounds a canonical, non-negative dot string to three decimals
-     * (round half up: a 4th decimal of 5..9 rounds the 3rd up). Operates purely on
-     * the digit string to avoid binary-float rounding errors, then strips trailing
-     * zeros ("1.2000" -> "1.2", "1.0000" -> "1"). Values with <= 3 decimals and
-     * plain integers are returned unchanged.
+     * Rounds a canonical, non-negative dot string half up to three decimals on the digit string and
+     * strips trailing zeros. Values with at most three decimals are returned unchanged.
      *
      * @param {string} s a canonical dot string from {@link normalize}
      * @returns {string} the value rounded to three decimals
@@ -129,10 +85,8 @@
     }
 
     /**
-     * Reduces a canonical dot string to a non-negative integer string, dropping any
-     * fractional part and leading zeros ("007" -> "7", "12.9" -> "12"). PIECE fields
-     * never hold a separator (the sanitiser strips it), so this normally just trims
-     * leading zeros.
+     * Reduces a canonical dot string to a non-negative integer string, dropping any fractional part
+     * and leading zeros ("007" -> "7", "12.9" -> "12").
      *
      * @param {string} s a canonical dot string from {@link normalize}
      * @returns {string} the integer string, or "" when there is no number
@@ -147,9 +101,8 @@
     }
 
     /**
-     * Parses a user-entered amount to a finite Number via {@link normalize},
-     * accepting both "." and "," as the decimal separator. Returns NaN when the
-     * field holds no finite number; callers already guard with `> 0` style checks.
+     * Parses a user-entered amount via {@link normalize}, accepting "." and "," as the decimal
+     * separator.
      *
      * @param {*} raw the raw field value
      * @returns {number} the parsed amount, or NaN
@@ -160,10 +113,8 @@
     }
 
     /**
-     * Reports whether a field is currently in integer ("Stueck"/PIECE) mode and
-     * must reject decimal separators. Inferred from the live `step` attribute,
-     * which the quantity-type-aware page scripts toggle between "1" (PIECE) and
-     * "0.001" (SCU); a missing or "any" step counts as decimal.
+     * Reports whether a field is in integer (PIECE) mode, inferred from an integral `step`
+     * attribute; a missing or "any" step counts as decimal.
      *
      * @param {HTMLInputElement} el the amount field
      * @returns {boolean} true when only whole digits are allowed
@@ -190,12 +141,8 @@
     }
 
     /**
-     * Computes the field's custom validity message: "" when the (canonicalised)
-     * value is acceptable, otherwise the localised positivity message. Empty fields
-     * are deferred to the native `required` constraint. A value must be > 0 unless
-     * the field carries data-scu-allow-zero (the book-out target stock), in which
-     * case 0 is also accepted. A value that rounds down to 0 (e.g. 0.0004) is
-     * rejected, because validation runs on the canonical (rounded) value.
+     * Computes the field's custom validity message from its canonical value: it must be positive, or
+     * zero or more with data-scu-allow-zero. Empty fields are left to the native `required` constraint.
      *
      * @param {HTMLInputElement} el the amount field
      * @returns {string} the validity message, or "" when valid
@@ -225,10 +172,8 @@
     }
 
     /**
-     * Strips every character not allowed in the field's current mode (preserving
-     * the caret) and refreshes its validity. Runs on every input event - typing,
-     * paste and IME - so a stray letter, sign or separator-in-integer-mode never
-     * survives in the field.
+     * Strips every character not allowed in the field's current mode, preserving the caret, and
+     * refreshes its validity.
      *
      * @param {Event} e the input event
      */
@@ -247,18 +192,15 @@
                 const pos = Math.max(0, caret - (before.length - cleaned.length));
                 try {
                     el.setSelectionRange(pos, pos);
-                } catch (_e) {
-                    // setSelectionRange throws on some input types; the caret is cosmetic.
-                }
+                } catch (_e) {}
             }
         }
         validate(el);
     }
 
     /**
-     * Canonicalises a field (rounds SCU to three decimals / reduces PIECE to an
-     * integer) when it loses focus, so the operator sees the value the backend will
-     * receive, then refreshes its validity.
+     * Canonicalises a field on change (SCU rounded to three decimals, PIECE reduced to an integer)
+     * and refreshes its validity.
      *
      * @param {Event} e the change event
      */
@@ -272,11 +214,8 @@
     }
 
     /**
-     * Just before the surrounding form serialises, rewrites every managed field to
-     * its canonical (rounded, dot) value and re-validates it. This also catches
-     * values set programmatically (e.g. the book-out target<->amount sync) that
-     * never fired an input/change event; if any field is then invalid the submit is
-     * blocked and the native message is shown.
+     * On submit, rewrites every managed field to its canonical value and re-validates it; an invalid
+     * field blocks the submit and shows the native message.
      *
      * @param {Event} e the submit event
      */
@@ -301,9 +240,6 @@
         }
     }
 
-    // Capture phase so these run before any page-level handler (the book-out sync
-    // reads the value on input; the handover validator reads it on submit) - those
-    // consumers then see an already-sanitised / canonical value.
     document.addEventListener('input', onInput, true);
     document.addEventListener('change', onCommit, true);
     document.addEventListener('submit', canonicaliseForm, true);

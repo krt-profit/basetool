@@ -51,11 +51,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC-level test for {@link AdminMaterialAliasesPageController}'s in-place AJAX twins (epic #571 /
- * #582). Proves the {@code X-Requested-With} header routing: the create/delete twins are
- * {@code @ResponseBody} (create binding the JSON body and returning the persisted {@link
- * MaterialExternalAliasDto}), while the same create URL POSTed without the header still hits the
- * classic redirect handler. Fails if the header gating breaks.
+ * MVC test for {@link AdminMaterialAliasesPageController}'s AJAX twins: with {@code
+ * X-Requested-With} the create/delete twins answer as {@code @ResponseBody} (create returning the
+ * persisted {@link MaterialExternalAliasDto}); without it the create URL still redirects.
  */
 @SpringBootTest
 class AdminMaterialAliasesPageControllerMvcTest {

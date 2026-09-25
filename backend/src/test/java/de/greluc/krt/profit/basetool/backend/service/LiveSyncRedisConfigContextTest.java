@@ -33,22 +33,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 
 /**
- * Context-wiring guard for {@link LiveSyncRedisConfig} with the Redis fan-out <b>enabled</b> and
- * Redis <b>refusing every connection</b>.
- *
- * <p>This is the 2026-09-02 07:07:09Z production outage written down as a test: {@code
- * ApplicationContextException: Failed to start bean 'liveSyncRedisMessageListenerContainer'}. Redis
- * was recreated during a deploy; the backend restarted into that window, its listener container
- * threw out of {@code SmartLifecycle#start()} while subscribing, Spring cancelled the refresh, and
- * the backend crash-looped with no API for the frontend at all — because an <em>optional</em>
- * fan-out could not reach an optional dependency. {@link LiveSyncRedisConfig}'s own class Javadoc
- * had promised the opposite ("an optional external must never keep the container from starting")
- * since it was written.
- *
- * <p>Note what is deliberately <em>not</em> here: no {@code setAutoStartup(false)} post-processor.
- * The sibling {@code NotificationRedisConfigContextTest} installs one so it can check bean wiring
- * without touching Redis, and that is precisely why it could stay green while this failure mode
- * shipped. Auto-start is the mechanism under test.
+ * Verifies that the context starts with the {@link LiveSyncRedisConfig} fan-out enabled while Redis
+ * refuses every connection, with the listener container's auto-start left on.
  */
 class LiveSyncRedisConfigContextTest {
 

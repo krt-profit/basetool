@@ -58,30 +58,13 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Component;
 
 /**
- * Translates an incoming Keycloak JWT into the authorities Spring Security will check against
- * {@code @PreAuthorize}.
+ * Translates a Keycloak JWT into the authorities checked by {@code @PreAuthorize}.
  *
- * <p>Three sources are merged: (1) Keycloak realm roles assigned to the user, mapped to {@code
- * ROLE_<UPPER_SNAKE_CASE>} authorities; (2) every permission name attached to those roles in the
- * local {@code role}/{@code permission} tables, used directly (no {@code ROLE_} prefix) for
- * fine-grained {@code hasAuthority} checks; (3) the per-OrgUnit-membership flags {@code
- * is_logistician} and {@code is_mission_manager} on {@code org_unit_membership}, promoted to flat
- * {@code ROLE_LOGISTICIAN} / {@code ROLE_MISSION_MANAGER} so an admin can grant these roles via the
- * membership-management UI without round-tripping through Keycloak.
- *
- * <p>SPEZIALKOMMANDO_PLAN.md D3 + §6.1: the per-role flags are sourced from {@code
- * org_unit_membership} — the legacy {@code app_user.is_logistician} / {@code
- * app_user.is_mission_manager} columns were dropped in V101 (R9 Step 5). The user gets the flat
- * role iff <b>any</b> of their memberships (Staffel + every SK) carries the flag — the contextual
- * scoping ("logistician of which OrgUnit") still happens at the {@code @PreAuthorize} call site
- * through {@link de.greluc.krt.profit.basetool.backend.service.OwnerScopeService}.
- *
- * <p>The converter calls {@link UserReconciliationService#syncUser(Jwt)} on every authentication so
- * the local row is created or updated lazily — this is where new Keycloak users acquire their
- * {@code app_user} record. Optimistic-locking conflicts from concurrent first-time logins by the
- * same user are retried up to {@value #MAX_SYNC_ATTEMPTS} times with a short fixed backoff; after
- * that the authentication is rejected with {@link AuthenticationServiceException} to avoid a stuck
- * client retry loop.
+ * <p>Merges realm roles as {@code ROLE_*}, their local permissions, and flat and contextual
+ * logistician / mission-manager roles derived from org-unit memberships. Each miss syncs the local
+ * user via {@link UserReconciliationService#syncUser(Jwt)}, retrying optimistic-lock conflicts up
+ * to {@value #MAX_SYNC_ATTEMPTS} times before rejecting with {@link
+ * AuthenticationServiceException}.
  */
 @Component
 @Slf4j
@@ -91,13 +74,8 @@ public class CustomJwtGrantedAuthoritiesConverter
   private static final int MAX_SYNC_ATTEMPTS = 3;
 
   /**
-   * The single authority a machine identity carries (ADR-0129).
-   *
-   * <p>Deliberately a named authority rather than an empty collection: an empty set makes the
-   * caller anonymous to every downstream check, so a misconfiguration would read as "not
-   * authenticated" instead of "authenticated as a machine" — and {@code
-   * .anyRequest().authenticated()} would then refuse it for a reason that points nowhere. It grants
-   * nothing on its own; the gateway's actual access comes from the member it acts for.
+   * The single authority a machine identity carries (ADR-0129). It grants nothing on its own; the
+   * gateway's access comes from the member it acts for.
    */
   public static final String GATEWAY_AUTHORITY = "ROLE_INGEST_GATEWAY";
 
@@ -115,11 +93,8 @@ public class CustomJwtGrantedAuthoritiesConverter
   static final String AUTHORITIES_CACHE_NAME = "jwt-authorities";
 
   /**
-   * Claims that change on every token the same session is issued and carry nothing the assembly
-   * reads, so they stay out of the claims fingerprint: with them in it every refresh would be a
-   * miss again, which is exactly the defect keying on {@code sid} removes (BE-PERF-08). {@code sid}
-   * and {@code azp} are left in — they are part of the key anyway — and so is every other claim,
-   * because a fingerprint that forgot one the assembly reads would serve a stale answer.
+   * Claims that change on every token of the same session and are excluded from the claims
+   * fingerprint, so a refreshed token hits the cache.
    */
   private static final Set<String> PER_TOKEN_CLAIMS = Set.of("iat", "exp", "nbf", "jti");
 
@@ -129,44 +104,25 @@ public class CustomJwtGrantedAuthoritiesConverter
   private final OrgUnitCascadeService orgUnitCascadeService;
 
   /**
-   * Per-session memoisation of the fully-assembled authority collection (#1141, ADR-0174). The
-   * resource-server authorities converter runs on <em>every</em> authenticated API call — every
-   * fragment refetch, every live-sync coalesce burst, every check-in — and each miss pays {@link
-   * UserReconciliationService#syncUser(Jwt)} (a write-capable transaction) plus a handful of
-   * SELECTs (user load, {@code user_roles}, the role catalogue read once with its permissions, and
-   * the membership read).
+   * Per-session cache of the assembled authority collection (ADR-0174).
    *
-   * <p>Keyed on the Keycloak session ({@code sid}) rather than on the token's {@code issuedAt}
-   * since 2026-09-23 (BE-PERF-08, ADR-0174 amendment): a refreshed access token of the same session
-   * is a hit, so the configured {@link AuthoritiesCacheProperties#ttl() TTL} — not the five-minute
-   * access-token lifespan — decides how often the storm runs. A fresh login is a new session and
-   * misses; a token whose content changed (a Keycloak role granted or revoked, a renamed account)
-   * misses through the claims fingerprint in the key. Only successful results are cached (an
-   * exception propagates uncached), the cached value is an immutable copy so a downstream mutation
-   * cannot corrupt it, and a token with neither {@code sid} nor {@code issuedAt}, or without {@code
-   * sub}, bypasses the cache entirely (always recomputed).
+   * <p>Keyed by {@link #authoritiesCacheKey(Jwt)} for the configured {@link
+   * AuthoritiesCacheProperties#ttl() TTL}. Only successful results are cached, as immutable copies.
    */
   private final Cache<String, Collection<GrantedAuthority>> authoritiesCache;
 
   /**
-   * Creates the converter and sizes its authorities cache from configuration.
-   *
-   * <p>An explicit constructor rather than {@code @RequiredArgsConstructor}: the cache's {@code
-   * expireAfterWrite} window comes from {@code app.security.authorities-cache.ttl} (ADR-0174), so
-   * it cannot be built in a field initialiser that runs before any dependency is available.
+   * Creates the converter and sizes its authorities cache from {@code
+   * app.security.authorities-cache.ttl}.
    *
    * @param userReconciliationService creates or updates the local {@code app_user} row on a cache
-   *     miss; never {@code null}.
-   * @param ingestGatewayProperties the machine-identity allowlist deciding whether a caller is a
-   *     gateway rather than a member (ADR-0129); never {@code null}.
-   * @param orgUnitMembershipRepository reads the memberships whose {@code is_logistician} / {@code
-   *     is_mission_manager} flags become flat and contextual authorities; never {@code null}.
-   * @param orgUnitCascadeService expands a leadership membership downward over the org-unit tree
-   *     (REQ-ORG-015); never {@code null}.
-   * @param authoritiesCacheProperties supplies the memoisation TTL, validated at startup to be
-   *     positive and at most {@link AuthoritiesCacheProperties#MAX_TTL}; never {@code null}.
-   * @param meterRegistry the registry the cache's hit / miss / eviction / size meters are bound to
-   *     under {@code cache=}{@value #AUTHORITIES_CACHE_NAME}; never {@code null}.
+   *     miss
+   * @param ingestGatewayProperties the machine-identity allowlist (ADR-0129)
+   * @param orgUnitMembershipRepository reads the memberships behind the officer authorities
+   * @param orgUnitCascadeService expands a leadership membership down the org-unit tree
+   * @param authoritiesCacheProperties supplies the cache TTL
+   * @param meterRegistry binds the cache meters under {@code cache=}{@value
+   *     #AUTHORITIES_CACHE_NAME}
    */
   public CustomJwtGrantedAuthoritiesConverter(
       @NonNull UserReconciliationService userReconciliationService,
@@ -189,14 +145,12 @@ public class CustomJwtGrantedAuthoritiesConverter
   }
 
   /**
-   * Resolves the authorities for {@code jwt}, memoised per {@code (sub, session, azp, claims)} for
-   * the configured {@link AuthoritiesCacheProperties#ttl() TTL} (#1141, ADR-0174). On a cache hit
-   * the whole {@link #assembleAuthorities(Jwt)} pipeline — {@code syncUser} and its query storm —
-   * is skipped; on a miss (or an unkeyable token) it is assembled fresh and, when keyable, cached
-   * as an immutable copy.
+   * Resolves the authorities for {@code jwt}, cached per {@code (sub, session, azp, claims)} for
+   * the configured TTL (ADR-0174); a miss or an unkeyable token runs {@link
+   * #assembleAuthorities(Jwt)}.
    *
-   * @param jwt the validated Keycloak access token; never {@code null}.
-   * @return the authorities Spring Security checks against {@code @PreAuthorize}.
+   * @param jwt the validated Keycloak access token
+   * @return the authorities checked against {@code @PreAuthorize}
    */
   @Override
   public Collection<GrantedAuthority> convert(@NonNull Jwt jwt) {
@@ -215,33 +169,15 @@ public class CustomJwtGrantedAuthoritiesConverter
   }
 
   /**
-   * Builds the memoisation key {@code sub | session | azp | claims-fingerprint}, or {@code null} to
-   * bypass the cache for this token.
+   * Builds the cache key {@code sub | session | azp | claims-fingerprint}, or {@code null} to
+   * bypass the cache.
    *
-   * <p><strong>Session.</strong> The Keycloak session id ({@code sid}) when the token carries one —
-   * every access token refreshed within one login shares it, so a refresh is a hit and the TTL
-   * alone bounds staleness (BE-PERF-08). A token without {@code sid} (a client-credentials grant,
-   * which has no user session) falls back to its {@code issuedAt}, exactly the pre-2026-09-23 key;
-   * a token with neither, or without {@code sub}, is not cached at all.
+   * <p>The session is {@code sid}, falling back to {@code issuedAt}; a token with neither, or
+   * without {@code sub}, is not cached. {@code azp} is part of the key because the assembly reads
+   * it (REQ-SEC-036). The fingerprint makes a changed role or account miss.
    *
-   * <p><strong>{@code azp} belongs in the key because the assembly reads it.</strong> Since
-   * REQ-SEC-036 / ADR-0141 the authority set is not a pure function of the subject: {@link
-   * #assembleAuthorities} branches on the authorized party twice - the ingest-gateway
-   * short-circuit, and the partial-role-scope client list that decides whether a client's role
-   * claim may replace the stored set. Two clients of the same person must never share an entry, or
-   * the first to arrive decides the authorities for both - precisely the admin-demotion (and,
-   * mirrored, admin-elevation) REQ-SEC-036 exists to prevent. A memoisation key must be a superset
-   * of the inputs the memoised computation reads.
-   *
-   * <p><strong>The claims fingerprint keeps a role change as fast as before.</strong> With {@code
-   * issuedAt} in the key, every refreshed token re-read everything, so a realm role granted or
-   * revoked in Keycloak took effect at the next refresh. A session-scoped key alone would serve the
-   * old answer until the TTL ran out. The fingerprint is a SHA-256 over every claim except the four
-   * that change per token ({@link #PER_TOKEN_CLAIMS}), so a refresh whose content is unchanged hits
-   * and one carrying different roles, a renamed account or a new e-mail address misses.
-   *
-   * @param jwt the access token.
-   * @return the cache key, or {@code null} to bypass caching for this token.
+   * @param jwt the access token
+   * @return the cache key, or {@code null} to bypass caching
    */
   @Nullable
   static String authoritiesCacheKey(@NonNull Jwt jwt) {
@@ -264,15 +200,11 @@ public class CustomJwtGrantedAuthoritiesConverter
   }
 
   /**
-   * Hashes the token's claims, minus {@link #PER_TOKEN_CLAIMS}, into a hex SHA-256 digest.
+   * Hashes the token's claims, minus {@link #PER_TOKEN_CLAIMS}, into a hex SHA-256 digest over an
+   * unambiguous canonical rendering.
    *
-   * <p>The input is an unambiguous canonical rendering: map keys sorted, every value tagged with
-   * its kind and every string length-prefixed, so no two different claim sets can render to the
-   * same text — a collision here would hand one token's authorities to a differently-roled token of
-   * the same session.
-   *
-   * @param jwt the access token.
-   * @return the lower-case hex digest of the canonical claim rendering.
+   * @param jwt the access token
+   * @return the lower-case hex digest
    */
   private static String claimsFingerprint(@NonNull Jwt jwt) {
     Map<String, Object> claims = new TreeMap<>(jwt.getClaims());
@@ -291,11 +223,11 @@ public class CustomJwtGrantedAuthoritiesConverter
 
   /**
    * Appends an unambiguous rendering of one claim value: {@code m{k=v;…}} for a map with sorted
-   * keys, {@code l[v;…]} for a collection in iteration order, {@code s<len>:text} for anything else
-   * rendered through {@link String#valueOf(Object)}, and {@code n} for {@code null}.
+   * keys, {@code l[v;…]} for a collection, {@code s<len>:text} for anything else and {@code n} for
+   * {@code null}.
    *
-   * @param out the buffer to append to.
-   * @param value the claim value; may be {@code null}.
+   * @param out the buffer to append to
+   * @param value the claim value; may be {@code null}
    */
   private static void appendCanonical(@NonNull StringBuilder out, @Nullable Object value) {
     if (value == null) {
@@ -326,13 +258,12 @@ public class CustomJwtGrantedAuthoritiesConverter
   }
 
   /**
-   * Assembles the authorities from scratch: syncs the local user (retried on optimistic-lock
-   * contention), short-circuits a non-approved registration to {@code ROLE_PENDING_APPROVAL}, and
-   * otherwise merges realm-role, permission and membership-derived authorities. Extracted from
-   * {@link #convert(Jwt)} so the cache wraps exactly this work (#1141).
+   * Assembles the authorities from scratch: syncs the local user (retrying on optimistic-lock
+   * contention), returns {@code ROLE_PENDING_APPROVAL} for a non-approved registration, and
+   * otherwise merges realm-role, permission and membership-derived authorities.
    *
-   * @param jwt the access token.
-   * @return the freshly assembled authorities.
+   * @param jwt the access token
+   * @return the freshly assembled authorities
    */
   private Collection<GrantedAuthority> assembleAuthorities(@NonNull Jwt jwt) {
     if (ingestGatewayProperties.isGatewayClient(jwt.getClaimAsString("azp"))) {
@@ -377,16 +308,8 @@ public class CustomJwtGrantedAuthoritiesConverter
   }
 
   /**
-   * Assembles a member's authorities from the database alone, with no token involved.
-   *
-   * <p>Extracted so the ordinary login path and the ingest gateway's acting-member path share
-   * <em>one</em> implementation (ADR-0129). Two copies would drift, and the way they would drift is
-   * the dangerous one: a member acting through the gateway would silently carry a different
-   * authority set than the same member logging in.
-   *
-   * <p>Nothing here reads the token, which is what makes the acting-member path exact rather than
-   * approximate: approval status, roles, per-role permissions and every org-unit-derived authority
-   * are database reads already.
+   * Assembles a member's authorities from the database alone, shared by the login path and the
+   * ingest gateway's acting-member path (ADR-0129).
    *
    * @param user the member whose authorities to assemble
    * @return the authorities, or the lone {@code ROLE_PENDING_APPROVAL} for a non-approved
@@ -397,17 +320,8 @@ public class CustomJwtGrantedAuthoritiesConverter
   }
 
   /**
-   * Assembles a member's authorities from a role set that may differ from the one stored on {@code
-   * user}.
-   *
-   * <p>The split exists for partial-scope clients (REQ-SEC-036). Their tokens carry a deliberately
-   * narrowed role list which {@link UserReconciliationService#syncUser(Jwt)} refuses to write down;
-   * the request must still be authorised with that narrower list, so the caller passes it here
-   * explicitly rather than the converter reading it back off the row it just declined to change.
-   *
-   * <p>Everything else about the assembly is unchanged and still database-derived: the approval
-   * short-circuit, the per-role permissions, and every org-unit-derived authority. Only *which*
-   * roles seed it is parameterised.
+   * Assembles a member's authorities from the given role set rather than the one stored on {@code
+   * user}, for partial-scope clients (REQ-SEC-036).
    *
    * @param user the member whose approval status and memberships to read
    * @param roles the roles to authorise with; the stored set for every ordinary client
@@ -444,44 +358,18 @@ public class CustomJwtGrantedAuthoritiesConverter
   }
 
   /**
-   * Plan D3 + §6.1 — emits two parallel authority surfaces:
+   * Appends the membership-derived authorities.
    *
-   * <ol>
-   *   <li><b>Flat (back-compat)</b> — {@code ROLE_LOGISTICIAN} / {@code ROLE_MISSION_MANAGER}
-   *       based on the OR-union of every OrgUnit membership. Lets every existing {@code
-   *       @PreAuthorize("hasRole('LOGISTICIAN')")} SpEL string keep working unchanged.
-   *   <li><b>Contextual (§6.1, long-term)</b> — one {@link OrgUnitContextualAuthority} per
-   *       (membership, flag = true) pair, i.e. {@code ROLE_LOGISTICIAN@<orgUnitUuid>}. Enables
-   *       per-OrgUnit scoping at the {@code @PreAuthorize} surface without a service-layer
-   *       round-trip. Matches the plan §6.1 design: "Spring Security authentication carries a
-   *       Set&lt;ContextualAuthority&gt;".
-   *   <li><b>Cascaded contextual (epic #692, REQ-ORG-015)</b> — additional {@link
-   *       OrgUnitContextualAuthority} entries for the org units a Bereichsleitung / OL leadership
-   *       membership reaches <em>downward</em> (a Bereich's Staffeln + SKs; for OL, every org
-   *       unit), resolved by {@link
-   *       OrgUnitCascadeService#cascadedOfficerReach(java.util.Collection)}. This makes a
-   *       Bereichsleitung / OL member act with officer-equivalent {@code LOGISTICIAN} / {@code
-   *       MISSION_MANAGER} authority in their subordinate units — never admin. A caller with no
-   *       leadership flag contributes nothing here, so the authority set is unchanged from the
-   *       pre-#692 behaviour.
-   * </ol>
+   * <ul>
+   *   <li>flat {@code ROLE_LOGISTICIAN} / {@code ROLE_MISSION_MANAGER} from the union of all
+   *       memberships;
+   *   <li>one {@link OrgUnitContextualAuthority} per membership and flag;
+   *   <li>contextual authorities for the org units a leadership membership reaches downward, via
+   *       {@link OrgUnitCascadeService#cascadedOfficerReach(java.util.Collection)} (REQ-ORG-015).
+   * </ul>
    *
-   * <p>Both lists emit on every authentication so existing flat-role gates and new contextual
-   * gates coexist. The {@link
-   * de.greluc.krt.profit.basetool.backend.service.OwnerScopeService#hasRoleInOrgUnit} helper reads
-   * the contextual authorities by value, which lets a SpEL like {@code
-   * @ownerScopeService.hasRoleInOrgUnit(#dto.owningOrgUnitId, 'LOGISTICIAN')} resolve without
-   * the caller having to construct the authority string by hand.
-   *
-   * <p>Post-R9 D3: the legacy User-level {@code is_logistician} / {@code is_mission_manager}
-   * columns have been dropped from {@code app_user} (V101). Memberless users carry no
-   * membership-derived authority — admin / guest accounts never had a Staffel link to anchor a
-   * Logistician / MissionManager flag on, so the empty-memberships branch is now a clean no-op.
-   *
-   * @param user the local {@link User} record produced by {@link
-   *     UserReconciliationService#syncUser(Jwt)}; never {@code null}.
-   * @param authorities the mutable authority list being assembled by the converter; flags are
-   *     appended in place.
+   * @param user the local {@link User} record
+   * @param authorities the authority list being assembled; appended in place
    */
   private void addMembershipDerivedRoles(
       @NonNull User user, @NonNull Collection<GrantedAuthority> authorities) {
@@ -522,51 +410,24 @@ public class CustomJwtGrantedAuthoritiesConverter
   }
 
   /**
-   * {@code true} iff holding {@code m} promotes the caller to the flat, officer-equivalent {@code
-   * ROLE_LOGISTICIAN} / {@code ROLE_MISSION_MANAGER} (epic #800, REQ-ROLE-001/002). A membership
-   * qualifies when it carries any functional rank — i.e. {@link
-   * MembershipRole#confersOwnLevelOversight()} ({@code role != MEMBER}): an SK-Lead, a
-   * Bereichsleitung rank, the OL, <em>or</em> a squadron rank (Staffelleiter / Kommandoleiter /
-   * stellv. Kommandoleiter / Ensign), each of which ranks at or above logistician + mission manager
-   * on its own unit (#344). The flat role is the back-compat surface for role-only
-   * {@code @PreAuthorize} gates.
+   * Whether holding {@code m} confers the flat {@code ROLE_LOGISTICIAN} / {@code
+   * ROLE_MISSION_MANAGER}: true for any functional rank ({@link
+   * MembershipRole#confersOwnLevelOversight()}) (REQ-ROLE-001/002).
    *
-   * <p>This is deliberately <b>not</b> the cascade-reach predicate. Which org units a leader
-   * reaches downward — and thus which contextual authorities are minted — is computed separately by
-   * {@link OrgUnitCascadeService#cascadedOfficerReach(Collection)}, which, unlike this method,
-   * cascades only area / OL ranks: an SK-Lead and a squadron rank keep own-unit-only reach
-   * (REQ-ROLE-002, REQ-ORG-017) and receive their unit's contextual authority from the per-row loop
-   * above (see {@link #confersOwnUnitOfficerReach(OrgUnitMembership)}), not from the cascade.
-   *
-   * <p>A per-membership Logistician / MissionManager flag is handled by the explicit {@code
-   * m.isLogistician()} / {@code m.isMissionManager()} terms at the call sites (a plain logistician
-   * confers only the logistician flat role, not mission manager), and a rank-less ({@link
-   * MembershipRole#MEMBER}) seat confers nothing — so both return {@code false} here.
-   *
-   * @param m the membership row to classify; never {@code null}.
-   * @return {@code true} iff {@code m} carries any functional rank other than {@link
-   *     MembershipRole#MEMBER}.
+   * @param m the membership row to classify
+   * @return {@code true} iff {@code m} carries a rank other than {@link MembershipRole#MEMBER}
    */
   private static boolean confersFlatOfficerRole(@NonNull OrgUnitMembership m) {
     return m.getRole().confersOwnLevelOversight();
   }
 
   /**
-   * {@code true} iff holding {@code m} mints its <em>own</em> org unit's contextual {@code
-   * LOGISTICIAN@<id>} + {@code MISSION_MANAGER@<id>} authorities in the per-row loop, without any
-   * downward cascade (epic #800, REQ-ROLE-002). This is the own-unit-officer set: an {@link
-   * MembershipRole#SK_LEAD} (logistician + mission manager of its SK, #344) and the four squadron
-   * ranks ({@link MembershipRole#isSquadronRank()}), which the baseline grant treats as
-   * officer-equivalent over their own squadron only.
+   * Whether holding {@code m} mints its own org unit's contextual {@code LOGISTICIAN@<id>} and
+   * {@code MISSION_MANAGER@<id>} authorities without cascade (REQ-ROLE-002). Area and OL ranks get
+   * theirs from the cascade instead.
    *
-   * <p>Area ranks ({@link MembershipRole#isAreaRank()}) and {@link MembershipRole#OL_MEMBER} are
-   * deliberately excluded here: their own-seat contextual authority is contributed by {@link
-   * OrgUnitCascadeService#cascadedOfficerReach(Collection)}, which includes the Bereich/OL seat
-   * itself alongside its descendants. Including them here too would double-mint the seat's
-   * authority. {@link MembershipRole#MEMBER} confers nothing.
-   *
-   * @param m the membership row to classify; never {@code null}.
-   * @return {@code true} iff {@code m} is an SK-Lead or one of the four squadron ranks.
+   * @param m the membership row to classify
+   * @return {@code true} iff {@code m} is an SK-Lead or one of the four squadron ranks
    */
   private static boolean confersOwnUnitOfficerReach(@NonNull OrgUnitMembership m) {
     return m.getRole() == MembershipRole.SK_LEAD || m.getRole().isSquadronRank();

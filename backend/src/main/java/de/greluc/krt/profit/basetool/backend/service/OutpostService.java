@@ -34,13 +34,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Read service plus admin-override mutators for the outpost catalogue. The records themselves are
- * owned by {@link UexUniverseSyncService}; this service only exposes the read API and the
- * admin-only {@code hasLoadingDock} pin used by the UEX-overrides admin page. Read methods are
- * cached against {@link CacheConfig#OUTPOSTS_CACHE}; the override mutators evict the whole cache,
- * and the periodic {@link UexUniverseSyncService} sweep evicts it on completion (via {@code
- * MasterDataCacheEvictionService}, CACHE-SYNC-EVICT-001), so background-sync writes are visible on
- * the next read; the 12-hour master-data TTL is only the backstop.
+ * Read API and admin {@code hasLoadingDock} overrides for the outpost catalogue, whose records are
+ * owned by {@link UexUniverseSyncService}. Reads are cached in {@link CacheConfig#OUTPOSTS_CACHE},
+ * which the override mutators and each completed UEX sync evict.
  */
 @Service
 @RequiredArgsConstructor

@@ -46,15 +46,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.util.UriComponentsBuilder;
 
 /**
- * Renders the bank-staff confirmation queue (epic #666 F2, REQ-BANK-023): the booking requests the
- * caller may act on, with confirm (records the holder, books the ledger) and reject modals. Gated
- * to {@code BANK_EMPLOYEE} like the rest of the bank area; the backend scopes the list to the
- * accounts the caller can see. Confirm/reject are AJAX writes via {@code
- * /api/proxy/bank/requests/**} that swap the {@code requestQueue} fragment in place. The queue is a
- * single table with parallel status filters (Ausstehend / Best&auml;tigt / Abgelehnt /
- * Zur&uuml;ckgezogen) whose selection {@code bank.js} persists per user in {@code localStorage} and
- * replays through the {@code status} query parameter; the holder registry is fetched here so the
- * confirm modal's holder select works without a follow-up read.
+ * Renders the bank-staff confirmation queue (REQ-BANK-023): the booking requests the caller may
+ * confirm or reject, filtered by status, with the holder registry for the confirm modal. Decisions
+ * are AJAX writes that swap the {@code requestQueue} fragment.
  */
 @Controller
 @UsesLayoutModel
@@ -79,15 +73,14 @@ public class BankRequestQueuePageController {
 
   /**
    * Response type for the account list ({@code /api/v1/bank/accounts}) feeding the direct-booking
-   * modal's source and transfer-destination selectors (REQ-BANK-023, #997).
+   * modal's source and destination selectors (REQ-BANK-023).
    */
   private static final ParameterizedTypeReference<PageResponse<BankAccountDto>> BANK_ACCOUNT_PAGE =
       new ParameterizedTypeReference<>() {};
 
   /**
    * Response type for the all-kinds active org-unit option list ({@code
-   * /api/v1/org-units/active-all-kinds}) feeding the external-counterparty unit picklist
-   * (REQ-BANK-044, #994).
+   * /api/v1/org-units/active-all-kinds}) feeding the external-counterparty picklist (REQ-BANK-044).
    */
   private static final ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>
       ORG_UNIT_OPTION_LIST = new ParameterizedTypeReference<>() {};
@@ -95,16 +88,13 @@ public class BankRequestQueuePageController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Renders the queue (or its {@code requestQueue} fragment for an in-place swap after a decision
-   * or a filter change).
+   * Renders the queue, or its {@code requestQueue} fragment after a decision or filter change.
    *
-   * @param status the parallel status filter as a comma-separated list of lifecycle states; {@code
-   *     null} (absent) is a first, unfiltered load and defaults to {@code PENDING}; the {@code
-   *     NONE} sentinel is the deliberate "all filters off" selection (empty table)
-   * @param fragment when {@code "requestQueue"} only the queue table is re-rendered (AJAX swap
-   *     after confirm/reject or a filter toggle); otherwise the full page is returned
+   * @param status comma-separated status filter; {@code null} defaults to {@code PENDING}, the
+   *     {@code NONE} sentinel shows an empty table
+   * @param fragment {@code "requestQueue"} to re-render only the queue table
    * @param model Spring MVC model
-   * @return the template, or its {@code requestQueue} fragment view
+   * @return the template, or its {@code requestQueue} fragment
    */
   @NotNull
   @GetMapping("/bank/requests")
@@ -145,10 +135,8 @@ public class BankRequestQueuePageController {
   }
 
   /**
-   * Fetches the current in-game transfer-fee rate for the direct-booking modal's live fee preview
-   * (ADR-0052, REQ-BANK-033); a backend failure or absent rate degrades to {@link BigDecimal#ZERO}
-   * so the page still renders (the preview then simply shows no fee). The authoritative fee is
-   * always computed server-side at booking time.
+   * Fetches the in-game transfer-fee rate for the direct-booking modal's preview (REQ-BANK-033);
+   * failure or absence yields {@link BigDecimal#ZERO}. The real fee is computed server-side.
    *
    * @return the fee rate as a fraction, never {@code null}
    */
@@ -159,16 +147,12 @@ public class BankRequestQueuePageController {
   }
 
   /**
-   * Resolves the raw {@code status} query parameter into the ordered, validated list of lifecycle
-   * states to show. {@code null} — the parameter is absent (a first, unfiltered load) or a blank
-   * value the global {@code emptyAsNull} string binder collapsed to {@code null} — defaults to the
-   * {@code PENDING} work queue. Otherwise the comma-separated names are kept in canonical display
-   * order, de-duplicated and filtered to the known states; the client sends the {@code NONE}
-   * sentinel (an unknown status that filters out) for the deliberate "all filters off" selection,
-   * so it yields an empty list distinct from the absent-parameter default.
+   * Resolves the {@code status} parameter into the lifecycle states to show, in canonical order,
+   * de-duplicated and restricted to known states. {@code null} defaults to {@code PENDING}; the
+   * {@code NONE} sentinel yields an empty list.
    *
-   * @param status the raw {@code status} query parameter, or {@code null} when absent/blank
-   * @return the lifecycle states to show, in canonical display order (possibly empty)
+   * @param status the raw {@code status} query parameter, or {@code null} when absent or blank
+   * @return the lifecycle states to show, possibly empty
    */
   private List<String> resolveStatuses(@Nullable String status) {
     if (status == null) {

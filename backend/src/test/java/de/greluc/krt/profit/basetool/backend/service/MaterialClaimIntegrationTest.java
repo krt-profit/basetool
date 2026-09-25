@@ -52,11 +52,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * End-to-end coverage of {@link MaterialClaimService} against the real Postgres test container: the
- * upsert persists and updates in place (one row per bucket+squadron), overclaim is rejected, and
- * the Phase-2 reassignment de-escalation withdraws claims via {@link
- * JobOrderService#reassignResponsibleOrgUnit}. Runs as an ADMIN so the service permission matrix
- * short-circuits to "allowed" and the test focuses on the invariants + reconciliation.
+ * Integration tests of {@link MaterialClaimService} against Postgres: in-place upsert, overclaim
+ * rejection, and claim withdrawal on {@link JobOrderService#reassignResponsibleOrgUnit}.
  */
 @SpringBootTest
 @ActiveProfiles("test")

@@ -28,13 +28,9 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 
 /**
- * The „Open-Source-Lizenzen“ page ({@code /licenses}, REQ-UI-021): every third-party component the
- * Basetool ships, grouped by licence, linked from the footer beside the Nutzungsbedingungen.
- *
- * <p>Public by design, like the other legal pages (REQ-SEC-052): the notice is owed to whoever
- * receives the software, and the landing page already serves the bundled font to a visitor who
- * holds no session. It makes no backend call — the list is read once at startup from the report the
- * build generated — so there is nothing behind it a login would protect.
+ * The „Open-Source-Lizenzen" page ({@code /licenses}, REQ-UI-021), listing every shipped
+ * third-party component grouped by licence. Public like the other legal pages (REQ-SEC-052); it
+ * reads the build-generated report once at startup and makes no backend call.
  */
 @Controller
 @UsesLayoutModel

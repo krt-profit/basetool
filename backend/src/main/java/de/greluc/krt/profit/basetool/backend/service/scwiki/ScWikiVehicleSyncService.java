@@ -43,20 +43,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 /**
- * R4 SC Wiki vehicle sync (SC_WIKI_SYNC_PLAN.md §8.6). Paginates {@code /api/vehicles} and fills
- * the Wiki-owned columns on the {@code ship_type} rows the UEX vehicle sync already created,
- * matched by {@code external_uuid} (falling back to case-insensitive name, which also backfills
- * {@code external_uuid} on a legacy row).
+ * Fills the Wiki-owned columns of the {@code ship_type} rows from the SC Wiki vehicle feed ({@code
+ * /api/vehicles}), matched by {@code external_uuid} or case-insensitive name.
  *
- * <p>Conflict policy (§6.3.5): the Wiki sync writes {@code scwiki_slug} / {@code game_name} /
- * {@code description_de}, and fills {@code description_en} / {@code class_name} / {@code
- * vehicle_inventory_scu} only when UEX left them blank — it never overwrites the UEX-canonical
- * {@code name}, the 36 capability {@code is_*} flags, dimensions, fuel or urls. It flips {@code
- * source_systems} {@code UEX_ONLY → BOTH}. A vehicle with no local row becomes a fresh {@code
- * WIKI_ONLY} ship type.
- *
- * <p>Gated behind {@code krt.scwiki.vehicle-sync-enabled} (default {@code false}); ships dark.
- * Empty Wiki responses short-circuit before the orphan sweep (§8.7).
+ * <p>Never overwrites UEX-canonical columns; an unmatched vehicle becomes a {@code WIKI_ONLY} ship
+ * type. Gated behind {@code krt.scwiki.vehicle-sync-enabled} (default {@code false}).
  */
 @Slf4j
 @Service
@@ -70,21 +61,13 @@ public class ScWikiVehicleSyncService {
   private final SyncReportService syncReportService;
 
   /**
-   * Runs the full Wiki vehicle fill. No-op (with an INFO line) when the feature flag is off. An
-   * empty Wiki response short-circuits before the orphan sweep.
+   * Runs the full Wiki vehicle fill; a no-op when the flag is off, and an empty response skips the
+   * orphan sweep.
    *
-   * <p>Returns the number of {@code ship_type} rows this run wrote — matched rows linked plus fresh
-   * {@code WIKI_ONLY} rows created — which {@link ScWikiScheduler} accumulates into {@code
-   * basetool_scheduled_job_items_total{job="scwiki_sync"}}. The disabled and <em>genuine</em>
-   * empty-response short-circuits return {@code 0} so a Wiki outage surfaces as a zero-item run
-   * ({@code SyncZeroItems}, #1041 item 2). A {@code 304 Not Modified} response is <b>not</b> such
-   * an outage — the catalogue is merely unchanged — so this reports {@link
-   * ShipTypeRepository#countLiveScwikiShipTypes() the live Wiki-linked ship-type count} instead of
-   * {@code 0}, keeping a fully-cached healthy run from false-firing {@code SyncZeroItems} (#1182).
-   *
-   * @return the number of {@code ship_type} rows written this run ({@code linked} plus {@code
-   *     createdWikiOnly}), or the live Wiki-linked ship-type count on a {@code 304 Not Modified}
-   *     (unchanged) catalogue
+   * @return the number of {@code ship_type} rows written ({@code linked} plus {@code
+   *     createdWikiOnly}), {@code 0} when disabled or empty, or {@link
+   *     ShipTypeRepository#countLiveScwikiShipTypes() the live Wiki-linked ship-type count} on a
+   *     {@code 304 Not Modified}
    */
   @Transactional
   public int syncVehicles() {
@@ -170,11 +153,8 @@ public class ScWikiVehicleSyncService {
   }
 
   /**
-   * Writes the Wiki-owned columns onto a ship type. {@code scwiki_slug} / {@code game_name} /
-   * {@code description_de} are always taken from the Wiki; {@code description_en} / {@code
-   * class_name} / {@code vehicle_inventory_scu} are filled only when UEX left them blank so the UEX
-   * value wins where both have one. The UEX-canonical {@code name}, capability flags, dimensions,
-   * fuel and urls are never touched.
+   * Writes the Wiki-owned columns onto a ship type; {@code description_en}, {@code class_name} and
+   * {@code vehicle_inventory_scu} are filled only when UEX left them blank.
    *
    * @param st the ship type to update
    * @param dto the Wiki vehicle payload

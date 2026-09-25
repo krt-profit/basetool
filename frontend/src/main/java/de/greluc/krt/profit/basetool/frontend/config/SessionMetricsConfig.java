@@ -41,28 +41,12 @@ import org.springframework.session.events.SessionDeletedEvent;
 import org.springframework.session.events.SessionExpiredEvent;
 
 /**
- * Binds the {@code basetool_active_sessions} gauge (REQ-OBS-011) — the count of active Spring
- * Session sessions across all logged-in principals, a proxy for concurrent live users — to an
- * event-driven {@link ActiveSessionsTracker} rather than sampling the session registry on scrape.
+ * Binds the {@code basetool_active_sessions} gauge (REQ-OBS-011), the count of active Spring
+ * sessions, to an event-driven {@link ActiveSessionsTracker}.
  *
- * <p><b>Why not sample the registry:</b> the previous implementation sampled {@code
- * SpringSessionBackedSessionRegistry.getAllPrincipals()}, whose Redis-backed implementation
- * unconditionally throws {@code UnsupportedOperationException}. Micrometer caught that during gauge
- * sampling and reported {@code NaN} on every scrape, so {@code basetool_active_sessions} never
- * produced a value and the {@code SsePushChannelDead} alert (gated on {@code
- * basetool_active_sessions > 3}) could never fire — silently disarming the "push dead while users
- * online" detection (#1158). This config instead maintains the count from session-lifecycle events.
- *
- * <p><b>How the count stays correct:</b> the gauge reads {@link ActiveSessionsTracker#count()},
- * which is seeded once at {@link ApplicationReadyEvent} time from the Redis session namespace (so a
- * frontend restart does not blank the gauge for existing sessions) and then kept current by the
- * {@link SessionCreatedEvent} / {@link SessionDeletedEvent} / {@link SessionExpiredEvent} that
- * {@code RedisIndexedSessionRepository} publishes (create on first save; delete/expire via Redis
- * keyspace notifications, which {@code @EnableRedisIndexedHttpSession} enables by default).
- *
- * <p>Gated to the non-{@code test} profiles because the Redis session store it reads is
- * {@code @Profile("!test")} (see {@code RedisSessionConfig}); under the test profile the session
- * store is absent, so this config — and the gauge — simply do not load.
+ * <p>The count is seeded from the Redis session namespace at {@link ApplicationReadyEvent} and kept
+ * current by {@link SessionCreatedEvent}, {@link SessionDeletedEvent} and {@link
+ * SessionExpiredEvent}. Not loaded under the {@code test} profile.
  */
 @Configuration
 @Profile("!test")
@@ -113,11 +97,8 @@ public class SessionMetricsConfig {
   }
 
   /**
-   * Seeds the tracker once the context is ready with the sessions that already existed before this
-   * instance started listening, so a frontend restart does not blank the gauge (and disarm the
-   * alert) for the whole session TTL. Scans {@code <namespace>:sessions:*} and skips the
-   * per-session {@code expires:<id>} marker keys so each session is counted exactly once. A Redis
-   * error here is logged and swallowed — the gauge then simply starts from the live event stream.
+   * Seeds the tracker with the sessions that already exist in Redis, counting each session once. A
+   * Redis error is logged and swallowed, leaving the count to the event stream.
    */
   @EventListener(ApplicationReadyEvent.class)
   void seedFromRedis() {

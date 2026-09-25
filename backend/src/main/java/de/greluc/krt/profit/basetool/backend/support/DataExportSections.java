@@ -27,40 +27,9 @@ import org.jetbrains.annotations.NotNull;
 /**
  * Every section of the Art. 15 / Art. 20 data export, as the SQL that produces it (REQ-SEC-058).
  *
- * <p><b>The projections are the anonymisation.</b> Third-party data is kept out of the export by
- * <em>not selecting it</em>, not by scrubbing it afterwards: each statement lists the columns it
- * returns, and no statement selects another member's id or handle. A redaction pass that had to
- * find other people's names in already-selected rows would miss some, and nobody would know which.
- *
- * <p>Free text the requester wrote is a separate problem and is handled separately, by {@link
- * HandleScrubber} — it is the requester's own data and belongs in the export, but it may name
- * somebody else inside the prose, where no projection can reach.
- *
- * <p><b>{@code audit_event.subject_label} is deliberately not selected.</b> It reads like a safe
- * column — REQ-AUDIT-001 describes it as a non-personal label, and for most domains it is one: a
- * material name, a rank step, an org-unit shorthand. For two it is a person. The job-order trails
- * build it as {@code #<displayId> '<handle>'}, where the handle is the order's <em>contact</em>
- * ("Handle des Ansprechpartners"), frequently an external customer with no account; and {@code
- * DeletionRequestService} writes a member's own effective name into it. {@link HandleScrubber}
- * could rescue neither: it is built from the roster, so a non-member contact is invisible to it and
- * a deleted member has already left it. Hence the column is <em>dropped</em> rather than scrubbed —
- * the projection is the only mechanism that works here. The timestamp, domain and event type carry
- * the Art. 15 substance; {@code subject_id} was never selected either, so the export did not
- * identify the object in the first place.
- *
- * <p><b>Each section carries its legal basis</b>, because the two rights are not the same set:
- *
- * <ul>
- *   <li>{@link #ART_15} — the right of access. Everything.
- *   <li>{@link #ART_15_20} — additionally portable under Art. 20: data the member <em>provided</em>
- *       themselves, processed on consent or contract. A reader can therefore pick the portable
- *       subset out of the export without re-deriving which sections qualify.
- * </ul>
- *
- * <p><b>What is deliberately out of scope</b>, and stated as such in {@code
- * docs/privacy/data-subject-requests.md} so the export and the record agree: platform logs, metrics
- * and traces; backups; and Keycloak's own record of the account. Each is either not retrievable per
- * person by design or belongs to a different controller surface.
+ * <p>Third-party data is excluded by the projections: no statement selects another member's id or
+ * handle, and {@code audit_event.subject_label} is not selected. Free text is scrubbed by {@link
+ * HandleScrubber}. Each section carries its legal basis, {@link #ART_15} or {@link #ART_15_20}.
  */
 public final class DataExportSections {
 
@@ -79,15 +48,7 @@ public final class DataExportSections {
    * @param key the stable machine key, also the JSON property name and the suffix of the {@code
    *     pdf.export.section.*} label key in the backend message bundle
    * @param legalBasis {@link #ART_15} or {@link #ART_15_20}
-   * @param rationale why the section carries this legal basis, in one sentence.
-   *     <p><b>Not shipped, and that is the correction.</b> It used to be serialised into the
-   *     member's JSON download as English prose, which the i18n rule forbids and which the PDF
-   *     never rendered -- so it was user-visible text with no bundle key anywhere. The wire carries
-   *     {@link #legalBasis} instead, which is machine-readable and locale-free; what the two bases
-   *     mean is explained in the PDF, in the reader's language, and in {@code
-   *     docs/privacy/processing-activities.md}. This field is the recorded reason for the
-   *     classification, kept beside the statement it is about, and {@code DataExportSectionsTest}
-   *     keeps every section carrying one.
+   * @param rationale one sentence on why the section has this legal basis; not serialised
    */
   public record Section(String key, String legalBasis, String rationale, String sql) {}
 
@@ -380,39 +341,11 @@ public final class DataExportSections {
               """));
 
   /**
-   * The columns whose value is passed through {@link HandleScrubber}, keyed by section.
+   * The columns whose value is passed through {@link HandleScrubber}, keyed by section: free text
+   * the member wrote, and name columns a member may have named after a person.
    *
-   * <p><b>The gate is the column and not the section, and that is a correction.</b> It used to be
-   * the section: every {@code String} of a listed section was scrubbed. That is fine for a section
-   * whose columns are all prose, and wrong for every section that mixes prose with structured
-   * values — most visibly {@code account}, which selects {@code username}, {@code email}, {@code
-   * approval_status} and six more identity fields, all of them {@code String} on the wire. Another
-   * member's three-character handle occurring inside the subject's own e-mail address was replaced
-   * there, so the export handed the member a corrupted copy of their own identity. The subject's
-   * own name is excluded from the scrubber's dictionary, which does nothing against somebody else's
-   * handle being a substring of it.
-   *
-   * <p>The file's previous note argued the section-wide gate was the accepted side of a trade —
-   * "the scrubber only fires on handles of three characters or more, and a collision corrupts one
-   * value in one person's export, whereas the alternative discloses a name". The trade was real but
-   * it was not necessary: naming the prose columns costs one line per column and gives up nothing.
-   *
-   * <p>Most of these carry free text the <em>member</em> wrote — a note, a remark, a description.
-   * That is their own data and belongs in the export, and it may name somebody else mid-sentence
-   * where no {@code SELECT} list can reach. Six database columns are listed for the mirror-image
-   * reason: the text names a thing rather than being prose, and somebody may have named that thing
-   * after a person — {@code ship.name}, {@code personal_inventory_item.name}, {@code mission.name}
-   * (selected by three sections), {@code bank_account.name}, and {@code org_chart_position.name}
-   * and {@code display_name}. Each of those is registered as a person-name surface in {@link
-   * PersonSearchTargets}, which is the registry that settles the question.
-   *
-   * <p><b>This list cannot be the answer for every column.</b> It only reaches handles the scrubber
-   * knows, which is registered members in all three of their spellings — never an external contact
-   * and never an already-deleted member. Where those appear, the column has to be left unselected
-   * instead; {@code audit_event.subject_label} is the worked example, in the class note above.
-   *
-   * @see #UNSCRUBBED_PERSON_COLUMNS for the columns that are a person-name surface and are still
-   *     deliberately not scrubbed, each with its reason
+   * <p>Other columns of a section are never scrubbed. Columns that are person-name surfaces but
+   * stay unscrubbed are listed in {@link #UNSCRUBBED_PERSON_COLUMNS}.
    */
   public static final Map<String, Set<String>> FREE_TEXT_COLUMNS =
       Map.ofEntries(
@@ -437,18 +370,11 @@ public final class DataExportSections {
           Map.entry("orgChartPositions", Set.of("name", "display_name")));
 
   /**
-   * Selected columns that {@link PersonSearchTargets} registers as a person-name surface and that
-   * are nevertheless <b>not</b> scrubbed, each with the reason.
+   * Selected columns that {@link PersonSearchTargets} registers as a person-name surface but that
+   * are not scrubbed, keyed {@code section.column}, each with the reason.
    *
-   * <p>Keyed {@code section.column}. This is the other half of {@link #FREE_TEXT_COLUMNS}, and it
-   * exists so that the two registries can be held against each other by a test rather than by
-   * whoever reads them next: {@code DataExportScrubCoverageTest} walks every section's {@code
-   * SELECT} list, and a column that names a person must appear in one map or the other. Without
-   * that, a new section selecting a prose column is scrubbed or not depending on whether its author
-   * remembered — which is precisely how {@code notificationRuleTargets} came to ship unscrubbed.
-   *
-   * <p>The pattern is the one {@code PersonSearchCoverageTest} uses for the search registry:
-   * covered or exempted, never merely absent.
+   * <p>{@code DataExportScrubCoverageTest} requires every person-name column to appear here or in
+   * {@link #FREE_TEXT_COLUMNS}.
    */
   public static final Map<String, String> UNSCRUBBED_PERSON_COLUMNS =
       Map.ofEntries(

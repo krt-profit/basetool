@@ -24,15 +24,15 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.UUID;
 
 /**
- * One concrete ingredient slot inside a {@link ScWikiBlueprintRequirementGroupDto} (SC Wiki {@code
- * blueprint_requirement_child}). Unlike the flat {@code ingredients[]} summary, a child carries the
- * per-group reference and the {@link #minQuality} gate. {@link #kind} selects the reference type:
+ * One ingredient slot inside a {@link ScWikiBlueprintRequirementGroupDto} (SC Wiki {@code
+ * blueprint_requirement_child}) with its {@link #minQuality} gate; {@link #kind} selects the
+ * reference type.
  *
  * <ul>
- *   <li>{@code "resource"} → {@link #uuid} is the commodity's resource-type UUID (resolves to a
- *       {@code material}), {@link #quantityScu} carries the SCU amount;
- *   <li>{@code "item"} → {@link #uuid} is the game-item UUID (resolves to a {@code game_item}),
- *       {@link #quantity} carries the whole-unit count.
+ *   <li>{@code "resource"} → {@link #uuid} is a resource-type UUID (a {@code material}), {@link
+ *       #quantityScu} the SCU amount;
+ *   <li>{@code "item"} → {@link #uuid} is a game-item UUID (a {@code game_item}), {@link #quantity}
+ *       the unit count.
  * </ul>
  *
  * @param key internal key of the child, or {@code null}

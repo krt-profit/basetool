@@ -61,12 +61,10 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC render + proxy test for the Materialbörse Gesuche (requests) surface of {@link
- * MaterialboersePageController}. Renders the real Thymeleaf request board (catching any template
- * error) with a mocked backend, proves the server-side Markdown description is rendered into the
- * page, the min-quality / desired-quantity facts render, and proves the request-edit proxy relays a
- * backend optimistic-lock conflict as a 409 with the problem code so {@code krtFetch} can offer the
- * reload-confirm.
+ * Render and proxy tests for the Materialbörse Gesuche surface of {@link
+ * MaterialboersePageController}: the request board renders with the Markdown description and
+ * quality/quantity facts, and the request-edit proxy relays a lock conflict as 409 with its problem
+ * code.
  */
 @SpringBootTest
 class MaterialgesuchPageControllerMvcTest {
@@ -142,7 +140,7 @@ class MaterialgesuchPageControllerMvcTest {
         .andExpect(content().string(not(containsString("id=\"mb-listwrap\""))));
   }
 
-  /** A PIECE material request renders its desired amount in the piece unit, never SCU (#1182). */
+  /** A PIECE material request renders its desired amount in the piece unit, never SCU. */
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void page_pieceMaterialRequest_rendersPieceUnitNotScu() throws Exception {

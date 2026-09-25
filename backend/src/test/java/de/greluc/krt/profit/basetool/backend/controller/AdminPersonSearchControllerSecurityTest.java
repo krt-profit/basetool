@@ -45,18 +45,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MockMvc gate matrix for the admin Personensuche (REQ-SEC-060).
- *
- * <p>Admin-only, and the reason is worth restating where it is tested: the endpoint returns every
- * place a given name appears, which is a profile of that person assembled across the whole system.
- * An officer or bank employee has no business assembling one.
- *
- * <p>The class also pins down that a served search reaches the seam that records it. What the
- * recorded payload may contain — the term's <b>length</b>, never the term, because a trail of every
- * name an admin searched for would be a second store of exactly the data this search exists to help
- * remove — is asserted in {@link
- * de.greluc.krt.profit.basetool.backend.service.PersonSearchServiceAuditTest}, which is where the
- * payload is now built.
+ * MockMvc gate matrix for the admin-only Personensuche (REQ-SEC-060), including that a served
+ * search reaches the seam that records it. The recorded payload is covered by {@link
+ * de.greluc.krt.profit.basetool.backend.service.PersonSearchServiceAuditTest}.
  */
 @SpringBootTest
 @ActiveProfiles("test")

@@ -69,12 +69,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
- * Coverage for {@link JobOrderService} methods that the main {@code JobOrderServiceTest} doesn't
- * reach: the list/page/reference getters and the {@code addAssignee} / {@code removeAssignee} pair.
- * Previously all of these methods were at 0% coverage according to JaCoCo.
- *
- * <p>Lives as a sibling test so the existing 586-line test file doesn't need to gain a {@code
- * UserRepository} mock (which would dirty its dependency surface for tests that don't need it).
+ * Unit tests for the list, page and reference getters of {@link JobOrderService} and for {@code
+ * addAssignee} / {@code removeAssignee}.
  */
 @ExtendWith(MockitoExtension.class)
 class JobOrderServiceAssigneeAndListTest {

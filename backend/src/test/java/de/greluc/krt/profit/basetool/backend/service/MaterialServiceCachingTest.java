@@ -40,12 +40,9 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Spring-Boot integration tests for the material caches (CACHE-02). Verifies that {@code
- * getMaterial} lands in the dedicated {@link CacheConfig#MATERIAL_BY_ID_CACHE} (never the list
- * catalogue), that the list reads populate {@link CacheConfig#MATERIALS_CACHE} under their prefixed
- * keys, and that a material write evicts <b>both</b> caches so a single-entity entry can never
- * survive a rename/delete while the list entry is dropped. Runs in a rolled-back transaction, so it
- * seeds its own two materials without disturbing the seeded catalogue.
+ * Integration tests of the material caches: {@code getMaterial} uses {@link
+ * CacheConfig#MATERIAL_BY_ID_CACHE}, list reads use {@link CacheConfig#MATERIALS_CACHE}, and a
+ * write evicts both.
  */
 @SpringBootTest
 @ActiveProfiles("test")

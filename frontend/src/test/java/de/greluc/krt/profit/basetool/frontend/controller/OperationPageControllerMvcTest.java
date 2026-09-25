@@ -72,14 +72,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Verifies that the operations index and operation-detail templates render status values through
- * the i18n bundle instead of leaking the raw backend enum strings. The i18n bug was: the
- * create/edit dropdowns went through {@code operation.status.planned} etc., but the displayed
- * status (in the table, the detail box, and the embedded missions table) was rendered as {@code
- * th:text="${op.status}"}, dumping the raw enum name into the page. These tests pin the fix: send
- * an Operation/Mission with status {@code PLANNED}/{@code COMPLETED}/{@code CANCELLED} through the
- * page and assert the rendered HTML contains the German translation, not the raw uppercase enum
- * value.
+ * Verifies that the operations index and detail templates render operation and mission status
+ * values through the i18n bundle rather than as raw enum names.
  */
 @SpringBootTest
 class OperationPageControllerMvcTest {

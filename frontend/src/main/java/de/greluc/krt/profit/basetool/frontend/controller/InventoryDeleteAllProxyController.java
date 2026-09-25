@@ -32,15 +32,8 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Frontend proxy for the admin-only "clear global inventory" action.
- *
- * <p>Forwards {@code DELETE /inventory/all} to the backend {@code DELETE /api/v1/inventory/all} via
- * the authenticated {@link WebClient} (which attaches the OAuth2 token). The backend rejects
- * non-admin callers with 403 — this controller's {@code @PreAuthorize("hasRole('ADMIN')")} adds an
- * upfront defence-in-depth check so the call never even leaves the frontend for a logistician /
- * officer caller. The {@code /inventory/all} path lives next to the existing {@code GET
- * /inventory/all} (squadron view) — Spring routes by HTTP method, so the two coexist on the same
- * URI.
+ * Admin-only proxy forwarding {@code DELETE /inventory/all} to {@code DELETE
+ * /api/v1/inventory/all}.
  */
 @RestController
 @RequestMapping("/inventory")

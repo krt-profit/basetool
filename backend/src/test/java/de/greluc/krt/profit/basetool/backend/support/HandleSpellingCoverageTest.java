@@ -28,26 +28,9 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 /**
- * Holds {@link HandleSpellings} against the person-search registry, so a new name column cannot
- * reach one data-protection surface and miss the other (REQ-SEC-058, REQ-SEC-062).
- *
- * <p><b>This test was named before it existed.</b> A {@code DataExportService} Javadoc said "adding
- * a fourth name column means adding it in all three places, and {@code HandleSpellingCoverageTest}
- * fails until it is" while no such class was in the tree, and the two places that needed the list —
- * the Art. 15 export's scrubber and the Art. 17 erasure's text-matched updates — each spelled the
- * three columns out for themselves. So a fourth column really would have been added to one and
- * missed in the other, and a miss is silent in both directions: an export that reports a complete
- * third-party redaction, or an erasure that reports a completed erasure while rows still name the
- * member. Written 2026-09-17.
- *
- * <p><b>Why the search registry is the right counterpart.</b> {@link PersonSearchTargets} is swept
- * against {@code information_schema} by {@code PersonSearchCoverageTest}: every text column of
- * every base table is either searched or exempted with a recorded reason. So a new {@code app_user}
- * name column cannot reach the schema unnoticed, and this class turns that into the obligation that
- * matters here — every searched {@code app_user} name column is either a spelling or declared
- * {@link HandleSpellings#NOT_A_SPELLING} with a reason.
- *
- * <p>A plain unit test: two constant lists and one projection, no container and no schema.
+ * Requires every {@code app_user} name column in the person-search registry to be either a {@link
+ * HandleSpellings} column or declared {@link HandleSpellings#NOT_A_SPELLING}, so the export
+ * scrubber and the erasure cover the same names (REQ-SEC-058, REQ-SEC-062).
  */
 class HandleSpellingCoverageTest {
 
@@ -111,15 +94,7 @@ class HandleSpellingCoverageTest {
         .doesNotContainAnyElementsOf(HandleSpellings.NOT_A_SPELLING.keySet());
   }
 
-  /**
-   * The projection yields one value per declared column, in that order.
-   *
-   * <p>The half a constant list cannot state: a getter added to {@link HandleSpellings#of(User)}
-   * without a matching column entry, or the other way round, leaves the two consumers matching on a
-   * different number of names than the registries were checked for. Distinct values, so the order
-   * is pinned too — {@code HandleSpellings.COLUMNS} documents it and the export's longest-first
-   * sorting reads better against a known order.
-   */
+  /** The projection yields one distinct value per declared column, in declaration order. */
   @Test
   void theProjectionYieldsExactlyTheDeclaredColumnsInOrder() {
     User user = new User();

@@ -49,18 +49,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Unit tests for {@link OrgUnitBankApprovalLimitService} — the approval-limit write mechanics split
- * out of {@code OrgUnitBankAccessService} (L3, #922, REQ-BANK-041/-048). These close the coverage
- * gap left by {@code OrgUnitBankAccessServiceTest}, which wires the real collaborator but never
- * drives its {@code set*}/{@code clear*} paths.
- *
- * <p>The tests pin three regression-prone behaviours: (1) every mutation records its {@code
- * APPROVAL_LIMIT_SET} / {@code APPROVAL_LIMIT_CLEARED} audit event (REQ-AUDIT-001) with the exact
- * details payload; (2) the idempotent {@code upsertLimit} updates the existing tier row in place
- * (no duplicate insert against the V193 partial unique index) and selects the row through the
- * kind-correct finder branch; (3) each {@code set*} first takes the account row lock via {@link
- * BankAccountRepository#findByIdForUpdate} before the find-or-insert, and each {@code clear*}
- * records the cleared event only when a row was actually deleted ({@code removed > 0}).
+ * Unit tests for {@link OrgUnitBankApprovalLimitService} (REQ-BANK-041): the audit events of every
+ * mutation, the in-place upsert, the account row lock via {@link
+ * BankAccountRepository#findByIdForUpdate}, and the cleared event only when a row was deleted.
  */
 @ExtendWith(MockitoExtension.class)
 class OrgUnitBankApprovalLimitServiceTest {

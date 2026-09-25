@@ -42,10 +42,7 @@ import org.springframework.data.domain.Sort;
 
 /**
  * Unit tests for {@link PersonalBlueprintOverviewController}: page-envelope wrapping and
- * delegation. The {@code @PreAuthorize("@ownerScopeService.canAccessBlueprintOverview()")} gate is
- * a declarative Spring concern and is exercised through {@code OwnerScopeServiceTest} (the
- * predicate) rather than here, matching the unit-test style of {@code
- * PersonalBlueprintControllerTest}.
+ * delegation.
  */
 @ExtendWith(MockitoExtension.class)
 class PersonalBlueprintOverviewControllerTest {

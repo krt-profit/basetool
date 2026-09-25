@@ -29,13 +29,11 @@ import org.mapstruct.Mapping;
 public interface KommandoGroupMapper {
 
   /**
-   * Projects a persisted {@link KommandoGroup} into its outbound read model, flattening the owning
-   * Staffel's id into {@code squadronId}. Replaces the byte-identical hand-built mapping that was
-   * duplicated in {@code KommandoGroupService} and {@code LeitungViewService}.
+   * Projects a {@link KommandoGroup} into its read model, flattening the owning Staffel's id into
+   * {@code squadronId}.
    *
-   * @param group the persisted group to project; {@code null} maps to {@code null}.
-   * @return the read-model DTO carrying the group's id, owning squadron id, name, sort index and
-   *     optimistic-lock version.
+   * @param group the persisted group; {@code null} maps to {@code null}
+   * @return the DTO with id, squadron id, name, sort index and version
    */
   @Mapping(target = "squadronId", source = "squadron.id")
   KommandoGroupDto toDto(KommandoGroup group);

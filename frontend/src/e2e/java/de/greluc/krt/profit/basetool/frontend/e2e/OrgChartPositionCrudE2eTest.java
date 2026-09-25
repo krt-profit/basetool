@@ -34,31 +34,18 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Functional CRUD flows for the inline org-chart editor ({@code /org-chart}), driven as the seeded
- * ADMIN user so the editor affordances render. Complements {@code OrgChartKeyboardA11yE2eTest}
- * (which covers the keyboard/ARIA behaviour) by exercising the create / edit / delete lifecycle of
- * actual positions through the UI — the descriptive-chart, ADMIN-edited contract (REQ-ORG-010), the
- * "a Kommando outlives its Kommandoleiter" rule (REQ-ORG-025) and the cascading remove
- * (REQ-ORG-012):
+ * CRUD flows of the inline org-chart editor ({@code /org-chart}) as {@code test-admin}
+ * (REQ-ORG-010, REQ-ORG-012, REQ-ORG-025):
  *
  * <ol>
- *   <li>{@link #createsRenamesAndDeletesAKommando()} — create a leaderless Kommando(gruppe), rename
- *       it, then remove it; no holder needed.
- *   <li>{@link #createsAssignsVacatesAndRemovesACommandLeader()} — create a Kommando, assign and
- *       reassign a free-text Kommandoleiter, vacate the seat (the group must survive), then remove
- *       the whole group.
+ *   <li>{@link #createsRenamesAndDeletesAKommando()} — create, rename and remove a leaderless
+ *       Kommando;
+ *   <li>{@link #createsAssignsVacatesAndRemovesACommandLeader()} — assign, reassign and vacate a
+ *       Kommandoleiter, then remove the group.
  * </ol>
  *
- * <p>Both tests are <strong>hermetic against the per-Staffel Kommando cap</strong>: each first
- * deletes any pre-existing Kommando on the IRIDIUM Staffel (a sibling test — the scroll case in the
- * a11y suite — may leave up to the cap of four), so a create never trips {@code
- * problem.org_chart.command_limit}. Holder changes are asserted by the typed free-text name the
- * chart editor places (the reassign control's {@code data-display-name}) plus the vacate
- * affordance's presence; the Kommando <em>name</em> is likewise a test-supplied literal asserted
- * directly.
- *
- * <p>Tagged {@code @Tag("e2e")} (not {@code smoke}): these mutate org-chart data, so they must run
- * only against the ephemeral, disposable stack.
+ * <p>Each test first deletes existing IRIDIUM Kommandos so the per-Staffel cap is never hit.
+ * Mutates data, so it runs only against the ephemeral stack.
  */
 @Tag("e2e")
 class OrgChartPositionCrudE2eTest {
@@ -144,11 +131,8 @@ class OrgChartPositionCrudE2eTest {
   }
 
   /**
-   * Creates a Kommando, assigns then reassigns a free-text Kommandoleiter, vacates the seat —
-   * asserting the Kommando(gruppe) survives the vacate, per REQ-ORG-025 — then removes the whole
-   * group. Account-linked seats are managed under Organisation -&gt; Leitung since REQ-ROLE-006, so
-   * the chart editor places only a typed name; holder changes are asserted by the reassign
-   * control's {@code data-display-name} and the vacate affordance's presence.
+   * Creates a Kommando, assigns then reassigns a free-text Kommandoleiter, vacates the seat and
+   * asserts the group survives (REQ-ORG-025), then removes the group.
    */
   @Test
   void createsAssignsVacatesAndRemovesACommandLeader() {
@@ -209,10 +193,7 @@ class OrgChartPositionCrudE2eTest {
   }
 
   /**
-   * Turns the inline editor on (idempotently), so the dashed add affordances and the per-node
-   * action controls become visible. Edit mode survives an in-place chart refresh (the {@code
-   * editing} class lives on the stable {@code #oc-chart} container), so the guard is really for the
-   * initial page load, where the toggle starts off; calling it after a refresh is a harmless no-op.
+   * Turns the inline editor on, idempotently, so the add and per-node controls become visible.
    *
    * @param page the page showing the org chart
    */
@@ -288,16 +269,11 @@ class OrgChartPositionCrudE2eTest {
   }
 
   /**
-   * Runs an action that triggers the editor's "save then in-place refresh" path and blocks until
-   * the refresh has committed. A successful edit no longer reloads the page: it re-renders the
-   * whole tree via {@code krtFetch.swap(?fragment=chartBody)} into the stable {@code #oc-chart}
-   * container (epic #571 / REQ-FE-005), which dispatches a {@code krt:swapped} event on {@code
-   * document} once the new subtree is in the DOM. A one-shot listener scoped to {@code #oc-chart}
-   * flips a sentinel on exactly that commit, so waiting for the sentinel proves the fresh tree
-   * (with its re-stamped {@code data-version}s) is in place before the caller inspects anything.
+   * Runs an action that saves and refreshes the chart in place, and waits for the {@code
+   * krt:swapped} event on {@code #oc-chart} (REQ-FE-005).
    *
    * @param page the page that hosts the chart
-   * @param action the action that starts the save (and the in-place refresh it triggers)
+   * @param action the action that starts the save
    */
   private static void awaitChartRefresh(Page page, Runnable action) {
     page.evaluate(

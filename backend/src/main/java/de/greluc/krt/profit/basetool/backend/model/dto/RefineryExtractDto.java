@@ -27,26 +27,19 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * Envelope of the frozen {@code RefineryExtract} JSON contract (v1) produced by the desktop
- * extractor and consumed by {@code POST /api/v1/refinery-orders/import-extract} — see {@code
- * docs/archive/REFINERY_SCREENSHOT_IMPORT_PLAN.md} §5 (epic #439, Phase 1 #434). The provenance
- * fields ({@code tool}, {@code toolVersion}, {@code model}, {@code generatedAt}, {@code
- * clientLanguage}) are echoed for display only and never influence matching.
+ * Envelope of the {@code RefineryExtract} v1 JSON contract produced by the desktop extractor.
  *
- * <p>Only {@code schemaVersion == 1} is accepted; the service rejects other versions with a 400 so
- * an outdated extractor fails loudly instead of producing a silently wrong draft. The {@code @Size}
- * caps are defensive limits on an authenticated endpoint, far above anything a real extract
- * produces (v1 emits exactly one order).
+ * <p>Only {@code schemaVersion == 1} is accepted. Provenance fields are for display only and never
+ * influence matching.
  *
- * @param schemaVersion contract version; must equal {@code 1} (enforced in the service, not via
- *     bean validation, so the error carries an i18n message instead of a generic 400)
- * @param tool producer name, e.g. {@code "basetool-sc-extractor"} (provenance only)
- * @param toolVersion producer version string (provenance only)
- * @param model VLM that produced the extract, e.g. {@code "qwen3-vl:8b-instruct"} (provenance only)
- * @param generatedAt UTC instant the extract was produced (provenance only)
- * @param clientLanguage SC client language the screenshots were taken in; v1 is always {@code "en"}
- * @param orders extracted orders; v1 producers emit exactly one, the service processes {@code
- *     orders[0]} and flags any surplus with {@code MULTIPLE_ORDERS_TRUNCATED}
+ * @param schemaVersion contract version; must equal {@code 1}, checked in the service
+ * @param tool producer name (provenance only)
+ * @param toolVersion producer version (provenance only)
+ * @param model VLM that produced the extract (provenance only)
+ * @param generatedAt UTC instant of production (provenance only)
+ * @param clientLanguage SC client language of the screenshots; always {@code "en"} in v1
+ * @param orders extracted orders; only {@code orders[0]} is processed, surplus is flagged {@code
+ *     MULTIPLE_ORDERS_TRUNCATED}
  */
 public record RefineryExtractDto(
     @NotNull Integer schemaVersion,

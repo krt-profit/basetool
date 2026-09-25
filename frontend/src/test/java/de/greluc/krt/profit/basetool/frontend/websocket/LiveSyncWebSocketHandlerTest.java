@@ -71,14 +71,8 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Tests for {@link LiveSyncWebSocketHandler} — the multiplexed {@code /ws/sync} relay.
- *
- * <p>Drives the handler through a hand-rolled {@link FakeSession} that records outbound messages so
- * the JSON wire format, room membership, principal-resolution and broadcast behaviour can be
- * verified without a real servlet container. Every socket is a multiplexed {@code /ws/sync} socket
- * (marked by the {@link LiveSyncWebSocketHandler#ATTR_MULTIPLEXED} attribute the {@code /ws/sync}
- * handshake interceptor sets); a socket joins a room by sending a {@code subscribe} frame, and its
- * {@code changed} / presence frames carry their own {@code topic}.
+ * Tests {@link LiveSyncWebSocketHandler}, the multiplexed {@code /ws/sync} relay, through a
+ * recording {@link FakeSession}: wire format, room membership, principal resolution and broadcast.
  */
 class LiveSyncWebSocketHandlerTest {
 
@@ -848,13 +842,8 @@ class LiveSyncWebSocketHandlerTest {
   }
 
   /**
-   * A handshake the consent gate marked is refused with {@code 4003} carrying the consent page.
-   *
-   * <p>All three parts are the contract and each alone is useless. The code is what {@code
-   * krt-live-sync.js} recognises as terminal; without it the close is just a close and the client
-   * reconnects forever, which is the defect. The reason is where the client learns which page can
-   * end the refusal. And the socket must actually be closed — a marked socket left open would relay
-   * peer changes to a user the backend refuses every fragment fetch for.
+   * Verifies that a socket marked by the consent gate is closed with code {@code 4003} and the
+   * consent page as reason.
    */
   @Test
   void consentGate_refusesTheSocketWithATerminalCloseCodeAndTheConsentUrl() throws Exception {
@@ -871,13 +860,7 @@ class LiveSyncWebSocketHandlerTest {
     assertThat(socketRejectedCounter(MetricNames.SOCKET_REJECTED_TERMS_GATE)).isEqualTo(1.0);
   }
 
-  /**
-   * A gated refusal consumes no per-user socket slot.
-   *
-   * <p>The check runs before the cap is acquired, so a tab reconnecting against a closed gate
-   * cannot exhaust the user's own budget and turn a consent prompt into a socket-cap refusal once
-   * they accept. Driven past the cap deliberately: with the checks in the other order this fails.
-   */
+  /** Verifies that a consent-gated refusal consumes no per-user socket slot, even past the cap. */
   @Test
   void consentGate_refusalTakesNoUserSocketSlot() throws Exception {
     OidcUser bob = oidcUser("user-2", "Bob");
@@ -1495,9 +1478,7 @@ class LiveSyncWebSocketHandlerTest {
   }
 
   /**
-   * Opens a multiplexed {@code /ws/sync} socket and subscribes it to {@code topic}, so it joins
-   * that room and receives its relays — the multiplexed equivalent of the old per-resource connect
-   * that auto-joined a single implicit room.
+   * Opens a multiplexed {@code /ws/sync} socket and subscribes it to {@code topic}.
    *
    * @param topic the canonical topic to subscribe to
    * @param user the socket owner
@@ -1510,9 +1491,8 @@ class LiveSyncWebSocketHandlerTest {
   }
 
   /**
-   * Builds — but does not establish — a multiplexed {@code /ws/sync} {@link FakeSession}, so a test
-   * driving a non-default handler (its own executor / authorizer) can call {@code
-   * afterConnectionEstablished} on that handler itself.
+   * Builds, without establishing, a multiplexed {@code /ws/sync} {@link FakeSession} for a test
+   * that establishes it on its own handler.
    *
    * @param user the socket owner
    * @return the un-established multiplexed session
@@ -1540,12 +1520,12 @@ class LiveSyncWebSocketHandlerTest {
 
   /**
    * Reads the subscribe counter for one exact {@code outcome} / {@code topic_class} / {@code
-   * reason} triple, so a test can prove the deny series is split rather than merely present.
+   * reason} triple.
    *
    * @param outcome the {@code outcome} tag value
    * @param topicClass the {@code topic_class} tag value
    * @param reason the {@code reason} tag value
-   * @return the counter's value, or {@code 0.0} when that exact series was never registered
+   * @return the counter's value, or {@code 0.0} when that series was never registered
    */
   private double subscribeCounter(String outcome, String topicClass, String reason) {
     var counter =
@@ -1684,9 +1664,7 @@ class LiveSyncWebSocketHandlerTest {
 
     /**
      * When {@code >= 0}, {@link #isOpen()} reports {@code true} for the first {@code flipOpenAfter}
-     * calls and {@code false} thereafter — used to reproduce a close that races in mid-way through
-     * {@code completeSubscribe} (open at the pre-join check, closed at the post-join check). {@code
-     * -1} (the default) reports the plain {@link #open} field, leaving every other test unaffected.
+     * calls and {@code false} thereafter; {@code -1} reports the plain {@link #open} field.
      */
     int flipOpenAfter = -1;
 

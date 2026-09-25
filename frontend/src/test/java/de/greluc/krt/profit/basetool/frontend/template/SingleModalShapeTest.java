@@ -36,23 +36,9 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
- * Build-time enforcement of REQ-UI-013 / ADR-0177: the app has <strong>exactly one</strong> dialog
- * shape, {@code .krt-modal-overlay} &gt; {@code .krt-modal}.
- *
- * <p>Until #1891 there were three. The canonical shape, legacy A ({@code .modal} / {@code
- * .modal-content}) and legacy B ({@code .modal-overlay} / {@code .modal-box}) differed in their
- * height cap, their body scrolling and — worst — in how they were opened, legacy A's root
- * defaulting to <em>visible</em> where the canonical one defaults to hidden. Every dialog defect
- * therefore had to be fixed once per shape, and a behaviour keyed on the root class was silently
- * absent from the shapes nobody remembered: {@code krt-live-sync.js}'s "is any dialog open?" guard
- * queried {@code .krt-modal-overlay} only, so 54 of 96 dialogs could be swapped out from under an
- * open form.
- *
- * <p>That is what this test exists to prevent recurring. A fourth shape is not reported by a
- * hand-maintained list of shapes — it is silently not measured — so the assertion is inverted: no
- * legacy dialog class may appear <em>anywhere</em> in the templates or the hand-written
- * stylesheets, and every dialog root must be the canonical one. A new shape fails the build on the
- * first commit that introduces it rather than on the second defect that has to be fixed twice.
+ * Enforces REQ-UI-013 / ADR-0177: the app has exactly one dialog shape, {@code .krt-modal-overlay}
+ * &gt; {@code .krt-modal}. No legacy dialog class may appear in the templates or hand-written
+ * stylesheets, and every dialog root must be the canonical one.
  */
 class SingleModalShapeTest {
 
@@ -78,20 +64,16 @@ class SingleModalShapeTest {
       List.of("krt-modal-overlay", "krt-modal", "krt-modal-head", "krt-modal-close");
 
   /**
-   * Matches a class token exactly: not preceded or followed by a word character or a hyphen. That
-   * is what separates the legacy {@code modal} from the canonical {@code krt-modal}, and the legacy
-   * {@code close-modal} from the shared {@code close-modal-display} trigger name.
+   * Matches a class token exactly, not adjoined by a word character or hyphen, so {@code modal}
+   * does not match {@code krt-modal}.
    */
   private static Pattern classToken(String name) {
     return Pattern.compile("(?<![-\\w])" + Pattern.quote(name) + "(?![-\\w])");
   }
 
   /**
-   * Asserts that no template declares an element carrying one of the legacy dialog classes.
-   *
-   * <p>Only {@code class="…"} attribute values are inspected, so prose in an HTML comment may still
-   * name a legacy shape to explain the history — which several templates and this change's own
-   * comments deliberately do.
+   * Asserts that no template's {@code class} attribute carries a legacy dialog class; comments are
+   * not inspected.
    *
    * @throws IOException if a template cannot be read
    * @throws URISyntaxException if the templates classpath root cannot be resolved
@@ -120,11 +102,8 @@ class SingleModalShapeTest {
   }
 
   /**
-   * Asserts that no hand-written stylesheet declares a rule for a legacy dialog class.
-   *
-   * <p>The markup check alone would pass against dead CSS, and dead CSS for a deleted shape is
-   * exactly the invitation to bring the shape back. {@code inline-migration.css} is generated but
-   * still checked — a regenerated legacy utility is the same defect.
+   * Asserts that no stylesheet, including the generated {@code inline-migration.css}, declares a
+   * rule for a legacy dialog class.
    *
    * @throws IOException if a stylesheet cannot be read
    * @throws URISyntaxException if the CSS classpath root cannot be resolved
@@ -151,15 +130,9 @@ class SingleModalShapeTest {
   }
 
   /**
-   * Asserts the positive half: every dialog is rendered by {@code fragments/modal-wrapper.html}
-   * (2026-09-23), and that fragment draws the canonical shell.
-   *
-   * <p>Until then 90 of the 96 dialogs wrote the shell by hand, and it had drifted: {@code <h2>} in
-   * 76 and {@code <h3>} in 20, an ✕ in 74 and an icon button in 22, the accessible name on the
-   * overlay in some and on the frame in others, and five close controls on the order page that
-   * closed nothing. So no template but the wrapper may carry the shell's own classes — the page
-   * supplies only {@code .krt-modal-body} and {@code .krt-modal-foot} — and the wrapper must be
-   * called often enough that the check is still measuring something.
+   * Asserts that every dialog is rendered by {@code fragments/modal-wrapper.html}, that no other
+   * template carries the shell's own classes, and that the wrapper is called often enough for the
+   * check to be meaningful.
    *
    * @throws IOException if a template cannot be read
    * @throws URISyntaxException if the templates classpath root cannot be resolved
@@ -199,12 +172,8 @@ class SingleModalShapeTest {
   }
 
   /**
-   * Asserts that every canonical overlay is a native {@code <dialog>} (FE-SIMP-04b, ADR-0177).
-   *
-   * <p>{@code window.krtModal.open} shows an overlay with {@code showModal()}: top layer, the page
-   * behind it inert, Escape raised as {@code cancel}. A {@code .krt-modal-overlay} left as a {@code
-   * <div>} would still open — by its class — but without any of that, so the app would be back to
-   * two dialog behaviours under one class name, which is the split this test exists to prevent.
+   * Asserts that every canonical overlay is a native {@code <dialog>} (ADR-0177), so {@code
+   * showModal()} semantics apply.
    *
    * @throws IOException if a template cannot be read
    * @throws URISyntaxException if the templates classpath root cannot be resolved
@@ -236,14 +205,7 @@ class SingleModalShapeTest {
   }
 
   /**
-   * Asserts that a dialog's submit button is inside the {@code <form>} it submits.
-   *
-   * <p>The canonical shell puts the actions in a {@code .krt-modal-foot} that is a sibling of
-   * {@code .krt-modal-body}, so a {@code <form>} wrapping the fields has to wrap <em>both</em> or
-   * the submit button ends up outside it. A submit button outside its form is not a layout problem:
-   * clicking it does nothing at all, silently. The port shipped exactly that defect twice — the
-   * Auftrag edit dialog and the Lager bulk-rebook dialog — and only one of them had an e2e test to
-   * catch it, which is why the invariant is asserted here for all of them.
+   * Asserts that each dialog's submit button is inside the {@code <form>} it submits.
    *
    * @throws IOException if a template cannot be read
    * @throws URISyntaxException if the templates classpath root cannot be resolved
@@ -276,9 +238,8 @@ class SingleModalShapeTest {
   }
 
   /**
-   * Splits a template into the source text of each dialog: every call of the wrapper, from the
-   * start tag that carries it ({@code <th:block>} or {@code <div>}) to that element's closing tag,
-   * which encloses the body the call passes in.
+   * Splits a template into the source text of each dialog: every wrapper call from its start tag to
+   * that element's closing tag.
    *
    * @param html the template source
    * @return one string per dialog found
@@ -335,11 +296,7 @@ class SingleModalShapeTest {
   }
 
   /**
-   * Resolves every Thymeleaf template on the test classpath.
-   *
-   * <p>Anchors on a known file rather than the bare {@code /templates} directory resource, which
-   * {@code getResource} does not resolve portably — the same approach {@code
-   * LiveSyncSectionMapParityTest} uses.
+   * Resolves every Thymeleaf template on the test classpath, anchored on a known file.
    *
    * @return every {@code .html} file under the templates root, subdirectories included
    * @throws IOException if the tree cannot be walked

@@ -30,18 +30,11 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Periodic self-heal that keeps the "default blueprints are always present" guarantee (REQ-INV-016)
- * true regardless of how a user came to exist.
+ * Periodic self-heal that re-grants the full default-blueprint set to every active user
+ * (REQ-INV-016), every {@code app.default-blueprints.provisioning.interval} (default {@code PT1H}).
  *
- * <p>Runs every {@code app.default-blueprints.provisioning.interval} (default {@code PT1H}) and
- * re-grants the full default set to every active user via the idempotent bulk insert. The
- * first-login event and the admin-add grant cover the common cases immediately; this sweep catches
- * anything they miss — users created between sweeps by the Keycloak directory sync, or a
- * transiently failed grant. Exceptions are swallowed and logged so a transient DB hiccup never
- * tears down the scheduler thread.
- *
- * <p>Gated by {@code app.default-blueprints.provisioning.enabled} (default on); the test profile
- * disables it so the sweep never races assertions.
+ * <p>Gated by {@code app.default-blueprints.provisioning.enabled} (default on); exceptions are
+ * logged and swallowed.
  */
 @Component
 @RequiredArgsConstructor
@@ -81,13 +74,9 @@ public class DefaultBlueprintProvisioningTask {
   }
 
   /**
-   * Publishes {@code basetool_scheduled_job_enabled{task="default_blueprint_provisioning"} = 1}.
-   *
-   * <p>A bean {@code @ConditionalOnProperty} never created publishes nothing, and that absence is
-   * what lets {@code ScheduledJobStale} tell "switched off on purpose" from "has never succeeded".
-   * Without it, following the documented instruction to disable a sweep before its first
-   * irreversible run raised a permanent warning: the last-success gauge is registered lazily on
-   * first success, so it never appeared and the alert's {@code absent()} leg stayed true.
+   * Publishes {@code basetool_scheduled_job_enabled{task="default_blueprint_provisioning"} = 1}, so
+   * {@code ScheduledJobStale} can tell a disabled sweep (no bean, no gauge) from one that never
+   * succeeded.
    */
   @PostConstruct
   void publishEnabledGauge() {

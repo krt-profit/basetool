@@ -33,11 +33,9 @@ import org.springframework.cache.CacheManager;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * Integration test for the per-domain frontend cache split (FE-CACHE-1/2). Pins the {@link
- * CachedCatalog} URIs and fetch modes (so a refactor cannot silently change a cache target or
- * re-truncate a page-walked catalogue, REQ-ADMIN-003), proves every domain is a registered Caffeine
- * cache, and — the split's whole point — that {@code evict(domain)} drops only that domain's cache
- * while a sibling domain is retained.
+ * Integration test for the per-domain frontend caches: pins the {@link CachedCatalog} URIs and
+ * fetch modes (REQ-ADMIN-003), checks every domain is a registered Caffeine cache, and that {@code
+ * evict(domain)} drops only that domain's cache.
  */
 @SpringBootTest
 @ActiveProfiles("test")

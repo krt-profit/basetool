@@ -92,16 +92,13 @@ public class PersonalInventoryPageController {
   /**
    * Renders the personal-inventory list with the create/edit modal.
    *
-   * @param q optional free-text filter; echoed back into the search input
+   * @param q optional free-text filter, echoed into the search input
    * @param page zero-based page index
    * @param size page size, defaults to 50
-   * @param sort optional sort spec ({@code field,asc|desc}); whitelisted by the backend
-   * @param fragment when {@code "results"} only the item-list fragment is rendered (AJAX filter
-   *     swap, REQ-FE-002); otherwise the full page is returned
-   * @param model Thymeleaf model populated with the form, the filter query, the item list and page
-   *     metadata
-   * @return the {@code personal-inventory} view name, or its {@code results} fragment for an AJAX
-   *     filter swap
+   * @param sort optional sort spec ({@code field,asc|desc}), whitelisted by the backend
+   * @param fragment {@code "results"} renders only the item-list fragment (REQ-FE-002)
+   * @param model model populated with the form, filter, item list and page metadata
+   * @return the {@code personal-inventory} view name, or its {@code results} fragment
    */
   @NotNull
   @GetMapping
@@ -120,18 +117,14 @@ public class PersonalInventoryPageController {
   }
 
   /**
-   * Creates a new personal-inventory item.
-   *
-   * <p>Validation errors render the list view inline (no redirect) — pushing the BindingResult into
-   * a FlashAttribute would crash Spring Session's Jackson serialization because {@code
-   * BeanPropertyBindingResult} holds a back-reference to its model map (a self-referencing cycle
-   * that exceeds Jackson's 500-deep nesting cap).
+   * Creates a personal-inventory item; validation errors re-render the list view inline instead of
+   * redirecting.
    *
    * @param form form-bound DTO
    * @param bindingResult validation errors carrier
-   * @param model Thymeleaf model used for inline re-rendering on validation failure
+   * @param model model used for inline re-rendering on validation failure
    * @param redirectAttributes flash attributes carrier
-   * @return inline {@code personal-inventory} view on validation failure, otherwise redirect
+   * @return the inline {@code personal-inventory} view on validation failure, otherwise a redirect
    */
   @NotNull
   @PostMapping("/add")
@@ -166,15 +159,15 @@ public class PersonalInventoryPageController {
   }
 
   /**
-   * Updates an existing personal-inventory item. Same self-referencing-BindingResult workaround as
-   * {@link #add}. A 409 surfaces as the dedicated optimistic-lock toast via {@link #classifyError}.
+   * Updates a personal-inventory item; validation errors re-render inline, and a 409 becomes the
+   * optimistic-lock toast via {@link #classifyError}.
    *
    * @param id inventory item id
    * @param form form-bound DTO
    * @param bindingResult validation errors carrier
-   * @param model Thymeleaf model used for inline re-rendering on validation failure
+   * @param model model used for inline re-rendering on validation failure
    * @param redirectAttributes flash attributes carrier
-   * @return inline {@code personal-inventory} view on validation failure, otherwise redirect
+   * @return the inline {@code personal-inventory} view on validation failure, otherwise a redirect
    */
   @NotNull
   @PostMapping("/{id}/update")
@@ -233,14 +226,8 @@ public class PersonalInventoryPageController {
   }
 
   /**
-   * Header-gated AJAX twin of {@link #add}: creates an item and returns {@code 204} so {@code
-   * personal-inventory.html} re-renders the {@code #pi-results} list fragment via {@code GET
-   * /personal-inventory?fragment=results} instead of the classic POST→redirect reload. The twin is
-   * selected only for an {@code X-Requested-With=XMLHttpRequest} JSON request, so the classic
-   * {@code @ModelAttribute} handler stays the no-JS fallback. The modal's HTML5 {@code required}
-   * and the location typeahead guard the inputs client-side; an empty required field still yields a
-   * {@code 422} so a crafted request cannot slip past, and a backend rejection is relayed as {@code
-   * problem+json}.
+   * AJAX twin of {@link #add}, selected by {@code X-Requested-With=XMLHttpRequest}: creates an item
+   * from JSON so the page can re-render its list fragment in place.
    *
    * @param request the item payload submitted as JSON
    * @return {@code 204} on success, {@code 422} on a missing required field, or the relayed backend
@@ -263,13 +250,11 @@ public class PersonalInventoryPageController {
   }
 
   /**
-   * Header-gated AJAX twin of {@link #update}: updates an item and returns {@code 204} so the page
-   * re-renders the {@code #pi-results} list fragment in place. The optimistic-lock {@code version}
-   * travels in the JSON payload; a concurrent edit surfaces as a {@code 409} {@code problem+json}
-   * carrying {@code OPTIMISTIC_LOCK}, which the client turns into the sanctioned reload-confirm.
+   * AJAX twin of {@link #update}: updates an item from JSON; a concurrent edit returns a {@code
+   * 409} carrying {@code OPTIMISTIC_LOCK}.
    *
    * @param id inventory item id
-   * @param request the item payload submitted as JSON (carries the last-seen {@code version})
+   * @param request the item payload including the last-seen {@code version}
    * @return {@code 204} on success, {@code 422} on a missing required field, or the relayed backend
    *     {@code problem+json}
    */
@@ -297,9 +282,8 @@ public class PersonalInventoryPageController {
   }
 
   /**
-   * Header-gated AJAX twin of {@link #delete}: deletes an item and returns {@code 204} so the page
-   * re-renders the {@code #pi-results} list fragment in place. A backend failure is relayed as
-   * {@code problem+json}.
+   * AJAX twin of {@link #delete}: deletes an item so the page can re-render its list fragment in
+   * place.
    *
    * @param id inventory item id
    * @return {@code 204} on success, or the relayed backend {@code problem+json}
@@ -317,12 +301,11 @@ public class PersonalInventoryPageController {
   }
 
   /**
-   * Mirrors the {@code PersonalInventoryForm} bean constraints for the JSON create twin: name must
-   * be present, a location (UEX id + type) must be chosen via the typeahead and the quantity must
-   * be at least one.
+   * Validates the JSON create payload like the {@code PersonalInventoryForm} constraints: name,
+   * location id and type present, quantity at least one.
    *
    * @param request the create payload to validate
-   * @return {@code true} when any required field is missing or out of range
+   * @return {@code true} when a required field is missing or out of range
    */
   private static boolean isInvalidCreate(PersonalInventoryItemCreateRequest request) {
     return request == null

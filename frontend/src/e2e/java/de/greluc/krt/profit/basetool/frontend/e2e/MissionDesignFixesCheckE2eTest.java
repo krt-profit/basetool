@@ -32,12 +32,11 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
- * Ad-hoc verification harness for the owner-review design fixes on the mission detail page against
- * an ALREADY RUNNING local test stack ({@code E2E_BASE_URL} env; self-skipping without {@code
- * MISSION_FIX_CHECK=true}; mission id via {@code MISSION_ID}). Uses a half-4K viewport (1880px) to
- * reproduce the reported clipping: probes the removed Wirtschaft jump card, the crew-board hint
- * readability, the payout-table fit, the Wirtschaft details background, and the visibility of the
- * "Jetzt" buttons. Not part of CI.
+ * Ad-hoc harness that checks the mission detail page's design fixes at an 1880px viewport against
+ * an already running local stack; not part of CI.
+ *
+ * <p>Skipped unless {@code MISSION_FIX_CHECK=true}; reads {@code E2E_BASE_URL} and {@code
+ * MISSION_ID}.
  */
 @Tag("e2e")
 class MissionDesignFixesCheckE2eTest {
@@ -46,11 +45,9 @@ class MissionDesignFixesCheckE2eTest {
   private static Browser browser;
 
   /**
-   * Skips the class unless {@code MISSION_FIX_CHECK=true}, then boots the headless browser of the
-   * configured engine ({@code -Pe2e.browser}) through {@link E2eSupport#launchBrowser}. The
-   * assumption runs <em>before</em> any browser launch: a CI matrix cell installs only its own
-   * engine, so an unconditional launch of a hard-coded one fails the whole class with a {@code
-   * DriverException} instead of skipping it.
+   * Skips the class unless {@code MISSION_FIX_CHECK=true}, then launches the configured browser
+   * engine through {@link E2eSupport#launchBrowser}. The skip check runs first, so a CI cell
+   * without that engine skips instead of failing.
    */
   @BeforeAll
   static void setUp() {

@@ -55,10 +55,8 @@ public interface TermsAcceptanceRepository extends JpaRepository<TermsAcceptance
   List<TermsAcceptance> findByUserIdOrderByAcceptedAtDesc(UUID userId);
 
   /**
-   * Counts how many distinct users have accepted a given wording. Drives the {@code
-   * basetool_terms_accepted_users} gauge, which is what makes a stalled rollout visible — after a
-   * terms change the count climbs from zero, and a flat line means people are being blocked rather
-   * than accepting.
+   * Counts the acceptances of a given wording; drives the {@code basetool_terms_accepted_users}
+   * gauge.
    *
    * @param termsVersion the content digest to count acceptances for
    * @return the number of acceptance rows carrying that version
@@ -66,21 +64,13 @@ public interface TermsAcceptanceRepository extends JpaRepository<TermsAcceptance
   long countByTermsVersion(String termsVersion);
 
   /**
-   * Backs the admin consent overview: every login-capable user together with the moment they
-   * accepted the given wording, or {@code null} where they have not (REQ-SEC-028).
+   * Backs the admin consent overview: every login-capable user with the moment they accepted the
+   * given wording, or {@code null} where they have not (REQ-SEC-028).
    *
-   * <p>The query is rooted in {@code User} rather than in this repository's own entity because the
-   * question is "which users are still missing", and only a left join from the user side can
-   * produce a row for someone who has no acceptance at all. It lives here rather than in {@code
-   * UserRepository} to keep the terms-consent reads in one place.
+   * <p>Only {@code inKeycloak = true} users are included, since a removed login can never accept.
    *
-   * <p>Restricted to {@code inKeycloak = true} on purpose: an account whose login was already
-   * removed from Keycloak cannot sign in and therefore cannot ever accept, so including it would
-   * park a permanently-pending row in the admin's worklist and make the overview unusable as one.
-   *
-   * @param termsVersion the wording to report against — normally the version currently in force
-   * @param filter {@code ALL}, {@code ACCEPTED} (only users who accepted) or {@code PENDING} (only
-   *     users who have not); passed as a string so no nullable-boolean parameter typing is involved
+   * @param termsVersion the wording to report against, normally the version currently in force
+   * @param filter {@code ALL}, {@code ACCEPTED} or {@code PENDING}
    * @param pageable page, size and sort; sort fields are whitelisted by the controller
    *     (REQ-API-005)
    * @return one page of consent rows

@@ -31,12 +31,11 @@ import org.mapstruct.MappingTarget;
 public interface RankRequirementMapper {
 
   /**
-   * Converts a {@link RankRequirement} into its {@link RankRequirementResponse} DTO, flattening the
-   * linked topic and category into id/name pairs so the client can render the requirement without
-   * follow-up fetches.
+   * Converts a {@link RankRequirement} into its {@link RankRequirementResponse}, flattening the
+   * linked topic and category into id/name pairs.
    *
-   * @param entity the managed requirement to convert
-   * @return the response DTO mirroring the entity's fields
+   * @param entity the requirement to convert
+   * @return the response DTO
    */
   @Mapping(target = "topicId", source = "topic.id")
   @Mapping(target = "topicName", source = "topic.name")

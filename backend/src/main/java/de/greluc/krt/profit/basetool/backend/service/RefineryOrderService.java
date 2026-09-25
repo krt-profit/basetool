@@ -70,18 +70,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * CRUD plus completion (store) for refinery orders.
+ * CRUD and completion (store) for refinery orders.
  *
- * <p>A refinery order tracks a player's ore-to-refined-good run at a specific terminal: input
- * materials and quantities, refining method, expected output, expenses and sale proceeds. The
- * service enforces "owner can edit / logistician can edit anyone" at the method boundary because
- * the rule is per-resource (the role-only check in {@code @PreAuthorize} can't see the order's
- * owner). The {@code store} operation finalizes a completed order by creating inventory items for
- * each output material and clearing the order's open status.
- *
- * <p>Location validation: refinery orders can only target locations that actually host a refinery.
- * The check runs at create + update time so a stale location pick surfaces as a 400 with a
- * localized message instead of silently producing an unreachable order.
+ * <p>Only the owner or a logistician may edit an order, checked per resource. Orders may only
+ * target locations that host a refinery.
  */
 @Service
 @RequiredArgsConstructor
@@ -118,20 +110,11 @@ public class RefineryOrderService {
   }
 
   /**
-   * Lists a target user's refinery orders for the cross-user oversight endpoint {@code GET
-   * /api/v1/refinery-orders/users/{userId}}, filtered to the caller's effective org-unit scope.
+   * Lists a target user's refinery orders within the caller's org-unit scope, for the cross-user
+   * oversight endpoint.
    *
-   * <p>Security (finding SEC-01): the per-user {@code @PreAuthorize} gate {@link
-   * OwnerScopeService#canViewUserRefineryOrders(UUID)} is only a coarse user-level pre-check — it
-   * passes when the caller shares <em>any one</em> of the (up to two, REQ-ORG-017) org units the
-   * target belongs to. The precise per-row filtering happens here via {@link
-   * RefineryOrderRepository#findByOwnerIdScoped} and the caller's {@link ScopePredicate}, so a
-   * logistician who shares only one of a multi-Staffel target's units never sees the target's
-   * orders stamped to the other, foreign unit. Refinery is a strict-staffel aggregate with no
-   * cross-squadron escape, mirroring {@link #getMissionRefineryOrdersScoped} (BAC-004). The
-   * self-service "my orders" list ({@code GET /my-orders}) stays owner-scoped and unfiltered via
-   * {@link #getMyRefineryOrders(UUID, List, Pageable)} — a user always sees all of their own orders
-   * (REQ-ORG-011 owner escape).
+   * <p>The {@code @PreAuthorize} gate only checks a shared org unit; the per-row scope filter here
+   * hides orders stamped to units the caller does not share.
    *
    * @param targetUserId the user whose orders to list; never {@code null}
    * @param pageable page request
@@ -149,13 +132,8 @@ public class RefineryOrderService {
   }
 
   /**
-   * Pools the yield of the caller's not-yet-completed refinery orders into one SCU total per
-   * (output material, quality) pair, for the optional refinery fold-in of the blueprint
-   * craftability calculation (#781). "Not yet completed or cancelled" maps to status {@code OPEN} +
-   * {@code IN_PROGRESS}; strictly owner-scoped to {@code userId}. The {@link
-   * RefineryGood#getOutputQuantity() outputQuantity} is tracked in units, so SCU commodities are
-   * converted (100 units = 1 SCU, see {@link #updateGoodOutputQuantity}) before pooling so the
-   * slices merge with the inventory slices.
+   * Sums the yield of the user's {@code OPEN} and {@code IN_PROGRESS} refinery orders into one SCU
+   * total per (output material, quality), for the craftability calculation.
    *
    * @param userId the owning user; never {@code null}
    * @return one slice per (output material, quality), with the summed SCU yield; never {@code null}
@@ -196,11 +174,8 @@ public class RefineryOrderService {
   }
 
   /**
-   * Converts a refinery good's {@code outputQuantity} (tracked in units) into SCU. For SCU
-   * commodities 100 units make 1 SCU (the inverse of the ×100 in {@link
-   * #updateGoodOutputQuantity}); non-SCU materials are returned unchanged. Mirrors the refinery
-   * store path so the craftability fold-in measures the same SCU the user would receive on
-   * completion.
+   * Converts a refinery good's output quantity from units to SCU (100 units per SCU for SCU
+   * commodities; others unchanged).
    *
    * @param outputQuantityUnits the good's output quantity in units
    * @param quantityType the output material's quantity type (may be {@code null})
@@ -214,17 +189,7 @@ public class RefineryOrderService {
   }
 
   /**
-   * Lists the refinery orders linked to a mission that fall within the caller's org-unit scope.
-   * Used by the mission detail page's refinery roll-up for logistician+ viewers. Refinery is a
-   * strict-staffel aggregate, so the result is filtered through the caller's {@link ScopePredicate}
-   * (admin all-scope sees every order; an admin pinned to a squadron and a non-admin logistician
-   * see only their own org units' orders) by {@link RefineryOrderRepository#findByMissionIdScoped}.
-   *
-   * <p>Without this scope filter (finding BAC-004) a logistician of one squadron could read another
-   * squadron's refinery financials by enumerating that squadron's public missions: Mission's
-   * cross-staffel visibility escape ({@code is_internal = false}) exposes the mission id, but it
-   * does NOT extend to the refinery orders attached to it - those stay private to their owning
-   * squadron.
+   * Lists the refinery orders linked to a mission within the caller's org-unit scope.
    *
    * @param missionId mission id
    * @return the in-scope orders linked to the mission
@@ -236,8 +201,7 @@ public class RefineryOrderService {
   }
 
   /**
-   * Lists the orders that BOTH belong to the given mission AND are owned by the given user. Used by
-   * the participant-scoped mission detail view so participants only see their own refinery lines.
+   * Lists the orders of the given mission that are owned by the given user.
    *
    * @param missionId mission id
    * @param userId owner id
@@ -294,29 +258,20 @@ public class RefineryOrderService {
   }
 
   /**
-   * Persists a new refinery order owned by the given user. Resolves and validates every shallow
-   * reference in the payload (location, mission, refining method, materials in goods) and rejects
-   * with 404 / 400 if any id is missing or unknown. The location must host a refinery — picking a
-   * regular city is rejected explicitly.
+   * Persists a new refinery order owned by the given user, validating every referenced id and that
+   * the location hosts a refinery.
    *
    * @param userId owner id
    * @param order transient entity with shallow id-only references
-   * @param owningOrgUnitId optional R5.d picker output: the {@link
-   *     de.greluc.krt.profit.basetool.backend.model.OrgUnit} on whose stock the new order should
-   *     land. When {@code null}, the service auto-stamps the owner's single org-unit membership, or
-   *     — if the owner has no membership at all — leaves the order ownerless ({@code owningOrgUnit
-   *     == null}, visible only to the owner). When non-null, must point at an org unit the order
-   *     owner is a member of — {@link OwnerScopeService#resolveOrgUnitForPickerOutputNullable}
-   *     performs the validation and rejects unknown / foreign selections with {@link
-   *     de.greluc.krt.profit.basetool.backend.exception.BadRequestException}.
+   * @param owningOrgUnitId the org unit to stamp, which must be one of the owner's memberships;
+   *     when {@code null}, the owner's single membership or none
    * @return the persisted order
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when any referenced
    *     id is unknown
-   * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when the chosen
-   *     location does not host a refinery, or the picker output is not a valid membership of the
-   *     order owner
-   * @throws MissionParticipantRequiredException when a mission is given that the order owner does
-   *     not take part in (REQ-SEC-042)
+   * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when the location
+   *     hosts no refinery or the org unit is not a membership of the owner
+   * @throws MissionParticipantRequiredException when the owner does not take part in the given
+   *     mission (REQ-SEC-042)
    */
   @Transactional
   public RefineryOrder createRefineryOrder(
@@ -381,21 +336,11 @@ public class RefineryOrderService {
   }
 
   /**
-   * Loads the mission a refinery order is being linked to and checks that the order's owner takes
-   * part in it (REQ-SEC-042).
-   *
-   * <p>The link is money: {@code OperationPayoutCalculator} adds every linked order's result to the
-   * operation's payout pool and credits its expenses to the order's owner. Checking only that the
-   * mission exists let any member attach an order to any mission whose id they knew — another
-   * Staffel's included, since non-internal missions are listed across Staffeln — and move that
-   * operation's pool. The owner must therefore hold a participant row on the mission; there is no
-   * exception for a caller who manages the mission (owner decision, 2026-09-22). The check is on
-   * the order's <em>owner</em>, not the caller, so a logistician booking on someone's behalf is
-   * held to the same rule.
+   * Loads the mission a refinery order is linked to and checks that the order's owner is a
+   * participant of it (REQ-SEC-042).
    *
    * @param missionId the requested mission
-   * @param owner the order's owner; {@code null} only for an order that somehow lost its owner,
-   *     which can never be linked
+   * @param owner the order's owner; {@code null} can never be linked
    * @return the managed mission
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no mission has
    *     that id
@@ -424,16 +369,13 @@ public class RefineryOrderService {
   }
 
   /**
-   * Updates an existing refinery order. Enforces "must be owner OR logistician" explicitly (the
-   * role-only {@code @PreAuthorize} cannot see per-resource ownership). Validates the
-   * optimistic-lock version and the same shallow-reference resolution as {@link
-   * #createRefineryOrder}. The goods list is replaced wholesale; the old rows are orphan-removed.
+   * Updates a refinery order, replacing its goods; only the owner or a logistician may do so.
    *
    * @throws AccessDeniedException when the caller is neither owner nor logistician
-   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the supplied
-   *     version is stale
-   * @throws MissionParticipantRequiredException when the mission is changed to one the order owner
-   *     does not take part in (REQ-SEC-042); an unchanged link is not re-checked
+   * @throws org.springframework.orm.ObjectOptimisticLockingFailureException when the version is
+   *     stale
+   * @throws MissionParticipantRequiredException when the mission is changed to one the owner does
+   *     not take part in (REQ-SEC-042)
    */
   @Transactional
   public RefineryOrder updateRefineryOrder(
@@ -516,15 +458,12 @@ public class RefineryOrderService {
   }
 
   /**
-   * Resolves and validates one refinery good's material references against the catalog and wires
-   * its back-reference to the owning order, leaving collection membership to the caller. Shared
-   * verbatim by the create and update paths, which differ only in whether the good is already in
-   * the order's set (create) or the set is cleared and each good re-added (update). The input
-   * material must resolve and be {@code RAW} (or a manual raw material); the output material either
-   * matches the input's refined material or is derived from it.
+   * Resolves and validates a good's input and output materials and sets its order back-reference.
    *
-   * @param good the transient good carrying id-only input/output material references; resolved and
-   *     mutated in place
+   * <p>The input material must be {@code RAW} or a manual raw material; the output must match or
+   * derive from its refined material.
+   *
+   * @param good the transient good with id-only material references; mutated in place
    * @param order the owning order wired as the good's back-reference
    */
   private void resolveGood(RefineryGood good, RefineryOrder order) {
@@ -600,24 +539,10 @@ public class RefineryOrderService {
   }
 
   /**
-   * Completes a refinery order by creating inventory items for each output material.
+   * Completes a refinery order by booking each output material as an inventory row.
    *
-   * <p>The refinery rounding mode setting controls how fractional output quantities are rounded
-   * (see {@code SystemSettingService}). Each output material becomes one inventory row owned by the
-   * configured recipient (typically the order's owner, optionally redirected to a different user /
-   * job order from the store form).
-   *
-   * <p>A row the store form marks {@code personal} (REQ-INV-035) lands as the receiver's private
-   * stock and, per the standing "personal stock carries no allocation" invariant ({@code
-   * InventoryItemService#assertNotPersonal}), receives <strong>no</strong> earmark: the per-item
-   * job order is a contradictory user choice and is rejected with a {@code BadRequestException},
-   * while the refinery order's automatic mission earmark is simply not applied (marking the batch
-   * personal is exactly the act of taking it out of the mission pool).
-   *
-   * <p>A non-logistician may only book the output onto <strong>themselves</strong>: the per-item
-   * {@code userId} chooses the receiving stock owner, so it is gated separately from the
-   * order-ownership check (REQ-SEC-039), mirroring {@code
-   * InventoryItemService#createInventoryItem}.
+   * <p>Rows marked {@code personal} get no earmark (REQ-INV-035); a non-logistician may only book
+   * onto themselves (REQ-SEC-039).
    *
    * @throws AccessDeniedException when the caller is neither owner nor logistician, or when a
    *     non-logistician names another user as an item's receiving stock owner
@@ -748,13 +673,8 @@ public class RefineryOrderService {
   }
 
   /**
-   * Composes the audit subject label for a refinery order. The order has no name/number field, so
-   * the deletion-proof identity snapshot is the <strong>non-personal</strong> composite {@code
-   * <method> · <location>}. REQ-AUDIT-001 limits {@code subjectLabel} to a non-personal display
-   * label (no person names) — the order owner is captured separately as the audit row's target user
-   * ({@code targetUserId}), so embedding the owner's handle here would be redundant and would
-   * durably retain a third party's name in the append-only trail. Started-at and other facts go
-   * into the event details.
+   * Builds the non-personal audit subject label {@code <method> · <location>} for a refinery order
+   * (REQ-AUDIT-001).
    *
    * @param order the refinery order
    * @return the {@code <method> · <location>} label
@@ -785,11 +705,8 @@ public class RefineryOrderService {
   }
 
   /**
-   * Writes the user's final storage amount back into the associated {@link
-   * de.greluc.krt.profit.basetool.backend.model.RefineryGood}. This persists the manual correction
-   * of the output amount in the refinery order itself (e.g. when the actual refinery output
-   * deviates from the forecast). For SCU materials the SCU input is converted back into units
-   * (x100) so the {@code outputQuantity} field stays uniformly tracked in units.
+   * Writes the user's final stored amount back into the matching {@link
+   * de.greluc.krt.profit.basetool.backend.model.RefineryGood}, converting SCU back to units (×100).
    */
   private void updateGoodOutputQuantity(RefineryOrder order, RefineryOrderStoreItemDto itemDto) {
     if (order.getGoods() == null
@@ -846,17 +763,8 @@ public class RefineryOrderService {
   }
 
   /**
-   * Returns a {@code materialId → yieldBonusPercent} map for the refinery sitting at {@code
-   * location}. The value semantics come straight from UEX: a positive integer is a bonus, a
-   * negative integer is a malus, both expressed in percent (5 = +5%, -3 = -3%). An empty map means
-   * "no UEX yield data is known for this location" (either the location was never picked, or the
-   * UEX universe sync has not yet matched the location's city/space-station name to a terminal that
-   * has yield rows).
-   *
-   * <p>Used by the controller to enrich {@code RefineryGoodDto.yieldBonusPercent} on outbound
-   * payloads and to feed the detail page's reactive bonus display in the form. Same lookup runs for
-   * every order detail render and every order write, so the underlying query is bounded by the
-   * number of yield rows at one terminal (small).
+   * Returns the UEX yield bonus in percent per material for the refinery at {@code location};
+   * negative values are a malus, and an empty map means no known yield data.
    *
    * @param location the order's chosen location, may be {@code null}
    * @return map keyed by material UUID, never {@code null}
@@ -883,11 +791,9 @@ public class RefineryOrderService {
   }
 
   /**
-   * Convenience overload that resolves {@code locationId} via {@link LocationRepository} and
-   * delegates to {@link #getYieldBonusByMaterialForLocation(Location)}. Returns an empty map when
-   * the id is {@code null} or unknown — the caller (typically the AJAX endpoint that refreshes the
-   * detail page's yield badges after the user picks a new refinery) treats "unknown location" the
-   * same as "no yield data", so a 404 would only force redundant error handling on the client.
+   * Resolves {@code locationId} and delegates to {@link
+   * #getYieldBonusByMaterialForLocation(Location)}; a {@code null} or unknown id yields an empty
+   * map.
    *
    * @param locationId target location id; may be {@code null}
    * @return per-material yield bonus map for the location, never {@code null}
@@ -903,25 +809,11 @@ public class RefineryOrderService {
   }
 
   /**
-   * Rejects a chosen location that hosts no refinery, keyed on the derived {@code
-   * hasRefineryTerminal} flag — exactly the signal {@link
-   * LocationRepository#findLocationsWithRefinery()} builds the picker from, so the gate accepts
-   * precisely what the form offered (REQ-REFINERY-020).
+   * Rejects a location whose derived {@code hasRefineryTerminal} flag is false, the same signal the
+   * picker uses (REQ-REFINERY-020).
    *
-   * <p>Deliberately NOT keyed on UEX's parent-level {@code hasRefinery} claim, which this check
-   * used to read: that claim both misses real refineries (MIC-L5, ARC-L4, Patch City) and invents
-   * ones that do not exist (four People's Service Stations). The flag is recomputed from the live
-   * {@code type = 'refinery'} terminals by {@code
-   * UexUniverseSyncService.reconcileRefineryTerminalFlags()}.
-   *
-   * <p>Reads the parent through the location's association rather than issuing a query, and that is
-   * load bearing: a query here would auto-flush a transaction that is midway through rewriting the
-   * order and its goods, so the goods {@code clear()} + re-add would race its own freshly written
-   * rows and fail with {@code ObjectOptimisticLockingFailureException}. Since BE-PERF-11
-   * (2026-09-23) {@code city} / {@code spaceStation} are lazy, so the first read may initialise a
-   * proxy; that is an entity load by id, for which Hibernate never auto-flushes (only JPQL /
-   * criteria / native queries do), and both callers run it straight after loading the location,
-   * before the goods are touched.
+   * <p>Reads the parent through the association, never a query, so it cannot trigger an auto-flush
+   * mid-update.
    *
    * @param location the order's chosen location
    * @throws IllegalArgumentException when the location hosts no live refinery terminal

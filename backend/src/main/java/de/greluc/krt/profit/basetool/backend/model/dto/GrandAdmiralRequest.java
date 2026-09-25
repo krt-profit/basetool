@@ -23,16 +23,11 @@ import jakarta.validation.constraints.Size;
 import java.util.UUID;
 
 /**
- * Inbound payload for {@code PUT /api/v1/org-hierarchy/organisationsleitung/{id}/grand-admiral}
- * (REQ-ORG-021). A Grand Admiral is held by <b>either</b> a Basetool account <b>or</b> a free-text
- * name for a member without one — mutually exclusive, matching the chart's holder rule
- * (REQ-ORG-020). Supply exactly one: {@code userId} designates an account Grand Admiral (with
- * OL-member rights, appointed under Leitung), {@code displayName} sets a free-text one (grants
- * nothing, set in the chart editor). The controller branches on which is present; the service
- * rejects a blank {@code displayName}.
+ * Payload for designating an Organisationsleitung's Grand Admiral (REQ-ORG-021): exactly one of an
+ * account or a free-text name.
  *
- * @param userId the account to designate as Grand Admiral, or {@code null} for a free-text holder.
- * @param displayName the free-text holder name, or {@code null} when designating an account.
- *     Bounded to the shared 120-char holder-name length.
+ * @param userId the account to designate, or {@code null} for a free-text holder
+ * @param displayName the free-text holder name, or {@code null} when designating an account; at
+ *     most 120 chars
  */
 public record GrandAdmiralRequest(UUID userId, @Size(max = 120) String displayName) {}

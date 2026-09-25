@@ -35,21 +35,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * End-to-end coverage for live multi-user mission sync (REQ-FE-010 / ADR-0031): a change one viewer
- * makes to a mission must appear on every other open mission-detail view without a manual reload.
+ * Verifies live multi-user mission sync (REQ-FE-010, ADR-0031): a crew change in one browser
+ * context appears in another open mission-detail view without a reload.
  *
- * <p>The relay broadcasts a {@code {"type":"changed","sections":[…]}} frame over the existing
- * presence WebSocket to every <em>other</em> socket on the mission and excludes the originating
- * <em>session</em> (not the user). This test therefore opens the same mission in <b>two browser
- * contexts</b> authenticated as the same test user — two distinct WebSocket sessions, exactly what
- * the relay fans out between — which exercises the full path (mutation in context A → relay →
- * context B re-fetches the crew fragment in place → the out-of-fragment header counts patch)
- * without needing a second seeded user. A genuine second user would hit the identical handler
- * branch.
- *
- * <p>A mission is staffel-scoped, so the user is assigned to the IRIDIUM Squadron first (mirrors
- * {@link MissionParticipantCountE2eTest}). The distinctive guest name resolves to no realm user, so
- * the add stays on the guest path.
+ * <p>Two contexts of the same user are two WebSocket sessions, which is what the relay fans out
+ * between. The user is assigned to the IRIDIUM Squadron first; the guest name keeps the add on the
+ * guest path.
  */
 @Tag("e2e")
 class MissionLiveSyncE2eTest {
@@ -157,11 +148,8 @@ class MissionLiveSyncE2eTest {
   }
 
   /**
-   * Same two-context setup, but for the Ziele objectives editor: context A adds an objective on the
-   * Verwaltung tab; context B — a passive viewer that never reloads — must gain the new objective
-   * row in its (backgrounded) editor IN PLACE. This pins the {@code objectives} section key across
-   * the full path (broadcast → relay whitelist → receiver container map): the key was once dropped
-   * at the relay AND missing from the receiver, so peers' Ziele stayed stale until a manual reload
+   * Verifies that an objective added on the Verwaltung tab in one context appears in place in
+   * another context's Ziele editor, pinning the {@code objectives} section key end to end
    * (REQ-FE-010).
    */
   @Test

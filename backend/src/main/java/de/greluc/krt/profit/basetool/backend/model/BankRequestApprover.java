@@ -21,13 +21,9 @@ package de.greluc.krt.profit.basetool.backend.model;
 
 /**
  * The class of approver a flagged {@link BankBookingRequest} needs before a bank employee may
- * confirm it (REQ-BANK-041/-046). Snapshotted onto the request as {@code required_approver} (V203)
- * only when {@link BankBookingRequest#isRequiresOwnerApproval()} is set; the concrete
- * amount-band&rarr;approver resolution and the mapping of each constant to a set of users lives
- * inside {@code OrgUnitBankAccessService} so the bank stays org-unit-blind (REQ-BANK-008).
- *
- * <p>Persisted as {@code VARCHAR(32)} via {@code @Enumerated(STRING)}; the enum is the source of
- * truth (no DB CHECK), mirroring the V193 owner-approval columns.
+ * confirm it (REQ-BANK-046). Set only when {@link BankBookingRequest#isRequiresOwnerApproval()} is
+ * true; resolving it to users happens in {@code OrgUnitBankAccessService} so the bank stays
+ * org-unit-blind.
  */
 public enum BankRequestApprover {
 
@@ -39,11 +35,8 @@ public enum BankRequestApprover {
   RESPONSIBLE_HOLDER,
 
   /**
-   * The bank management (Bankleitung, any holder of the {@code BANK_MANAGEMENT} role) approves —
-   * the middle band of the KRT-account amount ladder (REQ-BANK-047): an amount above the
-   * bank-employee ceiling {@code T1} and at or below the area-lead ceiling {@code T2}. Supersedes
-   * the original ADR-0066 routing to the Bereichsleiter Profit (ADR-0109): the Bankleitung, not the
-   * Profit Bereichsleiter, is the intended middle-band approver.
+   * The bank management (holders of the {@code BANK_MANAGEMENT} role) approves: the middle band of
+   * the KRT-account amount ladder, above {@code T1} and at or below {@code T2} (REQ-BANK-047).
    */
   BANK_MANAGEMENT,
 

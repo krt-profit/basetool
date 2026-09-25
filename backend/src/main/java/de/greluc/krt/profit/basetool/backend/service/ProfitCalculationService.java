@@ -41,14 +41,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Computes the best per-material buy/sell margin given a chosen ship and an optional star-system
- * filter.
- *
- * <p>Drives the profit-calculation page: for each material, finds the lowest auto-load buy price
- * and the highest auto-load sell price across the (filtered) terminal set, then derives the per-SCU
- * profit, the margin percent, and the full-load profit using the ship's SCU capacity. "Hull
- * C"-class ships only get terminals with a loading dock — the in-universe rule that a Hull C cannot
- * land planet-side.
+ * Computes the best per-material buy/sell margin for a chosen ship and optional star-system filter,
+ * from the lowest auto-load buy and highest auto-load sell price. "Hull C"-class ships only get
+ * terminals with a loading dock.
  */
 @Slf4j
 @Service
@@ -60,11 +55,8 @@ public class ProfitCalculationService {
   private final ShipTypeRepository shipTypeRepository;
 
   /**
-   * Calculates the profit table for one ship across the chosen star systems.
-   *
-   * <p>Materials without both a positive buy and a positive sell price are dropped. Hull-C
-   * filtering happens in memory after the price fetch so the SQL stays general-purpose. The result
-   * is sorted alphabetically by material name so the on-screen order is stable across reloads.
+   * Calculates the profit table for one ship across the chosen star systems. Materials without both
+   * a positive buy and sell price are dropped.
    *
    * @param shipId chosen ship type's id; supplies the SCU capacity
    * @param starSystemNames optional star-system filter; null/empty means "all auto-load terminals"

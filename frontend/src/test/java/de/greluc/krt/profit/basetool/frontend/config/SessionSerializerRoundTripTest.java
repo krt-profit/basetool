@@ -39,30 +39,10 @@ import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.validation.BeanPropertyBindingResult;
 
 /**
- * The session serializer must be able to read back what it just wrote.
+ * Verifies that the session serializer reads back the values Spring Session actually stores,
+ * including the bare scalar required keys.
  *
- * <p><strong>The production incident this pins (2026-09-02).</strong> Every request carrying a
- * session answered HTTP 500 with {@code SerializationException: … missing type id property
- * '@class'}, followed by Spring Session's {@code IllegalStateException: creationTime key must not
- * be null}. The blast radius was everything behind a login, and the symptom was a blank page rather
- * than an error page, because the error view itself reads the CSRF token out of the same unreadable
- * session.
- *
- * <p><strong>These cases pass, and that is the point.</strong> An early theory during the incident
- * was that the required keys were the broken ones: {@code creationTime} is a {@code Long}, the
- * default typing {@code SecurityJacksonModules} activates is {@code NON_FINAL}, and a final class
- * therefore gets no {@code @class} property. Measured against the real jars, that theory is
- * <em>wrong</em> — a bare JSON scalar is read back cleanly, because the reader does not demand a
- * type id it never had. Only {@code sessionAttr:*} values that are JSON <em>objects</em> can fail,
- * which is why {@link FaultTolerantSessionSerializerTest} carries the failing shape and this class
- * carries the ones that must never start failing.
- *
- * <p>Kept rather than deleted: a test that pins a disproved theory's subject is what stops the
- * theory being re-invented, and a regression here would mean a member cannot be signed in at all
- * rather than merely signed out.
- *
- * <p>Each case below is a value Spring Session actually stores in the session hash, so a failure
- * here is a failure of the real thing rather than of a contrived one.
+ * <p>The failing shapes are covered by {@link FaultTolerantSessionSerializerTest}.
  */
 class SessionSerializerRoundTripTest {
 
@@ -103,12 +83,10 @@ class SessionSerializerRoundTripTest {
   }
 
   /**
-   * A record, i.e. an implicitly final type whose JSON form is an object — one of the application's
-   * own, because since REQ-SEC-067 a record declared in this test package would be refused by the
-   * session type allow-list for its package rather than for being final, and the cases below would
-   * then pass for the wrong reason.
+   * Builds an application record, a final type whose JSON form is an object, that the session type
+   * allow-list admits.
    *
-   * @return a refinery-import suggestion, a record the import flash really carries.
+   * @return a refinery-import suggestion as carried by the import flash
    */
   private static ImportSuggestionDto probeRecord() {
     return new ImportSuggestionDto(

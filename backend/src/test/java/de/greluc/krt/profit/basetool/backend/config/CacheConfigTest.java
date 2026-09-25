@@ -36,11 +36,8 @@ import org.springframework.cache.caffeine.CaffeineCacheManager;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * Structural test for {@link CacheConfig}. Catches the common refactor mistake of declaring a
- * {@code public static final String FOO_CACHE = "foo"} constant on the config class but forgetting
- * to add the name to the {@code setCacheNames(...)} whitelist — the {@code @Cacheable} annotation
- * that references the constant would then throw {@code IllegalStateException: Cannot find cache
- * named 'foo'} only at runtime on the first request.
+ * Structural test for {@link CacheConfig}: every cache-name constant declared on the class must be
+ * registered in its {@code setCacheNames(...)} whitelist, or {@code @Cacheable} fails at runtime.
  */
 @SpringBootTest
 @ActiveProfiles("test")

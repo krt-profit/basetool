@@ -55,10 +55,8 @@ public class DeprecationInterceptor implements HandlerInterceptor {
           .withZone(ZoneOffset.UTC);
 
   /**
-   * Handler methods whose {@code @ApiDeprecation.sunset} value failed to parse, so the
-   * malformed-date WARN is emitted at most once per handler instead of on every request to that
-   * endpoint. {@code sunset()} is a compile-time constant, so a bad value would otherwise re-warn
-   * on every call.
+   * Handler methods whose {@code @ApiDeprecation.sunset} failed to parse, so the malformed-date
+   * WARN is emitted at most once per handler.
    */
   private final Set<Method> warnedBadSunset = ConcurrentHashMap.newKeySet();
 

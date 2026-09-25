@@ -26,24 +26,13 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Data transfer record carrying Operation Create payload.
+ * Data transfer record carrying a new operation.
  *
- * <p>R5.d.e added the trailing {@link #owningOrgUnitId} picker output. For an authenticated caller
- * the service layer routes the stamp through {@code
- * OwnerScopeService.resolveOrgUnitForPickerOutputNullable} — <b>all four</b> org-unit kinds
- * (Staffel, Spezialkommando, Bereich, Organisationsleitung) are accepted; the strict, Staffel-only
- * {@code resolveSquadronForPickerOutput} is not on this path. A non-null pick is honoured when it
- * is one of the caller's DIRECT memberships or an org unit the caller may edit ({@code
- * AccessGateService.canEditOrgUnit}, cascade-aware — epic #692 Phase 4 / REQ-ORG-016), and rejected
- * with 400 otherwise. A {@code null} pick auto-stamps a single-membership caller, honours an
- * active-context pin (REQ-ORG-017), 400s a multi-membership caller with neither, and yields an
- * <em>ownerless leadership operation</em> ({@code owningOrgUnit == null}, V145 / ADR-0005) for a
- * membershipless caller.
- *
- * <p>The legacy "stamp from {@code OwnerScopeService.currentOrgUnit()}" path is <b>not</b> keyed on
- * this field being {@code null} — it applies only when there is no authenticated caller at all (an
- * admin in "alle Staffeln" mode, an anonymous form submit), where a picker output cannot be
- * membership-validated and is therefore ignored. See {@code OperationService#createOperation}.
+ * <p>For an authenticated caller, a non-null {@link #owningOrgUnitId} of any org-unit kind is
+ * accepted when it is a direct membership or an org unit the caller may edit, and rejected with 400
+ * otherwise. A {@code null} pick follows the picker rules (single membership, active-context pin,
+ * else 400) and yields an ownerless operation for a membershipless caller. Without an authenticated
+ * caller the field is ignored and the current org unit is stamped.
  */
 public record OperationCreateDto(
     @NotBlank String name,

@@ -1,38 +1,3 @@
-/*
- * Mission detail presence/awareness client (Stufe 3).
- *
- * Rides the shared tool-wide live-sync socket (`/ws/sync`, krt-live-sync.js, REQ-FE-015 / ADR-0094):
- * this is a thin adapter that subscribes to the mission's `mission:{id}` topic room and, while the
- * user is editing a section, it:
- *  - sends {type:"focus", sectionKey} when the user starts editing a section
- *  - sends {type:"heartbeat", sectionKey} every HEARTBEAT_MS while focused
- *  - sends {type:"blur", sectionKey} when focus leaves the section (or tab is hidden)
- *  - renders a small KRT-styled pulse indicator on each .col-header[data-panel-key]
- *    showing who else is currently editing that section (driven by inbound {type:"presence"} frames).
- *
- * It also carries the live multi-user sync signal: sendChanged(sections) tells peers the local
- * user just changed those mission sections, and an inbound {type:"changed",sections:[...]} frame is
- * re-dispatched as a 'krt:mission-changed' DOM event (a reconnect re-subscribe fires
- * 'krt:mission-resync') which mission-detail.html turns into in-place fragment re-fetches. Only
- * section keys travel over the socket — never mission data.
- *
- * Awareness only — no locks, no save blocking. The socket lifecycle (connect, reconnect with
- * full-jitter backoff, per-user cap handling) is owned by the shared krt-live-sync.js transport;
- * this adapter only subscribes/publishes on it. Since #1236 there is no bespoke
- * `/ws/missions/{id}/presence` socket — the one-release legacy alias was removed.
- *
- * All user-visible strings are read from window.MISSION_PRESENCE_I18N, populated
- * by mission-detail.html from Thymeleaf messages.
- *
- * Heartbeat cadence (L-7 from the performance audit): raised from 10 s to 60 s.
- * The backend's presence ENTRY_TTL was raised from 30 s to 120 s in lockstep, so two missed beats
- * of slack remain before a stale editor gets reaped from a peer's indicator. The trade-off: peers
- * now see "user stopped editing" up to ~120 s after the editor navigates away (was ~30 s before),
- * but the WebSocket frame traffic per active editor drops by 6×. The presence panel never claims
- * real-time precision; this script is bundled only by mission-detail.html so the cost only matters
- * there. If the UX feedback is that the indicator lingers too long, drop both values together —
- * never one without the other, or the indicator will flicker / drop editors prematurely.
- */
 (function () {
     'use strict';
 
@@ -46,11 +11,7 @@
 
     function MissionPresence(missionId, currentUserId) {
         this.missionId = missionId;
-        // Canonical live-sync topic room for this mission — the same string the acting client's
-        // broadcast, the server relay and every peer's receiver key on.
         this.topic = 'mission:' + missionId;
-        // Stable identifier of the local user — used to filter the local user out of the
-        // indicator (we don't want to see "you are editing this section").
         this.currentUserId = currentUserId || null;
         this.subscription = null;
         this.heartbeatTimer = null;
@@ -71,26 +32,15 @@
         document.addEventListener('visibilitychange', this._onVisibility);
         const self = this;
         this.subscription = window.krtLiveSync.subscribe(this.topic, {
-            // Fired on every subscribe ack (first connect and each reconnect re-subscribe). If the
-            // user was already focused on a section, re-announce that focus so the indicator on
-            // other clients (re)appears — a presence frame sent before this ack is dropped by the
-            // server, so this is where a focus that raced the ack, or one held across a reconnect,
-            // is replayed.
             onSubscribed() {
                 if (self.activeSection) {
                     self._sendPresence('focus', self.activeSection);
                     self._ensureHeartbeat();
                 }
             },
-            // Fired only on a RE-subscribe after a dropped socket: 'changed' signals may have been
-            // missed while offline, so ask the page to resync every visible section. The initial
-            // subscribe is already fresh, so it never triggers a resync.
             onResync() {
                 document.dispatchEvent(new CustomEvent('krt:mission-resync'));
             },
-            // A peer mutated the mission. Hand the affected section keys to the page, which re-fetches
-            // those fragments in place (guarded against yanking a section the local user is actively
-            // editing). No mission data rides on the socket — only keys.
             onChanged(sections) {
                 document.dispatchEvent(
                     new CustomEvent('krt:mission-changed', {
@@ -98,7 +48,6 @@
                     }),
                 );
             },
-            // Inbound editor-presence snapshot for this room: render who else is editing which section.
             onPresence(sections) {
                 self.lastState = sections || {};
                 self._render();
@@ -111,7 +60,6 @@
         document.removeEventListener('focusout', this._onFocusOut);
         document.removeEventListener('visibilitychange', this._onVisibility);
         this._stopHeartbeat();
-        // Release the indicator on peers before we go, so we do not linger as an "editor".
         if (this.activeSection) {
             this._sendPresence('blur', this.activeSection);
             this.activeSection = null;
@@ -122,18 +70,12 @@
         this.subscription = null;
     };
 
-    // Sends an editor-presence control frame for this mission's room over the shared socket.
     MissionPresence.prototype._sendPresence = function (type, sectionKey) {
         if (window.krtLiveSync && typeof window.krtLiveSync.sendPresence === 'function') {
             window.krtLiveSync.sendPresence(this.topic, type, sectionKey);
         }
     };
 
-    // Announce to peers that the given mission sections were just changed by the local user, so
-    // their views re-fetch those fragments in place. Best-effort: if the socket is not open the
-    // shared transport buffers the signal until it reconnects (peers still catch up via the resync
-    // on their next reconnect, or a manual reload). Called from window.krtRefreshMissionSection in
-    // mission-detail.html via the write seam's broadcast closure.
     MissionPresence.prototype.sendChanged = function (sections) {
         if (
             Array.isArray(sections) &&
@@ -168,8 +110,6 @@
         if (!section || section === this.activeSection) {
             return;
         }
-        // Switching from one section to another: blur the old one first so the
-        // indicator on the other clients does not flash both sections active.
         if (this.activeSection) {
             this._sendPresence('blur', this.activeSection);
         }
@@ -182,8 +122,6 @@
         if (!this.activeSection) {
             return;
         }
-        // relatedTarget is the element gaining focus; if it's still inside the
-        // same section, this is an internal tab — do not blur.
         const next = ev.relatedTarget;
         if (next && this._sectionOf(next) === this.activeSection) {
             return;
@@ -195,8 +133,6 @@
 
     MissionPresence.prototype._onVisibility = function () {
         if (document.visibilityState === 'hidden' && this.activeSection) {
-            // Tab hidden — release the indicator so peers do not see us "editing"
-            // a section we have effectively stopped editing.
             this._sendPresence('blur', this.activeSection);
             this._stopHeartbeat();
         }

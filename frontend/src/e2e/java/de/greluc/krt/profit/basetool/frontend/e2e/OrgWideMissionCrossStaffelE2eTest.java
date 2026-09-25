@@ -33,23 +33,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Cross-Staffel mission visibility (UC-10): Staffel A owns one organisation-wide mission ({@code
- * is_internal=false}) and one internal mission. A member of Staffel B must see — and be able to
- * open — A's organisation-wide mission (the escape that enables cross-Staffel collaboration) but
- * must NOT see A's internal mission. This is the only cross-Staffel visibility path for missions
- * ({@code searchMissions}: {@code owning_org_unit.id IN (:memberOrgUnitIds) OR is_internal =
- * false}).
- *
- * <p><b>Renamed from {@code PublicMissionCrossStaffelE2eTest} with ADR-0159.</b> "Public" meant two
- * different things in that name and only one of them survived: {@code is_internal = false} still
- * opens a mission to the whole organisation, and it no longer opens it to the internet. The escape
- * itself is untouched, which is exactly why this test is the regression guard the members-only
- * change needed — a gate written one notch too tight would close it, and every member outside the
- * owning Staffel would quietly stop seeing the mission.
- *
- * <p>The join (participant add) is the documented next step; it is not automated here because it
- * depends on seeded job types, but the visibility + cross-Staffel detail access it builds on are
- * fully covered.
+ * Cross-Staffel mission visibility (UC-10): a member of Staffel B sees and can open Staffel A's
+ * organisation-wide mission ({@code is_internal=false}) but not A's internal one.
  */
 @Tag("e2e")
 class OrgWideMissionCrossStaffelE2eTest {

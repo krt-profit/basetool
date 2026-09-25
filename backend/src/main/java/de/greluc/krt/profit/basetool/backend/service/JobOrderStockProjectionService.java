@@ -46,16 +46,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 
 /**
- * Projects a managed {@link JobOrder} (or a whole page of them) into a {@link JobOrderDto} with its
- * per-bucket order-linked stock and — for SK-responsible orders — its per-squadron material claims.
- * Extracted from {@code JobOrderService} (L2, #921) so the read-projection concern lives on its
- * own, behind the exact same assembly logic.
- *
- * <p>Read-only: it only maps and sums, never mutating an entity, so it runs inside the caller's
- * transaction. The DTO assembly lives in exactly one place ({@link #mapToDtoWithStock(JobOrder,
- * StockResolver, ClaimResolver)}) shared by the single-order write paths (per-order queries) and
- * the paged list ({@link #mapPageWithStock(Page)}, page-batched lookups — REQ-DATA-003), so both
- * behave identically.
+ * Projects managed {@link JobOrder}s into {@link JobOrderDto}s with per-bucket order-linked stock
+ * and, for SK-responsible orders, per-squadron material claims. Read-only; single orders and paged
+ * lists share one assembly in {@link #mapToDtoWithStock(JobOrder, StockResolver, ClaimResolver)}.
  */
 @Slf4j
 @Service
@@ -105,16 +98,13 @@ public class JobOrderStockProjectionService {
   }
 
   /**
-   * Core order projection shared by the single-order write paths and the paged list. The {@code
-   * stockResolver} and {@code claimResolver} abstract where the per-bucket stock and the SK claim
-   * view come from — the single-order path backs them with per-order queries, the list path with
-   * page-batched lookups (REQ-DATA-003) — so the DTO assembly itself lives in exactly one place and
-   * behaves identically on both paths.
+   * Assembles the order DTO from pluggable stock and claim resolvers, backed by per-order queries
+   * on the single-order path and by page-batched lookups on the list path (REQ-DATA-003).
    *
-   * @param jobOrder the managed order to project.
-   * @param stockResolver resolves the order-linked stock of one material at a quality floor.
-   * @param claimResolver resolves the SK claim view of one order ({@code List.of()} for non-SK).
-   * @return the assembled order DTO with per-bucket stock and (for SK orders) claims.
+   * @param jobOrder the managed order to project
+   * @param stockResolver resolves the order-linked stock of one material at a quality floor
+   * @param claimResolver resolves the SK claim view of one order ({@code List.of()} for non-SK)
+   * @return the order DTO with per-bucket stock and, for SK orders, claims
    */
   @NotNull
   private JobOrderDto mapToDtoWithStock(
@@ -196,14 +186,11 @@ public class JobOrderStockProjectionService {
   }
 
   /**
-   * Projects a whole page of orders, batching the per-row enrichment once for the page
-   * (REQ-DATA-003): instead of one stock {@code SUM} per material per order plus one claim query
-   * per SK order, load every order's linked stock in a single query and sum the buckets in memory,
-   * and load every SK order's claims in a single query. The single-order write paths keep the
-   * per-order resolvers via {@link #mapToDtoWithStock(JobOrder)}.
+   * Projects a page of orders, loading all linked stock and all SK claims in one query each and
+   * summing buckets in memory (REQ-DATA-003).
    *
-   * @param page the scoped page of managed orders to project.
-   * @return the page mapped to DTOs, stock- and claim-enriched.
+   * @param page the scoped page of managed orders
+   * @return the page mapped to stock- and claim-enriched DTOs
    */
   public Page<JobOrderDto> mapPageWithStock(@NotNull Page<JobOrder> page) {
     List<JobOrder> orders = page.getContent();
@@ -221,16 +208,12 @@ public class JobOrderStockProjectionService {
   }
 
   /**
-   * Loads the order-linked material stock of many orders in <b>one</b> query and hands it back as a
-   * reusable lookup, so any multi-order read can resolve per-bucket stock without firing a {@code
-   * SUM} aggregate per bucket per order (REQ-DATA-003). Extracted from the paged list path so the
-   * cross-order material-demand overview (REQ-ORDERS-034) sums stock through the exact same
-   * batching and floor semantics rather than re-deriving them — a second implementation would drift
-   * from {@code sumAmountByMaterialAndJobOrderAndMinQuality} and make the two views disagree.
+   * Loads the order-linked material stock of many orders in one query as a reusable lookup
+   * (REQ-DATA-003), with the same floor semantics as the per-order sum.
    *
-   * @param orderIds the orders whose linked stock to index; an empty collection yields an index
-   *     that answers {@code 0.0} for everything without touching the database.
-   * @return the batched lookup, never {@code null}.
+   * @param orderIds the orders whose linked stock to index; empty yields an index answering {@code
+   *     0.0} without a query
+   * @return the batched lookup, never {@code null}
    */
   @NotNull
   public OrderLinkedStockIndex loadOrderLinkedStockIndex(Collection<UUID> orderIds) {
@@ -238,13 +221,11 @@ public class JobOrderStockProjectionService {
   }
 
   /**
-   * Maps an aggregated bucket's quality requirement to the inventory quality floor its linked stock
-   * is summed at: {@code GOOD} sums refining-grade stock ({@value #GOOD_QUALITY_FLOOR}+), {@code
-   * NONE} imposes no floor. Mirrors the MATERIAL requirement's stored {@code minQuality}, so both
-   * order kinds compute collection progress identically.
+   * Maps a bucket's quality requirement to its stock-summing floor: {@code GOOD} sums from {@value
+   * #GOOD_QUALITY_FLOOR}, {@code NONE} has no floor.
    *
-   * @param qualityRequirement the bucket's quality requirement.
-   * @return the minimum quality to sum at, or {@code null} for no floor.
+   * @param qualityRequirement the bucket's quality requirement
+   * @return the minimum quality to sum at, or {@code null} for no floor
    */
   @Nullable
   public static Integer qualityFloorFor(QualityRequirement qualityRequirement) {
@@ -274,14 +255,13 @@ public class JobOrderStockProjectionService {
     }
 
     /**
-     * Sums the linked stock of one {@code (order, material)} bucket at a quality floor, reproducing
-     * the {@code COALESCE(SUM(amount), 0.0) WHERE (:floor IS NULL OR quality &gt;= :floor)}
-     * semantics of {@code sumAmountByMaterialAndJobOrderAndMinQuality} in memory.
+     * Sums the linked stock of one order and material at a quality floor, in memory, with the same
+     * semantics as {@code sumAmountByMaterialAndJobOrderAndMinQuality}.
      *
-     * @param jobOrderId the order the stock is linked to.
-     * @param materialId the material to sum.
-     * @param qualityFloor the minimum quality, or {@code null} for no floor.
-     * @return the summed amount; {@code 0.0} when the bucket has no matching rows.
+     * @param jobOrderId the order the stock is linked to
+     * @param materialId the material to sum
+     * @param qualityFloor the minimum quality, or {@code null} for no floor
+     * @return the summed amount; {@code 0.0} when nothing matches
      */
     public double stockFor(UUID jobOrderId, UUID materialId, Integer qualityFloor) {
       return sumStockAtFloor(rowsByOrderAndMaterial, jobOrderId, materialId, qualityFloor);
@@ -289,20 +269,14 @@ public class JobOrderStockProjectionService {
   }
 
   /**
-   * Rebuilds the item order's aggregated-material rows with their collection stock and (for SK
-   * orders) their per-bucket claims + open-remaining. The base rows come from {@link
-   * JobOrderItemService#aggregateMaterials} with neutral stock/claim fields; this enriches each
-   * with {@code currentStock} — the order-linked inventory summed at the bucket's quality floor
-   * ({@code GOOD} → {@link #GOOD_QUALITY_FLOOR}, {@code NONE} → no floor), the same per-bucket sum
-   * the MATERIAL rows use — so the overview can show material-collection progress (#595). For a
-   * non-SK order {@code claimByBucket} is empty, so every row keeps its empty claims / {@code null}
-   * open-amount but still gains its stock.
+   * Enriches the item order's aggregated-material rows with {@code currentStock} at each bucket's
+   * quality floor and, for SK orders, with claims and open amount; non-SK rows keep empty claims
+   * and a {@code null} open amount.
    *
-   * @param jobOrder the item order.
-   * @param claimByBucket the SK claim view keyed by {@link #bucketKey}, or empty for non-SK orders.
-   * @param stockResolver resolves the order-linked stock of one material at a quality floor (per-
-   *     order query on the single-order path, page-batched lookup on the list path).
-   * @return the aggregated rows, stock- and claim-enriched.
+   * @param jobOrder the item order
+   * @param claimByBucket the SK claim view keyed by {@link #bucketKey}, or empty for non-SK orders
+   * @param stockResolver resolves the order-linked stock of one material at a quality floor
+   * @return the stock- and claim-enriched rows
    */
   private List<AggregatedMaterialDto> enrichAggregatedWithClaims(
       JobOrder jobOrder, Map<String, ClaimBucketDto> claimByBucket, StockResolver stockResolver) {
@@ -335,15 +309,14 @@ public class JobOrderStockProjectionService {
   @FunctionalInterface
   private interface StockResolver {
     /**
-     * Returns the total stock of {@code materialId} linked to {@code jobOrderId} whose quality
-     * meets or exceeds {@code qualityFloor} ({@code null} floor = no quality restriction); {@code
-     * 0.0} when nothing matches — the exact semantics of {@code
+     * Returns the stock of {@code materialId} linked to {@code jobOrderId} with quality at least
+     * {@code qualityFloor}, with the semantics of {@code
      * sumAmountByMaterialAndJobOrderAndMinQuality}.
      *
-     * @param jobOrderId the order the stock is linked to.
-     * @param materialId the material to sum.
-     * @param qualityFloor the minimum quality, or {@code null} for no floor.
-     * @return the summed amount, never negative, {@code 0.0} when empty.
+     * @param jobOrderId the order the stock is linked to
+     * @param materialId the material to sum
+     * @param qualityFloor the minimum quality, or {@code null} for no floor
+     * @return the summed amount, {@code 0.0} when nothing matches
      */
     double stockFor(UUID jobOrderId, UUID materialId, Integer qualityFloor);
   }
@@ -366,16 +339,11 @@ public class JobOrderStockProjectionService {
   }
 
   /**
-   * Loads every job-order-linked <em>material</em> inventory row for the given orders in one query
-   * and indexes it by order id then material id, so the paged list can sum each material bucket at
-   * its own quality floor in memory (REQ-DATA-003) instead of firing a {@code SUM} aggregate per
-   * bucket per order. Game-item earmarks (V220, REQ-INV-029 — created by the production
-   * auto-earmark) are excluded in-query by {@code findMaterialStockRowsByJobOrderIds}; without that
-   * guard they would surface here as {@code materialId = null} rows and NPE the {@code groupingBy}
-   * below, 500ing the paged order list.
+   * Loads every linked material inventory row of the given orders in one query, indexed by order id
+   * and material id (REQ-DATA-003). Game-item earmarks are excluded by the query.
    *
-   * @param orderIds the orders whose linked stock to index; empty yields an empty index.
-   * @return order id → material id → the linked material inventory rows, never {@code null}.
+   * @param orderIds the orders whose linked stock to index; empty yields an empty index
+   * @return order id to material id to linked material rows, never {@code null}
    */
   private Map<UUID, Map<UUID, List<JobOrderMaterialStockRow>>> loadStockIndex(
       Collection<UUID> orderIds) {
@@ -390,15 +358,14 @@ public class JobOrderStockProjectionService {
   }
 
   /**
-   * Sums the pre-loaded stock rows of one (order, material) bucket at a quality floor, reproducing
-   * the {@code COALESCE(SUM(amount), 0.0) WHERE (:floor IS NULL OR quality >= :floor)} semantics of
-   * {@code sumAmountByMaterialAndJobOrderAndMinQuality} entirely in memory.
+   * Sums the pre-loaded rows of one order and material at a quality floor, with the semantics of
+   * {@code sumAmountByMaterialAndJobOrderAndMinQuality}.
    *
-   * @param stockIndex the page-batched index from {@link #loadStockIndex(Collection)}.
-   * @param jobOrderId the order to sum within.
-   * @param materialId the material to sum.
-   * @param qualityFloor the minimum quality, or {@code null} for no floor.
-   * @return the summed amount; {@code 0.0} when the bucket has no matching rows.
+   * @param stockIndex the index from {@link #loadStockIndex(Collection)}
+   * @param jobOrderId the order to sum within
+   * @param materialId the material to sum
+   * @param qualityFloor the minimum quality, or {@code null} for no floor
+   * @return the summed amount; {@code 0.0} when nothing matches
    */
   private static double sumStockAtFloor(
       @NotNull Map<UUID, Map<UUID, List<JobOrderMaterialStockRow>>> stockIndex,
@@ -426,11 +393,11 @@ public class JobOrderStockProjectionService {
   }
 
   /**
-   * {@code true} iff the order is responsible to a Spezialkommando — the only orders that carry
-   * material claims (Phase 5, #345).
+   * Returns whether the order is responsible to a Spezialkommando, the only orders with material
+   * claims.
    *
-   * @param jobOrder the order.
-   * @return whether the order is a public SK order.
+   * @param jobOrder the order
+   * @return whether the order is a public SK order
    */
   private static boolean isSpecialCommandResponsible(@NotNull JobOrder jobOrder) {
     return jobOrder.getResponsibleOrgUnit() != null

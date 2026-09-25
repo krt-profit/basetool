@@ -26,24 +26,12 @@ import java.util.stream.Stream;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Every name a member is stored under, as one list two data-protection surfaces share.
+ * Every name a member is stored under, shared by the Art. 15 export's handle scrubbing
+ * (REQ-SEC-058) and the Art. 17 erasure of text-only handle snapshots (REQ-SEC-062).
  *
- * <p><b>Why this exists as a type.</b> Two places have to match on <em>all</em> the names a member
- * is known by, not on their effective name alone: the Art. 15 export, which scrubs other members'
- * handles out of the subject's free text (REQ-SEC-058), and the Art. 17 erasure, which matches the
- * text-only handle snapshots — a job-order contact, a handover recipient — that carry no foreign
- * key to the account (REQ-SEC-062). Whoever typed one of those wrote what <em>they</em> call the
- * person, and that is as likely to be the Discord guild nickname as the display name. Both places
- * spelled the list out for themselves, so a fourth name column would have been added to one and
- * missed in the other, and the miss is silent in both directions: an export that reports a complete
- * redaction, or an erasure that reports a completed erasure while rows still name the member.
- *
- * <p>{@code HandleSpellingCoverageTest} holds this list against the person-search registry ({@link
- * PersonSearchTargets}), which is itself swept against {@code information_schema} — so a new name
- * column on {@code app_user} cannot reach the schema without being registered for the search, and
- * cannot be registered for the search without being declared here as a spelling or as {@link
- * #NOT_A_SPELLING} with a reason. A {@code DataExportService} Javadoc claimed that gate existed
- * before it did (corrected 2026-09-17).
+ * <p>{@code HandleSpellingCoverageTest} holds this list against {@link PersonSearchTargets}, so a
+ * new {@code app_user} name column must be declared here as a spelling or in {@link
+ * #NOT_A_SPELLING}.
  */
 public final class HandleSpellings {
 
@@ -58,12 +46,8 @@ public final class HandleSpellings {
       List.of("username", "display_name", "discord_guild_nickname");
 
   /**
-   * The other {@code app_user} text columns the person search registers, and why each is not a
-   * spelling.
-   *
-   * <p>This is the half that makes the coverage test catch an <em>addition</em>. Without it the
-   * test could only check that every listed spelling is searched, which a new name column would
-   * satisfy by being searched and never being listed. Keyed by physical column name.
+   * The other {@code app_user} text columns the person search registers, keyed by physical column
+   * name, each with the reason it is not a spelling.
    */
   public static final Map<String, String> NOT_A_SPELLING =
       Map.of(
@@ -80,15 +64,12 @@ public final class HandleSpellings {
   private HandleSpellings() {}
 
   /**
-   * The member's names, one per {@link #COLUMNS} entry and in that order.
+   * Returns the member's names, one per {@link #COLUMNS} entry and in that order.
    *
-   * <p>Nulls and blanks are passed through, because what to do with them differs by caller: the
-   * export drops them, and the erasure drops them <em>and</em> sorts the rest longest-first. Doing
-   * either here would make this type a policy rather than a list.
+   * <p>Nulls and blanks are passed through; filtering is up to the caller.
    *
    * @param user the member
-   * @return their username, display name and Discord guild nickname, in {@link #COLUMNS} order,
-   *     nulls included
+   * @return their username, display name and Discord guild nickname, nulls included
    */
   public static @NotNull Stream<String> of(@NotNull User user) {
     return Stream.of(user.getUsername(), user.getDisplayName(), user.getDiscordGuildNickname());

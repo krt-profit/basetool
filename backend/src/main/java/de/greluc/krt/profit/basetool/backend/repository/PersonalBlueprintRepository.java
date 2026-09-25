@@ -105,9 +105,8 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
       UUID ownerUserId, Collection<String> productKeys);
 
   /**
-   * Bulk owner lookup across several owners — backs the org-unit blueprint availability aggregation
-   * (#364): given the {@code app_user.id}s of every in-scope org-unit member, returns all their
-   * owned-blueprint rows for grouping by product in the service layer.
+   * Returns all owned-blueprint rows of the given owners; backs the org-unit blueprint availability
+   * aggregation.
    *
    * @param ownerUserIds the {@code app_user.id}s of the in-scope owners
    * @return every owned-blueprint row whose owner is in the given set; never {@code null}
@@ -115,11 +114,8 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
   List<PersonalBlueprint> findAllByOwnerUserIdIn(Collection<UUID> ownerUserIds);
 
   /**
-   * Projection variant of {@link #findAllByOwnerUserIdIn(Collection)} for the family-grouping
-   * aggregations (availability overview #364, item-order owner drill-down): both only read the
-   * owner and product name to group by variant family and count distinct owners, so this returns a
-   * two-column {@link BlueprintOwnerProduct} projection instead of hydrating every full blueprint
-   * row of an admin all-scope view (REQ-DATA-003).
+   * Projection variant of {@link #findAllByOwnerUserIdIn(Collection)} returning only owner and
+   * product name, for the family-grouping aggregations (REQ-DATA-003).
    *
    * @param ownerUserIds the {@code app_user.id}s of the in-scope owners
    * @return one {@code (ownerUserId, productName)} projection per owned-blueprint row; never {@code
@@ -133,9 +129,7 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
       @Param("ownerUserIds") Collection<UUID> ownerUserIds);
 
   /**
-   * Owner-restricted product lookup — backs the availability drill-down (#364): given one product
-   * key and the {@code app_user.id}s of every in-scope member, returns the rows that pin which of
-   * those members own the product.
+   * Returns the rows of the given owners that own one product; backs the availability drill-down.
    *
    * @param productKey the normalized product key to match
    * @param ownerUserIds the {@code app_user.id}s of the in-scope owners
@@ -145,12 +139,11 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
       String productKey, Collection<UUID> ownerUserIds);
 
   /**
-   * Unrestricted product lookup — backs the admin "all org units" branch of the availability
-   * drill-down (#364). That scope spans every blueprint owner anyway, so enumerating all distinct
-   * {@code owner_user_id}s first and echoing them back as an {@code IN} list (the previous
-   * implementation) only added a full-table scan plus an unbounded parameter list to every expand
-   * click. ADMIN-ONLY: every scoped caller must keep using {@link
-   * #findAllByProductKeyAndOwnerUserIdIn(String, Collection)} so the owner-isolation rule holds.
+   * Returns every owner's row for one product; backs the admin "all org units" availability
+   * drill-down.
+   *
+   * <p>ADMIN-ONLY: scoped callers use {@link #findAllByProductKeyAndOwnerUserIdIn(String,
+   * Collection)} to keep owner isolation.
    *
    * @param productKey the normalized product key to match
    * @return every owned-blueprint row for the product, across all owners; never {@code null}
@@ -158,14 +151,11 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
   List<PersonalBlueprint> findAllByProductKey(String productKey);
 
   /**
-   * Unrestricted bulk product lookup — backs the admin "all org units" branch of the
-   * <em>variant-family</em> owner drill-down (#364). A family expands to several product keys (a
-   * base plus its cosmetic variants), so the drill-down resolves the family's product-key set once
-   * (via the cached blueprint family index) and fetches every owner of any of them in one bounded
-   * {@code IN} query — the family-aware generalization of {@link #findAllByProductKey(String)}.
-   * ADMIN-ONLY: scoped callers must keep using {@link
-   * #findAllByProductKeyInAndOwnerUserIdIn(Collection, Collection)} so the owner-isolation rule
-   * holds.
+   * Returns every owner's rows for any product of a variant family; backs the admin "all org units"
+   * family drill-down.
+   *
+   * <p>ADMIN-ONLY: scoped callers use {@link #findAllByProductKeyInAndOwnerUserIdIn(Collection,
+   * Collection)} to keep owner isolation.
    *
    * @param productKeys the normalized product keys making up the family
    * @return every owned-blueprint row for any of the products, across all owners; never {@code
@@ -174,12 +164,8 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
   List<PersonalBlueprint> findAllByProductKeyIn(Collection<String> productKeys);
 
   /**
-   * Owner-restricted bulk product lookup — backs the scoped branch of the variant-family owner
-   * drill-down (#364): given a family's product-key set and the {@code app_user.id}s of every
-   * in-scope member, returns the rows that pin which of those members own any product in the
-   * family. The family-aware generalization of {@link #findAllByProductKeyAndOwnerUserIdIn(String,
-   * Collection)}; keeping the owner restriction server-side preserves the multi-user data-isolation
-   * rule.
+   * Returns the rows of the given owners for any product of a variant family; backs the scoped
+   * family drill-down.
    *
    * @param productKeys the normalized product keys making up the family
    * @param ownerUserIds the {@code app_user.id}s of the in-scope owners
@@ -203,11 +189,8 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
       Collection<UUID> ownerUserIds, Collection<String> productKeys);
 
   /**
-   * Returns the distinct {@code app_user.id} of every blueprint owner in the table. Backs the admin
-   * "all org units" branch of the availability overview (#364, #371 fix): that scope spans every
-   * owner — including a user with no org-unit membership (e.g. an admin without a Staffel) — which
-   * a membership-derived member list silently dropped. The owned rows are still fetched through
-   * {@link #findAllByOwnerUserIdIn(Collection)}, so the owner-isolation contract is unchanged.
+   * Returns the distinct {@code app_user.id} of every blueprint owner, including owners without any
+   * org-unit membership; backs the admin "all org units" availability overview.
    *
    * @return every distinct {@code owner_user_id} present in the table; never {@code null}, possibly
    *     empty.
@@ -216,14 +199,11 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
   Set<UUID> findAllDistinctOwnerUserIds();
 
   /**
-   * Bulk-removes every <em>removable</em> owned blueprint of one user — the "delete all my
-   * blueprints" clear (REQ-INV-023). Auto-granted default blueprints (REQ-INV-016) are preserved by
-   * excluding any row whose {@code product_key} is in the {@code default_blueprint} set, exactly
-   * mirroring the per-row {@code requireRemovable} guard so no path can strip a user's defaults
-   * (they would only be re-provisioned). The {@code NOT IN (subquery)} form deletes the whole owned
-   * set when the default set is empty. A single set-based statement, so no {@code @Version} bumps
-   * and no per-row {@code load}; {@code clearAutomatically} detaches any owned rows loaded earlier
-   * in the transaction so a later read reflects the removal.
+   * Bulk-removes every removable owned blueprint of one user, keeping the auto-granted defaults
+   * (REQ-INV-023, REQ-INV-016).
+   *
+   * <p>A single set-based statement without {@code @Version} bumps; it clears the persistence
+   * context afterwards.
    *
    * @param ownerUserId the {@code app_user.id} of the owner whose removable blueprints are cleared
    * @return the number of rows removed (never counts a preserved default)
@@ -238,14 +218,11 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
   int deleteRemovableByOwnerUserId(@Param("ownerUserId") UUID ownerUserId);
 
   /**
-   * Bulk-removes every <em>removable</em> owned blueprint of <strong>all</strong> users — the admin
-   * "delete all users' blueprints" global purge (REQ-INV-024). Like {@link
-   * #deleteRemovableByOwnerUserId(String)} it preserves the auto-granted default blueprints
-   * (REQ-INV-016) by excluding rows whose {@code product_key} is in the {@code default_blueprint}
-   * set, so the purge cannot fight the default-provisioning sweep. ADMIN-ONLY — it spans every
-   * owner and is reachable only from the ADMIN-gated controller. One set-based statement (no
-   * {@code @Version} bumps); {@code clearAutomatically} detaches any owned rows loaded earlier in
-   * the transaction.
+   * Bulk-removes every removable owned blueprint of all users, keeping the auto-granted defaults
+   * (REQ-INV-024). ADMIN-ONLY.
+   *
+   * <p>A single set-based statement without {@code @Version} bumps; it clears the persistence
+   * context afterwards.
    *
    * @return the number of rows removed across all users (never counts a preserved default)
    */
@@ -258,18 +235,11 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
   int deleteAllRemovable();
 
   /**
-   * Bulk-removes <strong>every</strong> owned blueprint of one user, auto-granted defaults included
-   * — the hard account deletion (REQ-DATA-008), not the user-facing "clear my blueprints" action.
-   * The default-preserving exclusion of {@link #deleteRemovableByOwnerUserId(String)} is
-   * deliberately absent: preserving defaults for an account that no longer exists is what left
-   * orphaned rows behind, and every user carries at least the auto-granted starter set, so the
-   * removable-only variant could never empty an owner.
+   * Bulk-removes every owned blueprint of one user, defaults included, for the hard account
+   * deletion (REQ-DATA-008).
    *
-   * <p>Unlike its siblings this query does <em>not</em> set {@code clearAutomatically}. It runs
-   * inside the {@code UserDeletionService.deleteUser} transaction, where detaching the persistence
-   * context would detach the very {@code User} entity that is about to be deleted, turning the
-   * subsequent {@code delete} into a {@code merge} of a detached instance. Nothing loads {@code
-   * PersonalBlueprint} rows in that transaction, so there is nothing stale to evict.
+   * <p>Runs inside the user-deletion transaction and therefore does not clear the persistence
+   * context.
    *
    * @param ownerUserId the departing owner's {@code app_user.id}
    * @return the number of rows removed, for the audit summary event
@@ -279,12 +249,11 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
   int deleteAllByOwnerUserId(@Param("ownerUserId") UUID ownerUserId);
 
   /**
-   * Materialises the admin-curated default blueprints (REQ-INV-016) for a single user: inserts one
-   * {@code personal_blueprint} row per {@code default_blueprint} the user does not yet own. The
-   * {@code ON CONFLICT (owner_user_id, product_key) DO NOTHING} makes it idempotent (a re-run, or a
-   * race with the periodic sweep, inserts nothing); {@code version} / {@code created_at} / {@code
-   * updated_at} fall to their column defaults. {@code flushAutomatically} flushes any pending
-   * persistence-context writes first so a default just added in the same transaction is visible.
+   * Inserts one {@code personal_blueprint} row for each default blueprint the user does not yet own
+   * (REQ-INV-016).
+   *
+   * <p>Idempotent via {@code ON CONFLICT DO NOTHING}; pending persistence-context writes are
+   * flushed first.
    *
    * @param ownerUserId the {@code app_user.id} of the user to provision
    * @return the number of newly inserted rows
@@ -302,12 +271,10 @@ public interface PersonalBlueprintRepository extends JpaRepository<PersonalBluep
   int grantDefaultBlueprintsToUser(@Param("ownerUserId") UUID ownerUserId);
 
   /**
-   * Materialises the admin-curated default blueprints (REQ-INV-016) for every active user in one
-   * statement: a cross join of {@code app_user} (excluding soft-deleted {@code in_keycloak = false}
-   * rows) with {@code default_blueprint}, inserting only the rows a user does not yet own. Backs
-   * the startup backfill, the periodic provisioning sweep, and the post-add grant when an admin
-   * extends the default set. Idempotent via {@code ON CONFLICT}; {@code flushAutomatically} makes a
-   * default just added in the same transaction visible.
+   * Inserts the missing default blueprints (REQ-INV-016) for every user still in Keycloak, in one
+   * statement.
+   *
+   * <p>Idempotent via {@code ON CONFLICT}; pending persistence-context writes are flushed first.
    *
    * @return the number of newly inserted rows across all users
    */

@@ -32,44 +32,31 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Write payload for a caller raising a confirm-before-post booking request
- * (REQ-BANK-022/-039/-040). The caller names the (source) account they act on — any account they
- * may <em>view</em> — the movement kind and a whole-aUEC amount. For a {@code TRANSFER} the {@code
- * targetAccountId} names the destination (any active account); it is required for {@code TRANSFER}
- * and must be absent for {@code DEPOSIT} / {@code WITHDRAWAL} (the service enforces this). There is
- * deliberately <strong>no holder field</strong> — the holder(s) are recorded by the bank employee
- * at confirmation, not by the requester.
+ * Write payload for raising a confirm-before-post booking request (REQ-BANK-022/-039/-040). It
+ * carries no holder; the bank employee records the holder(s) at confirmation.
  *
- * <p><strong>Split deposit (REQ-BANK-043).</strong> A {@code DEPOSIT} request may set {@link
- * #splitEnabled} with a whole-percent {@link #splitPercent} (1–100): that percentage of the gross
- * is distributed evenly across all squadron accounts when the request is confirmed (the percentage
- * is snapshotted now; the concrete legs are resolved against the squadron-account set active at
- * confirmation). The split is <em>DEPOSIT-only</em> — a withdrawal/transfer request must not carry
- * it.
+ * <p>A {@code DEPOSIT} may enable a split (REQ-BANK-043): the given percentage of the gross is
+ * distributed evenly across the squadron accounts active at confirmation.
  *
- * @param sourceAccountId the (source) account the request acts on (the caller must be able to view
- *     it)
+ * @param sourceAccountId the (source) account the request acts on; the caller must be able to view
+ *     it
  * @param type whether to request a deposit, a withdrawal or a transfer
  * @param targetAccountId the destination account for a {@code TRANSFER}; {@code null} otherwise
  * @param amount whole-aUEC amount, at least 1
  * @param note optional free-text note carried onto the booking on confirmation
- * @param justification optional free-text justification (Begr&uuml;ndung) carried onto the booking
- *     on confirmation (REQ-BANK-045); captured only for a {@code WITHDRAWAL} / {@code TRANSFER} and
- *     required by the service when the source account type {@linkplain
+ * @param justification optional Begr&uuml;ndung carried onto the booking (REQ-BANK-045); only for a
+ *     {@code WITHDRAWAL} / {@code TRANSFER}, and required when the source account type {@linkplain
  *     de.greluc.krt.profit.basetool.backend.model.BankAccountType#requiresDebitJustification()
- *     mandates a reason}, optional otherwise
+ *     mandates a reason}
  * @param splitEnabled whether a {@code DEPOSIT} distributes {@link #splitPercent} across squadron
  *     accounts (REQ-BANK-044)
- * @param splitPercent the whole-percent (1–100) to distribute; required when {@link #splitEnabled},
+ * @param splitPercent the whole percent (1–100) to distribute; required when {@link #splitEnabled},
  *     absent otherwise
- * @param counterpartyUserId the <strong>Empf&auml;nger</strong> of a {@code WITHDRAWAL} — the
- *     member who receives the payout (REQ-BANK-055). {@code WITHDRAWAL}-only and optional; the UI
- *     pre-fills the requester, and leaving it {@code null} keeps the historical behaviour of
- *     deriving the requester at confirmation (REQ-BANK-044). Must be a registered tool user — the
- *     free-text external counterparty (#994) stays a bank-employee capability
- * @param counterpartyOrgUnitId the org unit of {@link #counterpartyUserId}, which the service
- *     validates is one of <em>that user's</em> direct memberships (else 400); requires a
- *     counterparty user
+ * @param counterpartyUserId the registered member receiving a {@code WITHDRAWAL} payout
+ *     (REQ-BANK-055); {@code WITHDRAWAL}-only, and {@code null} derives the requester at
+ *     confirmation
+ * @param counterpartyOrgUnitId the org unit of {@link #counterpartyUserId}, which must be one of
+ *     that user's direct memberships; requires a counterparty user
  */
 public record CreateBankBookingRequest(
     @NotNull UUID sourceAccountId,
@@ -84,15 +71,8 @@ public record CreateBankBookingRequest(
     @Nullable UUID counterpartyOrgUnitId) {
 
   /**
-   * Cross-field rule (REQ-BANK-043): the split is DEPOSIT-only and, when enabled, must carry a
-   * percentage; otherwise no percentage is allowed. The numeric range/whole-number of {@link
-   * #splitPercent} is enforced by its own field constraints.
-   *
-   * <p>{@code @Schema(hidden = true)} keeps this derived guard out of the generated OpenAPI
-   * document: it is computed from the other fields and is never part of the request payload.
-   * Accessor-derived schema properties are also harvested in unguaranteed {@code
-   * Class#getDeclaredMethods()} order, which rewrote {@code openapi.json} between builds (see
-   * {@code OpenApiDerivedPropertyTest}).
+   * Cross-field rule (REQ-BANK-043): a split is DEPOSIT-only and, when enabled, requires a
+   * percentage; otherwise no percentage is allowed. Hidden from the OpenAPI schema.
    *
    * @return {@code true} when the split flag, type and percentage are consistent
    */
@@ -106,15 +86,8 @@ public record CreateBankBookingRequest(
   }
 
   /**
-   * Cross-field rule (REQ-BANK-055): an Empf&auml;nger belongs to a {@code WITHDRAWAL} only, and a
-   * counterparty org unit is meaningless without the user it qualifies. A deposit's depositor and a
-   * transfer's counter-account are already implied (REQ-BANK-042/-044), so naming a counterparty on
-   * either is a client error rather than a silently ignored field.
-   *
-   * <p>{@code @Schema(hidden = true)} keeps this derived guard out of {@code openapi.json}: an
-   * accessor-derived schema property is harvested in unguaranteed {@code
-   * Class#getDeclaredMethods()} order and rewrites the document between builds (see {@code
-   * OpenApiDerivedPropertyTest}).
+   * Cross-field rule (REQ-BANK-055): a counterparty is valid only on a {@code WITHDRAWAL}, and a
+   * counterparty org unit requires a counterparty user. Hidden from the OpenAPI schema.
    *
    * @return {@code true} when the counterparty fields are consistent with the movement kind
    */
@@ -128,8 +101,7 @@ public record CreateBankBookingRequest(
   }
 
   /**
-   * Convenience constructor for a request without a split (the pre-REQ-BANK-043 shape) and without
-   * a named counterparty (the pre-REQ-BANK-055 shape), delegating to the canonical constructor.
+   * Creates a request without a split and without a named counterparty.
    *
    * @param sourceAccountId the (source) account
    * @param type the movement kind

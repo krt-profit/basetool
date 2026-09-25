@@ -33,13 +33,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 /**
- * Bean Validation contract tests for the {@code bookIn} requirement on {@link
- * JobOrderItemProductionCreateDto} (REQ-INV-032 flip): the transitional null-tolerant rollout
- * window closed when the production modal shipped its book-in section, so a payload without the
- * block — or without the block's required {@code locationId} — must surface as a 400 validation
- * error at the {@code @Valid} controller boundary, never reach {@code
- * JobOrderItemProductionService}. The former service-level "null bookIn = legacy no-op" test lives
- * on here as the validation-rejection contract.
+ * Bean Validation tests that {@link JobOrderItemProductionCreateDto} rejects a missing {@code
+ * bookIn} block or a missing {@code bookIn.locationId} (REQ-INV-032).
  */
 class JobOrderItemProductionCreateDtoValidationTest {
 

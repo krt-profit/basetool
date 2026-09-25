@@ -39,22 +39,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * End-to-end visibility matrix for the org-unit bank account-responsibility feature
- * (REQ-BANK-034..038, ADR-0043), driven through the real Keycloak login + JWT-to-authority chain
- * that the unit tests ({@code OrgUnitBankAccessServiceTest}) can only mock.
+ * End-to-end visibility matrix for org-unit bank account responsibility (REQ-BANK-034..038), driven
+ * through the real Keycloak login and JWT-to-authority chain.
  *
- * <p>The matrix is asserted race-free against the backend endpoints as each user (mirroring {@code
- * BankPermissionsE2eTest}), with one UI check for the Halter-redacted drill-in. It deliberately
- * exercises the two account types that are reliably seedable on the shared ephemeral stack — {@code
- * ORG_UNIT} (per-unit, idempotent) and {@code SPECIAL} (non-singleton) — across all four grantee
- * kinds (MEMBERSHIP_ROLE/GLOBAL_ROLE/USER/ALL_MEMBERS) plus the admin override. The
- * fixed-visibility global singletons {@code CARTEL} / {@code CARTEL_BANK} are awkward to seed on a
- * shared stack and carry no per-grant logic, so they stay covered by the unit suite.
- *
- * <p>The crown jewel here is the role-model assertion: a caller holding the {@code OFFICER}
- * Keycloak role but <em>no</em> Bereich/OL membership must NOT auto-see a Sonderkonto
- * (REQ-BANK-037) — the auto-view keys off membership, never the role — which only an end-to-end
- * test with a real token can prove.
+ * <p>Covers {@code ORG_UNIT} and {@code SPECIAL} accounts across all four grantee kinds plus the
+ * admin override; the {@code CARTEL} singletons stay with the unit tests. Asserts that the {@code
+ * OFFICER} role without a Bereich/OL membership does not auto-see a Sonderkonto (REQ-BANK-037).
  */
 @Tag("e2e")
 class OrgUnitBankVisibilityMatrixE2eTest {

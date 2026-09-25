@@ -24,16 +24,12 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Frontend mirror of the backend inventory-item projection. {@code createdAt} carries the row's
- * creation instant so the grouped-stack UI can order an append-only stack's entries oldest-first.
+ * Frontend mirror of the backend inventory-item projection. {@code createdAt} orders a stack's
+ * entries oldest-first.
  *
- * <p>Since Variante C (REQ-INV-027) an entry's quantity is split independently across several job
- * orders ({@code jobOrderAllocations}, unassigned {@code jobOrderRest}) and several missions
- * ({@code missionAllocations}, unassigned {@code missionRest}) shown as chips.
- *
- * <p>Catalog-discriminated since V220 (REQ-INV-029): a material row carries {@code material} +
- * {@code quality} with {@code gameItem == null}; a game-item stock row carries {@code gameItem}
- * with {@code material == null} and {@code quality == null}.
+ * <p>The quantity is split across job orders and missions ({@code *Allocations}, unassigned {@code
+ * *Rest}; REQ-INV-027). A material row carries {@code material} and {@code quality}; a game-item
+ * row carries {@code gameItem} with {@code null} material and quality (REQ-INV-029).
  */
 public record InventoryItemDto(
     UUID id,

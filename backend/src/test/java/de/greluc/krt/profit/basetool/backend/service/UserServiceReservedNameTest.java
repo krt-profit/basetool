@@ -38,26 +38,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * Two display names a member must not be able to give themselves (REQ-SEC-062).
+ * Verifies the two display names a member must not give themselves (REQ-SEC-062): the erasure
+ * sentinel, and another live account's name, which would aim the Art. 17 history erasure at that
+ * account's rows.
  *
- * <p>Both are about the Art. 17 erasure, whose text-matched statements are driven by exactly this
- * self-service field and carry no owner predicate:
- *
- * <ul>
- *   <li><b>The erasure sentinel.</b> {@code HandleAnonymisation}'s comment asserted that no real
- *       handle could equal the token while the field had only {@code @Size(max = 255)} on it — an
- *       invariant the code did not have. This class is what the comment now points at.
- *   <li><b>Another live account's name.</b> A departing member could set their display name to a
- *       victim's handle, tick "also erase my history", and have an admin rewrite the
- *       <em>victim's</em> job orders, handover receipts and audit labels to the sentinel. Since
- *       every viewer renders that token as "anonymised", the victim's rows then state that this
- *       person requested erasure — about somebody who never asked.
- * </ul>
- *
- * <p>What is <em>not</em> asserted here, deliberately: that the column is globally unique. Two
- * members who happen to share a spelling is a situation the system has always tolerated and
- * ADR-0183 documents as acceptable over-matching. What is rejected is <em>changing</em> a name into
- * a collision, which is the only way to aim the eraser.
+ * <p>Global uniqueness is not asserted; only changing a name into a collision is rejected
+ * (ADR-0183).
  */
 class UserServiceReservedNameTest {
 

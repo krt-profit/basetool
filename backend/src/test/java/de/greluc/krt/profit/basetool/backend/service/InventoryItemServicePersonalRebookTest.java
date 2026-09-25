@@ -70,19 +70,13 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 
 /**
- * Coverage for {@link InventoryItemService#rebookPersonal} — the personal-marker rebooking
- * ("Umbuchung", REQ-INV-007) flow that splits part or all of an inventory row into a new row with
- * the opposite {@code personal} flag.
+ * Unit tests for {@link InventoryItemService#rebookPersonal} (REQ-INV-007), which splits part or
+ * all of a row into a new row with the opposite {@code personal} flag.
  *
- * <p>The direction is derived from the source row's {@code personal} flag, never from the caller: a
- * {@code personal = true} source is de-personalized (new shared row stamped on the picked org-unit
- * pool, audit {@link AuditEventType#INVENTORY_ITEM_DEPERSONALIZED}); a {@code personal = false}
- * source is personalized (new private row carrying the source row's org-unit stamp, job-order /
- * mission dropped, audit {@link AuditEventType#INVENTORY_ITEM_PERSONALIZED}). The split mirrors the
- * book-out {@code TRANSFER} branch: the moved amount is decremented off the source (the source is
- * deleted once depleted below the epsilon) and inserted as a brand-new append-only row. A bug here
- * means wrong ownership decisions, lost stock, or a personal row that illegally carries a job-order
- * / mission link.
+ * <p>The direction follows the source row: a personal source is de-personalised onto the picked
+ * org-unit pool ({@link AuditEventType#INVENTORY_ITEM_DEPERSONALIZED}); a shared source is
+ * personalised, dropping its job-order and mission links ({@link
+ * AuditEventType#INVENTORY_ITEM_PERSONALIZED}).
  */
 @ExtendWith(MockitoExtension.class)
 class InventoryItemServicePersonalRebookTest {
@@ -375,13 +369,8 @@ class InventoryItemServicePersonalRebookTest {
   }
 
   /**
-   * Builds a source inventory row owned by {@link #owner} at {@link #location} for {@link
-   * #material}, with the given amount, optimistic-lock version and {@code personal} flag.
-   *
-   * @param amount the source row's available quantity
-   * @param version the source row's {@code @Version}
-   * @param personal the source row's personal flag (drives the rebook direction)
-   * @return the populated transient source row
+   * Rebooking a game-item row copies the game item onto the new personal row, with material and
+   * quality left {@code null}.
    */
   @Test
   void rebook_itemRow_copiesGameItemOntoNewRow() {

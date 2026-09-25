@@ -24,8 +24,8 @@ import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 
 /**
- * Request body to rename and/or reorder a Kommandogruppe (epic #800, REQ-ROLE-003). The optimistic-
- * lock {@code version} guards against a concurrent edit (409 on mismatch).
+ * Request body to rename and/or reorder a Kommandogruppe (REQ-ROLE-003); a stale {@code version}
+ * yields 409.
  *
  * @param name the new display name; required, 1–120 chars.
  * @param sortIndex the new ascending display order within the squadron; zero or positive.

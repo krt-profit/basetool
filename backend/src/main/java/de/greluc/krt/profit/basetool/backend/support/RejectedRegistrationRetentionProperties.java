@@ -28,22 +28,15 @@ import org.springframework.validation.annotation.Validated;
 
 /**
  * Validated configuration of the rejected-registration retention sweep (REQ-SEC-057, prefix {@code
- * app.registrations.rejected-retention}, fed by {@code APP_REGISTRATIONS_REJECTED_RETENTION_*}).
+ * app.registrations.rejected-retention}).
  *
- * <p>The sweep deletes a refused registration — its {@code app_user} row, its approval events and
- * its Keycloak user — once the rejection is older than {@code maxAge}. The spec states the window
- * is "not zero on purpose": it is also the period in which an erroneous rejection can still be
- * reopened (REQ-SEC-034). Bound through {@code @Value} it accepted {@code P0D} and negative values,
- * either of which would purge every rejection on the next run, including one decided a minute ago
- * (BE-MOD-03). The one-day floor makes "not zero" a startup check: a value under it refuses to
- * start the context.
+ * <p>The sweep deletes a refused registration, its approval events and its Keycloak user once the
+ * rejection is older than {@code maxAge}. A value below the floor refuses to start the context.
  *
- * @param enabled whether the sweep bean exists at all ({@code @ConditionalOnProperty} on the task
- *     reads the same key; default {@code true}, {@code false} under the {@code test} profile)
- * @param maxAge how long a rejected registration is kept after the rejection; at least one day,
- *     default {@code P90D}
- * @param interval the pause between two sweeps ({@code fixedDelay}); at least one minute, default
- *     {@code PT24H}
+ * @param enabled whether the sweep bean exists (default {@code true}, {@code false} under the
+ *     {@code test} profile)
+ * @param maxAge how long a rejected registration is kept; at least one day, default {@code P90D}
+ * @param interval the pause between two sweeps; at least one minute, default {@code PT24H}
  */
 @Validated
 @ConfigurationProperties("app.registrations.rejected-retention")

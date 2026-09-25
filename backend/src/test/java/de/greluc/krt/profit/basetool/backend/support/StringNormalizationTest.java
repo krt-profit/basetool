@@ -26,14 +26,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit tests for {@link StringNormalization}, the shared NFC-normalize-and-length-cap step
- * extracted from {@code NormalizedStringDeserializer} and {@code NormalizedStringEditor} plus the
- * blank-collapse primitives ({@link StringNormalization#blankToNull(String)}, {@link
- * StringNormalization#trimToNull(String)}) and the full {@link
- * StringNormalization#normalize(String, int, boolean) normalize} pipeline the service layer and
- * form editor reuse. The accent code points are built via {@link Character#toString(int)} rather
- * than literals or escaped unicode, so the decomposed-vs-precomposed distinction the tests hinge on
- * is unambiguous.
+ * Unit tests for {@link StringNormalization}: NFC normalization with length cap, {@link
+ * StringNormalization#blankToNull(String)}, {@link StringNormalization#trimToNull(String)} and the
+ * full {@link StringNormalization#normalize(String, int, boolean) normalize} pipeline.
  */
 class StringNormalizationTest {
 

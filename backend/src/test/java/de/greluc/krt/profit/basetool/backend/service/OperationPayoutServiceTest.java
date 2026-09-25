@@ -88,29 +88,25 @@ class OperationPayoutServiceTest {
   @Mock private AuditService auditService;
 
   /**
-   * Self-proxy the payout toggle uses to open a fresh {@code REQUIRES_NEW} transaction per retry
-   * (#1111). In these unit tests it is stubbed to return the {@link #operationPayoutService} under
-   * test (or a spy of it) so the orchestrator delegates to the real / spied within-transaction
-   * body.
+   * Self-proxy used by the payout toggle for its {@code REQUIRES_NEW} retries, stubbed to return
+   * the {@link #operationPayoutService} under test or a spy of it.
    */
   @Mock private ObjectProvider<OperationPayoutService> self;
 
   @InjectMocks private OperationPayoutService operationPayoutService;
 
   /**
-   * The payout calculator is the money-handling core of the operation flow. Its previous coverage
-   * was 0% — these tests exhaustively cover the branches:
+   * Branch tests of the payout calculation.
    *
    * <ol>
-   *   <li>Operation lookup (not-found path).
-   *   <li>Mission validity gate (null start, null end, end &lt;= start).
-   *   <li>Participant identity (user vs guest vs neither).
-   *   <li>Effective-window clamping (pStart &lt; actualStart, pEnd &gt; actualEnd, pEnd null falls
-   *       back to now()).
-   *   <li>DONATE preference precedence across multiple missions.
-   *   <li>Aggregation across missions for the same participant.
-   *   <li>Percentage math (total &gt; 0 vs total == 0 div-by-zero guard, two-decimal rounding).
-   *   <li>Output ordering (case-insensitive by participant name).
+   *   <li>Operation lookup (not found).
+   *   <li>Mission validity (null start, null end, end &lt;= start).
+   *   <li>Participant identity (user, guest, neither).
+   *   <li>Window clamping, including a null end falling back to now.
+   *   <li>DONATE precedence across missions.
+   *   <li>Aggregation across missions per participant.
+   *   <li>Percentage math, the zero-total guard and two-decimal rounding.
+   *   <li>Case-insensitive ordering by participant name.
    * </ol>
    */
   @Nested
@@ -550,18 +546,10 @@ class OperationPayoutServiceTest {
   }
 
   /**
-   * Coverage for the money-side of the payout breakdown. The reimbursement-first model says: each
-   * participant's out-of-pocket expenses (mission EXPENSE entries owned by them + refinery orders'
-   * costs they own) are paid back from gross income, and the remaining {@code totalSum} is split
-   * per participation percentage among PAYOUT participants. DONATE participants keep their
-   * reimbursement (it is their own money returned) but contribute their share. Finally an in-game
-   * banking fee is deducted from every participant's gross payout, and the resulting net is rounded
-   * HALF_UP to whole aUEC, so {@code payoutAmount = round(personalExpenses + shareAmount -
-   * transferFee)}. The fee rate comes from the runtime-editable {@code operation.transfer_fee_rate}
-   * system setting and falls back to 0.5% when the row is missing — tests that don't stub {@code
-   * systemSettingService.getSettingValue(...)} therefore exercise the 0.5% fallback path, which is
-   * what the existing assertions are calibrated to. The combined paid-out fields are covered
-   * together because they share the same setup.
+   * Tests the money side of the payout breakdown: {@code payoutAmount = round(personalExpenses +
+   * shareAmount - transferFee)}, rounded HALF_UP to whole aUEC.
+   *
+   * <p>Without a stubbed {@code operation.transfer_fee_rate} the 0.5% fallback fee applies.
    */
   @Nested
   class GetOperationPayoutsAmountTests {
@@ -991,13 +979,8 @@ class OperationPayoutServiceTest {
     }
 
     /**
-     * Audit MEDIUM-1: a caller who reached the operation only through the participant escape gets
-     * their own row and nothing else.
-     *
-     * <p>The escape is self-issuable - {@code POST /api/v1/missions/&#123;id&#125;/join} is open
-     * for every non-internal mission of every org unit - so honouring it with the full breakdown
-     * meant one request bought a foreign unit's entire payout table, callsigns and amounts
-     * included.
+     * A caller who reached the operation only through the participant escape sees only their own
+     * row.
      */
     @Test
     void summary_escapeOnlyCaller_seesOnlyTheirOwnRow() {
@@ -1277,11 +1260,9 @@ class OperationPayoutServiceTest {
   }
 
   /**
-   * Tests the concurrency contract of the payout toggle (#1111): two leads ticking the same
-   * participant race on the unique constraint / {@code @Version}, and the loser must retry in a
-   * fresh transaction rather than 409 — so last-writer-wins actually holds. Drives the orchestrator
-   * ({@link OperationPayoutService#setPayoutStatus}) with a spied within-transaction body to
-   * simulate the race deterministically.
+   * Tests that the loser of a concurrent payout toggle in {@link
+   * OperationPayoutService#setPayoutStatus} retries in a fresh transaction, simulated with a spied
+   * transaction body.
    */
   @Nested
   class SetPayoutStatusConcurrencyTests {

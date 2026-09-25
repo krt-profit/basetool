@@ -42,32 +42,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Finds every mention of a name across the application's free-text surfaces (REQ-SEC-060).
+ * Finds every mention of a name across the application's free-text columns, to serve Art. 16 and
+ * Art. 17 requests (REQ-SEC-060). ADMIN only.
  *
- * <p><b>Why this exists.</b> A person's name can sit where no foreign key points: an external
- * mission participant, a party lead without an account, a job-order handover recipient, an
- * org-chart placeholder, a booking reason, an admin's note. An Art. 16 rectification or Art. 17
- * erasure request from such a person could not be served, because nothing could find the entries —
- * and a rectification that fixes one of four occurrences is not a rectification. This is the search
- * that makes those requests answerable, and {@code docs/privacy/data-subject-requests.md} tells the
- * reader to run it for <em>every</em> Art. 16/17 request, members included.
- *
- * <p><b>ADMIN only</b>, and not merely because it is expensive: a query that returns every place a
- * given name appears is a profile of that person assembled across the whole system.
- *
- * <p><b>Bounded by construction.</b> One statement, a {@code UNION ALL} over the registry with a
- * per-branch {@code LIMIT}, then an overall cap. A multi-table {@code ILIKE} sweep with no ceiling
- * is a denial-of-service waiting for a one-character search term, so:
- *
- * <ul>
- *   <li>the term must be at least {@value #MIN_TERM_LENGTH} characters
- *   <li>each branch returns at most {@value #PER_TARGET_LIMIT} rows
- *   <li>the whole result is capped at {@value #TOTAL_LIMIT}, and the caller is told when it was
- *       truncated rather than being left to assume it saw everything
- * </ul>
- *
- * <p><b>Case-insensitive, always.</b> Whoever typed the name was not copying it from a roster, so
- * matching case would miss the very entries this exists to find.
+ * <p>Case-insensitive substring match in one {@code UNION ALL} statement, bounded by a minimum term
+ * length of {@value #MIN_TERM_LENGTH}, {@value #PER_TARGET_LIMIT} rows per column and {@value
+ * #TOTAL_LIMIT} rows overall; truncation is reported to the caller.
  */
 @Service
 @RequiredArgsConstructor
@@ -111,13 +91,8 @@ public class PersonSearchService {
    * The outcome of one search.
    *
    * @param hits the matches, in registry order (member record first, audit trails last)
-   * @param truncated whether the overall cap was reached, so the admin knows the list is partial
-   * @param cappedColumns the columns that hit the <b>per-column</b> cap, as {@code table.column}.
-   *     <p>Reported separately because the two caps are reached independently and the overall one
-   *     almost never fires: with 75 registered targets and 25 hits allowed per column, a name
-   *     occurring 40 times in a single column produced 25 hits, a union total far below 300, and
-   *     {@code truncated == false}. The admin read a complete-looking list while 15 occurrences
-   *     were dropped — on the one surface whose whole purpose is to be exhaustive.
+   * @param truncated whether the overall cap was reached
+   * @param cappedColumns the columns that hit the per-column cap, as {@code table.column}
    */
   public record PersonSearchResult(
       List<PersonSearchHitDto> hits, boolean truncated, List<String> cappedColumns) {}
@@ -176,21 +151,8 @@ public class PersonSearchService {
   }
 
   /**
-   * Appends the audit row for one performed search (REQ-SEC-060, REQ-AUDIT-001).
-   *
-   * <p>The search is a read, and a read would normally leave no trace — but this one assembles a
-   * profile of a named person across the whole system, and is the one operation here whose misuse
-   * would otherwise be invisible. Hence a row per search.
-   *
-   * <p>Separate from {@link #search(String)} rather than folded into it, because that method is
-   * {@code readOnly = true}: Spring marks the JDBC connection read-only and Postgres refuses an
-   * {@code INSERT} on it. The row gets its own short writable transaction, which is also what
-   * satisfies the {@code MANDATORY} propagation on {@link AuditService#record} — a controller
-   * calling it straight from a handler cannot satisfy it at all.
-   *
-   * <p><b>The term itself never reaches the row.</b> It is somebody's name, and REQ-AUDIT-001 keeps
-   * user free text out of the details payload; its length and the hit count are enough to judge how
-   * the surface was used.
+   * Appends the audit row for one performed search (REQ-SEC-060, REQ-AUDIT-001) in its own writable
+   * transaction. The row records the term's length and the hit count, never the term.
    *
    * @param term the term that was searched, used only for its trimmed length
    * @param result what the search returned, used only for its hit count and truncation flag
@@ -208,11 +170,7 @@ public class PersonSearchService {
   }
 
   /**
-   * Assembles the {@code UNION ALL} over the registry.
-   *
-   * <p>One statement rather than one query per column: the planner sees the whole thing, the trip
-   * to the database happens once, and a per-branch {@code LIMIT} keeps any single column from
-   * dominating the result.
+   * Assembles one {@code UNION ALL} statement over the registry, with a {@code LIMIT} per branch.
    *
    * @return the SQL, with {@code :term} left to be bound
    */
@@ -277,12 +235,7 @@ public class PersonSearchService {
   }
 
   /**
-   * Renders a registry constant as a SQL string literal.
-   *
-   * <p>These are compile-time constants from the registry, not input, and {@link
-   * #requireSafeIdentifier} has already rejected anything unexpected for the identifiers. The
-   * doubling is here so an area or link-kind label containing an apostrophe could not break the
-   * statement either.
+   * Renders a registry constant as a SQL string literal, doubling any apostrophe.
    *
    * @param value the literal
    * @return the quoted literal

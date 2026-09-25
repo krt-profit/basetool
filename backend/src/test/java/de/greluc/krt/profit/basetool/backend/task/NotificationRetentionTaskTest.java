@@ -123,14 +123,7 @@ class NotificationRetentionTaskTest {
     task().purgeExpiredNotifications();
   }
 
-  /**
-   * A failing read half must not skip the unread half.
-   *
-   * <p>They were two sequential statements, so a read purge that threw returned before the unread
-   * purge was reached \u2014 and the unread half is the one this feature added: without it an inbox
-   * nobody opened kept the triggering member's handle forever. The halves share nothing but a
-   * schedule, so one failing is no reason to skip the other.
-   */
+  /** A failing read-notification purge does not skip the unread purge. */
   @Test
   void aFailingReadHalfStillLetsTheUnreadHalfRun() {
     when(notificationService.purgeReadOlderThan(any())).thenThrow(new RuntimeException("db down"));

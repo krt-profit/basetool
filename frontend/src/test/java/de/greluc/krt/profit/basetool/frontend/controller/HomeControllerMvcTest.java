@@ -49,22 +49,10 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Renders the full {@code index} view (including {@code fragments/sidebar} and the transitively
- * included {@code fragments/toast}) end-to-end through MockMvc, so any breakage in the toast
- * fragment's SpEL expressions surfaces as a failed test rather than a 500 in production.
- *
- * <p>Regression context: {@code fragments/toast} previously called {@code
- * #strings.matches(param.error[0], '...')}, which throws {@code SpelEvaluationException: EL1004E:
- * Method matches(java.lang.String,java.lang.String) cannot be found on type
- * org.thymeleaf.expression.Strings}. Thymeleaf's {@code Strings} utility has no {@code matches}
- * method &mdash; {@code matches} is a native SpEL infix operator. The fix switched both branches to
- * {@code param.X[0] matches '...'}. The original crash happened on plain {@code GET /} for
- * anonymous users after a failed Keycloak callback (re)appended {@code ?error=...} to the URL; the
- * tests below cover exactly that path.
- *
- * <p>The pre-fix code reached the broken {@code Strings.matches} call only when {@code param.error
- * != null} (resp. {@code param.success != null}) due to SpEL's short-circuiting {@code and}, so the
- * regression cases here intentionally supply a matching query parameter.
+ * Renders the full {@code index} view, including the sidebar and toast fragments, through MockMvc
+ * so a broken SpEL expression in the toast fragment fails a test instead of returning 500. Uses
+ * {@code ?error=} and {@code ?success=} parameters to exercise the toast's {@code matches}
+ * branches.
  */
 @SpringBootTest
 class HomeControllerMvcTest {
@@ -99,10 +87,7 @@ class HomeControllerMvcTest {
   }
 
   /**
-   * Direct regression: pre-fix this exact request crashed the template with {@code EL1004E: Method
-   * matches(String,String) cannot be found on type org.thymeleaf.expression.Strings}. After the
-   * fix, the SpEL infix {@code param.error[0] matches '...'} evaluates cleanly and the param-toast
-   * div is emitted in the response body.
+   * An {@code ?error=} value matching the key pattern renders the page with the parameter toast.
    */
   @Test
   void home_ShouldRenderIndex_WhenErrorParamMatchesKeyPattern() throws Exception {
@@ -114,9 +99,7 @@ class HomeControllerMvcTest {
   }
 
   /**
-   * Same regression as the error variant above, but for the symmetric {@code ?success=} branch
-   * (toast.html line 38). Both branches used the broken {@code #strings.matches} call and both must
-   * now route through the SpEL {@code matches} operator.
+   * A {@code ?success=} value matching the key pattern renders the page with the parameter toast.
    */
   @Test
   void home_ShouldRenderIndex_WhenSuccessParamMatchesKeyPattern() throws Exception {
@@ -404,14 +387,7 @@ class HomeControllerMvcTest {
   }
 
   /**
-   * The landing page renders no data, calls no backend and mints no session (REQ-SEC-052, D7).
-   *
-   * <p>All three used to be violated on every hit. The seven-day mission grid was fetched and
-   * rendered for anyone who asked; and a session was created twice over — once by the {@code
-   * HttpSession} parameter Spring resolves with {@code getSession(true)} whether the body uses it
-   * or not, and once by {@code SafeCsrfAdvice} forcing the deferred CSRF token, which the default
-   * {@code HttpSessionCsrfTokenRepository} saves into a fresh session before any template runs.
-   * Every crawler hit cost two sessions in Redis for a page that carries no form.
+   * The landing page renders no data, calls no backend and creates no session (REQ-SEC-052).
    *
    * @throws Exception if the request could not be performed
    */
@@ -435,16 +411,9 @@ class HomeControllerMvcTest {
   }
 
   /**
-   * The landing page shows a logged-out visitor no navigation.
-   *
-   * <p>Pinned because of what it depends on: {@code landing.html} includes {@code
-   * fragments/sidebar}, and that fragment carries the tool's whole navigation, the notification
-   * bell and the org-unit switcher behind {@code sec:authorize="isAuthenticated()"}. Those three
-   * guards look exactly like the twenty-five on the pages behind the login — which are redundant
-   * with the URL matrix, because those pages answer nobody without a session. These are not: this
-   * page is one of the four surfaces REQ-SEC-052 serves without one, so the guards are the only
-   * thing between a visitor and the navigation. Somebody tidying "always-true" template guards
-   * would delete all twenty-eight, and only this case would notice.
+   * The landing page shows a logged-out visitor no navigation, notification bell or org-unit
+   * switcher; the sidebar's {@code sec:authorize} guards are the only protection on this public
+   * page (REQ-SEC-052).
    *
    * @throws Exception if the request could not be performed
    */

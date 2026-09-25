@@ -21,9 +21,7 @@ package de.greluc.krt.profit.basetool.backend.model;
 
 /**
  * Lifecycle state of a {@link BankAccount} (REQ-BANK-002). Accounts are never hard-deleted; closing
- * requires a zero balance and turns the account read-only (no postings) while history and
- * statements stay accessible. Persisted as {@code VARCHAR(16)} via {@code @Enumerated(STRING)}; the
- * V150 CHECK constraint mirrors this set.
+ * requires a zero balance and makes the account read-only while its history stays accessible.
  */
 public enum BankAccountStatus {
 

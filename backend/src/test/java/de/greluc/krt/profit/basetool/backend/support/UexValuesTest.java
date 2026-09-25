@@ -27,13 +27,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit tests for {@link UexValues#parseCrew(String)}.
- *
- * <p>The parser exists because UEX serves a vehicle's crew complement as one compact string and
- * <em>not</em> as the {@code crew_min} / {@code crew_max} fields this project used to bind — those
- * decoded to {@code null} and cleared both columns on every sync (REQ-DATA-015, ADR-0148). These
- * cases are the shapes the live {@code /vehicles} payload actually contains ({@code "1"}, {@code
- * "1,2"}, {@code "1,1"}, {@code ""} and absent), plus the malformed ones the parser must refuse.
+ * Unit tests for {@link UexValues#parseCrew(String)} over the crew-string shapes of the UEX {@code
+ * /vehicles} payload and malformed input (REQ-DATA-015, ADR-0148).
  */
 class UexValuesTest {
 

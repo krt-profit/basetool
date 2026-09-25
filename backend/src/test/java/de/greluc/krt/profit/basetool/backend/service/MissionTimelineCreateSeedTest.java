@@ -50,13 +50,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Unit tests for the create-time timeline seeders on {@link MissionTimelineService}: {@code
- * addObjectiveAtCreate} / {@code addStepAtCreate}. These run inside the mission-create transaction
- * on the just-persisted (managed) mission, so — unlike the post-create add mutators — they take the
- * mission directly (never re-{@code findById} it), assign the caller-supplied contiguous {@code
- * orderIndex}, and neither check nor bump the section version (no concurrent editor exists yet).
- * They still record the per-item audit event carrying only the id (plus the goal kind), never the
- * user-supplied title (REQ-AUDIT-001, no free text / PII in the details payload).
+ * Unit tests for the create-time timeline seeders {@code addObjectiveAtCreate} and {@code
+ * addStepAtCreate} of {@link MissionTimelineService}: they use the given mission and index, skip
+ * the version check, and audit without the user-supplied title (REQ-AUDIT-001).
  */
 @ExtendWith(MockitoExtension.class)
 class MissionTimelineCreateSeedTest {

@@ -37,19 +37,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Integration-level validation gate for {@code PUT /api/v1/users/me/payout-preference}. The
- * pure-Mockito {@link UserControllerTest} calls the controller method directly and therefore never
- * exercises the {@code @Valid} chain; these MockMvc cases boot the full filter +
- * argument-resolution stack so a regression that drops {@code @NotNull} from {@code
- * MyPayoutPreferenceRequest.preference} or {@code .version} surfaces as a 400 here instead of a
- * silent {@code null} reaching the service.
- *
- * <p>The harness intentionally mirrors {@code UserMembershipsSecurityTest} (same
- * {@code @MockitoBean} set: {@link OrgUnitMembershipService} + {@link JwtDecoder}) so both share
- * one cached Spring context. CSRF is disabled in the {@code test} profile, so the bare {@code
- * .with(jwt())} principal is enough to clear the {@code /api/v1/users/me/**} {@code
- * authenticated()} URL rule and the method-level {@code @PreAuthorize("isAuthenticated()")} and
- * reach bean validation.
+ * Verifies over the full MockMvc stack that {@code PUT /api/v1/users/me/payout-preference} answers
+ * 400 when {@code preference} or {@code version} is missing.
  */
 @SpringBootTest
 class UserPayoutPreferenceValidationTest {

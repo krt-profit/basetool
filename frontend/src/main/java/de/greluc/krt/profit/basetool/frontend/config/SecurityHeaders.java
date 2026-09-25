@@ -28,16 +28,12 @@ import org.springframework.security.web.header.HeaderWriter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
 
 /**
- * The frontend's security-response-header policy — the per-request {@code Content-Security-Policy}
- * (nonce-gated {@code script-src}/{@code style-src} plus a Keycloak-aware {@code form-action}),
- * {@code X-Frame-Options: DENY}, {@code Referrer-Policy}, Cross-Origin-Opener/Resource-Policy,
- * HSTS, {@code Permissions-Policy} and {@code X-Content-Type-Options} — extracted verbatim from
- * {@code SecurityConfig.filterChain} (audit L-tier config de-bloat, #15) so the filter chain wires
- * this self-contained concern with a single {@link #frontend(String)} call rather than an inline
- * ~40-line lambda plus its two supporting methods and the CSP template.
+ * The frontend's security response headers: the per-request nonce-gated {@code
+ * Content-Security-Policy} with a Keycloak-aware {@code form-action}, {@code X-Frame-Options:
+ * DENY}, {@code Referrer-Policy}, cross-origin policies, HSTS, {@code Permissions-Policy} and
+ * {@code X-Content-Type-Options}.
  *
- * <p>Stateless and static-only; the emitted headers are byte-identical to the previous inline
- * configuration and pinned by {@code SecurityHeadersTest}.
+ * <p>Stateless; pinned by {@code SecurityHeadersTest}.
  */
 @Slf4j
 public final class SecurityHeaders {
@@ -53,13 +49,10 @@ public final class SecurityHeaders {
           + "script-src 'nonce-%1$s' 'strict-dynamic'";
 
   /**
-   * Builds the frontend response-header {@link Customizer} for {@link HttpSecurity#headers}: the
-   * per-request CSP writer plus the static frame-options / referrer / cross-origin / HSTS /
-   * permissions-policy / content-type-options headers, in the exact order the filter chain applied
-   * them inline.
+   * Builds the frontend response-header {@link Customizer} for {@link HttpSecurity#headers}.
    *
-   * @param issuerUri the configured Keycloak issuer URI, used to derive the allowed logout-redirect
-   *     origin for the CSP {@code form-action} directive
+   * @param issuerUri the configured Keycloak issuer URI, from which the CSP {@code form-action}
+   *     logout-redirect origin is derived
    * @return the headers customizer to hand to {@code http.headers(...)}
    */
   public static Customizer<HeadersConfigurer<HttpSecurity>> frontend(String issuerUri) {
@@ -92,23 +85,11 @@ public final class SecurityHeaders {
   }
 
   /**
-   * Builds the per-request CSP header writer. The nonce is substituted per request; the {@code
-   * form-action} source list is computed once here (this method runs a single time while the filter
-   * chain is assembled). {@code 'self'} covers every same-origin form in the app, and the
-   * configured Keycloak origin is appended to it.
+   * Builds the per-request CSP header writer. The nonce is substituted per request; {@code
+   * form-action} is {@code 'self'} plus the Keycloak origin, so the POST-logout redirect to the
+   * end-session endpoint is allowed.
    *
-   * <p>Since ADR-0166 that appended origin is normally the app's own: Keycloak serves at {@code
-   * /auth} on this host, so the POST {@code /logout} whose success redirect targets the {@code
-   * end_session_endpoint} no longer leaves the origin, and the directive collapses to the
-   * equivalent of {@code 'self'}. The derivation is kept rather than hardcoded for the reason it
-   * was written this way in the first place: it states the RULE — the end-session endpoint's origin
-   * must be a permitted form target — so a deployment configuring an issuer elsewhere stays correct
-   * without an edit. Before that ADR the two really did differ, and without this entry Chromium
-   * blocked the redirect: the local Spring session was cleared but the Keycloak SSO session
-   * survived, so the next login silently re-authenticated instead of prompting.
-   *
-   * @param issuerUri the configured Keycloak issuer URI, used to derive the allowed logout-redirect
-   *     origin
+   * @param issuerUri the configured Keycloak issuer URI
    * @return a header writer that emits the {@code Content-Security-Policy} response header
    */
   private static HeaderWriter cspNonceHeaderWriter(String issuerUri) {
@@ -122,14 +103,11 @@ public final class SecurityHeaders {
   }
 
   /**
-   * Derives the origin ({@code scheme://host[:port]}) from the configured OIDC issuer URI, for use
-   * in the CSP {@code form-action} directive. Keycloak's {@code end_session_endpoint} shares the
-   * issuer's origin, so this is precisely the origin the POST-logout redirect must be allowed to
-   * reach.
+   * Derives the origin ({@code scheme://host[:port]}) of the OIDC issuer URI, which Keycloak's
+   * {@code end_session_endpoint} shares.
    *
    * @param issuerUri the configured Keycloak issuer URI; may be {@code null}, blank, or unparseable
-   * @return the {@code scheme://host[:port]} origin, or an empty string if it cannot be derived (in
-   *     which case {@code form-action} stays {@code 'self'}-only)
+   * @return the origin, or an empty string if it cannot be derived
    */
   @NotNull
   private static String keycloakOriginOf(String issuerUri) {

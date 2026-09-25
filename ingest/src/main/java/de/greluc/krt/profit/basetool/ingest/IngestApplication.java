@@ -24,16 +24,12 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 
 /**
- * Spring Boot entry point for the {@code ingest} gateway — the only internet-reachable
- * authenticated entry the desktop extractor uses to push its locally produced JSON into the
- * basetool (epic #639, ADR-0018).
+ * Spring Boot entry point for the {@code ingest} gateway, the internet-reachable endpoint the
+ * desktop extractor pushes its JSON to (ADR-0018).
  *
- * <p>The gateway is deliberately tiny: it validates the caller's Keycloak JWT, calls the backend's
- * existing import endpoints over the internal network under its OWN service-account identity while
- * naming the caller in an on-behalf-of header (ADR-0129), stages the returned draft in Redis for a
- * one-time browser pickup, and returns a handoff id. It owns no database, runs no Flyway migration
- * and serves no HTML. {@code @ConfigurationPropertiesScan} registers the {@code config/*Properties}
- * classes without an explicit enable list.
+ * <p>It validates the caller's JWT, calls the backend import endpoints under its own service
+ * account on behalf of the caller (ADR-0129), stages the draft in Redis for one-time browser pickup
+ * and returns a handoff id. It owns no database and serves no HTML.
  */
 @SpringBootApplication(
     exclude = {

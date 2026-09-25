@@ -213,24 +213,11 @@ class InventoryPageControllerMvcTest {
   }
 
   /**
-   * REQ-INV-037: the filter row sits in a collapsible panel, in both the Material and the Items
-   * view. Four separate guarantees are pinned here because each fails silently on its own:
+   * The "Mein Lager" filter row sits in a collapsible panel in both views (REQ-INV-037): the shared
+   * toggle carries {@code aria-expanded}/{@code aria-controls}, the panel is rendered expanded, the
+   * filter form is inside it, and the count chip keeps the raw {@code {0}} placeholder.
    *
-   * <ul>
-   *   <li>the toggle comes from the shared {@code filterToggle} fragment and carries the {@code
-   *       aria-expanded}/{@code aria-controls} pair — without them the collapse is a dead button
-   *       and mute to a screen reader;
-   *   <li>the panel is rendered EXPANDED. {@code hidden} is the collapse mechanism and the script
-   *       applies it on load, so a server-rendered collapsed panel would leave a client without
-   *       JavaScript no way to reach the filters at all;
-   *   <li>the filter form is INSIDE the panel, between the toggle and the bulk bar — a form left
-   *       outside stays permanently visible and the collapse silently does nothing;
-   *   <li>the count chip ships the raw {@code {0}} placeholder. The script substitutes the number
-   *       client-side, so a message source that resolved the argument here would hand it a string
-   *       with nothing left to replace and the count would never be announced.
-   * </ul>
-   *
-   * @param path the Lager view under test — the two views render two different filter forms
+   * @param path the Lager view under test, each rendering a different filter form
    * @throws Exception if the request fails
    */
   @ParameterizedTest
@@ -265,18 +252,11 @@ class InventoryPageControllerMvcTest {
   }
 
   /**
-   * REQ-INV-037 on the shared "Globales Lager", pinning the same four guarantees as its "Mein
-   * Lager" twin above — the shared toggle fragment plus the {@code aria-expanded}/{@code
-   * aria-controls} pair, the panel rendered EXPANDED so a client without JavaScript keeps its
-   * filters, the filter form INSIDE the panel, and the raw {@code {0}} placeholder the script
-   * substitutes client-side.
+   * The "Globales Lager" filter row sits in a collapsible panel in both views (REQ-INV-037), with
+   * the same four guarantees as the "Mein Lager" test; the source-order assertion ensures the panel
+   * wraps the filter forms themselves.
    *
-   * <p>The source-order assertion is what catches the specific way this page can regress: its two
-   * filter forms used to sit in a wrapper INSIDE the action bar, so a panel opened around the
-   * wrapper rather than around the forms would still render every attribute asserted here while
-   * collapsing nothing at all.
-   *
-   * @param path the Lager view under test — the two views render two different filter forms
+   * @param path the Lager view under test, each rendering a different filter form
    * @throws Exception if the request fails
    */
   @ParameterizedTest
@@ -690,11 +670,8 @@ class InventoryPageControllerMvcTest {
   }
 
   /**
-   * Full-render guard for the per-material drilldown's server-side pagination (REQ-INV-033). Stubs
-   * a three-page backend response and asserts the real {@code inventory-material} view renders a
-   * data row plus the pager (a next-page link at the snapped size) and the size picker's
-   * whitelisted options — so the page can never again silently cap a large material at a single
-   * fetch (ADR-0104), and a Thymeleaf error in the pager wiring fails the build.
+   * The per-material drilldown renders a data row, the pager and the whitelisted size options for a
+   * multi-page backend response (REQ-INV-033, ADR-0104).
    */
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
@@ -810,15 +787,8 @@ class InventoryPageControllerMvcTest {
   }
 
   /**
-   * Fragment-render guard for the personal Lager's lazy stack-entries drill-down ({@code
-   * /inventory/my/stack/entries}). The append-only Lager loads a stack's entries on expand, not
-   * inline, so this is where the per-entry Variante-C allocation chips (REQ-INV-027) live.
-   * Regression: a refinery order assigned to a (now non-active) mission produces an entry whose
-   * mission is no longer returned by {@code /api/v1/missions/lookup}; the mission must still appear
-   * because its chip renders from the entry's own {@code missionAllocations}, independent of the
-   * (empty) candidate lookup. Stubs the backend stack-entries page with that allocation and asserts
-   * the real {@code stackEntriesMy} fragment carries the entry row (id) and the mission chip — so a
-   * Thymeleaf 500 (stale {@code #{...}} key / bad SpEL) fails the build.
+   * The personal stack-entries fragment renders the entry row and its mission allocation chip, even
+   * when the mission is no longer returned by the active-mission lookup (REQ-INV-027).
    */
   @Test
   @WithMockUser(roles = "KRT_MEMBER", username = "test-user-123")
@@ -878,11 +848,8 @@ class InventoryPageControllerMvcTest {
   }
 
   /**
-   * PIECE amounts render whole (REQ-INV-027): a {@code PIECE} material's allocation chip and rest
-   * chip must show {@code 5} / {@code 10}, never {@code 5.000} / {@code 10.000}. Seeds a PIECE
-   * entry (amount 10) with a job-order slice of 5 and asserts the rendered {@code stackEntriesMy}
-   * fragment carries the order chip but no three-decimal amount anywhere — so a {@code
-   * formatDecimal} regression on the chips / rest chip fails the build.
+   * A {@code PIECE} material's allocation and rest chips render whole numbers ({@code 5}, {@code
+   * 10}) rather than three decimals (REQ-INV-027).
    */
   @Test
   @WithMockUser(roles = "KRT_MEMBER", username = "test-user-123")
@@ -940,12 +907,8 @@ class InventoryPageControllerMvcTest {
   }
 
   /**
-   * Picker-filter guard (REQ-ORDERS-018): the Lager "Auftrag" dropdown for a stack entry must offer
-   * only orders whose requirements include the entry's material. This is the exact reported
-   * regression — an ITEM order (no {@code job_order_material} rows, so an empty {@code materials}
-   * list) was offered for every material; the filter now keys on {@code requiredMaterialIds}, which
-   * is populated for both order kinds. Stubs two ITEM orders for the same lookup: one that requires
-   * the entry's material (must render) and one that does not (must be hidden).
+   * The stack-entry "Auftrag" picker offers only orders whose {@code requiredMaterialIds} include
+   * the entry's material, including ITEM orders (REQ-ORDERS-018).
    */
   @Test
   @WithMockUser(roles = "KRT_MEMBER", username = "test-user-123")
@@ -1030,15 +993,8 @@ class InventoryPageControllerMvcTest {
   }
 
   /**
-   * Book-in-form picker-filter guard (REQ-ORDERS-018): the {@code /inventory/input} order dropdown
-   * carries a per-option {@code data-materials} CSV that the client filter ({@code
-   * inventory-input.js#filterOrderSelects}) keys on. It must be the order's kind-agnostic {@code
-   * requiredMaterialIds}, not its {@code materials} MATERIAL-lines — an ITEM (crafting) order has
-   * no {@code job_order_material} rows, so an empty {@code materials} list rendered {@code
-   * data-materials=""} and the filter silently hid every ITEM order whose blueprint consumes the
-   * picked material (the reported "no/all/some orders" unreliability). Stubs an ITEM order with an
-   * empty {@code materials} list but a populated {@code requiredMaterialIds}, and asserts the
-   * option exposes the required material id in {@code data-materials}.
+   * The book-in form's order options expose the order's {@code requiredMaterialIds} in {@code
+   * data-materials}, so ITEM orders are filtered correctly (REQ-ORDERS-018).
    */
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
@@ -1084,13 +1040,8 @@ class InventoryPageControllerMvcTest {
   }
 
   /**
-   * Check-in picker need figures (REQ-INV-039, #1740): the {@code /inventory/input} form embeds
-   * each order's outstanding per-material need as one JSON blob on the allocation group, which
-   * {@code inventory-input.js} decodes to label the options.
-   *
-   * <p>Also pins that the page asks the lookup for the figures at all: without {@code
-   * withNeeds=true} the backend ships an empty list and every option would render unlabelled — a
-   * failure with no error anywhere.
+   * The {@code /inventory/input} form embeds each order's outstanding per-material need as one JSON
+   * blob, requested from the lookup with {@code withNeeds=true} (REQ-INV-039).
    */
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
@@ -1140,12 +1091,8 @@ class InventoryPageControllerMvcTest {
   }
 
   /**
-   * The live-sync re-read behind the same figures (REQ-FE-010): {@code /inventory/order-needs}
-   * answers the identical shape the page embedded, keyed by order id, so the page script decodes
-   * one format for both the first paint and every refresh.
-   *
-   * <p>It is an AJAX-only route ({@code X-Requested-With}); a page script cannot reach {@code
-   * /api/v1} on this origin, which is why the relay exists at all.
+   * The AJAX-only {@code /inventory/order-needs} relay returns the same shape the page embeds,
+   * keyed by order id (REQ-FE-010).
    */
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
@@ -1199,12 +1146,8 @@ class InventoryPageControllerMvcTest {
   }
 
   /**
-   * The second surface (REQ-INV-039): the per-entry {@code + Zuordnen} popover labels each order
-   * option with what that order still needs of <em>this</em> entry's material, so choosing a target
-   * does not mean opening the order first.
-   *
-   * <p>The label is server-rendered here — unlike the check-in form, this picker is a combobox,
-   * which snapshots an option's text at enhancement time and would never see a later rewrite.
+   * The per-entry "+ Zuordnen" popover labels each order option, server-side, with that order's
+   * outstanding need of the entry's material (REQ-INV-039).
    */
   @Test
   @WithMockUser(roles = "LOGISTICIAN", username = "logi-user")
@@ -1277,12 +1220,8 @@ class InventoryPageControllerMvcTest {
 
   /**
    * Same as {@link #viewMyStackEntries_ShouldRenderEntryRowsWithMissionFallbackOption()} for the
-   * logistician/admin stack-entries drill-down ({@code /inventory/all/stack/entries} → {@code
-   * stackEntriesAdmin} fragment), which additionally carries the owning {@code userId} in the stack
-   * key. Since Variante C (REQ-INV-027) the mission is an editable allocation chip (gated behind
-   * {@code sec:authorize} for association-capable roles), not a scalar {@code <option>}; the
-   * archived mission still shows because its chip renders from the entry's own {@code
-   * missionAllocations}, independent of the (empty) active-mission lookup.
+   * logistician stack-entries fragment ({@code /inventory/all/stack/entries}): an archived mission
+   * still shows as an allocation chip.
    */
   @Test
   @WithMockUser(roles = "LOGISTICIAN", username = "logi-user")
@@ -1342,13 +1281,8 @@ class InventoryPageControllerMvcTest {
   }
 
   /**
-   * Full-render guard for the personal Lager's collapsed Material → Stack rows. The append-only
-   * Lager no longer inlines a stack's entries, so this asserts the real {@code inventory-my} view
-   * renders (HTTP 200) the collapsed stack row — its location, entry count, the toggle trigger and
-   * the lazy {@code stack-entries-content} container ({@code data-stack-loaded="false"}) — while
-   * NOT inlining any per-entry row (no {@code data-item-id}); the entries arrive via the separate
-   * {@code /inventory/my/stack/entries} fragment (ADR-0003, REQ-INV-002). Catches a Thymeleaf 500
-   * from the new stack-key {@code th:data-*} attributes or a stale {@code #{...}} key.
+   * The personal Lager renders the collapsed stack row (location, entry count, toggle and lazy
+   * entries container) without inlining entry rows (ADR-0003, REQ-INV-002).
    */
   @Test
   @WithMockUser(roles = "KRT_MEMBER", username = "test-user-123")
@@ -1402,14 +1336,8 @@ class InventoryPageControllerMvcTest {
   }
 
   /**
-   * Full-render guard for the admin Lager's collapsed Material → Stack rows ({@code
-   * inventory-admin.html}). Mirrors {@link
-   * #viewMyInventory_WithStack_ShouldRenderCollapsedStackRow()} for {@code /inventory/all}: one
-   * material → one stack. Asserts the real {@code inventory-admin} view renders (HTTP 200) the
-   * collapsed stack row — its location, owner, entry count and the stack-toggle trigger plus the
-   * lazy entries container — without inlining any per-entry row; entries load via {@code
-   * /inventory/all/stack/entries}. Catches a render-500 from the new stack-key {@code th:data-*}
-   * attributes or the {@code sec:authorize}-gated stack table.
+   * Same as {@link #viewMyInventory_WithStack_ShouldRenderCollapsedStackRow()} for {@code
+   * /inventory/all}: the collapsed stack row with owner renders without inlined entry rows.
    */
   @Test
   @WithMockUser(roles = "LOGISTICIAN", username = "logi-user")
@@ -1464,12 +1392,8 @@ class InventoryPageControllerMvcTest {
   }
 
   /**
-   * Graceful-degradation guard for the parallelized input-form catalog fan-out (#769): the lookups
-   * run concurrently through the real {@link ParallelPageLoader}, but each fetch helper swallows
-   * its own failure and returns an empty list, so {@code allOf(...).join()} must never propagate an
-   * exception. Here the missions lookup throws while the materials lookup succeeds; the page must
-   * still render {@code 200} with an empty {@code missions} model attribute and the populated
-   * {@code materials} attribute — exactly as the serial version degraded.
+   * The book-in form still renders {@code 200} when one parallel catalog lookup fails: the failed
+   * {@code missions} attribute is empty and {@code materials} is populated.
    */
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
@@ -1527,11 +1451,8 @@ class InventoryPageControllerMvcTest {
   }
 
   /**
-   * Item-view render guard for the personal Lager (REQ-INV-030): {@code /inventory/my?view=items}
-   * renders the game-item tree — group row with the gameItem name, kind badge and manufacturer, the
-   * gameItemId stack key and a whole-unit amount — with no quality gauge and no mission filter,
-   * while the item filters (gameItem multi-select fed only from stocked items, job orders, personal
-   * flags) replace the material filter bar.
+   * {@code /inventory/my?view=items} renders the game-item tree with whole-unit amounts, without
+   * quality or mission filter, and with the item filter bar (REQ-INV-030).
    */
   @Test
   @WithMockUser(roles = "KRT_MEMBER", username = "test-user-123")
@@ -1714,11 +1635,8 @@ class InventoryPageControllerMvcTest {
   }
 
   /**
-   * Full-render guard for the per-game-item drilldown's server-side pagination (REQ-INV-033) — the
-   * item sibling of {@code viewMaterialInventory_ShouldRenderPaginationControls}. Stubs a
-   * three-page backend response and asserts the pager (next-page link at the snapped size) and the
-   * size-picker options render inside the item results fragment, so a large item's stock is fully
-   * reachable page by page rather than silently capped at a single fetch (ADR-0104).
+   * The per-game-item drilldown renders the pager and size options for a multi-page backend
+   * response (REQ-INV-033, ADR-0104).
    */
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
@@ -1761,12 +1679,9 @@ class InventoryPageControllerMvcTest {
   }
 
   /**
-   * Item stack-entries fragment guard (REQ-INV-030/031): the lazy {@code
-   * /inventory/my/game-item-stack/entries} drill-down renders the game-item leaf row — whole-unit
-   * amount, PIECE-typed action buttons, no mission split — carries the "Für Börse freigeben" toggle
-   * (a stock-backed item offer, REQ-MARKET-002/014; unchecked here since the released-item-ids
-   * lookup returned empty), and its "+ Zuordnen" picker offers only ITEM orders whose lines request
-   * the entry's gameItem (requiredGameItemIds), never unrelated orders.
+   * The game-item stack-entries fragment renders the item leaf row with whole-unit amount, no
+   * mission split, the Börse release toggle, and a "+ Zuordnen" picker limited to ITEM orders
+   * requesting the entry's game item (REQ-INV-031).
    */
   @Test
   @WithMockUser(roles = "KRT_MEMBER", username = "test-user-123")
@@ -1986,9 +1901,8 @@ class InventoryPageControllerMvcTest {
   }
 
   /**
-   * Item-mode check-in figures (REQ-INV-039, #1742): the embedded blob's {@code gameItems} half
-   * carries what each ITEM order still wants, so the form can label its picker after the member
-   * flips to Item mode without a second fetch.
+   * The embedded check-in blob's {@code gameItems} half carries each ITEM order's outstanding units
+   * (REQ-INV-039).
    */
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
@@ -2027,9 +1941,8 @@ class InventoryPageControllerMvcTest {
   }
 
   /**
-   * The item-mode popover (REQ-INV-039, #1742): the game-item stack entries' {@code + Zuordnen}
-   * picker labels each ITEM order with the units it still wants, the whole-unit sibling of the
-   * material picker's figure.
+   * The game-item "+ Zuordnen" picker labels each ITEM order with the units it still needs
+   * (REQ-INV-039).
    */
   @Test
   @WithMockUser(roles = "LOGISTICIAN", username = "logi-user")
@@ -2101,10 +2014,8 @@ class InventoryPageControllerMvcTest {
   }
 
   /**
-   * REQ-INV-040: both Lager pages carry the location multi-select, in both the Material and the
-   * Items view. The options are the locations that actually hold stock in the viewer's scope — they
-   * are derived from the grouped result's stack keys, so a stocked location renders as an option
-   * and the widget never falls back to the location catalog.
+   * Both Lager pages offer a location multi-select in both views, populated from the stocked
+   * locations of the grouped result (REQ-INV-040).
    *
    * @param path the Lager view under test
    * @throws Exception if the request fails

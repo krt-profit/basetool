@@ -50,18 +50,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MockMvc gate matrix for {@code GET /api/v1/special-commands/{id}}, which the SK member page reads
- * to render its header. The endpoint shares the {@link
- * SpecialCommandSecurityService#canManageMembers} gate of the membership endpoints, so an admin and
- * the SK lead of <em>this</em> SK get the row while a lead of another SK and a plain member are
- * forbidden.
- *
- * <p>The security service is a spy, not a mock: the admin and the plain-member cases run its real
- * verdict (the admin short-circuit from the JWT authorities, and a membership lookup that finds no
- * row for a random subject). Only the SK-lead cases stub the verdict for one SK id, because a real
- * lead would need a persisted membership row; that pins that the SpEL passes the path {@code #id}
- * through, while the lookup itself is unit-tested in {@code SpecialCommandSecurityServiceTest}. The
- * write endpoints stay admin-only — the last case proves a lead is still refused an update.
+ * Gate matrix for {@code GET /api/v1/special-commands/{id}} under {@link
+ * SpecialCommandSecurityService#canManageMembers}: admin and this SK's lead are admitted, another
+ * SK's lead and a plain member are forbidden, and a lead is still refused an update.
  */
 @SpringBootTest
 @ActiveProfiles("test")

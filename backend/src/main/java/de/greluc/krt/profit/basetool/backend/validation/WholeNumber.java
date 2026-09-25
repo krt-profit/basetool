@@ -34,19 +34,10 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
- * Asserts that a {@link java.math.BigDecimal} amount is a whole number, i.e. has no fractional
- * part.
+ * Asserts that a {@link java.math.BigDecimal} has no fractional part, by value rather than scale:
+ * {@code 500.00} passes, {@code 500.50} fails. {@code null} is valid.
  *
- * <p>This is a <strong>value-based</strong> check, deliberately distinct from
- * {@code @Digits(fraction = 0)}: {@code @Digits} inspects the BigDecimal <em>scale</em> and would
- * reject the mathematically-whole {@code 500.00} (scale 2), whereas this constraint accepts {@code
- * 500}, {@code 500.00} and {@code 500.0000} alike and rejects only genuinely fractional values such
- * as {@code 500.50}. It mirrors the project's existing value-based PIECE rule ({@link
- * ValidQuantityAmount}). A {@code null} value is treated as valid so presence stays the concern of
- * {@code @NotNull}; the lower bound stays the concern of {@code @DecimalMin}.
- *
- * <p>Used to enforce whole-aUEC mission-finance amounts (REQ-MISSION-001) at the {@code @Valid}
- * boundary, so a non-browser API client cannot store sub-aUEC precision.
+ * <p>Enforces whole-aUEC mission-finance amounts (REQ-MISSION-001).
  */
 @Documented
 @Constraint(validatedBy = WholeNumberValidator.class)

@@ -297,10 +297,8 @@ class MissionValidationTest {
   }
 
   /**
-   * Audit finding H-1 (2026-05-20): an authenticated squadron member typing the name of ANOTHER
-   * registered member must not silently end up signing that member up — only mission managers may
-   * add foreign users as participants (the {@code addParticipantSlim} branch already enforced this;
-   * the legacy {@code /participants/add} path used to let any authenticated caller through).
+   * Verifies that an authenticated non-manager cannot sign up another registered member as a
+   * participant; only mission managers may add other users.
    */
   @Test
   void testAddParticipantPublic_AuthenticatedNonManager_addingOtherMember_isForbidden()

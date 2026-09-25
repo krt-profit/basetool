@@ -28,10 +28,8 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins the bound on the rate-limit bucket maps (security audit INGEST-RATELIMIT-1). An unbounded
- * map keyed on caller identity is itself a DoS vector: an attacker rotating the key on every
- * request would grow it until the gateway exhausts heap. These tests assert both halves of the
- * mitigation — the hard cap, and the access-ordering that decides <em>which</em> entry is dropped.
+ * Pins the bound on the rate-limit bucket maps: the hard size cap and the access order that decides
+ * which entry is evicted.
  */
 class RateLimitBucketsTest {
 

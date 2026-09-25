@@ -27,29 +27,16 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Type-safe configuration for the transactional e-mail channel (REQ-NOTIF-013).
+ * Validated configuration under {@code app.mail.*} for the transactional e-mail channel
+ * (REQ-NOTIF-013).
  *
- * <p>Bound under {@code app.mail.*}. This block is the app-level gate and envelope metadata; the
- * SMTP transport (host / port / credentials) is Spring's own {@code spring.mail.*}. A mail is only
- * sent when {@code enabled} is {@code true} <b>and</b> a {@code JavaMailSender} exists (which
- * Spring Boot autoconfigures only when {@code spring.mail.host} is set) — both default off, so
- * dev/test/CI never send real mail. Validated via Jakarta-Validation so a malformed sender address
- * fails the context start early rather than at first send. An immutable record (BE-MOD-04).
+ * <p>Mail is sent only when {@code enabled} is {@code true} and a {@code JavaMailSender} exists,
+ * which requires {@code spring.mail.host}.
  *
- * @param enabled the kill-switch for outbound mail. The shipped config ({@code application.yml})
- *     sets it {@code true}; the effective on/off is whether an SMTP host is configured, so with no
- *     host mail is a no-op even while enabled. Set {@code APP_MAIL_ENABLED=false} to hard-disable
- *     regardless of SMTP config. The default stays {@code false} as a fail-safe if the property is
- *     ever unbound.
- * @param from the envelope sender address used as the {@code From} of every outbound mail. Defaults
- *     to the project's {@code no-reply} mailbox so validation passes even when mail is disabled;
- *     override in prod via {@code APP_MAIL_FROM_ADDRESS}.
- * @param fromName the human-readable display name prefixed to the {@code from} address ({@code Name
- *     <addr>}); purely cosmetic, blanking it falls back to the bare address
- * @param defaultLocale the BCP-47 language tag selecting the language of system-initiated mails
- *     (e.g. the account approval/rejection notice). No per-recipient locale is stored yet, so this
- *     default drives every such mail; German by default, matching the organisation's primary
- *     language.
+ * @param enabled the kill switch for outbound mail; defaults to {@code false} when unbound
+ * @param from the envelope sender address of every outbound mail
+ * @param fromName the display name prefixed to {@code from}; blank uses the bare address
+ * @param defaultLocale the BCP-47 tag selecting the language of system-initiated mails
  */
 @Validated
 @ConfigurationProperties(prefix = "app.mail")

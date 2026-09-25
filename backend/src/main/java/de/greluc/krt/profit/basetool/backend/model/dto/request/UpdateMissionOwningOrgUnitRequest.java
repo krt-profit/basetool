@@ -24,22 +24,13 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Request DTO for reassigning the owning org unit of a mission (REQ-ORG-018, ADR-0050).
+ * Request DTO for reassigning the owning org unit of a mission (REQ-ORG-018).
  *
- * <p>{@code owningOrgUnitId} is the id of the target {@code OrgUnit} (Staffel, Spezialkommando,
- * Bereich or Organisationsleitung) the mission should be re-homed to, or {@code null} to make the
- * mission an <em>ownerless leadership mission</em>. The target is validated server-side against the
- * caller's assignable-org-unit scope ({@code OwnerScopeService.resolveReassignTargetOrgUnit}): a
- * non-admin may only pick a unit they belong to or may edit, and may only choose {@code null} when
- * they hold no membership at all.
- *
- * <p>{@code version} must match the current {@code Mission.owningOrgUnitVersion} (NOT the global
- * {@code Mission.version}) to prevent lost updates on concurrent reassignments; a mismatch surfaces
- * as HTTP 409.
+ * <p>The target is validated against the caller's assignable scope: a non-admin may pick a unit
+ * they belong to or may edit, and {@code null} only when they hold no membership.
  *
  * @param owningOrgUnitId the target org-unit id, or {@code null} for an ownerless mission.
- * @param version the expected {@code Mission.owningOrgUnitVersion} echoed back from the rendered
- *     page.
+ * @param version the expected {@code Mission.owningOrgUnitVersion} section counter.
  */
 public record UpdateMissionOwningOrgUnitRequest(
     @Nullable UUID owningOrgUnitId, @NotNull Long version) {}

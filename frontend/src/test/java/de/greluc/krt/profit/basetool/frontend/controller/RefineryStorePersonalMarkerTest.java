@@ -67,16 +67,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC tests for the personal marker in the refinery-order store dialog (REQ-INV-035): refinery
- * output can be booked straight into the receiver's private pool instead of the shared squadron
- * stock, so a member no longer has to store it shared and rebook it on {@code /inventory/my}
- * afterwards.
- *
- * <p>Covers the three seams the feature adds on the frontend side: the per-row checkbox rendered by
- * {@code refinery-orders-details.html} and bound to {@code items[i].personal}, the forwarding of
- * that flag into the backend store payload, and the cross-field guard that rejects the
- * contradictory "personal + job order" combination before the backend call (personal stock never
- * carries an allocation) — with its own toast on the classic form path and a 400 on the AJAX twin.
+ * MVC tests for the personal marker in the refinery store dialog (REQ-INV-035): the per-row
+ * checkbox, its forwarding into the backend payload, and the rejection of "personal plus job order"
+ * before the backend call (toast on the form path, 400 on the AJAX twin).
  */
 @SpringBootTest
 @ActiveProfiles("test")

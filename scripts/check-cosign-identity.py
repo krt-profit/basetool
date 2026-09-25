@@ -4,39 +4,12 @@
 # Copyright (C) 2026 Lucas Greuloch
 #
 # SPDX-License-Identifier: GPL-3.0-only
-#
 """Assert that every cosign signer-identity regexp is anchored, and that all copies agree.
 
-WHY THIS GATE EXISTS
---------------------
-Four places decide which keyless signature this project trusts, and each passes a regexp to
-``cosign verify --certificate-identity-regexp``:
-
-* ``scripts/deploy.sh`` -- the host half of the supply-chain seam (REQ-OPS-015);
-* ``promote.yml`` and ``promote-testing.yml`` (or the composite action they share) -- the CI half
-  (REQ-OPS-002, REQ-OPS-022);
-* ``release-images.yml``'s reuse gate -- which only trusts the MAIN-branch run (REQ-OPS-021).
-
-cosign hands that regexp to Go's ``regexp.MatchString``, which reports a match ANYWHERE in the
-certificate SAN. Until 2026-09-22 all four were unanchored, so ``…@refs/(heads/main|tags/v.+)``
-also trusted a signature minted on ``refs/heads/main-x``, ``refs/heads/maintenance`` or
-``refs/tags/vfoo`` (audit item CI-SEC-01). Nothing failed, because a regexp that accepts too much
-never produces an error -- it produces a green verify.
-
-The copies are written by hand in shell and YAML, so they drift one edit at a time, and the
-REQ-OPS-015 acceptance says the CI half and the host half "cannot diverge". This makes that true:
-
-1. **Every copy is anchored** -- it starts with ``^`` and ends with ``$``.
-2. **The release copies are identical** after shell unquoting and after the repository variable is
-   normalised (``${REPO}`` in the workflows, ``${COSIGN_REPO}`` in deploy.sh).
-3. **The main-only copy is the release copy narrowed to ``heads/main``** and nothing else.
-4. **They behave as intended**, checked by running them: the release regexp accepts
-   ``refs/heads/main`` and ``refs/tags/v1.9.2`` and refuses a branch that merely starts with
-   ``main``, a ``v`` tag that is not a version, another workflow file and another repository. Go's
-   RE2 and Python's ``re`` agree on everything these regexps use (anchors, one group, ``|``,
-   ``[0-9]+``, ``\\.``), and ``re.search`` is unanchored exactly like ``MatchString``.
-5. **Something was found at all** -- a checker that stopped recognising the call sites would
-   otherwise report "no problems" forever.
+Covers every ``--certificate-identity-regexp`` in ``scripts/``, the workflows and the composite
+actions (REQ-OPS-015). Asserts that every copy is anchored with ``^`` and ``$``, that the release
+copies are identical after unquoting, that the main-only copy is the release copy narrowed to
+``heads/main``, that each accepts and refuses the expected SAN subjects, and that copies were found.
 
 Usage::
 
@@ -54,22 +27,16 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-#: The repository whose release workflow signs. Substituted for the shell variable each copy uses.
 REPO = "krt-profit/basetool"
 
-#: Shell variables that stand for :data:`REPO` inside a copy.
 REPO_VARIABLES = ("${REPO}", "${COSIGN_REPO}")
 
-#: ``--certificate-identity-regexp "<value>"`` (or single-quoted) on one line.
 FLAG_RE = re.compile(r"""--certificate-identity-regexp\s+(["'])(?P<value>.*?)\1""")
 
-#: deploy.sh's overridable default: ``COSIGN_IDENTITY_REGEXP="${IRI_…:-<value>}"``.
 DEFAULT_RE = re.compile(r"""^\s*COSIGN_IDENTITY_REGEXP="\$\{[A-Z_]+:-(?P<value>.*)\}"\s*$""")
 
-#: A value that is only a variable reference is an indirection, not a copy.
 BARE_VARIABLE_RE = re.compile(r"^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$")
 
-#: The ref alternation of a release copy, and what the main-only copy narrows it to.
 RELEASE_REFS = r"(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+)"
 MAIN_ONLY_REFS = "heads/main"
 
@@ -95,12 +62,7 @@ class Copy:
 
 
 def unquote_bash_double(value: str) -> str:
-    """Undo bash double-quote escaping: ``\\\\`` -> ``\\``, ``\\$`` -> ``$``, ``\\"`` -> ``"``.
-
-    Every copy sits inside a double-quoted bash word, so ``\\\\.`` in the file is the two characters
-    ``\\.`` cosign receives, while a lone ``\\.`` is passed through unchanged -- which is exactly how
-    bash treats a backslash before a character that is not special inside double quotes.
-    """
+    """Undo bash double-quote escaping: ``\\\\`` -> ``\\``, ``\\$`` -> ``$``, ``\\"`` -> ``"``."""
     out = []
     i = 0
     while i < len(value):
@@ -243,7 +205,7 @@ def check(root: Path) -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Command-line entry point."""
+    """Print every identity regexp found and report each problem; return the exit status."""
     parser = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     parser.add_argument("--root", type=Path,
                         default=Path(__file__).resolve().parent.parent,

@@ -52,12 +52,9 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Unit tests for the {@link ClientIdentityFilter} client-identity gate (REQ-INGEST-011): the {@code
- * azp} allowlist and the required ingest scope, each inert until configured and each fail-closed
- * once it is.
- *
- * <p>The tests pin three properties that are easy to regress and expensive to discover in
- * production: a rejection never reaches the chain, a <em>missing</em> claim is refused just like an
- * unknown one, and the {@code client_id} metric label never carries a raw token claim.
+ * azp} allowlist and the required ingest scope, each inert until configured and fail-closed once
+ * configured. A rejection never reaches the chain, a missing claim is refused like an unknown one,
+ * and the {@code client_id} metric label never carries a raw claim.
  */
 class ClientIdentityFilterTest {
 
@@ -260,15 +257,8 @@ class ClientIdentityFilterTest {
   }
 
   /**
-   * A percent-encoded spelling of the ingest path does not shed the gate.
-   *
-   * <p>{@code getRequestURI()} is the raw, still-encoded URI while Spring MVC routes on the decoded
-   * path, so the {@code startsWith("/v1/")} test this replaced skipped the filter for {@code
-   * /%761/refinery-extract} — which {@code RequestMappingHandlerMapping} then decoded to {@code
-   * /v1/refinery-extract} and dispatched to the ingest controller. The whole REQ-INGEST-011
-   * allowlist was one encoded character away from being optional. The default {@code
-   * StrictHttpFirewall} blocks {@code %2e}/{@code %2f}/{@code %25} but not {@code %76}. Must be a
-   * direct filter test: MockMvc normalises the path before the filter runs.
+   * A percent-encoded spelling of the ingest path (such as {@code /%761/refinery-extract}) is still
+   * gated. Tested on the filter directly because MockMvc normalises the path first.
    */
   @Test
   void shouldRejectAForeignClientThatPercentEncodesTheIngestPath() throws Exception {

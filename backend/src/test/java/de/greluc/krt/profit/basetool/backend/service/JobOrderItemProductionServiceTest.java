@@ -70,16 +70,10 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 
 /**
- * Unit tests for {@link JobOrderItemProductionService#bookProduction}: the happy-path counter bump
- * + inventory reduction + audit, the amount / demand-coverage 422s, the non-item-order and
- * missing-slice guards, the stale-version 409, the depleted-row delete branch, the
- * no-materials/empty-consumption line, and a material marked "nicht ausbuchen" (skipped: recorded
- * but not booked out). Pure Mockito over the five collaborators; a Steel/SCU item line (amount 4,
- * per-unit demand 40) linked to a 100-SCU inventory entry earmarked in full to the order backs
- * every scenario. Every payload carries a {@code bookIn} block — the field is {@code @NotNull}
- * since the production modal shipped its book-in section (REQ-INV-032; a missing block is a 400 at
- * the API boundary, pinned by {@code JobOrderItemProductionCreateDtoValidationTest}) — so the
- * fixture line carries a game item and the book-in collaborators resolve a default target.
+ * Unit tests for {@link JobOrderItemProductionService#bookProduction}: the counter bump, inventory
+ * reduction and audit; the amount and demand-coverage 422s; the non-item-order and missing-slice
+ * guards; the stale-version 409; the depleted-row delete; and a material marked "nicht ausbuchen".
+ * Every payload carries the required {@code bookIn} block (REQ-INV-032).
  */
 @ExtendWith(MockitoExtension.class)
 class JobOrderItemProductionServiceTest {

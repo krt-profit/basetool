@@ -35,15 +35,11 @@ public final class InventoryAuditLabels {
   private InventoryAuditLabels() {}
 
   /**
-   * Composes the audit subject label for an inventory row — {@code <catalog entry> @ location}, the
-   * deletion-proof identity snapshot stored on each audit event (REQ-AUDIT-001). The catalog entry
-   * is the material name for a material row and the game-item name for a game-item row (V220,
-   * REQ-INV-029) — without the game-item branch every reused event on an item row would log the
-   * em-dash fallback. A row missing both catalog references or its location renders the affected
-   * part as an em dash so the label stays well-formed for orphaned rows.
+   * Composes the audit subject label {@code <material|gameItem> @ location} for an inventory row
+   * (REQ-AUDIT-001); a missing part renders as an em dash.
    *
-   * @param item the inventory row (associations may be lazily loaded but must be within the tx)
-   * @return the {@code <material|gameItem> @ location} label
+   * @param item the inventory row; lazy associations must be loadable in the transaction
+   * @return the label
    */
   @NotNull
   public static String label(InventoryItem item) {
@@ -60,12 +56,10 @@ public final class InventoryAuditLabels {
   }
 
   /**
-   * Renders an inventory row's job-order reference for an audit details payload. Since Variante C
-   * (REQ-INV-027) the job-order link lives in the allocation table, so this reads the entry's first
-   * job-order slice — exactly one during the soak.
+   * Renders an inventory row's first earmarked job order for an audit details payload.
    *
-   * @param item the inventory row (allocations lazily loaded but must be within the tx)
-   * @return {@code #<displayId>} of the entry's first earmarked job order, {@code -} when none
+   * @param item the inventory row; allocations must be loadable in the transaction
+   * @return {@code #<displayId>} of the first earmarked job order, {@code -} when none
    */
   public static String jobOrderRef(@NotNull InventoryItem item) {
     return item.getJobOrderAllocations().stream()
@@ -77,12 +71,10 @@ public final class InventoryAuditLabels {
   }
 
   /**
-   * Renders an inventory row's mission reference (the mission name) for an audit details payload —
-   * the mission counterpart of {@link #jobOrderRef(InventoryItem)}, reading the entry's first
-   * mission slice (exactly one during the soak).
+   * Renders an inventory row's first earmarked mission name for an audit details payload.
    *
-   * @param item the inventory row (allocations lazily loaded but must be within the tx)
-   * @return the name of the entry's first earmarked mission, {@code -} when none
+   * @param item the inventory row; allocations must be loadable in the transaction
+   * @return the name of the first earmarked mission, {@code -} when none
    */
   public static String missionName(@NotNull InventoryItem item) {
     return item.getMissionAllocations().stream()

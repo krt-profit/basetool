@@ -52,24 +52,17 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
- * Admin-only endpoints that drive the KRT P4K Reader catalog import as <b>asynchronous background
- * jobs</b>. An administrator uploads the single JSON catalog the external KRT P4K Reader extracts
- * from the game's {@code Data/Game2.dcb}; rather than parsing and reconciling ~60k records inside
- * the request (which outran the frontend / proxy timeouts and hung the page), the upload only
- * enqueues a job and returns {@code 202 Accepted} immediately. A single-thread {@code @Async}
- * worker ({@link P4kImportJobRunner}) does the heavy work in the background and writes the per-type
- * result back onto the job, which the page polls.
+ * Admin-only endpoints that run the KRT P4K Reader catalog import as asynchronous background jobs.
+ * An upload only enqueues a job and returns {@code 202 Accepted}; {@link P4kImportJobRunner} does
+ * the work and writes the result onto the job, which the page polls.
  *
  * <ul>
  *   <li>{@code POST /jobs} — upload a catalog and enqueue a PREVIEW (dry-run) job.
- *   <li>{@code GET /jobs} — list recent jobs (status + result when finished).
+ *   <li>{@code GET /jobs} — list recent jobs.
  *   <li>{@code GET /jobs/{id}} — poll one job.
  *   <li>{@code POST /jobs/{id}/apply} — enqueue an APPLY job from a finished preview's stored
- *       upload (optionally seeding new rows), without re-uploading.
+ *       upload.
  * </ul>
- *
- * <p>The {@code ADMIN} role is enforced at this boundary; the services stay free of the security
- * context (the enqueuing administrator's id is read from the validated JWT here and passed down).
  */
 @RestController
 @RequestMapping("/api/v1/admin/import/p4k")

@@ -30,7 +30,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
 import org.springframework.security.web.savedrequest.RequestCache;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -39,18 +38,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * WP-F 11 / REQ-SEC-025: a logged-out browser's <b>background</b> calls must not mint sessions.
- *
- * <p>Spring Security's default {@link HttpSessionRequestCache} saves every refused request so the
- * caller can be sent back after login. That was affordable while most of the tool answered
- * anonymously; with REQ-SEC-052 every path refuses, so each poll, prefetch, {@code fragment}
- * refetch and SSE reconnect a logged-out tab fires would create a session in Redis to hold a URL
- * nobody will ever be redirected to. A tab left open overnight is a steady session leak.
- *
- * <p>These two cases are the whole contract: a navigation is saved, everything else is not. The
- * third pins that saving and replaying read the <em>same</em> cache — the handler used to build its
- * own, and its delegate a third, which agreed with the chain only because all three defaulted to
- * the same session attribute.
+ * Verifies that only navigations are saved in the request cache, so a logged-out tab's background
+ * calls create no sessions, and that saving and replaying use the same cache (REQ-SEC-025).
  */
 @SpringBootTest
 class NavigationRequestCacheTest {

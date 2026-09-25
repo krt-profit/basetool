@@ -36,17 +36,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Representative CRUD coverage for the admin mission-data page ({@code /admin/mission-data}), a
- * previously untested member of the admin data-management cluster. It creates a squadron through
- * the modal and deletes it through the confirm dialog — both modal-driven {@code krtFetch} writes
- * that re-render the {@code #squadrons-results} section in place (REQ-FE-002), never reloading the
- * page.
- *
- * <p>The flow is hermetic: it creates its own {@code "E2E Mission Data Squad"} (a member-less
- * squadron deletes cleanly — one still in use would 409) and removes it again, so it leaves no
- * residue that sibling suites depend on. Actor: {@code test-admin} (the page is {@code
- * ADMIN}-gated). Tagged {@code @Tag("e2e")}: it mutates data, so it runs only against the ephemeral
- * stack.
+ * CRUD coverage for {@code /admin/mission-data}: creates a squadron through the modal and deletes
+ * it through the confirm dialog, both re-rendering {@code #squadrons-results} in place
+ * (REQ-FE-002). Cleans up after itself; runs as {@code test-admin}.
  */
 @Tag("e2e")
 class AdminMissionDataCrudE2eTest {

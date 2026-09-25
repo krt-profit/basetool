@@ -35,16 +35,10 @@ import java.util.TreeSet;
 import org.junit.jupiter.api.Test;
 
 /**
- * Static lint of the backend message bundles. A user-visible string added to one locale but not the
- * other otherwise surfaces only as a raw {@code error.some.key} at render time; a literal umlaut in
- * the German bundle breaks the project's {@code \\uXXXX} encoding rule; a key declared twice
- * silently shadows its earlier value; a key missing from the no-locale default bundle falls back to
- * its raw key for any locale that is neither {@code de} nor {@code en}; and a default value that
- * drifts from its German counterpart renders stale text for such a locale. All of these are pinned
- * here so they fail the build instead of production. Reads the source files under {@code
- * src/main/resources} directly (the Gradle {@code Test} task runs with the module directory as its
- * working directory) so the assertions see the exact committed bytes, not the processed classpath
- * copy.
+ * Static lint of the backend message bundles: missing keys across locales, literal umlauts,
+ * duplicate keys and default-bundle drift from German.
+ *
+ * <p>Reads the committed source files under {@code src/main/resources} directly.
  */
 class MessageBundleConsistencyTest {
 
@@ -121,10 +115,8 @@ class MessageBundleConsistencyTest {
   }
 
   /**
-   * Asserts that the no-locale default bundle declares every key present in the German and English
-   * bundles, and declares no key absent from both. A key missing from {@code messages.properties}
-   * falls back to its raw {@code some.key} for any locale that is neither {@code de} nor {@code
-   * en}.
+   * Asserts that the default bundle declares exactly the keys present in the German or English
+   * bundle.
    *
    * @throws IOException if a bundle cannot be read from disk
    */
@@ -149,10 +141,7 @@ class MessageBundleConsistencyTest {
   }
 
   /**
-   * Asserts that the no-locale default bundle resolves every key to the same value as the German
-   * bundle. The default bundle is the German fallback, so it must mirror {@code messages_de}; a
-   * drift means a locale that is neither {@code de} nor {@code en} renders stale or wrong-language
-   * text.
+   * Asserts that the default bundle resolves every key to the same value as the German bundle.
    *
    * @throws IOException if a bundle cannot be read from disk
    */
@@ -173,9 +162,7 @@ class MessageBundleConsistencyTest {
   }
 
   /**
-   * Returns the declared property keys of a bundle in stable sorted order, parsed via {@link
-   * #load(Path)} (which handles comments, {@code =}/{@code :}/space separators, line continuations
-   * and escapes correctly).
+   * Returns the declared property keys of a bundle, sorted.
    *
    * @param path the bundle to read
    * @return the bundle's keys in stable sorted order
@@ -186,8 +173,7 @@ class MessageBundleConsistencyTest {
   }
 
   /**
-   * Loads a bundle via {@link Properties#load(Reader)}, exposing the resolved (unescaped) values so
-   * callers can compare them across bundles.
+   * Loads a bundle with {@link Properties#load(Reader)}, exposing the unescaped values.
    *
    * @param path the bundle to read
    * @return the parsed properties
@@ -202,8 +188,7 @@ class MessageBundleConsistencyTest {
   }
 
   /**
-   * Computes {@code left \\ right} (the keys in {@code left} absent from {@code right}) as a new
-   * sorted set, leaving the inputs untouched.
+   * Returns the keys in {@code left} absent from {@code right} as a new sorted set.
    *
    * @param left the source key set
    * @param right the key set whose members are excluded
@@ -216,10 +201,8 @@ class MessageBundleConsistencyTest {
   }
 
   /**
-   * Collects keys declared more than once in a bundle. Unlike {@link Properties#load(Reader)} --
-   * which silently keeps the last value of a repeated key and so hides duplicates -- this walks the
-   * raw physical lines (honouring line continuations and {@code #}/{@code !} comment lines) and
-   * records every key whose declaration is seen a second time.
+   * Collects keys declared more than once in a bundle by scanning its raw lines, which {@link
+   * Properties#load(Reader)} would hide.
    *
    * @param path the bundle to scan
    * @return the duplicated keys in first-seen order (empty when every key is unique)
@@ -264,9 +247,8 @@ class MessageBundleConsistencyTest {
   }
 
   /**
-   * Extracts the key of a property declaration: everything up to the first unescaped {@code =},
-   * {@code :} or whitespace separator, matching {@code java.util.Properties} key parsing for the
-   * flat single-line declarations these bundles use.
+   * Extracts the key of a property line: everything up to the first unescaped {@code =}, {@code :}
+   * or whitespace.
    *
    * @param stripped the property line with leading whitespace already removed
    * @return the declared key (empty when the line carries no key)

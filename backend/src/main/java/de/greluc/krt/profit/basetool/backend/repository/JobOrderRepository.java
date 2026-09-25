@@ -80,35 +80,14 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
   Optional<JobOrder> findById(UUID id);
 
   /**
-   * Loads every job-order in {@code OPEN} or {@code IN_PROGRESS} status together with the material
-   * requirements the active-order lookup projects, ordered by ascending {@code priority}
-   * (most-important first; orders without a priority sort last) and then by descending {@code
-   * displayId} as a stable tiebreaker — mirroring the Auftragsverwaltung's default {@code
-   * priority,asc} ranking so the warehouse (Lager) job-order filter and per-row pickers present the
-   * same order. Eager-fetch path matches exactly what {@link
+   * Loads every {@code OPEN} or {@code IN_PROGRESS} job order with the material and item-line
+   * requirements the active-order lookup reads, ordered by ascending {@code priority} (nulls last),
+   * then descending {@code displayId}.
+   *
+   * <p>Fetches exactly what {@link
    * de.greluc.krt.profit.basetool.backend.service.JobOrderQueryService#findAllActiveReference()}
-   * reads, so there is no N+1.
-   *
-   * <p>The item lines ({@code items} → {@code items.materials} → {@code items.materials.material})
-   * are fetched so the picker can compute an ITEM order's required materials ({@code
-   * JobOrderItemService.requiredMaterialIds}) without an N+1 per ITEM order; {@code items.gameItem}
-   * (a to-one path, no row explosion) joins the graph so the requested-game-item set ({@code
-   * JobOrderItemService.requiredGameItemIds}, REQ-INV-031) resolves N+1-free too. The {@code
-   * materials} and {@code items.materials} branches never explode against each other: the two order
-   * kinds are mutually exclusive, so for any given order exactly one branch is non-empty. Like
-   * every other multi-collection fetch query here, the result relies on Hibernate's automatic
-   * de-duplication of fetch-join roots, so each active order appears exactly once in the returned
-   * list — no {@code DISTINCT} is needed (REQ-ORDERS-018).
-   *
-   * <p><strong>Handovers are deliberately NOT fetched here</strong> — neither the MATERIAL {@code
-   * handovers} nor the ITEM {@code itemHandovers} side. The lookup projection reads only the order
-   * handle, status, requesting org unit and the required-material/-game-item sets, never a
-   * handover. Beyond being dead weight, a MATERIAL order legitimately carries both material lines
-   * <em>and</em> handovers, so eager-fetching {@code handovers} alongside {@code materials} turned
-   * the query into a {@code materials × handovers} cartesian product <em>at the SQL level</em> —
-   * extra result-set rows Hibernate has to read and then discard while de-duplicating the roots
-   * (Hibernate collapses them, so no duplicate root ever reached the picker, but the wasted rows
-   * were real). Keep this graph free of any handover branch; the picker never needs it.
+   * reads, each order exactly once (REQ-ORDERS-018). Handovers are not fetched, since they would
+   * multiply the SQL rows.
    */
   @EntityGraph(
       attributePaths = {
@@ -129,34 +108,20 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
   List<JobOrder> findAllActiveWithMaterials();
 
   /**
-   * Scoped, unpaged list of the orders in the given statuses together with <em>both</em> kinds'
-   * material requirement branches — the read behind the cross-order material-demand overview
-   * (REQ-ORDERS-034). It is the scoped sibling of {@link #findAllActiveWithMaterials()}: same
-   * requirement fetch graph, but the caller's visibility scope is pushed into SQL via the shared
-   * {@link ScopeSpecifications#JOB_ORDER_SCOPE_PREDICATE} (including the SK-public escape) instead
-   * of being filtered row-by-row in memory afterwards, so a caller can never see demand from an
-   * order they may not read.
+   * Scoped, unpaged list of the orders in the given statuses with both kinds' material requirement
+   * branches, for the cross-order material-demand overview (REQ-ORDERS-034). Scope is applied in
+   * SQL via {@link ScopeSpecifications#JOB_ORDER_SCOPE_PREDICATE}, including the SK-public escape.
    *
-   * <p>The graph fetches the {@code MATERIAL} branch ({@code materials}) and the {@code ITEM}
-   * branch ({@code items → materials}) side by side. That does <b>not</b> produce the cartesian
-   * blow-up the lookup query's Javadoc warns about, because the two branches are mutually exclusive
-   * per row: a {@code MATERIAL} order has no item lines and an {@code ITEM} order no material
-   * lines. No handover branch is fetched — the overview reads requirements and linked stock only.
+   * <p>Unpaged because the result is aggregated into sums (ADR-0104); callers bound it by passing
+   * only non-terminal statuses.
    *
-   * <p>Deliberately unpaged: the result is folded into one aggregation row per {@code
-   * (responsibleOrgUnit, material, quality)} bucket, so paging the orders would silently truncate
-   * the sums it produces (ADR-0104, no silent caps). The set is naturally bounded by the caller
-   * passing only the non-terminal statuses.
-   *
-   * @param statuses the statuses to keep; never bound empty (the service passes {@code OPEN} +
-   *     {@code IN_PROGRESS}).
-   * @param isAdminAllScope {@code true} iff the caller is an admin without an active pin — disables
-   *     the scope filter entirely.
+   * @param statuses the statuses to keep; never empty.
+   * @param isAdminAllScope {@code true} iff the caller is an admin without an active pin, which
+   *     disables the scope filter.
    * @param activeOrgUnitId the single OrgUnit the caller is pinned to, or {@code null}.
-   * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin path); empty for
-   *     admins and anonymous callers.
-   * @return the scoped orders with their material requirement branches eagerly loaded, ordered by
-   *     {@code displayId} so a bucket's contributing-order list is stable across requests.
+   * @param memberOrgUnitIds the OrgUnits the caller belongs to (non-admin path); empty for admins
+   *     and anonymous callers.
+   * @return the scoped orders with their requirement branches loaded, ordered by {@code displayId}.
    */
   @EntityGraph(
       attributePaths = {
@@ -178,49 +143,27 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
       @Param("memberOrgUnitIds") Collection<UUID> memberOrgUnitIds);
 
   /**
-   * Scoped, paged job-order list — the single entry point behind the {@code GET /api/v1/orders}
-   * list endpoint. Combines three concerns in one query so the service layer never has to fork its
-   * query builder:
+   * Scoped, paged job-order list behind {@code GET /api/v1/orders}, combining visibility scope,
+   * status filter and optional squadron display filter.
    *
-   * <ol>
-   *   <li><b>Visibility scope (Phase 3, #343).</b> Job Orders are a <em>conditionally</em>
-   *       staffel-scoped aggregate: an order whose {@code responsibleOrgUnit} is a Spezialkommando
-   *       is public to every squadron, while a squadron-responsible order is private to that
-   *       squadron + admins. The requester does NOT grant visibility. The scope is expressed with
-   *       the standard org-unit predicate triple ({@code isAdminAllScope} / {@code activeOrgUnitId}
-   *       / {@code memberOrgUnitIds}, see {@link
-   *       de.greluc.krt.profit.basetool.backend.service.ScopePredicate}) plus the SK-public escape
-   *       {@code TYPE(o.responsibleOrgUnit) = SpecialCommand}.
-   *   <li><b>Status filter.</b> The order's status must be in {@code statuses}. The service passes
-   *       the full enum set to disable status filtering (mirroring {@code searchMissions}), so the
-   *       {@code IN} clause is never bound with an empty collection.
-   *   <li><b>Optional squadron display filter.</b> A pure UI preference on top of the scope gate —
-   *       the orders-index multi-squadron picker, matching responsible OR requesting side. When
-   *       {@code noSquadronFilter} is {@code true} the filter is disabled (all scoped orders); else
-   *       an order is kept iff its responsible OR requesting org unit is in {@code squadronIds}. It
-   *       can only ever narrow the already-scoped result, never widen it past the security scope
-   *       above.
-   * </ol>
+   * <p>An order responsible to a Spezialkommando is visible to everyone; a squadron-responsible one
+   * only to that squadron and admins (see {@link
+   * de.greluc.krt.profit.basetool.backend.service.ScopePredicate}). The squadron filter matches the
+   * responsible or requesting side and only narrows the scoped result. Only the two org units are
+   * fetched; collections batch-load (REQ-DATA-003).
    *
    * @param statuses status values to keep; pass the full enum set to disable status filtering
    *     (never empty).
-   * @param noSquadronFilter {@code true} to disable the squadron display filter (show all scoped
-   *     orders); {@code false} to keep only orders matching {@code squadronIds}.
-   * @param squadronIds the selected squadron ids to match (responsible OR requesting side); never
-   *     bound empty — pass a non-empty placeholder when {@code noSquadronFilter} is {@code true}.
-   * @param isAdminAllScope {@code true} iff the caller is an admin without an active selection —
-   *     disables the scope filter entirely.
+   * @param noSquadronFilter {@code true} to disable the squadron display filter.
+   * @param squadronIds the squadron ids to match on either side; never empty, pass a placeholder
+   *     when {@code noSquadronFilter} is {@code true}.
+   * @param isAdminAllScope {@code true} iff the caller is an admin without an active selection,
+   *     which disables the scope filter.
    * @param activeOrgUnitId the single OrgUnit the caller is pinned to, or {@code null}.
-   * @param memberOrgUnitIds the union of OrgUnits the caller belongs to (non-admin path); empty for
-   *     admins and anonymous callers.
-   *     <p>Only the two {@code @ManyToOne} org units are graphed. The {@code materials}, {@code
-   *     assignees} and {@code handovers} collections this query used to fetch-join made Hibernate
-   *     paginate in memory over every matching order (HHH90003004) and multiplied the rows by each
-   *     collection's size; they now batch-load under {@code default_batch_fetch_size} when the page
-   *     is mapped, one bounded {@code IN} query per collection (REQ-DATA-003, BE-PERF-02).
+   * @param memberOrgUnitIds the OrgUnits the caller belongs to (non-admin path); empty for admins
+   *     and anonymous callers.
    * @param pageable page request.
-   * @return paged job-orders visible to the caller, matching the optional status + squadron
-   *     filters.
+   * @return paged job orders visible to the caller, matching the status and squadron filters.
    */
   @EntityGraph(attributePaths = {"responsibleOrgUnit", "requestingOrgUnit"})
   @Query(
@@ -238,24 +181,15 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
       Pageable pageable);
 
   /**
-   * Requester-side paged job-order list (REQ-ORDERS-023): every order whose {@code
-   * requestingOrgUnit} is one of {@code requesterOrgUnitIds} and whose status is in {@code
-   * statuses}. This is the deliberate counterpart to {@link #findScopedJobOrders}, which scopes
-   * only on the <em>responsible</em> side: here the match is purely on the <em>requesting</em>
-   * side, so a member of the ordering org unit sees the orders their unit placed even when a
-   * foreign squadron processes them and even when the caller is not profit-eligible. The service
-   * passes only the caller's own direct-membership org-unit ids, so this never leaks a foreign
-   * unit's placed orders. Uses the same to-one-only graph as the main list; the collections
-   * batch-load exactly as there. The response is redacted for the requester at the controller
-   * boundary. Ordering is supplied by the {@link Pageable} (default {@code priority,asc}), matching
-   * the main queue.
+   * Requester-side paged job-order list (REQ-ORDERS-023): orders whose {@code requestingOrgUnit} is
+   * one of {@code requesterOrgUnitIds} and whose status is in {@code statuses}, regardless of the
+   * responsible side. Sorted by the {@link Pageable}.
    *
    * @param statuses status values to keep; pass the full enum set to disable status filtering
    *     (never empty).
-   * @param requesterOrgUnitIds the caller's direct-membership org-unit ids; the service
-   *     short-circuits an empty set to an empty page before calling this.
+   * @param requesterOrgUnitIds the caller's direct-membership org-unit ids; never empty.
    * @param pageable page request (carries the sort).
-   * @return paged job-orders the caller's org unit(s) requested.
+   * @return paged job orders the caller's org units requested.
    */
   @EntityGraph(attributePaths = {"responsibleOrgUnit", "requestingOrgUnit"})
   @Query(
@@ -267,17 +201,11 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
       Pageable pageable);
 
   /**
-   * Loads a single job order together with its ordered item lines and, for each line, the chosen
-   * blueprint and the requested game item, in one query. Backs the item blueprint-coverage view
-   * ({@code JobOrderItemBlueprintOwnersService}), which reads {@code item.blueprint.outputName}
-   * (the product-key source) and {@code item.gameItem.name} (the display label) for every line — so
-   * the dedicated fetch join avoids the per-line N+1 that the default {@link #findById(UUID)}
-   * entity graph (which does not fetch {@code items}) would incur. Empty for a {@code MATERIAL}
-   * order, whose {@code items} set is empty.
+   * Loads one job order with its item lines and each line's blueprint and game item in a single
+   * query, for the item blueprint-coverage view. A {@code MATERIAL} order has no items.
    *
    * @param id the job-order id
-   * @return the order with its items + their blueprint/game-item to-one relations eagerly loaded,
-   *     or empty when the id is unknown
+   * @return the order with items, blueprints and game items loaded, or empty when the id is unknown
    */
   @Query(
       """
@@ -290,8 +218,8 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
   Optional<JobOrder> findByIdWithItemBlueprints(@Param("id") UUID id);
 
   /**
-   * Returns the current maximum priority across all job-orders (used to assign the next priority
-   * slot when creating a new order); {@link Optional#empty} when the table is empty.
+   * Returns the highest priority across all job orders, used to assign a new order's priority;
+   * empty when there are no orders.
    */
   @Query("SELECT MAX(o.priority) FROM JobOrder o")
   Optional<Integer> findMaxPriority();
@@ -307,17 +235,9 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
   List<JobOrder> lockAllJobOrders();
 
   /**
-   * Acquires a {@link LockModeType#PESSIMISTIC_WRITE} row lock on a single job order — the
-   * material-claim upsert takes it before summing a bucket's existing claims so concurrent
-   * claimants of the same order serialise and each reads the others' <em>committed</em> claim rows
-   * (REQ-ORDERS-024, ADR-0092). Without it, two different squadrons lodging their first claim on
-   * one bucket at once each read an empty already-claimed sum under {@code READ COMMITTED} (the
-   * other's uncommitted INSERT is invisible), both pass the no-overclaim guard and both commit —
-   * and because the unique index {@code uq_material_claim_bucket_org_unit} keys per claiming
-   * squadron it never collides across distinct squadrons, so the upsert's own {@code REQUIRES_NEW}
-   * retry (which only catches a same-{@code (bucket, squadron)} unique / {@code @Version}
-   * violation) cannot catch the cross-squadron overclaim. A bare single-row lock (no join fetch) so
-   * it serialises only this one order's claim writers, never an unrelated order or bucket.
+   * Takes a {@link LockModeType#PESSIMISTIC_WRITE} row lock on one job order so concurrent material
+   * claims on it serialise and each sees the others' committed claims (REQ-ORDERS-024, ADR-0092).
+   * Locks only this order's row.
    *
    * @param id the order to row-lock.
    * @return the locked order, or {@link Optional#empty} when the id is unknown.
@@ -340,17 +260,11 @@ public interface JobOrderRepository extends JpaRepository<JobOrder, UUID> {
   void removeAssignee(@Param("userId") UUID userId);
 
   /**
-   * Replaces a contact-person handle that is this member's with the erasure sentinel (REQ-SEC-062).
+   * Replaces a contact-person {@code handle} matching case-insensitively with the erasure sentinel
+   * (REQ-SEC-062).
    *
-   * <p>{@code job_order.handle} is the order's contact person — "Handle des Ansprechpartners" —
-   * typed in by hand, so like the two handover columns it has no user id beside it and can only be
-   * matched on the text, case-insensitively. Its two sibling handover columns were text-matched
-   * from the start; this one was not, and the omission is what let the name survive both in the
-   * order list and in the audit labels built from it.
-   *
-   * <p><b>A handle is not a unique key</b>, so this can over-match, which is the correct direction
-   * of error for an erasure request and is why the admin reviews the Personensuche hits before
-   * granting ({@code docs/privacy/data-subject-requests.md}).
+   * <p>The column is free text with no user id, so it is matched on text alone and may over-match;
+   * the admin reviews the Personensuche hits before granting.
    *
    * @param handle the contact spelling to erase; compared case-insensitively
    * @param sentinel {@code HandleAnonymisation#SENTINEL}

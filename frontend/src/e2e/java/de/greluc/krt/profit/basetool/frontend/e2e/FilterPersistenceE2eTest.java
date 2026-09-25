@@ -33,23 +33,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Verifies the app-wide per-browser filter-selection persistence convention (REQ-UI-017, ADR-0120)
- * on three representative, data-independent surfaces — the sweep that closed the audit gap where
- * most filter pages reset their selection on every reload:
+ * Verifies per-browser filter persistence across reloads (REQ-UI-017, ADR-0120) on {@code
+ * /refinery-orders} (status checkboxes), {@code /missions} ({@code showPast}) and {@code
+ * /materialboerse} (offer sort).
  *
- * <ul>
- *   <li><b>/refinery-orders</b> — a status-checkbox queue whose server default is the
- *       OPEN+IN_PROGRESS subset; adding COMPLETED must survive a reload (the pre-existing
- *       inconsistency: the sibling job-orders queue already persisted, the refinery queue did not).
- *   <li><b>/missions</b> — the {@code showPast} boolean toggle (search and date range stay
- *       deliberately unpersisted).
- *   <li><b>/materialboerse</b> — the offers-board sort selection, whose fragment swaps run {@code
- *       history:false}, so before the fix the choice was lost even on a plain F5.
- * </ul>
- *
- * <p>All three widgets are server-rendered unconditionally, so the test runs on an ephemeral stack
- * with no seeded domain data. Read-only and target-agnostic: it toggles client-side filter widgets
- * and asserts, mutating no server state. The actor is {@code test-admin}.
+ * <p>Needs no seeded data and mutates no server state; runs as {@code test-admin}.
  */
 @Tag("e2e")
 class FilterPersistenceE2eTest {
@@ -83,8 +71,8 @@ class FilterPersistenceE2eTest {
   }
 
   /**
-   * Logs in once and reuses the saved storage state across the test methods (each method still gets
-   * its own context, so the per-page localStorage writes stay isolated per test).
+   * Logs in once and returns the saved storage state, reused by every test method in its own
+   * context.
    *
    * @return the path of the authenticated Playwright storage-state file
    */
@@ -109,9 +97,8 @@ class FilterPersistenceE2eTest {
   }
 
   /**
-   * Refinery queue: adding COMPLETED to the default OPEN+IN_PROGRESS status subset and enabling
-   * "only mine" must both come back checked after a reload (status lists whose server default is a
-   * subset are stored verbatim per REQ-UI-017).
+   * Refinery queue: COMPLETED added to the default status subset and "only mine" both stay checked
+   * after a reload.
    */
   @Test
   void refineryStatusFilterSurvivesReload() {
@@ -161,8 +148,8 @@ class FilterPersistenceE2eTest {
   }
 
   /**
-   * Materialbörse: the offers-board sort selection survives a reload even though the board's
-   * fragment swaps run {@code history:false} (the pre-fix state was lost on a plain F5).
+   * Materialbörse: the offers-board sort selection survives a reload, although the board's fragment
+   * swaps run {@code history:false}.
    */
   @Test
   void materialboerseSortSurvivesReload() {

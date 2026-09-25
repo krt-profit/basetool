@@ -34,18 +34,12 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
- * Verifies the V168 bank-cascade migration (epic #692, REQ-ORG-019 / REQ-BANK-021): the relaxed
- * {@code chk_bank_account_owner_ref} CHECK that lets an {@code AREA} account carry its Bereich and
- * the {@code CARTEL} account carry the Organisationsleitung through the existing {@code
- * org_unit_id} FK, while the legacy free-form {@code area_name} form stays valid during the soak.
- * The test profile boots Postgres via Testcontainers and runs every migration at startup, so this
- * exercises the real DDL.
+ * Verifies the V168 bank-cascade migration against the real schema: the {@code
+ * chk_bank_account_owner_ref} CHECK lets an {@code AREA} account reference its Bereich and the
+ * {@code CARTEL} account the Organisationsleitung, while the free-form {@code area_name} form stays
+ * valid (REQ-BANK-021).
  *
- * <p>Cardinality is asserted at the DB level: the pre-existing partial unique index {@code
- * uq_bank_account_org_unit} (untouched by V168) already caps every org unit — including a Bereich
- * or the OL — at one account, so a second AREA account for the same Bereich is rejected. Throwaway
- * {@code org_unit} / {@code bank_account} rows are inserted directly and removed in a finally block
- * so the shared schema is left untouched.
+ * <p>Also asserts one account per org unit. Throwaway rows are removed in a finally block.
  */
 @SpringBootTest
 class V168BankAreaCartelLinkageMigrationTest {

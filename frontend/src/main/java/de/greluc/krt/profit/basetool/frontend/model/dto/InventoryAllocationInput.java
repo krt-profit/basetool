@@ -22,10 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.util.UUID;
 
 /**
- * Frontend mirror of the backend {@code InventoryAllocationInput} (per the {@code
- * feedback_backend_frontend_dto_mirror} memory): one quantity-split assignment supplied at
- * inventory check-in (Variante C, REQ-INV-027, R4) — {@code amount} of the new entry earmarked to
- * the job order / mission {@code targetId}.
+ * Frontend mirror of the backend {@code InventoryAllocationInput}: {@code amount} of a new entry
+ * earmarked to the job order or mission {@code targetId} at check-in (REQ-INV-027).
  *
  * @param targetId the job order / mission to earmark part of the new entry to.
  * @param amount the SCU to earmark to {@code targetId}.

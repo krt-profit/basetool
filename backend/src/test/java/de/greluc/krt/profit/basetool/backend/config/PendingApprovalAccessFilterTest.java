@@ -60,7 +60,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import tools.jackson.databind.json.JsonMapper;
 
-/** Unit tests for {@link PendingApprovalAccessFilter} (PR review #1: REQ-SEC-017 backend gate). */
+/** Unit tests for {@link PendingApprovalAccessFilter} (REQ-SEC-017). */
 class PendingApprovalAccessFilterTest {
 
   private PendingApprovalAccessFilter filter;
@@ -179,15 +179,8 @@ class PendingApprovalAccessFilterTest {
   }
 
   /**
-   * A percent-encoded path prefix does not slip past the gate.
-   *
-   * <p>{@code getRequestURI()} is the raw, still-encoded URI while Spring MVC routes on the decoded
-   * path, so the {@code startsWith("/api/")} test this replaced let {@code /%61pi/v1/missions}
-   * through — and {@code RequestMappingHandlerMapping} then decodes {@code %61pi} to {@code api}
-   * and dispatches it, handing a non-approved account the {@code isAuthenticated()}-only writes.
-   * The default {@code StrictHttpFirewall} blocks {@code %2e}/{@code %2f}/{@code %25} but not
-   * {@code %61}. Must be a direct filter test: MockMvc normalises the path before the filter sees
-   * it, so it cannot reproduce this.
+   * A percent-encoded path prefix such as {@code /%61pi/v1/missions} does not slip past the gate.
+   * Tested on the filter directly because MockMvc normalises the path first.
    */
   @Test
   void pendingUser_cannotBypassTheGateByPercentEncodingThePathPrefix() throws Exception {
@@ -323,10 +316,8 @@ class PendingApprovalAccessFilterTest {
   private record CapturedEvent(Level level, String message, String userId) {}
 
   /**
-   * Records the {@code userId} MDC value as it stands <em>at append time</em>, which is the only
-   * point where the logback pattern would read it. {@code ILoggingEvent.getMDCPropertyMap()}
-   * resolves lazily, so inspecting it after the filter's {@code finally} has removed the key would
-   * observe the post-removal state and silently pass whatever the filter did.
+   * Appender that records the {@code userId} MDC value at append time, since the event's MDC map
+   * resolves lazily and would otherwise show the post-removal state.
    */
   private static final class UserIdCapturingAppender extends AppenderBase<ILoggingEvent> {
 

@@ -39,13 +39,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 /**
- * Spring MVC controller backing the {@code /admin/blueprints} page: a paginated, filterable list of
- * the synced SC Wiki crafting blueprints with their ingredients and per-slot stat modifiers.
+ * Controller for the admin-only {@code /admin/blueprints} page: a paginated, filterable, read-only
+ * list of synced SC Wiki crafting blueprints with ingredients and stat modifiers.
  *
- * <p>Admin-only — class-level {@code @PreAuthorize("hasRole('ADMIN')")} matches the backend gate.
- * Read-only: the SC Wiki sync is the only writer. Filtering and paging are server-side (relayed to
- * {@code GET /api/v1/blueprints}); a backend failure collapses to an error banner with an empty
- * list rather than a 500.
+ * <p>Filtering and paging are relayed to {@code GET /api/v1/blueprints}; a backend failure renders
+ * an error banner with an empty list.
  */
 @Controller
 @UsesLayoutModel
@@ -73,16 +71,14 @@ public class AdminBlueprintsPageController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Loads one page of blueprints, optionally filtered by an output-item-name / Wiki-key substring,
-   * and populates the model for the {@code admin/blueprints} view.
+   * Loads one page of blueprints, optionally filtered, for the {@code admin/blueprints} view.
    *
-   * @param search optional case-insensitive output-name / key filter
+   * @param search optional case-insensitive output-name or key filter
    * @param page zero-based page index
-   * @param fragment when {@code "results"} only the toolbar + table + pager fragment is rendered
-   *     (AJAX filter/paging swap, REQ-FE-002); otherwise the full page is returned
+   * @param fragment {@code "results"} to render only the toolbar, table and pager for an AJAX swap
+   *     (REQ-FE-002); otherwise the full page
    * @param model Thymeleaf model
-   * @return the {@code admin/blueprints} view name, or its {@code results} fragment for an AJAX
-   *     swap request
+   * @return the {@code admin/blueprints} view name, or its {@code results} fragment
    */
   @NotNull
   @GetMapping

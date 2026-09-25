@@ -48,12 +48,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Render-level coverage for the personal hangar's server-side pagination + search (REQ-HANGAR-002),
- * mirroring the order/refinery pagination tests added in #772. The {@code BackendApiClient} is
- * mocked with a deterministic {@link PageResponse} envelope (content intentionally empty — the
- * pagination chrome is driven by the envelope, not the rows), so these assertions verify the
- * frontend renders the shared pagination component, snaps an out-of-set size to the default, clamps
- * a negative page, and threads the active {@code search} term through every page/size link.
+ * Render tests for the personal hangar's server-side pagination and search (REQ-HANGAR-002): the
+ * shared pagination component renders, an invalid size snaps to the default, a negative page is
+ * clamped, and the {@code search} term is kept in every page and size link.
  */
 @SpringBootTest
 @ActiveProfiles("test")

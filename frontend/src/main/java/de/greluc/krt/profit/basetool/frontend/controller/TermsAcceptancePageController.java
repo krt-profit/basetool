@@ -41,16 +41,8 @@ import org.springframework.web.bind.annotation.ResponseBody;
 /**
  * Renders the Terms-of-Use consent gate and records the answer (REQ-SEC-028).
  *
- * <p>A user who has not accepted the wording currently in force is redirected here by {@code
- * TermsAcceptanceGateFilter} from every other page. This controller and the logout endpoint are
- * exempt from that redirect — otherwise the gate would loop and there would be no way through it —
- * as are the imprint, privacy policy and the public {@code /terms} page, because a person cannot be
- * asked to agree to something they are prevented from reading.
- *
- * <p>The backend is the authority: this controller neither knows nor decides which version is in
- * force, it relays the caller's own token to {@code /api/v1/terms/acceptance} and lets the backend
- * stamp the version. A frontend that named the version could record consent to wording the user was
- * never shown.
+ * <p>The backend decides which version is in force and stamps it on acceptance; this controller
+ * only relays the caller's token.
  */
 @Controller
 @UsesLayoutModel
@@ -71,11 +63,7 @@ public class TermsAcceptancePageController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Renders the consent page, or sends an already-consenting user into the tool.
-   *
-   * <p>The redirect matters for the person who accepts in one tab and then reloads a second tab
-   * still showing the gate: without it they would be asked to agree to something they have already
-   * agreed to, and the page would look broken.
+   * Renders the consent page, or redirects a user who has already consented into the tool.
    *
    * @param model receives the wording under {@code terms}
    * @return the {@code terms-accept} view, or a redirect to the start page when consent is already
@@ -97,12 +85,7 @@ public class TermsAcceptancePageController {
   }
 
   /**
-   * Records the caller's consent and reports success to the page's {@code krtFetch} call, which
-   * then navigates into the tool.
-   *
-   * <p>Answers {@code 204} rather than a redirect because the caller is an AJAX write: the page
-   * decides where to go next, so the browser makes one navigation instead of following a redirect
-   * inside an XHR and rendering the start page into a fragment.
+   * Records the caller's consent; the page navigates itself afterwards.
    *
    * @param request the current request, whose session caches the gate verdict to be cleared
    * @return {@code 204} once consent is recorded, {@code 502} if the backend could not record it

@@ -25,22 +25,11 @@ import org.springframework.web.reactive.function.client.ClientRequest;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 
 /**
- * Relays the originating client IP (snapshotted by {@link ClientIpContextFilter}) to the backend
- * via the {@code X-Forwarded-For} header on every outbound {@code WebClient} call.
+ * Relays the client IP resolved by {@link ClientIpContextFilter} to the backend as {@code
+ * X-Forwarded-For} on every outbound {@code WebClient} call, so the backend's per-IP rate limiter
+ * sees the real client.
  *
- * <p>The backend is a pure resource server reached only server-side by this frontend, so without
- * this relay its per-IP rate limiter attributes every request to the single frontend container IP
- * and collapses each per-client / per-endpoint budget into one shared org-wide bucket — letting a
- * single caller trip a public endpoint's limit for everyone (security audit DOS-1). The backend
- * already honours {@code X-Forwarded-For} only from its configured trusted proxies (the frontend
- * container) and resolves the client from the chain by walking it right-to-left, skipping its own
- * trusted hops (see {@code backend ClientIpContextFilter.resolveClientIp}), so relaying the
- * resolved IP restores per-client isolation while reusing the backend's existing, hardened limiter
- * rather than duplicating it on the frontend.
- *
- * <p>An existing {@code X-Forwarded-For} on the outbound request is never overwritten, and a
- * request with no bound client IP (background task / scheduled job) degrades silently to "no header
- * added".
+ * <p>Never overwrites an existing header; adds nothing when no client IP is bound.
  */
 @Component
 public class ClientIpRelayFilter {

@@ -39,16 +39,9 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
 /**
- * Live multi-user sync for the {@code /missions} list (#1235, REQ-FE-015, ADR-0094).
- *
- * <p>The mission surface publishes <b>server-side</b> because create, core update and delete all
- * redirect: a client broadcast issued just before that navigation races the socket teardown. These
- * tests pin the delete path — the one core mutation whose handler takes no bound form — plus the
- * registry consistency of the topic and section strings the controller hardcodes.
- *
- * <p>The per-mission {@code mission:&#123;id&#125;} detail room is a <em>different</em> class and
- * is covered by the mission-detail tests; what matters here is that the two never collapse into
- * one.
+ * Tests the server-side live-sync publish for the {@code /missions} list (REQ-FE-015, ADR-0094):
+ * the delete path, and consistency of the hardcoded topic and section strings with the registry.
+ * The list topic must stay distinct from the per-mission detail room.
  */
 class MissionListLiveSyncPublishTest {
 

@@ -35,14 +35,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Phase 0 exemplar for epic #571 (REQ-FE-001, REQ-FE-004): the profile description save runs
- * through {@code window.krtFetch.write} and must update in place — no page navigation on success —
- * and must self-heal a stale CSRF token via one transparent {@code GET /csrf} refresh + retry.
+ * Verifies that the profile description save (REQ-FE-001, REQ-FE-004) updates in place and
+ * self-heals a stale CSRF token via one {@code GET /csrf} refresh and retry.
  *
- * <p>The "no reload" assertion uses a window marker set on the live document: a full navigation
- * wipes it, so its survival after the save proves the document was never reloaded. The forced
- * stale-token case corrupts the {@code _csrf} meta tag in the page, then saves again and asserts
- * the save still succeeds — exercising {@code krtCsrf.refresh()} + the single retry.
+ * <p>A window marker on the live document proves no reload; the stale-token case corrupts the
+ * {@code _csrf} meta tag before the second save.
  */
 @Tag("e2e")
 class ProfileDescriptionInPlaceE2eTest {

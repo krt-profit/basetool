@@ -39,11 +39,8 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
 /**
- * Pure-method unit tests for {@link TerminalController}. The PUT endpoint has a non-obvious
- * contract that's documented inline in the controller: even though it accepts a full {@link
- * TerminalDto}, the service only applies the {@code hidden} flag — a regression that started
- * writing the full DTO would unexpectedly let admins rename / re-link UEX-imported terminals via
- * this endpoint.
+ * Unit tests for {@link TerminalController}: the PUT endpoint applies only the {@code hidden} flag
+ * of the submitted {@link TerminalDto}.
  */
 @ExtendWith(MockitoExtension.class)
 class TerminalControllerTest {

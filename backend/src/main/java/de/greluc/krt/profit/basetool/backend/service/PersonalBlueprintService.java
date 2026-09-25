@@ -52,15 +52,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Owner-scoped domain service for the personal-blueprint feature (#327). Every read and write is
- * scoped by the Keycloak {@code sub} so a caller can only ever see or mutate their own owned
- * blueprints. The service is {@code sub}-parameterised (it never reads the security context) so the
- * Phase 7 admin surface can reuse it for a target user.
+ * Owner-scoped domain service for personal blueprints. Every method takes the owner id explicitly
+ * and never reads the security context.
  *
- * <p>Optimistic locking follows the project convention: the inbound update DTO carries the last
- * seen {@code version}; on mismatch an {@link ObjectOptimisticLockingFailureException} is raised so
- * the global handler maps it to HTTP 409. A duplicate add raises {@link DuplicateEntityException} →
- * 409 before the {@code (owner_user_id, product_key)} unique constraint fires.
+ * <p>A stale {@code version} raises {@link ObjectOptimisticLockingFailureException} and a duplicate
+ * add {@link DuplicateEntityException}, both mapped to 409.
  */
 @Service
 @RequiredArgsConstructor
@@ -132,9 +128,8 @@ public class PersonalBlueprintService {
   }
 
   /**
-   * Multi-select add: resolves and inserts each requested product key, skipping (not failing) keys
-   * the caller already owns, keys repeated within the request, and keys that resolve to no active
-   * product. Bulk-safe — only new entities are persisted, no detaching bulk update runs.
+   * Adds several blueprints, skipping keys already owned, repeated in the request, or not resolving
+   * to an active product.
    *
    * @param ownerUserId {@code app_user.id} of the caller
    * @param productKeys the product keys to add
@@ -211,12 +206,8 @@ public class PersonalBlueprintService {
   }
 
   /**
-   * Clears the caller's <em>removable</em> owned blueprints in one bulk statement — the "delete all
-   * my blueprints" action (REQ-INV-023). The auto-granted, non-removable default blueprints
-   * (REQ-INV-016) are preserved, exactly as the per-row {@link #delete} guard would, so a full
-   * clear leaves the user's defaults intact rather than churning them against the provisioning
-   * sweep. Idempotent: clearing an already-empty (or default-only) set removes nothing and returns
-   * {@code 0}.
+   * Deletes all of the caller's removable blueprints in one bulk statement, keeping the
+   * auto-granted defaults (REQ-INV-023, REQ-INV-016). Idempotent.
    *
    * @param ownerUserId {@code app_user.id} of the caller
    * @return the number of blueprints removed (never counts a preserved default)
@@ -229,11 +220,9 @@ public class PersonalBlueprintService {
   }
 
   /**
-   * Owner-scoped recipe view for one of the caller's owned blueprints (#327): loads the entry (404
-   * if missing or foreign), then resolves its product key to a representative SC Wiki recipe graph
-   * (ingredients + per-quality stat modifiers) via {@link BlueprintProductService#resolveRecipe}.
-   * If the master no longer lists the product the view degrades to an empty graph carrying the
-   * owned-row product name, so the UI still has a label to show.
+   * Returns the recipe graph of one of the caller's owned blueprints via {@link
+   * BlueprintProductService#resolveRecipe}; an empty graph with the owned name when the product is
+   * no longer listed.
    *
    * @param ownerUserId {@code app_user.id} of the caller
    * @param id owned-blueprint entry id
@@ -300,8 +289,7 @@ public class PersonalBlueprintService {
   }
 
   /**
-   * Admin-scoped update by id alone (admins are trusted to know the id). The optimistic-lock check
-   * still applies.
+   * Admin-scoped update by entry id alone, with the optimistic-lock check.
    *
    * @param id entry primary key
    * @param request the update payload (carries the expected version)
@@ -336,10 +324,8 @@ public class PersonalBlueprintService {
   }
 
   /**
-   * Admin global purge: clears the <em>removable</em> owned blueprints of <strong>every</strong>
-   * user in one bulk statement (REQ-INV-024). Preserves the auto-granted defaults (REQ-INV-016) so
-   * the purge does not fight the default-provisioning sweep. The ADMIN gate lives on the
-   * controller; logged at WARN because it removes data across all users at once.
+   * Deletes the removable blueprints of every user in one bulk statement, keeping the auto-granted
+   * defaults (REQ-INV-024, REQ-INV-016). Logged at WARN.
    *
    * @return the number of blueprints removed across all users (never counts a preserved default)
    */
@@ -371,9 +357,8 @@ public class PersonalBlueprintService {
   }
 
   /**
-   * Maps an owned blueprint to its response DTO, computing the {@code removable} flag from the
-   * cached default-blueprint key set: a default blueprint (REQ-INV-016) is non-removable so the UI
-   * can hide its delete control.
+   * Maps an owned blueprint to its response DTO; {@code removable} is {@code false} for a default
+   * blueprint (REQ-INV-016).
    *
    * @param entity the owned blueprint
    * @return the response DTO with {@code removable} populated
@@ -384,9 +369,7 @@ public class PersonalBlueprintService {
   }
 
   /**
-   * Guards a delete: refuses to remove an owned blueprint whose product is in the default set
-   * (REQ-INV-016). The frontend already hides the delete control for these, so this is the
-   * server-side enforcement for a hand-crafted request.
+   * Refuses to delete an owned blueprint whose product is in the default set (REQ-INV-016).
    *
    * @param entity the owned blueprint about to be deleted
    * @throws BusinessConflictException when the entry is an auto-granted default
@@ -423,8 +406,7 @@ public class PersonalBlueprintService {
   }
 
   /**
-   * Owner-scoped load; 404 (via {@link NotFoundException}) for an unknown id or a row owned by a
-   * different user — the two cases are deliberately indistinguishable on the wire.
+   * Loads an owned blueprint; an unknown id and another user's row both give 404.
    *
    * @param ownerUserId {@code app_user.id} of the caller
    * @param id entry primary key

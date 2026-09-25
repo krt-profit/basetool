@@ -54,11 +54,8 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 /**
- * Unit tests for {@link OrgUnitBankResponsibilityService} (REQ-BANK-034/-026/-047, ADR-0070).
- * Covers the derived responsible-holder reverse-resolution per account type and the
- * leadership-change audit (snapshot + record) split out of {@link OrgUnitBankAccessService} under
- * audit Thema 7 (#14). Lenient strictness mirrors the parent suite's convention across the many
- * independent scenarios.
+ * Unit tests for {@link OrgUnitBankResponsibilityService} (REQ-BANK-034): responsible-holder
+ * resolution per account type and the leadership-change snapshot and audit.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)

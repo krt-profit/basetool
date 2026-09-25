@@ -30,68 +30,14 @@ import org.springframework.web.util.pattern.PathPattern;
 import org.springframework.web.util.pattern.PathPatternParser;
 
 /**
- * The ETag filter, kept away from the Server-Sent-Event endpoints.
+ * The ETag filter, bypassed for Server-Sent-Event endpoints and for the {@link NoStoreApiScopes}
+ * families.
  *
- * <p><strong>This exists because the plain filter silently killed every SSE stream in this
- * application.</strong> {@link ShallowEtagHeaderFilter} computes a shallow ETag by buffering the
- * whole response body in a content-caching wrapper and writing it back afterwards — and its
- * write-back is explicitly skipped when the request has started async processing:
- *
- * <pre>{@code
- * filterChain.doFilter(request, responseToUse);
- * if (!isAsyncStarted(request)) {
- *   updateResponse(request, responseToUse);
- * }
- * }</pre>
- *
- * <p>An {@code SseEmitter} is exactly that case. Every event written to the emitter landed in the
- * wrapper's buffer, async was started, the write-back never ran, and the bytes were dropped. From
- * outside, the endpoint answered {@code 200} and then produced nothing at all — not the body, not
- * even the status line — for as long as the connection was held.
- *
- * <p>The failure had no signal. {@code basetool_sse_connections} counts emitters that were
- * <em>created</em>, not bytes that arrived, so a push channel accepting connections and delivering
- * nothing reads as healthy on every dashboard; {@code SsePushChannelDead} watches for zero
- * connections and there were plenty. It was found by walking a device: the backend's own {@code
- * basetool_livesync_delivered_total} incremented while the app on the other end of that connection
- * logged nothing (#1653).
- *
- * <p>Skipping the filter outright for these paths, rather than relying on Spring's streaming
- * awareness, is deliberate. That mechanism keys off a request attribute the caching wrapper checks
- * at write time, so it depends on the attribute being set before the first write on a path this
- * filter has already wrapped — a coupling that was evidently not holding here and that nothing in
- * our own code controls. Not wrapping a stream at all has no such condition, and an ETag over a
- * response with no end was never meaningful anyway.
- *
- * <h2>The second exemption: responses that can never carry an ETag</h2>
- *
- * <p>The streaming paths were a correctness fix. {@link NoStoreApiScopes} is a cost fix, and it
- * rests on a fact rather than a judgement: {@link ShallowEtagHeaderFilter#isEligibleForEtag}
- * returns {@code false} as soon as the response carries {@code Cache-Control: no-store}, and {@code
- * ApiCacheControlFilter} sets exactly that on those fourteen families — from {@code
- * HIGHEST_PRECEDENCE + 20}, ahead of this filter's write-back. <b>So on those paths no ETag is
- * generated today either.</b> What still happens is the whole point: the response is buffered into
- * a {@code ContentCachingResponseWrapper} on the way out and copied back afterwards, in full, in
- * memory — for a header the framework has already decided not to emit.
- *
- * <p>That makes this exemption nearly free of behavioural risk, and the "nearly" is worth stating
- * precisely rather than rounding away. No <em>caching</em> header changes: the families that lose
- * the buffer had no ETag to lose. <b>{@code Content-Length} can.</b> {@code
- * ContentCachingResponseWrapper.copyBodyToResponse} sets an exact length from the buffered bytes,
- * so every one of these responses used to carry one; without the wrapper a body past Tomcat's
- * output buffer commits mid-write and ships chunked instead. That is a legal and unremarkable
- * response either way, and it is the price of not buffering — but it is a difference, and both new
- * tests use {@code MockHttpServletResponse}, which never commits mid-write and therefore cannot
- * observe it. Skipping the <em>catalogue</em> paths would have been the larger saving — the
- * materials matrix that tipped the buffer at 16 MB revalidates rather than {@code no-store}s, so it
- * does get an ETag — and it was deliberately not taken here, because that ETag is inert only for as
- * long as no client sends {@code If-None-Match}. That is a property of today's clients, not of the
- * response, and removing it would quietly foreclose the mobile read cache in {@code
- * docs/archive/WIRE_PROTOCOL_EVALUATION.md} §8.3.
- *
- * <p>The list is not copied here. Both filters read {@link NoStoreApiScopes}, so a family added to
- * one is added to the other — ADR-0135's argument about a second copy of a rule, applied to a rule
- * about caching rather than authorisation.
+ * <p>{@link ShallowEtagHeaderFilter} buffers the response body and skips its write-back once async
+ * processing started, which drops every byte of an SSE stream. A {@code no-store} response is never
+ * eligible for an ETag ({@link ShallowEtagHeaderFilter#isEligibleForEtag}), so buffering it only
+ * costs memory; without the buffer such a response may ship chunked instead of with a {@code
+ * Content-Length}.
  */
 public class StreamAwareShallowEtagHeaderFilter extends ShallowEtagHeaderFilter {
 
@@ -99,14 +45,8 @@ public class StreamAwareShallowEtagHeaderFilter extends ShallowEtagHeaderFilter 
   private static final PathPattern API_SCOPE = PathPatternParser.defaultInstance.parse("/api/**");
 
   /**
-   * The streaming endpoints, matched exactly.
-   *
-   * <p>Exact patterns rather than a prefix, and the original reason has since been overtaken: the
-   * notification family carried ordinary reads that benefited from an ETag, so only its {@code
-   * /stream} member had to escape the buffer. Since the {@code NoStoreApiScopes} exemption below,
-   * the whole family bypasses this filter anyway. The exactness is kept because these two entries
-   * are about a <em>correctness</em> failure (#1653) rather than about cost, and narrowing them to
-   * a prefix would silently re-scope a guard whose blast radius is a dead push channel.
+   * The streaming endpoints, matched exactly so the correctness guard cannot be re-scoped by a
+   * prefix.
    */
   private static final List<PathPattern> STREAMING_PATHS =
       List.of(
@@ -114,19 +54,10 @@ public class StreamAwareShallowEtagHeaderFilter extends ShallowEtagHeaderFilter 
           PathPatternParser.defaultInstance.parse("/api/v1/live-sync/stream"));
 
   /**
-   * Answers whether this request must bypass the ETag buffer.
+   * Answers whether this request bypasses the ETag buffer.
    *
-   * <p>Matched on the parsed request URI, the same idiom the per-subject rate limiter uses. It does
-   * not collapse dot segments or decode escapes, so an unnormalised spelling of one of these
-   * endpoints is buffered like any other response — bounded and deliberate: it costs that one
-   * client its stream and exposes nothing, and a stricter normalisation belongs in both filters at
-   * once rather than in this one alone.
-   *
-   * <p>Two reasons to bypass, and they are not the same reason. A streaming path <b>must</b> escape
-   * the buffer or its bytes are dropped (#1653). A {@link NoStoreApiScopes} path <b>gains
-   * nothing</b> from it, because {@code Cache-Control: no-store} already makes the response
-   * ineligible for an ETag — the buffer is paid for and then thrown away. Both are answered here so
-   * a caller sees one decision rather than two half-filters.
+   * <p>Matched on the parsed request URI without normalisation, so an unnormalised spelling of an
+   * endpoint is buffered like any other response.
    *
    * @param request the request
    * @return {@code true} for a Server-Sent-Event endpoint, or for a family whose response can never

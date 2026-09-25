@@ -37,19 +37,10 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
- * Build-time enforcement of the design system's accessible text tints (REQ-UI-006): colour used
- * <em>as text</em> never takes one of the three canonical hues that fail WCAG AA on the dark
- * surfaces.
- *
- * <p>The danger hue ({@code #A3000A}, about 2.3:1), the info hue ({@code #355DDC}, about 3.3:1) and
- * grey 2 ({@code #646464}, about 3.3:1) are for fills, borders and icons behind text. As text they
- * need their {@code -text} tints ({@code --color-danger-text}, {@code --color-info-text}, {@code
- * --color-gray-2-text}). The axe smoke scans five pages and sees only what their seeded rows
- * render: on 2026-09-25 a sweep of every page route found the item order badge, the price column of
- * the materials matrix, the outline danger button and two hints failing, and a static read then
- * found 49 such declarations in all, most on elements the sweep had no data to render. This test
- * reads the declarations themselves, so a new one fails the build whether or not a page ever
- * renders it in a test.
+ * Build-time check of the accessible text tints (REQ-UI-006): text colour never uses the danger
+ * ({@code #A3000A}), info ({@code #355DDC}) or grey 2 ({@code #646464}) hues, which fail WCAG AA on
+ * dark surfaces, but their {@code -text} tints. Reads the declarations directly, so unrendered
+ * styles are covered too.
  */
 class AccessibleTextTintTest {
 

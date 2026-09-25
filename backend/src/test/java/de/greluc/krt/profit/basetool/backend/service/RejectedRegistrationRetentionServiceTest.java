@@ -48,12 +48,9 @@ import org.mockito.quality.Strictness;
 import org.springframework.beans.factory.ObjectProvider;
 
 /**
- * Mockito unit tests for {@link RejectedRegistrationRetentionService} — the scheduled purge of
- * registrations refused past the retention window (REQ-SEC-057).
- *
- * <p>The three properties worth pinning down are the ordering (database half before the external
- * Keycloak write), the in-transaction re-check that protects a concurrently reopened registration,
- * and the per-row failure isolation that keeps one bad row from costing the whole sweep.
+ * Unit tests for {@link RejectedRegistrationRetentionService} (REQ-SEC-057): the database purge
+ * precedes the Keycloak write, a concurrently reopened registration is spared, and one failing row
+ * does not abort the sweep.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)

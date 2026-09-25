@@ -30,8 +30,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit tests for {@link BlueprintOutputNameOverrides} — the curated, guarded, self-healing
- * CIG-mislabel blueprint output-name corrections (#327). Covers REQ-INV-047.
+ * Unit tests for {@link BlueprintOutputNameOverrides}, the curated blueprint output-name
+ * corrections (REQ-INV-047).
  */
 class BlueprintOutputNameOverridesTest {
 

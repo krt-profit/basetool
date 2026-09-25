@@ -45,13 +45,10 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC-level test for {@link AdminBankPageController}'s in-place wipe-reset AJAX twin (epic #571 /
- * #582). Proves the {@code X-Requested-With} header routing: the twin is {@code @ResponseBody} and
- * returns the affected counts as JSON ({@code 200}) on a valid {@code WIPE} confirm token, rejects
- * a wrong token with {@code 400}, relays a backend conflict as {@code problem+json} (so {@code
- * krtFetch} can offer the reload-confirm), and the same URL without the header still hits the
- * classic redirect handler. Fails if the header gating, the confirm-token backstop, or the conflict
- * relay breaks.
+ * MVC test for {@link AdminBankPageController}'s wipe-reset AJAX twin: with {@code
+ * X-Requested-With} it returns the affected counts on a valid {@code WIPE} token, rejects a wrong
+ * token with {@code 400} and relays a backend conflict as {@code problem+json}; without the header
+ * the classic redirect handler runs.
  */
 @SpringBootTest
 class AdminBankPageControllerMvcTest {

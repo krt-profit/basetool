@@ -33,11 +33,7 @@ public final class OrgUnitLabels {
   private OrgUnitLabels() {}
 
   /**
-   * Resolves the compact audit label for an org unit — its shorthand, falling back to its name —
-   * used as the {@code subjectLabel} on role / membership audit events. Null-tolerant: a {@code
-   * null} unit yields {@code null} (so id-lookup paths can pass an unresolved unit straight
-   * through), and a unit whose shorthand is blank and whose name is {@code null} likewise yields
-   * {@code null}.
+   * Resolves the compact audit label for an org unit: its non-blank shorthand, else its name.
    *
    * @param unit the org unit, or {@code null}
    * @return the shorthand if set and non-blank, otherwise the name, otherwise {@code null}

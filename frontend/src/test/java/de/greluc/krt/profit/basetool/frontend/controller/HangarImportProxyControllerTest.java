@@ -44,16 +44,10 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Unit tests for {@link HangarImportProxyController}. The controller is a multipart-pass-through to
- * two backend ship-import endpoints — the canonical {@code /api/v1/hangar/import/ships} and the
- * deprecated alias {@code /api/v1/hangar/import/fleetview}. The deprecated alias forwards to the
- * matching backend alias so existing automation does not break before the sunset date. Coverage:
- * happy paths for both endpoints, every exception branch on the deprecated path (the shared
- * forwarding plumbing means re-running each negative case for the new path would be redundant), and
- * the filename-fallback when the upload has no original filename.
- *
- * <p>{@link MockWebServer} stands in for the backend so the real WebClient fluent chain (URI /
- * content-type / multipart body / bodyToMono) is exercised.
+ * Unit tests for {@link HangarImportProxyController}, which forwards ship-import uploads to the
+ * backend's {@code /api/v1/hangar/import/ships} and its deprecated {@code fleetview} alias. Covers
+ * both happy paths, every error branch on the shared forwarding path, and the filename fallback,
+ * against a {@link MockWebServer} backend.
  */
 @SuppressWarnings("removal")
 class HangarImportProxyControllerTest {

@@ -53,10 +53,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
- * Mockito unit tests for {@link KommandoGroupService} (epic #800, REQ-ROLE-003): the create /
- * rename / delete contract, the &le;4-per-squadron and non-Staffel-parent 400s, the
- * referenced-group delete guard, optimistic-lock handling, and that every mutation records its
- * {@code ROLE}-domain audit event.
+ * Unit tests for {@link KommandoGroupService} (REQ-ROLE-003): create, rename and delete, the
+ * per-squadron limit and parent-kind 400s, the referenced-group delete guard, optimistic locking
+ * and the {@code ROLE} audit events.
  */
 @ExtendWith(MockitoExtension.class)
 class KommandoGroupServiceTest {

@@ -594,9 +594,8 @@ class GlobalExceptionHandlerTest {
   }
 
   /**
-   * The client-side guards that used to throw {@link IllegalStateException} now throw {@link
-   * BadRequestException} with i18n keys. Their details are user-visible, so each key is asserted
-   * against both bundles rather than trusted to exist.
+   * Client-side guards throw {@link BadRequestException} with i18n keys that resolve in both
+   * locales.
    */
   @Test
   void handleBadRequest_resolvesTheFormerIllegalStateGuardKeysInBothLocales() {
@@ -879,18 +878,8 @@ class GlobalExceptionHandlerTest {
   }
 
   /**
-   * A 403 from an upstream admin API is a 502, not a 500, and its body stays server-side.
-   *
-   * <p>The case that produced this handler: deleting the ingest gateway's stray member row called
-   * Keycloak's admin API, whose client may manage users but not inspect clients, so the call came
-   * back 403. Nothing handled {@link RestClientException}, so an admin was told "an unexpected
-   * error occurred" — which named neither the dependency nor the cause and is indistinguishable
-   * from a genuine bug in this application.
-   *
-   * <p>Both halves matter. The status must be 502 because a dependency answered badly, even though
-   * the upstream status is a 4xx: a 403 from the identity provider means THIS service lacks a role,
-   * which is never the caller's fault. And the upstream body must not be relayed — for an identity
-   * provider it can carry realm names, client ids or token material (CWE-209).
+   * An upstream {@link RestClientException}, even a 4xx, maps to 502 without relaying the upstream
+   * body (CWE-209).
    */
   @Test
   void handleRestClient_returns502_andDoesNotLeakTheUpstreamBody() {
@@ -913,12 +902,8 @@ class GlobalExceptionHandlerTest {
   }
 
   /**
-   * Spring actually dispatches an upstream failure here, and not to the {@code Exception} fallback.
-   *
-   * <p>The assertion the other two cannot make: they call the handler directly, so they would still
-   * pass if {@code @ExceptionHandler(Exception.class)} kept winning at runtime and every upstream
-   * failure carried on being an unexplained 500. This drives {@link ExceptionHandlerMethodResolver}
-   * — the same resolution Spring MVC performs — over the real class.
+   * Spring's own handler resolution dispatches an upstream failure to the {@link
+   * RestClientException} handler rather than the {@code Exception} fallback.
    */
   @Test
   void springResolvesAnUpstreamFailureToTheRestClientHandlerNotTheFallback() {
@@ -958,14 +943,8 @@ class GlobalExceptionHandlerTest {
   }
 
   /**
-   * A production {@code 400} on {@code POST /api/v1/missions/{id}/participants/slim} could not be
-   * diagnosed: the log line carried method, URI, status, code and correlation id, and nothing about
-   * which of the 242 {@code BadRequestException} call sites had spoken. The caller had the reason;
-   * the operator did not.
-   *
-   * <p>The message itself stays out of the log — a minority of those call sites interpolate the
-   * rejected value, and a rejected user value must not be persisted (REQ-OBS-004). The frame that
-   * threw carries no runtime data and answers the same question.
+   * A rejected request's log line names the source frame that threw the {@code
+   * BadRequestException}, never its message (REQ-OBS-004).
    */
   @Test
   void aRefusalNamesTheSourceLineThatProducedIt() {
@@ -1018,11 +997,7 @@ class GlobalExceptionHandlerTest {
             .getName());
   }
 
-  /**
-   * The response half. The handler must be {@code void}: the second production log line was Spring
-   * failing to write a {@link ProblemDetail} into a response whose content type is already {@code
-   * text/event-stream}, and there is no socket left to write to in any case.
-   */
+  /** The disconnected-client handler is {@code void} and writes no response body. */
   @Test
   void aDisconnectedClientHandlerReturnsNothingAtAll() throws Exception {
     assertEquals(

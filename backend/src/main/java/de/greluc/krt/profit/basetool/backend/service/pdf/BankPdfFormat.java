@@ -74,9 +74,8 @@ public final class BankPdfFormat {
   }
 
   /**
-   * Builds the holder-balance table (HALTER / BETRAG): one row per holder with a non-zero balance,
-   * in the supplied order, or the localized empty row. Since ADR-0039 this renders the global
-   * holder custody totals (not a per-account distribution).
+   * Builds the holder-balance table (HALTER / BETRAG) of the global holder custody totals: one row
+   * per holder with a non-zero balance, or the localized empty row.
    *
    * @param distribution the per-holder balances to render
    * @param label the message-bundle resolver of the calling service

@@ -28,12 +28,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * TestContainers-backed migration test for {@code
- * V125__drop_legacy_material_and_ship_type_columns.sql} — the R9 Step 4 destructive drop. Pins that
- * Flyway recorded the migration and that both legacy columns ({@code material.is_manual_entry} and
- * {@code ship_type.description}) are gone from the fully-migrated schema. Because the matching JPA
- * fields were removed in the same change, a green {@code @SpringBootTest} context boot here also
- * proves {@code ddl-auto=validate} accepts the post-drop schema.
+ * Migration test for {@code V125__drop_legacy_material_and_ship_type_columns.sql}: the migration is
+ * recorded and {@code material.is_manual_entry} and {@code ship_type.description} are gone.
  */
 @SpringBootTest
 @ActiveProfiles("test")

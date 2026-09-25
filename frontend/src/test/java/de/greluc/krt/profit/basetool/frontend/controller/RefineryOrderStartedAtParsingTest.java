@@ -28,9 +28,8 @@ import java.time.ZoneOffset;
 import org.junit.jupiter.api.Test;
 
 /**
- * Regressionstest fuer den Bugfix der doppelten Sommerzeit-Umrechnung in Raffinerieauftraegen. Der
- * Parser MUSS ISO-Instants (UTC mit 'Z'), ISO-Offsets und reine Datumseingaben deterministisch als
- * UTC-Instant liefern und DARF keine {@code ZoneId.systemDefault()}-Semantik verwenden.
+ * Tests that the refinery-order start-time parser reads ISO instants, ISO offsets and plain dates
+ * deterministically as UTC, independent of the system default zone.
  */
 class RefineryOrderStartedAtParsingTest {
 

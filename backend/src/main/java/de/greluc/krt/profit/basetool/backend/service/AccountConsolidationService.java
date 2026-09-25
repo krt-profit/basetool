@@ -41,45 +41,13 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Folds a duplicate account into the account the member keeps (REQ-SEC-055, #1828).
+ * Folds an approved duplicate account into the account the member keeps (REQ-SEC-055): moves its
+ * belongings and its Discord identity, then removes it.
  *
- * <p>The remedy for a member who ended up with two accounts and whose duplicate has already been
- * <em>approved</em>. While the duplicate sits in the approval queue the cheaper action applies:
- * {@link UserRegistrationService#linkRegistrationToExistingAccount} moves the Discord identity and
- * discards a registration that cannot yet own anything (REQ-SEC-026). Approving it takes that away
- * — the queue serves {@code PENDING} and {@code REJECTED} only, and the link action guards on
- * {@code PENDING} in the service as well — and leaves an account that has since been able to
- * accumulate data. So this action does both halves: it moves what the duplicate owns, and it moves
- * the identity.
- *
- * <h2>It composes rather than reimplements</h2>
- *
- * <ul>
- *   <li>{@link UserAccountMergeService#merge} decides which rows follow the member and which stay
- *       with the act (REQ-SEC-046), and refuses two bank ledgers rather than guessing. It carries
- *       no approval-status guard, so it already worked on an active account — it simply had no UI
- *       in front of it for this case.
- *   <li>{@link KeycloakService} moves the federated identity and removes the duplicate's realm
- *       user.
- *   <li>{@link UserDeletionService} removes the emptied row through the FK-safe purge.
- * </ul>
- *
- * <h2>Non-transactional orchestrator</h2>
- *
- * <p>Mirroring {@link UserRegistrationService#linkRegistrationToExistingAccount}: the Keycloak
- * writes are external side-effects that cannot roll back with a database transaction, so this
- * method runs outside any transaction and commits the database work through the self-proxied {@link
- * #completeConsolidationTransactionally}. The duplicate's Keycloak user is deleted <em>last</em>,
- * after the database is consistent, which is what makes a retry safe: a rolled-back database half
- * leaves that user intact so the next attempt re-reads its identity cleanly. Each Keycloak write is
- * itself idempotent.
- *
- * <h2>The ordering inside the transaction is not free choice</h2>
- *
- * <p>{@code app_user.discord_user_id} is UNIQUE (V172), so the duplicate's row must be gone before
- * the survivor can claim the snowflake. That is the same reason the {@code PENDING} path deletes
- * the throwaway row first and stamps the survivor second, and it is why the belongings move, the
- * delete and the stamp all sit in one transaction in that order.
+ * <p>Composes {@link UserAccountMergeService#merge}, {@link KeycloakService} and {@link
+ * UserDeletionService}. Runs outside a transaction; the database work commits through {@link
+ * #completeConsolidationTransactionally}, and the duplicate's Keycloak user is deleted last so a
+ * retry is safe.
  */
 @Service
 @RequiredArgsConstructor
@@ -100,14 +68,9 @@ public class AccountConsolidationService {
   private final ObjectProvider<AccountConsolidationService> selfProvider;
 
   /**
-   * Dissolves {@code duplicateId} into {@code targetUserId}: what the duplicate owns moves onto the
-   * target, its Discord identity (if it has one) is re-linked onto the target in Keycloak, and both
-   * the duplicate's {@code app_user} row and its Keycloak user are removed.
-   *
-   * <p>A duplicate with no Discord identity is a legitimate case — two credential accounts for one
-   * person — and consolidates the same way, minus the identity move. What is refused is a target
-   * that already carries a <em>different</em> Discord identity: that is not one member with two
-   * accounts, and quietly overwriting the link would rewrite who the surviving account belongs to.
+   * Dissolves {@code duplicateId} into {@code targetUserId}: moves its belongings and Discord
+   * identity (if any) onto the target and removes the duplicate's {@code app_user} row and Keycloak
+   * user.
    *
    * @param duplicateId the account to dissolve
    * @param targetUserId the account the member keeps
@@ -115,11 +78,10 @@ public class AccountConsolidationService {
    * @param adminId the acting admin's id, recorded in the audit
    * @return the surviving account
    * @throws NotFoundException when either account is unknown
-   * @throws BusinessConflictException when the two ids are the same, the duplicate is the acting
-   *     admin's own account, the target is not active, the target already carries a different
-   *     Discord identity, or both accounts hold a bank ledger
-   * @throws org.springframework.dao.OptimisticLockingFailureException when the supplied version is
-   *     stale
+   * @throws BusinessConflictException when the ids are equal, the duplicate is the admin's own
+   *     account, the target is inactive or carries a different Discord identity, or both accounts
+   *     hold a bank ledger
+   * @throws org.springframework.dao.OptimisticLockingFailureException when the version is stale
    */
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   @NotNull
@@ -166,14 +128,8 @@ public class AccountConsolidationService {
   }
 
   /**
-   * Refuses a target that already carries a Discord identity other than the one being moved onto
-   * it.
-   *
-   * <p>The same snowflake is not a conflict but the ordinary shape of a half-finished consolidation
-   * — someone linked the survivor in Keycloak before disposing of the duplicate, which is exactly
-   * the state that leaves {@code discord_user_id} unwritten on the survivor because the duplicate's
-   * row still holds it. A <em>different</em> snowflake is a genuine conflict: two identities and
-   * two accounts is not one member with a duplicate.
+   * Refuses a target that already carries a Discord identity other than the one being moved; the
+   * same snowflake is accepted.
    *
    * @param target the surviving account
    * @param link the identity about to be moved, or {@code null} when the duplicate has none
@@ -192,15 +148,8 @@ public class AccountConsolidationService {
   }
 
   /**
-   * Resolves the Discord identity to move off the duplicate, preferring the authoritative Keycloak
-   * federated identity and falling back to the locally persisted {@code discord_user_id}.
-   *
-   * <p>Same two-source shape as the {@code PENDING} path (REQ-SEC-026): the Keycloak read covers a
-   * link the claim mapper never persisted locally, and the local fallback recovers a consolidation
-   * whose earlier attempt had already deleted the duplicate's Keycloak user — {@code
-   * readDiscordLink} maps a {@code 404} to empty precisely so that fallback is reachable. Unlike
-   * that path, an empty result is not an error here: a duplicate with no Discord identity at all is
-   * a legitimate case.
+   * Resolves the duplicate's Discord identity from its Keycloak federated identity, falling back to
+   * the locally persisted {@code discord_user_id}.
    *
    * @param duplicate the account being dissolved; never {@code null}
    * @return the identity to move, or empty when the duplicate carries none
@@ -220,23 +169,16 @@ public class AccountConsolidationService {
   }
 
   /**
-   * The transactional database half, invoked through the self-proxy so its {@link Transactional}
-   * boundary actually applies.
+   * The transactional database half, invoked through the self-proxy: merges the duplicate's
+   * belongings into the target, purges the duplicate row, then stamps the survivor's Discord link.
    *
-   * <p>Three steps in a fixed order: move what the duplicate owns onto the target ({@link
-   * UserAccountMergeService#merge}, which also refuses two bank ledgers), purge the emptied
-   * duplicate row, then stamp the survivor's Discord link. The stamp must come last because {@code
-   * discord_user_id} is UNIQUE and the duplicate's row holds the value until it is gone.
-   *
-   * <p>The duplicate's Keycloak user is still present at this point — the orchestrator removes it
-   * after this commits — so the deletion's presence probe is waived explicitly ({@link
-   * UserDeletionService.KeycloakPresenceCheck#WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER}). On a retry
-   * where the duplicate row is already gone, all three steps degrade to just the stamp.
+   * <p>The stamp comes last because {@code discord_user_id} is UNIQUE. On a retry where the
+   * duplicate row is already gone, only the stamp runs.
    *
    * @param duplicateId the account to empty and remove; may already be gone on a retry
    * @param targetUserId the surviving account
    * @param snowflake the Discord id to record on the survivor, or {@code null} when there is none
-   * @param guildNickname the captured guild nickname to carry over, or {@code null}
+   * @param guildNickname the guild nickname to carry over, or {@code null}
    * @param adminId the acting admin's id, recorded in the audit
    * @return the surviving account
    * @throws NotFoundException when the target account is unknown

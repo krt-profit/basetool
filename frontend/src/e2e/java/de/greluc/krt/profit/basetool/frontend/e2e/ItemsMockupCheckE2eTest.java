@@ -32,11 +32,9 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
- * Ad-hoc visual verification harness for the personal-inventory items page against an ALREADY
- * RUNNING local test stack ({@code E2E_BASE_URL} env; self-skipping without {@code PI_CHECK=true}).
- * Logs in as the synthetic test admin, probes the shared tab-nav, the empty state and the KRT modal
- * frames (including the inline validation re-render), and screenshots each step while dumping
- * console errors. Not part of CI.
+ * Manual visual check of the personal-inventory items page against an already running stack ({@code
+ * E2E_BASE_URL}); screenshots each step and dumps console errors. Skipped unless {@code
+ * PI_CHECK=true}; not part of CI.
  */
 @Tag("e2e")
 class ItemsMockupCheckE2eTest {
@@ -45,11 +43,8 @@ class ItemsMockupCheckE2eTest {
   private static Browser browser;
 
   /**
-   * Skips the class unless {@code PI_CHECK=true}, then boots the headless browser of the configured
-   * engine ({@code -Pe2e.browser}) through {@link E2eSupport#launchBrowser}. The assumption runs
-   * <em>before</em> any browser launch: a CI matrix cell installs only its own engine, so an
-   * unconditional launch of a hard-coded one fails the whole class with a {@code DriverException}
-   * instead of skipping it.
+   * Skips the class unless {@code PI_CHECK=true}, then launches the configured browser engine via
+   * {@link E2eSupport#launchBrowser}.
    */
   @BeforeAll
   static void setUp() {

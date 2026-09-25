@@ -432,14 +432,8 @@ class BotProtectionFilterTest {
   }
 
   /**
-   * Differential check against the container's own parser: whatever this filter rejects, Tomcat
-   * would have rejected too. This is the one-directional property that matters, because a false
-   * positive here turns a legitimate request into a 400 while the reverse only means a rare probe
-   * takes the {@code GlobalExceptionHandler} path instead of the edge one. The corpus therefore
-   * deliberately includes inputs Tomcat rejects and this filter does not (a broken percent-escape),
-   * which the assertion permits. For a query string carrying no percent-escape the decoder cannot
-   * be the reason for a reject, so there the two verdicts are asserted to match exactly — that is
-   * what pins this filter's rule to {@code Parameters.processParameters} across a Tomcat upgrade.
+   * Verifies that every query string this filter rejects is also rejected by Tomcat's parser, and
+   * that for strings without percent-escapes both verdicts match exactly.
    *
    * @param queryString the raw query string under test
    */

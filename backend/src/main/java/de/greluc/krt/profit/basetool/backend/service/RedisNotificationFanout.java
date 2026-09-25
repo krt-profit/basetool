@@ -38,16 +38,12 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Redis pub/sub {@link NotificationFanout} that makes the real-time notification push correct
- * across backend replicas (ADR-0094), discharging the ADR-0016 single-instance follow-up.
+ * Redis pub/sub {@link NotificationFanout} that delivers real-time notification pushes across
+ * backend replicas (ADR-0094).
  *
- * <p>{@link #publish(Collection)} delivers to <em>this</em> instance's SSE emitters first (via
- * {@link NotificationStreamService#publish(Collection)}), then publishes {@code {v, recipients,
- * origin}} on the channel. Every replica receives it via {@link #onMessage(Message, byte[])}; a
- * message whose {@code origin} is this instance is skipped (already delivered locally), and any
- * other is delivered to this instance's emitters. Because local delivery happens before publish, a
- * Redis outage degrades to exactly the single-instance behaviour — publish fails, is counted, and
- * the frontend polling fallback (REQ-NOTIF-006) still keeps every badge correct.
+ * <p>{@link #publish(Collection)} delivers to this instance's emitters first, then publishes on the
+ * channel; {@link #onMessage(Message, byte[])} delivers peers' messages and skips its own. A Redis
+ * outage leaves local delivery and the polling fallback intact (REQ-NOTIF-006).
  */
 @Slf4j
 public class RedisNotificationFanout implements NotificationFanout, MessageListener {
@@ -60,7 +56,7 @@ public class RedisNotificationFanout implements NotificationFanout, MessageListe
   private final RedisJsonFanout transport;
 
   /**
-   * Builds the Redis notification fan-out.
+   * Creates the Redis notification fan-out.
    *
    * @param notificationStreamService the local SSE emitter registry (delivers to this instance)
    * @param redisTemplate the string Redis template used to publish
@@ -134,11 +130,7 @@ public class RedisNotificationFanout implements NotificationFanout, MessageListe
   }
 
   /**
-   * Reads the signal a peer attached, if any.
-   *
-   * <p>Defensive in the same way the recipient list is: a malformed or absent signal degrades to
-   * the bare refresh rather than dropping the push, because a client that cannot be told what
-   * arrived can still be told that something did.
+   * Reads the signal a peer attached; a malformed or absent signal falls back to a bare refresh.
    *
    * @param root the parsed message
    * @return the signal, or {@link NotificationSignal#refreshOnly()}

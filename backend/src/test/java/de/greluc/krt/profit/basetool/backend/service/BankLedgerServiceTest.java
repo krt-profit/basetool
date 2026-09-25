@@ -74,12 +74,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * Integration tests for {@link BankLedgerService} against the real Testcontainers PostgreSQL, on
- * the decoupled two-ledger model (ADR-0039): account and holder legs per booking, the
- * <strong>account-only</strong> no-overdraft guard under real concurrent contention (REQ-BANK-006 —
- * holders may go negative), the holder→holder Umbuchung (REQ-BANK-031), the negated-mirror reversal
- * across both ledgers (ADR-0010/0039), the wipe reset (REQ-BANK-013), append-only behavior and the
- * one-audit-row-per-booking rule (REQ-BANK-012).
+ * Integration tests for {@link BankLedgerService} against real Postgres on the two-ledger model
+ * (ADR-0039): account-only overdraft guard under contention (REQ-BANK-006), Umbuchung, reversal,
+ * wipe reset, append-only behaviour and one audit row per booking.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -925,9 +922,8 @@ class BankLedgerServiceTest {
   }
 
   /**
-   * Seeds an active {@code SPECIAL} account — a {@linkplain
-   * BankAccountType#requiresDebitJustification() justification-mandating} type — for the
-   * REQ-BANK-045 Begründung tests.
+   * Seeds an active {@code SPECIAL} account, a {@linkplain
+   * BankAccountType#requiresDebitJustification() justification-mandating} type (REQ-BANK-045).
    *
    * @param name the display name
    * @return the persisted SPECIAL account

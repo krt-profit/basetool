@@ -50,14 +50,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Renders the bank dashboard ({@code /bank}) to pin the client-side account-name live filter
- * (REQ-BANK-046): the search box wiring ({@code data-bank-acc-filter} + its scope/empty selectors),
- * the per-card {@code data-filter-name} the filter matches against, and the filter-empty note. Also
- * pins the two view-option checkboxes (table view + by-Bereich grouping, REQ-BANK-016), the header
- * direct-booking Kontobewegung CTA + modal (REQ-BANK-023), that the filter is available to a plain
- * {@code BANK_EMPLOYEE} while the three-month report stays {@code BANK_MANAGEMENT}-only (the
- * Verwaltung / Berechtigungen links moved to the sidebar), and that the filter is omitted entirely
- * when the caller has no cards to filter.
+ * Renders the bank dashboard ({@code /bank}) to pin the account-name live filter (REQ-BANK-046),
+ * the view-option checkboxes (REQ-BANK-016), the Kontobewegung CTA and modal (REQ-BANK-023), and
+ * the role gating of the filter and the three-month report.
  */
 @SpringBootTest
 class BankDashboardFilterMvcTest {

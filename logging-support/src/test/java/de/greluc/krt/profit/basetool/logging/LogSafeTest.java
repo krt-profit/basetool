@@ -27,28 +27,16 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
-/**
- * Unit tests for the log-injection guard all three applications share. The text reaching these log
- * lines comes from an authenticated member's search box or form field (backend, frontend) or from
- * the desktop extractor's free-text provenance fields (ingest), so the threat is a caller who can
- * make a log write a fabricated {@code ERROR} line — which would be taken at face value while
- * triaging an incident.
- *
- * <p>Until ADR-0205 this class existed three times, together with a parity test that read the other
- * two modules' sources and compared their marked regions byte for byte. With one implementation
- * there is nothing left to compare; the expectation table below is simply the specification.
- */
+/** Tests the shared log-injection guard {@link LogSafe} against an expectation table. */
 class LogSafeTest {
 
   /**
-   * Runs every row of the expectation table against the guard.
+   * Runs every row of the expectation table against the guard; the display name omits the arguments
+   * because they contain characters illegal in JUnit XML reports.
    *
-   * <p>The display name deliberately omits the arguments: the table carries NUL, DEL and the two
-   * Unicode separators, and those characters are illegal in the JUnit XML report a CI run parses.
-   *
-   * @param value the input handed to the guard, {@code null} for the null-input rows
+   * @param value the input, {@code null} for the null-input rows
    * @param maxLength the cap handed to the guard
-   * @param expected the exact rendering the guard must produce
+   * @param expected the exact expected rendering
    */
   @ParameterizedTest(name = "[{index}]")
   @MethodSource("sanitisationTable")

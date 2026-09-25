@@ -99,21 +99,12 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST surface over the job-order aggregate (the request-and-fulfill queue). Detail reads and
- * mutations are constrained to the caller's visibility scope (Phase 3, #343) via {@code
- * @ownerScopeService.canSee/canEditJobOrder}: SK-responsible orders are public, squadron-
- * responsible orders private to that squadron + admins. Mutations additionally require LOGISTICIAN
- * or above; delete is ADMIN-only. Job-order creation requires a login but no role beyond it
- * (ADR-0149) — it used to be {@code permitAll()}, a public request form whose orders were stamped
- * onto a configured intake Spezialkommando because they had no author.
+ * REST surface over the job-order aggregate (the request-and-fulfill queue).
  *
- * <p>Heavy concurrency lives in the service layer: {@code updateJobOrderPriority} acquires a
- * pessimistic write lock for the reorder shift; {@code updateJobOrderStatus} atomically unlinks
- * every inventory item on transition to a terminal state; handover creation follows the
- * bulk-update-after-loop pattern from CLAUDE.md to avoid the
- * {@code @Modifying(clearAutomatically=true)} trap. {@link #addAssignee}/{@link #removeAssignee}
- * resolve self-vs-logistician at the HTTP boundary so the service stays free of {@code
- * SecurityContextHolder} reads.
+ * <p>Reads and mutations are limited to the caller's visibility scope via {@code
+ * @ownerScopeService}: SK-responsible orders are public, squadron-responsible orders private to
+ * that squadron and admins. Creation needs a login only (ADR-0149); other mutations require
+ * LOGISTICIAN or above, delete requires ADMIN.
  */
 @RestController
 @RequestMapping("/api/v1/orders")
@@ -136,9 +127,8 @@ public class JobOrderController {
   private final JobOrderInventoryOwnerRedactor inventoryOwnerRedactor;
 
   /**
-   * Records a materials handover for the job order. Multi-item flows use the bulk-update-after-loop
-   * pattern: per-item mutations rely on Hibernate dirty-checking inside the loop, then a single
-   * bulk unlink runs after persistence to avoid clearing the persistence context mid-iteration.
+   * Records a materials handover for the job order, unlinking the handed-over items with a single
+   * bulk update after the per-item loop.
    *
    * @param id job-order id
    * @param dto handover create payload (per-item quantities)
@@ -190,18 +180,12 @@ public class JobOrderController {
   }
 
   /**
-   * Books a production run ("Herstellung", REQ-ORDERS-025) against one ordered item line: records
-   * the manufactured unit count and reduces the linked inventory the manufacture consumed. Same
-   * authorisation as the handovers (LOGISTICIAN+). The consumption plan must exactly cover the
-   * required per-material demand; a mismatch is a 422 (code {@code PRODUCTION_ALLOCATION}), a stale
-   * line/entry version a 409 (code {@code OPTIMISTIC_LOCK}).
+   * Books a production run ("Herstellung") against one ordered item line: records the manufactured
+   * units and consumes the linked inventory (REQ-ORDERS-025).
    *
-   * <p>An optional {@code bookIn} block additionally lands the produced units as Lager item stock
-   * in the same transaction (REQ-INV-032): it names the target location and owner user, stamps the
-   * owning org unit via the picker resolver, and by default earmarks the new stock for this order.
-   * {@code personal = true} combined with the order earmark is contradictory and a 400; an unknown
-   * book-in owner or location is a 404. {@code bookIn = null} keeps the exact legacy behaviour
-   * (transitional until the Herstellen dialog ships the block).
+   * <p>The consumption plan must exactly cover the per-material demand (422 {@code
+   * PRODUCTION_ALLOCATION}); a stale version gives 409. An optional {@code bookIn} block also books
+   * the produced units in as Lager item stock in the same transaction (REQ-INV-032).
    *
    * @param id job-order id
    * @param itemId ordered item-line id
@@ -366,12 +350,8 @@ public class JobOrderController {
   }
 
   /**
-   * Creates a new job order. Any member may file one; who may then <em>see</em> it is {@code
-   * canSeeJobOrder}'s question (REQ-ORG-003).
-   *
-   * <p>It was {@code permitAll()} for the public request form, and an anonymous caller got a
-   * response with {@code assignees}, {@code handovers} and {@code version} dropped. ADR-0149 closed
-   * the form and ADR-0159 the surface around it; the redaction went with its audience.
+   * Creates a new job order; any logged-in member may file one, and its visibility follows {@code
+   * canSeeJobOrder} (REQ-ORG-003).
    *
    * @param dto create payload
    * @return the persisted DTO
@@ -387,10 +367,8 @@ public class JobOrderController {
   }
 
   /**
-   * Creates a new item-based job order — the same gate as the material-order create above. The
-   * required materials are derived server-side from each ordered item's chosen blueprint and
-   * snapshotted onto the order; the response carries the derived per-item materials and the
-   * aggregated material view.
+   * Creates a new item-based job order. The required materials are derived from each item's chosen
+   * blueprint and snapshotted onto the order.
    *
    * @param dto item-order create payload (ordered finished items + per-material quality choices)
    * @return the persisted DTO
@@ -409,9 +387,7 @@ public class JobOrderController {
 
   /**
    * Paged picker of orderable items (blueprint outputs with at least one resolvable material) for
-   * the item-order create form. It was {@code permitAll()} so the anonymous request form could
-   * populate its item picker; both are gone (ADR-0149, ADR-0159). Returns game reference data only
-   * (no PII).
+   * the item-order create form.
    *
    * @param search optional case-insensitive item-name filter
    * @param page zero-based page index
@@ -438,8 +414,8 @@ public class JobOrderController {
   }
 
   /**
-   * Lists the blueprints that produce a given orderable item. Drives the create form's blueprint
-   * picker, shown when an item has more than one recipe (issue #304 decision 2).
+   * Lists the blueprints that produce a given orderable item, for the create form's blueprint
+   * picker.
    *
    * @param gameItemId the orderable item
    * @return blueprint references producing that item
@@ -478,16 +454,9 @@ public class JobOrderController {
   }
 
   /**
-   * Redacts a job-order DTO for a requester-only viewer (REQ-ORDERS-023): a member of the order's
-   * requesting org unit who is not otherwise a full viewer. Drops the Bearbeiter list ({@code
-   * assignees}), the materials summary ({@code aggregatedMaterials}), the delivery events ({@code
-   * handovers} / {@code itemHandovers}) and the collection-progress columns of each material line
-   * ({@code currentStock} / {@code claims} / {@code openAmount}) — the processing-side surfaces the
-   * ordering squad must not see. The ordered lines the requester may edit ({@code materials} with
-   * their quantity + min-quality, and {@code items}), the {@code comment}, the org-unit references,
-   * the status and the optimistic-lock {@code version} (the requester CAN edit, so it is kept) are
-   * preserved. The sibling {@code cleanupJobOrderForPeer} this convention was named after is gone
-   * with the anonymous create (ADR-0149).
+   * Redacts a job-order DTO for a requester-only viewer (REQ-ORDERS-023): drops assignees, the
+   * materials summary, handovers and per-line collection progress, and keeps the editable lines,
+   * comment, org units, status and {@code version}.
    *
    * @param dto the full job-order DTO
    * @return the redacted DTO safe for a requester-only viewer
@@ -518,11 +487,8 @@ public class JobOrderController {
   }
 
   /**
-   * Strips the collection-progress fields ({@code currentStock} / {@code claims} / {@code
-   * openAmount}) from each material line so a requester-only viewer sees only what they ordered
-   * (material, min-quality, amount) and never the internal fulfilment progress. Keeps the line id,
-   * material, min-quality, amount and version so the requester edit form can prefill and echo the
-   * version.
+   * Strips {@code currentStock}, {@code claims} and {@code openAmount} from each material line,
+   * keeping id, material, min-quality, amount and version.
    *
    * @param materials the material lines, possibly {@code null}
    * @return the material lines with their progress fields nulled/emptied; never {@code null}
@@ -548,17 +514,12 @@ public class JobOrderController {
   }
 
   /**
-   * Paged job-order list. Default sort is by {@code priority,asc} (lowest priority = top of queue),
-   * filterable by one or more statuses and optionally by squadron involvement (responsible OR
-   * requesting). The result is always constrained to the caller's visibility scope (Phase 3, #343):
-   * SK-responsible orders are public to all, squadron-responsible orders only to that squadron +
-   * admins. The {@code squadronId} parameter is a pure UI display preference layered on top of that
-   * scope — it can only narrow the already-scoped result, never widen it.
+   * Paged job-order list, by default sorted by {@code priority,asc}, limited to the caller's
+   * visibility scope. {@code squadronId} can only narrow that scope, never widen it.
    *
    * @param status optional status filter (logical OR across values)
-   * @param squadronId optional display filter; matches orders whose responsible OR requesting org
-   *     unit is one of the given ids. Repeatable ({@code squadronId=a&squadronId=b}); empty/absent
-   *     means "no display restriction" (full scoped view).
+   * @param squadronId optional repeatable filter on the responsible or requesting org unit; absent
+   *     means the full scoped view
    * @return paged job-order DTOs visible to the caller
    */
   @GetMapping
@@ -581,20 +542,10 @@ public class JobOrderController {
   }
 
   /**
-   * Cross-order material demand (REQ-ORDERS-034): the material still to be gathered across every
-   * non-terminal ({@code OPEN} / {@code IN_PROGRESS}) job order the caller may see, aggregated into
-   * one row per {@code (responsible org unit, material, quality)} bucket and split by the
-   * <em>responsible</em> (processing) org unit.
+   * Aggregates the outstanding material of every visible {@code OPEN} / {@code IN_PROGRESS} job
+   * order into one row per responsible org unit, material and quality (REQ-ORDERS-034).
    *
-   * <p>The aggregate sibling of the per-order material view: the order detail answers "what does
-   * this order need", this answers "what does my unit still have to gather in total". Both kinds of
-   * order contribute — a {@code MATERIAL} order through its material lines, an {@code ITEM} order
-   * through its blueprint-derived requirements — and both are counted at their <em>outstanding</em>
-   * amount, so handed-over and already-manufactured shares are excluded.
-   *
-   * <p>Deliberately unpaged: the response is a fold over the caller's whole visible queue, and
-   * paging the underlying orders would silently truncate the sums (ADR-0104). Read-only, so it logs
-   * no audit event.
+   * <p>Unpaged, since paging would truncate the sums (ADR-0104).
    *
    * @return the aggregated demand, empty when the caller may see no non-terminal order
    */
@@ -611,11 +562,8 @@ public class JobOrderController {
   }
 
   /**
-   * Requester-side paged list of the orders the caller's own org unit(s) requested — the "Meine
-   * Auftr&auml;ge" list (REQ-ORDERS-023). Independent of the profit-gated main queue: a member of a
-   * purely non-profit ordering unit, who is redirected away from {@code GET /orders}, sees the
-   * orders their unit placed here. Each row is redacted for the requester (no Bearbeiter, no
-   * materials summary). Same pagination + status-filter shape as {@link #getAllJobOrders}.
+   * Paged, requester-redacted list of the orders the caller's own org unit(s) requested, the "Meine
+   * Auftr&auml;ge" list (REQ-ORDERS-023). Independent of the profit-gated main queue.
    *
    * @param status optional status filter (logical OR across values)
    * @param page zero-based page index
@@ -644,14 +592,8 @@ public class JobOrderController {
   }
 
   /**
-   * Lightweight projection (id + label) of active job orders for typeaheads. Excludes terminal
-   * states.
-   *
-   * <p>With {@code withNeeds=true} each order additionally carries its outstanding per-material
-   * need (REQ-INV-039), which is what lets the Lager's allocation pickers label an order option
-   * with the amount it still needs instead of sending the member to the order itself. It is opt-in
-   * rather than always-on because an ITEM order's needs are folded from its blueprint-derived
-   * requirements, and this endpoint also feeds pickers that render no such figure.
+   * Returns an id-and-label projection of the non-terminal job orders for typeaheads, optionally
+   * with each order's outstanding per-material need (REQ-INV-039).
    *
    * @param withNeeds whether to include each order's outstanding per-material need
    * @return active job orders as reference DTOs
@@ -692,12 +634,8 @@ public class JobOrderController {
   }
 
   /**
-   * Item-order blueprint-coverage view: which members of the order's responsible (processing)
-   * squadron/SK own the blueprints for the items the order requests, and which of those blueprints
-   * each member holds. Restricted to members of the responsible org unit (+ admins) by {@code
-   * canSeeJobOrderBlueprintOwners} — deliberately stricter than the order's own {@code
-   * canSeeJobOrder} visibility, so the named-member coverage is never exposed to a non-member who
-   * can otherwise read a public SK order. Empty for {@code MATERIAL} orders.
+   * Shows which members of the order's responsible org unit own the blueprints for the ordered
+   * items. Visible only to members of that unit and admins; empty for {@code MATERIAL} orders.
    *
    * @param id job-order id
    * @return the blueprint-coverage view (required products with owner counts + owning members)
@@ -774,11 +712,8 @@ public class JobOrderController {
   }
 
   /**
-   * Updates the status. Transitions to a terminal state (COMPLETED, REJECTED) cascade an atomic
-   * unlink of every inventory item that pointed at the order, run after the dirty-check phase
-   * (canonical {@code completeJobOrderWithinTransaction} pattern — the inner method is {@code
-   * MANDATORY} and relies on dirty-checking instead of issuing its own {@code save}/{@code flush},
-   * which would otherwise collide with the already-incremented {@code @Version}).
+   * Updates the status; a transition to a terminal state (COMPLETED, REJECTED) also atomically
+   * unlinks every inventory item pointing at the order.
    *
    * @param id job-order id
    * @param dto status payload (carries the expected version)
@@ -871,14 +806,9 @@ public class JobOrderController {
   }
 
   /**
-   * Requester-side edit of a MATERIAL order (REQ-ORDERS-023): a member of the order's requesting
-   * org unit changes quantities, adds/removes not-yet-delivered material lines, edits the
-   * min-quality within the fixed choices, and edits the comment. Permitted only while the order is
-   * still fully undelivered (whole-order freeze, enforced by {@code canEditJobOrderAsRequester} and
-   * re-checked in the service). Carries no {@code hasRole('LOGISTICIAN')} requirement — the
-   * ordering-squad member need not be a logistician. The processing org unit's officers/leads are
-   * notified on commit; the response is redacted for the requester (no Bearbeiter, no materials
-   * summary).
+   * Requester-side edit of a MATERIAL order's lines and comment by a member of the requesting org
+   * unit, allowed only while nothing is delivered (REQ-ORDERS-023). Notifies the processing unit's
+   * leads.
    *
    * @param id job-order id
    * @param dto the new material lines + comment (carries the expected version)
@@ -912,11 +842,8 @@ public class JobOrderController {
   }
 
   /**
-   * Requester-side edit of an ITEM order (REQ-ORDERS-023): the requester replaces the ordered-item
-   * lines (change quantity, add/remove lines) and edits the comment; the required materials are
-   * re-derived from each line's blueprint and the inventory of any material no longer required is
-   * unlinked. Same authorisation, whole-order freeze and notification as {@link
-   * #updateJobOrderAsRequester}. The response is redacted for the requester.
+   * Requester-side edit of an ITEM order's lines and comment (REQ-ORDERS-023), re-deriving the
+   * required materials; same rules as {@link #updateJobOrderAsRequester}.
    *
    * @param id job-order id
    * @param dto the new item lines + comment (carries the expected version)
@@ -950,10 +877,7 @@ public class JobOrderController {
 
   /**
    * Toggles whether an item order's blueprint-coverage view counts cosmetic variants of the ordered
-   * items toward availability (REQ-ORDERS-021, issue #822). {@code true} keeps family-key matching
-   * (owners of any cosmetic variant count); {@code false} switches to exact-name matching, so an
-   * order for one specific variant counts only owners of that exact blueprint. Applies to item
-   * orders only and carries the order version for optimistic locking.
+   * items ({@code true}) or only exact-name matches ({@code false}) (REQ-ORDERS-021).
    *
    * @param id item-order id
    * @param dto the requested counting mode + expected version
@@ -1140,11 +1064,8 @@ public class JobOrderController {
   }
 
   /**
-   * Sets (creates or replaces) the note on an assignee entry. The note is the assignee's own
-   * context — when they work on the order, which part they take. Same self-or-logistician rule as
-   * {@link #addAssignee}: a user may edit only their own note, a Logistician+ any entry on an order
-   * they can see. Optimistic-locked on the assignee edge's own version (HTTP 409 on stale input),
-   * which never bumps the parent order's version.
+   * Sets or replaces the note on an assignee entry. Same self-or-logistician rule as {@link
+   * #addAssignee}; optimistic-locked on the assignee edge's own version.
    *
    * @param id job-order id
    * @param userId the assignee whose note is changed

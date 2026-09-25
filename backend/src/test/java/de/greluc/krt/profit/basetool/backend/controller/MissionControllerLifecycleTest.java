@@ -71,29 +71,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 /**
- * Pure-Mockito unit tests for the parts of {@link MissionController} that the existing {@code
- * MissionControllerSecurityTest} (role gates) and {@code MissionControllerSlimEndpointsTest} (slim
- * sub-resource endpoints + RSVP branches) do NOT touch:
+ * Unit tests for {@link MissionController} covering:
  *
  * <ul>
- *   <li><b>Peer redaction</b> — {@code MissionPeerRedactor#cleanupMissionForPeer} is the only path
- *       that controls what leaves the API to a member below Logistician (detected via {@code
- *       AuthHelperService#isLogisticianOrAbove()}). Pinning it (participant PII stripped to the
- *       public callsign tuple, owner and managers withheld from a caller who may not manage the
- *       mission) protects the multi-user-data-isolation guarantee in CLAUDE.md. Since 2026-09-06
- *       every mission return runs through it, not only the reads — which is why the {@code
- *       BeforeEach} below assumes a Logistician unless a case says otherwise.
- *       <p>There used to be a stricter <b>outsider</b> tier here for anonymous and role-less
- *       callers (ADR-0034), with its own access blocks (internal and terminal missions refused
- *       outright) and its own list filtering (silently restricted to {@code PLANNED}/{@code ACTIVE}
- *       non-internal). Its whole audience is gone (ADR-0159) and so are its cases.
- *   <li><b>Section patches</b> ({@code patchMissionCore}, {@code patchMissionSchedule}, {@code
- *       patchMissionFlags}) unpack each request record into the service's positional argument list.
- *       The argument order is the spot where a copy-paste during refactor would silently swap
- *       fields (e.g. {@code name} and {@code description}).
- *   <li><b>Versioned owner change</b> — {@code updateMissionOwner} forwards the ownership-aggregate
- *       version, not the parent {@code Mission.version}. Mixing those up reintroduces the bug that
- *       the dedicated aggregate was created to solve.
+ *   <li>peer redaction of every mission response for callers below Logistician (REQ-SEC-007);
+ *   <li>argument order when section patches unpack their request records;
+ *   <li>the owner change forwarding the ownership-aggregate version, not {@code Mission.version}.
  * </ul>
  */
 @ExtendWith(MockitoExtension.class)
@@ -112,11 +95,8 @@ class MissionControllerLifecycleTest {
   private MissionController controller;
 
   /**
-   * Built through the constructor rather than by {@code @InjectMocks}: the name resolver is REAL
-   * (over the mocked {@link UserService}), so the party-lead cases below exercise the actual
-   * resolution rule, and Mockito does not construct a non-mock collaborator for its target.
-   * Argument order is the controller's field-declaration order; the ship mapper is a dependency no
-   * case here reaches, exactly the {@code null} {@code @InjectMocks} passed before.
+   * Builds the controller by constructor with a real name resolver over the mocked {@link
+   * UserService}.
    */
   @BeforeEach
   void buildController() {
@@ -135,11 +115,8 @@ class MissionControllerLifecycleTest {
   }
 
   /**
-   * Every mission response now runs through the peer pass on its way out (REQ-SEC-007), so a test
-   * that does not say which tier its caller is in gets the redacted shape by Mockito's default
-   * {@code false}. Most cases here are about ARGUMENT FORWARDING and assert the mapper's own
-   * result, so the default is Logistician-and-above, for whom the pass is a no-op. The three cases
-   * that are about the redaction override it, and are the reason this is {@code lenient()}.
+   * Stubs the caller as Logistician-or-above by default, so the peer redaction is a no-op unless a
+   * case overrides it (REQ-SEC-007).
    */
   @BeforeEach
   void assumeALogisticianUnlessACaseSaysOtherwise() {
@@ -165,13 +142,11 @@ class MissionControllerLifecycleTest {
   }
 
   /**
-   * The unredacted mission the controller's mapper is stubbed to return.
+   * Builds the unredacted mission the controller's mapper is stubbed to return.
    *
    * @param id the mission id
-   * @param managing what {@code MissionMapper} resolved for THIS caller — {@code canEdit} and
-   *     {@code canManageManagers}, which since 2026-09-06 also decide whether the peer pass keeps
-   *     the mission's owner and manager list: a caller the response tells may change that list is
-   *     shown it, a peer who is only reading is not (REQ-SEC-007)
+   * @param managing the {@code canEdit} / {@code canManageManagers} value for this caller, which
+   *     also decides whether the peer pass keeps owner and managers (REQ-SEC-007)
    * @return a fully populated {@link MissionDto}
    */
   private static MissionDto fullMissionDto(UUID id, boolean managing) {
@@ -254,12 +229,8 @@ class MissionControllerLifecycleTest {
   }
 
   /**
-   * A list page resolves its registration counts in ONE grouped read, and each row gets its own.
-   *
-   * <p>REQ-MISSION-018 / REQ-DATA-003. The figure lives in the mission's lazy {@code participants}
-   * collection, so the tempting implementation — letting the mapper read it — is a SELECT per row.
-   * This pins the shape that avoids it: one call for the whole page, and a mission the grouped
-   * statement returned no row for is a zero rather than a null.
+   * Verifies that a list page resolves registration counts in one grouped read, with a missing row
+   * counted as zero (REQ-MISSION-018, REQ-DATA-003).
    */
   @Test
   void listRows_getTheirOwnCountFromOneGroupedRead() {
@@ -537,12 +508,8 @@ class MissionControllerLifecycleTest {
   }
 
   /**
-   * The defect this endpoint carried until ADR-0159: {@code joinMission} returned the mission
-   * <b>unredacted</b> — roster, owner, managers and every participant's e-mail — to whoever had
-   * just joined. That caller is by definition an ordinary member, the one person on the mission
-   * surface most likely to sit below Logistician, so the endpoint leaked precisely to the audience
-   * REQ-SEC-007 exists for. The ArchUnit rule that should have caught it selected only gates
-   * WITHOUT {@code isAuthenticated()}, and this gate has always had one.
+   * Verifies that {@code joinMission} returns the redacted mission to a member below Logistician
+   * (REQ-SEC-007).
    */
   @Test
   void joinMission_member_getsTheRedactedMission() {

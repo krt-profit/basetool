@@ -172,10 +172,8 @@ class ValidQuantityAmountValidatorTest {
   record TestDto(UUID materialId, Double amount) implements QuantityAware {}
 
   /**
-   * Dual-catalog {@link QuantityAware} probe (REQ-INV-029): carries BOTH a {@code materialId} and a
-   * {@code gameItemId} — the crafted shape the DTO XOR guard rejects — so the precedence test can
-   * pin that the validator's gameItem branch runs first and the material/PIECE lookup stays
-   * untouched.
+   * {@link QuantityAware} probe carrying both a {@code materialId} and a {@code gameItemId}, to pin
+   * that the validator's game-item branch takes precedence (REQ-INV-029).
    *
    * @param materialId the referenced material
    * @param gameItemId the referenced game item

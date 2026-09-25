@@ -35,22 +35,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * End-to-end coverage for a <b>stock-backed</b> Materialbörse item offer (REQ-MARKET-014,
- * ADR-0108): releasing one of the caller's own game-item Lager rows from the "Material anbieten"
- * picker creates an ITEM offer that appears on the board.
+ * E2E flow for a stock-backed Materialbörse item offer (REQ-MARKET-014, ADR-0108): releasing an own
+ * game-item Lager row from the "Material anbieten" picker creates an ITEM offer shown on the board.
  *
- * <p>The board release picker now returns both material and game-item rows ({@code
- * findReleasableForUser} dropped its material-only guard); picking a game-item row and submitting a
- * whole-unit quantity posts the ordinary {@code /materialboerse/offers/ajax} payload, and the
- * backend detects the game-item row and creates a stock-backed item offer bound to it (its product
- * key/name derived from the row's game item). This drives the whole flow in a real browser and
- * asserts the item offer surfaces on the board with its "Item" kind tag.
- *
- * <p><b>Seeding.</b> A bookable game item is the output of an active blueprint (REQ-INV-029),
- * seeded via {@link BackendSeeder#seedOrderableItem}; the game-item stock row is seeded through the
- * real {@code POST /api/v1/inventory} with a {@code gameItemId} payload ({@link
- * BackendSeeder#createItemInventoryEntry}). The actor is {@code test-admin} (seeded IRIDIUM
- * membership → KRT_MEMBER, the role the board requires).
+ * <p>Seeds an orderable game item and a stock row for it; runs as {@code test-admin}.
  */
 @Tag("e2e")
 class MaterialboardItemStockOfferE2eTest {

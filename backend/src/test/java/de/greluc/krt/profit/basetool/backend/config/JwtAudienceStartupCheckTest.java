@@ -26,11 +26,9 @@ import org.springframework.boot.convert.ApplicationConversionService;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 /**
- * Context tests for {@link JwtAudienceStartupCheck} (REQ-SEC-024, APPSEC-08): under the {@code
- * prod} profile a blank {@code app.security.jwt.expected-audiences} must abort the start instead of
- * silently switching the {@code aud} check off, while every other profile keeps "blank = off". Each
- * failing case has a passing twin that differs in exactly the one input, so a green failure case
- * cannot be green for an unrelated reason.
+ * Context tests for {@link JwtAudienceStartupCheck} (REQ-SEC-024): under {@code prod} a blank
+ * {@code app.security.jwt.expected-audiences} aborts startup, while other profiles treat blank as
+ * off. Each failing case has a passing twin differing in one input.
  */
 class JwtAudienceStartupCheckTest {
 

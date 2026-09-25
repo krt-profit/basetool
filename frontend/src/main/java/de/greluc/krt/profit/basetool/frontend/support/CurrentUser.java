@@ -25,18 +25,8 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 
 /**
- * The signed-in member's identity, read from the OIDC principal and named for what it is.
- *
- * <p>Nine controllers called {@code principal.getSubject()} at fifteen sites. The value is the
- * caller's {@code app_user.id} — the backend writes the row's primary key from the token's subject
- * at provisioning — but the call reads as "the sub", which is the identity provider's word for it,
- * and it sits one letter away from {@code authentication.getName()}, which returns the {@code
- * preferred_username}: <b>a name, not an id</b>. Three of those controllers carry comments warning
- * about exactly that confusion, all three written after it had already shipped a bug.
- *
- * <p>This is the "one helper, named for what it returns" of ADR-0142 point 2 (#1640). There is no
- * {@code getSubject} on it, because after this class there is nothing in the frontend that should
- * say "sub".
+ * Reads the signed-in member's {@code app_user.id} from the OIDC principal (ADR-0142). The subject
+ * is the user id; {@code authentication.getName()} is the username, not an id.
  */
 public final class CurrentUser {
 
@@ -44,15 +34,10 @@ public final class CurrentUser {
   private CurrentUser() {}
 
   /**
-   * The caller's {@code app_user.id}, parsed.
-   *
-   * <p>Returns {@code null} for an absent principal and for a subject that is not a UUID rather
-   * than throwing: every call site here decorates a page render, and a malformed subject must
-   * degrade to "no self-highlighting" rather than to a 500. The backend refuses such a token
-   * outright at its own seam, so this branch is a defensive floor, not a supported state.
+   * Returns the caller's {@code app_user.id} parsed as a UUID.
    *
    * @param principal the OIDC principal, or {@code null} when the request is anonymous
-   * @return the caller's user id, or {@code null} when unauthenticated or malformed
+   * @return the caller's user id, or {@code null} when unauthenticated or not a UUID
    */
   @Nullable
   @Contract("null -> null")
@@ -69,11 +54,8 @@ public final class CurrentUser {
   }
 
   /**
-   * The caller's {@code app_user.id} in its rendered form.
-   *
-   * <p>For the model attributes a template compares against an id it received as JSON text, and for
-   * the ingest handoff keys, which are strings by construction. Prefer {@link #userId(OidcUser)}
-   * wherever the value is passed on as an identifier rather than printed.
+   * Returns the caller's {@code app_user.id} as text, for template comparisons and string keys;
+   * prefer {@link #userId(OidcUser)} for identifiers.
    *
    * @param principal the OIDC principal, or {@code null} when the request is anonymous
    * @return the caller's user id as text, or {@code null} when unauthenticated

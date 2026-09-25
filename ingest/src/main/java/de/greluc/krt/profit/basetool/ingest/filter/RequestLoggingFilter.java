@@ -34,27 +34,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Emits one INFO access-log line per ingest {@code /v1/**} request — method, path, response status
- * and elapsed duration — so a handoff no longer succeeds or fails without a correlated log trace
- * (the gateway previously logged only a sparse relay WARN and nothing at all for a
- * 413/429/success), bringing ingest in line with the backend/frontend one-line-per-request
- * contract. The {@code correlationId} and {@code userId} are rendered from the MDC by the logback
- * pattern and are therefore not duplicated into the message.
+ * Emits one INFO access-log line per ingest {@code /v1/**} request with method, path, status and
+ * duration, escalated to WARN with the {@code Slow request} marker past {@link
+ * LoggingProperties#slowRequestThresholdMs()} (REQ-OBS-001).
  *
- * <p>A request that exceeds {@link LoggingProperties#slowRequestThresholdMs()} is escalated to WARN
- * with the {@code Slow request} marker, exactly as in the backend/frontend (REQ-OBS-001). The
- * gateway needs no counterpart to their SSE-relay carve-out: it serves two short synchronous POSTs
- * and holds no async request open, so no endpoint can cross the threshold by design.
- *
- * <p>{@code getRequestURI()} excludes the query string, so no user-supplied query text reaches the
- * log; the ingest {@code /v1} paths carry no entity ids either, so the path is safe to log
- * verbatim.
- *
- * <p>Ordered just inside {@link CorrelationIdFilter} (so the MDC id is populated when this filter
- * logs in its {@code finally}) but OUTSIDE the rate-limit / size-cap / security filters, so the
- * line captures the final status even when one of them short-circuits (a 413 payload reject, a 429
- * rate limit, a 401/403). {@link #shouldNotFilter} keeps it to {@code /v1/**} so actuator / health
- * / api-docs traffic never pollutes the access log.
+ * <p>Runs just inside {@link CorrelationIdFilter} and outside the rate-limit, size-cap and security
+ * filters, so it records their short-circuit statuses too. The query string is never logged.
  */
 @Slf4j
 @Component
@@ -93,12 +78,8 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Limits the access log to the ingest endpoints; actuator, health and api-docs are unaffected.
-   *
-   * <p>Decided on the decoded path via {@link IngestPathScope}. With the raw prefix test an encoded
-   * spelling of an ingest path produced no access-log line at all, which is the worst possible
-   * pairing with the sibling filters it also skipped: the one request class that evaded the
-   * client-identity gate was also the one class that left no trace.
+   * Limits the access log to the ingest endpoints, decided on the decoded path via {@link
+   * IngestPathScope}.
    *
    * @param request the current request
    * @return {@code true} for any path that is not under {@code /v1}

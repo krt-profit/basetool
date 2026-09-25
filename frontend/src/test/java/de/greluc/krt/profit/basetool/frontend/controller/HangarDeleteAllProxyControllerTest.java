@@ -34,20 +34,9 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Unit tests for {@link HangarDeleteAllProxyController}. Drives the real WebClient against {@link
- * MockWebServer} so every exception-handling branch is exercised end-to-end without a Spring
- * context.
- *
- * <p>Coverage points:
- *
- * <ul>
- *   <li>Happy path: backend returns 204 → controller returns 204.
- *   <li>Backend client error (4xx) → controller re-throws as {@link ResponseStatusException} with
- *       the same status.
- *   <li>Backend server error (5xx) → same passthrough behaviour.
- *   <li>Network failure (server shutdown mid-request) → controller wraps in a 500 {@code
- *       ResponseStatusException}.
- * </ul>
+ * Unit tests for {@link HangarDeleteAllProxyController} against a {@link MockWebServer} backend: a
+ * 204 is relayed, 4xx and 5xx are rethrown as {@link ResponseStatusException} with the same status,
+ * and a network failure becomes a 500.
  */
 class HangarDeleteAllProxyControllerTest {
 

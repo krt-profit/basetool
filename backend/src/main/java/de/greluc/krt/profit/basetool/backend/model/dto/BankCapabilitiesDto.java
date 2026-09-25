@@ -20,15 +20,13 @@
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
 /**
- * The calling user's evaluated booking capabilities on one account (REQ-BANK-009), as decided by
- * {@code BankSecurityService} — management and admins carry every flag via the role hierarchy. The
- * UI renders the K1 action buttons from these flags; the server re-checks every booking regardless
- * (the DTO is presentation input, not an authorization shortcut).
+ * The calling user's evaluated booking capabilities on one account (REQ-BANK-009). Presentation
+ * input only; the server re-checks every booking.
  *
  * @param canDeposit whether the caller may book deposits onto the account
  * @param canWithdraw whether the caller may book withdrawals from the account
  * @param canTransfer whether the caller may transfer out of / rebook within the account
- * @param management whether the caller has the management perspective (drives manage-only UI)
+ * @param management whether the caller has the management perspective
  */
 public record BankCapabilitiesDto(
     boolean canDeposit, boolean canWithdraw, boolean canTransfer, boolean management) {}

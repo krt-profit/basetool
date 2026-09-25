@@ -77,30 +77,14 @@ public class TermsController {
   }
 
   /**
-   * Records the caller's consent to the wording currently in force.
+   * Records the caller's consent to the Terms-of-Use version currently in force.
    *
-   * <p>Takes no request body on purpose. The version accepted is the one the server has in force,
-   * never a value the client names — a client-supplied version would let a caller "accept" an older
-   * wording and walk through the gate without ever seeing the current one.
-   *
-   * <p><strong>A machine cannot consent.</strong> The ingest gateway authenticates as a Keycloak
-   * service account, and this path is exempt from the consent gate — it has to be, or nobody could
-   * ever accept. That combination is an escalation whenever an {@code app_user} row happens to
-   * exist for the gateway's own {@code sub}: it could record consent for itself, clear the gate,
-   * and then reach every {@code isAuthenticated()}-only read behind the {@code
-   * anyRequest().authenticated()} catch-all. Production has exactly such a row — the gateway's very
-   * first call ran the registration flow on itself before the machine-identity carve-out existed
-   * (ADR-0129).
-   *
-   * <p>Refusing the gateway here closes that in the mechanism rather than by deleting the row,
-   * which matters because the row's removal is a per-environment manual step that can be forgotten,
-   * and because a blunt cleanup migration would risk aborting a deploy on one of the many
-   * non-cascading foreign keys into {@code app_user}. Consent is a person's act; a service account
-   * has no Terms of Use to accept.
+   * <p>The accepted version is always the server's, never client-supplied. Service accounts such as
+   * the ingest gateway are refused, because a machine cannot consent (ADR-0129).
    *
    * @param userId the caller's {@code app_user.id}
-   * @return the resulting consent status, always {@code 200} and always {@code accepted = true};
-   *     repeating the call is a no-op rather than an error
+   * @return the resulting consent status, always {@code 200} with {@code accepted = true};
+   *     repeating the call is a no-op
    */
   @NotNull
   @PostMapping("/acceptance")

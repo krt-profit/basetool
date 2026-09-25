@@ -31,24 +31,11 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
- * No controller puts a {@code BindingResult} into a flash attribute (REQ-SEC-049, amended
- * 2026-09-23).
+ * Asserts that no controller puts a {@code BindingResult} into a flash attribute (REQ-SEC-049),
+ * since the session serializer cannot read one back and the whole flash map would be dropped.
  *
- * <p><b>Why.</b> Flash attributes live in the Redis-backed session. The session serializer can
- * <em>write</em> a {@code BeanPropertyBindingResult} — {@code RedisSessionConfig}'s mix-in hides
- * its self-referencing model — but it cannot <em>read</em> one back, because neither it nor {@code
- * FieldError} has a constructor Jackson can use ({@code
- * SessionSerializerRoundTripTest#aBindingResultIsWrittenButCannotBeReadBack}). The redirect's GET
- * then drops the whole flash map, so the form's input, its errors and every toast flashed with it
- * vanish without a trace but a {@code basetool_session_value_dropped_total} tick. The admin
- * personal-inventory form did exactly that from the day it was written until 2026-09-23. Every
- * other form already re-renders inline and keeps its {@code BindingResult} request-scoped; this
- * test holds the whole frontend to that.
- *
- * <p><b>How it decides.</b> Every {@code addFlashAttribute(…)} call in the main sources is read up
- * to its closing parenthesis, and a call whose arguments name a binding result — the {@code
- * BindingResult} type or model-key prefix, or a {@code bindingResult} variable — fails the build. A
- * floor on the calls it found keeps a broken parser from passing for the wrong reason.
+ * <p>Scans every {@code addFlashAttribute(…)} call in the main sources, with a floor on the number
+ * of calls found.
  */
 class FlashAttributeTypesTest {
 

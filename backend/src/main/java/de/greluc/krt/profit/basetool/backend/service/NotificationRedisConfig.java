@@ -39,25 +39,11 @@ import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 /**
- * Wires the cross-replica Redis pub/sub fan-out behind the notification SSE push (ADR-0094),
- * discharging the ADR-0016 single-instance follow-up.
+ * Wires the Redis pub/sub fan-out behind the notification SSE push (ADR-0094).
  *
- * <p>Lives in the {@code service} package (not {@code config}) on purpose: its {@code @Bean}
- * methods reference {@code service} types ({@link RedisNotificationFanout}, {@link
- * NotificationStreamService}), and a {@code @Configuration} in {@code config} doing so would form a
- * {@code config → service → config} package cycle (the ArchUnit no-cycles invariant). Keeping the
- * wiring here makes those references intra-package.
- *
- * <p>Active only while {@code app.notifications.redis-fanout.enabled} is {@code true} (default
- * off). When off, {@link LocalNotificationFanout} delivers only to this instance's emitters — the
- * previous behaviour. The backend gains its first Redis dependency here; the Redis health indicator
- * is disabled ({@code management.health.redis.enabled=false}) and Redis is deliberately NOT added
- * to the readiness group, so an optional fan-out's Redis blip can never flip the container
- * unhealthy (the ADR-0084 lesson).
- *
- * <p>The {@link RedisMessageListenerContainer} subscribes the {@link RedisNotificationFanout} to
- * the channel; Lettuce reconnects the subscription automatically after a Redis restart. The
- * instance id is a fresh per-JVM UUID so an instance skips its own looped-back publications.
+ * <p>Active only while {@code app.notifications.redis-fanout.enabled} is {@code true}; otherwise
+ * {@link LocalNotificationFanout} applies. Redis is kept out of the readiness group, and each
+ * instance skips its own publications via a per-JVM instance id.
  */
 @Slf4j
 @Configuration
@@ -93,21 +79,12 @@ public class NotificationRedisConfig {
   }
 
   /**
-   * Bounded dispatch executor for consumed notification messages (F3). Without an explicit executor
-   * a {@link RedisMessageListenerContainer} defaults to a {@code SimpleAsyncTaskExecutor} — a
-   * <b>new, unbounded thread per dispatched message</b>. On this path the consume then does a
-   * blocking {@code SseEmitter.send()} to each local subscriber, so a cross-replica burst to
-   * slow/half-open SSE clients would otherwise spawn unbounded threads that each block until the
-   * write drains — exactly the native-thread-OOM shape (pid cap) seen in the July incident. This
-   * caps concurrency; when the queue is full the dispatch runs on the container's own thread
-   * ({@link ThreadPoolExecutor.CallerRunsPolicy}) — backpressure rather than an unbounded spawn. A
-   * dropped notification would only delay a badge until the REQ-NOTIF-006 polling fallback corrects
-   * it, but backpressure avoids even that. Sized with generous headroom (F2/#1243) so the blocking
-   * per-subscriber sends keep up at ≥200 concurrent users without falling back to container-thread
-   * backpressure that would delay live notifications, while the bound still caps the pool far below
-   * the native-thread-OOM shape.
+   * Bounded dispatch executor for consumed notification messages.
    *
-   * @return the bounded listener dispatch executor (shut down with the context)
+   * <p>When its queue is full, the dispatch runs on the container's thread ({@link
+   * ThreadPoolExecutor.CallerRunsPolicy}) instead of spawning unbounded threads.
+   *
+   * @return the bounded listener dispatch executor, shut down with the context
    */
   @NotNull
   @Bean(destroyMethod = "shutdown")
@@ -124,18 +101,12 @@ public class NotificationRedisConfig {
   }
 
   /**
-   * Subscribes the Redis notification fan-out to its channel so this instance delivers peer
-   * replicas' signals to its local emitters, dispatching consumed messages on the bounded {@link
-   * #notificationRedisListenerExecutor()} rather than the default unbounded per-message executor
-   * (F3).
+   * Subscribes the Redis notification fan-out to its channel, dispatching on {@link
+   * #notificationRedisListenerExecutor()}.
    *
    * @param connectionFactory the auto-configured Redis connection factory
-   * @param fanout the Redis fan-out (also the message listener)
-   * @param listenerExecutor the bounded dispatch executor — {@code @Qualifier}'d by bean name
-   *     because the context holds several {@link ThreadPoolTaskExecutor} beans (the async
-   *     uex/scWiki/import/notification/mail executors) and the parameter name alone cannot
-   *     disambiguate them, so an un-qualified inject fails to start the context once the fan-out is
-   *     enabled (the crash the disabled-by-default unit test never exercised)
+   * @param fanout the Redis fan-out, also the message listener
+   * @param listenerExecutor the bounded dispatch executor, qualified by bean name
    * @param meterRegistry registry the subscription gauge binds to
    * @return the message-listener container
    */

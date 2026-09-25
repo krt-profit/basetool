@@ -47,14 +47,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC-level render test for {@link BlueprintOverviewPageController}: pins the server-side
- * pagination surface of the availability page (REQ-INV-013) — the page-nav and the 10/50/100 size
- * picker render from the {@code PageResponse} envelope, and their links keep the active search.
- *
- * <p>Rendering a multi-page response is deliberately part of this test: the shared pagination
- * fragment used to call the non-existent {@code pageNumber()}/{@code pageSize()} accessors on the
- * {@code PageResponse} record, which made every page with {@code totalPages > 1} blow up at render
- * time. This test fails if that regression ever comes back.
+ * MVC render test for {@link BlueprintOverviewPageController}'s server-side pagination
+ * (REQ-INV-013): the page-nav and the size picker render from a multi-page {@code PageResponse},
+ * and their links keep the active search.
  */
 @SpringBootTest
 class BlueprintOverviewPageControllerMvcTest {

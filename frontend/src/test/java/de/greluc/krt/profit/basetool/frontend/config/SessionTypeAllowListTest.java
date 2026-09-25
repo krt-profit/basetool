@@ -93,22 +93,9 @@ import org.springframework.web.servlet.FlashMap;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Pins the session type allow-list (REQ-SEC-067, ADR-0206): every value a real session holds is
- * read under {@code ENFORCE} exactly as under the permissive validator of before, and a class
- * outside the list is refused before it is instantiated.
- *
- * <p><strong>Why a parity test rather than a list of successes.</strong> Switching the validator
- * cannot change what is <em>written</em>, only what is <em>read</em>, so the question a deploy
- * poses is precisely "does anything that was readable yesterday stop being readable today". Each
- * value below is written once and read under {@code OFF} and under {@code ENFORCE}; whatever the
- * permissive validator could read, the enforcing one must read to the same bytes. A value neither
- * can read (there are none today, but a flash-map shape once was) is not this list's business.
- *
- * <p>The sample is the session as production writes it: the OIDC security context, the authorized
- * client with both tokens, the pre-login authorization request, the CSRF token, the saved request,
- * a redirect's flash maps with a form and the refinery-import DTOs (and one with a form's {@code
- * BindingResult}, which no validator can read — see {@link #realisticSession()}), the attributes
- * our own filters write, and Tomcat's WebSocket binding listener.
+ * Verifies the session type allow-list (REQ-SEC-067, ADR-0206): every value of a realistic session
+ * reads the same under {@code ENFORCE} as under {@code OFF}, and a class outside the list is
+ * refused before instantiation.
  */
 class SessionTypeAllowListTest {
 
@@ -385,13 +372,11 @@ class SessionTypeAllowListTest {
   }
 
   /**
-   * An ID token exactly as a real login produces it: signed, decoded by Nimbus, and run through
-   * Spring's default OIDC claim-type conversion — so its claims carry the runtime types production
-   * stores ({@code URL}, {@code Instant}, {@code Long}, Nimbus's {@code LinkedTreeMap}), not the
-   * ones a hand-built map would.
+   * Builds an ID token as a real login produces it: signed, decoded by Nimbus and converted with
+   * Spring's default OIDC claim types.
    *
-   * @param now the issue time.
-   * @return the decoded token.
+   * @param now the issue time
+   * @return the decoded token
    */
   private static OidcIdToken decodedIdToken(Instant now) {
     try {

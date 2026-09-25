@@ -37,20 +37,11 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Integration tests for the {@code /actuator/loggers} authorization rule in {@link SecurityConfig}
- * (REQ-OBS-016).
+ * Tests the {@code /actuator/loggers} authorization in {@link SecurityConfig} (REQ-OBS-016):
+ * anonymous is rejected, an authenticated non-admin may read but not write, and only {@code
+ * ROLE_ADMIN} may write.
  *
- * <p>The backend configures no separate management port, so Actuator rides the ordinary application
- * connector and every actuator path is evaluated by the main filter chain. Before this rule the
- * mutating {@code POST /actuator/loggers/{name}} fell through to {@code
- * anyRequest().authenticated()}, which means any validly-signed realm JWT — a plain member, a guest
- * — could raise the ROOT logger to {@code TRACE} and have Spring Security / WebClient / Netty write
- * bearer tokens and request bodies into the retained log stream. These tests pin the intended
- * matrix: anonymous is rejected, an authenticated non-admin is forbidden from writing but may still
- * read, and only {@code ROLE_ADMIN} may write.
- *
- * <p>The write assertions target a synthetic logger name so the test never perturbs the level of a
- * logger another test in the shared context depends on.
+ * <p>Writes target a synthetic logger name so no other test's logger level changes.
  */
 @SpringBootTest
 class ActuatorLoggersAuthorizationTest {

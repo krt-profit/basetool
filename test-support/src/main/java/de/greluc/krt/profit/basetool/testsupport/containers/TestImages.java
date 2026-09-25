@@ -23,23 +23,10 @@ import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
 /**
- * Container images the integration tests start through Testcontainers, pinned to exactly what
- * production runs.
+ * Container images the Testcontainers integration tests start, pinned to what production runs.
  *
- * <p>Why this exists (audit item TST-18): five Redis integration tests in three modules each wrote
- * {@code redis:7-alpine} by hand while production ran {@code redis:8-alpine} pinned by digest, so
- * the Spring Session hash repair, the live-sync and notification pub/sub fan-out and the ingest
- * handoff staging were all verified against a major version nobody deploys. One constant here, used
- * by all five, makes the test image the production image.
- *
- * <p>The value is a copy, and a copy can drift, so it is guarded: {@code TestImagesTest} (this
- * module) reads the {@code x-redis} anchor of {@code docker-compose.yml} and the generated {@code
- * quadlet/systemd/redis.container} and fails the build unless both name this exact reference. A
- * digest bump therefore fails that test until this constant moves with it, in the same change. For
- * a Dependabot {@code docker-compose} PR that moves the Redis digest this is one more line in the
- * maintainer commit that PR already needs, because the Quadlet unit has to be regenerated from the
- * compose file anyway ({@code scripts/generate-quadlet.py}; repo-lint's drift check refuses the PR
- * until it is).
+ * <p>{@code TestImagesTest} fails unless {@code docker-compose.yml} and the generated Quadlet unit
+ * name the same reference.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class TestImages {

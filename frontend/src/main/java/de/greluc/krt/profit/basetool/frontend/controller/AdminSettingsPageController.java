@@ -58,19 +58,12 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
- * Spring MVC controller for the admin system-settings page ({@code /admin/settings}).
+ * Controller for the admin system-settings page ({@code /admin/settings}): job-order age
+ * thresholds, refinery rounding mode and the in-game transfer-fee rate, each with its own
+ * optimistic-lock version.
  *
- * <p>The page edits four independent system settings, each carrying its own optimistic-lock
- * version: the yellow/red age thresholds for job-order aging colors, the refinery rounding mode and
- * the in-game banking transfer-fee rate applied to per-participant operation payouts. Every load
- * fetches each setting individually so a single backend hiccup degrades to a default value and a
- * logged warning rather than blanking the entire page; the persisted version fields are passed back
- * through the form so the next save can use them.
- *
- * <p>The transfer-fee rate is stored in the DB as a decimal fraction ({@code 0.005} = 0.5%) so the
- * consumer ({@code OperationService}) can multiply directly. For the form we convert it to a
- * human-friendly percentage ({@code 0.5}) on load and back to a fraction on save — admins shouldn't
- * have to count leading zeros.
+ * <p>The transfer fee is stored as a fraction ({@code 0.005}) and shown as a percentage ({@code
+ * 0.5}).
  */
 @Controller
 @UsesLayoutModel
@@ -98,13 +91,10 @@ public class AdminSettingsPageController {
   private final MessageSource messageSource;
 
   /**
-   * Loads all admin-tunable system settings and exposes value+version pairs to the form template.
-   * Missing settings fall back to documented defaults (30/90 days, rounding mode {@code UP}, 0.5%
-   * transfer fee) so the page never renders an empty input. The transfer-fee rate is converted from
-   * DB-side decimal fraction to display-side percent so the admin sees {@code 0.5} instead of
-   * {@code 0.005}.
+   * Loads the system settings as value and version pairs for the form. A missing setting falls back
+   * to its default (30/90 days, rounding {@code UP}, 0.5% transfer fee).
    *
-   * @param model Thymeleaf model populated with the value+version pairs
+   * @param model Thymeleaf model populated with the value and version pairs
    * @return the {@code admin-settings} view name
    */
   @NotNull
@@ -186,12 +176,8 @@ public class AdminSettingsPageController {
   }
 
   /**
-   * Loads <em>every</em> active squadron (alphabetical, all pages — REQ-ADMIN-001, ADR-0102) for
-   * the "Beförderungssystem pro Staffel" toggle section on the admin-settings page. Inactive
-   * (soft-deleted) squadrons are filtered out — the admin re-activates them through the existing
-   * squadron CRUD before toggling features. A backend failure degrades to an empty catalogue with a
-   * logged warning so the rest of the page still renders; a page walk that hits its safety cap is
-   * flagged for the page-level warning banner (REQ-ADMIN-002).
+   * Loads every active squadron, sorted by name, for the per-squadron promotion toggle
+   * (REQ-ADMIN-001). A backend failure yields an empty catalogue.
    *
    * @return active squadrons sorted by name plus the truncation flag, never {@code null}.
    */
@@ -217,25 +203,19 @@ public class AdminSettingsPageController {
   }
 
   /**
-   * Persists the four settings in one form submit.
+   * Persists the four settings from one form submit, each through its own versioned PUT.
    *
-   * <p>Validates the relationship invariants ({@code yellow < red}, both non-negative; transfer fee
-   * in {@code [0, 100)} as percent) before issuing any PUT — a violation short-circuits with a
-   * flash toast so the user sees the error immediately and no partial update reaches the backend.
-   * Each setting is updated via its own PUT carrying the form-supplied version (optimistic
-   * locking); a number-format error or any other failure surfaces as a localized toast. The
-   * transfer-fee field is converted from the human percent input to the DB-side decimal fraction
-   * before posting.
+   * <p>Cross-field rules ({@code yellow < red}, both non-negative, transfer fee in {@code [0, 100)}
+   * percent) are checked before any PUT; a violation or failure surfaces as a toast.
    *
-   * @param ageYellowDaysStr yellow-aging threshold (parsed as int)
+   * @param ageYellowDaysStr yellow-aging threshold in days
    * @param ageYellowVersion optimistic-lock version for the yellow setting
-   * @param ageRedDaysStr red-aging threshold (parsed as int)
+   * @param ageRedDaysStr red-aging threshold in days
    * @param ageRedVersion optimistic-lock version for the red setting
-   * @param refineryRoundingMode rounding mode (one of {@code UP}/{@code DOWN}/{@code HALF_UP}/…)
+   * @param refineryRoundingMode rounding mode ({@code UP}, {@code DOWN}, {@code HALF_UP}, ...)
    * @param refineryRoundingVersion optimistic-lock version for the rounding setting
-   * @param transferFeePercentStr in-game banking transfer fee as a percentage (e.g. {@code 0.5})
-   * @param transferFeeVersion optimistic-lock version for the transfer-fee setting current value
-   *     untouched (the value cannot be cleared back to blank via this form)
+   * @param transferFeePercentStr in-game transfer fee in percent (e.g. {@code 0.5})
+   * @param transferFeeVersion optimistic-lock version for the transfer-fee setting
    * @param redirectAttributes flash attributes carrier
    * @return redirect to {@code /admin/settings}
    */
@@ -300,20 +280,14 @@ public class AdminSettingsPageController {
   }
 
   /**
-   * In-place (AJAX) twin of {@link #updateSettings} — routed here ahead of the classic handler by
-   * the {@code X-Requested-With} header so the no-JS form keeps its redirect fallback. Applies the
-   * same cross-field invariants and per-setting PUTs, but returns the bumped optimistic-lock
-   * versions as JSON so the page can write them back into the hidden version inputs (the next save
-   * would otherwise 409). Validation failures are returned as {@code application/problem+json} with
-   * a localized {@code detail} so the shared {@code krtFetch} client toasts the exact reason; a
-   * backend conflict on any setting is relayed with its {@code OPTIMISTIC_LOCK} code so the client
-   * offers the reload-confirm rather than reloading.
+   * AJAX twin of {@link #updateSettings}: applies the same rules and PUTs and returns the new
+   * versions as JSON. Validation failures answer {@code 422 problem+json} with a localized {@code
+   * detail}; a backend conflict is relayed with its {@code OPTIMISTIC_LOCK} code.
    *
-   * @param request the JSON-bound settings payload (values + per-setting versions)
+   * @param request the settings values and per-setting versions
    * @param locale the request locale used to resolve validation messages
-   * @return {@code 200} with the fresh versions on success, {@code 422 problem+json} on a
-   *     validation failure, the relayed backend status on conflict/failure, {@code 500} on an
-   *     unexpected error
+   * @return {@code 200} with the new versions, {@code 422} on a validation failure, the relayed
+   *     backend status on a conflict or failure, {@code 500} on an unexpected error
    */
   @ResponseBody
   @PostMapping(headers = "X-Requested-With=XMLHttpRequest")
@@ -396,17 +370,16 @@ public class AdminSettingsPageController {
   }
 
   /**
-   * JSON payload for the in-place settings save ({@link #updateSettingsAjax}). Mirrors the classic
-   * form's request parameters; the day/percent fields stay strings so they are parsed and
-   * range-validated server-side exactly as the redirect handler does.
+   * JSON payload of {@link #updateSettingsAjax}; the numeric fields stay strings so they are parsed
+   * and validated server-side like the form parameters.
    *
-   * @param ageYellowDays yellow-aging threshold (parsed as int)
+   * @param ageYellowDays yellow-aging threshold in days
    * @param ageYellowVersion optimistic-lock version for the yellow setting
-   * @param ageRedDays red-aging threshold (parsed as int)
+   * @param ageRedDays red-aging threshold in days
    * @param ageRedVersion optimistic-lock version for the red setting
-   * @param refineryRoundingMode rounding mode value ({@code UP} / {@code DOWN})
+   * @param refineryRoundingMode rounding mode ({@code UP} / {@code DOWN})
    * @param refineryRoundingVersion optimistic-lock version for the rounding setting
-   * @param transferFeePercent in-game transfer fee as a percent string (e.g. {@code 0.5})
+   * @param transferFeePercent in-game transfer fee in percent (e.g. {@code 0.5})
    * @param transferFeeVersion optimistic-lock version for the transfer-fee setting
    */
   public record SettingsAjaxRequest(

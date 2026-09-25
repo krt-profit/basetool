@@ -22,18 +22,12 @@ package de.greluc.krt.profit.basetool.frontend.logging;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Thread-local holder for the resolved real client IP of the current servlet request, so the {@code
- * WebClient} exchange filter ({@link ClientIpRelayFilter}) can forward it to the backend as {@code
- * X-Forwarded-For} from a Netty reactor thread that no longer has the Tomcat request bound.
+ * Thread-local holder for the real client IP of the current request, which {@link
+ * ClientIpRelayFilter} forwards to the backend as {@code X-Forwarded-For} so its per-IP rate limits
+ * apply per client.
  *
- * <p><b>Why this exists:</b> the backend is a pure resource server that no browser reaches directly
- * — every request is proxied server-side by this frontend. Without relaying the originating IP the
- * backend's per-IP rate limiter sees only the frontend container's single address and collapses
- * every per-client budget into one shared org-wide bucket, so a single caller can trip a public
- * endpoint's limit for everyone (security audit DOS-1). Populated by {@link ClientIpContextFilter}
- * at the start of every servlet request and cleared in the matching {@code finally} block to avoid
- * bleed-through on pooled / virtual threads. Mirrors {@link ActiveSquadronContext}; Reactor's
- * automatic context propagation carries the value across the hop to the reactor worker thread.
+ * <p>Set and cleared per request by {@link ClientIpContextFilter}; Reactor context propagation
+ * carries it to the Netty threads.
  */
 public final class ClientIpContext {
 

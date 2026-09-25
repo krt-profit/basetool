@@ -45,11 +45,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 /**
- * Renders the bank management page ({@code /bank/manage}, W1 mockup): the account-lifecycle tab and
- * the holder-registry tab. Open to bank employees (REQ-BANK-030, ADR-0040): employees may create
- * {@code SPECIAL} accounts and use the holder menu incl. the holder→holder Umbuchung, while
- * account-relationship lifecycle, manual holder registration and grants stay management-only —
- * enforced per-action in the template (and server-side). Admins pass via the role hierarchy.
+ * Renders the bank management page {@code /bank/manage} with its account-lifecycle and holder
+ * registry tabs. Open to bank employees for {@code SPECIAL} accounts and the holder menu; the other
+ * actions are management-only, enforced per action (REQ-BANK-030).
  */
 @Controller
 @UsesLayoutModel
@@ -78,23 +76,17 @@ public class BankManagePageController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Renders the management page with both tabs' data: all accounts (incl. balances — the
-   * zero-balance rule disables the close button server-knowledge-first) and the holder registry
-   * with custody totals. The org-unit list feeds the account-creation modal; the
-   * holder-registration modal's user picker is a server-side search combobox (#1193), so no user
-   * roster is preloaded.
+   * Renders the management page with all accounts including balances and the holder registry with
+   * custody totals.
    *
-   * @param tab the active tab ({@code halter} default/first, {@code konten})
-   * @param fragment when {@code "manageBody"} only the tab-nav + active panel are re-rendered after
-   *     an account/holder lifecycle write (REQ-FE-005), refreshing the row plus the tab-count
-   *     aggregates in place; the creation-modal lookups (org-units) are then skipped because the
-   *     modals live outside the swapped region
+   * @param tab the active tab ({@code halter} default, {@code konten})
+   * @param fragment {@code "manageBody"} to re-render only the tab navigation and active panel
+   *     (REQ-FE-005)
    * @param authentication the caller's authentication, used to detect the management perspective
-   * @param principal the authenticated OIDC user, used to read the caller's {@code sub} (Keycloak
-   *     UUID) so the holder tab can link the caller's own holder row; {@code null} for a non-OIDC
-   *     principal (e.g. a {@code @WithMockUser} test), in which case no self-link is rendered
+   * @param principal the OIDC user whose {@code sub} links the caller's own holder row; {@code
+   *     null} for a non-OIDC principal
    * @param model Spring MVC model
-   * @return the manage template, or its {@code manageBody} fragment for an AJAX swap
+   * @return the manage template, or its {@code manageBody} fragment
    */
   @NotNull
   @GetMapping("/bank/manage")
@@ -156,13 +148,10 @@ public class BankManagePageController {
   }
 
   /**
-   * Resolves the singleton {@code CARTEL} (KRT) account for the Bankleitung-only KRT-Freigaben tab
-   * (REQ-BANK-047) via a one-row, type-filtered search rather than scanning the paged accounts list
-   * (where the singleton might not sit on the current page, REQ-BANK-053). Returns {@code null}
-   * when no KRT account exists yet or the lookup fails, so the tab shows its "no KRT account" empty
-   * state.
+   * Resolves the singleton {@code CARTEL} (KRT) account for the KRT-Freigaben tab (REQ-BANK-047)
+   * via a type-filtered one-row search.
    *
-   * @return the CARTEL account, or {@code null} when none exists / the lookup fails
+   * @return the CARTEL account, or {@code null} when none exists or the lookup fails
    */
   @Nullable
   private BankAccountDto fetchCartelAccount() {

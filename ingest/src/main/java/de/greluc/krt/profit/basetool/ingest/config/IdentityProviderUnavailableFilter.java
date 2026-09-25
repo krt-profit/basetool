@@ -40,27 +40,13 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Translates an <em>identity-provider unreachable</em> failure into a retryable {@code 503 Service
- * Unavailable} instead of the opaque {@code 500} it produces by default (REQ-SEC-024). Module-local
- * twin of the backend filter of the same name (the ingest gateway is a separate module); it uses
- * the gateway's own {@link ProblemResponseWriter} (no i18n) rather than the backend's
- * message-source variant.
+ * Maps an identity-provider-unreachable authentication failure to a retryable {@code 503} instead
+ * of a {@code 500} (REQ-SEC-024).
  *
- * <p>The gateway is a JWT resource server: when Keycloak's JWKS endpoint is slow or down, {@code
- * NimbusJwtDecoder} fails the key fetch, {@code JwtAuthenticationProvider} wraps it into an {@link
- * AuthenticationServiceException}, and Spring Security's {@code
- * AuthenticationEntryPointFailureHandler} re-throws it (a server-side error, not a credential
- * failure), so it escapes the bearer-token filter unhandled and Tomcat renders {@code 500} on every
- * authenticated {@code /v1/**} call. Installed before the bearer-token filter, this filter catches
- * that {@link AuthenticationServiceException} and, only when the cause chain shows a transport /
- * upstream-5xx failure ({@link IOException} — incl. socket/connect/unknown-host/closed-channel,
- * {@link UnresolvedAddressException} for a Docker-DNS strand, {@link ResourceAccessException}, or
- * an upstream {@link HttpStatusCodeException} 5xx), re-maps it to a retryable {@code 503} (RFC-7807
- * problem+json, {@code Retry-After}, code {@code SERVICE_UNAVAILABLE}). It is WARN-logged and
- * counted on {@code basetool_http_error_total{code="SERVICE_UNAVAILABLE"}} so a Keycloak blip does
- * not masquerade as an application error (REQ-OBS-011/-013). A genuine token rejection never
- * reaches here (bad tokens → {@code 401} inside the entry point); any other cause is re-thrown
- * unchanged, preserving the {@code 500} behaviour.
+ * <p>Installed before the bearer-token filter, it catches {@link AuthenticationServiceException}
+ * and, only when the cause chain shows a transport or upstream-5xx failure, writes an RFC-7807
+ * {@code 503} with {@code Retry-After} and code {@code SERVICE_UNAVAILABLE}, WARN-logged and
+ * counted on {@code basetool_http_error_total}. Any other cause is re-thrown unchanged.
  */
 @Slf4j
 @RequiredArgsConstructor
@@ -99,10 +85,8 @@ public class IdentityProviderUnavailableFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Walks the (bounded) cause chain and reports whether the authentication failure stems from a
-   * transport-level or upstream-5xx problem talking to the identity provider — the signature of an
-   * unreachable Keycloak / JWKS endpoint — rather than a programming error that also surfaced as an
-   * {@link AuthenticationServiceException}.
+   * Reports whether the bounded cause chain contains a transport-level or upstream-5xx failure
+   * reaching the identity provider.
    *
    * @param throwable the caught {@link AuthenticationServiceException}
    * @return {@code true} when a transport / 5xx cause is present, {@code false} otherwise
@@ -129,13 +113,12 @@ public class IdentityProviderUnavailableFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Counts the event, sets {@code Retry-After}, WARN-logs (cause class only — never the message or
-   * stack, which may carry a URL) and writes the retryable RFC-7807 503 through {@link
-   * ProblemResponseWriter}.
+   * Counts the event, sets {@code Retry-After}, WARN-logs the cause class only and writes the
+   * RFC-7807 503 through {@link ProblemResponseWriter}.
    *
    * @param request the failed request (used only for the diagnostic log line)
    * @param response the response to populate
-   * @param cause the classified failure, logged by class name for diagnosis
+   * @param cause the classified failure, logged by class name
    * @throws IOException if writing the body fails
    */
   private void writeServiceUnavailable(

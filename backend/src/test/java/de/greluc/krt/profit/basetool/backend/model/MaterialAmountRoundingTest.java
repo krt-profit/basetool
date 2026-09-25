@@ -25,13 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import org.junit.jupiter.api.Test;
 
 /**
- * Verifies the {@code @PrePersist}/{@code @PreUpdate} rounding hooks on the material-amount
- * entities normalise SCU amounts to three decimals using commercial rounding ({@code HALF_UP}), the
- * same way {@link InventoryItem} does at its persistence chokepoint. This guarantees no row is
- * stored with more than three decimals regardless of which write path produced the value (order
- * creation, handover decrement, claim, refinery store). Lives in the {@code model} package so it
- * can invoke the package-private lifecycle callbacks directly without a full persistence
- * round-trip.
+ * Verifies that the lifecycle hooks of the material-amount entities round SCU amounts to three
+ * decimals with {@code HALF_UP}, like {@link InventoryItem}.
  */
 class MaterialAmountRoundingTest {
 

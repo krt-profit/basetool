@@ -23,28 +23,20 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * One ordered finished-item line of an item job order: the requested {@code gameItem}, the {@code
- * blueprint} chosen to produce it, the requested, already-manufactured and already-delivered unit
- * counts, and the snapshotted per-material requirements. {@code parentItemId} is non-null when the
- * line was adopted from another line's blueprint sub-assembly suggestion (provenance). The counts
- * hold the invariant {@code 0 <= deliveredAmount <= manufacturedAmount <= amount}.
- *
- * <p>{@code blueprintStale} flags the REQ-ORDERS-033 drift case: the chosen blueprint no longer
- * produces {@code gameItem}, because a later SC-Wiki sync re-pointed it at a different item. The
- * line's snapshotted {@code materials} then faithfully mirror a <em>foreign</em> recipe and must
- * not be trusted — re-saving the order repairs the line by re-picking a blueprint that still
- * produces the item.
+ * One ordered finished-item line of an item job order, with its blueprint, unit counts and
+ * snapshotted material requirements. The counts satisfy {@code 0 <= deliveredAmount <=
+ * manufacturedAmount <= amount}.
  *
  * @param id the item-line primary key
  * @param gameItem the requested finished item
  * @param blueprint the recipe chosen for this line
  * @param amount requested whole-unit count
- * @param manufacturedAmount whole units already manufactured (production booked)
+ * @param manufacturedAmount whole units already manufactured
  * @param deliveredAmount whole units already handed over
- * @param parentItemId the parent line this was adopted from, or {@code null} for a top-level line
+ * @param parentItemId the line this was adopted from, or {@code null} for a top-level line
  * @param materials the snapshotted material requirements for this line
- * @param blueprintStale {@code true} when the chosen blueprint no longer outputs {@code gameItem},
- *     making the snapshotted materials untrustworthy (REQ-ORDERS-033)
+ * @param blueprintStale {@code true} when the blueprint no longer outputs {@code gameItem}, so the
+ *     snapshotted materials are untrustworthy (REQ-ORDERS-033)
  * @param version optimistic-lock version
  */
 public record JobOrderItemDto(

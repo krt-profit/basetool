@@ -52,10 +52,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC-level test for {@link AdminOrgStructurePageController} (epic #692, REQ-ORG-014). Proves the
- * ADMIN gating (a plain member is forbidden on the page and the write twins), that the page
- * renders, and that the {@code X-Requested-With} AJAX create/set-parent twins relay to the backend
- * and return 200.
+ * MVC test for {@link AdminOrgStructurePageController} (REQ-ORG-014): ADMIN gating of the page and
+ * the write twins, the page render, and the AJAX create/set-parent twins relaying to the backend.
  */
 @SpringBootTest
 class AdminOrgStructurePageControllerMvcTest {

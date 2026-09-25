@@ -36,15 +36,9 @@ import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 
 /**
- * Unit tests for {@link PendingApprovalPageController} (REQ-SEC-017) — the status poll that lets
- * the waiting page forward a member into the tool the moment an admin approves, and the render
- * branch that decides which copy that page shows.
- *
- * <p>The render branch is the half that was missing: the routing filter sends {@code PENDING} and
- * {@code REJECTED} to the same path because both are equally access-less, so a rejected
- * registration was shown "waiting for an administrator" indefinitely and reported the rejection as
- * a stuck approval. All three approval states are pinned here, plus the unreadable-backend case,
- * which must degrade to the waiting copy rather than accusing a pending member of being declined.
+ * Unit tests for {@link PendingApprovalPageController} (REQ-SEC-017): the status poll that forwards
+ * an approved member, and the render branch choosing the copy for each approval state. An
+ * unreadable backend falls back to the waiting copy.
  */
 class PendingApprovalPageControllerTest {
 

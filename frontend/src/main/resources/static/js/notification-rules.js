@@ -19,18 +19,6 @@
 
 // @ts-check
 
-/*
- * Admin editor for the data-driven notification rules (epic #622, REQ-NOTIF-007).
- *
- * Manages the dynamic selector editor (add/remove rows, show only the fields a selector kind
- * needs), builds the rule JSON, and creates/updates/deletes via window.krtFetch (CSRF + 403-retry
- * handled centrally). A successful mutation re-fetches the rules table in place — the `rules`
- * fragment of /admin/notification-rules swapped into #rules-host — and puts the form back into
- * create mode; the page never reloads (REQ-FE-001). The edit / delete buttons are delegated on the
- * document, so the swapped-in rows work without re-binding. There is no peer broadcast: no admin
- * catalogue page takes part in the live multi-user sync, and this one follows them. Destructive
- * delete confirms through the non-native window.showKrtConfirm dialog.
- */
 (function () {
     const form = document.getElementById('rule-form');
     const container = document.getElementById('selectors-container');
@@ -117,14 +105,9 @@
             };
         }
 
-        // ---- selects ------------------------------------------------------------
-
         /**
-         * Selects `value` in a `<select>`. A value with no matching option — a backend enum value
-         * newer than this page — is not dropped: an option carrying the raw code is added (marked
-         * data-unknown-option, labelled with the `selector.unknown` text) so the value is shown as
-         * unknown and round-trips unchanged on save instead of silently becoming '' or the first
-         * option.
+         * Selects `value` in a `<select>`, first adding a data-unknown-option option labelled as
+         * unknown when no option matches, so the value round-trips unchanged on save.
          * @param {HTMLSelectElement | null} select
          * @param {string | null | undefined} value
          */
@@ -154,7 +137,6 @@
          */
         function unknownLabel(code) {
             const text = i18n.unknownValue;
-            // A replacer function, so a `$` in the code is never read as a replacement pattern.
             return text.includes('{0}')
                 ? text.replace('{0}', function () {
                       return code;
@@ -163,8 +145,7 @@
         }
 
         /**
-         * Removes the options selectValue added for unknown values, so they do not linger into the
-         * next rule or into create mode.
+         * Removes the options selectValue added for unknown values.
          * @param {HTMLSelectElement} select
          */
         function dropUnknownOptions(select) {
@@ -183,8 +164,6 @@
                 row.querySelector('[data-selector-' + name + ']')
             );
         }
-
-        // ---- selector rows ------------------------------------------------------
 
         /** @param {Element} row */
         function toggleRow(row) {
@@ -231,20 +210,12 @@
             }
             el.container.appendChild(row);
             toggleRow(row);
-            // Upgrade the freshly cloned selector row's SPECIFIC_USER picker into a searchable
-            // combobox. The picker searches the roster server-side (remote-users, #1193) instead of
-            // preloading every user, so an existing rule's chosen user is seeded here in edit mode:
-            // resolve its display name via /users/{id}, inject one selected <option>, THEN enhance
-            // (the enhancer seeds its committed value/label from that option). New rows have no
-            // user and enhance at once.
             enhanceSelectorRow(row, selector);
         }
 
         /**
-         * Enhances a selector row's SPECIFIC_USER combobox. When the row carries a preselected
-         * user (edit mode), seeds one <option> (value + resolved display name) before enhancing so
-         * the box shows the name, not a blank field; a failed name lookup falls back to the raw id
-         * so the value is never lost. All other rows (and non-user selectors) enhance immediately.
+         * Enhances a selector row's comboboxes; for a preselected SPECIFIC_USER it first seeds an
+         * option labelled with the fetched user name, or the raw id when the lookup fails.
          * @param {Element} row
          * @param {ApiDto<'NotificationRuleSelectorDto'> | null} selector
          */
@@ -300,7 +271,6 @@
                 const kind = readValue(row, 'kind');
                 /** @type {Record<string, string | null>} */
                 const selector = { kind };
-                // The event-derived kinds send only their kind: they read no selector field.
                 if (kind === 'ORG_RELATIVE_ROLE') {
                     selector.orgRelativeRole = readValue(row, 'orgRelativeRole');
                     selector.contextRole = readValue(row, 'contextRole');
@@ -326,8 +296,6 @@
                 selectors: collectSelectors(),
             };
         }
-
-        // ---- form mode ----------------------------------------------------------
 
         /** Puts the form back into create mode with one empty selector row. */
         function resetForm() {
@@ -387,8 +355,6 @@
                 });
         }
 
-        // ---- live refresh -------------------------------------------------------
-
         /** Re-renders the rules table in place from the `rules` fragment. */
         function refreshRules() {
             return window.krtFetch.swap({
@@ -398,8 +364,6 @@
                 errorMessage: i18n.error,
             });
         }
-
-        // ---- submit / delete ----------------------------------------------------
 
         /** @param {SubmitEvent} event */
         function onSubmit(event) {
@@ -439,8 +403,6 @@
                     errorMessage: i18n.error,
                     submitter,
                     onSuccess() {
-                        // Only the rule being edited is taken out of the form: an admin half-way
-                        // through editing another rule keeps their input.
                         if (el.form.getAttribute('data-rule-id') === id) {
                             resetForm();
                         }
@@ -469,8 +431,6 @@
                 action();
             }
         }
-
-        // ---- wiring -------------------------------------------------------------
 
         el.form.addEventListener('submit', onSubmit);
         const addSelector = document.getElementById('add-selector');
@@ -503,8 +463,6 @@
             }
         });
 
-        // Delegated on the document, not bound to the rows: the rows are replaced by every
-        // refreshRules() swap, and these handlers must keep working on the swapped-in ones.
         document.addEventListener('click', function (event) {
             const target = event.target;
             if (!(target instanceof Element)) {

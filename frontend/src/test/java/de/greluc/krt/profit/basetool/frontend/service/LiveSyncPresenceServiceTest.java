@@ -32,18 +32,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit tests for {@link LiveSyncPresenceService} (ported from {@code MissionPresenceServiceTest}
- * with topic strings replacing mission UUIDs; the presence semantics are unchanged).
+ * Unit tests for {@link LiveSyncPresenceService}: presence recording and snapshot, idempotent
+ * clearing, TTL reaping that reports only affected (topic, section) pairs, and independent tabs of
+ * one user.
  *
- * <p>The service is an in-memory state holder; tests verify (a) presence is recorded and surfaced
- * via the snapshot, (b) clearing removes single entries idempotently, (c) the reaper drops entries
- * past TTL and only reports the affected (topic, section) pairs, (d) two tabs of the same user
- * don't wipe each other on a single tab close.
- *
- * <p>The cross-replica mirror (ADR-0126, #1237) adds a second group: a peer's partition merges into
- * the snapshot without touching the local half, is replaced wholesale, reports a change only when
- * the merged view really changed (so the 10 s re-gossip does not broadcast every tick), and expires
- * when its replica goes silent.
+ * <p>For the cross-replica mirror (ADR-0126): a peer partition merges without touching the local
+ * half, is replaced wholesale, reports a change only when the merged view changes, and expires when
+ * its replica goes silent.
  */
 class LiveSyncPresenceServiceTest {
 

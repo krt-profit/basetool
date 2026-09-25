@@ -27,24 +27,14 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * What {@code /.well-known/assetlinks.json} publishes, so Android will hand the login callback to
- * the app instead of to a browser.
+ * The package names and signing-certificate digests {@code /.well-known/assetlinks.json} publishes,
+ * so Android opens the App Link login callback in the app.
  *
- * <p>The Android app's production redirect URI is an App Link — {@code
- * https://profit-base.online/app/callback} — rather than a custom scheme, so that no other
- * installed app can claim it. Android only honours that claim after fetching this file and finding
- * the app's package name and signing-certificate digest in it. Until then the callback opens in the
- * browser, which has no such route, and the member lands on the 404 page mid-login.
+ * <p>The digests are a list so old and new keys can be published together during a rotation.
  *
- * <p><strong>{@link #sha256CertFingerprints()} is a list, and that is the point.</strong> A signing
- * key rotation has to publish the new digest <em>before</em> the rotated APK ships, while the old
- * one is still installed on every device — so both must be servable at once. A single-value
- * property would force a window in which one of the two populations is broken.
- *
- * @param packageName the production application id; the {@code .dev} flavour is deliberately absent
- *     because it uses a custom scheme and never needs verification.
+ * @param packageName the production application id
  * @param sha256CertFingerprints upper-case, colon-separated SHA-256 digests of every signing
- *     certificate that may currently claim the domain.
+ *     certificate that may claim the domain
  */
 @Validated
 @ConfigurationProperties(prefix = "app.android-app-link")

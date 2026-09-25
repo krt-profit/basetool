@@ -35,29 +35,12 @@ import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 
 /**
- * JUnit 5 extension that provisions the full Basetool stack (Postgres x2, Keycloak, Redis, backend,
- * frontend) for end-to-end tests and tears it down once at the end of the test run.
+ * JUnit 5 extension that starts the full Basetool stack via the {@code docker compose} CLI once per
+ * test run and tears it down at the end.
  *
- * <p>It drives the {@code docker compose} CLI directly rather than Testcontainers' {@code
- * ComposeContainer}: the Phase-0 spike (see {@code docs/e2e-test/README.md}) established that
- * {@code ComposeContainer} cannot express this stack's combination of {@code --profile dev}, four
- * stacked {@code -f} files, fixed published ports, and the {@code !override} isolation tags. The
- * exact compose invocation here mirrors the documented local test-stack flow plus the {@code
- * docker-compose.e2e.yml} isolation override.
- *
- * <p><b>Target-agnostic.</b> If the {@code E2E_BASE_URL} environment variable (or {@code
- * -De2e.baseUrl}) is set, the extension does <i>not</i> manage Docker at all — the tests run
- * against that already-running deployment (e.g. a staging environment). Otherwise it provisions an
- * ephemeral local stack and exposes {@value #EPHEMERAL_BASE_URL}.
- *
- * <p><b>Lifecycle.</b> Register once via a {@code @RegisterExtension static} field. The stack is
- * brought up exactly once on the first {@link #beforeAll} and stopped exactly once when the whole
- * JUnit test plan finishes, via an {@link AutoCloseable} stored in the root context.
- *
- * <p>All credentials baked in here are throwaway values that must match {@code
- * realm-export.e2e.json} (the {@code backend-service} client secret) and the committed test
- * keystore in {@code docker/test-tls/} (ADR-0139) — never reuse them anywhere, never substitute
- * production values.
+ * <p>When {@code E2E_BASE_URL} (or {@code -De2e.baseUrl}) is set, it manages no Docker and the
+ * tests run against that deployment. All credentials here are throwaway values matching {@code
+ * realm-export.e2e.json} and {@code docker/test-tls/} (ADR-0139).
  */
 public final class E2eStackExtension implements BeforeAllCallback {
 
@@ -65,35 +48,20 @@ public final class E2eStackExtension implements BeforeAllCallback {
   static final String EPHEMERAL_BASE_URL = "https://localhost:18081";
 
   /**
-   * Password of the committed test keystore in {@code docker/test-tls/} (ADR-0139), which the
-   * compose stack mounts at {@code /run/secrets/keystore.p12}. It is fed to compose as {@code
-   * SERVER_SSL_KEY_STORE_PASSWORD} below and read by {@link BackendSeeder} to build its trust store
-   * from that certificate. The value is not a secret and is fixed by the committed file: this stack
-   * no longer generates a keystore of its own, because {@code docker-compose.test.yml} pins the
-   * same password per service and a locally generated store would fail to open against it.
+   * Password of the committed, non-secret test keystore in {@code docker/test-tls/} (ADR-0139),
+   * passed to compose as {@code SERVER_SSL_KEY_STORE_PASSWORD}.
    */
   static final String KEYSTORE_PW = "basetool-test";
 
   /**
-   * The image tag of the PREBUILT path only: {@code .github/workflows/e2e.yml}'s {@code
-   * build-stack} job builds the images under it and every matrix cell boots them with {@code
-   * --no-build}. One runner, one checkout, so a fixed name is safe there and is what the three
-   * files agree on ({@code E2ePrebuiltImageParityTest}).
-   *
-   * <p>A stack built here uses {@link ServedBuildCheck#localImageTag} instead — a name unique to
-   * the checkout. This one name used to serve every checkout on a machine, and two checkouts
-   * running the suite at once raced for it: the first booted the second's image and went green
-   * against code it was never meant to test (2026-09-23). See {@link #imageTag}.
+   * Image tag used only in prebuilt mode, matching the CI {@code build-stack} job ({@code
+   * E2ePrebuiltImageParityTest}); locally built stacks use {@link #imageTag}.
    */
   private static final String IMAGE_TAG = "e2e-local";
 
   /**
-   * The two images {@code docker-compose.build.yml} builds for this stack, named the way compose
-   * names them with {@code IRI_BASETOOL_VERSION} set to {@link #IMAGE_TAG} and {@code
-   * IRI_IMAGE_NAMESPACE} unset. In prebuilt mode ({@code -De2e.prebuilt=true}) they must already be
-   * in the local Docker store; {@code .github/workflows/e2e.yml}'s {@code build-stack} job builds
-   * them under exactly these names, and {@code E2ePrebuiltImageParityTest} pins the three places
-   * together.
+   * The two images {@code docker-compose.build.yml} builds, named as compose names them under
+   * {@link #IMAGE_TAG}; in prebuilt mode they must already be in the local Docker store.
    */
   static final List<String> BUILT_IMAGES =
       List.of(
@@ -101,23 +69,11 @@ public final class E2eStackExtension implements BeforeAllCallback {
           "ghcr.io/krt-profit/basetool-frontend:" + IMAGE_TAG);
 
   /**
-   * The JWT {@code aud} value the E2E stack's backend enforces (audit L-1, REQ-SEC-024). Fed to the
-   * compose stack as {@code IRI_BACKEND_EXPECTED_AUDIENCES}, which the {@code x-backend} anchor
-   * maps onto {@code APP_SECURITY_JWT_EXPECTED_AUDIENCES} → {@code
-   * app.security.jwt.expected-audiences}.
+   * The JWT {@code aud} value the stack's backend enforces (REQ-SEC-024), passed as {@code
+   * IRI_BACKEND_EXPECTED_AUDIENCES}.
    *
-   * <p>Enforcement is ON here on purpose: the knob stays empty (off) in the deployed prod {@code
-   * .env} until an operator flips it, so without this the enforced code path — the custom {@code
-   * resourceServerJwtDecoder} and its {@code aud} validator — would never run against a real
-   * Keycloak token anywhere, and the first execution ever would be in production, where a missing
-   * audience rejects every token and takes the whole app down. Running the whole suite against it
-   * turns that one-way prod change into a rehearsed one.
-   *
-   * <p>The value MUST match the {@code aud-basetool-backend} audience mapper on the {@code
-   * basetool-frontend} client in {@code realm-export.e2e.json} — every E2E token, browser-flow and
-   * {@link BackendSeeder} ROPC alike, is minted by that client. {@code
-   * E2eAudienceEnforcementParityTest} pins the two together so a realm edit that drops the mapper
-   * fails with that message instead of a 401 on every test.
+   * <p>Must match the {@code aud-basetool-backend} mapper in {@code realm-export.e2e.json} ({@code
+   * E2eAudienceEnforcementParityTest}).
    */
   static final String EXPECTED_AUDIENCE = "basetool-backend";
 
@@ -125,9 +81,8 @@ public final class E2eStackExtension implements BeforeAllCallback {
   private static final String IRIDIUM_SQUADRON_ID = "00000000-0000-0000-0000-000000000001";
 
   /**
-   * Throwaway admin username from {@code realm-export.e2e.json}, used once during bootstrap to opt
-   * the IRIDIUM Squadron into Job-Order processing. Never reuse; never substitute production
-   * values.
+   * Throwaway admin username from {@code realm-export.e2e.json}, used during bootstrap to enable
+   * Job-Order processing for the IRIDIUM Squadron.
    */
   private static final String E2E_ADMIN_USER = "test-admin";
 
@@ -164,11 +119,7 @@ public final class E2eStackExtension implements BeforeAllCallback {
   private static final Duration PULL_TIMEOUT = Duration.ofMinutes(5);
 
   /**
-   * How many times to attempt the registry pull of the external (non-built) images before giving
-   * up. The pull is split out from {@code up --build} because a registry blip (e.g. a {@code
-   * quay.io} 502 while fetching the Keycloak image) is transient and cheap to retry on its own,
-   * whereas re-running the whole {@code up --build} just to re-pull would rebuild the images first.
-   * Several attempts with a growing back-off ride out a multi-minute registry outage.
+   * Number of attempts for pulling the external (non-built) images, retried with growing back-off.
    */
   private static final int PULL_ATTEMPTS = 4;
 
@@ -244,9 +195,7 @@ public final class E2eStackExtension implements BeforeAllCallback {
   }
 
   /**
-   * Reports whether this extension is responsible for the Docker lifecycle. {@code false} when an
-   * external base URL was supplied (staging), in which case browser-side workarounds tied to the
-   * local stack (e.g. the {@code host.docker.internal} resolver remap) should be skipped.
+   * Reports whether this extension manages the Docker lifecycle, i.e. no external base URL was set.
    *
    * @return {@code true} when an ephemeral local stack is being managed, {@code false} for an
    *     external target
@@ -256,9 +205,8 @@ public final class E2eStackExtension implements BeforeAllCallback {
   }
 
   /**
-   * Brings the ephemeral stack up on the first invocation (no-op in external/staging mode, and a
-   * no-op on subsequent invocations from other test classes). Registers the one-time teardown on
-   * the JUnit root store so it runs after the entire test plan.
+   * Starts the ephemeral stack on the first invocation and registers its teardown for the end of
+   * the test plan; a no-op in external mode and on later invocations.
    *
    * @param context the JUnit extension context whose root store owns the teardown hook
    * @throws Exception if bootstrap or {@code docker compose up} fails
@@ -287,13 +235,8 @@ public final class E2eStackExtension implements BeforeAllCallback {
   }
 
   /**
-   * Performs the one-time ephemeral-stack bring-up: stages the realm/keystore, pulls + {@code up}s
-   * the compose stack, registers the one-time teardown on the JUnit root store as soon as it is up
-   * (so a failed check or seed still tears it down), checks that it serves this checkout, seeds the
-   * UEX-owned catalog, the refinery picker materials ({@code PICKER_MATERIAL_*}),
-   * profit-eligibility and an orderable item — everything a form picker must offer, before any page
-   * fills the frontend's catalogue caches — and marks the stack started. Extracted from {@link
-   * #beforeAll} so the caller can remember a failure and fail the remaining classes fast.
+   * Starts the ephemeral stack once: stages realm and keystore, pulls and starts compose, registers
+   * teardown, verifies the served build, and seeds the catalog data every picker needs.
    *
    * @param context the JUnit extension context whose root store owns the teardown hook
    * @throws Exception if bootstrap or {@code docker compose up} fails
@@ -337,10 +280,7 @@ public final class E2eStackExtension implements BeforeAllCallback {
   }
 
   /**
-   * Reports whether the application images were built before this JVM started ({@code
-   * -De2e.prebuilt=true}, forwarded from {@code -Pe2e.prebuilt} by the Gradle task). CI builds them
-   * once per run and loads them into every matrix cell, so the cells must boot them rather than
-   * spend a full multi-stage image build each on the same commit.
+   * Reports whether the images were built before this JVM started ({@code -De2e.prebuilt=true}).
    *
    * @return {@code true} when the stack is to be started with {@code --no-build}
    */
@@ -349,10 +289,7 @@ public final class E2eStackExtension implements BeforeAllCallback {
   }
 
   /**
-   * Fails the bring-up unless every image in {@link #BUILT_IMAGES} is present in the local Docker
-   * store. Without this, {@code up --no-build} on a missing image would try to PULL it from GHCR --
-   * where {@code :e2e-local} does not exist -- and report a registry error that names neither the
-   * prebuilt mode nor the job that was supposed to load the image.
+   * Fails unless every image in {@link #BUILT_IMAGES} is in the local Docker store.
    *
    * @param root the repository root, used as the working directory of the {@code docker} calls
    * @throws Exception if an image is absent (the message names it and the CI job that builds it)
@@ -408,9 +345,8 @@ public final class E2eStackExtension implements BeforeAllCallback {
   }
 
   /**
-   * Returns the explicitly configured external base URL, or {@code null} when none was supplied
-   * (the signal to manage an ephemeral stack). {@code E2E_BASE_URL} (environment) takes precedence
-   * over {@code -De2e.baseUrl} (system property).
+   * Returns the configured external base URL; {@code E2E_BASE_URL} takes precedence over {@code
+   * -De2e.baseUrl}.
    *
    * @return the external base URL, or {@code null} to manage an ephemeral stack
    */
@@ -424,8 +360,7 @@ public final class E2eStackExtension implements BeforeAllCallback {
   }
 
   /**
-   * Copies the checked-in synthetic realm from the e2e classpath to {@code <repoRoot>/
-   * realm-export.json}, which the base compose file bind-mounts into Keycloak for {@code
+   * Copies the synthetic e2e realm to {@code <repoRoot>/realm-export.json} for Keycloak's {@code
    * --import-realm}.
    *
    * @param root the repository root containing the compose files
@@ -443,11 +378,9 @@ public final class E2eStackExtension implements BeforeAllCallback {
   }
 
   /**
-   * Builds the images from the current source -- or, in {@link #prebuilt()} mode, boots the ones
-   * already loaded, with {@code --no-build} -- and brings the dev-profile stack up, blocking until
-   * every service reports healthy. Retries up to {@link #COMPOSE_UP_ATTEMPTS} times, tearing down
-   * between attempts, so a transient image-build flake (e.g. a Maven Central 5xx while downloading
-   * Gradle dependencies) does not fail the whole run.
+   * Builds (or, in {@link #prebuilt()} mode, reuses) the images and starts the dev-profile stack
+   * until healthy, retrying up to {@link #COMPOSE_UP_ATTEMPTS} times with teardown between
+   * attempts.
    *
    * @param root the repository root the compose files live in
    * @throws Exception if every {@code docker compose up} attempt exits non-zero or times out
@@ -480,11 +413,8 @@ public final class E2eStackExtension implements BeforeAllCallback {
   }
 
   /**
-   * Pulls the external (non-built) service images up front, retrying up to {@link #PULL_ATTEMPTS}
-   * times with a growing back-off. Splitting the registry pull out of {@code up --build --wait}
-   * means a transient registry fault (e.g. a {@code quay.io} 502 on the Keycloak image) is retried
-   * cheaply on its own; once the images are cached in the local daemon the subsequent {@code up
-   * --build} reuses them instead of pulling again under the same flaky window.
+   * Pulls the external service images, retrying up to {@link #PULL_ATTEMPTS} times with growing
+   * back-off.
    *
    * @param root the repository root the compose files live in
    * @throws Exception if every pull attempt exits non-zero or times out
@@ -509,9 +439,7 @@ public final class E2eStackExtension implements BeforeAllCallback {
   }
 
   /**
-   * Sleeps a back-off proportional to the just-failed attempt number ({@link #RETRY_BACKOFF} times
-   * {@code attempt}) so successive retries wait progressively longer, riding out a multi-minute
-   * registry or Maven Central outage rather than hammering it back-to-back.
+   * Sleeps {@link #RETRY_BACKOFF} times {@code attempt}.
    *
    * @param attempt the 1-based number of the attempt that just failed
    * @throws InterruptedException if the thread is interrupted while sleeping
@@ -565,17 +493,8 @@ public final class E2eStackExtension implements BeforeAllCallback {
   }
 
   /**
-   * Best-effort dump of one dev-profile service container's full log to {@code
-   * build/e2e/<label>.log} just before teardown, so a CI artifact preserves how that container
-   * handled every request — most usefully the access-log line (HTTP status + duration) for the
-   * operation a failing test was driving, which the browser-side artifacts cannot show. Un-tailed
-   * so a mid-run request is never truncated away; never throws (the test outcome is already
-   * decided).
-   *
-   * <p>The service must be named by its compose <em>service key</em> (e.g. {@code backend-dev}, not
-   * the network alias {@code backend} nor the prod-profile {@code backend} service): {@code docker
-   * compose logs} resolves service keys, and the prod-profile twins have no running container in
-   * the dev-profile e2e stack, so naming them would yield an empty log.
+   * Writes one service container's full log to {@code build/e2e/<label>.log} before teardown; never
+   * throws.
    *
    * @param root the repository root the compose files live in
    * @param service the dev-profile compose service key to read logs from (e.g. {@code backend-dev})
@@ -598,11 +517,8 @@ public final class E2eStackExtension implements BeforeAllCallback {
   }
 
   /**
-   * Assembles a {@code docker compose -f ... --profile dev <verb> ...} command line for the given
-   * verb and trailing arguments.
-   *
-   * <p>{@code up} / {@code logs} get the full service list appended; {@code pull} gets only the
-   * external, registry-sourced services ({@link #PULLED_SERVICES}).
+   * Builds a {@code docker compose -f ... --profile dev <verb> ...} command line; {@code up} and
+   * {@code logs} get all services, {@code pull} only {@link #PULLED_SERVICES}.
    *
    * @param verbAndArgs the compose verb followed by its flags (e.g. {@code "up","-d","--build"})
    * @return the full argument vector to hand to {@link ProcessBuilder}
@@ -625,13 +541,8 @@ public final class E2eStackExtension implements BeforeAllCallback {
   }
 
   /**
-   * The throwaway environment compose substitutes its {@code ${VAR}} placeholders from. Passed via
-   * the subprocess environment instead of an {@code --env-file}, so no credentials file is written
-   * to disk. {@code KEYCLOAK_ADMIN_CLIENT_SECRET} must match the {@code backend-service} secret in
-   * {@code realm-export.e2e.json}; {@code SERVER_SSL_KEY_STORE_PASSWORD} must match the committed
-   * test keystore the compose files mount by a hardcoded path (ADR-0139). {@code
-   * IRI_KEYSTORE_HOST_PATH} is deliberately NOT set: it selects the production keystore, and no
-   * compose file in this stack reads it any more.
+   * Returns the throwaway environment for compose's {@code ${VAR}} placeholders, passed to the
+   * subprocess rather than written to disk; {@code IRI_KEYSTORE_HOST_PATH} is never set.
    *
    * @return the environment variable map for the compose subprocess
    */
@@ -663,8 +574,7 @@ public final class E2eStackExtension implements BeforeAllCallback {
   }
 
   /**
-   * Walks up from the working directory until the directory containing {@code docker-compose.yml}
-   * is found (the test runs with the {@code frontend} module as its working directory).
+   * Walks up from the working directory to the directory containing {@code docker-compose.yml}.
    *
    * @return the repository root path
    */

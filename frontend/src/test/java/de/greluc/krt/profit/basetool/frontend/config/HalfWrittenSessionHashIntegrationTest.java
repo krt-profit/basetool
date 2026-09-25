@@ -43,26 +43,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 /**
- * A session hash that exists and is missing a required field, against a real Redis and the real
- * {@link RedisIndexedSessionRepository} — the production fault of REQ-SEC-063, reproduced from the
- * write that actually causes it rather than from a hand-built map.
- *
- * <p><strong>Why the reproduction is a delete-then-commit and not a fixture.</strong> The
- * interesting claim is not "a map without {@code creationTime} makes the mapper throw" — that is
- * one line of upstream code. It is that <em>Spring Session itself produces such a hash under
- * ordinary operation</em>: {@code RedisSession#saveDelta} issues a plain {@code HSET} of the
- * changed fields only, and {@code creationTime} is in that delta solely {@code if (isNew)}. So a
- * request that read its session before the hash vanished — a Redis restart, an AOF truncation, a
- * purge run against live traffic — re-creates the key holding {@code lastAccessedTime} alone when
- * it commits, and puts the full session TTL back on it. {@link
- * #aDeltaWriteAfterTheHashVanishesReCreatesItHalfWritten()} is that sequence, and it is the half
- * the production investigation of 2026-09-16 could only infer from the library sources.
- *
- * <p>Before the fix this state answered {@code IllegalStateException: creationTime key must not be
- * null} out of {@code SessionRepositoryFilter} — an HTTP 500 on <em>every</em> request carrying
- * that cookie, for up to the 720-hour authenticated window, because nothing on the read path
- * catches it and nothing clears the cookie. 286 of them landed on 2026-09-14 and no alert could see
- * them.
+ * Verifies against a real Redis and {@link RedisIndexedSessionRepository} that a session hash
+ * missing a required field, as produced by a delta write after the hash vanished, degrades to a
+ * signed-out member rather than an HTTP 500 (REQ-SEC-063).
  */
 @Testcontainers
 class HalfWrittenSessionHashIntegrationTest {

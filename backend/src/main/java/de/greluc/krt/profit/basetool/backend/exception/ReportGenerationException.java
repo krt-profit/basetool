@@ -20,21 +20,11 @@
 package de.greluc.krt.profit.basetool.backend.exception;
 
 /**
- * Thrown when generating a downloadable report (PDF, CSV, …) fails because of an unexpected problem
- * in the report pipeline — typically an {@code IOException} from the PDF library, a missing
- * required field on the input model, or an unsupported font/encoding.
+ * Thrown when generating a downloadable report (PDF, CSV, …) fails in the report pipeline.
  *
- * <p>Mapped to HTTP {@code 500 Internal Server Error} by {@link
- * de.greluc.krt.profit.basetool.backend.exception.GlobalExceptionHandler}'s generic {@code
- * AppException} dispatch handler with the stable error code {@code REPORT_GENERATION_FAILED}.
- * Compared to the generic 500 fallback this gives monitoring/alerting a dedicated handle on a
- * specific failure mode (a report problem is rarely a code bug, but it is also not a user-input
- * problem in the sense of {@code BadRequestException}).
- *
- * <p>{@link #disclosurePolicy()} is {@link ErrorDisclosurePolicy#SUPPRESSED} — inherited from
- * {@link AppExceptionKind#REPORT_GENERATION_FAILED}, the fixed identity passed to the superclass
- * constructor — so the original cause is preserved so the server log shows the full stack trace;
- * the client receives a localized generic detail instead of the raw upstream message.
+ * <p>Mapped to {@code 500} with code {@code REPORT_GENERATION_FAILED}. Its {@link
+ * #disclosurePolicy()} is {@link ErrorDisclosurePolicy#SUPPRESSED}: the cause is logged and the
+ * client receives a generic localized detail.
  */
 public final class ReportGenerationException extends AppException {
 
@@ -48,11 +38,10 @@ public final class ReportGenerationException extends AppException {
   }
 
   /**
-   * Creates a {@code ReportGenerationException} that wraps the original failure (typically an
-   * {@code IOException} from the PDF/CSV library). The cause is preserved for the server log; the
-   * client receives a localized generic detail.
+   * Creates the exception wrapping the original library or I/O failure, which is kept for the
+   * server log.
    *
-   * @param message human-readable summary of the report failure for server logging
+   * @param message summary of the report failure for the server log
    * @param cause underlying library or I/O failure
    */
   public ReportGenerationException(String message, Throwable cause) {

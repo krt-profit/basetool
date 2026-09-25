@@ -30,11 +30,9 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Pins the frontend↔backend contract for the org chart: the page controller decodes {@code GET
- * /api/v1/org-chart} directly into the nested {@link OrgChartDto} record tree via the WebClient's
- * Jackson. The controller test mocks the client, so this test exercises the actual record (and
- * nested-record-list) deserialization with the same Jackson 3 {@link JsonMapper} the {@code
- * BackendApiClient} uses — guarding against a runtime decode failure that unit mocks would hide.
+ * Pins the org-chart contract by deserializing a {@code GET /api/v1/org-chart} payload into the
+ * nested {@link OrgChartDto} tree with the same Jackson 3 {@link JsonMapper} the {@code
+ * BackendApiClient} uses.
  */
 class OrgChartDtoDeserializationTest {
 

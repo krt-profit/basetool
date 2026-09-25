@@ -37,9 +37,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
 /**
- * Unit tests for {@link AdminBankPageController}: the wipe-reset PRG flow and the legacy bank-audit
- * redirect. The audit viewer itself moved to the unified {@code /admin/audit-log} page
- * (REQ-AUDIT-001) and is covered by {@code AdminAuditLogPageControllerTest}.
+ * Unit tests for {@link AdminBankPageController}: the wipe-reset PRG flow and the bank-audit
+ * redirect to {@code /admin/audit-log}.
  */
 class AdminBankPageControllerTest {
 

@@ -73,31 +73,13 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST surface for inventory items — covers the aggregated/grouped read variants used by the
- * inventory page, the user-scoped {@code /my-inventory} subset, the admin-wide {@code /all}, the
- * create / update / note-only update endpoints, the book-out flow and the bulk-checkout.
+ * REST surface for inventory items: grouped and aggregated reads, the caller's own and the
+ * squadron-wide lists, create/update, book-out, rebook and allocation endpoints.
  *
- * <p>Owner-vs-logistician decisions happen at the HTTP boundary via {@link
- * AuthHelperService#isLogisticianOrAbove()} and are passed as a boolean to the service — the
- * service stays free of {@code SecurityContextHolder} reads (ArchUnit rule).
- *
- * <p>Catalog discrimination (V220, REQ-INV-029, ADR-0101): the grouped / aggregated / flat /
- * stack-entry reads carry a {@code catalog} query parameter defaulting to {@link
- * InventoryCatalog#MATERIAL}, so pre-item clients are untouched. The {@code MATERIAL} paths keep
- * delegating through {@link InventoryItemService} (the historical facade); the {@code ITEM} paths
- * dispatch directly to {@link InventoryAggregationService}'s item siblings. {@code catalog=ITEM}
- * rejects the material-only {@code minQuality} / {@code missionIds} / {@code quality} parameters
- * with 400 (items carry no quality dimension and are never mission-allocated, REQ-INV-031).
- *
- * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor, not the
- * ceiling — it is stated here so an endpoint added later inherits it rather than relying on a URL
- * matcher elsewhere being right, and a method-level gate still wins where one is present.
- *
- * <p><b>It is weaker than the URL rule above it, and that is not a licence to delete either.</b>
- * The chain gates {@code /api/v1/inventory/**} on {@code hasAnyRole(ADMIN, OFFICER, LOGISTICIAN,
- * KRT_MEMBER)}, which every request must pass as well — the two are ANDed. Reading this annotation
- * as the whole rule and removing the matcher as "redundant" would widen the surface from that set
- * to any authenticated caller.
+ * <p>Reads take a {@code catalog} parameter defaulting to {@link InventoryCatalog#MATERIAL}; {@code
+ * catalog=ITEM} rejects the material-only filters with 400 (REQ-INV-029, REQ-INV-031). The
+ * class-level {@code isAuthenticated()} gate is only the floor (REQ-SEC-052) and is ANDed with the
+ * URL rule requiring ADMIN, OFFICER, LOGISTICIAN or KRT_MEMBER.
  */
 @RestController
 @RequestMapping("/api/v1/inventory")
@@ -199,12 +181,7 @@ public class InventoryItemController {
   }
 
   /**
-   * Per-game-item drilldown — every individual non-personal stock row of the given game item,
-   * parallel to {@link #getInventoryByMaterial(UUID, Integer, Integer, String)} (REQ-INV-029,
-   * design §5.2). No quality sort key — items carry no quality dimension. Inherits the {@code
-   * hasAnyRole(ADMIN, OFFICER, LOGISTICIAN, KRT_MEMBER)} gate from the {@code /api/v1/inventory/**}
-   * URL umbrella in {@code SecurityConfig}, matching the controller's other read handlers (no
-   * method-level annotation needed).
+   * Lists every non-personal stock row of the given game item (REQ-INV-029).
    *
    * @param gameItemId game item to drill into
    * @param page zero-based page index
@@ -228,10 +205,8 @@ public class InventoryItemController {
   }
 
   /**
-   * Calling user's own inventory items. Owner id derived from the JWT — no impersonation. {@code
-   * catalog=MATERIAL} (the default) returns the material rows under the historical sort contract;
-   * {@code catalog=ITEM} returns the caller's game-item rows under the quality-less {@code
-   * gameItem.name} / {@code amount} whitelist (REQ-INV-029).
+   * Lists the calling user's own inventory rows of the given catalog; the owner comes from the JWT
+   * (REQ-INV-029).
    *
    * @param jwt the caller's token (owner scope)
    * @param catalog which stock catalog to list; defaults to {@code MATERIAL}
@@ -273,24 +248,17 @@ public class InventoryItemController {
   }
 
   /**
-   * Calling user's inventory grouped by material with totals/average-quality — drives the "personal
-   * inventory" page's outer rows.
+   * Returns the calling user's inventory grouped by material or game item with totals and average
+   * quality.
    *
-   * @param personalOnly when {@code true}, narrows the result to the caller's private stock ({@code
-   *     personal = true} rows) — the "Mein Lager" personal-entries-only filter; defaults to {@code
-   *     false} (both shared and personal stacks)
-   * @param nonPersonalOnly when {@code true}, narrows the result to the caller's shared stock
-   *     ({@code personal = false} rows) — the "Mein Lager" non-personal-entries-only filter;
-   *     defaults to {@code false} and is mutually exclusive with {@code personalOnly}
-   * @param catalog which stock catalog to group; defaults to {@code MATERIAL}. {@code ITEM} groups
-   *     GameItem → Stack over the quality-less item stack key, filters by {@code gameItemIds} /
-   *     {@code jobOrderIds}, and rejects {@code minQuality} / {@code missionIds} / {@code
-   *     materialIds} with 400 (REQ-INV-029/031); {@code MATERIAL} rejects {@code gameItemIds} the
-   *     same way — a catalog-mismatched filter is a contract error, never silently ignored
+   * @param personalOnly when {@code true}, only the caller's personal rows; defaults to {@code
+   *     false}
+   * @param nonPersonalOnly when {@code true}, only the caller's shared rows; defaults to {@code
+   *     false} and is mutually exclusive with {@code personalOnly}
+   * @param catalog which stock catalog to group; defaults to {@code MATERIAL}; a filter that does
+   *     not match the catalog is rejected with 400 (REQ-INV-029/031)
    * @param gameItemIds optional game-item filter ({@code catalog=ITEM} only; 400 otherwise)
-   * @param locationIds optional storage-location filter (REQ-INV-040). Valid for <em>both</em>
-   *     catalogs — a location is part of the material and the item stack key alike — so unlike
-   *     {@code minQuality} / {@code missionIds} / {@code materialIds} it is never catalog-rejected
+   * @param locationIds optional storage-location filter, valid for both catalogs (REQ-INV-040)
    * @return grouped DTOs
    */
   @GetMapping("/my-inventory/grouped")
@@ -329,15 +297,9 @@ public class InventoryItemController {
   }
 
   /**
-   * Ids of <em>every</em> one of the caller's own inventory entries matching the "Mein Lager"
-   * filter surface — the flat companion of {@link #getMyGroupedInventory} that backs the frontend's
-   * "Alle markieren" select-all (REQ-INV-034). The grouped view lazy-loads and paginates each
-   * stack's entries, so a client-side "check every visible box" would silently miss collapsed
-   * stacks and any entry past the first page; this endpoint returns the complete id set for the
-   * current filter so a bulk check-out can span the whole filtered view. Takes the identical filter
-   * + catalog parameters as {@link #getMyGroupedInventory} and applies the same catalog-mismatch
-   * rejection (REQ-INV-029 / REQ-INV-031), so the id set can never widen beyond what the grouped
-   * view shows. Owner-scoped from the JWT (no impersonation).
+   * Returns the ids of every one of the caller's own entries matching the grouped-view filter,
+   * backing the "Alle markieren" select-all (REQ-INV-034). Applies the same filters and
+   * catalog-mismatch rejection as {@link #getMyGroupedInventory}.
    *
    * @param jwt the caller's token, resolved to the owning user id
    * @param materialIds optional material filter ({@code catalog=MATERIAL} only; 400 otherwise)
@@ -388,11 +350,8 @@ public class InventoryItemController {
   }
 
   /**
-   * Squadron-wide flat inventory list (admin/logistician view). {@code catalog=MATERIAL} (the
-   * default) keeps the historical material contract; {@code catalog=ITEM} lists game-item rows and
-   * filters by {@code gameItemIds} / {@code jobOrderIds}. A catalog-mismatched filter ({@code
-   * minQuality} / {@code missionIds} / {@code materialIds} under {@code ITEM}, {@code gameItemIds}
-   * under {@code MATERIAL}) is rejected with 400 (REQ-INV-029/031), never silently ignored.
+   * Squadron-wide flat inventory list (admin/logistician view). A filter that does not match the
+   * catalog is rejected with 400 (REQ-INV-029/031).
    *
    * @param materialIds optional material filter ({@code catalog=MATERIAL} only; 400 otherwise)
    * @param gameItemIds optional game-item filter ({@code catalog=ITEM} only; 400 otherwise)
@@ -447,13 +406,8 @@ public class InventoryItemController {
   }
 
   /**
-   * Lists every inventory item linked to a mission — the mission-detail Wirtschaft "Lagereinträge"
-   * table (#1138). Replaces the former eagerly embedded {@code MissionDto.inventoryEntries} field
-   * with a dedicated read so the hottest mission GET no longer drags an unbounded list through its
-   * payload. Member-visible: the {@code /api/v1/inventory/**} security rule already requires a
-   * member role, so a non-member never reaches it (matching the removed field, which was cleared
-   * for the tier that no longer exists). Deliberately unscoped among members — the shared
-   * mission-stockpile view, reproducing the removed field's behaviour exactly.
+   * Lists every inventory item linked to a mission, for the mission-detail "Lagereinträge" table.
+   * Visible to every member, not org-unit-scoped.
    *
    * @param missionId the mission whose linked inventory to list
    * @return the mission's inventory items
@@ -465,11 +419,8 @@ public class InventoryItemController {
   }
 
   /**
-   * Squadron-wide grouped variant — same shape as {@link #getMyGroupedInventory} but scoped to all
-   * users. {@code catalog=ITEM} groups GameItem → Stack and filters by {@code gameItemIds} / {@code
-   * jobOrderIds}. A catalog-mismatched filter ({@code minQuality} / {@code missionIds} / {@code
-   * materialIds} under {@code ITEM}, {@code gameItemIds} under {@code MATERIAL}) is rejected with
-   * 400 (REQ-INV-029/031), never silently ignored.
+   * Squadron-wide variant of {@link #getMyGroupedInventory}. A filter that does not match the
+   * catalog is rejected with 400 (REQ-INV-029/031).
    *
    * @param materialIds optional material filter ({@code catalog=MATERIAL} only; 400 otherwise)
    * @param gameItemIds optional game-item filter ({@code catalog=ITEM} only; 400 otherwise)
@@ -501,18 +452,12 @@ public class InventoryItemController {
   }
 
   /**
-   * Lazily loads one of the caller's own stacks' entries, oldest-first and paginated — the
-   * drill-down behind a collapsed stack on the "my inventory" page. The stack is identified by the
-   * stock-identity query params the grouped view already exposes on each {@code InventoryStackDto};
-   * a {@code null} owning-org-unit param selects the rows where that association is itself absent
-   * (job-order / mission allocations are not part of the stack key). Owner-scoped to the calling
-   * user (no impersonation). Append-only inventory grows unboundedly per stack, so this is the only
-   * path that materialises the individual entries.
+   * Returns one oldest-first page of the entries of one of the caller's own stacks, addressed by
+   * the stack-key query parameters of {@code InventoryStackDto}.
    *
-   * <p>{@code catalog=MATERIAL} (the default) addresses the stack by {@code materialId} (+ optional
-   * {@code quality}); {@code catalog=ITEM} addresses it by {@code gameItemId} and rejects a {@code
-   * quality} param — item stacks carry no quality key (REQ-INV-005/029). The catalog-matching id is
-   * required (400 when absent).
+   * <p>A {@code null} owning-org-unit parameter selects rows without one. {@code MATERIAL} requires
+   * {@code materialId}; {@code ITEM} requires {@code gameItemId} and rejects {@code quality}
+   * (REQ-INV-005/029).
    *
    * @return one page of the stack's entries, oldest-first
    */
@@ -554,13 +499,8 @@ public class InventoryItemController {
   }
 
   /**
-   * Squadron-wide variant of {@link #getMyStackEntries} — the drill-down behind a collapsed stack
-   * on the admin/logistician "global Lager" page. Includes the stack's owning {@code userId}
-   * because a global stack is per-owner; the service re-applies the same org-unit scope predicate
-   * as the grouped view, so the drill-down can never widen visibility beyond the caller's org-unit
-   * slice. Catalog addressing follows {@link #getMyStackEntries}: {@code materialId} (+ optional
-   * {@code quality}) for {@code MATERIAL}, {@code gameItemId} without {@code quality} for {@code
-   * ITEM} (REQ-INV-005/029).
+   * Squadron-wide variant of {@link #getMyStackEntries}, keyed additionally by the stack's owning
+   * {@code userId} and restricted to the caller's org-unit scope (REQ-INV-005/029).
    *
    * @return one page of the stack's entries, oldest-first
    */
@@ -599,23 +539,15 @@ public class InventoryItemController {
   }
 
   /**
-   * Paged picker of the game items bookable as Lager item stock — the output of at least one active
-   * blueprint, deliberately a superset of the order picker's predicate (design §5.3/§5.4,
-   * REQ-INV-029). A dedicated endpoint rather than a reuse of {@code GET
-   * /api/v1/orders/item-catalog}: that one was {@code permitAll()} for the anonymous item-order
-   * request form, and the Member-facing Lager UI must not hang on a surface maintained for another
-   * audience. ADR-0159 closed it and removed the form, so the two now differ only in predicate —
-   * the separation stands on that, not on the gate. No method-level {@code @PreAuthorize} needed —
-   * the endpoint inherits {@code hasAnyRole(ADMIN, OFFICER, LOGISTICIAN, KRT_MEMBER)} from the
-   * {@code /api/v1/inventory/**} URL umbrella in {@code SecurityConfig} (verified), matching the
-   * controller's other read handlers.
+   * Paged picker of the game items bookable as Lager item stock: the output of at least one active
+   * blueprint (REQ-INV-029).
    *
    * @param q optional case-insensitive item-name filter
    * @param page zero-based page index
    * @param size page size
    * @param sort sort spec (whitelist: {@code name}, {@code id}; the default appends {@code id} as a
-   *     tiebreaker so equal-named UEX variants keep a stable page order)
-   * @return paged bookable game-item references (id, name, manufacturer, kind — no PII)
+   *     tiebreaker)
+   * @return paged bookable game-item references
    */
   @GetMapping("/item-catalog")
   @Operation(
@@ -637,10 +569,8 @@ public class InventoryItemController {
   }
 
   /**
-   * Builds the page request for a stack-entries drill-down: a clamped page/size with no sort, so
-   * the repository's oldest-first {@code ORDER BY createdAt ASC} (the REQ-INV-002 contract) is the
-   * sole ordering. Defaults to the first page of {@code STACK_ENTRIES_DEFAULT_SIZE} and clamps the
-   * size to {@code STACK_ENTRIES_MAX_SIZE} to bound the per-request load.
+   * Builds an unsorted, clamped page request for a stack-entries drill-down, so the repository's
+   * oldest-first order is the sole ordering (REQ-INV-002).
    *
    * @param page the requested zero-based page index, or {@code null} for the first page
    * @param size the requested page size, or {@code null} for the default
@@ -656,18 +586,12 @@ public class InventoryItemController {
   }
 
   /**
-   * Rejects the material-only filter parameters on a {@code catalog=ITEM} read (REQ-INV-029/031):
-   * game items carry no quality dimension, so a {@code minQuality} floor is meaningless; item rows
-   * are never mission-allocated, so a {@code missionIds} filter could only ever return the empty
-   * set; and item rows carry no material, so a {@code materialIds} filter cannot apply either — all
-   * three are contract errors, surfaced as RFC 7807 400 rather than silently ignored (a silently
-   * dropped filter returns plausible-looking but unfiltered data).
+   * Rejects the material-only filters {@code minQuality}, {@code missionIds} and {@code
+   * materialIds} on a {@code catalog=ITEM} read (REQ-INV-029/031).
    *
-   * @param minQuality the quality floor parameter; must be {@code null} for the item catalog
-   * @param missionIds the mission filter parameter; must be {@code null} or empty for the item
-   *     catalog
-   * @param materialIds the material filter parameter; must be {@code null} or empty for the item
-   *     catalog
+   * @param minQuality the quality floor; must be {@code null} for the item catalog
+   * @param missionIds the mission filter; must be {@code null} or empty for the item catalog
+   * @param materialIds the material filter; must be {@code null} or empty for the item catalog
    * @throws BadRequestException when any material-only filter is present
    */
   private static void rejectMaterialOnlyFilters(
@@ -684,13 +608,9 @@ public class InventoryItemController {
   }
 
   /**
-   * Rejects the item-only filter parameter on a {@code catalog=MATERIAL} read — the mirror of
-   * {@link #rejectMaterialOnlyFilters(Integer, List, List)}: material rows carry no game item, so a
-   * {@code gameItemIds} filter is a contract error, surfaced as RFC 7807 400 rather than silently
-   * ignored.
+   * Rejects the item-only {@code gameItemIds} filter on a {@code catalog=MATERIAL} read.
    *
-   * @param gameItemIds the game-item filter parameter; must be {@code null} or empty for the
-   *     material catalog
+   * @param gameItemIds the game-item filter; must be {@code null} or empty for the material catalog
    * @throws BadRequestException when the item-only filter is present
    */
   private static void rejectItemOnlyFilters(List<UUID> gameItemIds) {
@@ -718,9 +638,8 @@ public class InventoryItemController {
   }
 
   /**
-   * Validates the stack address of a {@code catalog=MATERIAL} stack-entries drill-down: the stack
-   * is keyed by {@code materialId}, which was historically a required parameter and became optional
-   * in the signature only so the {@code ITEM} variant can omit it (REQ-INV-029).
+   * Validates that a {@code catalog=MATERIAL} stack-entries drill-down names its {@code materialId}
+   * stack key.
    *
    * @param materialId the material stack key; must be present
    * @throws BadRequestException when the material key is missing
@@ -732,16 +651,8 @@ public class InventoryItemController {
   }
 
   /**
-   * Creates an inventory item. A caller may always book for themselves; booking for somebody else
-   * additionally requires shared editable org-unit scope with that member, which the service checks
-   * against the requested receiver (REQ-SEC-005).
-   *
-   * <p>The receiver check deliberately does <strong>not</strong> live here as a role boolean any
-   * more. It used to be {@code authHelperService.isLogisticianOrAbove()} passed down to the service
-   * - an org-unit-less authority that answered "may act for somebody" where the question is "may
-   * act for <em>this</em> somebody" - which let a logistician of any Staffel write into any other
-   * Staffel's member ledger. The decision needs the target id, so it belongs where the target is
-   * resolved.
+   * Creates an inventory item. Booking for another member requires shared editable org-unit scope
+   * with that receiver, checked in the service (REQ-SEC-005).
    *
    * @return the persisted DTO
    */
@@ -824,9 +735,8 @@ public class InventoryItemController {
   }
 
   /**
-   * Removes a list of inventory items in one transaction. Same concurrency pattern as {@link
-   * #bookOutInventoryItem} — collected ids run through a single bulk-update after the loop instead
-   * of one bulk-update per loop iteration.
+   * Books out a list of inventory items in one transaction, unlinking them with a single bulk
+   * update after the loop.
    */
   @Operation(
       summary = "Bulk checkout",

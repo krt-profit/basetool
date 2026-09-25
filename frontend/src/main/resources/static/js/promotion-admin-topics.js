@@ -17,21 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * Promotion admin topics/categories page module (/promotion/admin/topics), extracted verbatim from
- * the former inline script of promotion-admin-topics.html (ADR-0069, follow-up to #924).
- *
- * In-place CRUD for promotion topics + categories and their level-content textareas: JSON writes
- * through krtFetch.write (CSRF, retry-on-403, 409 -> toast + fragment-swap refresh, no reload),
- * up/down reorder by swapping neighbouring sortOrders, per-textarea dirty tracking with a save-all
- * banner + beforeunload guard, and bulk expand/collapse. Wired via window.krtEvents delegation on
- * DOMContentLoaded; the krt:swapped listener drops stale dirty refs after an in-place refresh.
- *
- * The MSG_* strings are defined by the inline Thymeleaf bootstrap block of promotion-admin-topics.html;
- * both that block and this th:src share th:unless="${isAllSquadronsMode}", so neither runs in
- * all-squadrons mode.
- */
-
 /* global MSG_SAVED, MSG_DELETED, MSG_ERROR, MSG_CONFLICT, MSG_DELETE_TOPIC_TITLE, MSG_DELETE_TOPIC_MSG, MSG_DELETE_CATEGORY_TITLE, MSG_DELETE_CATEGORY_MSG, MSG_OK, MSG_CANCEL, MSG_DIRTY_LEAVE, MSG_REFRESH_FAILED */
 
 function toastSuccess(msg) {
@@ -41,11 +26,6 @@ function toastError(msg) {
     if (window.showFrontendErrorToast) window.showFrontendErrorToast(msg);
 }
 
-// The dialogs moved from the legacy `.modal-overlay`/`.modal-box` shape (opened
-// by an `active` class) onto the canonical `.krt-modal-overlay` shell, whose
-// hidden default lives in styles.css. Visibility therefore rides the shared
-// krtm-modal-open / krtm-hidden pair, which window.krtModal drives (FE-SIMP-04) --
-// `active` styles nothing any more.
 function closeModal(id) {
     window.krtModal.close(id);
 }
@@ -53,10 +33,6 @@ function openModal(id) {
     window.krtModal.open(id);
 }
 
-// Re-renders the topics list in place after any structural change (create /
-// edit / delete / reorder). The server re-renders the fragment, so every
-// card's data-pa-*-version, sortOrder and first/last arrow state come back
-// fresh — this is what guarantees a second reorder does not 409 (#580).
 function paRefreshTopics() {
     if (!window.krtFetch || typeof window.krtFetch.swap !== 'function') {
         window.location.reload();
@@ -70,10 +46,6 @@ function paRefreshTopics() {
     });
 }
 
-// JSON write through krtFetch.write (REQ-FE-002: CSRF, the bare-403 refresh-and-retry and the
-// re-auth redirect). Resolves to the response body ({} for a bodiless 2xx such as a 204), or to null
-// once the failure was surfaced: on 409 it toasts and refreshes the list in place instead of
-// reloading the whole page; any other failure toasts MSG_ERROR.
 function apiCall(url, method, body) {
     if (!window.krtFetch) {
         toastError(MSG_ERROR);
@@ -107,9 +79,6 @@ function apiCall(url, method, body) {
         });
 }
 
-// ----------------------------------------------------------------------
-// Topic CRUD
-// ----------------------------------------------------------------------
 function openCreateTopicModal() {
     document.getElementById('ct-name').value = '';
     document.getElementById('ct-desc').value = '';
@@ -172,9 +141,6 @@ function deleteTopic(btn) {
     });
 }
 
-// ----------------------------------------------------------------------
-// Category CRUD
-// ----------------------------------------------------------------------
 function openCreateCategoryModal(btn) {
     document.getElementById('cc-topic-id').value = btn.getAttribute('data-pa-topic-id');
     document.getElementById('cc-name').value = '';
@@ -241,16 +207,6 @@ function deleteCategory(btn) {
     });
 }
 
-// ----------------------------------------------------------------------
-// Sort: up/down arrows (T4)
-// ----------------------------------------------------------------------
-// There is no swap endpoint; instead we PUT both the moved item and its
-// neighbour with their sortOrder values swapped, then re-render the list in
-// place (no reload) so every card's fresh @Version comes back for the next
-// move. The full DTO each PUT needs (name/description/sortOrder/version, plus
-// topicId for categories) is read straight from the card's edit-button data
-// attributes — the page already carries it, so no read-back GET is required
-// (the proxy exposes no GET-by-id route anyway).
 function paReadCardBody(card, trigger) {
     const btn = card.querySelector('[data-trigger="' + trigger + '"]');
     if (!btn) return null;
@@ -278,8 +234,6 @@ function swapSort(currentCard, otherCard, putUrl, kind) {
     const aSort = a.sortOrder;
     let bSort = b.sortOrder;
     if (aSort === bSort) {
-        // Tie-break: nudge the other value so the two become distinct,
-        // otherwise swapping equal sortOrders is a no-op and the move sticks.
         bSort =
             aSort +
             (otherCard.compareDocumentPosition(currentCard) & Node.DOCUMENT_POSITION_FOLLOWING
@@ -290,8 +244,6 @@ function swapSort(currentCard, otherCard, putUrl, kind) {
     b.sortOrder = aSort;
     const aId = currentCard.getAttribute(idAttr);
     const bId = otherCard.getAttribute(idAttr);
-    // Sequential, not parallel: a 409 on the first PUT surfaces (and refreshes
-    // the list) via apiCall before the second one fires.
     return apiCall(putUrl + '/' + aId, 'PUT', a).then(function (r1) {
         if (!r1) return null;
         return apiCall(putUrl + '/' + bId, 'PUT', b);
@@ -326,9 +278,6 @@ function moveCategory(btn, direction) {
     });
 }
 
-// ----------------------------------------------------------------------
-// Level-content inline save + dirty tracking (T2 + T3)
-// ----------------------------------------------------------------------
 const paDirtyTextareas = new Set();
 
 function paUpdateSaveAllBanner() {
@@ -393,8 +342,6 @@ function paSaveLevelContentFromButton(btn) {
 function paSaveAll() {
     const snapshot = Array.from(paDirtyTextareas);
     if (snapshot.length === 0) return;
-    // Sequential — one failure stops the chain so the user can fix the
-    // root cause before further saves go out.
     let chain = Promise.resolve(true);
     snapshot.forEach(function (ta) {
         chain = chain.then(function (alive) {
@@ -422,18 +369,12 @@ function paDiscardAll() {
     });
 }
 
-// ----------------------------------------------------------------------
-// Bulk expand/collapse on the topic cards
-// ----------------------------------------------------------------------
 function paToggleAllTopics(open) {
     document.querySelectorAll('.admin-topic-card').forEach(function (d) {
         d.open = open;
     });
 }
 
-// beforeunload guard: warn the admin if they navigate away with unsaved
-// textareas. The native dialog is the only allowed pre-navigation prompt;
-// showKrtConfirm cannot intercept it.
 window.addEventListener('beforeunload', function (e) {
     if (paDirtyTextareas.size > 0) {
         e.preventDefault();
@@ -442,9 +383,6 @@ window.addEventListener('beforeunload', function (e) {
     }
 });
 
-// ----------------------------------------------------------------------
-// Wiring
-// ----------------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', function () {
     if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         window.krtEvents.on('click', 'pa-open-create-topic', openCreateTopicModal);
@@ -490,9 +428,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // After an in-place refresh the level-content textareas are re-rendered
-    // from authoritative server state, so any tracked "dirty" references now
-    // point at detached nodes — drop them and hide the save-all banner.
     document.addEventListener('krt:swapped', function (e) {
         if (e.detail && e.detail.container && e.detail.container.id === 'pa-topics-results') {
             paDirtyTextareas.clear();

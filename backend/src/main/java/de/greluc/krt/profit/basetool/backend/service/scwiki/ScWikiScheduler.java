@@ -37,27 +37,11 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Scheduler bean that drives the periodic SC Wiki sync.
+ * Scheduler that runs the SC Wiki syncs on the dedicated executor, by default every 24 hours after
+ * a one-hour initial delay.
  *
- * <p>{@code @Scheduled} fixed-delay of {@code krt.scwiki.scheduler-delay} (default 24h); Wiki data
- * changes only on game patches. An {@code initialDelay} of {@code
- * krt.scwiki.scheduler-initial-delay} (default 1h) staggers the first run behind the UEX scheduler
- * (which starts at boot) so the two daily syncs do not fire at the same time.
- * {@code @Async(AsyncConfig.SCWIKI_EXECUTOR)} runs the sweep on the dedicated bounded pool so a
- * slow Wiki response cannot delay the UEX scheduler. Both schedulers additionally share a {@link
- * SyncCoordinator} gate as a safety net: if their cadences ever align, the later sync waits for the
- * earlier one to finish rather than running concurrently.
- *
- * <p>R3 wired the first real sync (commodity merge); R4 adds the vehicle fill, the closure-mode
- * item fill and the blueprint graph. The scheduler checks the {@code krt.scwiki.scheduler-enabled}
- * master switch, then delegates to each sync in dependency order; every sync <b>itself</b>
- * self-guards on its own per-sync feature flag (all default {@code false}) so each stays dark until
- * an operator opts in per the deployment runbook. R6 adds the manufacturer reconciliation, likewise
- * behind its own flag.
- *
- * <p>Per-sync exceptions are swallowed per step ({@link #runStep}) — same fail-one-succeed-others
- * contract as {@code UexScheduler} — so one failing sync never aborts the others or suppresses the
- * next tick.
+ * <p>Checks {@code krt.scwiki.scheduler-enabled}, then runs each sync in dependency order under the
+ * {@link SyncCoordinator}; a failing step does not abort the others ({@link #runStep}).
  */
 @Slf4j
 @Component
@@ -77,15 +61,8 @@ public class ScWikiScheduler {
   private final MeterRegistry meterRegistry;
 
   /**
-   * Periodic SC Wiki sync entry point. Runs on the {@link AsyncConfig#SCWIKI_EXECUTOR} pool so a
-   * slow Wiki response cannot delay the UEX scheduler (or any other {@code @Scheduled} bean).
-   *
-   * <p>If the master switch is off, logs and returns. Otherwise runs each sync in dependency order
-   * — commodities (R3) and vehicles fill cross-source rows first, then the closure-mode item fill,
-   * then blueprints (whose ingredients resolve against {@code game_item} / {@code material}), then
-   * the R6 manufacturer reconciliation. Each sync self-guards on its per-sync flag. The {@link
-   * ScWikiClient} field is referenced here so the {@code
-   * scWikiIntegrationClassesMustWireScWikiClient} ArchUnit rule is satisfied.
+   * Periodic SC Wiki sync entry point on the {@link AsyncConfig#SCWIKI_EXECUTOR} pool; returns
+   * early when the master switch is off.
    */
   @Async(AsyncConfig.SCWIKI_EXECUTOR)
   @Scheduled(
@@ -102,24 +79,12 @@ public class ScWikiScheduler {
   }
 
   /**
-   * Runs every SC Wiki sync step in dependency order. Invoked by {@link #scheduleScWikiSync()}
-   * through {@link SyncCoordinator#runExclusively(String, Runnable)} — and therefore only when no
-   * UEX sync is in progress; if one is, this run waits for it to finish first (bounded by the
-   * coordinator's wait cap) so the two never execute at the same time.
+   * Runs every SC Wiki sync step in dependency order via {@link
+   * SyncCoordinator#runExclusively(String, Runnable)}, then evicts the affected master-data caches
+   * through {@link MasterDataCacheEvictionService#evictScWikiSyncedMasterData()}.
    *
-   * <p>After the steps run, the master-data caches this sweep can make stale are evicted in a
-   * {@code finally} ({@link MasterDataCacheEvictionService#evictScWikiSyncedMasterData()}) so
-   * synced commodity / vehicle / manufacturer / blueprint-family changes are visible on the next
-   * read rather than lagging the 12-hour TTL (CACHE-SYNC-EVICT-001, CACHE-DIST-03).
-   *
-   * <p>Returns the total number of rows the five steps wrote this run (a failing step contributes
-   * {@code 0}), which {@link #scheduleScWikiSync()} records into {@code
-   * basetool_scheduled_job_items_total{job="scwiki_sync"}} via {@code TaskMetrics.recordCounting}.
-   * A clean sweep that wrote zero rows across every step — the signature of a Wiki catalogue outage
-   * returning empty responses — records {@code 0}, which the {@code SyncZeroItems} alert watches
-   * for (#1041 item 2).
-   *
-   * @return the total number of catalogue rows written across all five steps this run
+   * @return the total number of catalogue rows written across all steps; a failing step counts
+   *     {@code 0}
    */
   private int runAllSyncSteps() {
     log.debug("Running scheduled SC Wiki sync against {}", scWikiClient.getClass().getSimpleName());
@@ -137,9 +102,7 @@ public class ScWikiScheduler {
   }
 
   /**
-   * Runs one sync step, swallowing and logging any exception so a single failing sync never aborts
-   * the remaining steps or suppresses the next scheduled tick. A failing step contributes {@code 0}
-   * to the run's item tally.
+   * Runs one sync step, logging and swallowing any exception.
    *
    * @param label short name of the step for the error log line
    * @param step the sync invocation, returning the number of rows it wrote
@@ -163,15 +126,8 @@ public class ScWikiScheduler {
   }
 
   /**
-   * Publishes {@code basetool_scheduled_job_enabled{task="scwiki_sync"} = 1} when the sync is
-   * switched on.
-   *
-   * <p>The one job that reads its switch rather than being defined by bean existence: unlike every
-   * other wrapped job, this component is not {@code @ConditionalOnProperty}-gated — the bean is
-   * always created and {@link #scheduleScWikiSync()} early-returns on {@code
-   * krt.scwiki.scheduler-enabled=false}. Publishing unconditionally would therefore claim a
-   * switched-off sync is enabled, and {@code ExternalSyncStale}'s {@code absent()} leg would fire a
-   * false stale for a sync nobody expects to run.
+   * Publishes {@code basetool_scheduled_job_enabled{task="scwiki_sync"} = 1} only when {@code
+   * krt.scwiki.scheduler-enabled} is on.
    */
   @PostConstruct
   void publishEnabledGauge() {

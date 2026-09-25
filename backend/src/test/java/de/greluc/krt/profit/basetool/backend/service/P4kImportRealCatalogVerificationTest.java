@@ -34,23 +34,11 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
- * Opt-in end-to-end verification that {@link P4kImportService} consumes a <em>real</em> KRT P4K
- * Reader catalog (the full ~60k-record {@code Data/Game2.dcb} export, not a synthetic fixture)
- * without error, against the real Testcontainers Postgres of the {@code test} profile.
+ * Opt-in check that {@link P4kImportService#previewImport(byte[])} processes a real P4K catalog
+ * without error, against Postgres.
  *
- * <p>It is gated on the presence of a catalog file at {@code backend/build/p4k-catalog-verify.json}
- * (the working directory of the test JVM is the {@code backend} module dir, and {@code build/} is
- * gitignored): when the file is absent — as in CI — the test {@link Assumptions assumes} its way to
- * a skip, so it never breaks the pipeline. To run it locally, drop a catalog there and execute
- * {@code ./gradlew :backend:test --tests "*P4kImportRealCatalogVerificationTest"}.
- *
- * <p>The assertion that matters is simply that {@link P4kImportService#previewImport(byte[])}
- * returns rather than throwing: a successful preview means every one of the catalog's tens of
- * thousands of manufacturer / item / ship / commodity / blueprint records deserialized into the
- * {@code P4k*Dto} shapes and ran through the reconciliation chain. (A fresh test database carries
- * no UEX / SC-Wiki master data, so the records resolve as would-be seeds / unmatched rather than
- * matches — the point is coverage of the parse + classify path across the whole file, not match
- * counts.) {@link JwtDecoder} is mocked so the resource-server context boots without Keycloak.
+ * <p>Runs only when {@code backend/build/p4k-catalog-verify.json} exists and otherwise skips via
+ * {@link Assumptions}. {@link JwtDecoder} is mocked.
  */
 @SpringBootTest
 @ActiveProfiles("test")

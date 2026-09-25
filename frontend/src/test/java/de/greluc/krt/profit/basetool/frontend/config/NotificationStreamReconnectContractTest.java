@@ -29,26 +29,13 @@ import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 /**
- * Build-time pin of how {@code notifications.js} stops reconnecting its push stream once the
+ * Verifies against {@code notifications.js} that the push stream stops reconnecting once the
  * session is gone (REQ-NOTIF-010, REQ-SEC-012).
  *
- * <p>The server refuses an anonymous stream with {@code 401} + {@code X-Reauthenticate} ({@code
- * AnonymousSurfaceSweepMvcTest#anonymousEventSourceGets401}). An {@code EventSource} cannot read
- * that status: it fires the same {@code error} for a 401 as for a network blip, and the module used
- * to answer every {@code error} with a reconnect a few seconds later. A tab whose session ended —
- * logout in another tab, expiry, the renamed session cookie of the v1.11.0 deploy — therefore kept
- * asking the stream every three to six seconds for as long as it stayed open, hidden tabs included,
- * where the badge poll that would have noticed is paused.
- *
- * <p>The fix is spread over three places in the module, and any one of them missing re-opens the
- * loop without a test or an error message saying so — hence this guard, in the technique of {@link
- * HandRolledFetchGateContractTest}:
- *
  * <ol>
- *   <li>a connect refused before it ever opened probes the session through the badge read;
- *   <li>that read stops the stream on a {@code 401}, before the re-auth helper — which may decline
- *       to navigate inside its loop guard — decides anything;
- *   <li>a reconnect that was already waiting re-checks the stop flag before it opens a new stream.
+ *   <li>A connect refused before opening probes the session through the badge read.
+ *   <li>That read stops the stream on a {@code 401}.
+ *   <li>A pending reconnect re-checks the stop flag before opening a new stream.
  * </ol>
  */
 class NotificationStreamReconnectContractTest {
@@ -141,8 +128,7 @@ class NotificationStreamReconnectContractTest {
   }
 
   /**
-   * Returns group 1 of the first match, failing loudly when the anchor is gone so a rename breaks
-   * this guard instead of silently emptying it.
+   * Returns group 1 of the first match, failing when the anchor is missing.
    *
    * @param pattern the anchored pattern
    * @param text the module source

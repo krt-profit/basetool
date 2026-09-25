@@ -29,8 +29,8 @@ import jakarta.validation.constraints.Size;
 import java.util.List;
 
 /**
- * One extracted refinery order within a {@link RefineryExtractDto}. Mirror of the backend record;
- * only verbatim screen reads — the backend resolves names against master data.
+ * One extracted refinery order within a {@link RefineryExtractDto}, carrying only verbatim screen
+ * reads that the backend resolves.
  *
  * @param panelType the panel the capture came from; the backend requires {@code SETUP}
  * @param quoted whether the order was quoted on screen (drives the un-quoted warning)
@@ -42,11 +42,8 @@ import java.util.List;
  * @param expenses the order expenses read from screen
  * @param durationMinutes the refining duration in minutes
  * @param totalYieldScu the total yield in SCU read from screen
- * @param sourceImages provenance for the stitched capture(s); non-empty, at most 50 — a genuine
- *     extraction is always stitched from at least one screenshot, so an empty list marks a payload
- *     that no real capture produced (ADR-0008 amendment, REQ-INGEST-011)
- * @param goods the per-row reads; non-empty, at most 100 — an order with no rows carries nothing to
- *     import (ADR-0008 amendment)
+ * @param sourceImages provenance of the stitched capture(s); 1 to 50 entries (REQ-INGEST-011)
+ * @param goods the per-row reads; 1 to 100 entries
  */
 public record RefineryExtractOrderDto(
     @NotNull @Size(max = 32) String panelType,

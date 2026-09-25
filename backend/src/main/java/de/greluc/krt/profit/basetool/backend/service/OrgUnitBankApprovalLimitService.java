@@ -40,25 +40,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Approval-limit write mechanics of {@link OrgUnitBankAccessService} (L3 split, #922): the
- * idempotent upsert / clear of the three per-tier approval-limit rows (membership-role bucket,
- * all-members, individual user, REQ-BANK-041) and the row-locked {@link #upsertLimit} that
- * serialises concurrent set-limit calls. Each mutation records its {@code APPROVAL_LIMIT_SET} /
- * {@code APPROVAL_LIMIT_CLEARED} audit event (REQ-AUDIT-001).
+ * Persists and audits the per-tier bank approval limits (role bucket, all members, area members,
+ * individual user) on behalf of {@link OrgUnitBankAccessService} (REQ-BANK-041).
  *
- * <p>This collaborator holds <em>only</em> the persistence + audit mechanics; the account
- * resolution, the org-unit authorization ({@code requireCanConfigureApprovalLimits}) and the
- * limit-bucket / all-members type validation stay in {@link OrgUnitBankAccessService}, the single
- * sanctioned {@code OwnerScopeService}↔bank bridge. It injects {@link BankAccountRepository}
- * <em>only for the {@code SELECT … FOR UPDATE} row lock</em> in {@link #upsertLimit} and
- * deliberately does NOT inject {@link OwnerScopeService}, so it never becomes a second
- * org-unit-aware bridge (ADR-0020, {@code orgUnitAwareBankSeamIsContainedToOneClass}). The
- * read-side {@code resolveApplicableLimit} (which consults the caller's org-unit roles) stays in
- * the facade for exactly that reason.
- *
- * <p>Each mutation is {@code @Transactional} (propagation {@code REQUIRED}) so it joins the
- * read-write transaction the facade already opened; the caller re-reads the settings snapshot in
- * the same transaction afterwards.
+ * <p>Callers resolve and authorize the account first. {@link BankAccountRepository} is used only
+ * for the row lock in {@link #upsertLimit}; {@link OwnerScopeService} is deliberately not injected
+ * (ADR-0020). Each mutation joins the caller's transaction.
  */
 @Service
 @RequiredArgsConstructor
@@ -70,8 +57,8 @@ public class OrgUnitBankApprovalLimitService {
   private final BankAuditService bankAuditService;
 
   /**
-   * Sets or changes a role-bucket approval limit on an account and records the set audit event
-   * (REQ-BANK-041). The role code was validated against the account's limit buckets by the caller.
+   * Sets a role-bucket approval limit on an account and records the set audit event (REQ-BANK-041);
+   * the role code is validated by the caller.
    *
    * @param account the already-loaded, already-authorized account
    * @param roleCode the role bucket ({@code MembershipRole} name)
@@ -147,10 +134,9 @@ public class OrgUnitBankApprovalLimitService {
   }
 
   /**
-   * Sets or changes the "Mitglieder des Bereichs" cascade approval limit on a Bereichskonto and
-   * records the set audit event (REQ-BANK-048): the ceiling for any member of the whole area
-   * cascade (Bereichsleitung + child Staffel/SK members) who matches no more specific tier. The
-   * area-members-tier support was validated by the caller.
+   * Sets the "Mitglieder des Bereichs" approval limit on a Bereichskonto and records the set audit
+   * event (REQ-BANK-048): the ceiling for any member of the area cascade who matches no more
+   * specific tier.
    *
    * @param account the already-loaded, already-authorized account
    * @param limit the whole-aUEC ceiling (&gt;= 0)
@@ -184,9 +170,8 @@ public class OrgUnitBankApprovalLimitService {
   }
 
   /**
-   * Sets or changes an individual user's approval limit on an account and records the set audit
-   * event (REQ-BANK-041); the most specific tier, overriding any role/all-members limit for that
-   * user.
+   * Sets an individual user's approval limit on an account, the most specific tier, and records the
+   * set audit event (REQ-BANK-041).
    *
    * @param account the already-loaded, already-authorized account
    * @param userId the user the limit addresses
@@ -226,9 +211,8 @@ public class OrgUnitBankApprovalLimitService {
   }
 
   /**
-   * Idempotent upsert of one approval-limit row: updates the existing tier row's amount in place
-   * (dirty-checking) or inserts a new one. The partial unique indexes guarantee at most one row per
-   * (account, tier).
+   * Updates the account's existing row for the tier or inserts a new one, under a row lock on the
+   * account; at most one row exists per (account, tier).
    *
    * @param account the account
    * @param kind the tier kind

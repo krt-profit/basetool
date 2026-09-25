@@ -29,17 +29,13 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * Domain event published right after a brand-new Discord registration is persisted in the {@code
- * PENDING} state (epic #720, Track 1, REQ-NOTIF-012). The seeded default rule notifies every admin
- * so they can review and approve.
+ * Domain event published when a new Discord registration is persisted in the {@code PENDING} state
+ * (REQ-NOTIF-012); the default rule notifies every admin.
  *
- * <p>Carries only the new user's id (the notification's deep-link target) and their display
- * username for rendering — deliberately <strong>no Discord id</strong> or other PII rides the
- * event.
+ * <p>Carries no Discord id or other PII.
  *
- * @param userId the new user's id (also the notification's loose entity id, for deep-linking)
- * @param username the new user's username, for rendering the admin notification; may be {@code
- *     null}
+ * @param userId the new user's id (also the notification's loose entity id)
+ * @param username the new user's username, for rendering; may be {@code null}
  */
 public record DiscordRegistrationPendingEvent(UUID userId, @Nullable String username)
     implements NotificationEvent {

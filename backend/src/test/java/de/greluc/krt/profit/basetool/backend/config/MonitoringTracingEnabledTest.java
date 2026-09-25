@@ -45,12 +45,9 @@ import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.filter.ServerHttpObservationFilter;
 
 /**
- * Exercises the tracing instrumentation in its enabled state (REQ-OBS-009, epic #936 Phase 1b)
- * against an in-memory span exporter — no network export: server spans carry the <b>templated</b>
- * request URI (never raw path variables) and no user-identifying attributes, and an active span
- * puts {@code traceId}/{@code spanId} into the MDC for the JSON log appenders. OTLP export stays
- * off ({@code management.tracing.export.otlp.enabled=false}) so the only exporter is the in-memory
- * test double.
+ * Exercises enabled tracing against an in-memory span exporter (REQ-OBS-009): server spans carry
+ * the templated URI and no user-identifying attributes, and an active span puts {@code traceId} /
+ * {@code spanId} into the MDC. OTLP export is off.
  */
 @SpringBootTest(
     properties = {

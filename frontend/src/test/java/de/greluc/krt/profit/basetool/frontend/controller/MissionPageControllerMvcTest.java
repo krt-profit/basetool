@@ -258,14 +258,12 @@ class MissionPageControllerMvcTest {
   }
 
   /**
-   * Builds a renderable {@link MissionDto} carrying the given Ablauf steps plus one goal (Ziel) and
-   * a meeting point (Treffpunkt), so the per-step checklist/editor, the Ziele box/editor and the
-   * new at-a-glance rows actually render (REQ-MISSION-009/-019). Editable (canEdit), so the editors
-   * + done-toggle show.
+   * Builds an editable {@link MissionDto} with the given Ablauf steps, one goal and a meeting
+   * point, so the step, goal and at-a-glance sections render (REQ-MISSION-009/-019).
    *
    * @param missionId the id to stamp on the mission
    * @param steps the Ablauf steps to render
-   * @return a mission fixture with steps + one goal + meeting point
+   * @return a mission fixture with steps, one goal and a meeting point
    */
   private MissionDto missionWithSteps(
       UUID missionId,
@@ -318,9 +316,8 @@ class MissionPageControllerMvcTest {
   }
 
   /**
-   * Builds a minimal renderable {@link MissionDto} (empty sub-collections, one manager, editable,
-   * no description) for the mission-detail template tests, so the 38-argument constructor lives in
-   * one place.
+   * Builds a minimal editable {@link MissionDto} with empty collections, one manager and no
+   * description.
    *
    * @param missionId the id to stamp on the mission
    * @return a minimal mission fixture with no description
@@ -330,12 +327,11 @@ class MissionPageControllerMvcTest {
   }
 
   /**
-   * Builds a minimal renderable {@link MissionDto} carrying the given (possibly {@code null})
-   * Markdown description, so a test can exercise the collapsible detailed-description card while
-   * still leaving the goals + Ablauf collections empty.
+   * Builds a minimal {@link MissionDto} with the given Markdown description and empty goals and
+   * steps.
    *
    * @param missionId the id to stamp on the mission
-   * @param description the Markdown description to render, or {@code null} for none
+   * @param description the Markdown description, or {@code null} for none
    * @return a minimal mission fixture with the given description
    */
   private MissionDto minimalMission(UUID missionId, String description) {
@@ -401,14 +397,13 @@ class MissionPageControllerMvcTest {
   }
 
   /**
-   * Builds a renderable {@link MissionDto} carrying the given participants and assigned units, so
-   * the crew board (unit drop zones + per-crew person rows) actually renders. Editable (canEdit) so
-   * the board shows for the OFFICER fixture. All other collections are empty.
+   * Builds an editable {@link MissionDto} with the given participants and assigned units so the
+   * crew board renders; all other collections are empty.
    *
    * @param missionId the id to stamp on the mission
    * @param participants the mission participants (source of {@code participantsById})
    * @param units the assigned units whose crew rows the board renders
-   * @return a mission fixture with the given participants + units
+   * @return a mission fixture with the given participants and units
    */
   private MissionDto missionWithUnitsAndParticipants(
       UUID missionId,
@@ -524,14 +519,8 @@ class MissionPageControllerMvcTest {
   }
 
   /**
-   * The crew board's drop zones must advertise the click path, not only the drag one (#1936).
-   * Native HTML5 drag never fires from touch input, so hints reading "Teilnehmer hierher ziehen"
-   * told a phone user to perform the one gesture that cannot work and said nothing about the click
-   * fallback that has always worked. Each zone now renders a two-state hint — the idle instruction
-   * plus the armed call to action that CSS reveals while a participant is selected — and a zone's
-   * {@code aria-label} carries the same sentence as its visible idle text. Asserted in both bundles
-   * (German is the {@code CookieLocaleResolver} default, English via {@code ?lang=en}) so a
-   * half-translated rewording fails here rather than in production.
+   * Verifies that each crew-board drop zone renders an idle hint and an armed hint describing the
+   * click path, with its {@code aria-label} matching the idle text, in German and English.
    *
    * @throws Exception if the MockMvc exchange fails
    */
@@ -762,13 +751,11 @@ class MissionPageControllerMvcTest {
   }
 
   /**
-   * Reads the mission-detail page module ({@code static/js/mission-detail.js}) from the classpath.
-   * The #924 extraction moved the page's inline JavaScript there, so script-content regression
-   * guards now assert against the module source while the MockMvc render is only expected to carry
-   * the module's loader tag.
+   * Reads the mission-detail page module ({@code static/js/mission-detail.js}) from the classpath,
+   * for script-content assertions.
    *
-   * @return the full UTF-8 source of the mission-detail page module
-   * @throws IOException if the classpath resource cannot be read (build misconfiguration)
+   * @return the full UTF-8 source of the module
+   * @throws IOException if the classpath resource cannot be read
    */
   private static String missionDetailModuleSource() throws IOException {
     try (var in =
@@ -2234,14 +2221,8 @@ class MissionPageControllerMvcTest {
   }
 
   /**
-   * #816: the Übersicht "Funk" panel must list both the central, unit-less frequencies that carry a
-   * value and the per-unit frequencies of units that have one, while omitting empty entries.
-   *
-   * <p>Given a mission with one central frequency type that has a value ("Befehl"), one that has
-   * none ("Notfall"), one unit with a frequency ("Alpha") and one without ("Bravo"), the overview
-   * fragment must render the two entries that carry a value and neither empty one. The overview
-   * fragment is requested directly (`?fragment=overview`) so the assertions are scoped to the
-   * overview pane and never pick up the unit names from the crew board.
+   * Verifies that the overview "Funk" panel lists central and per-unit frequencies that carry a
+   * value and omits empty ones; the {@code overview} fragment is requested directly.
    */
   @Test
   void missionOverviewFragment_ListsFrequenciesWithValue_OmitsEmptyOnes() throws Exception {
@@ -2371,14 +2352,8 @@ class MissionPageControllerMvcTest {
   }
 
   /**
-   * #816 follow-up (review finding): the "Funk" panel must collapse — not paint a bare heading over
-   * an empty list — when the frequency-types lookup fails (a Resilience4j-wrapped fetch whose
-   * failure the controller swallows, leaving the {@code frequencyTypes} attribute null) while the
-   * mission still carries a stored central frequency value and no unit has a frequency.
-   *
-   * <p>The central rows iterate {@code frequencyTypes}; the panel gate therefore AND-s the
-   * central-value flag with {@code hasCentralTypes} so it stays hidden when the type list is
-   * absent.
+   * Verifies that the "Funk" panel is hidden when the frequency-types lookup fails, even though the
+   * mission stores a central frequency value.
    */
   @Test
   void missionOverviewFragment_FreqTypesFetchFailed_CollapsesFunkPanel() throws Exception {
@@ -2466,22 +2441,11 @@ class MissionPageControllerMvcTest {
   }
 
   /**
-   * Reproducer for the "creating a finance entry 500s the mission detail page" bug (live log:
-   * {@code TemplateProcessingException ... mission-detail line 856} right after a finance entry is
-   * persisted).
+   * Verifies that the mission detail page renders without a template error when the mission has a
+   * finance entry, including its edit button's rounded amount.
    *
-   * <p>The {@code th:each="entry : ${financeEntries}"} loop renders an edit button whose rounded
-   * amount used to be produced by {@code th:data-amount="${@moneyFormat.round(entry.amount)}"}.
-   * Thymeleaf 3.1 evaluates default/unknown attributes (such as {@code th:data-*}) in a restricted
-   * expression context where {@code @bean} references are forbidden, so the call threw and every
-   * render of a mission that owned at least one finance entry returned HTTP 500. The fix binds the
-   * rounded value via {@code th:with} (an unrestricted context) and only reads the resulting local
-   * variable in {@code th:data-amount}.
-   *
-   * <p>The earlier render tests all pass an empty finance list, so the loop body never executed and
-   * the bug slipped through; this test populates exactly one entry. {@code ROLE_OFFICER} is granted
-   * via {@code oidcLogin()} because the finance ledger is only fetched for member-or-above OIDC
-   * principals.
+   * <p>{@code ROLE_OFFICER} is granted via {@code oidcLogin()}, as finance data is only fetched for
+   * OIDC members.
    */
   @Test
   void missionDetail_WithFinanceEntry_ShouldRenderEditButtonWithoutTemplateError()
@@ -2585,10 +2549,8 @@ class MissionPageControllerMvcTest {
   }
 
   /**
-   * Renders the crew board with a unit that actually has crew: the earlier render fixtures all use
-   * empty crew lists, so the person-row fragment's crew branch (chip-select with the assigned job
-   * preselected, the multi-edit entry, and the unit drop-zone wiring) never executed. This test
-   * populates one unit with one crew member holding one function and asserts the board markup.
+   * Verifies the crew-board markup for a unit with one crew member holding one function: the job
+   * chip-select, the multi-edit entry and the drop-zone wiring.
    */
   @Test
   @org.springframework.security.test.context.support.WithMockUser(roles = "KRT_MEMBER")
@@ -2952,8 +2914,7 @@ class MissionPageControllerMvcTest {
   }
 
   /**
-   * Asserts the member-only finance reads (summary aggregate + entries page + refinery) were NOT
-   * issued.
+   * Asserts that the member-only finance reads (summary, entries page, refinery) were not issued.
    */
   private void verifyNoFinanceReads(UUID missionId) {
     verify(backendApiClient, never())
@@ -2967,14 +2928,8 @@ class MissionPageControllerMvcTest {
   }
 
   /**
-   * Asserts the all-users roster read ({@code /users/lookup}) was NOT issued. Since #1193 the owner
-   * / manager pickers are server-side searchable comboboxes that fetch matches from {@code
-   * /users/search} on demand, so this preload no longer happens on <em>any</em> render path — full
-   * page or fragment. (The owner-picker's org-unit read {@code /users/me/pickable-org-units} still
-   * lives in the {@code !anonymous && needMgmt} block but is principal-guarded: {@code
-   * fetchCallerMembershipOptions} short-circuits to an empty list when the {@code OidcUser}
-   * principal is null, and {@code @WithMockUser} injects a plain user, so it is never reached
-   * here.)
+   * Asserts that the all-users roster read ({@code /users/lookup}) was not issued; the owner and
+   * manager pickers search {@code /users/search} on demand.
    */
   private void verifyNoUserLookupRead() {
     verify(backendApiClient, never()).get(eq("/api/v1/users/lookup"), anyTypeRef());

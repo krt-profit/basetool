@@ -31,48 +31,32 @@ import org.mapstruct.Mapping;
 @Mapper(config = CentralMapperConfig.class)
 public interface SquadronMapper {
   /**
-   * Maps a {@link Squadron} entity to its outbound DTO. {@code isPromotionEnabled} is taken from
-   * the entity's {@code isPromotionEnabled} accessor and surfaces on the wire as a Boolean so the
-   * admin-settings page can render the per-squadron toggle without a second lookup.
+   * Maps a {@link Squadron} to its full DTO, including the {@code isPromotionEnabled} and {@code
+   * isProfitEligible} flags.
    *
-   * @param entity the squadron entity to project; {@code null} maps to {@code null}.
-   * @return the full squadron DTO.
+   * @param entity the squadron to project; {@code null} maps to {@code null}
+   * @return the squadron DTO
    */
   @Mapping(target = "isPromotionEnabled", source = "promotionEnabled")
   @Mapping(target = "isProfitEligible", source = "profitEligible")
   SquadronDto toDto(Squadron entity);
 
   /**
-   * Narrow reference projection (id + name + shorthand) embedded into the per-aggregate list /
-   * detail DTOs so the squadron column / badge can be rendered without an extra round-trip. Used
-   * via {@code @Mapper(uses = SquadronMapper.class)} from MissionMapper, JobOrderMapper,
-   * InventoryItemMapper, RefineryOrderMapper, OperationMapper and ShipMapper.
+   * Projects a squadron into the slim reference (id, name, shorthand) embedded in aggregate DTOs.
    *
-   * @param entity the squadron entity to project; {@code null} maps to {@code null}.
-   * @return the slim reference DTO (id + name + shorthand).
+   * @param entity the squadron to project; {@code null} maps to {@code null}
+   * @return the reference DTO
    */
   SquadronReferenceDto toReferenceDto(Squadron entity);
 
   /**
-   * OrgUnit-typed overload of {@link #toReferenceDto(Squadron)} used by the per-aggregate mappers
-   * (Mission, Operation, Ship, InventoryItem, RefineryOrder, JobOrder) after R9 Step 2 dropped the
-   * legacy {@code owningSquadron} / {@code creatingSquadron} / {@code requestingSquadron} fields
-   * from those aggregates. The aggregates now expose an {@code OrgUnit}-typed owner; the DTOs still
-   * publish a {@code SquadronReferenceDto} field so the API contract and the frontend templates
-   * stay stable.
+   * Projects any {@link OrgUnit} (Staffel or Spezialkommando) into the slim {@code
+   * SquadronReferenceDto} used for aggregate owner fields.
    *
-   * <p>The reference triplet ({@code id}, {@code name}, {@code shorthand}) lives entirely on the
-   * shared {@link OrgUnit} base, so both kinds project identically: a {@code Squadron} and a {@code
-   * Spezialkommando} each surface their own id/name/shorthand into the slim DTO. This deliberately
-   * supersedes the earlier "SK surfaces as {@code null}" behaviour so an SK-owned mission, order,
-   * ship, etc. renders its SK badge in the list columns instead of a blank {@code -}. Reading the
-   * base getters directly (rather than {@code instanceof}-dispatching to {@link
-   * #toReferenceDto(Squadron)}) also sidesteps the lazy-proxy {@code instanceof} pitfall, where an
-   * uninitialised {@code OrgUnit} proxy would not match its concrete subclass.
+   * <p>Reads the base getters directly, so an uninitialised proxy projects correctly.
    *
-   * @param orgUnit the owning org unit; may be {@code null}.
-   * @return the reference DTO carrying the org unit's id/name/shorthand, or {@code null} when the
-   *     {@code orgUnit} is {@code null}.
+   * @param orgUnit the owning org unit; may be {@code null}
+   * @return the reference DTO, or {@code null} when {@code orgUnit} is {@code null}
    */
   @Nullable
   default SquadronReferenceDto orgUnitToReferenceDto(OrgUnit orgUnit) {
@@ -83,14 +67,10 @@ public interface SquadronMapper {
   }
 
   /**
-   * Builds a new {@link Squadron} entity from the inbound DTO. Timestamps are owned by the
-   * persistence provider and ignored. {@code promotionEnabled} and {@code profitEligible} are
-   * intentionally NOT mapped from the DTO either: both flags are only mutable through their
-   * dedicated {@code PATCH /api/v1/squadrons/{id}/promotion-enabled} / {@code .../profit-eligible}
-   * endpoints (see {@code SquadronService.setPromotionEnabled} / {@code
-   * SquadronService.setProfitEligible}) so an accidental description edit cannot flip either
-   * per-squadron toggle. The {@code parent} hierarchy link (epic #692) is ignored too — a unit's
-   * Bereich is assigned through the org-hierarchy admin, never a squadron create/update.
+   * Builds a new {@link Squadron} entity from the DTO.
+   *
+   * <p>Ignores timestamps, the {@code promotionEnabled} and {@code profitEligible} flags (changed
+   * only through their dedicated endpoints) and the {@code parent} hierarchy link.
    */
   @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "updatedAt", ignore = true)

@@ -35,11 +35,7 @@ public final class PdfResponses {
   private PdfResponses() {}
 
   /**
-   * Builds a {@code 200 OK} response streaming the given bytes as a downloadable PDF attachment.
-   *
-   * <p>Sets {@code Content-Type: application/pdf} and a {@code Content-Disposition: attachment;
-   * filename="…"} header (via {@link HttpHeaders#setContentDispositionFormData}, whose RFC 6266
-   * encoding matches the previous per-controller assembly exactly).
+   * Builds a {@code 200 OK} response delivering the bytes as a downloadable PDF attachment.
    *
    * @param body the rendered PDF bytes
    * @param filename the download filename offered to the browser (e.g. {@code

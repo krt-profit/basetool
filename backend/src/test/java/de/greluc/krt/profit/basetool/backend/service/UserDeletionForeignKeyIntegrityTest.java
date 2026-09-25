@@ -66,25 +66,12 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Real-Postgres regression coverage for {@code UserDeletionService.deleteUser} referential
- * integrity, covering the two ways the delete has broken in production.
+ * Real-Postgres tests for the referential integrity of {@code UserDeletionService.deleteUser}: a
+ * user who owns a mission, stamped a material claim or holds an org-unit membership must be
+ * deletable without a foreign-key violation or a {@code TransientPropertyValueException}.
  *
- * <p>{@code deleteUser_ownerOfMissionAndClaimStamper_…}: an ex-member who owns a mission (and
- * therefore a {@code mission_ownership} companion row) and who has stamped a {@code material_claim}
- * must be deletable without tripping a foreign-key violation (SQLSTATE 23503) on the FK-less {@code
- * mission_ownership.owner_id} (V63) and {@code material_claim.claimed_by_user_id} (V131) columns.
- * Guards against the latent gap where {@code deleteUser} reassigned {@code mission.owner} but left
- * its companion (and the audit stamp) pointed at the now-deleted user.
- *
- * <p>{@code deleteUser_withOrgUnitMembership_…}: the complementary Hibernate-side failure — a
- * database-level {@code ON DELETE CASCADE} row that was nevertheless pulled into the persistence
- * context before the delete, so the flush aborted with {@code TransientPropertyValueException}
- * instead of any SQL error at all.
- *
- * <p>Uses {@link Transactional} rollback plus an explicit {@link EntityManager#flush()} to force
- * the {@code DELETE FROM app_user} statement to execute: PostgreSQL checks the (non-deferrable) FKs
- * at statement time, and Hibernate runs its transient-reference check at the same moment, so the
- * flush is exactly where both failures surface without their fixes.
+ * <p>Each test flushes explicitly inside a rolled-back transaction, which is where both failure
+ * modes surface.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -108,22 +95,14 @@ class UserDeletionForeignKeyIntegrityTest {
   @Autowired private EntityManager entityManager;
 
   /**
-   * Mocked so the delete-time Keycloak existence check does not reach out over HTTP — the test
-   * profile points {@code admin-url} at an unreachable host and the check is deliberately
-   * fail-closed, so the real bean would refuse every deletion here. The Mockito default for {@code
-   * userExists} is {@code false} — "the account is gone" — which is the precondition every deletion
-   * test in this class relies on.
+   * Mocked so the fail-closed delete-time Keycloak existence check makes no HTTP call; its default
+   * {@code userExists = false} is the precondition every deletion test relies on.
    */
   @MockitoBean private KeycloakService keycloakService;
 
   /**
-   * Unused by the tests, and deliberately present: a {@code @MockitoBean} is part of the Spring
-   * context cache key, so mocking Keycloak alone would give this class a context of its own instead
-   * of the shared plain one. Declaring the <em>same</em> override pair as {@code
-   * UserManagementTest} — which already owns a context for its {@code JwtDecoder} — lets both
-   * classes share a single context, leaving the suite's context count unchanged. Without this field
-   * the extra context pushes the 4 400-test run past the 2 GB test heap and every test in this
-   * class fails with {@code OutOfMemoryError} while still passing in isolation.
+   * Unused, but declared so this class shares its Spring test context with {@code
+   * UserManagementTest}, which mocks the same pair of beans.
    */
   @MockitoBean private JwtDecoder jwtDecoder;
 
@@ -244,16 +223,8 @@ class UserDeletionForeignKeyIntegrityTest {
   }
 
   /**
-   * An ex-member who still holds an org-unit membership must be deletable. {@code
-   * org_unit_membership.user_id} is cleared by the database {@code ON DELETE CASCADE} (V98), so
-   * {@code deleteUser} deliberately does not remove the rows itself — but the bank
-   * responsible-holder snapshot it takes right before the delete used to resolve the affected org
-   * units through {@code findAllByIdUserId}, attaching the membership entities to the persistence
-   * context. Those managed rows outlived {@code userRepository.delete(user)} still pointing at the
-   * removed {@code User}, and the flush aborted with {@code TransientPropertyValueException}
-   * ({@code OrgUnitMembership.user -> User}) — a 500 on {@code DELETE /api/v1/users/{id}} for every
-   * user who was a member of anything, which is nearly all of them. The snapshot now uses the bare
-   * id projection {@code findOrgUnitIdsByUserId}, leaving the persistence context empty.
+   * Verifies that a user holding an org-unit membership is deletable: the membership rows, removed
+   * by {@code ON DELETE CASCADE}, must not be loaded into the persistence context before the flush.
    */
   @Test
   void deleteUser_withOrgUnitMembership_doesNotTripTransientPropertyValueOnFlush() {
@@ -320,15 +291,8 @@ class UserDeletionForeignKeyIntegrityTest {
   }
 
   /**
-   * The FK-less personal stores must be purged by the delete, not left behind. {@code
-   * personal_blueprint.owner_user_id}, {@code personal_inventory_item.owner_user_id} and {@code
-   * member_evaluation.user_id} held the user id as plain text with no foreign key to {@code
-   * app_user} until V235 added one with {@code ON DELETE CASCADE}; nothing cascaded and no
-   * retention job reached them — before REQ-DATA-008 required the explicit purge they survived the
-   * account indefinitely (production carried 16 orphaned blueprints and 12 orphaned evaluations
-   * from earlier deletions), stayed undiscoverable because every lookup is keyed by a subject no
-   * roster can still offer, and would have been silently re-adopted had the same Keycloak subject
-   * ever returned.
+   * Verifies that the delete purges the personal stores keyed by the user's subject ({@code
+   * personal_blueprint}, {@code personal_inventory_item}, {@code member_evaluation}, REQ-DATA-008).
    */
   @Test
   void deleteUser_purgesTheFkLessPersonalStoresKeyedByTheKeycloakSubject() {

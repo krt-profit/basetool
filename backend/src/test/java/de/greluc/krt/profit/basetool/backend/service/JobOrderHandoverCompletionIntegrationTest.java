@@ -49,9 +49,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Reproduction of the JobOrder #40 handover bug: MEMBER (Logistiker) hands over the remaining
- * amounts of TWO materials in a single handover request. The handover must complete the JobOrder
- * without an {@code ObjectOptimisticLockingFailureException}.
+ * Integration test: a Logistiker handing over the remaining amounts of two materials in one request
+ * completes the job order without an {@code ObjectOptimisticLockingFailureException}.
  */
 @SpringBootTest
 @ActiveProfiles("test")

@@ -50,28 +50,16 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Mixed-flow regression test covering the partial-handover path that must NOT be broken by the
- * optimistic-locking fix in {@link JobOrderHandoverService}.
- *
- * <p>Scenario (MEMBER + LOGISTIKER, two required materials):
+ * Integration test for partial handovers through {@link JobOrderHandoverService} by a Logistiker:
  *
  * <ol>
- *   <li>First handover: material A is delivered in full, material B only partially &rArr; JobOrder
- *       must remain OPEN/IN_PROGRESS, material A counter at 0, material B counter still &gt; 0,
- *       inventory rows reflect the deduction.
- *   <li>Second handover: the remaining amount of material B is delivered &rArr; JobOrder is
- *       COMPLETED, no {@code ObjectOptimisticLockingFailureException}.
+ *   <li>a first handover delivers material A in full and B partially, leaving the job order open;
+ *   <li>a second handover delivers the rest of B and completes the job order without an {@code
+ *       ObjectOptimisticLockingFailureException}.
  * </ol>
  *
- * <p>This guards three concerns at once:
- *
- * <ul>
- *   <li>partial deliveries still work (no regression of the bugfix),
- *   <li>the deferred {@code unlinkJobOrderMaterial} bulk update only runs for fully fulfilled
- *       materials, never for partially fulfilled ones,
- *   <li>a follow-up handover that finally completes the order still triggers the {@code
- *       completeJobOrderWithinTransaction} path correctly.
- * </ul>
+ * <p>Also pins that the {@code unlinkJobOrderMaterial} bulk update runs only for fully delivered
+ * materials.
  */
 @SpringBootTest
 @ActiveProfiles("test")

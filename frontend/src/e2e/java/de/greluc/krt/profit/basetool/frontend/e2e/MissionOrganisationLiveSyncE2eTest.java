@@ -35,19 +35,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Two-context live-sync coverage for the mission Verwaltung <em>Organisation</em> panel (#1120,
- * REQ-FE-015 / ADR-0094): a party-lead change one viewer makes on the Verwaltung tab must appear on
- * another viewer's (default-tab) overview without a manual reload — the {@code organisation}/{@code
- * overview} section keys crossing the mission relay.
+ * Verifies that a party-lead change on the mission Verwaltung Organisation panel reaches another
+ * viewer's overview without a reload (REQ-FE-015, ADR-0094).
  *
- * <p>Mission detail rides the shared {@code /ws/sync} socket via the {@code missionPresence}
- * adapter's {@code mission:{id}} subscription (the legacy per-mission socket was removed in #1236),
- * so the deterministic pre-mutation wait is the same acked-subscription check ({@code
- * window.krtLiveSync.subscribedTopics()} contains {@code mission:{id}}) the shipped {@link
- * MissionLiveSyncE2eTest} anchor uses. Two browser contexts authenticated as the same test user are
- * two distinct sockets — exactly what the relay fans out between. A distinctive party-lead name
- * resolves to no realm user, so the set stays on the guest path (no second member needed),
- * mirroring the anchor's guest-participant approach.
+ * <p>Waits for the {@code mission:{id}} subscription to be acked before mutating; two contexts of
+ * the same user are two sockets.
  */
 @Tag("e2e")
 class MissionOrganisationLiveSyncE2eTest {

@@ -40,11 +40,7 @@ public record OssLicense(@Nullable String spdxId, @NotNull String name, @Nullabl
 
   /**
    * The key the page groups components by: the SPDX identifier where there is one, the licence name
-   * otherwise.
-   *
-   * <p>Grouping by name alone would split one licence into several groups, because POMs spell the
-   * same licence a dozen ways ("Apache License, Version 2.0", "The Apache Software License, Version
-   * 2.0"); Licensee has already normalised those to one identifier, and that is the key used.
+   * otherwise, so differently spelled POM names of one licence share a group.
    *
    * @return the SPDX identifier, or the name when the licence has none
    */

@@ -44,15 +44,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST surface for membership management on a single Spezialkommando. Endpoints live under {@code
- * /api/v1/special-commands/{id}/members} so the URL itself documents the parent SK; the controller
- * code stays focused on member-list mutations and never has to reach into SK-lifecycle concerns.
+ * REST surface for membership management on a single Spezialkommando.
  *
- * <p>Authorisation: every member-list mutation goes through
- * {@code @specialCommandSecurityService.canManageMembers(#id, authentication)} which combines
- * "ADMIN" and "Lead of this SK" into a single boolean. The dedicated Lead-toggle endpoint is
- * additionally hard-gated to {@code hasRole('ADMIN')} so a Lead cannot promote themselves or
- * someone else to Lead (would otherwise be a privilege-escalation path).
+ * <p>Member-list mutations require {@code canManageMembers} (ADMIN or Lead of this SK); the Lead
+ * toggle requires ADMIN or the parent Bereichsleiter, so a Lead cannot appoint Leads.
  */
 @RestController
 @RequestMapping("/api/v1/special-commands/{id}/members")
@@ -181,10 +176,8 @@ public class SpecialCommandMembershipController {
   }
 
   /**
-   * Flips the {@code is_lead} flag on the membership row. Admin, or — from epic #800 (REQ-ROLE-004)
-   * — the Bereichsleiter of the SK's parent Bereich (delegated appointment). A Lead can never
-   * promote themselves or another member to Lead: the SK-Lead rung is appointed strictly from the
-   * tier above (the parent Bereich), never from within the SK.
+   * Toggles the {@code is_lead} flag on a membership row. Allowed for an admin or the
+   * Bereichsleiter of the SK's parent Bereich, never for an SK Lead (REQ-ROLE-004).
    *
    * @param id Spezialkommando id.
    * @param userId user whose membership to update.

@@ -25,18 +25,8 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Configuration properties under {@code app.problems.*}.
- *
- * <p>Centralizes the base URI used to build RFC&nbsp;7807 {@code type} values (e.g. {@code
- * https://profit-base.online/problems/not-found}). Keeping the prefix here lets us repoint
- * problem-type URIs per environment without hunting through {@code GlobalExceptionHandler} for
- * hardcoded strings.
- *
- * <p>Lives in the dependency-leaf {@code support} package (not {@code config}) so the {@code
- * exception} and {@code filter} layers can read it without an {@code exception}/{@code filter}
- * &rarr; {@code config} package cycle; it depends only on Jakarta-validation / Spring-Boot and is
- * registered via {@code @ConfigurationPropertiesScan} regardless of package. An immutable record
- * (BE-MOD-04).
+ * Configuration properties under {@code app.problems.*}: the base URI for RFC&nbsp;7807 {@code
+ * type} values (e.g. {@code https://profit-base.online/problems/not-found}).
  *
  * @param baseUri the base URI for Problem Detail types
  */

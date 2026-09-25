@@ -44,18 +44,9 @@ import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 
 /**
- * Mockito tests for {@link AdminDeletionRequestsPageController} (REQ-SEC-061, ADR-0181).
- *
- * <p>Two of these are the reason the class has tests at all.
- *
- * <p><b>A refusal without a reason is refused.</b> Art. 12(4) obliges the controller to tell the
- * requester <em>why</em>, so the note is mandatory in three layers — here, in the backend, and as a
- * CHECK constraint in the database. This class pins the outermost one, including the shapes a
- * hand-written client actually produces: the key missing, the value blank, the value not a string.
- *
- * <p><b>Refusing and carrying out are separate endpoints.</b> They are not one endpoint with a
- * decision parameter, because a parameter is a thing a mistake can flip and one of the two outcomes
- * is irreversible. The tests assert each path relays to its own backend URI.
+ * Mockito tests for {@link AdminDeletionRequestsPageController} (REQ-SEC-061, ADR-0181): a refusal
+ * without a reason (missing, blank or non-string note) is rejected, and refusing and carrying out
+ * relay to their own backend URIs.
  */
 class AdminDeletionRequestsPageControllerTest {
 

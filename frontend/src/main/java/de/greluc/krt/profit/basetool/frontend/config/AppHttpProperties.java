@@ -28,38 +28,21 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Type-safe App Http configuration properties, bound through the canonical record constructor.
- * Component-level {@link DefaultValue} annotations preserve the previous field-initializer defaults
- * (connect 3s, the rest 5s) when the corresponding {@code app.http.*} key is absent.
+ * Type-safe {@code app.http.*} settings for the backend WebClient; absent keys fall back to the
+ * {@link DefaultValue}s (connect 3s, others 5s).
  *
  * @param connectTimeout WebClient connect timeout
  * @param responseTimeout overall WebClient response timeout
- * @param exportResponseTimeout the response timeout for a data-export download, which is the one
- *     backend call that is expected to take a long time: an Art. 15 export runs ~29 statements
- *     across the whole schema and then renders a PDF. On the shared 5 s bound a member with years
- *     of history got a read timeout and a 500. Applied per request rather than by raising the
- *     shared value, so an ordinary page render keeps failing fast.
+ * @param exportResponseTimeout response timeout applied per request to data-export downloads, which
+ *     take long
  * @param readTimeout WebClient socket read timeout
  * @param writeTimeout WebClient socket write timeout
- * @param backendProtocol the wire protocol the request/response WebClient negotiates with the
- *     backend (ADR-0161 §8.1). {@code H2} offers HTTP/2 by ALPN and falls back to HTTP/1.1 when the
- *     server does not take it; {@code HTTP11} is the pre-2026-09 behaviour, kept as the way back
- *     without a redeploy. The SSE relay ignores this and stays on HTTP/1.1 — see {@code
- *     WebClientConfig#connector(boolean)}.
- * @param maxConcurrentStreams how many HTTP/2 streams this client opens on one backend connection
- *     before it opens another. Only read when {@code backendProtocol} is {@code H2}.
- * @param codec what the request/response client puts in its {@code Accept} header for backend reads
- *     (ADR-0161 §8.5). {@code CBOR} asks for {@code application/cbor} and falls back to JSON for
- *     anything the backend answers with a preset content type — RFC 7807 problems above all.
- *     Request bodies are unaffected and stay JSON either way.
- * @param verifyBackendHostname whether the frontend→backend TLS hop verifies that the backend's
- *     certificate names the host it dialled ({@code backend}), on top of the pinned chain
- *     (REQ-SEC-070, ADR-0211). {@code false} — the default, and every deployment's behaviour before
- *     the per-service certificates — pins the chain only; {@code true} once each service serves its
- *     own leaf from the internal CA, which is the point: with one CA trusted, only the name tells
- *     the backend's certificate from any other service's. Bound from {@code
- *     INTERNAL_TLS_VERIFY_HOSTNAME}. Ignored under {@code dev}/{@code test}, which trust the
- *     ephemeral certificate wholesale.
+ * @param backendProtocol wire protocol negotiated with the backend (ADR-0161); the SSE relay always
+ *     uses HTTP/1.1
+ * @param maxConcurrentStreams HTTP/2 streams per backend connection; read only for {@code H2}
+ * @param codec the {@code Accept} preference for backend reads; request bodies stay JSON
+ * @param verifyBackendHostname whether the backend TLS hop also verifies the certificate's host
+ *     name on top of the pinned chain (REQ-SEC-070); ignored under {@code dev} and {@code test}
  */
 @Validated
 @ConfigurationProperties(prefix = "app.http")
@@ -75,16 +58,12 @@ public record AppHttpProperties(
     @DefaultValue("false") boolean verifyBackendHostname) {
 
   /**
-   * The wire protocol offered on the frontend→backend hop.
-   *
-   * <p>An enum rather than a boolean because the fallback is not "off": {@code H2} configures
-   * Reactor Netty with {@code H2, HTTP11} and lets ALPN choose, and a plain-{@code http://} backend
-   * URL (the {@code test} profile) drops H2 from the list on its own rather than failing — Reactor
-   * Netty only rejects the combination when H2 is the <em>sole</em> protocol.
+   * The wire protocol offered on the frontend-to-backend hop. {@code H2} also offers HTTP/1.1, so a
+   * plain {@code http://} backend URL still works.
    */
   public enum BackendProtocol {
 
-    /** Offer HTTP/2 by ALPN, fall back to HTTP/1.1. The default since 2026-09-10. */
+    /** Offers HTTP/2 via ALPN with HTTP/1.1 as fallback; the default. */
     H2,
 
     /** Speak HTTP/1.1 only, as this client did before ADR-0161 §8.1. */
@@ -101,13 +80,8 @@ public record AppHttpProperties(
   public enum BackendCodec {
 
     /**
-     * Ask for {@code application/cbor} first, {@code application/json} second. The default since
-     * 2026-09-10.
-     *
-     * <p>The fallback is not decoration: a response whose content type the backend sets itself —
-     * {@code application/problem+json}, a PDF, a CSV export — never reaches content negotiation at
-     * all, and the JSON half is what decodes the problem bodies that carry the stable error {@code
-     * code} the frontend routes on.
+     * Requests {@code application/cbor} first and {@code application/json} second; the default. The
+     * JSON fallback decodes responses with a preset content type, such as RFC 7807 problems.
      */
     CBOR,
 

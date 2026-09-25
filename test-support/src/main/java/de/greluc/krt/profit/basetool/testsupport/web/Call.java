@@ -23,24 +23,16 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.http.HttpMethod;
 
 /**
- * One (verb, path) pair to issue, expanded from a {@code RequestMappingInfo} by {@link
- * EndpointEnumeration#mappings}.
- *
- * <p>The path is concrete: every {@code {variable}} has already been substituted, so the value can
- * be handed to {@code MockMvc} as-is. A pattern that has no single concrete spelling never becomes
- * a {@code Call} at all.
+ * One concrete (verb, path) pair to issue, expanded by {@link EndpointEnumeration#mappings}.
  *
  * @param method the HTTP verb
- * @param path the concrete path, with every variable substituted
+ * @param path the concrete path, every variable substituted
  */
 public record Call(@NotNull HttpMethod method, @NotNull String path) {
 
   /**
-   * Renders the call the way an assertion message should read: {@code GET /api/v1/missions}.
-   *
-   * <p>This is also the sort key {@link EndpointEnumeration#mappings} orders by, so a sweep's
-   * failure list comes out in the same order on every run and two runs can be diffed against each
-   * other.
+   * Renders the call as {@code GET /api/v1/missions}; also the stable sort key of {@link
+   * EndpointEnumeration#mappings}.
    *
    * @return the verb and path, separated by a single space
    */

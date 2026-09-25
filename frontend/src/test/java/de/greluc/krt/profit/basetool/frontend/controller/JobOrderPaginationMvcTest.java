@@ -48,15 +48,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC-level render test for the order-list pagination on {@link JobOrderPageController} — pins
- * REQ-ORDERS-020: {@code GET /orders} renders the shared page-nav and the order-specific 50/100/200
- * size picker from the {@code PageResponse} envelope, and every generated link keeps the active
- * status + scope filter. The order page deliberately deviates from the shared 10/50/100 contract
- * (REQ-INV-013) so the drag-reorder queue fits on one page in the common case.
- *
- * <p>The mocked backend returns an empty content page with inflated totals: pagination chrome is
- * driven by the page envelope, not the row content, so an empty list keeps the test focused on the
- * navigation surface.
+ * Render tests for the order-list pagination on {@link JobOrderPageController} (REQ-ORDERS-020):
+ * the page nav and the 50/100/200 size picker render, and every link keeps the status and scope
+ * filters.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -80,8 +74,7 @@ class JobOrderPaginationMvcTest {
   }
 
   /**
-   * Builds a deterministic page envelope as the mocked backend answer. The content is intentionally
-   * empty — only the page coordinates matter for the pagination chrome.
+   * Builds a page envelope with empty content for the mocked backend.
    *
    * @param pageIndex zero-based page index to report
    * @param pageSize page size to report

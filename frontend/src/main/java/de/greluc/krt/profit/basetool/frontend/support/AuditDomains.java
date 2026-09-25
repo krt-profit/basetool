@@ -22,17 +22,11 @@ package de.greluc.krt.profit.basetool.frontend.support;
 import java.util.List;
 
 /**
- * The audit-log tabs, in display order — the frontend's single copy of the backend's {@code
- * AuditDomain} enum plus the {@code BANK} trail that predates it (REQ-AUDIT-001, ADR-0037).
+ * The audit-log tabs in display order: the frontend copy of the backend's {@code AuditDomain}
+ * values plus the {@code BANK} trail (REQ-AUDIT-001).
  *
- * <p>It lives here rather than in a controller because two of them need it and they had already
- * drifted: the page rendered a {@code MARKET} tab that the export/purge proxy's own copy of the
- * list rejected, so that tab's PDF, JSON and retention-purge buttons answered {@code 400} while
- * every other tab worked. Sharing the list is what stops the next tab from repeating it.
- *
- * <p>The frontend holds no backend beans, so this cannot be derived from the enum. Adding a value
- * to {@code AuditDomain} means adding it here, to the event-type map the filter dropdown renders,
- * and to the {@code admin.audit.domain.*} message keys.
+ * <p>A new {@code AuditDomain} value must also be added here, to the event-type filter map and to
+ * the {@code admin.audit.domain.*} message keys.
  */
 public final class AuditDomains {
 

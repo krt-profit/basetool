@@ -45,12 +45,9 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
- * Mockito unit tests for {@link OrgUnitCascadeService} — the single, shared definition of the
- * org-hierarchy scope cascade (epic #692, REQ-ORG-015). Verifies the exact reach a leadership
- * membership confers downward, the strict-silo isolation between Bereiche, the OL "everything"
- * branch, that an SK-Lead does <em>not</em> cascade (REQ-ORG-017), the per-request memoisation of
- * the hierarchy reads, and — most importantly for the zero-regression mandate — that a caller with
- * no leadership flag is expanded to exactly their direct memberships with no hierarchy read at all.
+ * Unit tests for {@link OrgUnitCascadeService} (REQ-ORG-015): the reach of each leadership kind,
+ * isolation between Bereiche, no cascade for an SK-Lead, per-request memoisation, and no hierarchy
+ * read for a caller without leadership.
  */
 @ExtendWith(MockitoExtension.class)
 class OrgUnitCascadeServiceTest {

@@ -35,12 +35,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Cached CRUD service for the {@code refining_method} reference table.
- *
- * <p>Underlying data is owned by {@link UexRefinerySyncService}; this service adds the
- * cache-evicting CRUD surface used by admins to manually correct names / descriptions when UEX data
- * is wrong. The cache eviction is {@code allEntries=true} because the frontend's refining-method
- * dropdown lists everything in one call.
+ * Cached CRUD service for the {@code refining_method} reference table, whose data is owned by
+ * {@link UexRefinerySyncService}. Writes evict the whole cache.
  */
 @Service
 @RequiredArgsConstructor
@@ -93,9 +89,8 @@ public class RefiningMethodService {
   }
 
   /**
-   * Updates name and description of an existing refining method. UEX-imported numeric ratings
-   * (yield/cost/speed) are NOT mutable here — those come from {@link UexRefinerySyncService} and a
-   * manual override would be silently overwritten on the next sync.
+   * Updates the name and description of a refining method. The UEX-imported ratings
+   * (yield/cost/speed) are not changed here, since {@link UexRefinerySyncService} owns them.
    *
    * @param id refining method primary key
    * @param refiningMethodDetails transient entity carrying the new values

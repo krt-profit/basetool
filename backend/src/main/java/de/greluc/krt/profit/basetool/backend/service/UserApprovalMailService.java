@@ -32,12 +32,10 @@ import org.springframework.util.StringUtils;
 /**
  * Composes and sends the account approval/rejection decision e-mail (REQ-NOTIF-014).
  *
- * <p>Turns a {@link UserApprovalDecidedEvent} into a localized plain-text {@link MailMessage} and
- * hands it to the channel-agnostic {@link MailService}. Localization uses the backend {@link
- * MessageSource} and {@link MailProperties#resolveDefaultLocale() default locale} (no per-recipient
- * locale is stored yet). For a rejection the admin's free-text reason is written into the body;
- * when none was given a localized placeholder is used instead. A recipient with no e-mail on file
- * is skipped. Nothing here logs the address, name or reason (all PII).
+ * <p>Turns a {@link UserApprovalDecidedEvent} into a plain-text {@link MailMessage} in the {@link
+ * MailProperties#resolveDefaultLocale() default locale} and hands it to {@link MailService}. A
+ * rejection's reason goes into the body, or a placeholder when none was given; a recipient without
+ * an e-mail address is skipped. Address, name and reason are never logged.
  */
 @Service
 @RequiredArgsConstructor

@@ -42,17 +42,9 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Authorization helper for mission-scoped {@code @PreAuthorize} expressions.
  *
- * <p>Methods on this bean are referenced from {@code @PreAuthorize} on controllers and other
- * services (e.g. {@code @missionSecurityService.canEditFinanceEntry(#id, authentication)}). Each
- * method translates a "can the caller do X on resource Y" question into a boolean by combining the
- * caller's authorities with the resource's owner/manager relations. An <em>external</em>
- * participant (unlinked, no user account) is editable by a mission manager / officer / admin in
- * scope and by nobody else; a participant linked to a user is editable only by that user or an
- * elevated role.
- *
- * <p>Missing resources translate to {@code NotFoundException} rather than {@code false} so a stale
- * frontend gets a deterministic 404 instead of an opaque "access denied" for an entity that no
- * longer exists.
+ * <p>An external participant is editable only by an in-scope mission manager, officer or admin; a
+ * linked participant by its user or an elevated role. Missing resources raise {@code
+ * NotFoundException} instead of returning {@code false}.
  */
 @Service
 @RequiredArgsConstructor
@@ -68,19 +60,11 @@ public class MissionSecurityService {
   private final OwnerScopeService ownerScopeService;
 
   /**
-   * Authorizes access to a single participant of a mission.
+   * Authorizes access to a single participant: elevated callers always, otherwise only the
+   * participant's own linked user. An external participant is accessible to elevated callers only.
    *
-   * <p>Access is granted when the caller has elevated privileges (MISSION_MANAGER / OFFICER / ADMIN
-   * / mission owner or manager) OR when the participant belongs to the currently authenticated user
-   * (Self-Edit: {@code participant.user.id == jwt.sub}). An <em>external</em> (unlinked)
-   * participant is editable by an elevated caller only — the row carries no creator to bind a
-   * self-edit to (ADR-0159, decision D4).
-   *
-   * <p>If the participant does not exist (e.g. the frontend holds a stale row whose entry was
-   * concurrently deleted in another tab), this method translates the missing row into a {@code 404
-   * Not Found} via {@link de.greluc.krt.profit.basetool.backend.exception.NotFoundException}
-   * instead of letting a plain {@link RuntimeException} bubble up as a generic {@code 500 Internal
-   * Server Error} (see RFC7807 Problem Details).
+   * <p>A missing participant raises {@link
+   * de.greluc.krt.profit.basetool.backend.exception.NotFoundException}.
    */
   public boolean canAccessParticipant(
       UUID missionId, UUID participantId, Authentication authentication) {
@@ -114,26 +98,8 @@ public class MissionSecurityService {
   }
 
   /**
-   * Authorizes <b>creating</b> a mission finance entry, as the write-level twin of {@link
-   * #canEditFinanceEntry}.
-   *
-   * <p>True for a caller who may manage the mission ({@link #canManageMission} — ADMIN
-   * unconditionally, an OFFICER / MISSION_MANAGER whose owning-OrgUnit scope covers it, the owner
-   * or a co-manager), and otherwise only for a member booking against <b>their own</b> participant
-   * row on that mission. The self-booking branch resolves the caller's participant row by {@code
-   * (missionId, userId)} and compares it to the requested id, so it enforces all three conditions
-   * at once: the row exists, it belongs to this mission, and it is the caller's.
-   *
-   * <p><b>REQ-SEC-042 — why this replaced the read-level gate.</b> The create used to be gated by
-   * {@code ownerScopeService.canSeeMission(...)}, which deliberately grants the cross-squadron
-   * <em>public escape</em> on a non-internal mission — appropriate for a read, wrong for a write.
-   * Combined with a service that only checked that the participant belonged to the mission, any
-   * member could book income/expense rows into another squadron's payout ledger and attribute them
-   * to a member of that squadron, while the edit/delete of the very same row stayed restricted to
-   * its owner / an officer in scope. A create strictly weaker than the edit of what it creates is
-   * the broken-object-level-authorization asymmetry this closes; booking money is a management act
-   * on the mission, so it is gated like one (MULTI_SQUADRON_PLAN.md section 1: editing is the
-   * owning OrgUnit's prerogative).
+   * Authorizes creating a mission finance entry: a caller who may manage the mission, or a member
+   * booking against their own participant row on it (REQ-SEC-042).
    *
    * @param missionId the mission the entry is booked against
    * @param participantId the participant the entry is attributed to
@@ -165,14 +131,9 @@ public class MissionSecurityService {
   }
 
   /**
-   * Authorizes editing or deleting a mission finance entry.
-   *
-   * <p>Grants access to ADMIN unconditionally and to an OFFICER only when the entry's mission is
-   * within the officer's owning-OrgUnit scope ({@link OwnerScopeService#canEditMission(UUID)} —
-   * security audit H1, mirroring {@link #canManageMission}/{@link #canChangeOwner}); otherwise the
-   * entry's linked participant must belong to the calling user AND the user must currently be a
-   * registered participant of the same mission. The "still a participant" check prevents a former
-   * participant from editing their finance entries after they've been removed from the mission.
+   * Authorizes editing or deleting a mission finance entry: ADMIN always, an OFFICER within the
+   * mission's org-unit scope, otherwise the entry's own user while still a participant of the
+   * mission.
    *
    * @param entryId finance entry id
    * @param authentication current Spring Security authentication
@@ -217,10 +178,8 @@ public class MissionSecurityService {
   }
 
   /**
-   * Authorizes any management action on a mission (edit, add/remove participant, …). True when the
-   * caller carries one of the elevated authorities (via the role hierarchy: ADMIN, OFFICER,
-   * MISSION_MANAGER, plus the legacy non-{@code ROLE_}-prefixed equivalents) or is the mission's
-   * owner / a listed co-manager.
+   * Authorizes management actions on a mission: elevated authorities (ADMIN, OFFICER,
+   * MISSION_MANAGER) or the mission's owner or a co-manager.
    *
    * @param missionId mission id
    * @param authentication current Spring Security authentication
@@ -262,10 +221,8 @@ public class MissionSecurityService {
   }
 
   /**
-   * Authorizes adding/removing co-managers on a mission. Same elevated-authority surface as {@link
-   * #canManageMission} plus the mission owner / current co-managers. Verbose debug-level trace
-   * lines exist because this is the most common "why was I denied" report — enable {@code DEBUG} on
-   * this class to see exactly which authority check passed or failed for a given user.
+   * Authorizes adding or removing co-managers on a mission; same rule as {@link #canManageMission}.
+   * Logs each check at debug level.
    *
    * @param missionId mission id
    * @param authentication current Spring Security authentication
@@ -330,12 +287,8 @@ public class MissionSecurityService {
   }
 
   /**
-   * Authorizes changing the owner of a mission. Tighter than {@link #canManageManagers(UUID,
-   * Authentication)}: only the current owner of the mission or holders of the global {@code
-   * ROLE_ADMIN} / {@code ROLE_OFFICER} authorities may transfer ownership. Regular co-managers and
-   * holders of the mission-scoped role {@code ROLE_MISSION_MANAGER} are NOT permitted to change the
-   * owner, since they would otherwise be able to displace the original owner and grant themselves
-   * ownership of any mission they have manager rights on.
+   * Authorizes changing a mission's owner: only the current owner, {@code ROLE_ADMIN} or {@code
+   * ROLE_OFFICER}; co-managers and {@code ROLE_MISSION_MANAGER} may not.
    */
   public boolean canChangeOwner(UUID missionId, Authentication authentication) {
     if (authentication == null || !authentication.isAuthenticated()) {
@@ -370,16 +323,8 @@ public class MissionSecurityService {
   }
 
   /**
-   * {@link #canManageMission(UUID, Authentication)} for a mission the caller <em>already
-   * holds</em>, with no second load of the aggregate.
-   *
-   * <p>The id-taking variant re-reads the mission through {@code findByIdForAuthorization}. Calling
-   * it from a controller, ahead of the writing service's own {@code findById}, put a second copy of
-   * the aggregate into the open-session persistence context and the subsequent write then compared
-   * against a stale participant version - a spurious {@code 409} on an edit nobody else had
-   * touched. That is the #1139 hazard the scope loads were reshaped to avoid, and it is why the
-   * payload-level "may this caller manage the mission" question is answered inside the service,
-   * from the entity it has just loaded, rather than at the HTTP boundary.
+   * {@link #canManageMission(UUID, Authentication)} for an already-loaded mission, without
+   * reloading the aggregate into the persistence context.
    *
    * @param mission the already-loaded mission.
    * @param authentication current Spring Security authentication.
@@ -409,9 +354,7 @@ public class MissionSecurityService {
   }
 
   /**
-   * Returns true if the calling user is the mission's owner or appears in its manager list. Public
-   * helper because both {@code canManage*} methods need the same check and a private variant would
-   * be untestable in isolation.
+   * Returns whether the calling user is the mission's owner or a co-manager.
    *
    * @param mission already-loaded mission
    * @param authentication current Spring Security authentication

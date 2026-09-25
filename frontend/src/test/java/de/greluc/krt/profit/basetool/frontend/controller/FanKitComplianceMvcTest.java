@@ -42,18 +42,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Pins the Star Citizen Fan Kit compliance band (REQ-UI-018) to the home page.
- *
- * <p>Section 2b of the Fan Kit Guidelines allows the required CIG trademark notice to sit "on the
- * home page, on a navigation area that is always visible regardless of scrolling, or both". The
- * band used to live in the always-visible fixed footer; it was moved to the end of the home page's
- * {@code <main>} so the footer stops spending a full row on it. That makes {@code GET /} the single
- * surface still carrying the notice — if this test fails, the app is out of compliance, not merely
- * out of layout.
- *
- * <p>Section 2 additionally couples the two elements: whoever renders the "Made By The Community"
- * logo must render the trademark notice as well. Both assertions therefore live in one test rather
- * than in two that could be disabled independently.
+ * Pins the Star Citizen Fan Kit compliance band (REQ-UI-018) to the home page: the "Made By The
+ * Community" logo and the CIG trademark notice render together on {@code GET /}.
  */
 @SpringBootTest
 class FanKitComplianceMvcTest {
@@ -68,23 +58,8 @@ class FanKitComplianceMvcTest {
           + " are registered trademarks of Cloud Imperium Rights LLC";
 
   /**
-   * The Fankit Agreement clause 2(g) notice, verbatim from {@code
-   * 06_Fankit_Agreement_2025_11_19.pdf} and byte-identical across the three archived kit versions
-   * (2024-04-25, 2025-06-03, 2025-11-19).
-   *
-   * <p>Three details in it read as typing mistakes and are none of them:
-   *
-   * <ul>
-   *   <li>{@code Ltd..} carries <strong>two</strong> full stops.
-   *   <li>There is <strong>no</strong> space before any of its four ® signs. {@link
-   *       #REQUIRED_TRADEMARK_NOTICE} has one before its third, because CIG's §2b prose writes it
-   *       that way. The two notices differ in exactly this detail and both are correct.
-   *   <li>The Oxford comma before "and Cloud Imperium®".
-   * </ul>
-   *
-   * <p>This is the Agreement's requirement, not the Guidelines' — the two documents bind the
-   * project cumulatively, and §2b alone never asked for the non-affiliation sentence, the copyright
-   * line, "Squadron 42®" or the closing "All rights reserved."
+   * The Fankit Agreement clause 2(g) notice, verbatim, including its double full stop after {@code
+   * Ltd}, no space before any ® sign and the Oxford comma.
    */
   private static final String REQUIRED_AGREEMENT_NOTICE =
       "This site is not endorsed by or affiliated with the Cloud Imperium or Roberts Space"
@@ -129,11 +104,7 @@ class FanKitComplianceMvcTest {
         .andExpect(content().string(containsString(REQUIRED_AGREEMENT_NOTICE)));
   }
 
-  /**
-   * The notice is a prescribed legal wording, not UI copy: it must stay verbatim English in every
-   * locale bundle. A well-meaning German translation of "are registered trademarks of" would break
-   * section 2b while leaving every key-parity check green, so the value itself is asserted here.
-   */
+  /** The trademark notice stays verbatim English in every locale bundle. */
   @Test
   void trademarkNotice_ShouldStayVerbatimEnglish_InEveryLocale() {
     assertThat(messageSource.getMessage("fankit.trademark", null, Locale.GERMAN))
@@ -145,15 +116,7 @@ class FanKitComplianceMvcTest {
   }
 
   /**
-   * The legal pages carry the band too.
-   *
-   * <p>Clause 2(g) asks for its notice "wherever materials, trademarks, or properties owned by CIG
-   * are located", and these two pages are what the Android app's Datenschutz and Impressum rows
-   * open — that app has no in-app legal screen, so a member reaching them from the phone lands
-   * here. Both are permitAll, so an anonymous request is the honest check.
-   *
-   * <p>This is an <em>addition</em>: the sanctioned §2b placement remains the home page, which the
-   * test above pins independently.
+   * The legal pages carry the Fan Kit band too, checked anonymously.
    *
    * @param path the legal page to check.
    * @throws Exception when the request fails.

@@ -39,15 +39,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
  * Pins the {@code ForwardedHeaderFilter} behaviour that {@link ClientIpContextFilter} and {@code
- * ForwardedHeaderConfig} exist to work around (REQ-SEC-011).
- *
- * <p>This is a test of the framework, not of our code, and that is the point. The decision to set
- * {@code server.forward-headers-strategy: none} and re-register the filter one slot later is
- * expensive to justify from prose alone, and a future reader is likely to try reverting it. What
- * makes the detour necessary is exactly what is asserted here: after that filter runs, a downstream
- * filter sees a peer address the client chose and no chain to re-derive it from. If a Spring
- * upgrade ever changes this, that reader deserves a failing test rather than a silent regression in
- * rate-limit attribution.
+ * ForwardedHeaderConfig} work around: downstream of it, the peer address is client-chosen and the
+ * original chain is gone (REQ-SEC-011).
  */
 class ForwardedHeaderRewriteTest {
 

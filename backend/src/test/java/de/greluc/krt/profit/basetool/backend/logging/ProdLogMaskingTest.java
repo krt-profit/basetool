@@ -36,14 +36,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Sends one event carrying a bearer token and an e-mail address through the backend's <em>real</em>
- * {@code logback-spring.xml} with the {@code prod} profile active, and reads what the JSON sink and
- * the plain-text file sink actually wrote.
- *
- * <p>The masker itself is unit-tested in {@code logging-support}. What only this test can show is
- * the wiring: that the prod JSON appender still names the shared {@link PiiMaskingLogstashEncoder}
- * after the class moved out of this module (ADR-0205), that the text layout is the masking one, and
- * that nothing between the logger and the file bypasses either.
+ * Sends an event carrying a bearer token and an e-mail address through the real prod {@code
+ * logback-spring.xml} and asserts that both the JSON and the text sink mask them (ADR-0205).
  */
 class ProdLogMaskingTest {
 

@@ -38,21 +38,12 @@ import lombok.Setter;
 import lombok.ToString;
 
 /**
- * One blueprint product that is unlocked by default on every Star Citizen account (REQ-INV-016) and
- * is therefore granted to every basetool user automatically.
+ * A blueprint product unlocked by default on every Star Citizen account and therefore granted to
+ * every user as a {@link PersonalBlueprint} (REQ-INV-016).
  *
- * <p>Default blueprints can no longer be earned in-game and never appear in an SCMDB / Basetool
- * Blueprint Extractor import, so the basetool itself materialises them as {@link PersonalBlueprint}
- * rows for every user. This table is the admin-curated source of truth for the default set
- * (REQ-INV-017): administrators add/remove entries through the admin surface, and the per-user
- * grant reads it.
- *
- * <p>Identity is the normalized {@link #productKey} (the same key {@link PersonalBlueprint} uses,
- * so a granted default lines up with the catalog, product search and coverage views). The unique
- * constraint on {@code product_key} makes adding a default idempotent and lets the per-user grant
- * rely on {@code ON CONFLICT}. {@link #outputItem} optionally links the resolved produced item; it
- * is informational, never the identity. Optimistic locking is inherited via {@link
- * AbstractEntity#getVersion()}.
+ * <p>The admin-curated source of the default set (REQ-INV-017). Identity is the unique normalized
+ * {@link #productKey}, which makes adding a default idempotent; {@link #outputItem} is
+ * informational only.
  */
 @Entity
 @Table(

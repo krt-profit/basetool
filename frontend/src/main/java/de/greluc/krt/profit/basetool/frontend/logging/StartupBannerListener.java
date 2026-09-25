@@ -33,18 +33,11 @@ import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
 /**
- * Logs a concise startup banner as soon as the frontend's context is fully ready — the last of the
- * three modules to get one, so all of them now announce their effective runtime configuration the
- * same way.
+ * Logs a startup banner with the frontend's effective runtime configuration once the context is
+ * ready.
  *
- * <p>The frontend is the module where a misconfiguration is hardest to see from the outside: a
- * wrong {@code BACKEND_URL} or a wrong Keycloak issuer does not fail the boot, it surfaces much
- * later as a login loop or a page of 502s. Printing the resolved values once at startup turns that
- * into a ten-second check.
- *
- * <p>No secret is ever printed: the OAuth2 client secret, the Redis password and the keystore
- * password are deliberately absent, and the Redis endpoint is rendered host:port only with any
- * embedded credentials stripped by {@link #sanitiseRedisEndpoint(String, String)} (REQ-OBS-004).
+ * <p>Never prints a secret; the Redis endpoint is sanitised by {@link
+ * #sanitiseRedisEndpoint(String, String)} (REQ-OBS-004).
  */
 @Slf4j
 @Component

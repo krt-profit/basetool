@@ -23,18 +23,15 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Boundary DTO for one of the caller's owned blueprints (#327). The internal {@code ownerUserId} is
- * intentionally never exposed.
+ * One of the caller's owned blueprints; the owner id is never exposed.
  *
  * @param id entry primary key
  * @param productKey normalized product identity
  * @param productName display name of the owned product
- * @param outputItemId resolved output {@code game_item} id, or {@code null} if unresolved
+ * @param outputItemId resolved output {@code game_item} id, or {@code null}
  * @param acquiredAt optional in-game acquisition time
  * @param note optional free-form note
- * @param removable whether the owner may delete this entry; {@code false} for an auto-granted
- *     default blueprint (REQ-INV-016), which the UI uses to hide the delete control and which the
- *     delete endpoint enforces server-side
+ * @param removable {@code false} for an auto-granted default blueprint (REQ-INV-016)
  * @param version optimistic-lock version
  * @param createdAt row creation timestamp
  * @param updatedAt row last-update timestamp

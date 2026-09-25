@@ -44,17 +44,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC-Tests fuer den unlinkInventoryItem-POST-Pfad in {@link
- * JobOrderWriteController#unlinkInventoryItem}.
- *
- * <p>Testet, dass Logistiker/Officer/Admin einen einzelnen Lagereintrag aus einem Auftrag entlinken
- * koennen:
- *
- * <ul>
- *   <li>Logistiker kann Lagereintrag entlinken (success-Toast + Redirect).
- *   <li>Einfacher Member ohne Logistiker-Rechte erhaelt 403 Forbidden.
- *   <li>Backend-Fehler bei Logistiker → error-Toast + Redirect.
- * </ul>
+ * MVC tests for {@link JobOrderWriteController#unlinkInventoryItem}: a logistician unlinks with a
+ * success toast, a plain member gets 403, and a backend error yields an error toast.
  */
 @SpringBootTest
 class JobOrderPageControllerUnlinkInventoryItemMvcTest {

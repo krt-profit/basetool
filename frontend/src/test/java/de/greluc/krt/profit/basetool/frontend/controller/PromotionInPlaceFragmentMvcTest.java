@@ -53,14 +53,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC-level rendering checks for the in-place AJAX fragments the promotion admin/manage pages swap
- * after a write instead of reloading (epic #571 / #580, spec REQ-FE-005).
- *
- * <p>Each {@code ?fragment=...} request must render <em>only</em> the section that changes — the
- * list of cards / the matrix body / a single eligibility cell — and must <em>not</em> carry the
- * surrounding page chrome (toolbars, modals, the second {@code &lt;table&gt;} header). Injecting a
- * whole page into the small results container would duplicate ids and double-render the toolbar, so
- * these boundary assertions are the regression guard for the fragment cut points.
+ * Verifies that each {@code ?fragment=...} request on the promotion admin and manage pages renders
+ * only the changing section, without surrounding page chrome (REQ-FE-005).
  */
 @SpringBootTest
 class PromotionInPlaceFragmentMvcTest {

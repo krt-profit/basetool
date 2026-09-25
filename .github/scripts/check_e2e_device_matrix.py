@@ -1,22 +1,10 @@
 #!/usr/bin/env python3
 """Keep the E2E device matrix and the sweep's own device classes in agreement.
 
-``TouchClassLayoutE2eTest`` declares the five device classes REQ-UI-009 is measured at, and
-``.github/workflows/e2e.yml`` fans them across runners as ``browser x device``. The two lists are
-verbatim copies of each other with nothing comparing them, and the drift is **one-directional**:
+Compares ``DEVICE_CLASSES`` in ``TouchClassLayoutE2eTest`` (REQ-UI-009) with the ``device``
+matrix axis of ``.github/workflows/e2e.yml``; a class missing from the workflow is never measured.
 
-* a device in the workflow that the test does not know fails loudly — the sweep reports
-  ``e2e.device=... matched none of N classes`` and the job goes red;
-* a device class added to the test and not to the workflow is **silent**. No job passes
-  ``-Pe2e.device`` for it, so it is simply never measured, while the test's own coverage assertion
-  is satisfied by the one class its runner did get.
-
-That second case is what this check exists for. It is the same failure shape as the seventeen
-routes missing from ``PAGES`` while its Javadoc claimed completeness: a list that reads as
-authoritative and is short.
-
-Run it by hand with ``python3 .github/scripts/check_e2e_device_matrix.py``, and its self-test with
-``--selftest``.
+Usage: ``check_e2e_device_matrix.py [--selftest]``. Exit 1 on disagreement.
 """
 
 from __future__ import annotations
@@ -43,14 +31,12 @@ SWEEP = (
     / "TouchClassLayoutE2eTest.java"
 )
 
-# `device: ['375x812', '810x1080', ...]` — the matrix axis, single-quoted WxH entries.
 MATRIX = re.compile(r"^\s*device:\s*\[(?P<items>[^\]]*)\]", re.MULTILINE)
-# `new int[] {375, 812},` — one DEVICE_CLASSES entry.
 CLASSES = re.compile(r"new int\[\]\s*\{\s*(?P<w>\d+)\s*,\s*(?P<h>\d+)\s*\}")
 
 
 def workflow_devices(text: str) -> list[str]:
-    """The matrix axis, in declaration order."""
+    """Return the workflow's ``device`` matrix axis, in declaration order."""
     match = MATRIX.search(text)
     if not match:
         raise SystemExit(
@@ -60,10 +46,7 @@ def workflow_devices(text: str) -> list[str]:
 
 
 def sweep_devices(text: str) -> list[str]:
-    """DEVICE_CLASSES, as WxH strings in declaration order.
-
-    Anchored to the declaration so an ``int[]`` elsewhere in the file cannot contribute.
-    """
+    """Return ``DEVICE_CLASSES`` as WxH strings in declaration order, read from that declaration only."""
     start = text.find("DEVICE_CLASSES =")
     if start == -1:
         raise SystemExit("FAIL: no DEVICE_CLASSES declaration in TouchClassLayoutE2eTest.java")
@@ -72,7 +55,7 @@ def sweep_devices(text: str) -> list[str]:
 
 
 def compare(in_workflow: list[str], in_sweep: list[str]) -> list[str]:
-    """Every problem found, as operator-readable lines. Empty means the two agree."""
+    """Return every disagreement as a readable line; empty means the two lists agree."""
     problems = []
     for device in in_sweep:
         if device not in in_workflow:
@@ -96,12 +79,12 @@ def compare(in_workflow: list[str], in_sweep: list[str]) -> list[str]:
 
 
 def selftest() -> int:
-    """Both drift directions, and the agreeing case."""
+    """Check both drift directions, the order mismatch and the agreeing case; return the exit code."""
     cases = [
         (["a", "b"], ["a", "b"], 0),
-        (["a"], ["a", "b"], 1),  # the silent direction
-        (["a", "b"], ["a"], 1),  # the loud one
-        (["b", "a"], ["a", "b"], 1),  # order
+        (["a"], ["a", "b"], 1),
+        (["a", "b"], ["a"], 1),
+        (["b", "a"], ["a", "b"], 1),
         (["a"], ["b"], 2),
     ]
     for in_workflow, in_sweep, expected in cases:
@@ -109,7 +92,6 @@ def selftest() -> int:
         if len(found) != expected:
             print(f"SELFTEST FAIL: {in_workflow} vs {in_sweep}: expected {expected}, got {found}")
             return 1
-    # And the real files must parse to something non-empty, or the regexes have rotted.
     if not workflow_devices(WORKFLOW.read_text(encoding="utf-8")):
         print("SELFTEST FAIL: the workflow matrix parsed to an empty list")
         return 1

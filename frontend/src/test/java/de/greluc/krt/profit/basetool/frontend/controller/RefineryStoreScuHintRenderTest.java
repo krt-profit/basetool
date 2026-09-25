@@ -59,16 +59,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC render test guarding the SCU input-hint gating in the refinery-order store dialog
- * (refinery-orders-details.html). The store dialog builds one row per refinery output good; the
- * decimal-scale hint ({@code fragments/scu-hint :: scuHint}) must render ONLY on SCU-measured rows,
- * never on PIECE rows.
- *
- * <p>Regression guard for the Thymeleaf attribute-precedence trap: {@code th:replace} (precedence
- * 1) is processed BEFORE {@code th:if} (precedence 3), so putting both on the same element made the
- * SCU-only guard dead and rendered the hint on every row — including PIECE rows. The fix gates an
- * outer {@code th:block} while {@code th:replace} sits alone on the inner one; this test fails on
- * the pre-fix markup (hint count 2) and passes after it (count 1).
+ * Render test that the store dialog shows the SCU input hint only on SCU rows, never on PIECE rows.
  */
 @SpringBootTest
 @ActiveProfiles("test")

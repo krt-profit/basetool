@@ -83,11 +83,8 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 
 /**
- * Unit tests for {@link BankBookingRequestService} — the F2 lifecycle engine (REQ-BANK-022/-023):
- * create (audit + notification event), cancel (ownership + pending guards), confirm (capability +
- * ledger reuse + state flip), reject and the close-account input. The ledger / overdraft mechanics
- * themselves are pinned by {@code BankLedgerServiceTest}; here the ledger is mocked and we assert
- * the request orchestration around it.
+ * Unit tests for {@link BankBookingRequestService} (REQ-BANK-022): create, cancel, confirm, reject
+ * and close-account orchestration, with the ledger mocked.
  */
 @ExtendWith(MockitoExtension.class)
 class BankBookingRequestServiceTest {
@@ -146,9 +143,9 @@ class BankBookingRequestServiceTest {
   }
 
   /**
-   * Builds an active {@code CARTEL} account — a {@linkplain
+   * Builds an active {@code CARTEL} account, a {@linkplain
    * BankAccountType#requiresDebitJustification() justification-mandating} type with no owning org
-   * unit — for the REQ-BANK-045 Begr&uuml;ndung tests.
+   * unit (REQ-BANK-045).
    *
    * @param id the account id
    * @return an active CARTEL account
@@ -650,11 +647,7 @@ class BankBookingRequestServiceTest {
     assertThat(request.getRequiredApprover()).isEqualTo(BankRequestApprover.RESPONSIBLE_HOLDER);
   }
 
-  /**
-   * REQ-BANK-056: once the responsible holder has granted the over-limit approval, the request is
-   * frozen. The approval was given for the amount and reason AS THEY STOOD, so allowing an edit
-   * would turn a small approved request into an arbitrarily large pre-approved one.
-   */
+  /** A request whose over-limit approval was already granted cannot be edited (REQ-BANK-056). */
   @Test
   void updateOwn_alreadyApproved_throwsConflict() {
     UUID requestId = UUID.randomUUID();
@@ -927,10 +920,8 @@ class BankBookingRequestServiceTest {
   }
 
   /**
-   * REQ-BANK-055: confirmation happens an arbitrary time after the request, and the ledger
-   * re-validates the org unit against the counterparty's CURRENT memberships. A unit that went
-   * stale in between must degrade to their primary unit rather than 400 and block the employee from
-   * confirming at all.
+   * On confirming a withdrawal, a counterparty org unit that is no longer current degrades to the
+   * counterparty's primary unit (REQ-BANK-055).
    */
   @Test
   void confirm_withdrawal_staleCounterpartyOrgUnitDegradesToThePrimary() {
@@ -964,9 +955,8 @@ class BankBookingRequestServiceTest {
   }
 
   /**
-   * A withdrawal request that named nobody keeps the historical behaviour exactly: the requester is
-   * derived as the Empfaenger (REQ-BANK-044). This is the no-regression control for every request
-   * raised before V232.
+   * A withdrawal request naming no counterparty derives the requester as the Empfaenger on
+   * confirmation (REQ-BANK-044).
    */
   @Test
   void confirm_withdrawal_withoutNamedCounterparty_stillDerivesTheRequester() {

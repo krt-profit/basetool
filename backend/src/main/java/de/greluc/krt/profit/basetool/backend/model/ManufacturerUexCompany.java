@@ -33,27 +33,12 @@ import lombok.Setter;
 import lombok.ToString;
 
 /**
- * Maps a single UEX {@code /companies} integer id to the local {@link Manufacturer} it belongs to.
+ * Maps one UEX {@code /companies} id to the local {@link Manufacturer} it belongs to.
  *
- * <p>UEX ships several <em>distinct</em> company records for the same real-world manufacturer — the
- * item-side record and the vehicle-side record carry different ids and frequently different names
- * (observed: id 87 {@code "Esperia"} carries the items, id 278 {@code "Esperia Incorporation"}
- * carries the ships; likewise {@code 70 "Denim Manufacture Corporation"} / {@code 287 "DMC"} and
- * {@code 62 "Covalex Shipping"} / {@code 293 "Covalex"}). Because the item sync resolves the
- * manufacturer by {@code id_company} and the vehicle sync by {@code id_company} too, but the two
- * surfaces reference <em>different</em> ids for the same brand, a single {@code manufacturer} row
- * keyed on one {@code uex_company_id} cannot serve both — it split the brand's ships from its items
- * across two rows.
- *
- * <p>This table is the fix: every UEX company id (canonical <em>and</em> duplicate) maps to the one
- * surviving {@code manufacturer} row, so both the item and vehicle syncs resolve every id-variant
- * of a brand to the same manufacturer. The canonical company (lowest {@code uex_company_id} of a
- * brand) still owns the row's display identity via {@link Manufacturer#getUexCompanyId()}; the
- * other ids live here as aliases. See {@code ADR-0023} / {@code REQ-DATA-004}.
- *
- * <p>Pure mapping entity: the natural {@link #uexCompanyId} is the primary key and there is no
- * optimistic-locking version — the sync is single-threaded per source (the {@code SyncCoordinator}
- * serialises UEX vs. SC Wiki), so concurrent writers never contend for an alias row.
+ * <p>UEX ships several distinct company records per brand (e.g. separate item and vehicle ids);
+ * every id, canonical and alias, maps to the single manufacturer row so both syncs resolve a brand
+ * consistently (ADR-0023). The UEX id is the primary key; there is no version column, as the syncs
+ * are serialised.
  */
 @Entity
 @Table(name = "manufacturer_uex_company")

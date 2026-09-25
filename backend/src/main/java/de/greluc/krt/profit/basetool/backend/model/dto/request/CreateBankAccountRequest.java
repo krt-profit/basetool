@@ -27,20 +27,16 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Write payload for creating a bank account (REQ-BANK-001/-002). Server-managed fields (id, account
- * number, status, version) are deliberately absent; the type-specific owner-reference rules are
- * validated in {@code BankAccountService} because they depend on {@link #type}. Since epic #692
- * (REQ-ORG-019) the {@code orgUnitId} FK carries the owner for {@code ORG_UNIT} (Staffel/SK),
- * {@code AREA} (its Bereich) and {@code CARTEL} (the Organisationsleitung, optional); {@code
- * areaName} is the legacy free-form AREA form, accepted only during the soak.
+ * Write payload for creating a bank account (REQ-BANK-001/-002). The type-specific owner rules are
+ * validated in {@code BankAccountService}.
  *
  * @param name display name of the new account
  * @param type the organizational layer; immutable after creation
  * @param orgUnitId owning org unit — required for {@code ORG_UNIT} (Staffel/SK) and {@code AREA}
  *     (Bereich), optional for {@code CARTEL} (the OL), forbidden for {@code CARTEL_BANK}/{@code
  *     SPECIAL}
- * @param areaName legacy free-form Bereich name for an {@code AREA} account created without the
- *     Bereich FK; forbidden for every other type and for FK-linked AREA accounts
+ * @param areaName free-form Bereich name for an {@code AREA} account without the Bereich FK;
+ *     forbidden for every other type and for FK-linked AREA accounts
  */
 public record CreateBankAccountRequest(
     @NotBlank @Size(max = 255) String name,

@@ -17,36 +17,9 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * UEX admin page module (/admin/uex), extracted verbatim from the former inline script of
- * admin/uex.html (ADR-0069, follow-up to #924).
- *
- * In-place (#582) override + visibility toggles: the three-state loading-dock / auto-load override
- * buttons and the terminal hidden toggle save via the krtFetch AJAX twins and patch their own state
- * (and the adjacent UEX-source-chip mismatch marker) client-side, so the page never reloads; the
- * classic POST->redirect forms stay the no-JS fallback. Also localises the last-sync timestamps and
- * drives the global system/location/terminal filter.
- *
- * The two Thymeleaf-interpolated toast strings (MSG_SAVED, MSG_ERROR) stay inline in the page
- * bootstrap this module reads.
- */
-
 /* global MSG_SAVED, MSG_ERROR */
 
-// In-place toggle messages (#582). The override / visibility forms now save via the AJAX
-// twins, so the scroll + disclosure snapshot the old POST->redirect needed is gone with it.
-
 document.addEventListener('DOMContentLoaded', function () {
-    // ---- In-place override + visibility toggles (#582) ---------------
-    // The three-state override buttons (loading-dock / auto-load) and the terminal hidden
-    // toggle save via the AJAX twins and patch their own state client-side, so the page never
-    // reloads. The new state is deterministic from the clicked action, so no backend body is
-    // needed.
-
-    // Patches a three-state override group: the button matching the clicked action becomes
-    // active, the other two secondary. For terminals the adjacent UEX source chip's "mismatch"
-    // marker is recomputed from the action and the rendered UEX value (data-uex-value): yes ->
-    // effective true, no -> false, uex -> the UEX value (so no mismatch).
     function patchOverrideGroup(form, action) {
         const group = form.parentElement;
         if (group) {
@@ -101,7 +74,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (!btn) {
                     return;
                 }
-                // btn-secondary is present only when the terminal is visible (hidden=false).
                 const currentlyHidden = !btn.classList.contains('btn-secondary');
                 const newHidden = !currentlyHidden;
                 btn.classList.toggle('btn-secondary', !newHidden);
@@ -115,8 +87,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Selecting by action keeps the markup edit-free. stopPropagation on the click keeps a
-    // button press inside a <summary> (city/station controls) from toggling the <details>.
     document
         .querySelectorAll('form[action*="/loading-dock"], form[action*="/auto-load"]')
         .forEach(function (form) {
@@ -148,7 +118,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    // ---- Last-sync timestamp localisation ---------------------------
     document.querySelectorAll('.local-datetime-display').forEach(function (el) {
         const utcMsStr = el.getAttribute('data-utc');
         if (!utcMsStr) return;
@@ -162,13 +131,6 @@ document.addEventListener('DOMContentLoaded', function () {
         el.textContent = day + '.' + month + '.' + year + ' ' + hours + ':' + minutes;
     });
 
-    // ---- Global filter ---------------------------------------------
-    // Matches against star-system names *and* any nested location/terminal
-    // name. A system is hidden only if it contains zero matching children;
-    // otherwise it is force-opened so the admin can immediately see what
-    // matched. Per-parent details retain their own open state — we only
-    // open them transiently to surface a match, and reset all overrides
-    // once the filter is cleared.
     const filterInput = document.getElementById('filterUex');
     const systems = document.querySelectorAll('details.uex-system');
     if (filterInput) {

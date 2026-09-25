@@ -32,17 +32,10 @@ import org.springframework.http.client.ClientHttpRequestInterceptor;
 import org.springframework.http.client.ClientHttpResponse;
 
 /**
- * Caps how many response-body bytes a {@code RestClient} will read from one exchange.
+ * Caps how many response-body bytes a {@code RestClient} reads from one exchange.
  *
- * <p>The reactive client this replaces buffered each backend response in memory and refused one
- * past its {@code maxInMemorySize}, set to {@code app.ingest.max-payload-bytes}. {@code RestClient}
- * streams the body into the message converter and has no such ceiling of its own, so without this
- * interceptor a hostile or buggy backend response could make the relay allocate without bound. The
- * contract is kept: reading past the cap throws an {@link IOException}, which {@code RestClient}
- * surfaces as a {@code RestClientException} — a failed relay, never a silently truncated draft.
- *
- * <p>The backend module carries an identical copy for its UEX and SC-Wiki clients; the two modules
- * share no runtime code.
+ * <p>Reading past the cap throws an {@link IOException}, surfaced as a {@code RestClientException};
+ * the body is never silently truncated.
  */
 @RequiredArgsConstructor
 public final class ResponseSizeLimitInterceptor implements ClientHttpRequestInterceptor {

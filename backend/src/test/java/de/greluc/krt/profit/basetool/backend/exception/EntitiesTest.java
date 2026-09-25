@@ -29,9 +29,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit tests for {@link Entities}, the fetch-or-throw helper (S1, #907). Covers both supported
- * message styles (bare constant and lazily-interpolated id-suffixed), the present-value
- * pass-through and the laziness contract of the {@code Supplier} overload.
+ * Unit tests for {@link Entities}: both message styles, present-value pass-through and the laziness
+ * of the {@code Supplier} overload.
  */
 class EntitiesTest {
 

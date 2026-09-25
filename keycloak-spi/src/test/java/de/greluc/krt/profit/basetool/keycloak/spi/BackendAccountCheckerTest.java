@@ -35,11 +35,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 /**
- * Fail-open matrix for {@link BackendAccountChecker}, served by a throwaway in-process HTTP server
- * (REQ-SEC-022). The checker is the duplicate-account guard: only a clean HTTP 200 with {@code
- * exists=true} denies; every other outcome (200/false, 503, 401, malformed/absent field, timeout)
- * is {@link Result#UNKNOWN}, which the caller treats as allow. Also pins the request contract: the
- * shared-secret header and the JSON candidate body are sent.
+ * Tests {@link BackendAccountChecker} against an in-process HTTP server (REQ-SEC-022): only HTTP
+ * 200 with {@code exists=true} denies, everything else is {@link Result#UNKNOWN}; also verifies the
+ * secret header and the JSON body.
  */
 class BackendAccountCheckerTest {
 

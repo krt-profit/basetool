@@ -31,27 +31,17 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Write payload for a requester correcting their own still-pending booking request (REQ-BANK-056).
  *
- * <p><strong>Deliberately no {@code sourceAccountId} and no {@code type}.</strong> The source
- * account decides the applicable approval limit, whether a Begr&uuml;ndung is mandatory and whether
- * the caller may request against it at all; the movement kind decides the whole field shape.
- * Changing either makes the row a <em>different</em> request rather than a correction, so the
- * supported move is to cancel and re-raise — one click, already available on the same row. Keeping
- * them out also keeps this endpoint off the eligibility-resolution path, where a mistake would mean
- * an approval-gate bypass rather than a bad edit.
- *
- * <p>Every field is replaced wholesale (PUT semantics, not PATCH): omitting {@code note} clears it.
- * The service re-derives the approval snapshot from the new {@code amount}, so raising it past the
- * requester's limit re-arms the responsible holder's approval instead of riding the original
- * below-limit snapshot.
+ * <p>Source account and type cannot change; that requires cancelling and re-raising. Every field is
+ * replaced wholesale, and the approval snapshot is re-derived from the new {@code amount}.
  *
  * @param amount the corrected whole-aUEC amount, at least 1
  * @param note the corrected free-text note, or {@code null} to clear it
  * @param justification the corrected Begr&uuml;ndung (REQ-BANK-045), or {@code null} to clear it;
- *     still required by the service when the source account type mandates a reason
+ *     still required when the source account type mandates a reason
  * @param targetAccountId the corrected destination for a {@code TRANSFER}; must be {@code null} for
- *     a {@code DEPOSIT} / {@code WITHDRAWAL}, and the type cannot be changed here
+ *     a {@code DEPOSIT} / {@code WITHDRAWAL}
  * @param counterpartyUserId the corrected Empf&auml;nger of a {@code WITHDRAWAL} (REQ-BANK-055), or
- *     {@code null} to fall back to deriving the requester at confirmation
+ *     {@code null} to derive the requester at confirmation
  * @param counterpartyOrgUnitId that Empf&auml;nger's org unit, validated against their own
  *     memberships; requires a counterparty user
  * @param version the optimistic-locking version the client echoes back

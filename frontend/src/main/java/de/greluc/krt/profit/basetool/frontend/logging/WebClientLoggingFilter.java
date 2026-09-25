@@ -31,29 +31,15 @@ import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 /**
  * Provides {@link ExchangeFilterFunction}s for the frontend {@code WebClient}.
  *
- * <p>Two goals:
- *
  * <ul>
- *   <li><b>Correlation propagation</b> – injects the current request's {@code X-Correlation-Id}
- *       (configurable via {@link LoggingProperties#getCorrelationIdHeader()}) into outbound backend
- *       calls so the backend log line shares the same id.
- *   <li><b>Structured call logging</b> – logs one line per outbound call with method, host, path,
- *       status and elapsed time. A {@code 5xx} server fault is logged at WARN; a non-{@code 5xx}
- *       response that merely exceeds {@link LoggingProperties#slowBackendCallThresholdMs()} is
- *       still a success and is logged at INFO with an explicit {@code Slow backend call} marker
- *       rather than escalated to WARN (issue #1204) – backend-call latency is alerted on through
- *       the {@code http.client.requests} p95 histogram, not this log line. Network-level failures
- *       are logged at WARN as well, with the exception class and message only (no stack trace – the
- *       exception is re-thrown and the frontend {@code GlobalExceptionHandler} decides on
- *       user-facing behaviour). A {@link CallNotPermittedException} is the exception: it means the
- *       circuit breaker short-circuited the call locally (0 ms, no backend hit), an expected
- *       self-healing state that repeats for every call for the whole open window — logged at DEBUG
- *       so a routine backend restart/deploy does not flood WARN (issue #1203, REQ-OBS-001).
+ *   <li>correlation propagation of the {@code X-Correlation-Id} header ({@link
+ *       LoggingProperties#getCorrelationIdHeader()}) to backend calls;
+ *   <li>one log line per call with method, host, path, status and elapsed time: {@code 5xx} and
+ *       network failures at WARN, a slow non-{@code 5xx} call at INFO, and a {@link
+ *       CallNotPermittedException} at DEBUG.
  * </ul>
  *
- * <p>Query strings are intentionally excluded from the log line because they may carry PII such as
- * filter expressions containing email fragments or user ids of other users (see AGENTS.md: no
- * information disclosure).
+ * <p>Query strings are never logged.
  */
 @Slf4j
 @Component
@@ -83,12 +69,12 @@ public class WebClientLoggingFilter {
   }
 
   /**
-   * Returns filter that logs one line per call including method/host/path/status/duration. A {@code
-   * 5xx} is logged at WARN; a slow-but-non-{@code 5xx} call is logged at INFO with a {@code Slow
-   * backend call} marker rather than escalated to WARN (issue #1204).
+   * Returns a filter that logs one line per call with method, host, path, status and duration;
+   * {@code 5xx} at WARN, a slow non-{@code 5xx} call at INFO with a {@code Slow backend call}
+   * marker.
    *
-   * @return filter that logs one line per call including method/host/path/status/duration, with
-   *     only {@code 5xx} responses (and network failures) at WARN.
+   * @return the call-logging filter, with only {@code 5xx} responses (and network failures) at
+   *     WARN.
    */
   @NotNull
   public ExchangeFilterFunction callLogging() {

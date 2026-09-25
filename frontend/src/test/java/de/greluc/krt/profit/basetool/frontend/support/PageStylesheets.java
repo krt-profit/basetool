@@ -32,16 +32,8 @@ import java.util.regex.Pattern;
 import org.springframework.test.web.servlet.ResultMatcher;
 
 /**
- * Asserts on the page stylesheets a rendered page links, the way the render tests used to assert on
- * its inline {@code <style>} block.
- *
- * <p>FE-PERF-02 moved every page {@code <style>} block into {@code static/css/pages/<page>.css},
- * linked where the block stood. The render tests that pin a load-bearing selector — the
- * zero-specificity {@code .form-group input:where(…)} exclusion above all — therefore read the
- * stylesheet the response links rather than the response itself. The link is taken from the
- * rendered HTML, so the assertion still fails when a page stops linking its stylesheet, and a
- * response that links none fails outright instead of letting a {@code not(…)} matcher pass
- * vacuously.
+ * Asserts on the page stylesheets ({@code static/css/pages/<page>.css}) a rendered page links. The
+ * link is read from the rendered HTML, so a page that links no stylesheet fails outright.
  */
 public final class PageStylesheets {
 

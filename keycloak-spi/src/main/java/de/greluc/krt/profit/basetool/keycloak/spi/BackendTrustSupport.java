@@ -35,16 +35,12 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Builds the {@link HttpClient} the {@link BackendAccountChecker} uses to call the Basetool backend
- * over HTTPS (REQ-SEC-022). The backend serves a self-signed certificate that the default JVM
- * truststore inside the Keycloak container does not trust, so this loads an explicit PKCS#12
- * truststore (path + password from configuration) and pins it as the client's {@code SSLContext}.
+ * Builds the {@link HttpClient} with which {@link BackendAccountChecker} calls the backend over
+ * HTTPS (REQ-SEC-022), trusting a configured PKCS#12 truststore.
  *
- * <p>Certificate validation is <strong>never disabled</strong> — there is deliberately no
- * trust-all/insecure path here. When no truststore is configured, or it cannot be loaded, the
- * client falls back to the default JVM truststore; a TLS handshake against the self-signed backend
- * certificate then fails, which the checker maps to {@link BackendAccountChecker.Result#UNKNOWN}
- * (fail open) rather than admitting an unverified connection.
+ * <p>Certificate validation is never disabled: without a usable truststore the client uses the
+ * default JVM truststore, and a failing handshake maps to {@link
+ * BackendAccountChecker.Result#UNKNOWN}.
  */
 @JBossLog
 final class BackendTrustSupport {

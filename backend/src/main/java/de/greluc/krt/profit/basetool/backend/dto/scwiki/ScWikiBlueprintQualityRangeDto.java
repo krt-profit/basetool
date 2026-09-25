@@ -23,10 +23,8 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
- * The input quality band a {@link ScWikiBlueprintModifierDto} interpolates across (SC Wiki {@code
- * blueprint_modifier_quality_range}). In observed payloads this is {@code 0..1000}; the crafted
- * item's stat multiplier moves from {@code modifier_range.at_min_quality} to {@code at_max_quality}
- * as the consumed ingredient's quality moves from {@link #min} to {@link #max}.
+ * The ingredient-quality band a {@link ScWikiBlueprintModifierDto} interpolates across (SC Wiki
+ * {@code blueprint_modifier_quality_range}), typically {@code 0..1000}.
  *
  * @param min lowest ingredient-quality value of the band, or {@code null}
  * @param max highest ingredient-quality value of the band, or {@code null}

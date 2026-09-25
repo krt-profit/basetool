@@ -29,15 +29,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit tests for {@link ParallelPageLoader}'s request-scoped context propagation onto the
- * virtual-thread workers.
- *
- * <p>The load-bearing case is {@link ClientIpContext} (#1130): the worker runs the WebClient
- * exchange and the {@code X-Forwarded-For} relay reads this thread-local at filter-assembly time,
- * so if the loader does not restore it the backend's per-IP rate limiter collapses every
- * parallelized read onto the one frontend-container IP — the regression this test guards against.
- * The sibling relay thread-locals ({@link ActiveSquadronContext}, {@link CorrelationContext}) are
- * asserted alongside so a future context added to the capture set cannot silently drop one.
+ * Unit tests for {@link ParallelPageLoader}'s propagation of request-scoped context onto its
+ * virtual-thread workers, chiefly {@link ClientIpContext} for the {@code X-Forwarded-For} relay,
+ * plus {@link ActiveSquadronContext} and {@link CorrelationContext}.
  */
 class ParallelPageLoaderTest {
 

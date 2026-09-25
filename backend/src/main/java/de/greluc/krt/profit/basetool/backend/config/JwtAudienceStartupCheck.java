@@ -30,18 +30,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 /**
- * Startup gate for the JWT {@code aud} check of the resource server (REQ-SEC-024, APPSEC-08).
+ * Validates the JWT {@code aud} configuration at startup (REQ-SEC-024).
  *
- * <p>{@code app.security.jwt.expected-audiences} is what makes {@link
- * SecurityConfig#resourceServerJwtDecoder} add its audience validator. Blank means "no audience
- * check", which is the right default for dev, test and a hand-rolled local realm — and was also
- * what production silently fell back to whenever {@code IRI_BACKEND_EXPECTED_AUDIENCES} went
- * missing from the host {@code .env}: nothing failed, the backend just started accepting every
- * validly-signed token of the realm, whatever client it was minted for. Under the {@code prod}
- * profile a blank value is therefore a configuration error and the context refuses to start. Every
- * other profile keeps "blank = off", logged at WARN so the state is visible.
- *
- * <p>The accepted audiences are logged at INFO on every start. They are client ids, not secrets.
+ * <p>Under the {@code prod} profile a blank {@code app.security.jwt.expected-audiences} aborts the
+ * start; other profiles treat blank as "no audience check" and log it at WARN. The accepted
+ * audiences are logged at INFO.
  */
 @Slf4j
 @Component
@@ -59,11 +52,9 @@ public class JwtAudienceStartupCheck {
   /**
    * Evaluates the configured audiences once, at context start.
    *
-   * @param environment the application environment, asked for the active profiles
-   * @param expectedAudiences the raw {@code app.security.jwt.expected-audiences} comma list; blank
-   *     entries are ignored
-   * @throws IllegalStateException when the {@code prod} profile is active and no non-blank audience
-   *     is configured, which aborts the application start
+   * @param environment the environment, queried for the active profiles
+   * @param expectedAudiences the raw comma-separated audience list; blank entries are ignored
+   * @throws IllegalStateException when {@code prod} is active and no audience is configured
    */
   public JwtAudienceStartupCheck(
       @NotNull Environment environment,

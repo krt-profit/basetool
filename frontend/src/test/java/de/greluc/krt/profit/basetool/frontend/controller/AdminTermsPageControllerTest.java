@@ -46,12 +46,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Behaviour of the admin consent overview page (REQ-SEC-028).
- *
- * <p>Covers the two decisions that are easy to get wrong and invisible afterwards: the default
- * filter (the reason to open this page is "who is still missing", so {@code ALL} would bury the
- * rows that matter), and that a junk filter from the query string degrades to that default instead
- * of breaking the page or reaching the backend as-is.
+ * Tests the admin consent overview page (REQ-SEC-028): its default filter shows the members still
+ * missing consent, and an unknown filter value falls back to that default.
  */
 @SpringBootTest
 class AdminTermsPageControllerTest {
@@ -85,13 +81,8 @@ class AdminTermsPageControllerTest {
   }
 
   /**
-   * The swap path returns the results FRAGMENT, not the whole document.
-   *
-   * <p>This is the interaction the page is for. {@code krtFetch.swap} appends {@code
-   * fragment=results} and writes the response straight into {@code #admin-terms-results}; it bails
-   * only on a redirect or a non-2xx, so a full page comes back 200 and gets nested inside its own
-   * container — header, nav, heading and filter form and all — on every filter change and page
-   * click, with nothing reporting the breakage. Shipped exactly that way and was caught in review.
+   * The {@code fragment=results} swap request returns only the results fragment, not the whole
+   * document.
    */
   @Test
   @WithMockUser(roles = "ADMIN")

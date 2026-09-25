@@ -68,14 +68,10 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 /**
- * Mockito unit tests for {@link DeletionRequestService} — the members' Art. 17 erasure requests
- * (REQ-SEC-061).
- *
- * <p>Four properties carry the requirement and are each pinned down here: a member's click never
- * deletes anything; the request is idempotent even against a genuine race, because the guarantee is
- * a partial unique index rather than a check-then-act; a refusal cannot happen without a recorded
- * reason (Art. 12(4)); and carrying it out anonymises <b>before</b> deleting and reaches Keycloak
- * <b>after</b> the database half has committed (ADR-0111).
+ * Mockito unit tests for {@link DeletionRequestService}, the members' Art. 17 erasure requests
+ * (REQ-SEC-061): a request deletes nothing, is idempotent under a race, cannot be refused without a
+ * reason, and on execution anonymises before deleting and reaches Keycloak only after the database
+ * commit (ADR-0111).
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -340,15 +336,8 @@ class DeletionRequestServiceTest {
   }
 
   /**
-   * The half-finished erasure has to be findable afterwards.
-   *
-   * <p>It used to leave a {@code log.warn} and nothing else. The surviving Keycloak account cannot
-   * show up in the REQ-SEC-059 orphan gauge — that counts a local row whose Keycloak account has
-   * gone, and this account has no local row left at all — so the counter and the audit row are the
-   * only signals there are. The audit row carries a {@code null} target because {@code
-   * target_user_id} is a foreign key to an {@code app_user} row that has already been deleted, and
-   * only the exception's class name, because its message can echo Keycloak's own view of the
-   * account.
+   * A failing Keycloak delete after the database erasure leaves a failure counter increment and an
+   * audit row with a {@code null} target and only the exception's class name.
    */
   @Test
   void aFailingKeycloakDeleteLeavesACounterAndAnAuditRow() {

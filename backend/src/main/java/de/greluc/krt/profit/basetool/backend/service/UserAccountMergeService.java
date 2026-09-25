@@ -38,41 +38,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Moves everything one account <em>owns</em> onto another, so an admin can repair a member who
- * ended up with two (REQ-SEC-045, ADR-0142 point 5).
+ * Moves everything one account owns onto another, so an admin can repair a member who ended up with
+ * two (REQ-SEC-045).
  *
- * <p>The need arises because a login whose subject matches no row no longer adopts an account found
- * by callsign (#1639). That silent inheritance was the defect — but the outcome it produced was not
- * always wrong, and removing it without a remedy would leave a member's data stranded on an account
- * nobody can log into and the admin with nothing to do about it. This is that remedy, and the
- * difference that matters is that it is a <b>decision</b>: an admin names both accounts, and one
- * audit event records it.
+ * <p>Ownership follows the member; attribution stays with the act. Every foreign key into {@code
+ * app_user} is listed in exactly one of {@link #FOLLOWS_THE_MEMBER} or {@link #STAYS_WITH_THE_ACT},
+ * enforced by {@code UserAccountMergeCoverageTest}.
  *
- * <h2>The rule that decides each table</h2>
- *
- * <p><b>Ownership follows the member; attribution stays with the act.</b> A row that says "this
- * belongs to X" moves. A row that says "X did this, then" does not — re-pointing it would not
- * repair an identity, it would falsify history. That is why the member's warehouse stock moves and
- * the audit event recording who booked it does not, and why an open bank grant moves while the
- * record of who granted it stays.
- *
- * <p>The classification is exhaustive by construction: {@code UserAccountMergeCoverageTest} reads
- * every foreign key into {@code app_user} out of the live schema and fails the build unless each
- * one appears in exactly one of {@link #FOLLOWS_THE_MEMBER} or {@link #STAYS_WITH_THE_ACT}. A new
- * user-referencing column cannot be forgotten here; it can only be classified.
- *
- * <h2>Conflicts are refused, not guessed</h2>
- *
- * <p>Several of the moved tables carry a unique constraint over the user column, so the same member
- * may legitimately hold a row on both accounts — two sign-ups for one Einsatz, the same blueprint
- * owned twice. Those are deduplicated: the source's row is dropped where the target already has an
- * equivalent, and the rest are re-pointed. That is safe precisely because the two accounts are one
- * person, so the duplicate carries no information the survivor lacks.
- *
- * <p>{@code bank_holder} is the exception, and it is refused rather than deduplicated: its unique
- * key is the user alone, so a holder on both accounts means <b>two ledgers</b>, and merging ledgers
- * is an accounting decision with money in it, not a duplicate to drop. The merge aborts and says
- * so.
+ * <p>Where a unique constraint lets the same row exist on both accounts, the source's duplicate is
+ * dropped. A {@code bank_holder} on both accounts means two ledgers, so the merge is refused.
  */
 @Service
 @RequiredArgsConstructor
@@ -86,12 +60,10 @@ public class UserAccountMergeService {
   /**
    * One table whose user column is re-pointed from the source account to the target.
    *
-   * @param table the table name, from this file's own literals — never from a request
+   * @param table the table name, from this file's own literals, never from a request
    * @param column the column holding the {@code app_user.id}
    * @param conflictKeys the remaining columns of the unique constraint over {@code column}, or
-   *     empty when the table carries none. When present, a source row whose key already exists on
-   *     the target is deleted rather than re-pointed, because the update would otherwise violate
-   *     the constraint and the duplicate carries nothing the survivor lacks
+   *     empty; a source row whose key the target already has is deleted instead of re-pointed
    */
   private record OwnedRows(String table, String column, List<String> conflictKeys) {
 
@@ -148,27 +120,12 @@ public class UserAccountMergeService {
           OwnedRows.deduped("member_evaluation", "user_id", "category_id"));
 
   /**
-   * Everything that records an act rather than a belonging, and therefore stays.
+   * Every user column that records an act rather than a belonging, and therefore stays with the
+   * source account.
    *
-   * <p>Each of these answers "who did this, and when", and the answer does not change because the
-   * person later ended up with a second account. The audit columns are the clearest case and the
-   * reason the whole distinction exists (REQ-AUDIT-001: the trail must outlive even a deleted
-   * account); the rest follow the same logic one step further out.
-   *
-   * <p>Two consequences are accepted deliberately rather than worked around:
-   *
-   * <ul>
-   *   <li>A bank booking request the <em>source</em> account raised keeps naming it as the
-   *       requester, so the target cannot act on it as its owner. Re-pointing it would rewrite who
-   *       asked, which is exactly what a booking record must not do. An open request is finished
-   *       under the account that raised it, or withdrawn.
-   *   <li>{@code user_roles} stays because roles are not owned: they are re-derived from the
-   *       member's token on every login and from the roster sync (REQ-SEC-013, REQ-SEC-036). Moving
-   *       them would grant the target, for one request, a set its own token does not carry.
-   *   <li>{@code terms_acceptance} stays because consent is recorded per account. A member who
-   *       accepted on the old one is asked once more on the new one — an annoyance, and the honest
-   *       alternative to back-dating a consent the surviving account never gave.
-   * </ul>
+   * <p>Includes the audit columns (REQ-AUDIT-001), the requester of a bank booking request, {@code
+   * user_roles} (re-derived on every login, REQ-SEC-013) and {@code terms_acceptance} (consent is
+   * per account).
    */
   public static final List<String> STAYS_WITH_THE_ACT =
       List.of(
@@ -211,18 +168,15 @@ public class UserAccountMergeService {
   /**
    * Moves everything {@code sourceUserId} owns onto {@code targetUserId}.
    *
-   * <p>The source row itself is left in place, emptied. Deleting it is the existing user-deletion
-   * flow's job and carries its own fail-closed Keycloak probe (REQ-DATA-008) — an account whose
-   * Keycloak user still exists must not be removed here as a side effect of a data move, and an
-   * admin who wants it gone runs that operation deliberately.
+   * <p>The emptied source row is left in place; removing it is the separate user-deletion flow.
    *
-   * @param sourceUserId the account to empty — the one the member can no longer reach
-   * @param targetUserId the account to keep — the one the member logs into now
+   * @param sourceUserId the account to empty, which the member can no longer reach
+   * @param targetUserId the account to keep, which the member logs into now
    * @param adminId the acting admin, recorded as the audit actor
    * @return the surviving target account
    * @throws NotFoundException when either account is unknown
-   * @throws BusinessConflictException when the two ids are the same, or when both accounts hold a
-   *     bank-holder row (two ledgers is an accounting decision, not a duplicate)
+   * @throws BusinessConflictException when the two ids are the same, or both accounts hold a
+   *     bank-holder row
    */
   @Transactional
   @NotNull
@@ -267,11 +221,8 @@ public class UserAccountMergeService {
   }
 
   /**
-   * Refuses the merge when both accounts carry a bank-holder row.
-   *
-   * <p>{@code bank_holder} is unique on the user alone, so this is not a duplicate to drop — it is
-   * two ledgers, and which postings belong to which holder is an accounting question with money in
-   * it. Failing loudly is the only honest answer a data move can give.
+   * Refuses the merge when both accounts carry a bank-holder row, since that is two ledgers rather
+   * than a duplicate.
    *
    * @param sourceUserId the account being emptied
    * @param targetUserId the account being kept

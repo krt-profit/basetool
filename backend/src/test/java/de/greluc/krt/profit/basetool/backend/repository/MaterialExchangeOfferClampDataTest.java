@@ -44,12 +44,10 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Data-level coverage for the Materialbörse ratchet-down of an offer when its backing Lager row is
- * reduced, against the real Postgres test schema (Testcontainers + Flyway via the {@code test}
- * profile) — the atomic, persisting counterpart of the display-time clamp-on-read (ADR-0086).
- * Covers both {@link MaterialExchangeOfferRepository#clampOfferedAmountToStock} for a material
- * offer (REQ-MARKET-013) and {@link MaterialExchangeOfferRepository#clampItemQuantityToStock} for a
- * stock-backed item offer (REQ-MARKET-014, ADR-0108).
+ * Verifies against PostgreSQL that reducing a backing Lager row ratchets its Materialbörse offer
+ * down: {@link MaterialExchangeOfferRepository#clampOfferedAmountToStock} for material offers
+ * (REQ-MARKET-013) and {@link MaterialExchangeOfferRepository#clampItemQuantityToStock} for
+ * stock-backed item offers (REQ-MARKET-014).
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -166,9 +164,8 @@ class MaterialExchangeOfferClampDataTest {
   }
 
   /**
-   * Persists a fresh owner, game item, location and game-item stock row (amount 20) plus an {@code
-   * ACTIVE} stock-backed {@link MaterialExchangeOfferKind#ITEM} offer on that row with the given
-   * whole-unit quantity — the physical fixture the item ratchet acts on.
+   * Persists an owner, game item, location and item stock row (amount 20) with an {@code ACTIVE}
+   * stock-backed {@link MaterialExchangeOfferKind#ITEM} offer on it.
    *
    * @param quantity the stored offered whole-unit quantity.
    * @return the saved item offer.

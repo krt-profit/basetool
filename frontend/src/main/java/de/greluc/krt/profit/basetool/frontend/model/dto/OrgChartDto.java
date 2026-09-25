@@ -22,14 +22,13 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.util.List;
 
 /**
- * Frontend mirror of the complete org chart, decoded from {@code GET /api/v1/org-chart}.
- * Multi-Bereich since epic #692 / REQ-ORG-026: the OL tier on top, one tier per Bereich, then the
- * ungrouped/legacy area-leadership tier with any Staffeln/SKs not wired under a Bereich (the whole
- * chart until an admin builds the hierarchy).
+ * Frontend mirror of the complete org chart, decoded from {@code GET /api/v1/org-chart}: the OL
+ * tier, one tier per Bereich, and an ungrouped tier for units not placed under a Bereich
+ * (REQ-ORG-026).
  *
  * @param organisationsleitung the OL tier (id + name + members), or {@code null} when no OL exists.
  * @param bereiche the per-Bereich tiers, ordered by name; never {@code null}, possibly empty.
- * @param areaLeadership the legacy/ungrouped area-leadership tier; never {@code null}.
+ * @param areaLeadership the ungrouped area-leadership tier; never {@code null}.
  * @param squadrons the ungrouped profit-eligible Staffeln, ordered by name; never {@code null}.
  * @param specialCommands the ungrouped profit-eligible Spezialkommandos, ordered by name; never
  *     {@code null}.

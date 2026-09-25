@@ -45,11 +45,8 @@ class BlueprintsMockupCheckE2eTest {
   private static Browser browser;
 
   /**
-   * Skips the class unless {@code BP_CHECK=true}, then boots the headless browser of the configured
-   * engine ({@code -Pe2e.browser}) through {@link E2eSupport#launchBrowser}. The assumption runs
-   * <em>before</em> any browser launch: a CI matrix cell installs only its own engine, so an
-   * unconditional launch of a hard-coded one fails the whole class with a {@code DriverException}
-   * instead of skipping it.
+   * Skips the class unless {@code BP_CHECK=true}, then launches the configured engine through
+   * {@link E2eSupport#launchBrowser}.
    */
   @BeforeAll
   static void setUp() {

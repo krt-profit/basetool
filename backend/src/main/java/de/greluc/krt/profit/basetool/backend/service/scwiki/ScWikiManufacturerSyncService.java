@@ -44,28 +44,13 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 /**
- * R6 SC Wiki manufacturer reconciliation (SC_WIKI_SYNC_PLAN.md §11 R6 / §6.4). Paginates {@code
- * /api/manufacturers} and stamps the Wiki cross-reference columns ({@code scwiki_uuid} / {@code
- * scwiki_code}) onto the {@code manufacturer} rows the UEX sync already created.
+ * Reconciles SC Wiki manufacturers ({@code /api/manufacturers}) with the existing UEX {@code
+ * manufacturer} rows by stamping the Wiki cross-reference columns.
  *
- * <p>It is an <b>enrichment-only</b> pass: it never inserts a row (a Wiki manufacturer with no
- * local UEX counterpart is simply skipped — {@code manufacturer} has no {@code WIKI_ONLY} concept
- * and its {@code name} is {@code NOT NULL UNIQUE}) and it never overwrites the UEX-canonical {@code
- * name} / {@code abbreviation} / {@code industry}. Only {@code scwiki_uuid}, {@code scwiki_code}
- * and {@code scwiki_synced_at} are written (and {@code scwiki_deleted_at} cleared) — mirroring the
- * §6.3.5 "each side owns its columns" rule used by the item / vehicle syncs.
- *
- * <p>Resolution chain (§6.4): {@code scwiki_uuid} → case-insensitive {@code name} →
- * case-insensitive {@code abbreviation == code} (the §6.4 chain's third step is {@code
- * industry+name}, but the Wiki manufacturer payload exposes no industry; the local {@code
- * abbreviation} matched against the Wiki {@code code} is the available analogue and lifts the link
- * rate for companies whose full name differs between catalogues). A candidate already linked to a
- * <em>different</em> Wiki UUID is left untouched and logged {@link
- * SyncEventType#MANUFACTURER_MISMATCH} rather than hijacked.
- *
- * <p>Gated behind {@code krt.scwiki.manufacturer-sync-enabled} (default {@code false}); ships dark.
- * An empty Wiki response short-circuits before the orphan sweep, which — like every other sync —
- * only fires on a non-empty seen set (§8.7) so an outage never wipes the reconciliation state.
+ * <p>Enrichment only: never inserts a row and never overwrites UEX-owned columns. A row already
+ * linked to a different Wiki UUID is left alone and logged as {@link
+ * SyncEventType#MANUFACTURER_MISMATCH}. Gated behind {@code krt.scwiki.manufacturer-sync-enabled}
+ * (default {@code false}).
  */
 @Slf4j
 @Service
@@ -79,23 +64,12 @@ public class ScWikiManufacturerSyncService {
   private final SyncReportService syncReportService;
 
   /**
-   * Runs the manufacturer reconciliation. No-op (with an INFO line) when the feature flag is off;
-   * an empty Wiki response short-circuits before the orphan sweep.
+   * Runs the manufacturer reconciliation; a no-op when the flag is off, and an empty response skips
+   * the orphan sweep.
    *
-   * <p>Returns the number of {@code manufacturer} rows this run wrote — first-time links plus
-   * refreshed links (conflicts and unmatched rows excluded, since they leave the row untouched) —
-   * which {@link ScWikiScheduler} accumulates into {@code
-   * basetool_scheduled_job_items_total{job="scwiki_sync"}}. The disabled and <em>genuine</em>
-   * empty-response short-circuits return {@code 0} so a Wiki outage surfaces as a zero-item run
-   * ({@code SyncZeroItems}, #1041 item 2). A {@code 304 Not Modified} response is <b>not</b> such
-   * an outage — the catalogue is merely unchanged — so this reports {@link
-   * ManufacturerRepository#countLiveScwikiManufacturers() the live reconciled-manufacturer count}
-   * instead of {@code 0}, keeping a fully-cached healthy run from false-firing {@code
-   * SyncZeroItems} (#1182).
-   *
-   * @return the number of {@code manufacturer} rows written this run ({@code linked + refreshed}),
-   *     or the live reconciled-manufacturer count on a {@code 304 Not Modified} (unchanged)
-   *     catalogue
+   * @return the number of {@code manufacturer} rows written ({@code linked + refreshed}), {@code 0}
+   *     when disabled or empty, or {@link ManufacturerRepository#countLiveScwikiManufacturers() the
+   *     live reconciled-manufacturer count} on a {@code 304 Not Modified}
    */
   @Transactional
   public int syncManufacturers() {
@@ -208,9 +182,8 @@ public class ScWikiManufacturerSyncService {
   }
 
   /**
-   * Resolves a Wiki manufacturer to an existing local row via the §6.4 chain: {@code scwiki_uuid} →
-   * case-insensitive {@code name} → case-insensitive {@code abbreviation == code}. Returns {@code
-   * null} when nothing matches — the reconciliation never creates a manufacturer.
+   * Resolves a Wiki manufacturer to a local row by {@code scwiki_uuid}, then case-insensitive name,
+   * then case-insensitive {@code abbreviation == code}.
    *
    * @param dto the Wiki manufacturer payload
    * @return the matching local manufacturer, or {@code null}

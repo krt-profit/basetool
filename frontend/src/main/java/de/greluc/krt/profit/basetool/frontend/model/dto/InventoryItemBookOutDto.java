@@ -27,21 +27,12 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Frontend mirror of the backend {@code InventoryItemBookOutDto} (per the {@code
- * feedback_backend_frontend_dto_mirror} memory).
+ * Frontend mirror of the backend {@code InventoryItemBookOutDto}.
  *
- * <p>R5.d.g added the trailing {@code targetOwningOrgUnitId} picker output. Only honoured for
- * {@link CheckoutType#TRANSFER}; ignored for {@link CheckoutType#DISCARD} and {@link
- * CheckoutType#SELL}. The final {@code mergeStock} field is the per-action stock-merge opt-in
- * (REQ-INV-026) for the {@code TRANSFER} target: honoured only for an {@code SCU} material (a
- * {@code PIECE} transfer always merges); {@code null}/{@code false} keeps the new row separate.
- *
- * <p>{@code jobOrderReductions} / {@code missionReductions} are the Variante-C "deduct from" plan
- * (REQ-INV-027): the deducted {@code amount} is sourced independently per dimension from named
- * earmark slices or the not-yet-assigned rest. A {@code null}/empty list takes it all from the
- * rest. On a {@code TRANSFER} the reduced tags move to the new row; on a {@code SELL} the mission
- * reductions also drive the coupled proceeds split (each mission credited {@code sellAmount ×
- * amount_j / amount}, the rest personal).
+ * <p>{@code targetOwningOrgUnitId} and {@code mergeStock} (REQ-INV-026) apply only to {@link
+ * CheckoutType#TRANSFER}; {@code mergeStock} is honoured only for an {@code SCU} material. {@code
+ * jobOrderReductions} / {@code missionReductions} name which earmark slices the amount comes from
+ * (REQ-INV-027); {@code null} or empty takes it from the unassigned rest.
  */
 public record InventoryItemBookOutDto(
     @NotNull @Min(0) Double amount,

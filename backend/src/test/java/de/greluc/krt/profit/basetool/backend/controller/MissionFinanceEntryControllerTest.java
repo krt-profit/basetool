@@ -52,14 +52,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
 /**
- * Pure-Mockito unit tests for {@link MissionFinanceEntryController}. The controller's split
- * URL-space (reads are mission-scoped under {@code /missions/{missionId}/finance-entries}, writes
- * are entry-scoped under {@code /finance-entries/{entryId}}) is the easy-to-regress part. The whole
- * finance ledger is restricted to registered members and above (anonymous AND role-less GUEST
- * callers are blocked); that authorization gate lives in {@code @PreAuthorize} and is covered by
- * {@code MissionFinanceEntryControllerSecurityTest}. These tests pin the route topology and the
- * unconditional participant-PII redaction by asserting each handler's pass-through to its specific
- * service method.
+ * Unit tests for {@link MissionFinanceEntryController}: the split route topology (mission-scoped
+ * reads, entry-scoped writes) and the participant-PII redaction on each handler.
  */
 @ExtendWith(MockitoExtension.class)
 class MissionFinanceEntryControllerTest {

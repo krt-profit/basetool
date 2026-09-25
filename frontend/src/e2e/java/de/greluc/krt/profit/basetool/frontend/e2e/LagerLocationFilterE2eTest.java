@@ -34,17 +34,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Browser flow for the Lager location filter (REQ-INV-040) on "Mein Lager".
- *
- * <p>The server half — the relayed {@code locationIds}, the narrowed stacks and the in-scope-only
- * option list — is pinned by {@code InventoryItemStackQueryDataTest}, {@code
- * InventoryItemControllerTest} and {@code InventoryPageControllerMvcTest}. What only a browser can
- * show is the part in between: that ticking one location actually re-swaps the grouped table **in
- * place** (no navigation), that the stack at the other location disappears while its option stays
- * selectable, and that the collapsed panel's active-filter chip counts the new dimension.
- *
- * <p>The no-reload assertion is a window marker set before the click and read afterwards: a
- * full-page navigation would wipe it, and REQ-FE-001…010 forbid one on a filter change.
+ * E2E flow for the Lager location filter on "Mein Lager" (REQ-INV-040): selecting a location
+ * re-swaps the grouped table in place, hides the other location's stack while keeping its option,
+ * and updates the active-filter chip count.
  */
 @Tag("e2e")
 class LagerLocationFilterE2eTest {

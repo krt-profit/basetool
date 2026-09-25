@@ -36,27 +36,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Two-context live-sync coverage for the refinery-order detail page (#1238, REQ-FE-015 / ADR-0094):
- * an edit one viewer saves must appear on another viewer's form without a manual reload — the
- * {@code order} section key crossing the {@code refinery-order:{id}} room.
+ * Two-context live-sync coverage for the refinery-order detail page (REQ-FE-015): an edit saved by
+ * one viewer appears on another viewer's form without a reload, via the {@code order} section of
+ * the {@code refinery-order:{id}} room.
  *
- * <p>This is the page family that the #1235 sweep could not cover, because save / store / cancel
- * all navigated away to the list and the template exposed no fragment seam. The room only works on
- * top of that conversion, so this test is really asserting both halves at once: that a save
- * re-renders the {@code order} section in place for the acting client (page A keeps its no-reload
- * marker), and that the same section is pushed to a passive viewer (page B).
- *
- * <p>The deterministic pre-mutation wait is {@code window.krtLiveSync.subscribedTopics()} becoming
- * non-empty — a subscribe is registered only once its async server-side authorization has acked, so
- * A's change frame cannot race past B's subscription. Two browser contexts as the same test user
- * are two distinct {@code /ws/sync} sockets, which is exactly what the relay fans out between (it
- * skips the originating session).
- *
- * <p>Ore-Sales is the mutation: a plain numeric field rendered inside the swapped {@code order}
- * fragment, so what the peer sees is unambiguous. The main form still has to be made
- * <em>submittable</em> first, though — its {@code required} input-material combobox can render
- * empty for a freshly-seeded material (see the inline comment), and a blocked submit would silently
- * look like a live-sync failure.
+ * <p>Waits for {@code window.krtLiveSync.subscribedTopics()} to be non-empty before mutating, so
+ * the change cannot race the subscription. Ore sales is the mutated field.
  */
 @Tag("e2e")
 class RefineryOrderLiveSyncE2eTest {

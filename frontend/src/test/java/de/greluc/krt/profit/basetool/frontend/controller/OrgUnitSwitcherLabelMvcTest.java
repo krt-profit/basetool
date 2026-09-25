@@ -44,23 +44,11 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * The sidebar org-unit switcher's no-pin row, which says two different things to two callers.
+ * Verifies the sidebar org-unit switcher's no-pin row label, which differs for admins (every org
+ * unit) and other callers (their own reach).
  *
- * <p><strong>The row is one control with two meanings.</strong> Choosing it sends no {@code
- * X-Active-Org-Unit-Id}, and {@code RequestScopeResolver#currentScopePredicate} answers that with
- * {@code adminAllScope} — every org unit — for an admin, and with the union of the caller's own
- * reach for everybody else. Labelling both „Alle Org-Einheiten" promised a member more than it
- * delivers: measured against the test stack on 2026-09-01, a member of two Staffeln read 884.8 SCU
- * under that row while an admin read 1403.4.
- *
- * <p><strong>Why this is an MVC render test and not an advice test.</strong> The fork is a pair of
- * {@code sec:authorize} attributes in {@code fragments/sidebar.html}. A malformed SpEL expression
- * there — and the expression carries a {@code T(...)} type reference and a negation — is not a
- * compile error and no unit test would see it; it surfaces at render time, on every page that draws
- * the sidebar. Rendering the page is the only thing that asserts the expression parses at all.
- *
- * <p>Two options are required for the switcher to render, because the template hides itself for a
- * caller with fewer than two — no choice to offer means no control.
+ * <p>Renders the page because the label is chosen by {@code sec:authorize} expressions that only
+ * fail at render time. The switcher needs at least two options to render.
  */
 @SpringBootTest
 class OrgUnitSwitcherLabelMvcTest {

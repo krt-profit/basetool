@@ -44,14 +44,9 @@ import org.springframework.data.redis.connection.DefaultMessage;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
 /**
- * Unit tests for {@link RedisLiveSyncFanout} using a mocked {@link StringRedisTemplate} and
- * handler, so the publish/consume logic, own-origin skip and error counting are verified
- * deterministically without a Redis container (the end-to-end round trip is covered by {@code
- * RedisLiveSyncFanoutIntegrationTest}).
- *
- * <p>Covers both channels: the {@code changed} relay (ADR-0094) and the editor-presence gossip
- * (ADR-0126), including that a message is routed by the channel it arrived on and that the two
- * streams keep separate publish / consume / error series.
+ * Unit tests for {@link RedisLiveSyncFanout} with a mocked {@link StringRedisTemplate}: publish,
+ * consume, own-origin skip and error counting on both the {@code changed} channel (ADR-0094) and
+ * the presence channel (ADR-0126), each with separate series.
  */
 class RedisLiveSyncFanoutTest {
 

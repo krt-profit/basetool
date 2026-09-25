@@ -178,11 +178,8 @@ class RefineryOrderStorageCalculationTest {
   }
 
   /**
-   * Regression test for issue #230. UEX-imported materials historically have a NULL {@code
-   * quantity_type} (the UEX commodity sync never sets the field). Before the fix the store-dialog
-   * prefill treated NULL as "not SCU" and skipped the units->SCU conversion, so a 2.21 SCU refinery
-   * output got booked as 221 SCU. The controller now defaults the unknown/NULL case to SCU since
-   * refineries never produce piece-counted goods.
+   * A material with a {@code null} quantity type is treated as SCU in the store-dialog prefill, so
+   * refinery output is converted from units to SCU.
    */
   @Test
   void testStoreFormCalculationForNullQuantityTypeDefaultsToScu() {

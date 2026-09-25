@@ -28,13 +28,8 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Caching;
 
 /**
- * Composed cache annotation that flushes both material caches ({@link CacheConfig#MATERIALS_CACHE}
- * and {@link CacheConfig#MATERIAL_BY_ID_CACHE}, {@code allEntries = true}) in one place. Every
- * material mutation (create / update / delete) carries it instead of repeating the identical
- * two-entry {@code @Caching(evict = …)} block, so the eviction set has a single source of truth and
- * a newly added material cache is wired in exactly once. Spring resolves the meta-annotated
- * {@code @Caching} through its standard merged-annotation lookup, so this behaves identically to
- * the inline block it replaced.
+ * Evicts all entries of both material caches ({@link CacheConfig#MATERIALS_CACHE} and {@link
+ * CacheConfig#MATERIAL_BY_ID_CACHE}); placed on every material mutation.
  */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)

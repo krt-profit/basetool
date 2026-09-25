@@ -22,24 +22,15 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import java.util.List;
 
 /**
- * Best-effort, <b>never persisted</b> pre-fill produced by {@code POST
- * /api/v1/refinery-orders/import-extract} from a {@code RefineryExtract} JSON (#434, plan §7.5).
- * The frontend pours {@link #order} into the existing refinery create form and renders {@link
- * #issues} as inline review flags; saving still goes through the untouched {@code POST
- * /api/v1/refinery-orders} create path with full validation.
+ * Never-persisted pre-fill of the refinery create form built from a {@code RefineryExtract}.
  *
- * <p>The embedded order intentionally violates save-time constraints where matching failed:
- * unmatched rows carry a {@code null} {@code inputMaterial}, an unresolved location stays {@code
- * null} despite being {@code @NotNull} on create. That is the point — the review form forces the
- * user to complete exactly those fields.
+ * <p>Fields whose matching failed stay {@code null}, even where save-time validation requires them.
  *
- * @param order the pre-filled order; goods appear in on-screen ({@code rowIndex}) order, duplicate
- *     material rows preserved
- * @param issues every finding the user must see, ordered as encountered (order-level first, then
- *     per-row); empty when everything matched cleanly
- * @param goodsMatched number of draft rows whose input material was resolved
- * @param goodsTotal number of material rows read from the screenshots (incl. skipped ones)
- * @param rowsSkipped number of rows not added to the draft (refine-off, zero-quantity, un-quoted)
+ * @param order the pre-filled order, goods in on-screen order
+ * @param issues every finding for the user, order-level first; empty on a clean match
+ * @param goodsMatched number of rows whose input material was resolved
+ * @param goodsTotal number of rows read, including skipped ones
+ * @param rowsSkipped number of rows not added to the draft
  */
 public record RefineryImportDraftDto(
     RefineryOrderDto order,

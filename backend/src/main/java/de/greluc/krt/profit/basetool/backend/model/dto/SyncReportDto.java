@@ -23,11 +23,9 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Response DTO for one {@link de.greluc.krt.profit.basetool.backend.model.ExternalSyncReport} row.
- *
- * <p>Read-only projection for the {@code /admin/sync-reports} pages. The {@code sourceSystem} and
- * {@code eventType} enums are flattened to their {@code String} names for the wire so the frontend
- * mirror need not depend on the backend enums.
+ * Read-only projection of one {@link
+ * de.greluc.krt.profit.basetool.backend.model.ExternalSyncReport} row, with enums flattened to
+ * their names.
  *
  * @param id event id
  * @param runId run id grouping a sync cycle's events

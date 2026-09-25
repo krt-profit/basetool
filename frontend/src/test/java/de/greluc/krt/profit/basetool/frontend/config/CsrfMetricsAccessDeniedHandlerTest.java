@@ -33,9 +33,9 @@ import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.csrf.CsrfException;
 
 /**
- * Unit tests for {@link CsrfMetricsAccessDeniedHandler} (#1041 item 18): a CSRF-token rejection
- * must bump {@code basetool_csrf_rejections_total} and still delegate the {@code 403}; any other
- * access-denied cause must delegate uncounted.
+ * Unit tests for {@link CsrfMetricsAccessDeniedHandler}: a CSRF-token rejection increments {@code
+ * basetool_csrf_rejections_total} and still delegates the {@code 403}; other causes delegate
+ * uncounted.
  */
 class CsrfMetricsAccessDeniedHandlerTest {
 

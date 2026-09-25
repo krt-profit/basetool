@@ -29,20 +29,12 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Request DTO for {@code PUT /api/v1/missions/{id}} — the legacy full-replace update path. Carries
- * the same safe fields as {@link CreateMissionRequest} plus the {@code actualStartTime} / {@code
- * actualEndTime} lifecycle columns (the legacy PUT path is allowed to set those explicitly to
- * preserve compatibility with the auto-stamp-on-activation flow) and the global optimistic-lock
- * {@code version}.
+ * Request DTO for the full-replace {@code PUT /api/v1/missions/{id}}: the fields of {@link
+ * CreateMissionRequest} plus {@code actualStartTime} / {@code actualEndTime} and the global {@code
+ * version}.
  *
- * <p>Everything else stays server-managed and is structurally absent from this record so a caller
- * cannot smuggle in {@code id} / {@code owningSquadron} / {@code parent} / {@code owner} / {@code
- * managers} / collections via JSON (audit finding C-3). The path-variable {@code id} is the
- * authoritative target; the {@code version} field is the optimistic-lock check.
- *
- * <p>For section-scoped, multi-user-friendly updates prefer the dedicated patch endpoints ({@code
- * /core}, {@code /schedule}, {@code /flags}) which use their own per-section version counters and
- * avoid the all-three-counters bump that this DTO triggers in the service layer.
+ * <p>Server-managed fields are absent so they cannot be set via JSON. This path bumps all section
+ * counters; the {@code /core}, {@code /schedule} and {@code /flags} patches are preferred.
  */
 public record UpdateMissionRequest(
     @NotBlank @Size(max = 255) String name,

@@ -27,26 +27,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Excludes the long-lived notification SSE endpoint from the {@code http.server.requests}
- * observation (REQ-OBS-009). Boot registers every {@link ObservationPredicate} bean on the
- * observation registry; when {@link #test} returns {@code false} the observation is a no-op, so the
- * request produces neither a Micrometer timer sample nor a trace span.
- *
- * <p>Why: {@code GET /api/v1/notifications/stream} holds an {@link
- * org.springframework.web.servlet.mvc.method.annotation.SseEmitter} open for up to 30 minutes
- * ({@code NotificationStreamService.EMITTER_TIMEOUT_MS}). Spring MVC books the request's <em>whole
- * lifetime</em> into {@code http.server.requests} when the async request finally completes, so each
- * closed stream records an ~1800s latency observation. That value lands in the {@code +Inf} bucket
- * of the histogram (capped at a 10s {@code maximum-expected-value}), and once stream turnover
- * exceeds ~5% of requests in a scrape window it pins the aggregate {@code histogram_quantile(0.95,
- * …)} to the top bucket — firing {@code HttpLatencyP95High} (a p95 &gt;2s warning) with no real
- * user-facing slowness. Skipping the observation keeps the SSE lifetime out of the latency metric
- * entirely.
- *
- * <p>This is the server-side mirror of the client-side decision to leave the {@code sseWebClient}
- * off the observation registry ({@code WebClientConfig}); the stream's health is instead tracked by
- * the dedicated {@code basetool_sse_connections} gauge and {@code basetool_sse_send_failures_total}
- * counter, so nothing observable is lost. Mirrored across backend/frontend per the no-shared-module
- * convention, each with its own module-local stream path.
+ * observation, so stream lifetimes do not distort the latency metric (REQ-OBS-009).
  */
 @Component
 public class NotificationStreamObservationPredicate implements ObservationPredicate {
@@ -58,16 +39,13 @@ public class NotificationStreamObservationPredicate implements ObservationPredic
   private static final String STREAM_PATH = "/api/v1/notifications/stream";
 
   /**
-   * Skips the {@code http.server.requests} observation for the notification SSE endpoint and lets
-   * every other observation through unchanged. Matches on the raw request path ({@link
-   * HttpServletRequest#getRequestURI()}, query string already excluded) because the endpoint
-   * carries no path variables, so the actual path equals its route template.
+   * Drops the {@code http.server.requests} observation for the notification SSE endpoint, matched
+   * on {@link HttpServletRequest#getRequestURI()}.
    *
-   * @param name the observation name being evaluated by the registry
+   * @param name the observation name
    * @param context the observation context; a {@link ServerRequestObservationContext} for inbound
-   *     HTTP server requests
-   * @return {@code false} to drop the observation for the SSE stream endpoint, {@code true} to
-   *     record every other observation
+   *     HTTP requests
+   * @return {@code false} for the SSE stream endpoint, {@code true} otherwise
    */
   @Override
   public boolean test(String name, Observation.Context context) {

@@ -49,18 +49,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC-Tests fuer den Handover-POST-Pfad in {@link JobOrderWriteController#createHandover}.
- *
- * <p>Dient als zusaetzliche Absicherung des in der Backend-Korrektur behobenen Optimistic-Locking-
- * Bugs auf der Frontend-Seite: das Frontend leitet Erfolgs- wie Fehlerantworten unveraendert via
- * Flash-Toast + Redirect an den Browser weiter. Die Tests verifizieren:
- *
- * <ul>
- *   <li>Erfolgreiche Uebergabe → DTO wird korrekt gemappt, success-Toast, Redirect auf Detailseite.
- *   <li>Backend-409 (z. B. Optimistic-Lock-Konflikt) → kein 5xx, error-Toast, Redirect auf
- *       Detailseite.
- *   <li>Leeres Items-Set → kein Backend-Call, error-Toast, Redirect auf Detailseite.
- * </ul>
+ * MVC tests for the handover POST in {@link JobOrderWriteController#createHandover}: success and
+ * backend 409 both redirect to the detail page with the matching toast, and an empty item set is
+ * rejected without a backend call.
  */
 @SpringBootTest
 class JobOrderPageControllerHandoverMvcTest {

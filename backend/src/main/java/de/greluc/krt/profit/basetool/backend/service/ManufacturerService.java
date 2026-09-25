@@ -34,13 +34,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Read service plus visibility toggle for the manufacturer catalog.
- *
- * <p>The catalog itself is owned by {@link UexManufacturerService}; this service exposes the cached
- * read surface used by every page that needs a manufacturer dropdown, plus the admin-only {@code
- * hidden} flag flip. Cache is the {@code manufacturers} cache from {@link CacheConfig} — 12-hour
- * master-data write-expire, evicted on any visibility change and on completion of the UEX / SC Wiki
- * sync sweep (via {@code MasterDataCacheEvictionService}, CACHE-SYNC-EVICT-001).
+ * Cached read service and admin visibility toggle for the manufacturer catalog, which {@link
+ * UexManufacturerService} owns. The cache is evicted on visibility changes and after each sync
+ * sweep.
  */
 @Service
 @RequiredArgsConstructor
@@ -50,8 +46,7 @@ public class ManufacturerService {
   private final ManufacturerRepository manufacturerRepository;
 
   /**
-   * Returns a paged manufacturer list. {@code includeHidden=true} bypasses the {@code hidden=false}
-   * filter — used by the admin page so admins can un-hide entries.
+   * Returns a cached, paged manufacturer list.
    *
    * @param pageable page request (whitelisted sort fields applied by the controller)
    * @param includeHidden true to include manufacturers marked hidden
@@ -79,8 +74,7 @@ public class ManufacturerService {
   }
 
   /**
-   * Flips the {@code hidden} flag on a manufacturer. Evicts the full manufacturer cache so the next
-   * read sees the new state immediately.
+   * Sets the {@code hidden} flag on a manufacturer and evicts the manufacturer cache.
    *
    * @param id manufacturer primary key
    * @param hidden new flag value

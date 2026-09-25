@@ -41,12 +41,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
- * Real-Postgres coverage for the admin account merge (REQ-SEC-045, #1639).
- *
- * <p>Runs against the live schema on purpose. The merge is set-based native SQL over two dozen
- * tables, and the two things that can go wrong with it — a unique constraint the deduplication
- * missed, and a column whose type no longer matches the parameter — are both invisible to a mocked
- * repository and both fail loudly here.
+ * Real-Postgres tests for the admin account merge (REQ-SEC-045), catching unique-constraint and
+ * column-type errors in its set-based native SQL that a mocked repository would hide.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -173,12 +169,8 @@ class UserAccountMergeServiceTest {
   }
 
   /**
-   * The other half of the rule, and the one that is easy to get wrong in the permissive direction:
-   * a row recording who <em>did</em> something must stay where it happened.
-   *
-   * <p>Uses the approval history, which is both a {@code STAYS_WITH_THE_ACT} entry and a record
-   * about the account itself — if anything were going to be swept along by an over-broad move, it
-   * would be this.
+   * Verifies that a row recording an act, here the approval history, stays on the source account
+   * instead of moving with the merge.
    */
   @Test
   @DisplayName("a row recording an act stays on the source account")

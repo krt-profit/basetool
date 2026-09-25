@@ -28,12 +28,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 /**
- * Spring Data repository for {@link BankAccountViewGrant} — the holder-configured additional read
- * access to a bank account (REQ-BANK-035, V189). Read exclusively by the org-unit-aware {@code
- * OrgUnitBankAccessService} seam (and the bank-management SPECIAL-visibility path); the row's
- * existence grants the named audience view access, so the finders are existence/list shaped and the
- * removals are single-row derived deletes (entity-level, so they never bulk-clear the persistence
- * context).
+ * Spring Data repository for {@link BankAccountViewGrant}, the holder-configured extra read access
+ * to a bank account (REQ-BANK-035). A row's existence grants its audience view access.
  */
 @Repository
 public interface BankAccountViewGrantRepository extends JpaRepository<BankAccountViewGrant, UUID> {
@@ -48,19 +44,16 @@ public interface BankAccountViewGrantRepository extends JpaRepository<BankAccoun
   List<BankAccountViewGrant> findByAccountId(UUID accountId);
 
   /**
-   * Returns every view grant of the given accounts in one query — batched for the org-unit bank
-   * card list so the per-account {@code canView} check needs no per-account N+1 read
-   * (REQ-DATA-003).
+   * Returns every view grant of the given accounts in one query (REQ-DATA-003).
    *
-   * @param accountIds the accounts whose grants to collect; never {@code null}. An empty collection
-   *     yields an empty result.
+   * @param accountIds the accounts whose grants to collect; never {@code null}; empty yields an
+   *     empty result
    * @return the view grants across the given accounts; never {@code null}
    */
   List<BankAccountViewGrant> findByAccountIdIn(Collection<UUID> accountIds);
 
   /**
-   * {@code true} iff the account already carries a grant of the given kind — used to keep the
-   * all-members toggle idempotent before an insert.
+   * Whether the account already carries a grant of the given kind.
    *
    * @param accountId the account; never {@code null}
    * @param granteeKind the grant kind to probe; never {@code null}
@@ -69,8 +62,7 @@ public interface BankAccountViewGrantRepository extends JpaRepository<BankAccoun
   boolean existsByAccountIdAndGranteeKind(UUID accountId, BankAccountViewGranteeKind granteeKind);
 
   /**
-   * {@code true} iff the account already carries a role grant of the given kind and role code —
-   * keeps a role-bucket toggle idempotent before an insert.
+   * Whether the account already carries a role grant of the given kind and role code.
    *
    * @param accountId the account; never {@code null}
    * @param granteeKind {@code MEMBERSHIP_ROLE} or {@code GLOBAL_ROLE}; never {@code null}
@@ -81,8 +73,7 @@ public interface BankAccountViewGrantRepository extends JpaRepository<BankAccoun
       UUID accountId, BankAccountViewGranteeKind granteeKind, String roleCode);
 
   /**
-   * {@code true} iff the account already carries an individual-user grant for the given user —
-   * keeps a user grant idempotent before an insert.
+   * Whether the account already carries an individual-user grant for the given user.
    *
    * @param accountId the account; never {@code null}
    * @param granteeUserId the granted user; never {@code null}

@@ -40,11 +40,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * Pins the no-N+1 contract of the bank read surface (REQ-BANK-020, REQ-DATA-003) against the real
- * Testcontainers PostgreSQL: with ≥ 100 accounts seeded, the management dashboard and the paged
- * account list each issue a fixed handful of SQL statements — the count is bounded by the grouped
- * queries and does <em>not</em> grow with the account count (the property an N+1 would violate
- * regardless of total posting volume).
+ * Verifies against real Postgres that the bank dashboard and paged account list issue a fixed
+ * number of SQL statements regardless of account count (REQ-BANK-020, REQ-DATA-003).
  */
 @SpringBootTest
 @ActiveProfiles("test")

@@ -57,11 +57,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST surface for refinery orders. Two endpoint families: user endpoints under {@code /} that
- * derive the caller from the JWT, and admin/officer endpoints under {@code /all} and {@code
- * /users/{userId}} that take the target user from the URL. Logistician role lifts the owner
- * constraint on the user endpoints (a logistician can edit anyone's order via the user endpoint as
- * well — convenient for the in-app order screen).
+ * REST surface for refinery orders: user endpoints that derive the caller from the JWT, and
+ * admin/officer endpoints under {@code /all} and {@code /users/{userId}} that take the target user
+ * from the URL.
  */
 @RestController
 @RequestMapping("/api/v1/refinery-orders")
@@ -118,13 +116,11 @@ public class RefineryOrderController {
   }
 
   /**
-   * Returns the UEX-derived refinery bonus/malus per input material for the refinery at {@code
-   * locationId}, as a {@code materialId → percent} map (positive = bonus, negative = malus, {@code
-   * 0} = explicit baseline). Used by the refinery-order detail page to refresh the yield badge
-   * client-side when the user changes the input material or the picked location. An unknown or null
-   * location id returns an empty map (200, not 404) because the client treats "unknown location"
-   * identically to "no yield data" — see {@link
-   * RefineryOrderService#getYieldBonusByMaterialForLocationId(UUID)}.
+   * Returns the UEX-derived refinery yield bonus/malus per input material for a refinery location,
+   * as a {@code materialId → percent} map (positive = bonus, negative = malus, {@code 0} =
+   * baseline).
+   *
+   * <p>An unknown or {@code null} location returns an empty map, not 404.
    *
    * @param locationId the chosen refinery location
    * @return per-material yield bonus map
@@ -137,16 +133,11 @@ public class RefineryOrderController {
   }
 
   /**
-   * Lists refinery orders linked to a mission. Logisticians see every order within their own
-   * org-unit scope (an admin without an active pin sees all; an admin pinned to a squadron and a
-   * non-admin logistician see only their scope); regular users see only their own orders. The
-   * mission detail page is rendered for both roles.
+   * Lists refinery orders linked to a mission: logisticians see every order within their org-unit
+   * scope, other users only their own.
    *
-   * <p>Security (finding BAC-004): the logistician branch is org-unit-scoped via {@link
-   * RefineryOrderService#getMissionRefineryOrdersScoped}. Refinery is a strict-staffel aggregate
-   * with no cross-squadron escape, so although a non-internal mission is visible to other
-   * squadrons, the refinery financials attached to it are not - a logistician cannot read a foreign
-   * squadron's refinery orders by enumerating that squadron's public missions.
+   * <p>Refinery is strict-staffel, so a foreign squadron's orders stay hidden even on a mission
+   * that is visible to other squadrons.
    *
    * @return list of refinery-order list DTOs
    */
@@ -169,18 +160,11 @@ public class RefineryOrderController {
   }
 
   /**
-   * Creates a refinery order. A caller who names another member via {@code orderDto.owner()} must
-   * pass the same per-target scope gate as the dedicated on-behalf endpoint {@link
-   * #createRefineryOrderForUser}; otherwise the override is ignored and the caller owns the order.
+   * Creates a refinery order owned by the caller.
    *
-   * <p><strong>Why the gate and not the role.</strong> This branch used to honour the
-   * client-supplied owner for anyone holding the flat {@code ROLE_LOGISTICIAN} - the OR-union over
-   * all of the caller's memberships, with no org-unit context - so a logistician of any Staffel
-   * could stamp an order into a member of any other Staffel's refinery ledger (REQ-SEC-005). Its
-   * sibling {@code POST /users/&#123;userId&#125;} had already been hardened with {@code
-   * canManageUserRefineryOrders} in PR #808, and only this door was left open - which matters
-   * because the hardened one is not on the API vhost allow-list at all, so from the internet this
-   * was the only reachable of the two.
+   * <p>An owner named via {@code orderDto.owner()} is honoured only when the caller passes the same
+   * per-target scope gate as {@link #createRefineryOrderForUser}; otherwise it is ignored
+   * (REQ-SEC-005).
    *
    * @return the persisted DTO
    */
@@ -292,16 +276,11 @@ public class RefineryOrderController {
   }
 
   /**
-   * Lists a specific user's refinery orders. Two-stage org-unit scoping (epic #800 / PR #808 +
-   * finding SEC-01): the {@code @PreAuthorize} gate {@code canViewUserRefineryOrders} is a coarse
-   * user-level pre-check (admin, the target user themselves, or a logistician whose strict org-unit
-   * scope covers <em>any one</em> unit the target belongs to), and the returned page is then
-   * filtered per-row to the caller's effective scope by {@link
-   * RefineryOrderService#getUserRefineryOrdersScoped}. Because a member may belong to up to two
-   * Staffeln (REQ-ORG-017), the gate alone is not enough — without the scoped query a logistician
-   * sharing only one of the target's Staffeln would read the target's orders stamped to the other,
-   * foreign Staffel. Refinery is a strict-staffel aggregate, so the list never returns a row the
-   * per-order {@code canSeeRefineryOrder} gate would individually deny.
+   * Lists a specific user's refinery orders.
+   *
+   * <p>The {@code canViewUserRefineryOrders} gate is a coarse user-level pre-check; the returned
+   * page is then filtered per row to the caller's effective org-unit scope, so a logistician
+   * sharing only one of the target's Staffeln never sees orders of the other (REQ-ORG-017).
    *
    * @param userId target user id
    * @return paged refinery-order list DTOs
@@ -329,10 +308,8 @@ public class RefineryOrderController {
   }
 
   /**
-   * Creates a refinery order on behalf of a target user. Logistician scoped to the caller's org
-   * units: an admin, the target user themselves, or a logistician whose strict org-unit scope
-   * covers a unit the target user belongs to (epic #800 / PR #808 security review — no longer
-   * org-wide).
+   * Creates a refinery order on behalf of a target user. Allowed for an admin, the target user, or
+   * a logistician whose strict org-unit scope covers a unit the target belongs to.
    *
    * @return the persisted DTO
    */

@@ -35,11 +35,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Exemplar for epic #571 / #573 (REQ-FE-005): filtering the missions list swaps the results in
- * place — no page navigation — and keeps the address-bar URL in sync so a refresh re-renders the
- * same filter. Two distinctively-named missions are seeded; filtering by one's token must keep that
- * row and drop the other, prove no reload happened (a window marker survives), and leave the URL
- * carrying the {@code search} parameter.
+ * Verifies that filtering the missions list swaps the results in place without navigation and keeps
+ * the {@code search} parameter in the URL (REQ-FE-005).
  */
 @Tag("e2e")
 class MissionListFilterInPlaceE2eTest {

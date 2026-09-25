@@ -22,20 +22,16 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.util.UUID;
 
 /**
- * Frontend mirror of the backend {@code JobOrderMaterialNeedDto}: one order's outstanding need for
- * a single {@code (material, quality)} bucket, used to label the Lager's allocation picker options
- * (REQ-INV-039).
- *
- * <p>Only populated when the page asked the lookup for it ({@code withNeeds=true}); the pickers
- * that render no figure receive an empty list. {@code qualityFloor} is the numeric inventory
- * quality the bucket's stock is summed at or above, so the Einbuchen form can compare it against
- * the grade being entered without re-deriving the 650 constant client-side.
+ * Frontend mirror of the backend {@code JobOrderMaterialNeedDto}: an order's outstanding need for
+ * one {@code (material, quality)} bucket, labelling the Lager allocation pickers (REQ-INV-039).
+ * Present only when requested with {@code withNeeds=true}.
  *
  * @param materialId the bucket's material
  * @param qualityFloor the quality floor ({@code 650}) or {@code null} for no floor
  * @param requiredAmount the order's outstanding requirement for the bucket
  * @param bookedAmount the inventory already linked to this order at or above the floor
- * @param outstandingAmount {@code requiredAmount − bookedAmount}, floored at 0 — what to render
+ * @param outstandingAmount {@code requiredAmount − bookedAmount}, floored at 0; the figure to
+ *     render
  */
 public record JobOrderMaterialNeedDto(
     UUID materialId,

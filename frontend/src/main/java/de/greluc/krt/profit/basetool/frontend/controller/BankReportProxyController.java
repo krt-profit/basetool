@@ -42,11 +42,9 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 /**
- * Frontend proxy for the bank PDF exports (epic #556 Phase 3): the account statement (REQ-BANK-014)
- * and the management three-month report (REQ-BANK-015). Streams the backend's PDF bytes back to the
- * browser via the authenticated {@link WebClient} (OAuth2 token attached automatically) and
- * forwards the caller's IANA time zone so the documents render local timestamps. Authorization is
- * decided by the backend gates; this seam only requires authentication.
+ * Frontend proxy for the bank PDF exports: account statement (REQ-BANK-014) and management
+ * three-month report (REQ-BANK-015). Forwards the caller's IANA time zone; authorization is decided
+ * by the backend, this seam only requires authentication.
  */
 @RestController
 @RequestMapping("/api/proxy/bank")

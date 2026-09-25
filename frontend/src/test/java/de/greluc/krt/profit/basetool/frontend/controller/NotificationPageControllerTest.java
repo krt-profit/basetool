@@ -48,12 +48,8 @@ import org.springframework.ui.Model;
 import org.springframework.web.reactive.function.client.WebClient;
 
 /**
- * Unit tests for the {@code /notifications} inbox page's load-more / no-silent-cap behaviour
- * (REQ-NOTIF-019). The page renders the newest 50 notifications from the paginated backend listing
- * and exposes the total count plus a more-pages flag so the template can show a truthful "latest N
- * of M" hint and a load-more control; {@code /page-items} relays the following pages. These tests
- * pin the paging facts the view and the relay depend on, driving the controller directly with a
- * mocked {@link BackendApiClient}.
+ * Unit tests for the {@code /notifications} inbox paging (REQ-NOTIF-019): the newest 50 are
+ * rendered with the total count and a more-pages flag, and {@code /page-items} relays later pages.
  */
 class NotificationPageControllerTest {
 

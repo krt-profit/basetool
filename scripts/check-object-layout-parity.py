@@ -1,20 +1,10 @@
 #!/usr/bin/env python3
 """Assert that the image's startup cache and every runtime JVM agree on the object layout.
 
-REQ-OPS-030 / ADR-0180 set ``-XX:+UseCompactObjectHeaders`` in two places that cannot see each
-other: the AOT-cache training run in ``docker/app/Dockerfile`` (the image build, where
-``JAVA_TOOL_OPTIONS`` does not exist) and every service's ``JAVA_TOOL_OPTIONS`` in the compose files
-and the generated ``quadlet/env.d`` templates. A cache created with one layout is refused by a JVM
-started with the other, and the refusal is not a failure: the JVM prints a warning and starts
-without the cache (verified 2026-09-23). Until then the invariant rested on two comments naming each
-other.
-
-Three guards now cover it, one per moment it can break:
-  - this check, before merge: the Dockerfile's ``layout=`` and every ``JAVA_TOOL_OPTIONS`` line
-    that names the flag carry the SAME sign, and each application service's line names it at all;
-  - the image build: a start under ``-XX:AOTMode=on`` with that ``layout=`` must accept the cache;
-  - the runtime: the Loki rule ``JvmStartupCacheRejected`` fires on the JVM's refusal, which is what
-    the documented rollback ``IRI_EXTRA_JAVA_OPTS=-XX:-UseCompactObjectHeaders`` produces on purpose.
+The ``layout=`` of the AOT-cache training run in ``docker/app/Dockerfile`` and every
+``JAVA_TOOL_OPTIONS`` in the compose files and ``quadlet/env.d`` templates must set
+``UseCompactObjectHeaders`` with the same sign; a mismatched JVM silently starts without the cache
+(REQ-OPS-030, ADR-0180).
 
 Usage:
     check-object-layout-parity.py            # check the tree
@@ -79,7 +69,7 @@ def mismatches(sign: str | None, lines: list[tuple[str, str]], expected_count: i
 
 
 def selftest() -> int:
-    """Prove the check discriminates.
+    """Check that each mismatch shape is reported and the real tree is readable.
 
     :return: 0 when every case holds, 1 otherwise.
     """
@@ -102,8 +92,6 @@ def selftest() -> int:
     last = runtime_lines({"compose": "  JAVA_TOOL_OPTIONS: -XX:-UseCompactObjectHeaders -XX:+UseCompactObjectHeaders\n"})
     expect("the last setting wins, as in the JVM", mismatches("+", last, 1) == [])
     expect("too few assignments are reported", len(mismatches("+", ok, 3)) == 1)
-    # Anti-vacuity: the real tree must yield the image's layout and six assignments (three services,
-    # compose and env.d), or this check is looking at nothing.
     real = collect()
     expect("the real Dockerfile yields a layout", image_layout(DOCKERFILE.read_text(encoding="utf-8")) is not None)
     expect("the real tree yields at least six JAVA_TOOL_OPTIONS lines", len(runtime_lines(real)) >= 6)

@@ -36,14 +36,10 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Pure, side-effect-free aggregate math backing the operation payout breakdown, extracted from
- * {@code OperationPayoutService} (audit Thema 7, #14). Every method here is a stateless function of
- * its arguments — no repository, no security context, no clock other than {@link Instant#now()} for
- * the still-running-participant clamp — so it is trivially unit-testable in isolation and can be
- * shared without dragging the payout service's collaborators onto the call path. The service loads
- * the finance ledger / refinery orders / participant graph and merges in the persisted paid-out
- * status; this calculator only turns those already-loaded rows into the total sum, the per-owner
- * out-of-pocket reimbursements and the per-participant attendance breakdown.
+ * Stateless math behind the operation payout breakdown: turns already-loaded finance entries,
+ * refinery orders and the participant graph into the total sum, per-participant out-of-pocket
+ * reimbursements and the attendance breakdown. Uses no repository or security context; the only
+ * clock read is {@link Instant#now()} for clamping still-running participants.
  */
 public final class OperationPayoutCalculator {
 
@@ -51,10 +47,8 @@ public final class OperationPayoutCalculator {
   private OperationPayoutCalculator() {}
 
   /**
-   * Computes the operation total sum identically to {@code OperationFinanceService} (mission INCOME
-   * plus refinery profit minus mission EXPENSE). Duplicated from the canonical {@code
-   * OperationFinanceService} implementation on purpose — recomputing ten lines here keeps the
-   * payout call path off that service and its own DTO assembly cost.
+   * Computes the operation total sum (mission INCOME plus refinery profit minus mission EXPENSE),
+   * identical to the {@code OperationFinanceService} figure.
    *
    * @param entries the mission finance entries across every mission of the operation
    * @param orders the refinery orders across every mission of the operation
@@ -190,24 +184,9 @@ public final class OperationPayoutCalculator {
   }
 
   /**
-   * Returns the opaque participant key used across the payout pipeline — real user UUID
-   * stringified, {@code "guest_<name>"} for guests, or {@code "deleted_<participantId>"} for a
-   * participant whose account was hard-deleted (REQ-DATA-008).
-   *
-   * <p>The deleted branch is load-bearing, not cosmetic. A user deletion nulls {@code
-   * mission_participant.user_id} while leaving {@code guest_name} empty, which used to make this
-   * method return {@code null} — and a {@code null} key drops the row from {@link
-   * #computeParticipationBreakdown} entirely: the person vanished from the payout list, their
-   * attendance stopped counting towards {@code totalDuration}, and their {@code EXPENSE} entries
-   * stopped counting as personal reimbursement while still counting into the shared pool. The
-   * percentages and aUEC amounts of an <em>already-settled historical</em> operation therefore
-   * changed silently whenever some unrelated member was deleted, redistributing money the deleted
-   * member had advanced onto everyone else.
-   *
-   * <p>Keying on the participant row's own id keeps that row in the breakdown with a stable
-   * identity, so the split stays exactly as it was settled. Two deleted members never collapse into
-   * one bucket, and the key survives repeated recomputation. Only a row with no id at all — never
-   * persisted — is still unkeyable.
+   * Returns the opaque participant key used across the payout pipeline: the user UUID, {@code
+   * "guest_<name>"} for guests, or {@code "deleted_<participantId>"} for a participant whose
+   * account was hard-deleted (REQ-DATA-008), which keeps a settled operation's split stable.
    *
    * @param participant the mission participant to key
    * @return the opaque participant key, or {@code null} for an unpersisted row
@@ -224,9 +203,7 @@ public final class OperationPayoutCalculator {
   }
 
   /**
-   * Internal carrier for the values produced by a single pass over the operation's
-   * mission-participant graph. Keeping them as a record avoids passing four separate maps around
-   * and accidentally desyncing them.
+   * The values produced by one pass over the operation's mission-participant graph.
    *
    * @param participantNames participant key → display name
    * @param validDurations participant key → accumulated valid attendance window, in milliseconds

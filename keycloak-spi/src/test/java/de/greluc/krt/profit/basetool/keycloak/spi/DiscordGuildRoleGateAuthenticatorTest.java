@@ -45,12 +45,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Orchestration tests for {@link DiscordGuildRoleGateAuthenticator#authenticate}: the fail-closed
- * membership branches (missing config, missing brokered token, membership denial) and the fail-open
- * account-existence precheck (REQ-SEC-022) — deny-on-collision, allow-on-no-collision,
- * allow-on-uncertain (fail open), and the three skip paths (account linking, unconfigured URL,
- * non-HTTPS URL). The brokered-identity and environment reads are overridden per test (they would
- * otherwise need a live first-broker-login session and real environment variables).
+ * Tests {@link DiscordGuildRoleGateAuthenticator#authenticate}: the fail-closed membership branches
+ * and the fail-open account-existence precheck (REQ-SEC-022), including its skip paths.
  */
 @ExtendWith(MockitoExtension.class)
 class DiscordGuildRoleGateAuthenticatorTest {
@@ -249,11 +245,8 @@ class DiscordGuildRoleGateAuthenticatorTest {
   }
 
   /**
-   * KC-PERF-01: a first login with the precheck configured makes exactly ONE Discord call — the
-   * guild-member read — and the server nickname the precheck needs comes out of that same object.
-   * It used to be two here (roles, then the same endpoint again for the nickname), plus the
-   * identity provider's own read, i.e. three calls of the user's Discord rate-limit budget for one
-   * member object.
+   * A first login with the precheck configured makes exactly one Discord call, and the nickname
+   * comes from that member object.
    */
   @Test
   void makesExactlyOneDiscordCallPerFirstLogin_andTakesTheNicknameFromIt() throws Exception {

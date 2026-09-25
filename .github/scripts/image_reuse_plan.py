@@ -1,63 +1,15 @@
 #!/usr/bin/env python3
 """Decide, per app image, whether a main-branch push must rebuild it or may re-tag the previous one.
 
-REQ-OPS-021 / ADR-0137 build every app image once per COMMIT, and the release-tag run already
-re-tags what the main run of the same commit produced. A main push whose diff touches nothing that
-goes into an image still rebuilt all three images on six runners (audit item CI-07). ADR-0210 first
-re-tagged all three when NO image input changed; since its per-module amendment (owner decision
-2026-09-23) each image is decided on its own: a frontend-only change rebuilds the frontend and
-re-tags the backend and ingest images of the previous main tip.
+This is the git half of the decision (REQ-OPS-021, ADR-0210); the registry checks stay in the
+workflow. Image inputs are derived from ``docker/app/Dockerfile``'s context ``COPY`` sources:
 
-This script is the git half of that decision: for each module it answers "did anything that goes
-into THIS image change between the previous main tip and this one?". The registry half -- the
-predecessor's image exists, carries both architectures, carries this workflow's main-branch
-signature and is at most seven days old -- stays in the workflow's ``plan`` job, per module; a module
-that fails it is rebuilt.
+* ``${MODULE}`` sources and the paths in ``MODULE_OWN`` rebuild only their module;
+* every other COPY source, plus ``STATIC_SHARED``, rebuilds all three.
 
-WHAT COUNTS AS AN IMAGE INPUT (the precise definition; REQ-OPS-021 quotes it). Everything is derived
-from ``docker/app/Dockerfile``'s ``COPY`` lines (``COPY --from=<stage>`` is internal and skipped), so
-a COPY added there is an input here without anyone remembering to say so:
-
-* A module's OWN inputs rebuild only that module:
-  - every COPY source written with ``${MODULE}`` -- today ``<module>/src/main``;
-  - the paths in ``MODULE_OWN``, each with the reason it is read by one module's build only --
-    today ``frontend/oss-bundled-components.json`` (the Dockerfile copies it for every module, but
-    only the frontend's ``generateOssLicenses`` reads it).
-* Every other COPY source is SHARED and rebuilds all three: the Gradle wrapper and ``gradle/``
-  (catalog, wrapper, ``verification-metadata.xml``), the root build scripts and
-  ``gradle.properties``, ``logging-support/src/main`` (all three ship it), and ALL SIX module build
-  scripts. The build scripts are shared on purpose, not by caution alone: Gradle configures every
-  project for every build, and the frontend jar embeds the Licensee reports of the backend, ingest
-  and keycloak-spi runtime classpaths (the "Open-Source-Lizenzen" page, REQ-UI-021), so a
-  dependency change in ``backend/build.gradle.kts`` changes the frontend image.
-* Also shared, because they shape every build without being copied: the Dockerfile itself (it pins
-  both base-image digests), the root ``.dockerignore``, ``release-images.yml`` (build args, labels,
-  platforms), ``.github/actions/setup-buildx/`` (the BuildKit that runs the build) and
-  ``.github/scripts/app_version.py`` (the version string the frontend bakes).
-
-A change to anything else -- docs, tests, the monitoring tree, compose files, other workflows --
-leaves an image byte-for-byte what its previous build produced, apart from what that build's time
-and commit stamp into it: its labels and, for the frontend, the version chip, which name the commit
-that BUILT the image, not the one that re-tagged it. After a partial reuse the three images of one
-``:sha-<short>`` can therefore name three different building commits; ADR-0210 lists what reads that.
-
-A RELEASE COMMIT REBUILDS ALL THREE, whatever it changes: it is the commit whose images the tag run
-re-tags as the release and whose frontend footer must name the release (app_version.py), and a
-release deserves images built from one commit on its own day. It is recognised by the newest dated
-CHANGELOG section differing from the base's -- the section ``release-prepare.yml`` writes -- which,
-unlike "is the tag there yet?", does not depend on how fast ``release-publish.yml`` runs.
-
-Everything unclear rebuilds all three: an unknown base, a base that is not an ancestor, an
-unreadable Dockerfile, a git error. The default is the behaviour this path optimises, never a guess.
-
-Two more questions the workflow asks before that decision (amendments of 2026-09-23):
-
-* ``--skip-check``: is this main-push run SUPERSEDED -- its commit no longer the tip of ``main``
-  when ``plan`` starts -- so that the whole run may skip? Never for a release commit, a tag push or
-  ``workflow_dispatch``. See :func:`skip_decision`.
-* ``--candidates``: which main commits may serve as the reuse base, newest first, bounded? The
-  workflow takes the first whose three images exist, so a skipped or failed predecessor run does not
-  force a full rebuild. See :func:`base_candidates`.
+A release commit (new dated CHANGELOG section) and anything unclear (unknown or non-ancestor base,
+unreadable Dockerfile, git error) rebuild all three. ``--skip-check`` decides whether a superseded
+main-push run skips (:func:`skip_decision`); ``--candidates`` lists reuse bases (:func:`base_candidates`).
 
 Usage:
     image_reuse_plan.py --base <sha> --head <sha>     # one decision, JSON on stdout
@@ -91,7 +43,6 @@ from app_version import newest_changelog_version  # noqa: E402  (sibling module,
 APP_DOCKERFILE = "docker/app/Dockerfile"
 MODULES = ("backend", "frontend", "ingest")
 
-# Inputs that no COPY names but that still decide what every image is.
 STATIC_SHARED = (
     APP_DOCKERFILE,
     ".dockerignore",
@@ -100,17 +51,10 @@ STATIC_SHARED = (
     ".github/scripts/app_version.py",
 )
 
-# COPY sources written without ${MODULE} that nevertheless only one module's build reads. Each entry
-# needs a reason; everything not listed here and not written with ${MODULE} is shared. The selftest
-# fails when an entry is no longer a COPY source, so a stale entry cannot linger.
 MODULE_OWN = {
-    # Read only by the frontend's generateOssLicenses (frontend/build.gradle.kts); the Dockerfile
-    # copies it for every module to avoid a per-module glob.
     "frontend/oss-bundled-components.json": "frontend",
 }
 
-# Only for --dry-run over history older than docker/app/Dockerfile (ADR-0209, 2026-09-23): what the
-# three per-module Dockerfiles copied on top of today's inputs.
 LEGACY_OWN = {m: [f"{m}/Dockerfile"] for m in MODULES}
 LEGACY_SHARED = ["test-support/src/main", "versions.properties"]
 
@@ -120,9 +64,8 @@ ZERO_SHA = "0" * 40
 def copy_sources(dockerfile: str) -> list[str]:
     """Return every build-context COPY source, ``${MODULE}`` left unexpanded.
 
-    Line continuations are joined first; ``COPY --from=...`` is skipped (it copies between stages,
-    not from the context); other ``--flag`` options are dropped; the last operand is the
-    destination.
+    Line continuations are joined; ``COPY --from=...`` is skipped and other ``--flag`` options
+    dropped.
 
     :param dockerfile: the Dockerfile's full text.
     :return: the source paths without trailing slashes, de-duplicated, in first-seen order.
@@ -285,9 +228,8 @@ def decide_from_git(base: str, head: str, dockerfile_override: str | None = None
 
     :param base: the previous main tip.
     :param head: the pushed commit.
-    :param dockerfile_override: a Dockerfile text to use instead of the one at ``head`` -- only the
-        dry run passes it, to replay commits older than ``docker/app/Dockerfile``.
-    :param legacy: add the pre-2026-09-23 per-module Dockerfile inputs (dry run only).
+    :param dockerfile_override: a Dockerfile text to use instead of the one at ``head`` (dry run).
+    :param legacy: add the legacy per-module Dockerfile inputs (dry run).
     :return: the decision from :func:`decide`, plus ``base`` and ``head``.
     """
     valid = re.fullmatch(r"[0-9a-f]{40}", base or "") and base != ZERO_SHA
@@ -314,9 +256,8 @@ def decide_from_git(base: str, head: str, dockerfile_override: str | None = None
 def dry_run(count: int, ref: str) -> int:
     """Replay the decision over the last ``count`` first-parent commits of ``ref``.
 
-    Each commit is planned against its first parent, as a one-commit push would be, with today's
-    Dockerfile and the legacy per-module Dockerfiles counted as inputs, so history from before
-    ``docker/app/Dockerfile`` is judged as it would have had to be.
+    Each commit is planned against its first parent with today's Dockerfile plus the legacy
+    per-module Dockerfiles as inputs.
 
     :param count: how many commits to replay.
     :param ref: the branch to replay, e.g. ``origin/main``.
@@ -346,28 +287,15 @@ def dry_run(count: int, ref: str) -> int:
 
 SHA_RE = re.compile(r"[0-9a-f]{40}")
 
-# How far back the main path looks for a reuse base whose images exist (see base_candidates).
 BASE_SEARCH_LIMIT = 20
 
 
 def skip_decision(event: str, pushed_ref: str, head: str, tip: str, head_behind_tip: bool,
                   release_in_range: bool) -> dict:
-    """Decide whether a main-push run is superseded and may skip everything (ADR-0137 amendment).
+    """Decide whether a main-push run is superseded and may skip everything (ADR-0137).
 
-    Every push to ``main`` queues its own run -- the concurrency group is per COMMIT, so a release
-    commit and its tag never run in parallel -- and on a busy day the queue outgrows the runners
-    (2026-09-23: 29 runs queued behind ~35 merges, starving PR CI). A run whose commit is no longer
-    the tip of ``main`` when its ``plan`` job starts produces images nobody will deploy: the tip's
-    own run builds or re-tags the newer state, and ``:edge`` must not move BACK to it anyway. So it
-    skips, except where skipping could lose something:
-
-    * only a ``push`` to ``refs/heads/main`` is ever skipped -- never ``workflow_dispatch`` (the
-      manual rebuild) and never a tag push;
-    * only when the pushed commit is a STRICT ancestor of the current tip -- a newer commit on main
-      exists and has its own run; a tip that is unknown, equal, or not a descendant (a force push)
-      means "build";
-    * never when the pushed range contains a release commit: the tag run re-tags
-      ``:sha-<release commit>``, which only this run produces.
+    Skips only a ``push`` to ``refs/heads/main`` whose commit is a strict ancestor of the current
+    tip and whose range contains no release commit.
 
     :param event: ``github.event_name``.
     :param pushed_ref: ``github.ref``.
@@ -408,7 +336,6 @@ def skip_from_git(event: str, pushed_ref: str, head: str, before: str, tip: str)
     """
     behind = (bool(SHA_RE.fullmatch(tip or "")) and tip != head
               and git("merge-base", "--is-ancestor", head, tip).returncode == 0)
-    # A base the range cannot be computed from counts as "may contain a release": no skip.
     release = True
     if SHA_RE.fullmatch(before or "") and before != ZERO_SHA:
         release = is_release_commit(show(head, "CHANGELOG.md") or "", show(before, "CHANGELOG.md") or "")
@@ -420,13 +347,7 @@ def skip_from_git(event: str, pushed_ref: str, head: str, before: str, tip: str)
 def base_candidates(chain: list[str], before_is_ancestor: bool, limit: int = BASE_SEARCH_LIMIT) -> list[str]:
     """Order the commits the main path may take its reuse base from.
 
-    The natural base is ``github.event.before``, the previous tip. Its run may never have
-    published images -- skipped as superseded (above), cancelled, or failed -- and then every gate
-    fails and the whole push rebuilds. So the workflow walks this list, newest first, and takes the
-    first commit whose three images exist; the per-module decision is then computed against THAT
-    commit, so nothing changed since it can be missed. Bounded, because a base far back makes the
-    diff (and every rebuild it implies) larger for no benefit, and the seven-day age gate would
-    refuse most of it anyway.
+    The workflow takes the first candidate whose three images exist and decides against it.
 
     :param chain: ``git rev-list --first-parent before``, newest first.
     :param before_is_ancestor: whether ``before`` is an ancestor of the pushed commit.
@@ -525,7 +446,6 @@ def selftest() -> int:
     r = decide(base, head, dockerfile, ["backend/Dockerfile"], old, old, True, LEGACY_OWN, LEGACY_SHARED)
     check("dry run: a legacy per-module Dockerfile rebuilds its module", r["rebuild"] == ["backend"])
 
-    # Superseded-run skip (ADR-0137 amendment 2026-09-23).
     tip, h = "c" * 40, "b" * 40
     main = ("push", "refs/heads/main")
     check("skip: a superseded main push skips", skip_decision(*main, h, tip, True, False)["skip"])
@@ -539,7 +459,6 @@ def selftest() -> int:
     check("skip: a commit that is not behind the tip (force push) builds",
           not skip_decision(*main, h, tip, False, False)["skip"])
 
-    # Reuse-base search.
     chain = [c * 40 for c in "abcdef"]
     check("base: candidates are the before chain, newest first", base_candidates(chain, True, 20) == chain)
     check("base: the search is bounded", base_candidates(chain, True, 3) == chain[:3])
@@ -549,8 +468,6 @@ def selftest() -> int:
 
     real = show("HEAD", APP_DOCKERFILE) or (REPO / APP_DOCKERFILE).read_text(encoding="utf-8")
     real_own, real_shared = input_sets(real)
-    # Anti-vacuity: the split must still see the real Dockerfile's COPYs. A parser that found none
-    # would make every change look input-free -- the one wrong answer.
     for m in MODULES:
         check(f"the real Dockerfile yields {m}/src/main as {m}'s own input", f"{m}/src/main" in real_own[m])
     for must in ("gradle", "logging-support/src/main", "build.gradle.kts", "backend/build.gradle.kts"):

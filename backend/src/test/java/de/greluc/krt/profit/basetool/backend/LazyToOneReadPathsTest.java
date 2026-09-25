@@ -96,26 +96,16 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Drives the most-used read endpoints of the aggregates whose {@code @ManyToOne} associations are
- * lazy (BE-PERF-11) through the real HTTP stack against the Testcontainers PostgreSQL, with <b>no
- * test transaction</b> — so each request runs in exactly the transaction its controller opens and
- * nothing more, as in production with {@code spring.jpa.open-in-view=false}.
- *
- * <p>Two things are asserted per endpoint:
+ * Drives the main read endpoints of aggregates with lazy {@code @ManyToOne} associations through
+ * the real HTTP stack with no test transaction, as in production with open-in-view disabled.
  *
  * <ul>
- *   <li><b>It answers 200, twice.</b> A lazy association read after the controller's transaction
- *       ended, or a lazy proxy left uninitialised inside a cached entity, surfaces here as a {@code
- *       LazyInitializationException} → 500. The second call is served from the Caffeine caches
- *       where the endpoint has one, which is the case that only the second call can catch.
- *   <li><b>Its statement count does not grow with the data.</b> Every endpoint is measured over a
- *       small and a large seed; a per-row lazy load would make the large one cost more. The counts
- *       are printed, which is where the before/after table in the pull request came from.
+ *   <li>Each endpoint answers 200 twice, the second time from the caches where present.
+ *   <li>Its statement count does not grow between a small and a large seed.
  * </ul>
  *
- * <p>Seeding and clean-up commit through a {@link TransactionTemplate}, because the point is the
- * absence of an enclosing transaction; everything seeded is removed again in {@link #cleanUp()} so
- * the shared container stays as the other test classes expect it.
+ * <p>Seeding and clean-up commit through a {@link TransactionTemplate}; {@link #cleanUp()} removes
+ * all seeded data.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -196,14 +186,8 @@ class LazyToOneReadPathsTest {
   }
 
   /**
-   * A cached entity must carry a complete graph even when the caller that filled the cache never
-   * touched an association (support.CachedEntityGraphs). Each cached method is called through its
-   * bean — in the service's own read-only transaction and no other — and the associations are then
-   * read with no session at all, exactly as the next request would read the cached copy. An
-   * uninitialised proxy fails here with {@code LazyInitializationException}.
-   *
-   * <p>The HTTP test above cannot show this: its cold call maps the entity inside the controller's
-   * transaction and so initialises the proxies itself before the warm call reads them.
+   * Verifies that each cached entity is stored with a fully initialised graph: cached methods are
+   * called through their beans, and associations are then read without a session.
    */
   @Test
   void aCachedEntityIsCompleteBeforeTheCacheStoresIt() {
@@ -250,8 +234,8 @@ class LazyToOneReadPathsTest {
   }
 
   /**
-   * Measures every endpoint for one seed, cold (caches cleared first), and calls it a second time
-   * warm, both of which must answer 200.
+   * Calls every endpoint cold (caches cleared) and then warm for one seed; both calls must answer
+   * 200.
    *
    * @param seed the data the endpoints read
    * @return endpoint label to the statement count of its cold call, in a stable order
@@ -332,9 +316,9 @@ class LazyToOneReadPathsTest {
   }
 
   /**
-   * Seeds one self-contained data set whose every lazy association is populated: an admin with
-   * {@code rows} ships, inventory rows and refinery orders, and a mission with {@code rows}
-   * participants, units and crew seats.
+   * Seeds a self-contained data set with every lazy association populated: an admin with {@code
+   * rows} ships, inventory rows and refinery orders, and a mission with {@code rows} participants,
+   * units and crew seats.
    *
    * @param rows how many rows of each kind
    * @return the ids of what was created

@@ -49,34 +49,13 @@ import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 /**
- * Builds the gateway's two outbound clients — the relay to the internal backend and the
- * client-credentials grant against Keycloak — as {@link RestClient}s on the JDK {@link HttpClient}
- * (ADR-0204). The bearer token and per-request headers are attached per call in {@code
- * BackendImportClient}, not here.
+ * Builds the gateway's two outbound {@link RestClient}s on the JDK {@link HttpClient}: the backend
+ * relay and the Keycloak client-credentials client (ADR-0204).
  *
- * <p>Both calls are blocking — they run on the request thread that is waiting for the answer — so
- * the reactive {@code WebClient} this class used to build bought nothing but a second HTTP stack on
- * the internet-facing module's classpath and a {@code block()} at every call site.
- *
- * <p><b>TLS trust</b> (finding M-13, ING-SEC-04). In {@code dev}/{@code test} the ephemeral docker
- * certificate is trusted without validation and without a hostname check. In every other profile a
- * configured {@code backend-trust} SSL bundle becomes the backend relay's <em>only</em> trust
- * anchor. Whether the relay then also verifies the hostname is {@code
- * app.ingest.verify-backend-hostname} (REQ-SEC-070, ADR-0211): off by default — the chain is pinned
- * and the name ignored, as ADR-0204 kept it for the single shared self-signed certificate — and on
- * once every service serves its own leaf from the internal CA, where the pinned anchor vouches for
- * every service and only the name tells the backend's certificate from the gateway's own. With no
- * bundle the relay falls back to the JVM trust store with hostname verification ON. The Keycloak
- * client trusts the JVM anchors plus the pinned {@code keycloak-trust} bundle and always verifies
- * the hostname outside {@code dev}/{@code test}.
- *
- * <p><b>How the hostname check is switched off per client.</b> The JDK client cannot do that
- * through its own API — it always asks the TLS engine for HTTPS endpoint identification, and the
- * only switch is a JVM-wide system property. The check itself, though, is performed by the trust
- * manager: an {@link X509ExtendedTrustManager} is handed the engine and verifies the peer's name
- * against it, while a plain {@link X509TrustManager} is wrapped by JSSE in one that does. {@link
- * #withoutHostnameVerification} is an extended trust manager that validates the chain and ignores
- * the engine, so the check is dropped for exactly the client that installs it and nowhere else.
+ * <p>In {@code dev}/{@code test} all certificates are trusted. Elsewhere the backend relay trusts
+ * only the {@code backend-trust} bundle (hostname checked per {@code
+ * app.ingest.verify-backend-hostname}, REQ-SEC-070) or else the JVM defaults; the Keycloak client
+ * trusts the JVM defaults plus {@code keycloak-trust} and always checks the hostname.
  */
 @Configuration
 @RequiredArgsConstructor
@@ -86,16 +65,14 @@ public class RestClientConfig {
   static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
 
   /**
-   * Upper bound on the backend relay once connected: the JDK request timeout (until the response
-   * headers arrive, which includes sending the upload) and, via Spring's request factory, the body
-   * read. The replaced client bounded read, write and response by 15&nbsp;s each.
+   * Timeout on the backend relay once connected, covering the request until response headers and
+   * the body read.
    */
   static final Duration BACKEND_READ_TIMEOUT = Duration.ofSeconds(15);
 
   /**
-   * Ceiling on the token call once connected. The effective bound is the smaller of this and {@code
-   * app.ingest.service-account.timeout-millis}, which is what the replaced client's netty timeouts
-   * (10&nbsp;s) and its {@code block(timeoutMillis)} amounted to together.
+   * Ceiling on the token call once connected; the effective bound is the smaller of this and {@code
+   * app.ingest.service-account.timeout-millis}.
    */
   static final Duration KEYCLOAK_READ_TIMEOUT_CEILING = Duration.ofSeconds(10);
 
@@ -105,11 +82,8 @@ public class RestClientConfig {
   private final SslBundles sslBundles;
 
   /**
-   * Micrometer observation registry wired into both clients (REQ-OBS-009). The clients are
-   * hand-built with {@code RestClient.builder()} — this module does not ship Boot's {@code
-   * spring-boot-restclient}, whose customizer would otherwise do it — so without this explicit
-   * wiring no {@code http.client.requests} metrics are recorded and, with tracing enabled, no
-   * {@code traceparent} header propagates to the backend.
+   * Observation registry wired into both clients so they record {@code http.client.requests} and
+   * propagate {@code traceparent} (REQ-OBS-009).
    */
   private final ObservationRegistry observationRegistry;
 
@@ -135,13 +109,8 @@ public class RestClientConfig {
   }
 
   /**
-   * The client used for the gateway's own client-credentials grant against Keycloak (ADR-0129).
-   *
-   * <p>Separate from {@link #backendRestClient()} for three reasons: it addresses a different host
-   * (absolute token URI, so no base URL), it must not carry the backend-relay logging interceptor —
-   * that interceptor names the call as a backend hop and this one is not — and its response is a
-   * handful of bytes. It has its own trust set because it faces a different server; see {@link
-   * #keycloakSslContext()}.
+   * The client for the gateway's own client-credentials grant against Keycloak (ADR-0129), with no
+   * base URL, no backend-relay logging and its own trust set ({@link #keycloakSslContext()}).
    *
    * @return a {@link RestClient} for the Keycloak token endpoint
    */
@@ -159,15 +128,8 @@ public class RestClientConfig {
   }
 
   /**
-   * Builds a {@link JdkClientHttpRequestFactory} over a JDK client with the given TLS context.
-   *
-   * <p>The client is pinned to HTTP/1.1: the JDK client defaults to HTTP/2, which against the
-   * backend's TLS connector would negotiate h2 through ALPN, and over plain {@code http://} would
-   * offer {@code Upgrade: h2c} on every request — neither of which the replaced Reactor Netty
-   * client did. Idle pooled connections are closed after the JDK's {@code
-   * jdk.httpclient.keepalive.timeout} (30&nbsp;s by default), well inside Tomcat's 60&nbsp;s
-   * keep-alive on the backend, so the client never reuses a connection the server has already
-   * dropped — the stale-connection failure a pool without idle eviction invites (ING-PERF-01).
+   * Builds a {@link JdkClientHttpRequestFactory} over an HTTP/1.1 JDK client with the given TLS
+   * context.
    *
    * @param sslContext the TLS context for {@code https://} targets
    * @param readTimeout the bound on one exchange once connected
@@ -215,20 +177,12 @@ public class RestClientConfig {
   }
 
   /**
-   * The Keycloak client's TLS context, with its OWN trust set.
+   * The Keycloak client's TLS context, with its own trust set: the JVM defaults plus the {@code
+   * keycloak-trust} bundle, hostname verification on; accept-everything in {@code dev}/{@code
+   * test}.
    *
-   * <p><strong>It must not reuse {@link #backendSslContext()}.</strong> That one installs the
-   * {@code backend-trust} bundle as the <em>only</em> trust anchor, which is right for the
-   * self-signed {@code https://backend:11261} and catastrophic here: pinned to the backend's
-   * certificate, this client cannot validate Keycloak's publicly-trusted one, so the TLS handshake
-   * fails and the client-credentials grant dies as a transport error with no HTTP status to explain
-   * it. That is exactly how it failed on 2026-08-04 — every send answered "An unexpected error
-   * occurred."
-   *
-   * <p>The trust set mirrors {@link KeycloakTrustSupport}, which the JWKS decoder already uses: the
-   * JVM's default anchors plus {@code keycloak-trust} when that bundle is configured (an internal,
-   * self-signed Keycloak), with hostname verification left ON. {@code dev}/{@code test} keep the
-   * accept-everything trust for the local stack's ephemeral certificate.
+   * <p>Must not reuse {@link #backendSslContext()}, whose sole anchor cannot validate Keycloak's
+   * certificate.
    *
    * @return the TLS context for the token endpoint
    * @throws IllegalStateException if a TLS context cannot be built from the configured trust
@@ -271,22 +225,10 @@ public class RestClientConfig {
   }
 
   /**
-   * Trust manager for the token endpoint: the JVM's default anchors <em>plus</em> the pinned {@code
-   * keycloak-trust} bundle when one is configured.
+   * Trust manager for the token endpoint: the JVM's default anchors plus the pinned {@code
+   * keycloak-trust} bundle when configured, so both a public and an internal Keycloak validate.
    *
-   * <p><strong>Additive on purpose, and this is the whole fix.</strong> Choosing one or the other
-   * gets it wrong whichever way you choose, because the right answer depends on where the token URI
-   * points — the public host needs the public CAs, an internal one needs the pinned certificate —
-   * and nothing in the SSL configuration knows which was configured. Both previous attempts picked
-   * a single anchor and broke the other case: first the backend's truststore, then the pinned
-   * Keycloak one, each failing against the public certificate with {@code PKIX path building
-   * failed}.
-   *
-   * <p>Trusting both is not a weakening: the pinned certificate is one the operator deliberately
-   * placed in the bundle, and the default anchors are what every other publicly-trusted call in the
-   * JVM already uses. Hostname verification stays on either way: the additive manager is a plain
-   * {@link X509TrustManager}, which JSSE wraps in one that checks the peer's name, and the defaults
-   * alone are the JDK's own extended manager, which checks it itself.
+   * <p>Hostname verification stays on.
    *
    * @return a trust manager accepting both anchor sets
    * @throws GeneralSecurityException if neither trust manager can be initialised
@@ -298,12 +240,9 @@ public class RestClientConfig {
   }
 
   /**
-   * Accepts a chain that <em>either</em> anchor set validates.
+   * Accepts a chain that either anchor set validates.
    *
-   * <p>Package-private so a test can drive it with two throwaway anchor sets and assert the
-   * property that both shipped bugs violated: adding one anchor set must never remove the other.
-   * Deliberately a plain {@link X509TrustManager}, not an extended one, so JSSE keeps verifying the
-   * hostname around it.
+   * <p>A plain {@link X509TrustManager}, so JSSE still verifies the hostname around it.
    *
    * @param defaults the JVM's default anchors
    * @param pinnedAnchors the operator-pinned anchors
@@ -349,13 +288,7 @@ public class RestClientConfig {
 
   /**
    * Wraps a trust manager so it validates the certificate chain exactly as {@code delegate} does
-   * but performs no hostname check.
-   *
-   * <p>Being an {@link X509ExtendedTrustManager}, it is handed the TLS engine (or socket) by JSSE,
-   * which is where endpoint identification would happen; it passes only the chain on to {@code
-   * delegate}'s two-argument check, which never looks at a hostname. Package-private so a test can
-   * prove both halves against a real TLS server: a pinned-but-misnamed certificate is accepted, an
-   * unpinned one is still refused.
+   * but performs no hostname check, for the one client that installs it.
    *
    * @param delegate the trust manager whose chain validation is kept
    * @return an extended trust manager with the hostname check removed
@@ -408,10 +341,8 @@ public class RestClientConfig {
   }
 
   /**
-   * A trust manager that accepts every certificate — the {@code dev}/{@code test} posture for the
-   * local stack's ephemeral certificates, which the replaced client took from Netty's {@code
-   * InsecureTrustManagerFactory}. Never installed outside those two profiles (see {@link
-   * #isDevOrTest()}).
+   * A trust manager that accepts every certificate; installed only in {@code dev}/{@code test} (see
+   * {@link #isDevOrTest()}).
    *
    * @return a trust manager that validates nothing
    */

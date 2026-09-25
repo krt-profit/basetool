@@ -52,14 +52,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
 /**
- * Mockito unit tests for {@link PersonalBlueprintOverviewService} — the in-Java
- * <em>variant-family</em> aggregation (a base item and its cosmetic variants collapse onto one
- * availability row) and the family-aware, scope-driven owner drill-down (the family key is expanded
- * to its product keys via a mocked {@link BlueprintVariantFamilyCatalog}, then owners are fetched
- * by that product-key set). The real {@link BlueprintVariantFamilyResolver} is wired in so the
- * family grouping runs end-to-end; the oversight {@link ScopePredicate} is supplied by a mocked
- * {@link OwnerScopeService} (its persona-specific construction is covered by {@code
- * OwnerScopeServiceTest}).
+ * Unit tests for {@link PersonalBlueprintOverviewService}: variant-family aggregation through the
+ * real {@link BlueprintVariantFamilyResolver}, and the owner drill-down via a mocked {@link
+ * BlueprintVariantFamilyCatalog} with the {@link ScopePredicate} from a mocked {@link
+ * OwnerScopeService}.
  */
 @ExtendWith(MockitoExtension.class)
 class PersonalBlueprintOverviewServiceTest {

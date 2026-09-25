@@ -41,13 +41,8 @@ import org.springframework.session.MapSession;
 import org.springframework.session.data.redis.RedisSessionMapper;
 
 /**
- * The mapper must name the unreadable attribute and then get out of the way.
- *
- * <p>The name is the field the 2026-09-02 incident did not have: 496 WARN lines over three hours,
- * none of which said <em>which</em> session attribute could not be read. Everything else about the
- * session-building behaviour must stay byte-for-byte what {@link RedisSessionMapper} already does,
- * because that behaviour is what makes an unreadable attribute a signed-out member rather than an
- * unusable application.
+ * Verifies that the mapper names an unreadable session attribute and otherwise builds the session
+ * exactly as {@link RedisSessionMapper} does.
  */
 class SessionAttributeDiagnosticMapperTest {
 

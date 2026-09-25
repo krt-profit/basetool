@@ -34,52 +34,20 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Removes the session attributes that could not be read, so a poisoned session is repaired on the
- * request that discovered it instead of re-dropping the same value for the rest of its life
+ * Removes the session attributes that could not be read, on the same request that discovered them
  * (REQ-SEC-050, ADR-0157).
  *
- * <p><strong>The defect this closes (2026-09-03, the second alert).</strong> {@link
- * FaultTolerantSessionSerializer} turns an unreadable value into "absent" and {@link
- * SessionAttributeDiagnosticMapper} names it, but neither writes anything back — so the unreadable
- * bytes stay in Redis and are re-read, re-dropped and re-counted on <em>every</em> request the
- * session makes, for up to the 720-hour authenticated window (REQ-SEC-025). ADR-0154 accepted that,
- * on the reasoning that the one attribute in play would be re-written by the servlet container "on
- * the next handshake, i.e. every logged-in page, because live sync opens {@code /ws/sync}". That
- * premise is **false**: {@code krt-live-sync.js} opens the socket <em>lazily</em> — {@code
- * ensureSocket()} is reached only from {@code subscribe()}, {@code sendChanged()} and {@code
- * sendPresence()} — so a page that subscribes to no live-sync room never handshakes, while the
- * notification poll (60 s, or 300 s while SSE is healthy) keeps reading the session. Production
- * therefore kept dropping at 2-6 per minute for hours after the fix that was supposed to end it,
- * and `SessionValueDropsSustained` fired again against an application whose write path was already
- * correct.
- *
- * <p><strong>Why removing, and why here.</strong> {@code HttpSession#removeAttribute} is the same
- * public API that {@code BackendRoleSyncFilter} and {@code TermsAcceptanceGateFilter} already call
- * on every request; it goes through the ordinary delta-and-flush machinery rather than reaching
- * into the serializer, and it leaves the hash field readable-as-absent so the next read costs
- * nothing. Doing it from the deserializer instead would put a Redis write on the session
- * <em>read</em> path — the change ADR-0154 rightly called the one with the worst track record in
- * this codebase.
- *
- * <p><strong>Why this is safe even if a value is still being written unreadably.</strong> The
- * repair does not change how often a value is read, only whether the same unreadable bytes are read
- * twice. An attribute that some writer re-poisons every request would be repaired and re-poisoned
- * at an unchanged drop rate — the case {@link SessionAttributeDiagnosticMapper} flagged when it
- * deferred this decision — so the worst case is one extra write per drop, never a new failure mode.
- *
- * <p>The filter deliberately repairs on the way <em>out</em>: the session is loaded lazily, so at
- * the time the chain is entered nothing has been dropped yet.
+ * <p>Removal uses {@code HttpSession#removeAttribute} after the chain has run, since the session is
+ * loaded lazily.
  */
 @Component
 @Slf4j
 public class SessionAttributeRepairFilter extends OncePerRequestFilter implements Ordered {
 
   /**
-   * Filter order: immediately inside Spring Session's {@link SessionRepositoryFilter}, so every
-   * session load that happens anywhere downstream — Spring Security's context read included — is
-   * still inside this filter's {@code finally} when the repair runs. Expressed against {@link
-   * SessionRepositoryFilter#DEFAULT_ORDER} rather than as a literal so it cannot silently drift to
-   * the wrong side if that default ever moves.
+   * Filter order: immediately inside {@link SessionRepositoryFilter}, relative to {@link
+   * SessionRepositoryFilter#DEFAULT_ORDER}, so every downstream session load happens before the
+   * repair.
    */
   @Override
   public int getOrder() {
@@ -87,15 +55,10 @@ public class SessionAttributeRepairFilter extends OncePerRequestFilter implement
   }
 
   /**
-   * Runs for asynchronous dispatches too.
+   * Runs for asynchronous dispatches too, so a session read on the SSE stream's dispatch is
+   * repaired.
    *
-   * <p>The notification SSE stream is an async request, and a session read on its dispatch would
-   * otherwise queue a repair that no {@code finally} ever drains — leaving the name on a pooled
-   * thread for the next request to apply to a different member's session. {@link
-   * SessionAttributeRepairQueue#clear()} on entry makes that harmless, and filtering the async
-   * dispatch makes it repairable instead of merely harmless.
-   *
-   * @return {@code false} — this filter must see every dispatch.
+   * @return {@code false}
    */
   @Override
   protected boolean shouldNotFilterAsyncDispatch() {
@@ -106,12 +69,11 @@ public class SessionAttributeRepairFilter extends OncePerRequestFilter implement
    * Clears anything a previous request left on this thread, runs the chain, then repairs whatever
    * the session read dropped.
    *
-   * @param request the current request; its session is fetched with {@code false} so the repair
-   *     never creates one.
-   * @param response the current response, passed through untouched.
-   * @param filterChain the rest of the chain.
-   * @throws ServletException propagated from the chain.
-   * @throws IOException propagated from the chain.
+   * @param request the current request; its session is fetched without creating one
+   * @param response the current response, passed through untouched
+   * @param filterChain the rest of the chain
+   * @throws ServletException propagated from the chain
+   * @throws IOException propagated from the chain
    */
   @Override
   protected void doFilterInternal(

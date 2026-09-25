@@ -1,17 +1,13 @@
 #!/usr/bin/env python3
 """Sanitize a Keycloak realm export so it can be committed as a reference.
 
-The production realm export carries operator secrets — SMTP credentials, identity-provider
-secrets, service-account users. `docs/keycloak/README.md` documents what has to be stripped
-before such an export may enter the repository; this script performs exactly that list, so the
-step is repeatable and reviewable instead of a hand edit nobody can re-run.
+Applies the stripping list documented in `docs/keycloak/README.md`. Prints counts and key names
+only, never a secret.
 
 Usage:
     python scripts/sanitize-realm-export.py RAW_EXPORT.json OUT.json
 
-The script never prints a secret. It reports counts and key names only, and it refuses to write
-the output if a guard pattern survives sanitization — a silent leak is the one failure mode that
-would matter here, so the exit code is the contract, not the log.
+Exit codes: 0 written, 1 a guard pattern survived (nothing written), 2 bad invocation.
 """
 
 from __future__ import annotations
@@ -22,18 +18,14 @@ import sys
 from pathlib import Path
 from typing import Any
 
-# Placeholder the repository already uses for values that are set at deploy time.
 DEPLOY_PLACEHOLDER = "__SET_AT_DEPLOY__"
 
-# Public hostnames of the deployment. Not secret, but the reference is kept host-neutral so it
-# cannot be mistaken for an importable dump.
 REAL_HOSTS = ("profit-base.online", "iri-base.org")
 NEUTRAL_HOST = "basetool.example.invalid"
 
-# Top-level sections that are dropped wholesale.
 DROP_SECTIONS = (
-    "users",           # only the backend service account, still a user record
-    "components",      # realm signing keys
+    "users",
+    "components",
     "keys",
     "authenticationFlows",
     "authenticatorConfig",
@@ -44,18 +36,14 @@ DROP_SECTIONS = (
     "federatedUsers",
 )
 
-# Keycloak's built-in clients carry no project information.
 BUILTIN_CLIENTS = frozenset(
     {"account", "account-console", "admin-cli", "broker", "realm-management", "security-admin-console"}
 )
 
-# Keys whose value is replaced with the deploy placeholder wherever they appear.
 SECRET_KEYS = frozenset({"secret", "clientSecret", "password", "privateKey", "publicKey", "certificate"})
 
-# Keys carrying identity-provider credentials.
 IDP_SECRET_KEYS = frozenset({"clientId", "clientSecret"})
 
-# Anything matching these in the *output* means sanitization missed something.
 GUARD_PATTERNS = (
     (re.compile(r"[A-Za-z0-9._%+-]+@(?!example\.invalid)[A-Za-z0-9.-]+\.[A-Za-z]{2,}"), "e-mail address"),
     (re.compile("|".join(re.escape(h) for h in REAL_HOSTS)), "real hostname"),
@@ -64,11 +52,7 @@ GUARD_PATTERNS = (
 
 
 def scrub(node: Any, stats: dict[str, int]) -> Any:
-    """Recursively replace secret values and neutralize public hostnames.
-
-    Structure is preserved on purpose: the reference documents *shape* — which mappers exist, which
-    scopes are default — so dropping a whole client because one of its fields is secret would
-    destroy the very information the file exists for.
+    """Recursively replace secret values, drop UUID ids and neutralize public hostnames, keeping the structure.
 
     :param node: the current JSON node.
     :param stats: counters, mutated in place, reported to the operator afterwards.
@@ -127,8 +111,6 @@ def sanitize(raw: dict[str, Any]) -> tuple[dict[str, Any], dict[str, int]]:
         stats["dropped:builtinClients"] = len(clients) - len(kept)
         raw["clients"] = kept
 
-    # Keycloak's own role catalogue for the built-in clients is several hundred lines of noise
-    # that says nothing about this deployment; the project's realm roles stay.
     client_roles = (raw.get("roles") or {}).get("client")
     if isinstance(client_roles, dict):
         removed = [name for name in client_roles if name in BUILTIN_CLIENTS]
@@ -137,9 +119,6 @@ def sanitize(raw: dict[str, Any]) -> tuple[dict[str, Any], dict[str, int]]:
         if removed:
             stats["dropped:builtinClientRoles"] = len(removed)
 
-    # Identity-provider credentials sit in a plain config map, where the key names carry no hint
-    # that they are secrets: `clientId` there is the Discord application id, not a Keycloak client
-    # name, and docs/keycloak/README.md requires both halves to be replaced.
     for provider in raw.get("identityProviders") or []:
         config = provider.get("config")
         if isinstance(config, dict):
@@ -176,13 +155,12 @@ def guard(text: str) -> list[str]:
     for pattern, label in GUARD_PATTERNS:
         hits = pattern.findall(text)
         if hits:
-            # Deliberately reports the count and the label, never the matched text.
             findings.append(f"{len(hits)} possible {label}(s) survived sanitization")
     return findings
 
 
 def main() -> int:
-    """Entry point.
+    """Sanitize the export given on the command line and write it unless a guard pattern survives.
 
     :return: process exit code; non-zero means nothing was written.
     """

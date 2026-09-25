@@ -38,23 +38,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Functional coverage for the audited "Mein Inventar" (personal inventory) area at {@code
- * /personal-inventory}, which previously had no end-to-end test. This is the {@code
- * PersonalInventoryItem} feature (free-text name + UEX location + quantity, per JWT {@code sub}) —
- * distinct from the squadron Lager's personal view at {@code /inventory/my} that {@code
- * InventoryOperationsE2eTest} covers.
+ * Functional coverage for the audited "Mein Inventar" area at {@code /personal-inventory}, distinct
+ * from the Lager's personal view at {@code /inventory/my}.
  *
- * <p>It drives the create-in-place and delete-in-place mutations (REQ-AUDIT-001 audited writes,
- * REQ-FE-001/002 in-place {@code #pi-results} swap): both go through {@code window.krtFetch.write}
- * and re-render the results fragment without a page reload. The create flow exercises the bespoke
- * UEX-location typeahead ({@code /personal-inventory/uex-search}), which requires a city carrying a
- * numeric {@code id_city} to select — the E2E catalog seeds {@code "E2E Personal Inventory City"}
- * for exactly this test.
- *
- * <p>Actor: the suite-default {@code test-admin}. Personal inventory is per-user and carries no
- * org-unit scope, so no squadron membership seed is required — the single shared OIDC login is the
- * only setup. Tagged {@code @Tag("e2e")}: it mutates data, so it runs only against the ephemeral,
- * disposable stack.
+ * <p>Drives the in-place create and delete (REQ-AUDIT-001, REQ-FE-001) as {@code test-admin}; the
+ * create uses the UEX-location typeahead with the seeded {@code "E2E Personal Inventory City"}.
  */
 @Tag("e2e")
 class PersonalInventoryCrudE2eTest {

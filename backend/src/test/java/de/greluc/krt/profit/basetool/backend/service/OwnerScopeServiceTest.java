@@ -75,17 +75,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 
 /**
- * Mockito unit tests for {@link OwnerScopeService}. Inherits the test scenarios that previously
- * lived under {@code SquadronScopeServiceTest} before the R2.c rename — the implementation moved
- * from {@code SquadronScopeService} to {@code OwnerScopeService} but every behavioural invariant
- * stayed the same. Covers the org-unit-context resolution paths (admin via {@code
- * X-Active-Org-Unit-Id} request header, non-admin via persistent user record), the aggregate-
- * specific access checks for the five staffel-scoped roots, and the Mission cross-staffel-
- * visibility escape clause ({@code is_internal = false}).
- *
- * <p>The thin {@code SquadronScopeService} shim that still carries the legacy class name has its
- * own minimal smoke test ({@link SquadronScopeServiceTest}) verifying that every shim method
- * forwards to this service.
+ * Unit tests for {@link OwnerScopeService}: org-unit context resolution for admins and non-admins,
+ * the per-aggregate access checks, and the Mission cross-staffel visibility escape ({@code
+ * is_internal = false}). The {@code SquadronScopeService} shim is covered by {@link
+ * SquadronScopeServiceTest}.
  */
 @ExtendWith(MockitoExtension.class)
 class OwnerScopeServiceTest {
@@ -162,16 +155,9 @@ class OwnerScopeServiceTest {
   }
 
   /**
-   * Wires the L3-split (#922) collaborators into the {@link OwnerScopeService} facade under test.
-   * Mockito does not inject one {@code @InjectMocks} target into another, so the facade's three
-   * sub-services are built here as REAL instances fed with the same mocks the scenarios stub, and
-   * the facade is then constructed from them. They used to be patched into an {@code @InjectMocks}
-   * facade with {@code ReflectionTestUtils.setField}; its fields are {@code private final}, which
-   * JEP 500 (JDK 26) warns about and a later release will refuse. A single {@link
-   * RequestScopeResolver} instance is shared by the facade, the gates and the stamping service so
-   * the request-scoped memoisation (backed by the shared {@code request} mock) collapses repeated
-   * reads exactly as in production. Constructor-arg order matches each service's
-   * {@code @RequiredArgsConstructor} field-declaration order.
+   * Builds the {@link OwnerScopeService} facade under test from real sub-service instances fed with
+   * the scenario mocks, sharing one {@link RequestScopeResolver} so request-scoped memoisation
+   * behaves as in production.
    */
   private void wireDelegates() {
     RequestScopeResolver requestScopeResolver =
@@ -222,11 +208,7 @@ class OwnerScopeServiceTest {
     return m;
   }
 
-  /**
-   * Returns a Bereich membership row (no leadership flags set) for the given user + Bereich; the
-   * caller flips {@code isBereichsleiter}/-koordinator/-operator to make it an oversight seat (epic
-   * #692 Phase 6).
-   */
+  /** Returns a Bereich membership row without leadership flags for the given user and Bereich. */
   private static OrgUnitMembership bereichMembershipRow(UUID userId, UUID bereichId) {
     OrgUnitMembership m = new OrgUnitMembership();
     m.setId(new OrgUnitMembershipId(userId, bereichId));
@@ -1050,11 +1032,8 @@ class OwnerScopeServiceTest {
   }
 
   /**
-   * REQ-ORG-011 owner-retains-access escape: the per-user owner of a personal aggregate (inventory
-   * item, ship, refinery order) may always see and edit it, even when the row is still stamped to
-   * an org unit the owner no longer belongs to (org-unit switch, or loss of the last membership). A
-   * non-owner stays bound by the strict owning-org-unit scope. Mirrors the service-layer owner
-   * check so the {@code @PreAuthorize} gate never denies a write the service would accept.
+   * The owner of a personal aggregate may always see and edit it, even when it is stamped to an org
+   * unit the owner left, while a non-owner stays bound by the owning-org-unit scope (REQ-ORG-011).
    */
   @Nested
   class PersonalAggregateOwnerRetainsAccessTests {
@@ -1445,10 +1424,8 @@ class OwnerScopeServiceTest {
   }
 
   /**
-   * Verifies the request-scoped memoisation on {@link OwnerScopeService#currentSquadronId()} and
-   * {@link OwnerScopeService#currentSquadron()}. Without this, every controller call chain on a
-   * non-admin request would re-hit the {@code org_unit_membership} lookup and {@code
-   * orgUnitRepository.findById} once per scope query.
+   * Verifies the request-scoped memoisation of {@link OwnerScopeService#currentSquadronId()} and
+   * {@link OwnerScopeService#currentSquadron()}.
    */
   @Nested
   class RequestScopedCacheTests {
@@ -2253,11 +2230,8 @@ class OwnerScopeServiceTest {
   }
 
   /**
-   * Epic #692 Phase 6 (REQ-BANK-022, owner decision Q4): the own-level (write) oversight scope is
-   * deliberately NOT cascaded — it names only the caller's own-level leadership seats, so a
-   * Bereichsleitung/OL may raise a bank booking request against their own AREA/CARTEL account but
-   * not against the subordinate accounts they may merely view (those reach them through the
-   * cascading {@link OwnerScopeService#currentOversightScope()} instead).
+   * The own-level oversight scope names only the caller's own leadership seats and is not cascaded,
+   * unlike {@link OwnerScopeService#currentOversightScope()} (REQ-BANK-022).
    */
   @Nested
   class CurrentOwnLevelOversightScopeTests {
@@ -2406,12 +2380,9 @@ class OwnerScopeServiceTest {
   }
 
   /**
-   * Epic #692 / REQ-ORG-015: verifies that {@link OwnerScopeService} routes the cascade expansion
-   * (delegated to {@link OrgUnitCascadeService}) into the scope predicate, so a Bereichsleitung /
-   * OL member's per-row {@code canSee*}/{@code canEdit*} gates cover their subordinate units —
-   * while never setting {@code adminAllScope} and never granting reach outside the cascaded set
-   * (strict silo). The expansion math itself is covered by {@link OrgUnitCascadeServiceTest}; here
-   * we stub the cascade output and assert OwnerScopeService consumes it correctly.
+   * Verifies that {@link OwnerScopeService} feeds the {@link OrgUnitCascadeService} expansion into
+   * the scope predicate without setting {@code adminAllScope} or reaching beyond the cascaded set
+   * (REQ-ORG-015); the expansion itself is tested in {@link OrgUnitCascadeServiceTest}.
    */
   @Nested
   class CascadingScopeTests {
@@ -2489,17 +2460,9 @@ class OwnerScopeServiceTest {
   }
 
   /**
-   * Epic #692 / REQ-ORG-016 (Phase 4): the picker resolvers may stamp a {@code BEREICH} / {@code
-   * ORGANISATIONSLEITUNG} as the owning org unit, and a leadership caller may stamp a subordinate
-   * unit they oversee (create-on-behalf). Ordinary-member self-service stamping is unchanged
-   * (covered by the existing {@code resolveOrgUnitForPickerOutput*} tests above).
-   *
-   * <p>Coverage here pins, in addition to the Bereich owner case: the {@code ORGANISATIONSLEITUNG}
-   * arm of the resolution kind filter; both resolution legs of a create-on-behalf descendant pick
-   * (Staffel and Spezialkommando); and — the genuine production divergence — a create-on-behalf
-   * where the <b>caller differs from the target user</b> (inventory book-out/transfer, refinery
-   * store), proving the validation gate keys {@code canEditOrgUnit} on the caller rather than the
-   * target user.
+   * Stamping a Bereich or the OL as owning org unit, and creating on behalf of an overseen
+   * subordinate unit (REQ-ORG-016), including a caller who differs from the target user, where the
+   * gate must key on the caller.
    */
   @Nested
   class BereichOlOwnershipStampingTests {
@@ -2682,11 +2645,8 @@ class OwnerScopeServiceTest {
   }
 
   /**
-   * REQ-HANGAR-003 / ADR-0048: the hangar unit-overview scope mirrors {@link
-   * OwnerScopeService#currentScopePredicate()} for every caller except one owner-approved widening
-   * — a non-pinned OL member is upgraded to {@code adminAllScope} so the Org-Einheitsübersicht
-   * surfaces every ship, including ownerless personal ones. A pin still narrows it, and no other
-   * caller class is affected.
+   * The hangar unit-overview scope equals {@link OwnerScopeService#currentScopePredicate()} except
+   * that an unpinned OL member gets {@code adminAllScope} (REQ-HANGAR-003, ADR-0048).
    */
   @Nested
   class CurrentUnitOverviewScopeTests {

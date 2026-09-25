@@ -20,19 +20,11 @@
 package de.greluc.krt.profit.basetool.backend.exception;
 
 /**
- * Thrown when a request collides with the current state of the system in a way that is neither a
- * pure duplicate (see {@link DuplicateEntityException}) nor a referential-integrity block (see
- * {@link EntityInUseException}).
+ * Thrown when a request collides with the current system state in a way that is neither a duplicate
+ * ({@link DuplicateEntityException}) nor a referential-integrity block ({@link
+ * EntityInUseException}).
  *
- * <p>Typical cases: ambiguous lookups where multiple candidates match a user-supplied identifier,
- * state machines that refuse a transition from the current step, or invariants that hold across
- * several aggregates and cannot be expressed by a simple uniqueness constraint.
- *
- * <p>Mapped to HTTP {@code 409 Conflict} by {@link
- * de.greluc.krt.profit.basetool.backend.exception.GlobalExceptionHandler}'s generic {@code
- * AppException} dispatch handler with the stable error code {@code BUSINESS_CONFLICT}. Every
- * accessor is inherited unchanged from {@link AppException} — it delegates to {@link
- * AppExceptionKind#BUSINESS_CONFLICT}, the fixed identity passed to the superclass constructor.
+ * <p>Mapped to HTTP {@code 409} with the code {@code BUSINESS_CONFLICT}.
  */
 public final class BusinessConflictException extends AppException {
 

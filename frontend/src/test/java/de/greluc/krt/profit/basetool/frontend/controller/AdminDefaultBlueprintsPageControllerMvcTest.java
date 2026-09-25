@@ -59,17 +59,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC-level test for {@link AdminDefaultBlueprintsPageController}. Pins two things:
- *
- * <ul>
- *   <li>the type-ahead proxy's double-encoding fix: the free-text term must reach the backend as a
- *       WebClient URI-template variable (encoded exactly once), never {@code URLEncoder}-encoded
- *       into the URI string (which the frontend&rarr;backend hop re-encodes, mangling spaces and
- *       umlauts to a zero-match);
- *   <li>the in-place mutations (REQ-FE-001): the {@code X-Requested-With}-routed add and remove
- *       twins answer JSON / status instead of a redirect, the {@code fragment=rows} read renders
- *       only the swapped table, and the header-less requests keep the POST → redirect fallback.
- * </ul>
+ * MVC test for {@link AdminDefaultBlueprintsPageController}: the type-ahead term reaches the
+ * backend as a URI-template variable encoded exactly once, and the add/remove AJAX twins, the
+ * {@code fragment=rows} read and the header-less redirect fallback behave (REQ-FE-001).
  */
 @SpringBootTest
 class AdminDefaultBlueprintsPageControllerMvcTest {

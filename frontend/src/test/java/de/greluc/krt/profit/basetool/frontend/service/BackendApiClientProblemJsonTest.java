@@ -60,11 +60,10 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
- * Verifies that the {@link BackendApiClient} correctly parses RFC7807 Problem+JSON responses
- * produced by the backend's {@code GlobalExceptionHandler} and exposes the stable {@code code},
- * {@code correlationId} and {@code fieldErrors[]} via {@link BackendServiceException}. Covers the
- * main error classes defined in the prompt (tasks 7-12): optimistic locking, access denied,
- * validation errors and service-unavailable fall-through.
+ * Verifies that {@link BackendApiClient} parses the backend's RFC 7807 Problem+JSON responses and
+ * exposes {@code code}, {@code correlationId} and {@code fieldErrors[]} via {@link
+ * BackendServiceException}, for optimistic locking, access denied, validation and
+ * service-unavailable cases.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -91,12 +90,6 @@ class BackendApiClientProblemJsonTest {
 
   /**
    * Gives the authenticated WebClient a resolvable {@code keycloak} registration and a live token.
-   *
-   * <p>These cases used to pass {@code isPublic = true} and go out on the anonymous WebClient,
-   * which carries no OAuth2 exchange filter — a way of reaching the Problem+JSON mapping without a
-   * Keycloak registration. That client is gone (ADR-0159), and routing around the authenticated
-   * chain was never the point of this class anyway: what it asserts is the mapping, and it now
-   * asserts it on the client the application actually uses.
    */
   @BeforeEach
   void bearAToken() {
@@ -244,15 +237,8 @@ class BackendApiClientProblemJsonTest {
   }
 
   /**
-   * A consent-gate 403 is logged at DEBUG, not WARN.
-   *
-   * <p>Not cosmetic. After a Terms-of-Use wording change every member is unconsented at once, and
-   * the role sync plus three unconditional {@code @ControllerAdvice} model attributes each 403 on
-   * every non-static request — so a WARN here is several lines per navigation, per user,
-   * indefinitely, for a feature that is working exactly as designed (REQ-SEC-028, REQ-OBS-001).
-   * Pinned so a future refactor of this branch order cannot quietly reintroduce the flood; the
-   * {@code backend_4xx} metric increment sits outside the branch, so the monitoring signal is
-   * unaffected either way.
+   * A consent-gate 403 is logged at DEBUG, not WARN, since every unconsented member triggers it on
+   * every request (REQ-SEC-028, REQ-OBS-001).
    */
   @Test
   void get_ShouldLogTermsGate403AtDebug_NotWarn() {
@@ -282,13 +268,8 @@ class BackendApiClientProblemJsonTest {
   }
 
   /**
-   * A consent-gate 403 is not counted as a backend-call failure.
-   *
-   * <p>{@code BackendCallFailureSustained} alerts on {@code
-   * sum(rate(basetool_backend_client_errors_total[5m])) > 0.5}. Counting the gate's refusals there
-   * made it fire 38 minutes after the consent gate shipped, at 3.2/s, because every unconsented
-   * session hits the gate on every request — the alert could not tell "the backend is failing" from
-   * "the gate is working". The backend counts each refusal itself by code, so no signal is lost.
+   * A consent-gate 403 is not counted in {@code basetool_backend_client_errors_total}, so the
+   * backend-failure alert does not fire on a working gate.
    */
   @Test
   void get_ShouldNotCountTermsGate403AsABackendCallFailure() {
@@ -301,16 +282,7 @@ class BackendApiClientProblemJsonTest {
     assertEquals(before, backendErrorCount(), "a consent-gate refusal is not a call failure");
   }
 
-  /**
-   * A {@code NO_ROLE} 403 is the third member of the same family, and is treated like the other
-   * two.
-   *
-   * <p>It was missed when REQ-SEC-053 shipped, and its arrival rate is the reason that matters: one
-   * role-less member loading one page produces a refusal per fragment on it — {@code /users/me},
-   * terms status, capabilities, notification count, active org unit, org units, mission search — so
-   * a single account waiting for an administrator raises the same alert the consent gate raised at
-   * 3.2/s. The counter measures backend health; a working gate is not ill health.
-   */
+  /** A {@code NO_ROLE} 403 is likewise not counted as a backend-call failure (REQ-SEC-053). */
   @Test
   void get_ShouldNotCountNoRole403AsABackendCallFailure() {
     double before = backendErrorCount();
@@ -373,21 +345,9 @@ class BackendApiClientProblemJsonTest {
   }
 
   /**
-   * A connection lost while the response body is streaming must be classified as a transport
-   * failure, not as a backend refusal.
-   *
-   * <p>Spring hands such a failure to the caller as a {@code WebClientResponseException} carrying
-   * the status that had already arrived — a 200 — because the status line describes the headers and
-   * the headers were fine. Routing that through the Problem+JSON path produced {@code Backend
-   * returned 200 [UNKNOWN]} in production on 2026-09-20: an error object claiming success, a
-   * "backend client error" WARN naming a client that made no mistake, and the fault counted under
-   * {@code reason=backend_4xx} because 200 is below 500. Five inventory-page loads reported it as
-   * an ERROR with a stack trace whose top frame was {@code fromProblem}, which reads as a parsing
-   * bug rather than a lost connection.
-   *
-   * <p>The assertion that matters is the negative one: the status must NOT be 200. A 504 with
-   * {@code BACKEND_TIMEOUT} is what the sibling failure — the connection dying before any response
-   * — has always produced, and both halves of one transport fault now classify alike.
+   * A connection lost while the response body streams is classified as a transport failure, never
+   * as a status-200 backend refusal; it yields a 504 {@code BACKEND_TIMEOUT} like a connection lost
+   * before the response.
    */
   @Test
   void get_ShouldClassifyABodyCutMidResponseAsTransportFailure_Not200Unknown() {

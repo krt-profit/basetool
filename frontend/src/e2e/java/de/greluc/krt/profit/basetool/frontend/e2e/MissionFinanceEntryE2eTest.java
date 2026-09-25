@@ -36,22 +36,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Functional flow: add a finance entry to a mission through the UI, then reopen the mission-detail
- * page and assert it still renders.
+ * Verifies that a mission whose finance entry was added through the UI still renders its detail
+ * page, covering a populated finance loop.
  *
- * <p>Regression coverage for the production 500 where {@code GET /missions/{id}} threw a Thymeleaf
- * {@code TemplateProcessingException} as soon as the mission owned at least one finance entry: the
- * finance loop rendered the edit button's amount with the {@code @moneyFormat} bean inside the
- * restricted {@code th:data-amount} attribute. The fix binds the rounded value via {@code th:with}
- * (see PR #509 and the unit regression in {@code MissionPageControllerMvcTest}). Every prior render
- * test passed an empty finance list, so the loop body never executed and no e2e exercised a
- * populated finance loop — which is why the bug reached production.
- *
- * <p>The mission and a guest participant (the finance modal's participant dropdown is {@code
- * required}) are seeded via {@link BackendSeeder}; the test then drives only the finance-create
- * flow through the UI and reloads the detail page, reusing one authenticated session via {@link
- * E2eSupport#authenticatedStorageState}. A mission is staffel-scoped, so the user is assigned to
- * the IRIDIUM Squadron first.
+ * <p>The mission and a guest participant are seeded via {@link BackendSeeder}; the user is assigned
+ * to the IRIDIUM Squadron first.
  */
 @Tag("e2e")
 class MissionFinanceEntryE2eTest {

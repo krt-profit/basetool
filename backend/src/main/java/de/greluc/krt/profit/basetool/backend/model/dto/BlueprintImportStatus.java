@@ -20,9 +20,8 @@
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
 /**
- * Per-name resolution outcome produced by the SCMDB blueprint import preview (#327, Phase 4).
- * Drives how the frontend renders each row: auto-confirmed matches versus rows that need a manual
- * pick.
+ * Per-name resolution outcome of a blueprint import preview, deciding whether a row is
+ * auto-confirmed or needs a manual pick.
  */
 public enum BlueprintImportStatus {
   /** The external name normalized to an existing product key — an unambiguous direct match. */

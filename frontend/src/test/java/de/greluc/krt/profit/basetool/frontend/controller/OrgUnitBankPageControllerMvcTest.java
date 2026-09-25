@@ -68,10 +68,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Renders the org-unit officer/lead bank page (epic #666 F1/F2) to pin that the balance card, the
- * request form modal and the own-request list with a cancel action all render without a Thymeleaf
- * error, that the page is gated to leadership roles (not {@code BANK_EMPLOYEE}), and that the
- * {@code orgUnitBank} fragment view resolves for the in-place swap.
+ * Renders the org-unit bank page for officers and leads: balance card, request form modal and own
+ * request list with cancel render without error, the page is gated to leadership roles, and the
+ * {@code orgUnitBank} fragment resolves.
  */
 @SpringBootTest
 class OrgUnitBankPageControllerMvcTest {
@@ -379,10 +378,8 @@ class OrgUnitBankPageControllerMvcTest {
   }
 
   /**
-   * Stubs the read-only account drill-in (REQ-BANK-038) plus the holder/OL settings region: an
-   * ORG_UNIT account with a balance target, a single booking, one granted role bucket and one
-   * granted user. The visibility/limit user pickers are server-side search comboboxes (#1193), so
-   * no user roster is stubbed here.
+   * Stubs the read-only account drill-in (REQ-BANK-038) and the settings region: an ORG_UNIT
+   * account with a balance target, one booking, one granted role bucket and one granted user.
    *
    * @param accountId the account id used in every backend URI
    */
@@ -638,16 +635,8 @@ class OrgUnitBankPageControllerMvcTest {
   }
 
   /**
-   * REQ-BANK-055 regression: the pre-filled Empfaenger option must carry the caller's <b>JWT
-   * subject</b> as its value, never their username.
-   *
-   * <p>This client is configured with {@code user-name-attribute: preferred_username}, so {@code
-   * #authentication.name} is the USERNAME. Seeding the option with it submitted a username where
-   * the backend deserializes a UUID, which 400'd <em>every</em> withdrawal request — the request
-   * was silently never created. Nothing in the render tests noticed (the markup looked perfectly
-   * well-formed); only {@code BankOrgUnitRequestsE2eTest} caught it, and only because it asserts
-   * the request exists afterwards. Asserting the shape of the seeded value here makes the
-   * regression cheap to catch again.
+   * Verifies that the pre-filled Empfaenger option carries the caller's JWT subject, not their
+   * username (REQ-BANK-055).
    *
    * @throws Exception if the MockMvc exchange fails
    */
@@ -688,18 +677,11 @@ class OrgUnitBankPageControllerMvcTest {
   }
 
   /**
-   * Builds the caller principal the way {@code application.yml} configures this client: {@code
-   * user-name-attribute: preferred_username}.
-   *
-   * <p>That third constructor argument is the whole point. {@code oidcLogin()} defaults the name
-   * attribute to {@code sub}, which makes {@code #authentication.name} accidentally equal the user
-   * id in tests while it is the USERNAME in production — so a template reading {@code
-   * #authentication.name} as an id passes every render test and 400s every real request. Mirroring
-   * the configured key here is what lets {@link
-   * #orgUnitBank_empfaengerSeedIsTheSubjectNotTheUsername()} actually fail on that bug.
+   * Builds an officer principal with {@code preferred_username} as the name attribute, as the
+   * client is configured, so {@code #authentication.name} is the username rather than the subject.
    *
    * @param sub the JWT subject (the real user id)
-   * @return an OIDC principal whose {@code getName()} is the username, not the subject
+   * @return an OIDC principal whose {@code getName()} is the username
    */
   private static DefaultOidcUser officerPrincipal(String sub) {
     OidcIdToken idToken =
@@ -713,10 +695,8 @@ class OrgUnitBankPageControllerMvcTest {
   }
 
   /**
-   * REQ-BANK-056: a still-pending, unapproved own request offers an edit action and its per-row
-   * modal, which PUTs to the request's own endpoint. The modal is rendered once per row (rather
-   * than primed) because the Empfaenger picker is a remote combobox that only seeds itself from a
-   * server-rendered {@code selected} option.
+   * Verifies that a pending, unapproved own request offers an edit action with a per-row modal that
+   * PUTs to the request's endpoint (REQ-BANK-056).
    *
    * @throws Exception if the MockMvc exchange fails
    */
@@ -744,9 +724,8 @@ class OrgUnitBankPageControllerMvcTest {
   }
 
   /**
-   * REQ-BANK-056: once the responsible holder has granted the over-limit approval the request is
-   * frozen — the backend refuses the edit, so the button and its modal must be gone rather than
-   * offering the requester a dead end. Cancel stays available.
+   * Verifies that an own request with a granted over-limit approval offers no edit action or modal,
+   * while cancel stays available (REQ-BANK-056).
    *
    * @throws Exception if the MockMvc exchange fails
    */
@@ -813,12 +792,11 @@ class OrgUnitBankPageControllerMvcTest {
   }
 
   /**
-   * Builds a booking request for either the approval tab or the requester's own list, varying only
-   * the fields that decide whether the row is expandable.
+   * Builds a booking request, varying only the fields that decide whether the row is expandable.
    *
    * @param note the requester's note, or {@code null}
    * @param justification the requester's Begruendung, or {@code null}
-   * @param staffNote the confirming employee's own note (REQ-BANK-054), or {@code null}
+   * @param staffNote the confirming employee's note (REQ-BANK-054), or {@code null}
    * @return the request DTO
    */
   private static BankBookingRequestDto bookingRequest(
@@ -904,9 +882,8 @@ class OrgUnitBankPageControllerMvcTest {
   }
 
   /**
-   * REQ-BANK-022/-045: the requester's own "Meine Antraege" rows expand to reveal the Begruendung
-   * and Notiz they filed, the same mechanism as the staff queue and the approval tab. Without it a
-   * requester could not read back what they had written on a request they may still cancel.
+   * Verifies that the requester's own "Meine Antraege" rows expand to show their Begruendung and
+   * Notiz (REQ-BANK-022/-045).
    *
    * @throws Exception if the MockMvc exchange fails
    */

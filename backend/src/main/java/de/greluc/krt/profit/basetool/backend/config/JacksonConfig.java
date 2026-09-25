@@ -27,39 +27,20 @@ import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.module.SimpleModule;
 
 /**
- * Applies the project's two REST-layer Jackson defaults to Spring Boot's auto-configured Jackson 3
- * {@code JsonMapper}:
+ * Customizes Spring Boot's primary Jackson 3 {@code JsonMapper} for the REST layer.
  *
- * <ol>
- *   <li>registers {@link NormalizedStringDeserializer} so every JSON {@code String} read by the
- *       REST layer is trimmed, NFC-normalized and length-capped — the same normalization {@link
- *       GlobalBindingAdvice} performs for x-www-form-urlencoded posts, so a JSON body and a form
- *       body cannot produce subtly different stored values;
- *   <li>restores {@code FAIL_ON_NULL_FOR_PRIMITIVES = false}. Jackson 3 flipped this feature's
- *       default to {@code true}; Jackson 2 (which the project's DTOs were written against) mapped
- *       an absent/null JSON value for a primitive field to its type default. Without this, a
- *       request body that omits a nested primitive — e.g. {@code location.hidden} (a {@code
- *       boolean} on {@code LocationDto}) in a RefineryOrder create payload — would start returning
- *       400 instead of defaulting to {@code false}.
- * </ol>
- *
- * <p><b>Why a customizer and not a {@code @Primary ObjectMapper} bean.</b> Spring Boot 4 /
- * Framework 7 drive the REST message converters with their own Jackson 3 {@code JsonMapper}. A
- * hand-rolled {@code @Primary} mapper — especially a Jackson 2 one — is not the instance Spring
- * actually uses, so configuring it would silently leave the REST layer on the framework's bare
- * defaults. {@link JsonMapperBuilderCustomizer} is the supported hook: Spring Boot applies it to
- * the very builder it constructs the primary {@code JsonMapper} from.
+ * <p>Registers {@link NormalizedStringDeserializer}, so JSON strings are normalized like form posts
+ * in {@link GlobalBindingAdvice}, and sets {@code FAIL_ON_NULL_FOR_PRIMITIVES = false}, so an
+ * absent primitive in a request body takes its type default instead of failing with 400.
  */
 @Configuration
 public class JacksonConfig {
 
   /**
-   * Applies the normalized-string module and the {@code FAIL_ON_NULL_FOR_PRIMITIVES = false}
-   * compatibility setting to the builder Spring Boot uses to construct its primary Jackson 3 {@code
-   * JsonMapper}, so both govern every payload the REST layer parses.
+   * Registers the normalized-string module and disables {@code FAIL_ON_NULL_FOR_PRIMITIVES} on the
+   * builder of the primary {@code JsonMapper}.
    *
-   * @return a customizer that registers {@link NormalizedStringDeserializer} and restores the
-   *     Jackson 2 primitive-null leniency on the primary mapper
+   * @return the customizer applied to the primary mapper's builder
    */
   @Bean
   public JsonMapperBuilderCustomizer appJsonMapperBuilderCustomizer() {

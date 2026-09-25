@@ -30,20 +30,10 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
- * Domain event published when an admin refuses a member's erasure request (REQ-SEC-061). The seeded
- * default rule notifies the requesting member through the {@code EVENT_RECIPIENT} selector.
+ * Domain event published when an admin refuses a member's erasure request (REQ-SEC-061); the
+ * default rule notifies the requesting member.
  *
- * <p>This notification is not a courtesy. <b>Art. 12(4) obliges the controller to tell the
- * requester that the request was refused</b>, and to do so without undue delay; the reasoning,
- * their right to complain to a supervisory authority and their right to a judicial remedy go with
- * it. The notification is what makes that happen in-app rather than depending on an admin
- * remembering.
- *
- * <p><b>The reasoning itself does not ride the event.</b> The admin's note lives on the request
- * row; a notification is rendered from a bounded message template with bounded parameters
- * (REQ-NOTIF-002), and pushing free text through it would put an admin's prose into every
- * recipient's inbox payload. The member reads the reason on their profile page, where the request
- * is shown.
+ * <p>The admin's reasoning does not ride the event; the member reads it on their profile page.
  *
  * @param userId the requesting member, who is the single recipient
  */
@@ -100,12 +90,7 @@ public record AccountDeletionRequestDeclinedEvent(UUID userId) implements Notifi
   }
 
   /**
-   * The refusal settles the request, so the administrators' "member requests erasure" items are
-   * stale and get cleared (REQ-NOTIF-018).
-   *
-   * <p>Without this the request kept showing in every administrator's bell after it was refused —
-   * with the member's handle in its render parameters. The bank's booking lifecycle is the
-   * precedent, and was the only one implementing this override.
+   * Clears the administrators' now-stale erasure-request notifications (REQ-NOTIF-018).
    *
    * @return the singleton {@link NotificationType#ACCOUNT_DELETION_REQUESTED}
    */

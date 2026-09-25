@@ -31,12 +31,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit tests for {@link BankTrendCalculator} (REQ-BANK-016/021): the 30-day end-of-day balance
- * sparkline and the signed net window delta the bank dashboard and org-unit balance page share. The
- * load-bearing invariants covered are the fixed {@link BankTrendCalculator#WINDOW_DAYS} series
- * length, the reconciliation of the last plotted point back to the current balance (series opens at
- * {@code balance - delta} and walks daily nets forward), and the UTC day-bucketing that merges two
- * postings of the same calendar day into one step.
+ * Unit tests for {@link BankTrendCalculator} (REQ-BANK-016): series length, reconciliation of the
+ * last point to the current balance, and UTC day bucketing.
  */
 class BankTrendCalculatorTest {
 
@@ -44,8 +40,7 @@ class BankTrendCalculatorTest {
   private static final UUID ACCOUNT_ID = UUID.randomUUID();
 
   /**
-   * Builds a posting slice on a UTC day {@code daysAgo} before {@code today}, at midday so the
-   * booking instant unambiguously buckets into that calendar day.
+   * Builds a posting slice at midday UTC, {@code daysAgo} days before {@code today}.
    *
    * @param today the UTC "today" the calculator will bucket against
    * @param daysAgo how many whole days before {@code today} the posting falls
@@ -70,9 +65,8 @@ class BankTrendCalculatorTest {
   }
 
   /**
-   * The series always holds exactly {@link BankTrendCalculator#WINDOW_DAYS} points, opens at the
-   * window-start balance ({@code balance - delta}) and reconciles: its last point equals the
-   * current balance once every daily net has been walked forward.
+   * The series holds {@link BankTrendCalculator#WINDOW_DAYS} points, opens at {@code balance -
+   * delta} and ends at the current balance.
    */
   @Test
   void sparkline_hasThirtyPointsAndLastEqualsBalance() {

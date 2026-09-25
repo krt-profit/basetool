@@ -48,11 +48,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC render checks for the {@code /notifications} inbox page's no-silent-cap UI (REQ-NOTIF-019).
- * The page shows the newest 50 notifications; when more exist it must render the "latest N of M"
- * hint and a load-more control, and when they all fit one page it must render neither. This test
- * also guards the Thymeleaf template itself — its {@code #{notifications.showingLatest(...)}}
- * MessageFormat call and the load-more fragment are exercised nowhere else.
+ * MVC render checks for the {@code /notifications} inbox (REQ-NOTIF-019): the "latest N of M" hint
+ * and load-more control appear only when more notifications exist than fit one page.
  */
 @SpringBootTest
 class NotificationPageRenderMvcTest {

@@ -30,20 +30,10 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 
 /**
- * Decides whether the current caller may join one live-sync room (ADR-0143).
+ * Decides whether the current caller may join one live-sync room (ADR-0143), asking the same
+ * question the equivalent read asks.
  *
- * <p>Every question here is the question the equivalent read already asks, and it is asked of the
- * same collaborator the {@code @PreAuthorize} expressions use. That is the whole design: a room
- * admits exactly the callers who could already fetch what changed, so the one thing a {@code
- * changed} frame carries — that a resource moved — never reaches someone who may not see the
- * resource.
- *
- * <p>Unlike the frontend's authorizer (ADR-0094), there is no fail-open branch and no bounded
- * executor. The frontend has to work through a captured token against a remote API and cannot tell
- * "refused" from "unreachable"; this backend is the authority and answers from its own data, so a
- * verdict is either yes or no. A check that throws is treated as **no**: a stream open is
- * user-initiated and retried on the next screen, so refusing a room during a transient fault costs
- * one refresh, while admitting one would be an access decision made by an exception handler.
+ * <p>A check that throws is treated as a refusal.
  */
 @Service
 @Slf4j
@@ -77,14 +67,8 @@ public class LiveSyncSubscriptionAuthorizer {
   }
 
   /**
-   * Records that a caller named a topic this backend's registry does not know.
-   *
-   * <p>Lives here rather than in the controller so the whole subscribe-side measurement sits in one
-   * place, and unlabelled because the topic belongs to no class — an {@code unknown} sentinel in
-   * the bounded {@code topic_class} set would cost every other query its clean vocabulary. A
-   * sustained rate is the signature of an app build asking for a room this server no longer serves,
-   * which is the one skew the parity gate cannot catch: the gate compares two server registries,
-   * not a shipped client against either.
+   * Counts a subscribe request naming a topic this backend's registry does not know (unlabelled
+   * metric).
    */
   public void recordInvalidTopic() {
     meterRegistry.counter(MetricNames.LIVESYNC_INVALID_TOPIC).increment();
@@ -120,13 +104,8 @@ public class LiveSyncSubscriptionAuthorizer {
   }
 
   /**
-   * Answers whether the caller may read one org-unit bank account.
-   *
-   * <p>There is no {@code canSee…} predicate for this one, so the read itself is the check: the
-   * member-facing detail read throws when the caller may not see the account, which is exactly the
-   * gate the app's Bank screen passes through. Deliberately the org-unit read and not the
-   * bank-staff one — the app carries the member-facing surface only (REQ-APP-BANK-007), and a room
-   * wider than the screen it feeds would admit a bank employee to a stream they have no client for.
+   * Answers whether the caller may read one org-unit bank account via the member-facing detail read
+   * (REQ-APP-BANK-007).
    *
    * @param accountId the account named by the topic
    * @return {@code true} if the detail read succeeds
@@ -141,9 +120,8 @@ public class LiveSyncSubscriptionAuthorizer {
    *
    * @param topic the room
    * @return the id
-   * @throws IllegalStateException if a per-resource class reached here without one — impossible via
-   *     {@link LiveSyncTopic#parse}, which refuses that combination, so it can only mean the
-   *     registry and the parser disagree
+   * @throws IllegalStateException if a per-resource topic carries no id (registry and parser
+   *     disagree)
    */
   @NotNull
   private static UUID required(@NotNull LiveSyncTopic topic) {

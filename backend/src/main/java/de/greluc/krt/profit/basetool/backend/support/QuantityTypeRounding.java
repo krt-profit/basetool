@@ -27,17 +27,10 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Rounds a derived material quantity to the precision its {@link QuantityType} can express: a whole
- * unit for a {@link QuantityType#PIECE} material, three decimals (the {@code 0.001} SCU input step
- * used throughout the UI) otherwise. A {@code null} type — or a {@code null} {@link Material} — is
- * treated as SCU, the {@link Material#getQuantityType()} default.
+ * unit for {@link QuantityType#PIECE}, three decimals otherwise. A {@code null} type or {@link
+ * Material} counts as SCU.
  *
- * <p>Extracted from the two byte-identical, comment-synchronized private copies that {@code
- * JobOrderItemService} and {@code BlueprintCraftabilityService} each carried (audit "Ingredient
- * MaterialBridge" dedup): the craftability calc and the job-order requirement snapshot must round a
- * shared PIECE material identically or a blueprint's craftable count silently diverges from the
- * order it fulfils, so this is now the single source of that rounding. Lives in the dependency-leaf
- * {@code support} package — it depends only on {@code model} ({@link Material} / {@link
- * QuantityType}).
+ * <p>Craftability and job-order snapshots must both round through this class.
  */
 public final class QuantityTypeRounding {
 
@@ -47,9 +40,8 @@ public final class QuantityTypeRounding {
   private QuantityTypeRounding() {}
 
   /**
-   * Rounds a quantity to the precision the given quantity type can express, eliminating the binary
-   * floating-point artefacts that a {@code perUnit * amount} product introduces (e.g. {@code 0.36 *
-   * 5} yielding {@code 1.7999999999999998} instead of {@code 1.8}).
+   * Rounds a quantity to the precision the given quantity type can express, removing floating-point
+   * artefacts such as {@code 1.7999999999999998}.
    *
    * @param quantity the raw, possibly noisy quantity
    * @param quantityType the material's quantity type, or {@code null} (treated as SCU)
@@ -63,12 +55,11 @@ public final class QuantityTypeRounding {
   }
 
   /**
-   * Convenience overload reading the quantity type off a material; a {@code null} material is
-   * treated as SCU, preserving the job-order snapshot's original null-handling.
+   * Overload reading the quantity type off a material; a {@code null} material is treated as SCU.
    *
    * @param quantity the raw, possibly noisy quantity
-   * @param material the material whose quantity type selects the rounding granularity, or {@code
-   *     null} (treated as SCU)
+   * @param material the material selecting the rounding granularity, or {@code null} (treated as
+   *     SCU)
    * @return the rounded quantity, in the material's own unit
    */
   public static double roundForQuantityType(double quantity, @Nullable Material material) {
@@ -76,14 +67,11 @@ public final class QuantityTypeRounding {
   }
 
   /**
-   * Convenience overload for the projection side, where a material has already been mapped and its
-   * quantity type survives only as the DTO's text. An absent, blank or unrecognised value is
-   * treated as SCU — the {@link Material#getQuantityType()} default — rather than failing the whole
-   * read for one malformed catalog row, which is what a cross-order fold over many materials needs.
+   * Overload for a mapped material whose quantity type is text; an absent, blank or unrecognised
+   * value is treated as SCU.
    *
    * @param quantity the raw, possibly noisy quantity
-   * @param material the mapped material whose textual quantity type selects the granularity, or
-   *     {@code null} (treated as SCU)
+   * @param material the mapped material selecting the granularity, or {@code null} (treated as SCU)
    * @return the rounded quantity, in the material's own unit
    */
   public static double roundForQuantityType(double quantity, @Nullable MaterialDto material) {
@@ -92,11 +80,10 @@ public final class QuantityTypeRounding {
   }
 
   /**
-   * Resolves a DTO's textual quantity type back to the enum, tolerating the two shapes a projection
-   * can carry that an entity cannot: absent, and a value no longer in the enum.
+   * Parses a DTO's textual quantity type, tolerating an absent or unknown value.
    *
    * @param quantityType the textual quantity type, possibly {@code null}
-   * @return the parsed type, or {@code null} to mean "the SCU default"
+   * @return the parsed type, or {@code null} to mean the SCU default
    */
   @Contract("null -> null")
   @Nullable

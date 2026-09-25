@@ -23,18 +23,10 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 /**
- * One mission's roll-up line in the operation finance summary: the mission's id + name and its
- * signed bottom line (finance income − expense + refinery profit), computed by grouped SQL
- * aggregates rather than a per-row load-all.
+ * One mission's line in the operation finance summary: its id, name and signed bottom line, without
+ * per-entry lists (those load via {@code GET /api/v1/operations/{id}/finances/{missionId}}).
  *
- * <p>Unlike {@link MissionFinanceSummaryDto} this carries <em>no</em> per-entry /
- * per-refinery-order lists — those load lazily per mission via {@code GET
- * /api/v1/operations/{id}/finances/{missionId}} when the operation-detail finance panel expands a
- * mission's breakdown (#1121). This DTO drives the always-rendered "Ergebnis je Einsatz" bars and
- * each collapsed mission's summary line, so it stays cheap and connection-light regardless of how
- * many finance entries the operation's missions hold.
- *
- * @param missionId the mission's id (links the row to its lazy-loaded detail)
+ * @param missionId the mission's id
  * @param missionName the mission's display name
  * @param totalSum the mission's signed bottom line in aUEC (income − expense + refinery profit)
  */

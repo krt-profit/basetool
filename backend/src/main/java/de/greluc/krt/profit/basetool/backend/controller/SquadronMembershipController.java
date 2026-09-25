@@ -38,29 +38,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * R6.e — REST surface for membership-row management on a single Squadron. Mounts under {@code
- * /api/v1/squadrons/{id}/members} so the URL itself documents the parent Squadron, mirroring the
- * R5.b layout of {@link SpecialCommandMembershipController} for SK memberships.
+ * REST surface for membership rows of a single Squadron.
  *
- * <p>SPEZIALKOMMANDO_PLAN.md D3 + §5.6 + R6.d wrote the read side of the
- * Logistician/Mission-Manager flag onto the {@code org_unit_membership} row (the JWT converter now
- * consults the per-membership flag, not the legacy {@code app_user.is_logistician} / {@code
- * app_user.is_mission_manager} columns). This controller completes the write side: the admin
- * user-management UI can now flip the flag on the membership row directly, with optimistic-lock
- * detection.
- *
- * <p>Authorisation: every write goes through {@code hasRole('ADMIN')}. Unlike the SK side there is
- * no Squadron-Lead concept — Squadron member management has always been an ADMIN / Squadron-Officer
- * concern, and the existing pre-R6.e legacy endpoints ({@code PATCH
- * /api/v1/users/{id}/memberships}) also gated on ADMIN. The V95 CHECK constraint {@code
- * chk_org_unit_membership_lead_only_on_special_command} forbids the {@code is_lead} column being
- * set on a Squadron membership in the first place, so no {@code /lead} endpoint exists here.
- *
- * <p>The per-flag query-param toggle endpoints were removed once the member-edit page moved to the
- * version-aware membership-delta PATCH ({@code PATCH /api/v1/users/{id}/memberships}); Staffel flag
- * changes now flow through {@link OrgUnitMembershipService#reconcileStaffelMemberships(
- * de.greluc.krt.profit.basetool.backend.model.User, java.util.List)} or the version-aware PATCH
- * below.
+ * <p>Every write is ADMIN-only. Squadrons have no Lead concept, so no {@code /lead} endpoint
+ * exists; Staffel assignments also flow through the membership-delta PATCH on the user resource.
  */
 @RestController
 @RequestMapping("/api/v1/squadrons/{id}/members")

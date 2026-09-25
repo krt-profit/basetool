@@ -60,32 +60,11 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Payout computation, the per-participant paid-out toggle and the in-game transfer-fee resolution
- * for the {@code operation} aggregate. Split out of {@code OperationService} (audit Thema 7, #14)
- * so the operation CRUD/reads and the heavier payout engine live in focused services; the plain
- * CRUD (list, search, picker, create, update, delete) stays in {@code OperationService}.
+ * Computes the operation payout breakdown and toggles the per-participant paid-out flag.
  *
- * <p>The pure aggregate math — total sum, per-owner out-of-pocket reimbursements and the
- * per-participant attendance breakdown — lives in the stateless {@link OperationPayoutCalculator};
- * this service loads the ledger / refinery orders / participant graph, merges in the persisted
- * paid-out status and assembles the DTOs.
- *
- * <p>The payout view is the complex read path here: {@link #getOperationPayouts(UUID)} computes the
- * per-participant time share AND the actual money number per participant. The money formula treats
- * out-of-pocket expenses (mission EXPENSE entries owned by the participant + refinery orders' costs
- * where they are the owner) as a "reimbursement off the top" before the remaining {@code totalSum}
- * is split per participation percentage among PAYOUT participants. DONATE participants still get
- * their personal reimbursement (their own money) but their share is not distributed. Finally, an
- * in-game banking fee is deducted from every participant's gross payout so the displayed amount
- * matches what their mobiGlas will actually receive. The fee rate is runtime-editable: it lives
- * under the {@code operation.transfer_fee_rate} key in {@code system_setting} (seeded to 0.005 =
- * 0.5% by Flyway), can be tuned from {@code /admin/settings} by officers and admins, and degrades
- * to {@link #DEFAULT_TRANSFER_FEE_RATE} when the row is missing, blank or unparseable. {@link
- * #setPayoutStatus(UUID, String, boolean)} provides the mission-manager toggle that records whether
- * a participant has been paid out; it is a non-transactional orchestrator retrying a {@code
- * REQUIRES_NEW} inner method so the last-writer-wins race on the {@code @Version}ed,
- * uniquely-indexed status row is resolved by retry rather than a client version echo (#1111).
- * Operationen is an audited area — the toggle records {@link
+ * <p>Expenses are reimbursed first, the remaining total is split by attendance share among PAYOUT
+ * participants, and the in-game transfer fee from the {@code operation.transfer_fee_rate} system
+ * setting is deducted from every gross payout. The paid-out toggle is audited as {@link
  * AuditEventType#OPERATION_PAYOUT_TOGGLED}.
  */
 @Service
@@ -104,12 +83,8 @@ public class OperationPayoutService {
   static final String TRANSFER_FEE_RATE_SETTING_KEY = "operation.transfer_fee_rate";
 
   /**
-   * Fallback in-game banking fee rate used when the {@code operation.transfer_fee_rate} system
-   * setting is absent, blank or unparseable. Mirrors Star Citizen's documented Spectrum / mobiGlas
-   * banking charge of 0.5% on every aUEC transfer to the recipient. Kept as a hard fallback so a
-   * truncated or accidentally-deleted setting row degrades gracefully to the historical default
-   * instead of crashing the payout view (which is gated behind authentication and used by mission
-   * managers settling operations — silent zero would be far worse than a possibly-stale rate).
+   * Transfer-fee rate (0.5%) used when the {@code operation.transfer_fee_rate} system setting is
+   * absent, blank or unparseable.
    */
   static final BigDecimal DEFAULT_TRANSFER_FEE_RATE = new BigDecimal("0.005");
 
@@ -131,64 +106,24 @@ public class OperationPayoutService {
   private final AuditService auditService;
 
   /**
-   * Self-reference used to invoke {@link #setPayoutStatusWithinTransaction} through the Spring
-   * proxy so each retry of {@link #setPayoutStatus} opens its OWN {@code REQUIRES_NEW} transaction.
-   * A direct {@code this} call would be self-invocation and skip the proxy, running every attempt
-   * in one transaction — which is fatal here, because a losing writer's {@link
-   * DataIntegrityViolationException} poisons the whole transaction so no same-transaction retry
-   * could ever commit. An {@link ObjectProvider} defers the lookup, avoiding an eager
-   * self-injection cycle at construction (#1111).
+   * Proxy-backed self-reference through which {@link #setPayoutStatus} runs each attempt of {@link
+   * #setPayoutStatusWithinTransaction} in its own {@code REQUIRES_NEW} transaction.
    */
   private final ObjectProvider<OperationPayoutService> self;
 
   /**
-   * Total attempts (one initial + retries) the payout toggle makes against a concurrent same-row
-   * writer before giving up and surfacing the conflict. Three is ample: the first losing writer
-   * loses the INSERT / {@code @Version} race, but by the retry the winner has committed the row, so
-   * a second attempt loads it and UPDATEs in place. A further loss needs yet another writer
-   * toggling the exact same {@code (operation, participant)} within microseconds — vanishingly
-   * unlikely.
+   * Total attempts (initial plus retries) the payout toggle makes against a concurrent writer of
+   * the same row before surfacing the conflict.
    */
   private static final int MAX_PAYOUT_TOGGLE_ATTEMPTS = 3;
 
   /**
    * Computes the per-participant payout breakdown for the operation.
    *
-   * <p>Pulls the operation with its missions / participants pre-fetched, then loads finance entries
-   * and refinery orders by mission id so the percentage AND the money number can be derived in one
-   * pass. The percentage is the participant's clamped attendance time over the operation's clamped
-   * attendance time (mirrors the previous behavior); the money number is {@code
-   * round(personalExpenses + sharePayout − transferFee)} — final HALF_UP rounding to whole aUEC,
-   * because Star Citizen's mobiGlas does not accept fractional credits in a transfer. The
-   * components below are tracked at two-decimal precision so the breakdown sub-labels stay
-   * auditable; only the final {@code payoutAmount} is collapsed to scale 0:
-   *
-   * <ul>
-   *   <li><b>personalExpenses</b> reimburses each participant for the expenses attributed to them —
-   *       mission EXPENSE entries where they are the {@code participant} plus refinery orders'
-   *       {@code expenses + otherExpenses} where they are the {@code owner}.
-   *   <li><b>sharePayout</b> is {@code totalSum × percentage / 100} for PAYOUT participants and
-   *       {@link BigDecimal#ZERO} for DONATE participants. Their share is contributed to the org
-   *       but the reimbursement is still paid out (it is the participant's own money returned).
-   *   <li><b>transferFee</b> is {@code (personalExpenses + sharePayout) × transferFeeRate} — Star
-   *       Citizen's in-game banking deducts a small fraction from any aUEC transfer to the
-   *       recipient, so this fee is subtracted from the gross payout to show what actually lands in
-   *       the participant's mobiGlas. The rate is runtime-editable via the {@code
-   *       operation.transfer_fee_rate} system setting (default 0.005 = 0.5%, fallback applied when
-   *       the row is absent or unparseable). Applies to PAYOUT and DONATE participants alike
-   *       (DONATE participants only receive their reimbursement, but that transfer also incurs the
-   *       fee).
-   * </ul>
-   *
-   * <p>The {@code paidOut*} fields are merged in from {@link OperationPayoutStatus} rows by
-   * participant key; absence of a row is treated as {@code paidOut=false}. Output is sorted
-   * alphabetically by participant name.
-   *
-   * <p>Uses {@link OperationRepository#findWithMissionsAndParticipantsById} with an explicit
-   * {@code @EntityGraph} so the loop's {@code .getMissions()/.getParticipants()/.getUser()} never
-   * triggers lazy SELECTs — otherwise {@code 1 + N + N*M} round trips for {@code N} missions ×
-   * {@code M} participants each. Refinery orders are fetched via {@code @EntityGraph} on the
-   * repository method so the owner is eagerly loaded for the per-owner cost attribution.
+   * <p>The percentage is the participant's clamped attendance time over the operation's total. The
+   * payout is {@code round(personalExpenses + sharePayout − transferFee)}, rounded HALF_UP to whole
+   * aUEC; the components keep two decimals. DONATE participants receive only their reimbursement.
+   * Rows without an {@link OperationPayoutStatus} count as not paid out.
    *
    * @param id operation primary key
    * @return per-participant payout breakdown, sorted by participant name
@@ -279,19 +214,11 @@ public class OperationPayoutService {
   }
 
   /**
-   * Returns the operation payout breakdown together with the operation-wide donation total.
-   *
-   * <p>Thin aggregation wrapper over {@link #getOperationPayouts(UUID)}: it builds the payout rows
-   * once (a single load of the participant graph) and sums every row's {@link
-   * OperationPayoutDto#donatedAmount()} into {@code totalDonations}. The total therefore equals the
-   * sum of the per-donor donated shares shown in the table — there is no separate, independently
-   * rounded computation that could drift from the rows. PAYOUT rows contribute {@link
-   * BigDecimal#ZERO}, so the total is exactly the pool slice the DONATE participants contributed to
-   * the org rather than received. This is the canonical read path for the operation-detail payout
-   * panel.
+   * Returns the operation payout breakdown together with the donation total, summed from the rows'
+   * {@link OperationPayoutDto#donatedAmount()}.
    *
    * @param id operation primary key
-   * @return the payout rows (sorted by participant name) plus the aggregated donation total
+   * @return the payout rows (sorted by participant name) plus the donation total
    * @throws NotFoundException when no operation matches the id
    */
   @NotNull
@@ -306,25 +233,12 @@ public class OperationPayoutService {
   }
 
   /**
-   * Reduces the breakdown to the caller's own row when they reached the operation <em>only</em>
-   * through the participant escape.
+   * Reduces the breakdown to the caller's own row when they can see the operation only through the
+   * participant escape (ADR-0006) rather than through its org-unit scope.
    *
-   * <p>{@code canSeeOperation} - the endpoint's gate - admits two very different callers: somebody
-   * in the operation's org-unit scope, and somebody who merely participated in one of its linked
-   * missions. The second key is self-issuable ({@code POST /api/v1/missions/&#123;id&#125;/join} is
-   * open for every non-internal mission of every org unit), so honouring it with the full breakdown
-   * meant one request bought a foreign unit's entire payout table: per participant the callsign,
-   * share percentage, personal expenses, share and donated amounts, transfer fee, net payout and
-   * the confirming officer.
-   *
-   * <p>The escape itself stays - a participant may still open the operation and read <strong>their
-   * own</strong> payout, which is what ADR-0006 granted it for. What changes is that the escape no
-   * longer carries everybody else's row with it. {@code totalDonations} is recomputed over the
-   * reduced list by the caller, so the operation-wide aggregate does not leak either.
-   *
-   * @param operationId the operation being read.
-   * @param payouts the full breakdown.
-   * @return the full list for a scope-visible caller, otherwise only the caller's own row.
+   * @param operationId the operation being read
+   * @param payouts the full breakdown
+   * @return the full list for a scope-visible caller, otherwise only the caller's own row
    */
   private List<OperationPayoutDto> restrictToOwnRowIfEscapeOnly(
       @NotNull UUID operationId, @NotNull List<OperationPayoutDto> payouts) {
@@ -339,31 +253,19 @@ public class OperationPayoutService {
   }
 
   /**
-   * Toggles the paid-out flag for a single participant of an operation, recording the acting user
-   * and timestamp. Materializes a new {@link OperationPayoutStatus} row on the first toggle;
-   * subsequent toggles update the row in place.
+   * Sets the paid-out flag for one participant of an operation, recording the acting user and
+   * timestamp; the status row is created on the first toggle.
    *
-   * <p><b>Last-writer-wins under concurrency, for real.</b> The row carries a JPA {@code @Version}
-   * and a unique constraint on {@code (operation_id, participant_key)}, so two leads toggling the
-   * same never-yet-paid participant at once do NOT both succeed: one loses the INSERT (constraint)
-   * or the UPDATE ({@code @Version}) race and throws. This method therefore runs each attempt in
-   * its own {@code REQUIRES_NEW} transaction (via {@link #self}) and retries up to {@link
-   * #MAX_PAYOUT_TOGGLE_ATTEMPTS} times on {@link DataIntegrityViolationException} / {@link
-   * ObjectOptimisticLockingFailureException}: by the retry the winner has committed the row, so the
-   * loser reloads it and UPDATEs in place. No client-supplied version is required (the field is a
-   * boolean); the retry — not the field's nature — is what makes the toggle idempotent. Previously
-   * the Javadoc claimed this was intrinsic and the bare save simply 409'd the loser, which the
-   * frontend proxy then mis-mapped to a 500 (#1111).
+   * <p>Runs each attempt in its own {@code REQUIRES_NEW} transaction and retries up to {@link
+   * #MAX_PAYOUT_TOGGLE_ATTEMPTS} times when a concurrent writer wins, so the last writer wins
+   * without a client version.
    *
    * @param operationId operation primary key
    * @param participantKey opaque participant key produced by {@link #getOperationPayouts}
    * @param paidOut new flag value
-   * @return the paid-out status block for the updated participant, for patching a single "Bezahlt"
-   *     cell without re-running the full payout computation
-   * @throws NotFoundException when the operation does not exist or the participant key cannot be
-   *     resolved against the operation's current participant list
-   * @throws ObjectOptimisticLockingFailureException only if every attempt loses the race — a
-   *     persistent hot-row contention the proxy still maps to a 409, never a 500
+   * @return the paid-out status block of the updated participant
+   * @throws NotFoundException when the operation or the participant key cannot be resolved
+   * @throws ObjectOptimisticLockingFailureException when every attempt loses the race
    */
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public OperationPayoutStatusDto setPayoutStatus(
@@ -384,16 +286,13 @@ public class OperationPayoutService {
   }
 
   /**
-   * Performs one attempt of the payout toggle inside its own {@code REQUIRES_NEW} transaction — the
-   * find-or-create + save + audit + re-render body that {@link #setPayoutStatus} retries. Kept
-   * separate (and invoked through {@link #self}) precisely so a constraint / version violation
-   * rolls back only this attempt's transaction and the caller can retry in a clean one (#1111).
-   * Must never be called directly by application code — go through {@link #setPayoutStatus}.
+   * Performs one attempt of the payout toggle in its own {@code REQUIRES_NEW} transaction. Called
+   * only by {@link #setPayoutStatus} through {@link #self}.
    *
    * @param operationId operation primary key
    * @param participantKey opaque participant key produced by {@link #getOperationPayouts}
    * @param paidOut new flag value
-   * @return the paid-out status block for the updated participant
+   * @return the paid-out status block of the updated participant
    * @throws NotFoundException when the operation or participant key cannot be resolved
    * @throws DataIntegrityViolationException when a concurrent writer already inserted the row
    * @throws ObjectOptimisticLockingFailureException when a concurrent writer already updated the
@@ -450,16 +349,11 @@ public class OperationPayoutService {
   }
 
   /**
-   * Loads and validates the runtime-editable in-game transfer-fee rate from {@code system_setting}.
-   * Falls back to {@link #DEFAULT_TRANSFER_FEE_RATE} when the row is absent, blank, not a number,
-   * negative or {@code >= 1} (which would zero-out or invert every payout). The fallback is logged
-   * at WARN so an operator sees the misconfiguration in the access log instead of silently working
-   * off a stale default. Called once per {@link #getOperationPayouts(UUID)} invocation — the
-   * underlying repository hit is a single PK lookup on a tiny table, so caching is unnecessary and
-   * would only introduce stale-value risk after admin edits.
+   * Loads the transfer-fee rate from {@code system_setting}, falling back to {@link
+   * #DEFAULT_TRANSFER_FEE_RATE} with a WARN log when the value is absent, blank, not a number,
+   * negative or {@code >= 1}.
    *
-   * @return a non-null, validated rate in the range {@code [0, 1)}; either the persisted setting
-   *     value or {@link #DEFAULT_TRANSFER_FEE_RATE} when the persisted value is unusable
+   * @return a validated rate in {@code [0, 1)}
    */
   @NotNull
   private BigDecimal resolveTransferFeeRate() {

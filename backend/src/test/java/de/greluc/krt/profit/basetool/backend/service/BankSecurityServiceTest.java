@@ -45,12 +45,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.Authentication;
 
 /**
- * Unit tests for {@link BankSecurityService}: the capability matrix (REQ-BANK-009/-010) and the
- * org-unit-independence contract (REQ-BANK-008) — the service consults exactly two inputs (bank
- * roles via {@link AuthHelperService} and the grant table) and nothing else, so org-unit
- * memberships, contextual authorities and the admin pin cannot influence any decision by
- * construction. {@code ArchitectureTest} pins the absence of an {@code OwnerScopeService}
- * dependency at the bytecode level; the matrix e2e test pins it end to end.
+ * Unit tests for {@link BankSecurityService}: the capability matrix (REQ-BANK-009) and its
+ * independence from org-unit membership (REQ-BANK-008).
  */
 @ExtendWith(MockitoExtension.class)
 class BankSecurityServiceTest {

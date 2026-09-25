@@ -22,12 +22,8 @@ package de.greluc.krt.profit.basetool.backend.service;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Immutable value object describing one plain-text e-mail handed to {@link MailService}.
- *
- * <p>Channel-agnostic and free of any domain concept (approval, notification, …) so the same seam
- * serves any future producer — including the in-app notification system routing a notification to
- * e-mail as a second delivery channel (REQ-NOTIF-013). Callers localize the subject and body before
- * constructing it.
+ * Immutable, channel-agnostic description of one plain-text e-mail handed to {@link MailService};
+ * subject and body are already localized.
  *
  * @param to the recipient's e-mail address
  * @param subject the already-localized subject line

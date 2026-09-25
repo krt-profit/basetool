@@ -22,39 +22,26 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import java.util.List;
 
 /**
- * Boundary DTO for one stat contribution a requirement group makes to the crafted item. Surfaces
- * the persisted {@code blueprint_requirement_modifier} on the admin blueprint page: {@link #label}
- * names the affected output stat and {@link #modifierAtMinQuality}..{@link #modifierAtMaxQuality}
- * gives the multiplier band swept across {@link #qualityMin}..{@link #qualityMax}.
+ * Boundary DTO for one stat contribution a requirement group makes to the crafted item: the
+ * affected stat and the multiplier band swept across the quality range.
  *
- * <p>When {@link #segments} is non-empty the stat changes in steps rather than along the single
- * endpoint band — the slider on the page interpolates within the segment that contains the chosen
- * quality and ignores the {@code modifierAtMin/MaxQuality} pair.
- *
- * <p><b>Effective vs. raw quality band.</b> For a stepped modifier the SC Wiki populates the raw
- * {@link #qualityMin}..{@link #qualityMax} pair with only the <em>first</em> segment's bounds (e.g.
- * {@code 0..500}), while the {@link #segments} together cover the full {@code 0..1000} band. The UI
- * must span the whole covered range, so {@link #effectiveQualityMin}..{@link #effectiveQualityMax}
- * give the union of the segment bounds when segments are present and fall back to the raw pair for
- * the simple linear form. Slider extents must use the effective pair; the raw pair is kept for
- * reference / linear interpolation only.
+ * <p>When {@link #segments} is non-empty the stat changes stepwise and the raw {@link
+ * #qualityMin}..{@link #qualityMax} pair holds only the first segment's bounds; slider extents must
+ * use {@link #effectiveQualityMin}..{@link #effectiveQualityMax}, which span all segments.
  *
  * @param propertyKey internal stat key (e.g. {@code "weapon_damage"})
  * @param label human-readable stat name (e.g. {@code "Impact Force"})
  * @param betterWhen whether a higher / lower / neutral value is desirable
- * @param qualityMin lowest ingredient-quality value of the raw endpoint band (first segment only
- *     for stepped modifiers)
- * @param qualityMax highest ingredient-quality value of the raw endpoint band (first segment only
- *     for stepped modifiers)
+ * @param qualityMin lowest quality of the raw endpoint band (first segment only when stepped)
+ * @param qualityMax highest quality of the raw endpoint band (first segment only when stepped)
  * @param modifierAtMinQuality stat multiplier at the minimum quality
  * @param modifierAtMaxQuality stat multiplier at the maximum quality
  * @param valueRangeType interpolation type between the endpoints (e.g. {@code "linear"})
- * @param segments per-segment ranges of a stepped / piecewise-linear modifier; empty for the simple
- *     linear form
- * @param effectiveQualityMin lowest quality the modifier actually covers — the smallest segment
- *     {@code qualityMin} when stepped, else {@link #qualityMin}
- * @param effectiveQualityMax highest quality the modifier actually covers — the largest segment
- *     {@code qualityMax} when stepped, else {@link #qualityMax}
+ * @param segments per-segment ranges of a stepped modifier; empty for the linear form
+ * @param effectiveQualityMin lowest quality the modifier covers: the smallest segment bound when
+ *     stepped, else {@link #qualityMin}
+ * @param effectiveQualityMax highest quality the modifier covers: the largest segment bound when
+ *     stepped, else {@link #qualityMax}
  */
 public record BlueprintRequirementModifierDto(
     String propertyKey,

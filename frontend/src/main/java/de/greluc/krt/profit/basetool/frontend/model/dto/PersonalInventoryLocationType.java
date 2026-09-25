@@ -20,9 +20,7 @@
 package de.greluc.krt.profit.basetool.frontend.model.dto;
 
 /**
- * Mirror of the backend enum used to disambiguate UEX location entries between cities and space
- * stations. Kept as a lightweight frontend copy to avoid a hard module dependency on the backend
- * module while still ensuring type safety on REST payloads.
+ * Frontend mirror of the backend enum that tells cities from space stations among UEX locations.
  */
 public enum PersonalInventoryLocationType {
   CITY,

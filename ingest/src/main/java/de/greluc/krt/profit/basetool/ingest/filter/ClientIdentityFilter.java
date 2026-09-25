@@ -46,34 +46,12 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Enforces <em>which client software</em> may drive the ingest endpoints (REQ-INGEST-011). The user
- * gate is unchanged and stays {@code isAuthenticated()} for every member (REQ-INGEST-002/-008):
- * this filter never asks whether the caller is entitled, only whether the program making the call
- * is an approved one.
+ * Enforces which client software may call the ingest endpoints (REQ-INGEST-011) by checking the
+ * token's {@code azp} against the allowlist and the configured ingest scope; the user gate stays
+ * {@code isAuthenticated()}.
  *
- * <p>Two token-level checks, each inert until configured (see {@link ClientIdentityProperties}):
- * the {@code azp} claim against the client-id allowlist and the configured ingest scope. The
- * payload-level provenance check cannot live here (the body is not parsed yet) and sits in {@code
- * ProvenanceGuard} instead; both share the {@code CLIENT_NOT_ALLOWED} problem code so a client sees
- * one coherent answer.
- *
- * <p><b>Placement.</b> Inside the Spring Security chain, after {@code
- * BearerTokenAuthenticationFilter} (there is no {@link
- * org.springframework.security.core.context.SecurityContext} before it) and after {@link
- * UserIdMdcFilter}, so every line this filter logs already carries the acting subject in the {@code
- * userId} MDC field and never has to repeat it (REQ-OBS-002/-004). Like its siblings it is
- * deliberately not a {@code @Component}: Boot would otherwise also register it as a plain servlet
- * filter, where it would run before authentication and see nothing.
- *
- * <p><b>What it is worth.</b> These gates segment <em>registered</em> clients from one another — a
- * frontend session token cannot drive the gateway, and an approved integration is individually
- * scoped and individually revocable. They are explicitly <em>not</em> anti-tamper: the extractor is
- * a public OAuth client whose client id is readable from the binary and from the wire, so a member
- * who deliberately reproduces it obtains a token that passes every check here. Native-client
- * attestation is not achievable on Windows (no App Attest / Play Integrity equivalent), which is
- * why the design leans on containment instead — the ingest path persists nothing (REQ-INGEST-004) —
- * and on making a foreign caller <em>visible</em> through {@code
- * basetool_ingest_client_rejected_total} rather than pretending it is impossible.
+ * <p>Runs inside the security chain after authentication and {@link UserIdMdcFilter}. Segments
+ * registered clients from one another; it is not anti-tamper.
  */
 @Slf4j
 @RequiredArgsConstructor
@@ -180,15 +158,7 @@ public class ClientIdentityFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Runs the configured checks in order of decreasing severity and returns the first failure.
-   *
-   * <p>Order matters for diagnosis, not for security: both yield the same {@code 403}, but the
-   * client-identity failure is reported before the scope one because it is the more common
-   * misconfiguration and the more actionable message.
-   *
-   * <p>Takes the already-extracted {@code azp} rather than the {@link Jwt} itself: the only other
-   * claim-derived input, the ingest scope, reaches this through the {@code SecurityContext} as a
-   * {@code SCOPE_} authority, so passing the token would be a parameter nothing reads.
+   * Runs the configured checks, client identity before scope, and returns the first failure.
    *
    * @param request the current request, inspected for the {@code Authorization} scheme
    * @param authorizedParty the token's {@code azp} claim, or {@code null} when absent
@@ -214,19 +184,8 @@ public class ClientIdentityFilter extends OncePerRequestFilter {
   }
 
   /**
-   * The user-facing sentence for a client-identity rejection, naming <em>which</em> check refused.
-   *
-   * <p>Deliberately explicit rather than a bare "forbidden": the extractor surfaces the problem
-   * {@code detail} verbatim, so this is where the support boundary is actually communicated to
-   * whoever built the calling tool.
-   *
-   * <p><b>Why the failing check is named.</b> All four checks used to answer with one identical
-   * sentence, which cost real time during the 2026-08-03 production incident: the message could not
-   * distinguish a token-level refusal from the payload-provenance one, so the operator had to reach
-   * for the log to learn which of four gates had fired — and the container had already been
-   * recreated by then, taking its log with it. The {@code failedCheck} clause is coarse on purpose:
-   * it names the category, never the configured allowlist or scope value, so it diagnoses without
-   * disclosing configuration to a caller that was just refused.
+   * Builds the user-facing detail for a client-identity rejection, naming the category of the check
+   * that refused without disclosing configured values.
    *
    * @param failedCheck short, non-sensitive name of the check that refused the caller
    * @return the problem detail for a non-approved client
@@ -238,25 +197,10 @@ public class ClientIdentityFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Warns when an access token arrives <b>without</b> the RFC 7800 {@code cnf.jkt} confirmation,
-   * i.e. as a plain bearer rather than sender-constrained.
+   * Logs a warning when an access token arrives without the RFC 7800 {@code cnf.jkt} confirmation,
+   * i.e. not sender-constrained (REQ-INGEST-012).
    *
-   * <p>This canary points the opposite way since ADR-0129. While the gateway still relayed the
-   * caller's token, a bound access token could not survive the second hop and the warning fired on
-   * {@code cnf.jkt} being <em>present</em>. The gateway no longer relays: it validates the caller
-   * itself and calls the backend under its own service account, so the internet-facing hop is the
-   * one that consumes the token — which is precisely where sender-constraining pays, and
-   * REQ-INGEST-012 requires the DPoP scheme accordingly.
-   *
-   * <p>Leaving the old direction in place made the line fire on every successful send, with a
-   * stated cause ("the backend will refuse it") that had stopped being true — a canary that cries
-   * on the happy path teaches operators to ignore it.
-   *
-   * <p>An unbound token now means the protection lapsed silently: a client policy started binding
-   * nothing, Keycloak stopped honouring the proof, or an older extractor build authenticated
-   * without one. Logged rather than rejected, because the token is otherwise valid and the {@code
-   * azp} allowlist already decides who may call at all — this line names a regression, it does not
-   * gate traffic.
+   * <p>Logs only; the request is not rejected.
    *
    * @param request the current request
    * @param jwt the authenticated caller's token
@@ -307,9 +251,8 @@ public class ClientIdentityFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Maps a raw {@code azp} to a metric label from a finite set: the matching allowlist entry, or
-   * {@link MetricNames#CLIENT_ID_OTHER}. Never returns the raw claim — a label derived from token
-   * content is an unbounded-cardinality bug waiting to happen (REQ-OBS-011).
+   * Maps a raw {@code azp} to a bounded metric label: the matching allowlist entry or {@link
+   * MetricNames#CLIENT_ID_OTHER} (REQ-OBS-011).
    *
    * @param authorizedParty the token's {@code azp}, or {@code null}
    * @return a bounded, safe metric tag value
@@ -334,9 +277,8 @@ public class ClientIdentityFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Whether the security context holds a real, authenticated caller — anything else (no
-   * authentication, an anonymous token, an unauthenticated token) is left to the resource-server
-   * chain, which answers it with a {@code 401}.
+   * Whether the security context holds an authenticated, non-anonymous caller; anything else is
+   * left to the resource-server chain's 401.
    *
    * @param authentication the current authentication, possibly {@code null}
    * @return {@code true} for an authenticated, non-anonymous principal
@@ -388,14 +330,8 @@ public class ClientIdentityFilter extends OncePerRequestFilter {
   }
 
   /**
-   * Restricts the filter to the two ingest endpoints. Actuator health, the Prometheus scrape and
-   * {@code /v3/api-docs} are not client-identity gated — they are either unauthenticated by design
-   * or guarded by their own chain, and gating them would break the container healthcheck.
-   *
-   * <p>Decided on the decoded path via {@link IngestPathScope}, never on the raw {@code
-   * getRequestURI()}: a raw prefix test skips this gate for {@code /%761/…} while the dispatcher
-   * still routes it to the ingest controller, which would hand the whole REQ-INGEST-011 allowlist
-   * to anyone willing to encode one character.
+   * Restricts the filter to the two ingest endpoints, decided on the decoded path via {@link
+   * IngestPathScope}.
    *
    * @param request the current request
    * @return {@code true} to bypass the filter

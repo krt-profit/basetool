@@ -46,11 +46,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Domain service for {@link PromotionTopic} CRUD operations. Topics carry the squadron scope for
- * the entire promotion subtree (categories, level contents, rank requirements, member evaluations
- * all derive their squadron from {@code topic.owningSquadron}); Officer-of-squadron-X may read and
- * edit topics owned by squadron X, Admin may operate across squadrons or focus via the sidebar
- * switcher.
+ * Domain service for {@link PromotionTopic} CRUD. A topic's {@code owningSquadron} scopes its whole
+ * promotion subtree; officers act on their own squadron's topics, admins on any.
  */
 @Service
 @RequiredArgsConstructor
@@ -71,11 +68,8 @@ public class PromotionTopicService {
   private final AuditService auditService;
 
   /**
-   * Returns a paginated slice of every {@link PromotionTopicResponse} visible to the caller. The
-   * controller validates the caller-supplied sort against {@link #SORTABLE_FIELDS} before this
-   * method is invoked. For Officer / KRT Member callers the result is restricted to their home
-   * squadron; for Admin with the switcher set, to the focused squadron; for Admin in "all
-   * squadrons" mode the result spans every squadron.
+   * Pages the promotion topics in the caller's squadron scope; admins in "all squadrons" mode see
+   * every squadron.
    *
    * @param pageable Spring Data paging and sorting parameters
    * @return a page of promotion topics
@@ -106,9 +100,7 @@ public class PromotionTopicService {
   }
 
   /**
-   * Resolves a single {@link PromotionTopicResponse} by identifier. Rejects with {@link
-   * AccessDeniedException} when the caller's squadron context does not match the topic's owning
-   * squadron (and the caller is not Admin).
+   * Resolves a single topic by identifier; non-admins must share its owning squadron.
    *
    * @param id identifier of the topic
    * @return the matching topic in response form
@@ -123,10 +115,8 @@ public class PromotionTopicService {
   }
 
   /**
-   * Persists a new {@link PromotionTopic}. Auto-stamps the owning squadron from the caller's active
-   * context ({@link OwnerScopeService#currentSquadron()}) so Officers always tag their own squadron
-   * and Admins must focus the switcher before creating (Admin in "all squadrons" mode is rejected
-   * with HTTP 400, mirroring the JobOrder create contract).
+   * Persists a new {@link PromotionTopic} stamped with the caller's active squadron ({@link
+   * OwnerScopeService#currentSquadron()}).
    *
    * @param request validated payload describing the new topic
    * @return the persisted topic in response form
@@ -164,20 +154,14 @@ public class PromotionTopicService {
   }
 
   /**
-   * Updates the topic identified by {@code id}. The caller-supplied {@code version} is compared
-   * against the loaded entity and a mismatch produces an {@link
-   * ObjectOptimisticLockingFailureException} that surfaces as HTTP 409. The owning squadron is
-   * immutable post-create — admins cannot reassign a topic to a different squadron through this
-   * endpoint.
+   * Updates a topic; its owning squadron cannot be changed.
    *
    * @param id identifier of the topic to update
-   * @param request validated payload with the new field values and the previously fetched {@code
-   *     version}
+   * @param request validated payload with the new field values and the expected {@code version}
    * @return the updated topic in response form
    * @throws NotFoundException if no topic exists for that id
    * @throws AccessDeniedException if the caller's squadron does not match
-   * @throws ObjectOptimisticLockingFailureException if the request's {@code version} no longer
-   *     matches the persisted entity
+   * @throws ObjectOptimisticLockingFailureException if the {@code version} is stale
    */
   @Transactional
   @PreAuthorize(Roles.ADMIN_OR_OFFICER)
@@ -196,8 +180,7 @@ public class PromotionTopicService {
   }
 
   /**
-   * Permanently removes the topic identified by {@code id}, cascading the orphan removal to its
-   * categories. Restricted to ADMIN or OFFICER callers whose squadron matches the topic.
+   * Permanently deletes a topic together with its categories.
    *
    * @param id identifier of the topic to delete
    * @throws NotFoundException if no topic exists for that id

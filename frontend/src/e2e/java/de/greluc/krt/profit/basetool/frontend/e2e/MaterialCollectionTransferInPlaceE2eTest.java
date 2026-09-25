@@ -38,22 +38,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Regression for the stale row-identity bug class on the material-collection in-place transfer
- * (epic #571, #577): an owner/location change posts {@code POST /inventory/{id}/transfer}, and the
- * backend DELETES the full-amount source item and APPENDS a brand-new target item (its own id +
- * version), returning that target DTO. The page must re-key the kept {@code <tr>} (and its
- * controls) to the new id/version so a follow-up action on the SAME row hits the live item — not
- * the deleted source, which would 404.
+ * E2E regression test: after an in-place full-amount transfer on the material-collection page, the
+ * row must be re-keyed to the newly created target item so a follow-up action hits the live item.
  *
- * <p>The proven bug: the {@code onSuccess} handler assumed a full-amount transfer returned a {@code
- * 204} with no body and removed the row; because the backend actually returns the target DTO, that
- * dead branch never ran, the row kept the deleted source's id, and a subsequent delivered-toggle on
- * that row {@code 404}ed (surfacing an error toast) instead of persisting.
- *
- * <p><b>Drive via UI, verify via API.</b> The seeded row's location is changed through its {@code
- * .location-select}; the outcome is read back from {@code GET
- * /api/v1/orders/{jobOrderId}/material-collection} so the assertions never race the in-place
- * render. A window marker proves no reload happened across the transfer and the follow-up toggle.
+ * <p>Asserts no reload via a window marker and reads the outcome back from the backend.
  */
 @Tag("e2e")
 class MaterialCollectionTransferInPlaceE2eTest {

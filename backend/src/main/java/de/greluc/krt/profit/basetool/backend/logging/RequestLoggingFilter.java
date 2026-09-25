@@ -20,7 +20,6 @@
 package de.greluc.krt.profit.basetool.backend.logging;
 
 import de.greluc.krt.profit.basetool.backend.config.LoggingProperties;
-import de.greluc.krt.profit.basetool.backend.config.NotificationStreamObservationPredicate;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -34,26 +33,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Emits a single structured access-log line per request on INFO (or WARN for slow requests).
+ * Emits one access-log line per request (method, path, status, duration) at INFO, or at WARN above
+ * {@link LoggingProperties#getSlowRequestThresholdMs()}.
  *
- * <p>The line includes HTTP method, path, response status and elapsed duration. Correlation id and
- * user id are intentionally not duplicated into the message body because they are already rendered
- * via the MDC pattern in {@code logback-spring.xml}. This avoids noisy, redundant log output and
- * keeps structured-JSON fields clean.
- *
- * <p>Slow requests (duration above {@link LoggingProperties#getSlowRequestThresholdMs()}) are
- * logged at WARN so operators can flag them in dashboards / alerting. The notification SSE relay
- * ({@value #STREAM_PATH}) is exempt from that escalation: Spring MVC books the async request's
- * whole lifetime as the elapsed duration, so a stream held open for up to 30 minutes ({@code
- * NotificationStreamService.EMITTER_TIMEOUT_MS}) would cross the threshold on every close and flood
- * the access log with false-positive WARN lines. It still gets its one INFO access-log line. This
- * is the access-log mirror of {@link NotificationStreamObservationPredicate} dropping the same
- * endpoint from {@code http.server.requests} (REQ-OBS-001/-009).
- *
- * <p>Runs slightly earlier than {@link CorrelationIdFilter} in terms of filter order but since both
- * filters run once per request, the MDC values set by the correlation filter are still available
- * when this filter logs in its {@code finally} block – the correlation filter wraps this one via
- * the servlet chain.
+ * <p>The notification SSE stream ({@value #STREAM_PATH}) never escalates to WARN, since its
+ * duration is the stream's lifetime (REQ-OBS-009). Correlation and user ids come from the MDC.
  */
 @Slf4j
 @Component

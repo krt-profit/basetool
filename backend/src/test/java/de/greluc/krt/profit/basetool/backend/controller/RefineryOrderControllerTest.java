@@ -52,15 +52,8 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 /**
- * Tests the manual security shaping in {@link RefineryOrderController}.
- *
- * <p>This is the only controller in the codebase that ships substantial owner-vs-Logistician logic
- * inline (per CLAUDE.md authorization should be centralised in {@code @PreAuthorize}, but here the
- * controller decides which {@code targetUserId} is used and whether to throw {@link
- * AccessDeniedException} directly). A regression here lets a normal user update someone else's
- * refinery order or silently re-route ownership.
- *
- * <p>No dedicated controller test existed before this PR. Coverage was 30% line / 19% branch.
+ * Tests the inline owner-vs-Logistician shaping in {@link RefineryOrderController}: which {@code
+ * targetUserId} is used and when {@link AccessDeniedException} is thrown.
  */
 @ExtendWith(MockitoExtension.class)
 class RefineryOrderControllerTest {

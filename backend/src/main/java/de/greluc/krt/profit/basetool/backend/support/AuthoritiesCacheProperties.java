@@ -27,61 +27,31 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Tuning for the authorities memoisation in {@code CustomJwtGrantedAuthoritiesConverter} (prefix
- * {@code app.security.authorities-cache}, fed by {@code APP_SECURITY_AUTHORITIES_CACHE_TTL} —
- * REQ-SEC-056, ADR-0174).
+ * Tuning for the authorities cache in {@code CustomJwtGrantedAuthoritiesConverter} (prefix {@code
+ * app.security.authorities-cache}, fed by {@code APP_SECURITY_AUTHORITIES_CACHE_TTL}; REQ-SEC-056,
+ * ADR-0174).
  *
- * <p>This is the single knob that decides how much load the authorization path puts on the
- * database. Every authenticated request runs the converter; a cache <em>miss</em> costs a
- * write-capable {@code syncUser} transaction plus a handful of SELECTs against the permission and
- * scoping tables. A production measurement on 2026-09-13 attributed 84 million sequential scans
- * across six tables to that miss traffic, and it was the dominant driver of CFS throttling on the
- * {@code db-backend} container. The per-realm-role lookup this paragraph used to list among a
- * miss's costs is gone since {@code 9ab1bb135} (2026-09-06, released in v1.7.1): the role catalogue
- * is read once per miss, with its permissions (corrected 2026-09-22).
+ * <p>A cache miss runs a {@code syncUser} transaction plus several permission and scoping queries.
  *
- * <p>Lives in {@code support} rather than {@code config} deliberately: {@code config} already
- * depends on {@code service} (the security configuration wires the converter), so a properties
- * class the {@code service} layer reads would close a package cycle that {@code
- * ArchitectureTest.backendPackagesShouldBeFreeOfDependencyCycles} forbids. Registered via
- * {@code @ConfigurationPropertiesScan} on {@code BackendApplication}, which scans regardless of
- * package. An immutable record (BE-MOD-04).
- *
- * @param ttl how long an assembled authority collection is reused for a given {@code (sub, token
- *     issuedAt, azp)} key before the next request re-runs the full resolution. Defaults to five
- *     minutes (ADR-0174), raised from the original hard-coded 30 seconds: roles, permissions and
- *     memberships change on the order of once a week, so a 30-second window made an actively
- *     clicking member pay the full query storm twice a minute for facts that had not moved. A fresh
- *     login always misses regardless of this value, because the token's {@code issuedAt} is part of
- *     the cache key — so a re-authentication picks up new authorities immediately, and this TTL
- *     only bounds staleness <em>within</em> one token's life.
+ * @param ttl how long an assembled authority collection is reused per {@code (sub, token issuedAt,
+ *     azp)} key; default five minutes, and a new token always misses
  */
 @Validated
 @ConfigurationProperties(prefix = "app.security.authorities-cache")
 public record AuthoritiesCacheProperties(@DefaultValue("5m") @NotNull Duration ttl) {
 
   /**
-   * Hard ceiling on {@code ttl}, enforced at startup by {@link #isTtlWithinBounds()}.
-   *
-   * <p>The TTL is a security-relevant staleness window: until it expires, a revoked role, a
-   * withdrawn permission, a reversed approval or a removed org-unit membership stays effective for
-   * an already-issued token. Fifteen minutes keeps that window inside the operational expectation
-   * that a revocation takes effect within a few minutes without a forced logout, and refusing to
-   * start beyond it means a mistyped value cannot quietly widen the window.
+   * Hard ceiling on {@code ttl}, enforced at startup by {@link #isTtlWithinBounds()}; it bounds how
+   * long a revoked role, permission or membership stays effective for an issued token.
    */
   public static final Duration MAX_TTL = Duration.ofMinutes(15);
 
   /**
-   * Validates that {@code ttl} is strictly positive and does not exceed {@link #MAX_TTL}.
-   *
-   * <p>Runs at startup because the record is {@code @Validated}: a zero or negative value would
-   * disable the cache and silently restore the query storm this property exists to bound, and a
-   * value above the ceiling would widen the revocation window past what the access model assumes.
-   * Both fail the context rather than degrading at run time.
+   * Validates at startup that {@code ttl} is strictly positive and does not exceed {@link
+   * #MAX_TTL}.
    *
    * @return {@code true} when {@code ttl} is positive and at most {@link #MAX_TTL}, or when it is
-   *     {@code null} — the {@code null} case is reported by the component's own {@code @NotNull},
-   *     so this check does not duplicate that message
+   *     {@code null} (reported by its own {@code @NotNull})
    */
   @AssertTrue(
       message =

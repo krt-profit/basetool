@@ -60,10 +60,9 @@ public class Terminal extends AbstractEntity<UUID> {
   private String code;
 
   /**
-   * UEX terminal kind — one of {@code item}, {@code commodity}, {@code commodity_raw}, {@code
-   * fuel}, {@code refinery}, {@code vehicle_buy}, {@code vehicle_rent}. Mirrored verbatim from the
-   * upstream {@code /terminals} feed; {@code null} for rows synced before V226 until the next UEX
-   * sweep refreshes them. Compare against {@link #TYPE_REFINERY} rather than a string literal.
+   * UEX terminal kind ({@code item}, {@code commodity}, {@code commodity_raw}, {@code fuel}, {@code
+   * refinery}, {@code vehicle_buy}, {@code vehicle_rent}), mirrored verbatim from UEX; {@code null}
+   * until a UEX sync writes it. Compare against {@link #TYPE_REFINERY}.
    */
   @Column(name = "type")
   private String type;
@@ -127,11 +126,9 @@ public class Terminal extends AbstractEntity<UUID> {
   private Boolean isAutoLoadOverridden = false;
 
   /**
-   * Raw {@code has_loading_dock} value that the most recent UEX sweep reported for this terminal.
-   * Always written by {@code UexUniverseSyncService.syncTerminals()} regardless of {@link
-   * #hasLoadingDockOverridden}, so the admin UI can show what UEX currently claims even while an
-   * officer's pin is active. {@code null} until the first sweep touches this row (or for legacy
-   * rows that were admin-pinned before the column existed and never re-synced).
+   * Raw {@code has_loading_dock} value from the most recent UEX sync, written regardless of {@link
+   * #hasLoadingDockOverridden} so the admin UI can show the UEX claim beside an officer's pin;
+   * {@code null} until a sync touches the row.
    */
   @Column(name = "uex_has_loading_dock")
   private Boolean uexHasLoadingDock;
@@ -145,10 +142,8 @@ public class Terminal extends AbstractEntity<UUID> {
   private Boolean uexIsAutoLoad;
 
   /**
-   * UTC instant of the most recent UEX sweep that touched this terminal. Stamped unconditionally by
-   * {@code UexUniverseSyncService.syncTerminals()} on every visit; a value markedly older than the
-   * latest sync timestamp on neighbouring rows means UEX has stopped emitting this terminal. {@code
-   * null} until the first sweep.
+   * UTC instant of the most recent UEX sync that saw this terminal; a value well behind its
+   * neighbours means UEX no longer emits it. {@code null} until the first sync.
    */
   @Column(name = "uex_synced_at")
   private Instant uexSyncedAt;

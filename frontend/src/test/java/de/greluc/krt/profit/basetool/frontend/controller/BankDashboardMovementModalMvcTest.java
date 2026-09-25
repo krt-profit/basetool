@@ -45,14 +45,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Pins the direct-booking movement-modal gating on the bank dashboard (REQ-BANK-017/-023) against
- * the Thymeleaf attribute-precedence trap: {@code th:if="${canBook}"} must NOT share an element
- * with {@code th:replace}, because {@code th:replace} (precedence 1) is processed before {@code
- * th:if} (3) — a same-element combination rendered the movement modal unconditionally, so a viewer
- * with no bookable (active) account still got the hidden modal in the DOM even though the CTA
- * button that opens it was correctly hidden. Since REQ-BANK-053/ADR-0106 the account pickers search
- * on demand, so {@code canBook} is derived from the already-loaded dashboard's active accounts in
- * {@link BankPageController} rather than a separate {@code /api/v1/bank/accounts} preload.
+ * Pins the dashboard's direct-booking movement modal (REQ-BANK-017/-023): it renders only when
+ * {@code canBook}, derived by {@link BankPageController} from the dashboard's active accounts.
  */
 @SpringBootTest
 class BankDashboardMovementModalMvcTest {

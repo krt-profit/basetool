@@ -43,11 +43,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Pure-method unit tests for {@link SpecialCommandMembershipController}. The Spring-MVC binding
- * ({@code @PreAuthorize} SpEL on the security service, JSON marshalling) is covered by integration
- * tests; here we pin the controller's delegation to the service. Since L4 (#923) the entity-&gt;DTO
- * mapping moved into {@link OrgUnitMembershipService} (the {@code *Dto} projections), so the
- * controller no longer wires the mapper and simply forwards the DTO the service returns.
+ * Unit tests for {@link SpecialCommandMembershipController}: forwarding the DTOs returned by {@link
+ * OrgUnitMembershipService}.
  */
 @ExtendWith(MockitoExtension.class)
 class SpecialCommandMembershipControllerTest {

@@ -58,11 +58,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Unit tests for {@link UexItemPriceSyncService} — the R7 UEX item-price matrix sync
- * (SC_WIKI_SYNC_PLAN.md §6.7 / §11 R7). Covers the flag gate, empty-feed abort, the
- * upsert-by-(item,terminal) path against the preloaded id maps (BE-PERF-09), skipping unknown items
- * / terminals, the per-row isolation of a failing row, and the non-empty-seen gate on the stale-row
- * sweep.
+ * Unit tests for {@link UexItemPriceSyncService}: the flag gate, the empty-feed abort, the upsert
+ * by item and terminal, skipping unknown items or terminals, per-row failure isolation and the gate
+ * on the stale-row sweep.
  */
 @ExtendWith(MockitoExtension.class)
 class UexItemPriceSyncServiceTest {

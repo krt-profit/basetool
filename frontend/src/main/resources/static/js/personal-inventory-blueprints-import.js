@@ -1,21 +1,4 @@
 // @ts-check
-/*
- * Personal Inventory — Blueprints import flow (#327, Phase 6).
- * Accepts the SCMDB log-watcher export, the Basetool Blueprint Extractor JSON, and the
- * scmdb.net profile / tracking export (the frontend only relays the file; the backend parses).
- *
- * Responsibilities:
- *  - "Import JSON" -> file pick -> POST the upload to the frontend preview proxy.
- *  - Render a KRT-styled preview modal (no native dialogs) grouping entries into
- *    Auto-matched / Suggestions / Unmatched / Already owned. Suggested + unmatched
- *    rows carry an inline type-ahead (reusing the Phase 5 product search) to pick a
- *    product; every includable row carries an optional note and an include checkbox.
- *  - Multi-row resolution: select-all / select-none across includable rows, then
- *    "Apply" posts the full resolution list and toasts the summary.
- *
- * Wiring: CSP-nonce-safe via window.krtEvents delegation + data-trigger="bp-import-…".
- * Strings from window.krtBlueprintsImportI18n; endpoints from window.krtBlueprintsEndpoints.
- */
 (function () {
     'use strict';
 
@@ -58,8 +41,7 @@
 
     /**
      * Opens the preview modal for a krtFetch outcome whose body is the parsed import preview, or runs
-     * onFailure when it is not (a non-2xx already reported through the caller's hooks resolves here
-     * with ok=false and is left alone).
+     * onFailure when it is not; an already reported non-2xx outcome is left alone.
      *
      * @param {KrtWriteResult} result the krtFetch outcome
      * @param {() => void} onFailure shows the caller's error toast
@@ -69,22 +51,10 @@
             renderPreview(result.body);
             openModal();
         } else if (result.ok) {
-            // A 2xx that is not the preview JSON (e.g. a followed redirect to an HTML page).
             onFailure();
         }
     }
 
-    /* --------------------------------------------------------------- handoff */
-
-    // One-click ingest (epic #639): the desktop extractor opened this page with a `?handoff=<id>`.
-    // Fetch the staged preview (single-use, scoped to the session user server-side) and render it
-    // straight into the import modal — no file upload. An expired/foreign/unknown id is a 404,
-    // surfaced as a friendly toast. The id is stripped from the URL so a reload does not re-attempt.
-    // The consume is a POST (REQ-INGEST-004): it is a single-use, state-changing GETDEL, so it must
-    // not ride a cacheable/prefetchable GET — the navigational page GET already never consumes, and
-    // keeping the consume off any GET means a speculative prefetch / duplicate load cannot burn the
-    // token before the real pickup (the 2026-07-19 double-GET incident on the refinery surface).
-    // It goes through krtFetch.write (REQ-FE-002): CSRF, the 403 retry and the re-auth redirect.
     function loadHandoff() {
         const params = new URLSearchParams(window.location.search);
         const id = params.get('handoff');
@@ -141,10 +111,6 @@
         fileInput.value = '';
     }
 
-    /* ----------------------------------------------------------------- preview */
-
-    // The preview upload goes through krtFetch.submitForm (REQ-FE-002): CSRF, the 403 retry and the
-    // re-auth redirect, with Content-Type left to the browser so the multipart boundary is written.
     function uploadPreview(file) {
         if (!window.krtFetch) return;
         const fd = new FormData();
@@ -213,9 +179,6 @@
             return e.status === 'ALREADY_OWNED';
         });
 
-        // The preview markup accumulator: every write — here and in the nested append* helpers — is
-        // a literal or an escapeHtml / escapeAttr call, so the one innerHTML sink it feeds provably
-        // sees escaped values only (FE-SEC-05). The helpers are nested so it stays a local here.
         let html = '';
 
         function appendGroup(title, groupEntries, kind) {
@@ -237,19 +200,11 @@
         function appendRow(entry, kind) {
             const isOwned = kind === 'owned';
             const suggestions = entry.suggestions || [];
-            // Auto-select the top suggestion for a SUGGESTED row so the pre-checked box is honest:
-            // a checked row ALWAYS carries a resolved product key, which is what apply() submits
-            // (issue #824). MATCHED rows already carry their own productKey; UNMATCHED rows resolve
-            // nothing until the user picks one. The user can still pick a different suggestion /
-            // search hit (setRowProduct) or untick the row to skip it.
             let resolved = entry.productKey || '';
             if (!resolved && kind === 'suggested' && suggestions.length > 0) {
                 resolved = suggestions[0].productKey || '';
             }
             const acquired = entry.suggestedAcquiredAt || '';
-            // Pre-check matched rows and any suggested row that resolved to a product (never
-            // owned). Keeping "checked ⇔ data-key set" is the whole fix: a SUGGESTED row with no
-            // resolvable suggestion stays unchecked instead of looking importable when it is not.
             let includeState = '';
             if (isOwned) {
                 includeState = ' disabled';
@@ -353,8 +308,6 @@
         bindRowSearch();
     }
 
-    /* --------------------------------------------------------- per-row search */
-
     function bindRowSearch() {
         if (!bodyEl) return;
         bodyEl.querySelectorAll('.krt-bp-imp-suggestion').forEach(function (chip) {
@@ -450,8 +403,6 @@
         if (include && key) include.checked = true;
     }
 
-    /* ------------------------------------------------------------------ apply */
-
     function selectAll(value) {
         if (!bodyEl) return;
         /** @type {NodeListOf<HTMLInputElement>} */ (
@@ -459,7 +410,6 @@
         ).forEach(function (cb) {
             if (!cb.disabled) {
                 const row = cb.closest('.krt-bp-imp-row');
-                // Only tick rows that actually have a resolved product.
                 if (!value || (row && row.getAttribute('data-key'))) cb.checked = value;
             }
         });
@@ -494,8 +444,6 @@
             applyError();
             return;
         }
-        // Apply -> krtFetch (REQ-FE-002): CSRF + retry-on-403 + problem handling; on success the
-        // blueprint list re-renders in place instead of the former AJAX-then-reload (REQ-FE-001).
         window.krtFetch
             .write({
                 method: 'POST',
@@ -565,8 +513,6 @@
                 window.krtI18nText(i18n().error, 'krtBlueprintsImportI18n.error'),
             );
     }
-
-    /* ----------------------------------------------------------------- modal */
 
     function openModal() {
         if (modal) window.krtModal.open(modal);

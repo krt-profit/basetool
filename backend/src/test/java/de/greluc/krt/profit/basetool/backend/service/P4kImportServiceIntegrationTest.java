@@ -53,25 +53,12 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * End-to-end seeding test for {@link P4kImportService} against the real Testcontainers Postgres of
- * the {@code test} profile (Flyway-migrated through {@code V140}). The {@link
- * de.greluc.krt.profit.basetool.backend.service.P4kImportServiceTest pure-Mockito suite} cannot
- * catch a NOT&nbsp;NULL / CHECK violation on a seeded row because its repositories never reach a
- * database — this boots the full context (Flyway-migrated through {@code V141}) and actually
- * persists one new row of every catalog type with seeding opted in, proving:
+ * Verifies against Postgres that {@link P4kImportService} seeds one row of every catalog type
+ * without constraint violations, round-trips the P4K provenance columns and resolves references to
+ * rows seeded in the same run.
  *
- * <ul>
- *   <li>every {@code source = P4K} seed satisfies the live schema (no NOT&nbsp;NULL / CHECK / FK
- *       violation), including the {@code blueprint_ingredient} RESOURCE/ITEM exclusivity CHECKs;
- *   <li>the {@code V140} provenance lane ({@code p4k_uuid} / {@code p4k_synced_at}) round-trips;
- *   <li>cross-seed resolution works in one run — an item links to a manufacturer seeded earlier in
- *       the same pass, and a blueprint's output item plus its ingredient FKs resolve to rows seeded
- *       earlier in the same pass.
- * </ul>
- *
- * <p>The class is {@code @Transactional}, so every seeded row is rolled back after the test; the
- * intermediate auto-flushes still exercise the constraints. {@link JwtDecoder} is mocked so the
- * resource-server context boots without a reachable Keycloak.
+ * <p>Transactional, so seeded rows roll back; {@link JwtDecoder} is mocked. The mocked-repository
+ * counterpart is {@link de.greluc.krt.profit.basetool.backend.service.P4kImportServiceTest}.
  */
 @SpringBootTest
 @ActiveProfiles("test")

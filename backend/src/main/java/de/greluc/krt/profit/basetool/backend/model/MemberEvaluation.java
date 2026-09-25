@@ -61,10 +61,8 @@ public class MemberEvaluation extends AbstractEntity<UUID> {
   /**
    * {@code app_user.id} of the evaluated member.
    *
-   * <p>A plain id rather than a {@code @ManyToOne User}: the column carries a foreign key with
-   * {@code ON DELETE CASCADE} (V235, REQ-DATA-008), and an association would make every row the
-   * cascade removes a managed entity holding a reference to the user being deleted -- the {@code
-   * TransientPropertyValueException} landmine REQ-DATA-008 documents.
+   * <p>A plain id rather than an association, so the {@code ON DELETE CASCADE} foreign key can
+   * remove rows without managed references to the deleted user (REQ-DATA-008).
    */
   @Column(name = "user_id", nullable = false)
   private UUID userId;

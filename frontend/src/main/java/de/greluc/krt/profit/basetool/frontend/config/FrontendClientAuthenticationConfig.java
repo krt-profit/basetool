@@ -30,27 +30,11 @@ import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.util.StringUtils;
 
 /**
- * Chooses how the frontend authenticates to Keycloak's token endpoint from one fact: whether a
- * client secret is configured (REQ-SEC-069, ADR-0001).
+ * Chooses how the frontend authenticates to Keycloak's token endpoint from whether a client secret
+ * is configured (REQ-SEC-069, ADR-0001).
  *
- * <p>With {@code KEYCLOAK_FRONTEND_CLIENT_SECRET} set, the {@code keycloak} registration becomes a
- * <strong>confidential</strong> client: {@code client_secret_basic} <em>and</em> PKCE, so a
- * captured authorization code cannot be redeemed without the secret. Without it the registration
- * stays the <strong>public</strong> client it has always been: {@code none}, PKCE only. PKCE is on
- * in both modes — {@code ClientSettings.requireProofKey} defaults to {@code true} in Spring
- * Security 7, and {@code FrontendClientAuthenticationConfigTest} pins it.
- *
- * <p><strong>Why one variable decides and not two.</strong> The pair "secret" and "authentication
- * method" can only be wrong in two ways, and both are outages: a method of {@code
- * client_secret_basic} with no secret sends an empty password, a secret with the method {@code
- * none} never sends it to a confidential client. Deriving the method from the secret leaves one
- * thing to set and nothing to disagree.
- *
- * <p><strong>Why the order of the rollout does not matter to the code.</strong> Keycloak accepts
- * {@code client_secret_basic} from a client it still considers public — it ignores the credentials
- * (measured on Keycloak 26.7 on 2026-09-23: a public client answers a wrong Basic secret exactly as
- * it answers none). So the frontend can be switched to confidential first and Keycloak second, with
- * no moment in which logins fail; see {@code docs/OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md}.
+ * <p>With {@code KEYCLOAK_FRONTEND_CLIENT_SECRET} set the client is confidential ({@code
+ * client_secret_basic}); without it, public ({@code none}). PKCE is on in both modes.
  */
 @Slf4j
 @Configuration(proxyBeanMethods = false)
@@ -60,13 +44,10 @@ public class FrontendClientAuthenticationConfig {
   static final String REGISTRATION_ID = "keycloak";
 
   /**
-   * Registers the post-processor that settles the {@code keycloak} registration's authentication
-   * method before Spring Boot turns the properties into a {@code ClientRegistrationRepository}.
+   * Registers the post-processor that sets the {@code keycloak} registration's authentication
+   * method before the {@code ClientRegistrationRepository} is built.
    *
-   * <p>{@code static}, as Spring requires of a {@link BeanPostProcessor} factory method, so the
-   * processor exists before any other bean of this configuration is created.
-   *
-   * @return the post-processor.
+   * @return the post-processor
    */
   @Bean
   public static @NotNull BeanPostProcessor frontendClientAuthenticationSelector() {
@@ -83,13 +64,12 @@ public class FrontendClientAuthenticationConfig {
   }
 
   /**
-   * Sets the registration's authentication method from whether it carries a secret, and normalises
-   * a blank secret to none at all.
+   * Sets the registration's authentication method from whether it carries a secret, normalising a
+   * blank secret to none.
    *
-   * @param registration the {@code keycloak} registration, or {@code null} when a profile defines
-   *     none (then nothing is done).
-   * @return {@code true} when the registration is now confidential, {@code false} when it is public
-   *     or absent.
+   * @param registration the {@code keycloak} registration, or {@code null} when none is defined
+   * @return {@code true} when the registration is now confidential, {@code false} when public or
+   *     absent
    */
   static boolean select(OAuth2ClientProperties.@Nullable Registration registration) {
     if (registration == null) {

@@ -42,16 +42,9 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
 /**
- * Pure-method unit tests for {@link FrequencyTypeController}. The Spring-MVC binding (path params,
- * `@PreAuthorize`, JSON serialisation) is covered by the integration suite; here we focus on:
- *
- * <ul>
- *   <li>Pagination wrapper: the {@link PageResponse} is assembled from the Spring {@link Page}
- *       correctly (page / size / total / sort).
- *   <li>Service-layer delegation: every CRUD action delegates with the expected arguments and the
- *       {@link FrequencyTypeMapper} round-trips in both directions.
- *   <li>Activate / reorder endpoints are void-returning and do not silently swallow the id list.
- * </ul>
+ * Pure-method unit tests for {@link FrequencyTypeController}: {@link PageResponse} assembly from
+ * {@link Page}, service delegation with {@link FrequencyTypeMapper} round-trips, and that the
+ * activate and reorder endpoints pass the id list through.
  */
 @ExtendWith(MockitoExtension.class)
 class FrequencyTypeControllerTest {

@@ -49,12 +49,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Unit tests for {@link ScWikiCommoditySyncService} — the R3 Wiki commodity merge.
- *
- * <p>Covers the behaviours that drive the merge's correctness: the §8.9 junk filter, the §4.3
- * "looks like an item" carve-out, each step of the §8.1.1 resolution chain, the conflict policy
- * (§4.6 — UEX name/code/kind never overwritten), the {@code UEX_ONLY → BOTH} transition, the
- * canonical multi-match rejection, and the §8.7 orphan-sweep gating.
+ * Unit tests for {@link ScWikiCommoditySyncService}, the Wiki commodity merge: the junk filter, the
+ * item-like carve-out, each resolution step, the conflict policy (UEX name/code/kind never
+ * overwritten), the {@code UEX_ONLY → BOTH} transition, multi-match rejection and orphan-sweep
+ * gating.
  */
 @ExtendWith(MockitoExtension.class)
 class ScWikiCommoditySyncServiceTest {

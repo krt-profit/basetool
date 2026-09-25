@@ -39,9 +39,8 @@ public interface ManufacturerUexCompanyRepository
     extends JpaRepository<ManufacturerUexCompany, Integer> {
 
   /**
-   * Resolves the manufacturer a UEX company id maps to. This is the canonical id→manufacturer
-   * lookup for both the item and vehicle syncs: it covers a brand's canonical company id and every
-   * duplicate id UEX ships for the same brand, so ships and items reunite on one row.
+   * Resolves the manufacturer a UEX company id maps to, covering a brand's canonical id and every
+   * duplicate id UEX ships for it.
    *
    * @param uexCompanyId UEX integer company id (from {@code /companies[].id} or a row's {@code
    *     id_company})

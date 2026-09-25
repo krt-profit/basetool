@@ -62,12 +62,10 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 /**
- * Mockito unit tests for {@link UserRegistrationService} — the registration approval lifecycle
- * (approve / reject / decide, the pending-queue read), the admin-driven {@link
- * UserRegistrationService#linkRegistrationToExistingAccount} merge (REQ-SEC-026), the reversal of
- * an erroneous rejection via {@link UserRegistrationService#reopenRegistration} (REQ-SEC-034), plus
- * the shared {@link UserRegistrationService#stampNewPendingRegistration} fail-safe PENDING
- * stamping, extracted out of {@code UserService} (audit Thema&nbsp;7, #1252).
+ * Mockito unit tests for {@link UserRegistrationService}: the approval lifecycle, the {@link
+ * UserRegistrationService#linkRegistrationToExistingAccount} merge (REQ-SEC-026), {@link
+ * UserRegistrationService#reopenRegistration} (REQ-SEC-034) and the fail-safe PENDING stamping of
+ * {@link UserRegistrationService#stampNewPendingRegistration}.
  */
 @ExtendWith(MockitoExtension.class)
 class UserRegistrationServiceTest {

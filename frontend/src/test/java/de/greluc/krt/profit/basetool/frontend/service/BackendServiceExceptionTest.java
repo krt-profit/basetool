@@ -34,13 +34,8 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Unit tests for {@link BackendServiceException} — the single seam through which the frontend
- * translates an RFC 7807 Problem+JSON response from the backend into a structured value the
- * controller advice can map to a localized user-visible error. Coverage was 69% line / 42% branch
- * with no dedicated test file. A regression here means users see "UNKNOWN" instead of a meaningful
- * message, or worse, a backend stack trace leaks through.
- *
- * <p>The class is a pure value type + parser, so the tests are pure JUnit without a Spring context.
+ * Unit tests for {@link BackendServiceException}, which parses a backend RFC 7807 Problem+JSON
+ * response into the structured value the controller advice maps to a localized error.
  */
 class BackendServiceExceptionTest {
 

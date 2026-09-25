@@ -39,34 +39,19 @@ import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserModel;
 
 /**
- * First-broker-login authenticator that gates Discord federation on das-kartell guild membership
- * AND guards against duplicate registrations.
- *
- * <p>It runs two checks, in order, before a brand-new Discord user is created:
+ * First-broker-login authenticator that gates a new Discord user on guild membership and on the
+ * absence of an existing account.
  *
  * <ol>
- *   <li><strong>Membership gate (REQ-SEC-016, fail-closed).</strong> Admits the login only when the
- *       brokered Discord user is in the configured guild and holds the configured KRT-Mitglied
- *       role, delegating to {@link DiscordMembershipChecker} (which fails closed). On any denial it
- *       renders the localized {@code discordMembershipDenied} error page and ends the flow with
- *       {@link AuthenticationFlowError#ACCESS_DENIED}, so no Keycloak session is issued.
- *   <li><strong>Account-existence gate (REQ-SEC-022, fail-open).</strong> Once membership is
- *       confirmed, it asks the Basetool backend whether an account already exists matching the
- *       incoming Discord username / server nickname (against username or display name) or e-mail,
- *       via {@link BackendAccountChecker} over HTTPS. A confident match denies the first-login with
- *       the localized {@code discordAccountAlreadyExists} page, directing the member to link their
- *       existing account (Account Console → Linked accounts → Discord, ADR-0036) instead of
- *       registering anew. This match only ever <em>rejects</em> — it never links or inherits
- *       (REQ-DATA-006 still forbids that). It is deliberately fail-open: it is skipped when the
- *       feature is unconfigured or a name match cannot be confidently established, so a transient
- *       backend/Discord hiccup never blocks a legitimate new member — they fall through to the
- *       normal PENDING approval queue. It is also skipped while an existing account is
- *       <em>linking</em> Discord (an already-authenticated session, ADR-0036), so the legitimate
- *       link is not denied against the very account it targets.
+ *   <li>Membership gate (REQ-SEC-016), fail-closed via {@link DiscordMembershipChecker}: a denial
+ *       renders {@code discordMembershipDenied} and ends with {@link
+ *       AuthenticationFlowError#ACCESS_DENIED}.
+ *   <li>Account-existence gate (REQ-SEC-022), fail-open via {@link BackendAccountChecker}: a
+ *       confident match renders {@code discordAccountAlreadyExists}; skipped when unconfigured,
+ *       uncertain or while an existing account is linking Discord.
  * </ol>
  *
- * <p>It never logs the token, the membership payload, the candidate names/e-mail, or any Discord id
- * — only the coarse decision.
+ * <p>Logs only the coarse decision, never tokens, names, e-mails or Discord ids.
  */
 @JBossLog
 @RequiredArgsConstructor
@@ -149,18 +134,14 @@ public class DiscordGuildRoleGateAuthenticator implements Authenticator {
   }
 
   /**
-   * Fail-open account-existence precheck (REQ-SEC-022). Returns {@code true} only when the backend
-   * confidently reports a collision; every skip/ambiguity returns {@code false} so the login
-   * proceeds.
-   *
-   * <p>The server nickname candidate comes from the member object the membership gate already read,
-   * so the precheck costs no Discord call of its own. It stays fail-open: an absent or unreadable
-   * {@code nick} simply means no nickname candidate.
+   * Fail-open account-existence precheck (REQ-SEC-022), using the server nickname from the member
+   * object the membership gate already read.
    *
    * @param context the authentication flow context
-   * @param memberBody the guild-member JSON the membership gate read, or {@code null}
-   * @param brokered the brokered Discord identity (username + e-mail + access token)
-   * @return {@code true} iff a collision is confidently established and the login must be denied
+   * @param memberBody the guild-member JSON read by the membership gate, or {@code null}
+   * @param brokered the brokered Discord identity
+   * @return {@code true} iff the backend confidently reports a collision and the login must be
+   *     denied
    */
   private boolean accountAlreadyExists(
       @NotNull AuthenticationFlowContext context,
@@ -194,9 +175,8 @@ public class DiscordGuildRoleGateAuthenticator implements Authenticator {
   }
 
   /**
-   * Deserializes the brokered Discord identity from the first-broker-login session: the access
-   * token, the Discord username and the Discord e-mail. Package-visible (not private) so a unit
-   * test can override it without a live Keycloak session.
+   * Reads the brokered Discord identity (access token, username, e-mail) from the
+   * first-broker-login session; package-visible for tests.
    *
    * @param context the authentication flow context
    * @return the brokered identity, or {@code null} when no brokered context is present
@@ -218,12 +198,11 @@ public class DiscordGuildRoleGateAuthenticator implements Authenticator {
   }
 
   /**
-   * Whether an already-authenticated user is present on the auth session, which marks an
-   * account-linking flow (ADR-0036) rather than a brand-new registration. Package-visible so a unit
-   * test can drive the linking branch without a live session.
+   * Whether an already-authenticated user is on the auth session, marking an account-linking flow
+   * rather than a new registration; package-visible for tests.
    *
    * @param context the authentication flow context
-   * @return {@code true} when an existing user is linking Discord to their account
+   * @return {@code true} when an existing user is linking Discord
    */
   boolean isAccountLinking(@NotNull AuthenticationFlowContext context) {
     return context.getAuthenticationSession() != null

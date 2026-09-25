@@ -23,37 +23,22 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Craftability of one of the caller's owned blueprints, computed from the caller's own stock
- * (#781): how many times it can be crafted, what output quality the user's material would deliver,
- * and what is missing. Keyed by the owned {@link
- * de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint} id so the frontend can decorate
- * the matching master-list row and detail pane.
+ * Craftability of one of the caller's owned blueprints, computed from the caller's own stock: how
+ * often it can be crafted, the resulting quality and what is missing.
  *
- * <p>Every count is given twice — {@code craftable} from "My Inventory" stock alone and {@code
- * craftableWithRefinery} with the caller's {@code OPEN}/{@code IN_PROGRESS} refinery yield folded
- * in — so the refinery toggle switches client-side without a refetch. A row whose {@code
- * craftableWithRefinery} exceeds {@code craftable} is craftable only thanks to the refinery.
- *
- * <p>Evaluated requirements are the recipe's RESOURCE ingredients plus the ITEM ingredients bridged
- * to a PIECE material (a hand-mined gem the wiki models as a non-craftable game item, ADR-0046).
- * {@code hasItemIngredients} flags a recipe that still needs an ITEM left "not evaluated" — a
- * craftable sub-assembly or an unresolved item — and {@code hasResourceIngredients} is {@code
- * false} for a recipe with no evaluable material requirement at all. {@code recipeResolved} is
- * {@code false} when no active SC Wiki recipe backs the owned product.
+ * <p>Each count is given from inventory alone ({@code craftable}) and with open refinery yield
+ * ({@code craftableWithRefinery}), so the refinery toggle needs no refetch.
  *
  * @param blueprintId the owned blueprint's id
  * @param recipeResolved whether an active recipe was found for the owned product
- * @param hasItemIngredients whether the recipe still needs an ITEM ingredient that is not evaluated
- *     (a craftable sub-assembly or an unresolved item), marked "not evaluated" in the UI
- * @param hasResourceIngredients whether the recipe has any evaluable material requirement (a
- *     RESOURCE commodity or a PIECE-material-bridged ITEM)
+ * @param hasItemIngredients whether the recipe needs an ITEM ingredient that is not evaluated
+ * @param hasResourceIngredients whether the recipe has any evaluable material requirement
  * @param craftable how many crafts the inventory stock alone allows
  * @param craftableWithRefinery how many crafts the inventory plus open refinery yield allows
- * @param limitingMaterialName the material capping the inventory-only count, or {@code null} when
- *     nothing limits it or no recipe resolved
+ * @param limitingMaterialName the material capping the inventory-only count, or {@code null}
  * @param limitingMaterialNameWithRefinery the commodity capping the refinery-included count, or
  *     {@code null}
- * @param groups per-requirement-group overlay, in recipe order (drives the slot quality sliders)
+ * @param groups per-requirement-group overlay, in recipe order
  * @param materials per-material breakdown (required / available / effective quality / missing)
  */
 public record BlueprintCraftabilityDto(

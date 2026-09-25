@@ -59,10 +59,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
 
 /**
- * Unit tests for {@link RoleService#updatePermissions} — the one mutation in the audited "Rollen"
- * area that rewrites what a role may DO. {@code role_permissions} keeps current state only, so the
- * audit row and the log line are the sole record of the previous grant and the acting admin
- * (REQ-AUDIT-001).
+ * Unit tests for {@link RoleService#updatePermissions}, whose audit row and log line are the only
+ * record of the previous grant (REQ-AUDIT-001).
  */
 @ExtendWith(MockitoExtension.class)
 class RoleServiceTest {
@@ -274,11 +272,8 @@ class RoleServiceTest {
   }
 
   /**
-   * The permission values {@link Permissions} declares, read independently of {@code RoleService}
-   * so the parity test above compares two halves rather than one value with itself. Also asserts
-   * the two properties the reflective derivation relies on: every public constant in the holder is
-   * a {@code String}, and its value equals its field name — a constant of any other kind would
-   * silently join the audited vocabulary.
+   * Reads the permission values {@link Permissions} declares, independently of {@code RoleService},
+   * asserting that every public constant is a {@code String} equal to its field name.
    *
    * @return the declared permission constant values
    */

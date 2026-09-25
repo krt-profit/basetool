@@ -48,37 +48,14 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Imports the UEX commodity catalog and the full commodity-price matrix.
+ * Imports the UEX commodity catalogue into {@code material} and the commodity-price matrix into
+ * {@code material_price} (REQ-DATA-005).
  *
- * <p>Two-phase sync: first the commodity catalog ({@link UexClient#getCommodities()}) is upserted
- * into {@code material} (matched by UEX {@code id_commodity}, falling back to name — legacy
- * migrations may have a record without an id), then the price matrix ({@link
- * UexClient#getCommoditiesPricesAll()}) is upserted into {@code material_price} per (material,
- * terminal) pair. Unknown terminals are silently skipped (the universe sync owns the terminal
- * table); unknown materials get auto-created with a fallback name so the price-matrix sync stays
- * self-healing if UEX adds a commodity between two of our runs.
- *
- * <p><strong>Transactions (BE-PERF-09, REQ-DATA-005).</strong> Nothing is held open across an HTTP
- * call: both feeds are fetched with no transaction, and the rows are written through {@link
- * SyncChunkWriter} — chunks of {@value SyncChunkWriter#DEFAULT_CHUNK_SIZE} rows, each in its own
- * transaction, a failed chunk replayed row by row so one row the database refuses costs that row
- * only. The price phase no longer looks up the material, the terminal and the existing price per
- * row (three {@code SELECT}s and an auto-flush of the whole growing matrix before each): it reads
- * three id maps up front, one query each, and loads each chunk's existing price rows with one
- * {@code findAllById}. Until 2026-09-22 the whole sync — both fetches and every row — was one
- * transaction, and one refused row rolled the entire run back.
- *
- * <p>The price-matrix phase additionally records the ids of every row touched and, once every chunk
- * is written, nulls out the price / SCU / status columns on every other {@code material_price} row
- * via {@link MaterialPriceRepository#clearPricesByIds}. UEX does not signal removals - a terminal
- * that stops listing a commodity simply disappears from the matrix - so without this sweep a stale
- * {@code priceBuy} would survive every subsequent sync. The sweep is gated on a non-empty
- * touched-set so a sync that fails on every single row never wipes the entire table.
- *
- * <p>An empty response on either call short-circuits without wiping local data — the sync is
- * idempotent and resilient to transient UEX outages. An <em>unchanged</em> feed ({@code 304 Not
- * Modified}) short-circuits the same way but is reported at INFO rather than WARN: nothing to
- * re-import is the healthy steady state, not an outage.
+ * <p>Materials match by UEX {@code id_commodity}, then by name; materials the matrix names but the
+ * catalogue lacks are created, unknown terminals are skipped. Rows are written through {@link
+ * SyncChunkWriter} with no transaction held across HTTP calls. Price rows UEX no longer lists are
+ * cleared via {@link MaterialPriceRepository#clearPricesByIds} unless nothing was written; an empty
+ * or unchanged feed leaves local data untouched.
  */
 @Slf4j
 @Service
@@ -86,11 +63,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class UexCommodityService {
 
-  /**
-   * Cap for the upstream-supplied commodity name in log lines. UEX is a third party we do not
-   * control, so the value is untrusted free text and goes through {@link LogSafe} first; 64
-   * characters comfortably fit any real commodity name.
-   */
+  /** Maximum length of an upstream commodity name in log lines, logged through {@link LogSafe}. */
   private static final int MAX_NAME_LOG_LENGTH = 64;
 
   private final UexClient uexClient;
@@ -98,7 +71,7 @@ public class UexCommodityService {
   private final MaterialPriceRepository materialPriceRepository;
   private final TerminalRepository terminalRepository;
 
-  /** Writes the rows in short isolated transactions after the fetch (BE-PERF-09). */
+  /** Writes the rows in short isolated transactions after the fetch. */
   private final SyncChunkWriter chunkWriter;
 
   /**
@@ -324,11 +297,11 @@ public class UexCommodityService {
   }
 
   /**
-   * Writes one chunk of price rows inside its transaction: loads the chunk's existing rows in one
-   * {@code findAllById}, updates them in place or creates the missing ones against {@code
-   * getReferenceById} parents, and saves the chunk. A row whose terminal (or material) is unknown
-   * is skipped. A pair created here is recorded in {@code lookups}, so a later chunk — or the
-   * row-by- row replay of this one — updates it instead of inserting a duplicate.
+   * Writes one chunk of price rows inside its transaction, updating existing rows and creating the
+   * missing ones; rows with an unknown terminal or material are skipped.
+   *
+   * <p>Created pairs are recorded in {@code lookups}, so later chunks and replays update them
+   * instead of inserting duplicates.
    *
    * @param chunk the price rows of this chunk
    * @param lookups the preloaded id maps
@@ -436,16 +409,9 @@ public class UexCommodityService {
   }
 
   /**
-   * Promotes a locally-existing material that this UEX sync has just adopted by name-match. A row
-   * the Wiki imported first ({@link MaterialSourceSystem#WIKI_ONLY}, inserted invisible per §4.3)
-   * is validated by UEX's presence — UEX only carries real trade commodities — so its provenance
-   * flips to {@link MaterialSourceSystem#BOTH} and it becomes visible in trading flows. This
-   * honours the {@link MaterialSourceSystem} contract (§6.1) that the UEX item and vehicle syncs
-   * already follow; the commodity sync previously left an adopted Wiki row stuck at {@code
-   * WIKI_ONLY} (and hidden). Idempotent: only a {@code WIKI_ONLY} row is touched, so a normal
-   * re-sync of a {@code UEX_ONLY} / {@code BOTH} / {@code MANUAL} row is unaffected <em>by this
-   * method</em> — note that the caller has already flipped an adopted {@code MANUAL} row to {@code
-   * UEX_ONLY} two statements earlier, so no {@code MANUAL} row ever reaches here on adoption.
+   * Flips a {@link MaterialSourceSystem#WIKI_ONLY} material that UEX just adopted by name to {@link
+   * MaterialSourceSystem#BOTH}, making it visible in trading flows; any other row is left
+   * unchanged.
    *
    * @param material the locally-resolved material UEX just linked by name
    */

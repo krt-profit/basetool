@@ -580,9 +580,8 @@ class UexCommodityServiceTest {
   }
 
   /**
-   * Stubs {@link MaterialPriceRepository#save} so it assigns a fresh UUID to any transient {@link
-   * MaterialPrice}. The service now reads {@code save(...).getId()} to feed the stale-row sweep, so
-   * tests that exercise the price upsert path need a non-null saved entity.
+   * Stubs {@link MaterialPriceRepository#save} to assign a fresh UUID to any transient {@link
+   * MaterialPrice}, as the price upsert reads the saved id.
    */
   private void stubPriceSaveAssignsId() {
     when(materialPriceRepository.save(any(MaterialPrice.class)))

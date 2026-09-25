@@ -31,25 +31,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
- * Reconciles the Keycloak user directory into the local {@code app_user} table.
+ * Reconciles the Keycloak user directory into the local {@code app_user} table, driven by {@link
+ * de.greluc.krt.profit.basetool.backend.task.UserSyncTask} and the manual {@code POST
+ * /api/v1/users/sync}.
  *
- * <p>The reconciliation is a service (not a task) so it can be driven from BOTH the periodic {@link
- * de.greluc.krt.profit.basetool.backend.task.UserSyncTask} (scheduled, failure-swallowing) AND an
- * admin-triggered manual run via {@code POST /api/v1/users/sync} (request-scoped,
- * failure-surfacing) — both wrapping the same {@link #syncFromKeycloak()} through {@code
- * TaskMetrics} so a manual run is indistinguishable in monitoring and refreshes the same {@code
- * user_sync} last-success gauge.
- *
- * <p>It pulls the full user list from Keycloak via {@link KeycloakService#fetchUsers} (which pages
- * internally so the set is complete, not just the first server-side page, and resolves roles
- * role-indexed with an incremental Discord back-fill), upserts each user via {@link
- * UserReconciliationService#syncUser}, collects the Keycloak {@code id}s observed this run, and
- * then asks the service to mark every local user NOT in that set as missing — that is how deletions
- * in Keycloak get reflected locally without a hard {@code DELETE}. The completeness of the fetched
- * set is a hard prerequisite (REQ-SEC-043): a truncated list would soft-delete every real member
- * beyond the page cap, which is why {@code fetchUsers} pages and an empty result is treated as
- * "skip" (never a wipe) — including when a role-membership read fails transiently, so a degraded,
- * role-stripped set is never persisted as a successful run.
+ * <p>Upserts every fetched user via {@link UserReconciliationService#syncUser} and flags local
+ * users missing from the roster instead of deleting them. The fetched roster must be complete; an
+ * empty or degraded fetch skips the run (REQ-SEC-043).
  */
 @Service
 @RequiredArgsConstructor
@@ -68,30 +56,17 @@ public class UserSyncService {
   private final UserReconciliationService userReconciliationService;
   private final BankHolderReconciliationService bankHolderReconciliationService;
 
-  /**
-   * Records {@link MetricNames#USER_SYNC_FAILURES}. Until #1825 a per-user reconciliation failure
-   * existed only as a log line, so the condition that soft-deleted a present member had no signal
-   * an alert could watch.
-   */
+  /** Records {@link MetricNames#USER_SYNC_FAILURES} for per-user reconciliation failures. */
   private final MeterRegistry meterRegistry;
 
   /**
-   * Fetches the current Keycloak user list and reconciles it into the local table.
+   * Fetches the Keycloak user list and reconciles it into the local table.
    *
-   * <p>Failures on individual users are logged, counted ({@link MetricNames#USER_SYNC_FAILURES})
-   * and swallowed so a single bad row does not abort the batch -- but such a user is still counted
-   * as <em>present</em>. After the loop, {@link
-   * UserReconciliationService#markMissingUsers(java.util.Collection)} flags every local user whose
-   * Keycloak id did not appear in the <em>fetch</em>, which is the only thing that answers "does
-   * this account still exist upstream". An empty Keycloak fetch is a no-op skip (never a wipe). A
-   * batch-level failure (e.g. {@code markMissingUsers} hitting a DB error) propagates to the
-   * caller: the scheduled path wraps this in the failure-swallowing {@code
-   * TaskMetrics.recordCounting} so the scheduler thread survives; the manual endpoint wraps it in
-   * {@code recordCountingRethrow} so the admin sees the failure as an RFC 7807 error rather than a
-   * silent success.
+   * <p>A failing user is logged, counted and still treated as present; users absent from the fetch
+   * are flagged via {@link UserReconciliationService#markMissingUsers(java.util.Collection)}. An
+   * empty fetch skips the run; batch-level failures propagate.
    *
-   * @return the number of users successfully synced this run (the {@code items} metric); {@code 0}
-   *     when Keycloak returned an empty roster
+   * @return the number of users synced; {@code 0} when Keycloak returned an empty roster
    */
   public int syncFromKeycloak() {
     log.info("Starting scheduled user sync from Keycloak...");

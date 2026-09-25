@@ -35,9 +35,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Pure-method unit tests for {@link MaterialCategoryController}. Coverage before this file was 0%
- * on every endpoint. Asserts the controller-to- service delegation and the mapper round-trip on the
- * write endpoints.
+ * Unit tests for {@link MaterialCategoryController}: service delegation and the mapper round-trip
+ * on the write endpoints.
  */
 @ExtendWith(MockitoExtension.class)
 class MaterialCategoryControllerTest {

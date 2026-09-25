@@ -35,17 +35,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Browser coverage for the cross-order material-demand page ({@code /orders/material-demand},
- * REQ-ORDERS-034). The MockMvc render test pins the server-rendered markup; everything this page
- * does <em>after</em> the HTML arrives is client-side and only reachable here: the per-bucket
- * drill-down toggle and its per-browser {@code localStorage} persistence across a reload.
+ * E2E coverage for the client-side behaviour of the cross-order material-demand page ({@code
+ * /orders/material-demand}, REQ-ORDERS-034): the per-bucket drill-down toggle and its {@code
+ * localStorage} persistence across a reload.
  *
- * <p>Seeds two orders of the same profit-eligible unit requesting the <em>same</em> material at the
- * same quality, so the page must fold them into a <b>single</b> row whose demand is the sum — the
- * defining behaviour of the feature — with both orders listed in that row's drill-down.
- *
- * <p>The seeded material name is unique to this class, so the assertions stay stable even when a
- * shared stack carries other suites' orders.
+ * <p>Seeds two orders requesting the same material at the same quality and asserts they fold into
+ * one summed row listing both orders.
  */
 @Tag("e2e")
 class JobOrderMaterialDemandE2eTest {

@@ -40,12 +40,9 @@ import org.springframework.security.core.session.SessionInformation;
 import org.springframework.security.web.session.SessionInformationExpiredEvent;
 
 /**
- * Unit tests for {@link SecurityConfig.SessionEvictionLoggingStrategy} (audit finding M9). A
- * concurrent-session eviction used to leave no trace at all — Spring's own account of it is DEBUG
- * on a logger this app pins to INFO, and {@code basetool_active_sessions} cannot see it because
- * {@code expireNow()} only marks the session. The three things under test are therefore: it is
- * counted, it is logged at WARN with the cap value and a non-PII identity, and the evicted user's
- * response is unchanged.
+ * Unit tests for {@link SecurityConfig.SessionEvictionLoggingStrategy}: a concurrent-session
+ * eviction is counted, logged at WARN with the cap and a non-PII identity, and leaves the evicted
+ * user's response unchanged.
  */
 class SessionEvictionLoggingStrategyTest {
 

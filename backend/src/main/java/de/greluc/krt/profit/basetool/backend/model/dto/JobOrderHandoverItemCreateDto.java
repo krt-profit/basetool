@@ -27,17 +27,13 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * One line of a material handover: hand over {@code amount} SCU of the inventory entry {@code
- * inventoryItemId} to the job order. Since Variante C (REQ-INV-027) the handed amount also leaves
- * the entry's mission earmarks, so {@code missionReductions} optionally names how much of it comes
- * out of each mission slice (whatever it leaves comes from the mission rest). A {@code null} plan
- * lets the backend clamp the mission dimension automatically — rest-first, then proportional; the
- * modal surfaces the picker only for the ambiguous multi-mission case.
+ * One line of a material handover: {@code amount} SCU from inventory entry {@code inventoryItemId}
+ * to the job order (REQ-INV-027).
  *
  * @param inventoryItemId the inventory entry the stock is handed over from
  * @param amount the SCU amount handed over from that entry
- * @param missionReductions the per-mission "deduct from" plan for the handed amount, or {@code
- *     null} to auto-clamp the mission earmarks
+ * @param missionReductions per-mission deductions for the handed amount, or {@code null} to clamp
+ *     the mission earmarks automatically
  */
 public record JobOrderHandoverItemCreateDto(
     @NotNull UUID inventoryItemId,

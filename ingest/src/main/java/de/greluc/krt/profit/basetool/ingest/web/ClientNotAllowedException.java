@@ -22,16 +22,11 @@ package de.greluc.krt.profit.basetool.ingest.web;
 import java.io.Serial;
 
 /**
- * Raised when an authenticated caller's <em>client software</em> is not approved for the ingest
- * path (REQ-INGEST-011) — the payload-level half of the check, thrown from {@code ProvenanceGuard}
- * once the body has been parsed. The token-level half short-circuits earlier, in {@code
- * ClientIdentityFilter}, which writes the identical problem shape directly to the response.
+ * Raised by {@code ProvenanceGuard} when a caller's client software is not approved for the ingest
+ * path (REQ-INGEST-011).
  *
- * <p>Mapped by {@link GlobalExceptionHandler} to a {@code 403} carrying the stable {@code
- * CLIENT_NOT_ALLOWED} code — deliberately not the generic {@code ACCESS_DENIED}, because the user
- * is fully entitled here and it is the tool that is refused. The extractor surfaces the detail
- * verbatim, so conflating the two would tell a member "you are not allowed" when the accurate
- * answer is "use the official extractor".
+ * <p>Mapped by {@link GlobalExceptionHandler} to a {@code 403} with the code {@code
+ * CLIENT_NOT_ALLOWED}.
  */
 public class ClientNotAllowedException extends RuntimeException {
 

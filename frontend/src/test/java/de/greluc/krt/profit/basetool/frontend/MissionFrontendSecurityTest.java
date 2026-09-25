@@ -88,12 +88,8 @@ class MissionFrontendSecurityTest {
   }
 
   /**
-   * The mission list does not render for an anonymous visitor at all any more (REQ-SEC-052).
-   *
-   * <p>This case used to assert something weaker and stranger: that the page rendered, but without
-   * the create button. That was the right assertion while the list was {@code permitAll} — the leak
-   * to guard against was the control, not the page. Now the page itself is the leak, and the answer
-   * is a redirect into the OAuth2 entry point rather than a roster with one button missing.
+   * Verifies that an anonymous visitor is redirected to the OAuth2 entry point instead of seeing
+   * the mission list (REQ-SEC-052).
    */
   @Test
   @WithAnonymousUser

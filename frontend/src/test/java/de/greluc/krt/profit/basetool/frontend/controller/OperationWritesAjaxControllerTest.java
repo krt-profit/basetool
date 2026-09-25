@@ -47,14 +47,14 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC tests for the #576 in-place operation write twins ({@link
+ * MVC tests for the in-place operation write twins ({@link
  * OperationPageController#createOperationAjax}, {@link
  * OperationPageController#updateOperationAjax}, {@link
- * OperationPageController#deleteOperationAjax}): the {@code X-Requested-With}-gated twins return
- * JSON, the update twin hands back the fresh {@code {version, name, status}} the backend PUT echoes
- * in-transaction (for the optimistic-lock writeback and the title patch), a backend {@code 409} is
- * propagated as {@code problem+json} preserving the {@code code}, and a header-less POST falls back
- * to the classic redirect handler.
+ * OperationPageController#deleteOperationAjax}).
+ *
+ * <p>They return JSON, the update returns the fresh {@code {version, name, status}}, a backend
+ * {@code 409} is relayed as {@code problem+json} with its {@code code}, and a POST without the AJAX
+ * header falls back to the redirect handler.
  */
 @SpringBootTest
 class OperationWritesAjaxControllerTest {

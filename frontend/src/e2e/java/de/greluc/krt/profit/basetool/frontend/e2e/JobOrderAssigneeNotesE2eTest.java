@@ -40,20 +40,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Functional flow for the Bearbeiter (assignee) section of a job order: enroll, attach a note, edit
- * it, delete it, and unenroll — all driven through the order detail page. Since the section moved
- * to AJAX (REQ-ORDERS-013/014), every action re-renders the {@code #assignees-section} fragment in
- * place via {@code outerHTML} swap, so this test proves the whole loop works without a page reload.
- *
- * <p>Each step is gated on the AJAX call (via {@code waitForResponse}) and then verified by reading
- * the persisted state straight from the backend ({@code GET /api/v1/orders/{id}} → {@code
- * assignees[]}), which is deterministic and does not race the client-side fragment swap. The UI is
- * additionally asserted (name visible, note text visible/gone) to prove the fragment rendered.
- *
- * <p>The actor is {@code test-admin}, which reaches {@code LOGISTICIAN} through the role hierarchy;
- * it enrolls and edits its <em>own</em> entry, exercising the self path of the self-or-logistician
- * rule. The enroll/unenroll buttons and the per-row note controls all live on the swapped fragment,
- * so re-locating them each step also proves the delegated handlers survive the swap.
+ * Functional flow for a job order's Bearbeiter section (REQ-ORDERS-013/014): enroll, add, edit and
+ * delete a note, and unenroll, each re-rendering the section in place. Each step is verified via
+ * {@code GET /api/v1/orders/{id}} and in the UI; runs as {@code test-admin} on its own entry.
  */
 @Tag("e2e")
 class JobOrderAssigneeNotesE2eTest {

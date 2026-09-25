@@ -31,17 +31,9 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Turns a session id into a short, stable fingerprint that is safe to write into a log line
- * (APPSEC-12).
- *
- * <p>A Spring session id is a bearer credential: whoever holds it holds the session, and with it
- * the user's OAuth2 tokens. Logging it verbatim put that credential into every log file and into
- * Loki, where it outlives the session's own retention and reaches everyone who can read logs. What
- * a log reader actually needs is to <em>correlate</em> lines of one session — "the same session
- * lost its authentication here" — and a truncated SHA-256 does that without being usable to resume
- * the session: the first {@value #FINGERPRINT_HEX_CHARS} hex characters (48 bits) keep accidental
- * collisions between the few hundred live sessions negligible, and a hash cannot be turned back
- * into a cookie value.
+ * Turns a session id into a short, stable, non-reversible fingerprint (the first {@value
+ * #FINGERPRINT_HEX_CHARS} hex characters of its SHA-256) for log correlation, since the id itself
+ * is a bearer credential.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class SessionIdFingerprint {

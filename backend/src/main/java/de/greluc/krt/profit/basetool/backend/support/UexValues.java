@@ -26,11 +26,8 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.util.StringUtils;
 
 /**
- * Shared normalisers for the raw values the UEX catalogue API emits, so the per-entity UEX sync
- * services stop each carrying private copies. The two 0/1-flag semantics are deliberately kept as
- * <b>separately named</b> methods — some UEX surfaces treat an absent flag as {@code false}, others
- * must preserve the {@code null}/{@code false} distinction — so collapsing them into one method
- * would silently change behaviour on one side of the fork.
+ * Shared normalisers for raw UEX catalogue API values. The two 0/1-flag conversions differ in how
+ * an absent flag is treated and are intentionally separate methods.
  */
 @Slf4j
 public final class UexValues {
@@ -51,16 +48,11 @@ public final class UexValues {
   }
 
   /**
-   * Splits UEX's compact {@code crew} string into its min / max bounds.
+   * Splits UEX's compact {@code crew} string ({@code "1"} or {@code "1,2"}) into its min / max
+   * bounds (ADR-0148).
    *
-   * <p>UEX serves the crew complement as either a single number ({@code "1"}) or a comma-separated
-   * pair ({@code "1,2"} = one to two). It does <b>not</b> serve the {@code crew_min} / {@code
-   * crew_max} fields this project used to bind — they decoded to {@code null} and cleared both
-   * columns on every run (REQ-DATA-015 / ADR-0148), which is why the range is derived here instead.
-   *
-   * <p>Anything that does not parse — a blank string, a range with a non-numeric bound, an empty
-   * second bound — yields {@link CrewRange#UNKNOWN} rather than a half-filled range: a crew of "1
-   * to ?" is not a fact UEX stated. Extra bounds past the second are ignored.
+   * <p>Anything unparseable yields {@link CrewRange#UNKNOWN} rather than a half-filled range;
+   * bounds past the second are ignored.
    *
    * @param crew the raw {@code crew} value, or {@code null}
    * @return the parsed bounds, or {@link CrewRange#UNKNOWN} when nothing parseable was carried

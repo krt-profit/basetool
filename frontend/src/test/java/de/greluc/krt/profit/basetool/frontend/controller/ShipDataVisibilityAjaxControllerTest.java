@@ -44,12 +44,10 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC tests for the #578 header-gated ship-data write twins ({@link
- * ShipDataPageController#toggleShipTypeVisibilityAjax}/{@code toggleManufacturerVisibilityAjax}/
- * {@code resetAllFittedAjax}). They assert that an {@code X-Requested-With=XMLHttpRequest} admin
- * request forwards to the backend and answers {@code 204}, a backend failure is relayed as {@code
- * problem+json} carrying its {@code code}, and that a non-admin caller is rejected with {@code
- * 403}.
+ * MVC tests for the ship-data AJAX writes on {@link ShipDataPageController} ({@link
+ * ShipDataPageController#toggleShipTypeVisibilityAjax}, {@code toggleManufacturerVisibilityAjax},
+ * {@code resetAllFittedAjax}): {@code 204} for an admin, {@code problem+json} with its {@code code}
+ * on a backend failure, {@code 403} for a non-admin.
  */
 @SpringBootTest
 class ShipDataVisibilityAjaxControllerTest {

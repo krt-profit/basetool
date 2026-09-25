@@ -72,10 +72,9 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST surface for bank accounts (epic #556, REQ-BANK-001/-002/-010): paged listing, detail with
- * holder distribution, booking history, creation, rename and the close/reopen lifecycle. All gates
- * evaluate only bank roles and grants via {@code BankSecurityService} — org-unit scope has no
- * influence (REQ-BANK-008).
+ * REST surface for bank accounts (REQ-BANK-001/-002): paged listing, detail with holder
+ * distribution, booking history, creation, rename and the close/reopen lifecycle. Gates evaluate
+ * only bank roles and grants, never org-unit scope (REQ-BANK-008).
  */
 @RestController
 @RequestMapping("/api/v1/bank/accounts")
@@ -92,14 +91,9 @@ public class BankAccountController {
   private final BankStatementReportService bankStatementReportService;
 
   /**
-   * Pages over the accounts visible to the caller: management/admin see all, employees their
-   * granted accounts (REQ-BANK-010), optionally narrowed by a case-insensitive name/account-number
-   * substring and by status/type (REQ-BANK-053, ADR-0106). This one endpoint backs both the
-   * server-side account-search pickers (the frontend proxies it as {@code
-   * /api/proxy/bank/accounts/search?query=…&status=ACTIVE&size=…}) and the paged management table,
-   * replacing the former unbounded {@code size=500} preload that silently truncated past 500
-   * accounts. {@code status}/{@code type} are repeatable; an absent filter means "all" (the full
-   * enum set), so the management table gets every account while a picker narrows to {@code ACTIVE}.
+   * Pages over the accounts visible to the caller (REQ-BANK-010), optionally filtered by a
+   * case-insensitive name/account-number substring and by status/type (REQ-BANK-053). Backs both
+   * the account-search pickers and the management table.
    *
    * @param page zero-based page index
    * @param size page size
@@ -213,11 +207,9 @@ public class BankAccountController {
   }
 
   /**
-   * Sets or clears the KRT-account (CARTEL) 3-stage approval thresholds T1/T2 (REQ-BANK-047):
-   * bank-employee self-approval ceiling {@code T1} and Bereichsleiter-Profit ceiling {@code T2}
-   * (above {@code T2} the Organisationsleitung approves). Bankleitung-only — {@code
-   * hasRole('BANK_MANAGEMENT')} (admins pass via the role hierarchy). The Verwaltung tab is the
-   * only surface that edits these; the account-detail surfaces show them read-only.
+   * Sets or clears the KRT-account (CARTEL) approval thresholds: the bank-employee ceiling {@code
+   * T1} and the Bereichsleiter-Profit ceiling {@code T2}, above which the Organisationsleitung
+   * approves (REQ-BANK-047). Bank-management only.
    *
    * @param id the KRT account
    * @param request the two ceilings (each {@code null} clears its band) plus the echoed version

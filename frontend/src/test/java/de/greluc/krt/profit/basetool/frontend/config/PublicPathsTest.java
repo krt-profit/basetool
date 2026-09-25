@@ -28,22 +28,9 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.mock.web.MockHttpServletRequest;
 
 /**
- * Pins the one list both session gates read, and the distinction between its two halves.
- *
- * <p>The list exists because it used to be two lists. {@code TermsAcceptanceGateFilter} and {@code
- * BackendRoleSyncFilter} each carried a private {@code isStaticAsset} with an identical body, and
- * nothing compared them — so {@code /.well-known/assetlinks.json} could be, and was, {@code
- * permitAll} in {@code SecurityConfig} and exempt in neither gate. A signed-in member who opened
- * the Android App Links descriptor got the consent page, and paid a {@code /api/v1/users/me} round
- * trip for it.
- *
- * <p>The last group of tests pins the second half of that story: the list also has to agree with
- * {@code SecurityConfig} about how a path is <em>spelled</em>. Spring Security matches {@code
- * permitAll} with a {@code PathPatternRequestMatcher}, which decides on the percent-decoded
- * segment, so {@code /.well-known/assetlink%73.json} is {@code permitAll} — and while this class
- * compared the raw URI it was exempt in neither gate. Same defect as above, one layer down.
- *
- * <p>What the gates do with the list is asserted in their own tests; this one asserts the list.
+ * Unit tests for {@code PublicPaths}: the path list both session gates read, the distinction
+ * between its two halves, and its agreement with {@code SecurityConfig} on percent-encoded
+ * spellings.
  */
 @DisplayName("Public paths")
 class PublicPathsTest {

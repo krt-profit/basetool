@@ -56,14 +56,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC-level test for {@link SpecialCommandMembersPageController}, the SK member page at {@code
- * /organisation/special-commands/{id}}. Pins the coarse frontend gate ({@code ADMIN} / {@code
- * OFFICER} in, a plain member out), the backend-403 → 403-page mapping that keeps an officer who
- * does not lead the SK out, the admin-vs-lead differences ({@code canToggleLead} renders the
- * admin-only lead-toggle column, {@code backUrl} points to the SK overview or the Leitung page),
- * the {@code membersResults} swap fragment (REQ-FE-005), and the member writes' redirect target and
- * AJAX relay (#582). The backend's per-SK {@code canManageMembers} verdict is the real authority;
- * here it is represented by the mocked backend's answers.
+ * MVC test for {@link SpecialCommandMembersPageController}: the admin/officer gate, the mapping of
+ * a backend 403, the admin-versus-lead differences, the {@code membersResults} fragment
+ * (REQ-FE-005) and the member writes' redirect and AJAX relay.
  */
 @SpringBootTest
 class SpecialCommandMembersPageControllerMvcTest {

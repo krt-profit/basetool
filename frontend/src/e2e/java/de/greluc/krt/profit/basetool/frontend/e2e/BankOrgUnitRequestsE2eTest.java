@@ -36,25 +36,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Org-unit officer/lead bank features end to end (epic #666, REQ-BANK-021/-022/-023). Proves the
- * full confirm-before-post lifecycle across two audiences on the real UI:
+ * End-to-end tests of the org-unit bank requests (REQ-BANK-021, REQ-BANK-022, REQ-BANK-023):
+ * officers see the balance card and raise requests, bank employees confirm or reject them, and the
+ * role boundaries hold.
  *
- * <ul>
- *   <li><b>F1:</b> an officer who oversees a Staffel sees the balance-only card on the slim {@code
- *       /org-unit-bank} page; a plain member may open the same member-or-above page and sees its
- *       nav entry, but — overseeing and granted no account — no balance card (REQ-BANK-038).
- *   <li><b>F2:</b> the officer raises a deposit request through the modal (recorded {@code
- *       PENDING}, no money moved); a granted bank employee confirms it from the staff queue,
- *       recording a holder, which books the deposit onto the org-unit account; the requester can
- *       cancel a pending request, and the employee can reject one.
- *   <li><b>Role matrix:</b> the officer cannot reach the {@code BANK_EMPLOYEE}-only staff queue,
- *       and a pure bank employee cannot reach the officer/lead page.
- * </ul>
- *
- * <p><b>Drive via UI, verify via API.</b> Every mutation is driven through the real modal/form, but
- * the outcome (the request's status, the account balance) is read back from the backend so the
- * assertions never race the in-place AJAX swap. Each test uses a distinct amount so it can target
- * exactly the request it raised on the shared ephemeral stack.
+ * <p>Mutations are driven through the UI and verified through the backend API; each test uses a
+ * distinct amount to find its own request.
  */
 @Tag("e2e")
 class BankOrgUnitRequestsE2eTest {
@@ -318,16 +305,8 @@ class BankOrgUnitRequestsE2eTest {
   }
 
   /**
-   * Role matrix: the officer cannot reach the {@code BANK_EMPLOYEE}-only staff queue, and a bank
-   * employee with no officer/lead role cannot reach the officer/lead org-unit page.
-   *
-   * <p><b>The employee's half asserts the PAGE, not the nav link.</b> It used to assert both, which
-   * worked only while {@code test-bank-employee} held its bank role alone — an account shape
-   * Keycloak cannot produce, because {@code default-roles-iri} grants {@code KRT Member} to every
-   * account it creates (REQ-SEC-053). The fixture was corrected on 2026-09-06, and the link
-   * legitimately appears now: {@code nav-org-unit-bank} is gated on {@code hasAnyRole(ADMIN,
-   * OFFICER, LOGISTICIAN, MISSION_MANAGER, KRT_MEMBER)} and every real member passes that. What the
-   * boundary was ever about is the page, and the page still refuses.
+   * Asserts that the officer cannot reach the staff queue and a bank employee without an officer or
+   * lead role cannot reach the org-unit bank page.
    */
   @Test
   void roleBoundariesAreEnforced() {

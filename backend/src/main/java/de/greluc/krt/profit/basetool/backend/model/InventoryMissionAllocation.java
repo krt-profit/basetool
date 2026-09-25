@@ -41,15 +41,11 @@ import lombok.Setter;
 import lombok.ToString;
 
 /**
- * A single mission slice of an {@link InventoryItem}'s quantity — the mission counterpart of {@link
- * InventoryJobOrderAllocation} (Variante C, REQ-INV-027): an entry may earmark part of its stock to
- * several missions at once, each with its own {@link #amount}, validated independently of the
- * job-order split (each dimension's Σ amount must stay ≤ the owning entry's amount). The owning
- * {@link InventoryItem}'s {@code @Version} is the concurrency token for the whole split.
+ * One mission slice of an {@link InventoryItem}'s quantity, the mission counterpart of {@link
+ * InventoryJobOrderAllocation} (REQ-INV-027).
  *
- * <p>Both foreign keys are {@code ON DELETE CASCADE} (V217): deleting the entry removes its
- * allocations, and deleting the mission removes the allocation while the entry survives — the
- * successor to the former {@code unlinkMissions} null-out.
+ * <p>The owning entry's {@code @Version} is the concurrency token for the whole split. Deleting the
+ * entry or the mission removes the slice; the entry survives a mission deletion.
  */
 @Entity
 @Table(

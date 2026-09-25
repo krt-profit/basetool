@@ -22,16 +22,10 @@ package de.greluc.krt.profit.basetool.backend.model.dto;
 import java.util.List;
 
 /**
- * The whole cross-order material-demand overview (REQ-ORDERS-034): the material still to be
- * gathered across every non-terminal ({@code OPEN} / {@code IN_PROGRESS}) job order the caller may
- * see, split by responsible org unit.
+ * The cross-order material-demand overview: outstanding material across every {@code OPEN} / {@code
+ * IN_PROGRESS} job order the caller may see, split by responsible org unit (REQ-ORDERS-034).
  *
- * <p>Wrapped in a record rather than returned as a bare {@code List} so the projection can grow
- * page-level context (a generation timestamp, a freshness marker) without breaking the response
- * shape — and so the JSON body is an object, per the API conventions.
- *
- * @param groups one group per responsible org unit that has outstanding demand, ordered by the
- *     unit's shorthand; empty when the caller may see no non-terminal order, which the page renders
- *     as its empty state rather than as an error
+ * @param groups one group per responsible org unit with outstanding demand, ordered by shorthand;
+ *     empty when the caller sees no non-terminal order
  */
 public record MaterialDemandOverviewDto(List<MaterialDemandGroupDto> groups) {}

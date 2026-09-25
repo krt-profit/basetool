@@ -25,33 +25,16 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Plan §3.5 effective-scope vector resolved by {@link OwnerScopeService#currentScopePredicate()}.
- * Encodes the three orthogonal cases that every staffel-scoped read query has to honour:
+ * The caller's effective org-unit scope, resolved by {@link
+ * OwnerScopeService#currentScopePredicate()}.
  *
  * <ul>
- *   <li><b>Admin without active selection</b> ({@link #adminAllScope()} = {@code true}): the caller
- *       sees data across every OrgUnit, no filter applies. Both {@link #activeOrgUnitId()} and
- *       {@link #memberOrgUnitIds()} are empty here — admins are not constrained until they pin a
- *       specific selection via the switcher.
- *   <li><b>Admin or non-admin pinned to a specific OrgUnit</b> ({@link #activeOrgUnitId()} non-
- *       null): the caller sees data owned by that single OrgUnit. The admin-pinned case relies on
- *       the {@code X-Active-Org-Unit-Id} request header; the non-admin pinned case (R5.e) relies on
- *       the same header propagated by the frontend switcher widened to non-admins.
- *   <li><b>Non-admin without pinning</b> ({@link #memberOrgUnitIds()} non-empty, {@link
- *       #activeOrgUnitId()} null, {@link #adminAllScope()} = {@code false}): the caller sees the
- *       union of every OrgUnit they belong to (Staffel + every SK membership). This is the case
- *       where today's "single Staffel id" view silently dropped SK data — the new predicate fixes
- *       that by passing the full membership set into the {@code IN} clause.
+ *   <li>Admin without selection ({@link #adminAllScope()}): no filter applies.
+ *   <li>Pinned caller ({@link #activeOrgUnitId()} non-null): only that org unit.
+ *   <li>Unpinned non-admin: the union of {@link #memberOrgUnitIds()} (Staffel and SK memberships).
  * </ul>
  *
- * <p>There used to be a fourth case here: an anonymous caller, all fields empty, seeing nothing
- * through the scoped clause and reaching data only through Mission's organisation-wide escape. That
- * case is gone with the anonymous surface (ADR-0159), and {@code
- * RequestScopeResolver#currentScopePredicate()} now throws rather than building it — an all-empty
- * predicate is indistinguishable from a legitimate one and would answer a question nobody was
- * entitled to ask.
- *
- * <p>Used in repository queries by the standard JPQL fragment
+ * <p>Repository queries apply it as:
  *
  * <pre>{@code
  * (:isAdminAllScope = true)
@@ -59,11 +42,7 @@ import org.jetbrains.annotations.Nullable;
  *   OR (:scopeOrgUnitId IS NULL AND x.owningOrgUnit.id IN :memberOrgUnitIds)
  * }</pre>
  *
- * <p>Mission (cross-staffel aggregate) adds {@code OR x.isInternal = false} as the
- * organisation-wide escape clause — {@code isInternal = false} means "every member of the
- * organisation", never "everyone" (REQ-ORG-009, D8). The empty-collection case for {@link
- * #memberOrgUnitIds()} returns no rows from the {@code IN} clause (Hibernate 6 handles {@code IN
- * ()} as a constant {@code false}).
+ * <p>Mission additionally allows {@code OR x.isInternal = false} (REQ-ORG-009).
  *
  * @param adminAllScope {@code true} iff the caller is an admin with no active selection — the
  *     filter clauses are short-circuited to "all rows visible".
@@ -76,12 +55,8 @@ public record ScopePredicate(
     boolean adminAllScope, @Nullable UUID activeOrgUnitId, @NotNull Set<UUID> memberOrgUnitIds) {
 
   /**
-   * In-memory mirror of the JPQL scope clause documented above, for the per-row {@code canSee*} /
-   * {@code canEdit*} detail and write gates. A single org-unit id is permitted iff a row owned by
-   * it would appear in this caller's scoped <em>list</em> view: admin-all-scope sees everything, a
-   * pinned caller sees only the pinned id, and an unpinned non-admin sees any org unit in their
-   * membership union (Staffel + every Spezialkommando). Keeping this on the record guarantees the
-   * detail/edit checks and the list queries can never diverge.
+   * In-memory equivalent of the JPQL scope clause, for per-row detail and write gates: permits an
+   * org unit iff a row it owns would appear in this caller's scoped list view.
    *
    * @param orgUnitId the org-unit id (Staffel or Spezialkommando) to test; never {@code null}.
    * @return {@code true} iff a row owned by {@code orgUnitId} is in scope for this caller.

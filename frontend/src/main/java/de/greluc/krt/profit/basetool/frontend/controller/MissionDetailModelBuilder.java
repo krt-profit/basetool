@@ -38,25 +38,19 @@ import java.util.UUID;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Derives the mission-detail view attributes that are pure functions of the fetched {@link
- * MissionDto} — participant sort + groupings, the facts-bar leader, unit-assignment lookups,
- * participation percentages and the frequency split — out of {@code MissionPageController}'s
- * ~450-line detail handler (audit L-tier controller de-bloat, #15). Every value here is a
- * deterministic transform over the single mission payload with no backend call, security decision
- * or {@code Model} mutation; the controller keeps that orchestration (fragment-gating, catalog
- * reads, the finance/refinery/inventory fan-out) and adds these values to the model.
+ * Derives the mission-detail view attributes that are pure functions of a {@link MissionDto}:
+ * participant sorting and grouping, the facts-bar leader, unit-assignment lookups, participation
+ * percentages and the frequency split.
  *
- * <p>Co-located with the sibling view helper {@link BankDashboardViewAssembler} in the {@code
- * controller} package; stateless and static-only.
+ * <p>Stateless and static-only; makes no backend call and does not touch the {@code Model}.
  */
 public final class MissionDetailModelBuilder {
 
   private MissionDetailModelBuilder() {}
 
   /**
-   * The pure, mission-derived attributes the mission-detail template consumes. All collections are
-   * mutable copies built off the mission payload; {@code factLeaderName} is {@code null} when
-   * neither an Einsatzleiter nor an (unredacted) owner is present.
+   * The mission-derived attributes the mission-detail template consumes; all collections are
+   * mutable copies.
    *
    * @param participants the mission participants, sorted case-insensitively by display name
    * @param participantsByLeadType participants grouped by their leadership job-type id (string key)
@@ -65,11 +59,11 @@ public final class MissionDetailModelBuilder {
    * @param participantUserIds ids of every account-backed participant (guests excluded)
    * @param assignedUnitByParticipantId participant id → space-joined names of the unit(s) they crew
    * @param assignedUnitShipIds ids of ships already pinned to a unit of this mission
-   * @param unassignedParticipants participants not yet crewed into any unit, sort order inherited
-   * @param participantsById participant id → full participant payload (crew-board row resolution)
+   * @param unassignedParticipants participants not yet crewed into any unit, in sorted order
+   * @param participantsById participant id → full participant payload
    * @param participationPercentages participant id → share of total participant-time (0.0 default)
    * @param frequencyByTypeId typed (global) channel by frequency-type id (string key)
-   * @param customFrequencies mission-specific free-text channels, sorted case-insensitively by name
+   * @param customFrequencies mission-specific channels, sorted case-insensitively by name
    */
   public record MissionDetailViewModel(
       List<MissionParticipantDto> participants,
@@ -155,12 +149,8 @@ public final class MissionDetailModelBuilder {
   }
 
   /**
-   * Facts-bar "Leiter" (REQ-MISSION-013): the participant designated as Einsatzleiter — the one
-   * whose planned mission job type is the single mission-lead designation ({@code
-   * JobType.isMissionLead}) — else the mission owner, else {@code null}. The owner reaches a caller
-   * below Logistician only when they may manage the Einsatz (REQ-SEC-007), so a member who merely
-   * reads one with no Einsatzleiter assigned sees "none". A mission can have only one
-   * Einsatzleiter, so the first match is authoritative.
+   * Resolves the facts-bar "Leiter" (REQ-MISSION-013): the participant whose planned job type is
+   * the mission-lead designation, else the visible mission owner, else {@code null}.
    *
    * @param participants the sorted participants
    * @param mission the mission (for the owner fallback)
@@ -187,10 +177,7 @@ public final class MissionDetailModelBuilder {
   }
 
   /**
-   * User ids of every account-backed participant (guests have no account and thus no hangar ships).
-   * The unit ADD modal offers only ships owned by these users; the EDIT modal also keeps
-   * already-assigned ships (see {@link UnitAssignments#shipIds()}) so a unit can only be crewed
-   * with a ship brought by someone registered for the mission, without dropping an existing one.
+   * Collects the user ids of every account-backed participant, whose ships the unit modals offer.
    *
    * @param participants the sorted participants
    * @return the account-backed participant user ids
@@ -207,11 +194,8 @@ public final class MissionDetailModelBuilder {
   }
 
   /**
-   * Builds the unit-assignment lookups: participant id → the space-joined name(s) of the unit(s)
-   * they crew, and the ids of ships already pinned to a unit. The unit EDIT modal keeps offering
-   * those ships even when the owner is no longer a participant, so editing an unrelated field on
-   * such a unit doesn't silently drop the ship — the client-side picker pre-selects the current
-   * ship by value and needs the {@code <option>} to exist.
+   * Builds the unit-assignment lookups: participant id to the space-joined names of the units they
+   * crew, and the ids of ships already assigned to a unit.
    *
    * @param mission the mission whose assigned units to index
    * @return the unit-assignment lookups
@@ -240,11 +224,8 @@ public final class MissionDetailModelBuilder {
   }
 
   /**
-   * "Crew zuweisen"-Dropdown zeigt nur Teilnehmer, die noch keiner Einheit zugewiesen sind.
-   * Sortierung wird aus {@code participants} (bereits alphabetisch nach extractParticipantName)
-   * geerbt — ein assignment-Status-Filter aendert die Reihenfolge der verbleibenden Eintraege
-   * nicht. Der server-seitige Filter ist authoritativ; nach einer Crew-Zuweisung laedt der
-   * AJAX-Pfad die ganze Seite neu, sodass das Dropdown auf dem aktuellen Stand bleibt.
+   * Selects the participants not yet assigned to any unit, for the "Crew zuweisen" dropdown,
+   * preserving the order of {@code participants}.
    *
    * @param participants the sorted participants
    * @param assignedUnitByParticipantId the participant → unit lookup
@@ -259,9 +240,8 @@ public final class MissionDetailModelBuilder {
   }
 
   /**
-   * Crew board (tab layout, Variante B): unit crew lists carry only participantId/participantName,
-   * so the board's person rows resolve the full participant payload (org units, desired job,
-   * comment, check-in state, version) via this id lookup.
+   * Indexes the participants by id, so the crew board can resolve the full payload of a unit's crew
+   * member.
    *
    * @param participants the sorted participants
    * @return participant id → participant payload
@@ -279,10 +259,8 @@ public final class MissionDetailModelBuilder {
   }
 
   /**
-   * Calculates each participant's share of the total participant-time as a percentage. Every
-   * participant starts at {@code 0.0}; when the mission has an actual start time, each
-   * participant's effective window is clamped to the mission window (open windows run to the
-   * mission end, else now) and their duration is divided by the summed total.
+   * Calculates each participant's percentage share of the total participant-time, clamped to the
+   * mission window; all shares are {@code 0.0} until the mission has an actual start time.
    *
    * @param participants the sorted participants
    * @param mission the mission (for the actual start/end window)
@@ -343,10 +321,8 @@ public final class MissionDetailModelBuilder {
   }
 
   /**
-   * Builds the frequency lookup for the typed (global) channels plus the ordered list of custom
-   * (mission-specific) channels (REQ-MISSION-014) rendered in the "Weitere Frequenzen" editor and
-   * the overview Funk panel. Custom rows carry a free-text name and no frequencyType; they are
-   * sorted case-insensitively by label for a stable, reload-independent order.
+   * Splits the mission's frequencies into a lookup of typed channels and a name-sorted list of
+   * custom channels (REQ-MISSION-014).
    *
    * @param mission the mission whose frequencies to split
    * @return the frequency grouping
@@ -370,9 +346,8 @@ public final class MissionDetailModelBuilder {
   }
 
   /**
-   * Resolves a participant's display name: the account's effective / display / username in that
-   * order of preference, else the guest name, else the empty string. Mirrors the ordering the
-   * detail template uses so the participant sort is stable against what the rows render.
+   * Resolves a participant's display name: the account's effective, display or user name, else the
+   * guest name, else the empty string.
    *
    * @param participant the participant, or {@code null}
    * @return the non-null display name (possibly empty)

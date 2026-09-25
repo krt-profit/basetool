@@ -26,19 +26,10 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Scales an account balance-over-time series (REQ-BANK-049) into the geometry the detail page's
- * inline SVG line chart renders — the bigger sibling of {@link BankSparkline}. Where the sparkline
- * is a bare 96&times;26 polyline, this produces a full {@value #VIEW_W}&times;{@value #VIEW_H}
- * chart: the balance polyline, a soft area fill under it, two horizontal gridlines at the data
- * extremes (labelled with the min/max balance) and — when the account has a balance target — a
- * dashed reference line at the target level. Every colour comes from a design-system token via CSS
- * classes on the template's SVG elements; this helper only computes coordinates, so it holds no
- * styling and no user-visible string.
- *
- * <p>Pure computation, mirroring {@link BankSparkline}: shared by the bank-staff detail ({@code
- * BankPageController}) and the org-unit viewer detail ({@code OrgUnitBankPageController}) so both
- * draw the chart identically. The x-axis date range is rendered as localisable HTML around the SVG,
- * never as SVG text, so nothing here needs the user's time zone.
+ * Scales an account's balance-over-time series (REQ-BANK-049) into the geometry of the detail
+ * page's {@value #VIEW_W}&times;{@value #VIEW_H} SVG chart: balance line, area fill, min/max
+ * gridlines and an optional dashed target line. Pure coordinate computation with no styling or
+ * text, shared by the bank-staff and org-unit detail pages.
  */
 public final class BankBalanceChart {
 
@@ -70,26 +61,20 @@ public final class BankBalanceChart {
   private BankBalanceChart() {}
 
   /**
-   * The scaled chart geometry ready for the template. All coordinates are in the {@value #VIEW_W}
-   * &times;{@value #VIEW_H} viewBox space. When {@link #empty()} is {@code true} the template
-   * renders the "no data" state instead of the SVG and every other field is {@code null}/zero.
+   * The scaled chart geometry in {@value #VIEW_W}&times;{@value #VIEW_H} viewBox space; when {@link
+   * #empty()} is {@code true} every other field is {@code null} or zero.
    *
-   * @param empty {@code true} when the series has no points (render the empty state)
-   * @param linePoints the balance polyline {@code points} attribute value, or {@code null} when
-   *     empty
-   * @param areaPoints the filled-area polygon {@code points} (line closed down to the baseline), or
-   *     {@code null} when empty
-   * @param targetY the y of the dashed balance-target line, or {@code null} when no target is set
-   * @param maxValue the highest balance in the series (top gridline label), or {@code null} when
-   *     empty
-   * @param maxLineY the y of the top gridline (the {@code maxValue} level)
-   * @param minValue the lowest balance in the series (bottom gridline label), or {@code null} when
-   *     empty
-   * @param minLineY the y of the bottom gridline (the {@code minValue} level)
-   * @param target the balance-target value (target line label), or {@code null} when no target is
-   *     set
-   * @param plotLeft the left plot edge x (gridline/target-line start)
-   * @param plotRight the right plot edge x (gridline/target-line end)
+   * @param empty {@code true} when the series has no points
+   * @param linePoints the balance polyline {@code points} value, or {@code null} when empty
+   * @param areaPoints the filled-area polygon {@code points}, or {@code null} when empty
+   * @param targetY the y of the target line, or {@code null} when no target is set
+   * @param maxValue the highest balance, or {@code null} when empty
+   * @param maxLineY the y of the top gridline
+   * @param minValue the lowest balance, or {@code null} when empty
+   * @param minLineY the y of the bottom gridline
+   * @param target the balance-target value, or {@code null} when no target is set
+   * @param plotLeft the left plot edge x
+   * @param plotRight the right plot edge x
    * @param axisLabelX the x of the right-aligned y-axis labels
    */
   public record Chart(

@@ -65,16 +65,10 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 
 /**
- * Verifies the per-squadron promotion-feature gate end-to-end through {@link OwnerScopeService} +
- * the adjacent {@link PromotionTopicService} (the rest of the promotion services follow the same
- * pattern, so one representative is enough — every gated call site uses the same {@code
- * OwnerScopeService} primitive).
- *
- * <p>What's pinned here: an admin without an active pin keeps the menu open (so they can re-enable
- * a locked-out squadron); an admin pinned to a squadron honours that squadron's flag so the pinned
- * view matches what a member would see; Officers / members of a flag-off squadron get empty reads
- * and {@link AccessDeniedException} on writes; and the squadron-toggle service method flips only
- * the flag without touching any other column.
+ * Verifies the per-squadron promotion-feature gate through {@link OwnerScopeService} and {@link
+ * PromotionTopicService}: an unpinned admin keeps access, a pinned admin honours the squadron's
+ * flag, members of a disabled squadron get empty reads and {@link AccessDeniedException} on writes,
+ * and the toggle changes only the flag.
  */
 @ExtendWith(MockitoExtension.class)
 class PromotionFeatureFlagServiceGateTest {

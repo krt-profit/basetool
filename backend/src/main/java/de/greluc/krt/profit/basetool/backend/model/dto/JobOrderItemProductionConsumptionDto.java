@@ -24,16 +24,13 @@ import jakarta.validation.constraints.Positive;
 import java.util.UUID;
 
 /**
- * One inventory-entry draw of a production booking: {@code amount} of the entry {@code
- * inventoryItemId} (which must be linked to the order and hold {@code materialId}) is consumed to
- * manufacture the item. Carries the entry's optimistic-lock {@code version} so a concurrent stock
- * change surfaces as a 409.
+ * One inventory-entry draw of a production booking.
  *
  * @param inventoryItemId the linked inventory entry drawn from
- * @param materialId the material the entry holds (must be one the item requires)
- * @param amount the SCU/PIECE consumed from this entry (positive, ≤ the entry's own amount and its
- *     earmark to this order)
- * @param version the inventory entry's optimistic-lock version (echoed for the 409 guard)
+ * @param materialId the material the entry holds; must be one the item requires
+ * @param amount the quantity consumed; positive, within the entry's amount and its earmark to this
+ *     order
+ * @param version the inventory entry's optimistic-lock version
  */
 public record JobOrderItemProductionConsumptionDto(
     @NotNull UUID inventoryItemId,

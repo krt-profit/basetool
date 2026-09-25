@@ -40,16 +40,9 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
- * Spring MVC controller for the admin bank pages (epic #556 Phase 4, REQ-BANK-013): the wipe-reset
- * danger card ({@code /admin/bank}, A1 mockup). Admin-only — class-level {@code @PreAuthorize}
- * matches the backend's admin URL gate; bank management does NOT reach these pages (REQ-BANK-010).
- *
- * <p>The audit-log viewer moved to the unified {@code /admin/audit-log} page (REQ-AUDIT-001,
- * ADR-0037); the legacy {@code /admin/bank-audit} URL redirects there with the bank tab preselected
- * so old bookmarks keep working.
- *
- * <p>The wipe-reset is a server-side PRG form post (not AJAX) gated by a type-to-confirm hurdle in
- * the browser; the backend re-enforces the admin role and the idempotency.
+ * Controller for the admin-only bank page ({@code /admin/bank}) with the wipe reset (REQ-BANK-013);
+ * bank management has no access (REQ-BANK-010). The wipe reset is a form post guarded by a
+ * type-to-confirm step.
  */
 @Controller
 @UsesLayoutModel
@@ -73,8 +66,7 @@ public class AdminBankPageController {
   }
 
   /**
-   * Redirects the legacy bank-audit URL to the unified audit-log page with the bank tab selected
-   * (REQ-AUDIT-001) so existing bookmarks and links keep working.
+   * Redirects {@code /admin/bank-audit} to the unified audit-log page with the bank tab selected.
    *
    * @return a redirect to the unified audit-log page, bank tab
    */
@@ -85,10 +77,8 @@ public class AdminBankPageController {
   }
 
   /**
-   * Executes the wipe reset against the backend and redirects back with a flash result: the
-   * affected counts on success (incl. the idempotent no-op = zero counts), or an error flag on
-   * failure. The {@code confirm} field must equal {@code WIPE} — a server-side backstop to the
-   * type-to-confirm modal so a crafted POST without the hurdle is still rejected.
+   * Runs the wipe reset and redirects back with the affected counts or an error flag. {@code
+   * confirm} must equal {@code WIPE}.
    *
    * @param confirm the type-to-confirm token; must equal {@code WIPE}
    * @param redirectAttributes flash attributes carrier
@@ -119,17 +109,13 @@ public class AdminBankPageController {
   }
 
   /**
-   * In-place (AJAX) twin of {@link #wipeReset} — routed here ahead of the classic handler by the
-   * {@code X-Requested-With} header so the no-JS form keeps its redirect fallback. Returns the
-   * affected counts as {@code {"accountsReset": <n>, "holderStashesZeroed": <m>}} so the page can
-   * show a success/no-op toast in place instead of reloading. The {@code WIPE} confirm token is
-   * re-checked server-side as a backstop to the type-to-confirm modal.
+   * AJAX variant of {@link #wipeReset}, returning {@code {"accountsReset": <n>,
+   * "holderStashesZeroed": <m>}}. {@code confirm} must equal {@code WIPE}.
    *
    * @param confirm the type-to-confirm token; must equal {@code WIPE}
-   * @return {@code 200} with the counts on success, {@code 400} when the confirm token is wrong, a
-   *     relayed {@code problem+json} carrying the backend status and {@code code} (e.g. {@code
-   *     PESSIMISTIC_LOCK} when the wipe races a concurrent booking) so {@code krtFetch} can offer
-   *     the reload-confirm, or {@code 500} on an otherwise-unclassified backend failure
+   * @return {@code 200} with the counts on success, {@code 400} when the confirm token is wrong,
+   *     the relayed backend {@code problem+json} on a backend error, or {@code 500} on an
+   *     unclassified failure
    */
   @ResponseBody
   @PostMapping(value = "/admin/bank/wipe-reset", headers = "X-Requested-With=XMLHttpRequest")

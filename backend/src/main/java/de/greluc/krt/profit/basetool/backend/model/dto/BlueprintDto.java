@@ -25,10 +25,8 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Boundary DTO for a synced crafting blueprint on the admin blueprint page. Carries the recipe
- * header, the requirement groups (build slots) with their ingredients and stat modifiers, the flat
- * ingredient list (rendered as a fallback for blueprints synced before their detail / requirement
- * groups were captured), the de-duplicated stat roll-up, and the dismantle returns.
+ * Admin view of a synced crafting blueprint: recipe header, requirement groups with ingredients and
+ * modifiers, the flat ingredient list, the stat roll-up and the dismantle returns.
  *
  * @param id local primary key
  * @param scwikiUuid SC Wiki blueprint UUID
@@ -43,7 +41,7 @@ import java.util.UUID;
  * @param dismantleEfficiency fraction of inputs recovered on dismantle, or {@code null}
  * @param scwikiSyncedAt timestamp of the last successful SC Wiki sync touch
  * @param requirementGroups build slots with their ingredients and stat modifiers
- * @param ingredients the flat ingredient list (fallback rendering when no groups are present)
+ * @param ingredients the flat ingredient list (fallback when no groups are present)
  * @param summaryProperties roll-up of the stats this blueprint affects
  * @param dismantleReturns commodities recovered on dismantle
  * @param version optimistic-lock version

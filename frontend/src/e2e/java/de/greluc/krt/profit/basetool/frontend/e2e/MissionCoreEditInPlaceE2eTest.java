@@ -37,14 +37,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Functional flow (#589): the mission core-edit form (Verwaltung tab) saves in place. Proves the
- * three things the carve-out's Definition of Done requires: a save updates with no full-page reload
- * (the {@code window.__krtNoReload} guard), a second consecutive save does not 409 (the
- * four-version writeback), and a server-side validation failure renders inline without a
- * navigation.
+ * Verifies that the mission core-edit form (Verwaltung tab) saves in place: no full-page reload, no
+ * 409 on a second consecutive save, and inline rendering of a server-side validation failure.
  *
- * <p>Drive via UI, verify via API ({@link BackendSeeder}). The actor is {@code test-admin}, who can
- * edit every mission through the role hierarchy.
+ * <p>Drives the UI and verifies via {@link BackendSeeder}, as {@code test-admin}.
  */
 @Tag("e2e")
 class MissionCoreEditInPlaceE2eTest {

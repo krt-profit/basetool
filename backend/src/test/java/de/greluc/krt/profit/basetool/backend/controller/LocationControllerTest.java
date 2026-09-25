@@ -42,16 +42,13 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
 /**
- * Pure-method unit tests for {@link LocationController}. Key behaviour documented in the test
- * names:
+ * Unit tests for {@link LocationController}.
  *
  * <ul>
- *   <li>The POST create endpoint must pass through {@link
- *       LocationMapper#stripServerManaged(Location)} so a client cannot mass-assign onto an
- *       existing row via {@code id} / {@code version}.
- *   <li>The "lookup" endpoint returns reference DTOs directly from the service — no mapper
- *       involvement.
- *   <li>Pagination wrapping ({@link PageResponse}) honours the {@code includeHidden} flag verbatim.
+ *   <li>Create passes through {@link LocationMapper#stripServerManaged(Location)}, so {@code id} /
+ *       {@code version} cannot be mass-assigned.
+ *   <li>The lookup endpoint returns the service's reference DTOs unmapped.
+ *   <li>{@link PageResponse} wrapping honours the {@code includeHidden} flag.
  * </ul>
  */
 @ExtendWith(MockitoExtension.class)

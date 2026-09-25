@@ -35,17 +35,12 @@ public interface RefineryYieldRepository extends JpaRepository<RefineryYield, UU
   Optional<RefineryYield> findByTerminalIdAndMaterialId(UUID terminalId, UUID materialId);
 
   /**
-   * Returns every yield row whose terminal sits at the given city or space station.
+   * Returns every yield row whose terminal sits at the given city or space station, matched by the
+   * terminal's {@code cityName} / {@code spaceStationName}.
    *
-   * <p>Used to enrich a refinery-order DTO with per-material bonus/malus percentages: the order's
-   * {@link de.greluc.krt.profit.basetool.backend.model.Location} resolves to either a {@code City}
-   * or a {@code SpaceStation}, and the terminal-side {@code cityName} / {@code spaceStationName}
-   * columns (populated by the UEX universe sync from the same upstream feed) are matched by name.
-   * The "city but no station" branch additionally requires {@code spaceStationName IS NULL} so a
-   * terminal that belongs to a station within a city is not mistaken for a city-level refinery.
-   *
-   * <p>Both parameters are independently nullable — the caller passes only the side it knows. A
-   * fully-null call returns an empty list (no usable filter).
+   * <p>A city-only match also requires {@code spaceStationName IS NULL}, so a station within a city
+   * is not taken for a city-level refinery. Either parameter may be {@code null}; both {@code null}
+   * returns an empty list.
    *
    * @param cityName name of the city to match on {@code Terminal.cityName}, or {@code null}
    * @param spaceStationName name of the space station to match on {@code

@@ -47,17 +47,13 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MockMvc gate matrix for the Art. 17 erasure-request surface (REQ-SEC-061).
- *
- * <p>Two gates, and they are opposites, which is the point of testing them together:
+ * MockMvc gate matrix for the erasure-request surface (REQ-SEC-061).
  *
  * <ul>
- *   <li>{@code /api/v1/users/me/deletion-request} is open to <b>every</b> authenticated member. It
- *       has to be — the right is the member's — and it is safe because the subject comes from the
- *       token and no endpoint accepts a user id.
- *   <li>{@code /api/v1/admin/deletion-requests} is <b>admin-only</b>, at the URL matcher and again
- *       at the method level. Not only because carrying a request out deletes an account, but
- *       because the queue itself names every member who has asked to be erased.
+ *   <li>{@code /api/v1/users/me/deletion-request} is open to every authenticated member and accepts
+ *       no user id.
+ *   <li>{@code /api/v1/admin/deletion-requests} is admin-only at the URL matcher and the method
+ *       level.
  * </ul>
  */
 @SpringBootTest

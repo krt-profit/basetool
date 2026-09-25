@@ -37,18 +37,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Owns the job-order priority queue: the drag-and-drop reorder and the contiguous-1..n
- * normalisation that the whole lifecycle (create / status change / delete / auto-complete) relies
- * on. Extracted from {@code JobOrderService} (L2, #921) so the priority-ordering concern lives on
- * its own, behind the same logic verbatim.
+ * Owns the job-order priority queue: drag-and-drop reorder and normalisation to a contiguous {@code
+ * 1..n} sequence.
  *
- * <p>Concurrency (CLAUDE.md's "pessimistic locking for bulk reorders" rule) is preserved: both
- * methods take a {@code @Lock(PESSIMISTIC_WRITE)} lock over the whole priority sequence via {@link
- * JobOrderRepository#lockAllJobOrders} to serialise concurrent reorders. {@link
- * #normalizePriorities} carries no transaction annotation of its own — exactly as the
- * extracted-from private helper did — so it runs inside the caller's transaction; the callers that
- * need it (notably {@code completeJobOrderWithinTransaction}) still {@code flush()} their pending
- * {@code @Version} bump <em>before</em> invoking it, so the lock query never reads a stale row.
+ * <p>Both operations take a pessimistic write lock over the whole sequence via {@link
+ * JobOrderRepository#lockAllJobOrders}.
  */
 @Service
 @RequiredArgsConstructor
@@ -64,12 +57,8 @@ public class JobOrderPriorityService {
   private final JobOrderStockProjectionService jobOrderStockProjectionService;
 
   /**
-   * Reorders a job order to a new priority position.
-   *
-   * <p>Backend uses {@code @Lock(LockModeType.PESSIMISTIC_WRITE)} on the whole priority sequence
-   * (see {@code JobOrderRepository.lockAllJobOrders}) to serialize concurrent reorders — without
-   * it, two simultaneous drag-and-drops would produce duplicate priorities. Adjacent orders shift
-   * up or down to make room for the moved row.
+   * Moves a job order to a new priority position, shifting adjacent orders, under a pessimistic
+   * lock on the whole sequence.
    *
    * @param id job order primary key
    * @param newPriority target slot (1-based)
@@ -123,13 +112,11 @@ public class JobOrderPriorityService {
   }
 
   /**
-   * Re-packs the active orders' priorities to a contiguous {@code 1..n} sequence (stable by current
-   * priority then creation time), taking the whole-sequence {@code @Lock(PESSIMISTIC_WRITE)} lock
-   * to serialise against concurrent reorders. Called from every lifecycle edge that can leave a gap
-   * (create, status change to/from terminal, delete, auto-complete). Carries no
-   * {@code @Transactional} of its own so it runs inside the caller's transaction — callers that
-   * hold a pending {@code @Version} bump must {@code flush()} it before calling this (see {@code
-   * JobOrderService.completeJobOrderWithinTransaction}).
+   * Re-packs the active orders' priorities to a contiguous {@code 1..n} sequence, stable by current
+   * priority then creation time, under a pessimistic lock on the whole sequence.
+   *
+   * <p>Runs in the caller's transaction; a caller holding a pending {@code @Version} bump must
+   * flush it first.
    */
   public void normalizePriorities() {
     List<JobOrder> activeOrders =
@@ -149,19 +136,8 @@ public class JobOrderPriorityService {
   }
 
   /**
-   * Composes the audit subject label for a job order — {@code #<displayId> '<handle>'}, the
-   * deletion-proof identity snapshot stored on each audit event (REQ-AUDIT-001).
-   *
-   * <p><b>The handle names a person.</b> It is the order's contact — {@code orders.create.handle}
-   * renders it as "Handle des Ansprechpartners" — and is frequently somebody outside the
-   * organisation with no account at all. The snapshot itself stays, because the trail has to remain
-   * readable once the order is gone; but it is why {@code audit_event.subject_label} is registered
-   * as a person-name surface in {@code PersonSearchTargets} and why the Art. 15 export does not
-   * select it (REQ-SEC-058).
-   *
-   * <p>Corrected 2026-09-16: this said the handle was "a non-personal order title and is safe to
-   * snapshot". It is neither non-personal nor safe to disclose, and that claim is why the export
-   * shipped without a guard on the column.
+   * Composes the audit subject label {@code #<displayId> '<handle>'} of a job order
+   * (REQ-AUDIT-001). The handle names a person and is treated as personal data (REQ-SEC-058).
    *
    * @param jobOrder the order
    * @return the {@code #<displayId> '<handle>'} label

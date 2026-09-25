@@ -38,26 +38,9 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Execution-level coverage for {@link MissionFinanceEntryRepository#aggregateFinanceByMission}
- * against the real Postgres test container (Flyway-migrated schema). The unit tests ({@code
- * MissionFinanceEntryServiceTest}) only <em>mock</em> this method, so this is what actually
- * validates the JPQL constructor-expression aggregate: that Hibernate parses the {@code sum(case
- * ...)} / {@code count(case ...)} query, executes it, and instantiates the {@link
- * FinanceEntryAggregate} record from the numeric/bigint results — plus the SQL semantics the
- * service relies on: a {@code SUM} over an absent type is {@code NULL} (coalesced to zero by the
- * service), and counts are per-type. Closes the ADR-0078 finance-summary follow-up's last gap.
- *
- * <p>The Testcontainer is shared and other suites commit rows, so every mission id is random and
- * the aggregate is scoped to one mission — assertions only see the rows created here. Class-level
- * {@code @Transactional} rolls each test back; the aggregate query auto-flushes the pending inserts
- * before it runs, so it sees them within the same transaction.
- *
- * <p>Also covers the operation finance roll-up queries added in #1121/#1124: the grouped
- * per-mission finance aggregate ({@link
- * MissionFinanceEntryRepository#aggregateFinanceByMissionIds}), the grouped refinery profit
- * aggregate ({@code RefineryOrderRepository#aggregateProfitByMissionIds}) and the
- * status/recency-bounded operation picker ({@code OperationRepository#findAllReferenceScoped}) —
- * all raw JPQL that only executes for real against the container.
+ * Verifies against PostgreSQL {@link MissionFinanceEntryRepository#aggregateFinanceByMission}, the
+ * grouped {@link MissionFinanceEntryRepository#aggregateFinanceByMissionIds}, the refinery profit
+ * aggregate and the scoped operation picker. Each test rolls back and is scoped to its own ids.
  */
 @SpringBootTest
 @ActiveProfiles("test")

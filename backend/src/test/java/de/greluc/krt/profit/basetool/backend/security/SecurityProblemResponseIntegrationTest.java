@@ -41,13 +41,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * End-to-end verification of the RFC-7807 hardening for Spring Security's filter-level rejections
- * (REQ-API-004 / REQ-SEC): an unauthenticated request to a protected endpoint returns {@code 401
- * application/problem+json} with code {@code UNAUTHENTICATED}, and an authenticated caller lacking
- * the required role returns {@code 403 application/problem+json} with code {@code ACCESS_DENIED} —
- * both carrying a {@code correlationId}, instead of Spring's default bare 401/403. Exercised
- * against the ADMIN-gated {@code /api/v1/audit/**} matcher, whose deny verdict is reached at the
- * authorization filter before any controller.
+ * Verifies that Spring Security's filter-level rejections return {@code application/problem+json}:
+ * 401 {@code UNAUTHENTICATED} and 403 {@code ACCESS_DENIED}, each with a {@code correlationId}
+ * (REQ-API-004).
  */
 @SpringBootTest
 @ActiveProfiles("test")

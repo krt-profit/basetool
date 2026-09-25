@@ -23,14 +23,8 @@ import org.jetbrains.annotations.NotNull;
 import org.keycloak.broker.oidc.mappers.AbstractJsonUserAttributeMapper;
 
 /**
- * JSON attribute-importer mapper for the Discord identity provider.
- *
- * <p>Reuses Keycloak's {@link AbstractJsonUserAttributeMapper} machinery so an admin can map a path
- * in the stored Discord {@code /users/@me} JSON (notably {@code id}) into a Keycloak user attribute
- * — configured to target {@code discord_user_id}, which a {@code basetool-frontend} protocol mapper
- * then carries into the token as the {@code discord_user_id} claim. That is the Discord-account
- * auto-link (epic #720 / REQ-DATA-006). Registered via {@code
- * META-INF/services/org.keycloak.broker.provider.IdentityProviderMapper}.
+ * JSON attribute-importer mapper for the Discord identity provider, used to import the profile's
+ * {@code id} into the {@code discord_user_id} user attribute (REQ-DATA-006).
  */
 public class DiscordUserAttributeMapper extends AbstractJsonUserAttributeMapper {
 

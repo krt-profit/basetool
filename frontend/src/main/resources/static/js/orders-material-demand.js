@@ -19,38 +19,12 @@
 
 // @ts-check
 
-/*
- * Cross-order material-demand page module (/orders/material-demand, REQ-ORDERS-034).
- *
- * Everything here is read-only presentation over already-rendered rows — the page has no write
- * seam:
- *   1. the per-bucket drill-down toggle, persisted per browser;
- *   2. the collapsible filter panel (material / quality / hide-covered), mirroring the Lager;
- *   3. client-side sorting of every group table by one shared column selection;
- *   4. the live-sync receiver, which re-fetches the tables when a peer changes an order.
- *
- * Because a live-sync swap replaces the server-rendered (unfiltered, unsorted, collapsed) rows,
- * every view state above is re-applied on `krt:swapped`.
- *
- * KRT_DEMAND_* are defined by the inline Thymeleaf bootstrap block of orders-material-demand.html,
- * which executes immediately before this classic script.
- */
-
 /* global KRT_DEMAND_LIVESYNC_UPDATES, KRT_DEMAND_SECTION_REFRESH_ERROR */
 
-// ---- Live multi-user sync — the aggregated demand (REQ-FE-010 / REQ-FE-015) ---------------------
-// This page shares the global `orders` room with the order list: both render folds of the same
-// queue and are invalidated by the same events. It carries only the `demand` key and the list only
-// `queue`, so the two seam maps PARTITION the LiveSyncTopicClass.ORDERS_QUEUE whitelist (asserted by
-// LiveSyncSectionMapParityTest — the three-mirror-points rule).
 const DEMAND_SECTIONS = {
     demand: { container: '#orders-material-demand-results', fragmentValue: 'results' },
 };
 
-// ---- Persisted view state (REQ-UI-017 / ADR-0120) ----------------------------------------------
-// One JSON object per page under one bare key (no user id — the app-wide default outside bank
-// surfaces). The drill-down expansion keeps its own pre-existing key so a stored expansion set
-// survives this change.
 const DEMAND_EXPANDED_KEY = 'orders_demand_expanded';
 const DEMAND_FILTERS_KEY = 'orders_demand_filters';
 
@@ -65,10 +39,8 @@ const DEMAND_FILTERS_KEY = 'orders_demand_filters';
  */
 
 /**
- * The live view state. Materials and qualities are stored as EXCLUSIONS rather than selections on
- * purpose: the option list is rendered from the data present at page load, so a material that only
- * appears after a live-sync swap has no checkbox. Keyed on exclusions it is simply not excluded and
- * stays visible, where a selection list would silently hide it.
+ * The live view state. Materials and qualities are stored as exclusions, so a material that appears
+ * only after a live-sync swap stays visible.
  *
  * @type {DemandViewState}
  */
@@ -106,9 +78,7 @@ function readDemandState() {
             panelCollapsed:
                 typeof parsed.panelCollapsed === 'boolean' ? parsed.panelCollapsed : undefined,
         };
-    } catch (_e) {
-        /* corrupt value / private mode: keep the defaults */
-    }
+    } catch (_e) {}
 }
 
 /**
@@ -136,9 +106,7 @@ function writeDemandState() {
                 panelCollapsed: demandState.panelCollapsed,
             }),
         );
-    } catch (_e) {
-        /* quota / private mode: skip persistence */
-    }
+    } catch (_e) {}
 }
 
 /**
@@ -153,18 +121,6 @@ function countActiveDemandFilters() {
     if (demandState.hideCovered) active++;
     return active;
 }
-
-// ---- Filter panel ------------------------------------------------------------------------------
-
-// The collapse itself lives in krt-filter-panel.js (REQ-FE-021). This page supplies only
-// the COUNT, because its dimensions are not readable from the panel's own controls, and it
-// registers that counter inside DOMContentLoaded rather than here: this file is a
-// non-deferred script at the end of the body, so it executes BEFORE the deferred
-// krt-filter-panel.js and window.krtFilterPanel does not exist yet at this point. A
-// top-level registration would be silently skipped and the panel would fall back to the
-// generic scan, which counts the wrong things here.
-
-// ---- Material multi-select ---------------------------------------------------------------------
 
 /**
  * Opens the given options list, closing any other open multi-select first.
@@ -195,8 +151,7 @@ function demandMaterialCheckboxes() {
 
 /**
  * Rewrites the multi-select header text: "Alle" when everything (or nothing) is checked, the single
- * option's own label when exactly one is, otherwise "N ausgewählt" — the shared idiom of the Lager
- * and orders-index multi-selects.
+ * option's own label when exactly one is, otherwise "N ausgewählt".
  *
  * @returns {void}
  */
@@ -274,8 +229,6 @@ function filterDemandMaterialOptions(input) {
         });
 }
 
-// ---- Quality + hide-covered --------------------------------------------------------------------
-
 /**
  * Rebuilds the quality exclusion list from its checkboxes and re-renders.
  *
@@ -318,11 +271,9 @@ function resetDemandFilters() {
     applyDemandView();
 }
 
-// ---- Sorting -----------------------------------------------------------------------------------
-
 /**
  * Cycles the clicked column: ascending on first click, descending on the second, back to the
- * server's own order on the third — so there is always a way back to the default.
+ * server's own order on the third.
  *
  * @param {Element} button the clicked column-header button.
  * @returns {void}
@@ -345,8 +296,7 @@ function cycleDemandSort(button) {
 
 /**
  * The sort value of one row for a column: the material name for the name column, the raw numeric
- * data attribute otherwise. Never the rendered cell text, which is localised ("1000,000 SCU") and
- * would sort as a string.
+ * data attribute otherwise (never the localized cell text).
  *
  * @param {Element} row the bucket row.
  * @param {string} key the sort column key.
@@ -361,9 +311,8 @@ function demandSortValue(row, key) {
 }
 
 /**
- * Reorders every group table by the active column. Each bucket is TWO rows — the figures and its
- * drill-down — so they are moved as a pair, otherwise a sort would separate a drill-down from the
- * material it belongs to. Ties keep the server's order via the stamped original index.
+ * Reorders every group table by the active column and updates the header sort indicators. Each
+ * bucket row moves together with its drill-down row; ties keep the server's order.
  *
  * @returns {void}
  */
@@ -424,12 +373,9 @@ function applyDemandSort() {
     });
 }
 
-// ---- Filtering + rendering ---------------------------------------------------------------------
-
 /**
- * Applies the filters to every bucket row, hides a group left with no visible row, and surfaces the
- * empty-result notice. Then re-applies the sort and the drill-down expansion, so one call fully
- * reconciles the DOM with the view state.
+ * Reconciles the DOM with the view state: filters the bucket rows, hides empty groups, toggles the
+ * empty-result notice, then re-applies the sort and the drill-down expansion.
  *
  * @returns {void}
  */
@@ -488,8 +434,7 @@ function applyDemandView() {
 }
 
 /**
- * Pushes the persisted state back into the controls. Runs on load and after a reset; the panel's
- * own collapsed state is handled separately because it also has a data-dependent default.
+ * Pushes the view state back into the filter controls; the panel's collapsed state is not touched.
  *
  * @returns {void}
  */
@@ -513,10 +458,6 @@ function restoreDemandControls() {
     );
     if (hideCovered) hideCovered.checked = demandState.hideCovered;
 }
-
-// ---- Collapsible per-bucket order drill-down ----------------------------------------------------
-// The set of expanded bucket keys lives in localStorage as a JSON array and is re-applied on load
-// AND after every fragment swap, so a live-sync refresh never collapses what the user opened.
 
 /**
  * Reads the expanded bucket keys, degrading to "none expanded" when localStorage is unavailable or
@@ -542,9 +483,7 @@ function readExpandedBuckets() {
 function writeExpandedBuckets(values) {
     try {
         localStorage.setItem(DEMAND_EXPANDED_KEY, JSON.stringify(values));
-    } catch (_e) {
-        /* quota / private mode: skip persistence */
-    }
+    } catch (_e) {}
 }
 
 /**
@@ -603,8 +542,7 @@ function toggleBucketOrders(btn) {
 }
 
 /**
- * Re-applies the persisted expanded state to every bucket currently in the DOM. Run on load and
- * after each fragment swap, because a swap replaces the rows with server-rendered collapsed ones.
+ * Re-applies the persisted expanded state to every bucket drill-down under root.
  *
  * @param {ParentNode} [root] the subtree to restore; defaults to the whole document.
  * @returns {void}
@@ -619,9 +557,6 @@ function restoreBucketStates(root) {
     });
 }
 
-// ---- Wiring ------------------------------------------------------------------------------------
-
-// Document-delegated so every control survives the results fragment's swaps.
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('click', 'demand-toggle-orders', toggleBucketOrders);
     window.krtEvents.on('click', 'demand-toggle-multi', toggleDemandMulti);
@@ -634,7 +569,6 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('click', 'demand-sort', cycleDemandSort);
 }
 
-// Close the material dropdown on an outside click.
 document.addEventListener('click', (e) => {
     const target = /** @type {Element|null} */ (e.target);
     if (target && !target.closest('.multi-select-container')) {
@@ -647,8 +581,6 @@ document.addEventListener('click', (e) => {
 document.addEventListener('DOMContentLoaded', function () {
     readDemandState();
     restoreDemandControls();
-    // The panel's own state is krt-filter-panel.js's and was applied before this ran; only the
-    // count needs restating, because restoreDemandControls just repopulated the widgets it reads.
     if (window.krtFilterPanel) {
         window.krtFilterPanel.registerCounter('demandFilterPanel', countActiveDemandFilters);
         window.krtFilterPanel.refresh('demandFilterPanel');
@@ -665,8 +597,6 @@ document.addEventListener('DOMContentLoaded', function () {
         window.krtLiveSync.createReceiver({
             topic: 'orders',
             sections: DEMAND_SECTIONS,
-            // Global room: coalesce like the order queue does, so a burst of order writes does not
-            // trigger a refetch herd across every viewer.
             coalesceMs: 1500,
             refresh() {
                 window.krtFetch.swap({
@@ -691,9 +621,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 
-// A swap replaces the server-rendered rows — unfiltered, unsorted and collapsed — so the whole view
-// state is re-applied afterwards. Without this the user's filter and sort silently reset on every
-// live-sync refresh.
 document.addEventListener('krt:swapped', function () {
     applyDemandView();
 });

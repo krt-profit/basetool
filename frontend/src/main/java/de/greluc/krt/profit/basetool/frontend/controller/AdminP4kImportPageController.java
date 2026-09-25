@@ -52,20 +52,12 @@ import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
 /**
- * Spring MVC controller backing the {@code /admin/p4k-import} page (#326): an admin uploads a JSON
- * catalog extracted from the Star Citizen game files, which is processed as an <b>asynchronous
- * background job</b>. The upload returns immediately; the page polls the job list until each run
- * finishes, shows the per-type preview, and can then apply a finished preview, all without the page
- * hanging or hitting a request timeout.
+ * Admin-only controller for the {@code /admin/p4k-import} page: uploads a JSON catalog extracted
+ * from the Star Citizen game files as an asynchronous backend import job, polls its preview and
+ * applies it.
  *
- * <p>Every action proxies to the backend admin import job endpoints ({@code
- * /api/v1/admin/import/p4k/jobs}) via the authenticated {@link WebClient}, which relays the OAuth2
- * bearer token. Enqueue / poll / apply are all quick calls, so the default short-timeout client is
- * appropriate; the heavy work happens server-side in the background worker. A backend {@link
- * WebClientResponseException} is relayed as the same HTTP status so the page JS toasts the error;
- * any other failure collapses to a 500.
- *
- * <p>Admin-only — class-level {@code @PreAuthorize("hasRole('ADMIN')")} matches the backend gate.
+ * <p>Every action proxies to {@code /api/v1/admin/import/p4k/jobs}; a backend {@link
+ * WebClientResponseException} is relayed with its status, any other failure as 500.
  */
 @Controller
 @UsesLayoutModel
@@ -83,9 +75,7 @@ public class AdminP4kImportPageController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Renders the P4K import page. The page is static chrome plus the upload control and the job
-   * table; the proxy endpoint base URL is exposed to the inlined JS so it can POST the picked file
-   * and poll the jobs.
+   * Renders the P4K import page and exposes the proxy base URL to its script.
    *
    * @param model Thymeleaf model
    * @return the {@code admin/p4k-import} view name
@@ -229,10 +219,9 @@ public class AdminP4kImportPageController {
   }
 
   /**
-   * Blocks on a backend WebClient call and maps failures uniformly: a backend {@link
-   * WebClientResponseException} becomes a {@link ResponseStatusException} of the same status (so
-   * the page JS toasts its own i18n message without leaking the backend body); any other failure
-   * becomes a 500.
+   * Blocks on a backend call, turning a {@link WebClientResponseException} into a {@link
+   * ResponseStatusException} of the same status without the backend body, and any other failure
+   * into a 500.
    *
    * @param call the WebClient call producing the result mono
    * @param op a short label for diagnostic logging

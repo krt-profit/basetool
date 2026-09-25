@@ -35,28 +35,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Functional flow: walk a MATERIAL job order through its status lifecycle from the detail page —
- * {@code OPEN} → {@code IN_PROGRESS} → {@code COMPLETED} — and verify each transition persists.
+ * E2E flow that walks a MATERIAL job order from {@code OPEN} through {@code IN_PROGRESS} to {@code
+ * COMPLETED} on the detail page and verifies each transition persists.
  *
- * <p>The status dropdown ({@code #status-select}) is gated {@code
- * sec:authorize="hasRole('LOGISTICIAN')"} and drives the AJAX endpoint {@code POST
- * /orders/{id}/status} (relayed to the LOGISTICIAN-gated backend {@code PUT
- * /api/v1/orders/{id}/status}). The two transition kinds differ in the UI:
- *
- * <ul>
- *   <li><b>Non-terminal</b> ({@code IN_PROGRESS}) posts immediately on the {@code change} event.
- *   <li><b>Terminal</b> ({@code COMPLETED} / {@code REJECTED}) first opens the {@code
- *       #status-warning-modal} (terminal transitions unlink all linked inventory), and only the
- *       {@code od-confirm-status} click posts.
- * </ul>
- *
- * <p>Verification is read back through the backend ({@code GET /api/v1/orders/{id}}) rather than
- * the post-submit dropdown: the client reloads ~1 s after a successful change, so asserting on the
- * reloaded {@code #status-select} races that reload under CI load. Reading the persisted status
- * directly is deterministic and still proves the UI drove the change end to end. The terminal step
- * additionally waits for the warning modal to be shown before confirming, so the confirm never
- * out-races the modal. The actor is {@code test-admin}, which reaches {@code LOGISTICIAN} through
- * the role hierarchy.
+ * <p>The terminal transition confirms the warning modal first. Status is read back from {@code GET
+ * /api/v1/orders/{id}}, not from the reloaded dropdown. Runs as {@code test-admin}.
  */
 @Tag("e2e")
 class JobOrderStatusE2eTest {

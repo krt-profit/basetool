@@ -72,15 +72,8 @@ class SecurityHeadersTest {
   }
 
   /**
-   * Audit finding L-3 (2026-05-20): the CSP {@code style-src} directive must be nonce-gated and
-   * must NOT carry {@code 'unsafe-inline'} — every {@code <style>} block in the templates now
-   * renders with {@code th:attr="nonce=${cspNonce}"}, so an injected {@code <style>} tag (stored
-   * XSS via mission name / finance note / …) cannot be evaluated by the browser. Inline {@code
-   * style=""} attributes are now locked out too: {@code style-src-attr} is {@code 'none'} because
-   * every inline style attribute was migrated out of the templates (static values to {@code
-   * inline-migration.css} classes; data-driven ones to {@code th:classappend} classes or a {@code
-   * data-krtm-width} attribute applied via the CSSOM), so an injected inline style attribute is
-   * blocked rather than merely restricted to visual harm.
+   * Verifies that the CSP {@code style-src} directive is nonce-gated without {@code
+   * 'unsafe-inline'} and that {@code style-src-attr} is {@code 'none'}.
    */
   @Test
   void cspStyleSrcIsNonceGated_andStyleSrcAttrIsNone() throws Exception {
@@ -107,14 +100,9 @@ class SecurityHeadersTest {
   }
 
   /**
-   * Regression-pin for the POST-logout CSP block. Logout became a CSRF-safe POST form (audit
-   * finding L-3); its success redirect targets Keycloak's cross-origin {@code
-   * end_session_endpoint}. With {@code form-action 'self'} alone, Chromium blocks that cross-origin
-   * redirect, so the local Spring session is cleared but the Keycloak SSO session survives and the
-   * next login silently re-authenticates instead of prompting for credentials. The Keycloak origin
-   * (derived from the configured {@code issuer-uri}) must therefore appear in {@code form-action}.
-   * Under the {@code test} profile the issuer is {@code http://keycloak.example.com/realms/test},
-   * so the expected origin is {@code http://keycloak.example.com}.
+   * Verifies that the CSP {@code form-action} directive includes the Keycloak origin derived from
+   * the {@code issuer-uri}, so the POST logout can redirect to Keycloak's {@code
+   * end_session_endpoint}.
    */
   @Test
   void cspFormActionAllowsKeycloakOriginForLogoutRedirect() throws Exception {

@@ -39,12 +39,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Integration tests for the configured state of the {@code /actuator/prometheus} scrape chain
- * (REQ-OBS-005, epic #936 Phase 1): only the dedicated basic-auth identity may read the metrics
- * payload — anonymous callers, wrong passwords and even a fully logged-in browser session are
- * rejected, no session cookie is ever minted for a scrape, {@code /actuator/health} stays public,
- * and the {@link BotProtectionFilter} (registered here exactly as in production) lets the
- * whitelisted scrape path through. Test-only credentials, never production values.
+ * Integration tests for the configured {@code /actuator/prometheus} scrape chain (REQ-OBS-005):
+ * only the basic-auth scrape identity may read it, no session is created, {@code /actuator/health}
+ * stays public, and {@link BotProtectionFilter} lets the scrape through.
  */
 @SpringBootTest(
     properties = {

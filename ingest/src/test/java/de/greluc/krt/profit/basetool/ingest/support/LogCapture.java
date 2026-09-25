@@ -27,13 +27,8 @@ import java.util.List;
 import org.slf4j.LoggerFactory;
 
 /**
- * Captures the logback events a single class emits while a block of code runs, so a test can assert
- * the <em>level</em> of a log line and not just its side effects. Several ingest behaviours are
- * defined purely in terms of level — the slow-request WARN escalation, the DEBUG-not-WARN handling
- * of an open circuit breaker (REQ-OBS-001) — and would otherwise be untestable.
- *
- * <p>The temporarily-installed appender and the temporarily-raised level are always restored, so
- * capturing cannot leak into a sibling test.
+ * Captures the logback events one class emits while a block runs, so tests can assert log levels
+ * (REQ-OBS-001). The temporary appender and level are always restored.
  */
 public final class LogCapture {
 

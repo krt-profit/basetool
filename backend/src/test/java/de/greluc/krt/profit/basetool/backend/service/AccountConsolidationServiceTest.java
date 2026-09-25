@@ -51,13 +51,11 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
- * Unit tests for {@link AccountConsolidationService} — folding a duplicate account into the one the
- * member keeps (REQ-SEC-055, #1828).
+ * Unit tests for {@link AccountConsolidationService}, which folds a duplicate account into the kept
+ * one (REQ-SEC-055).
  *
- * <p>The orchestration is the interesting part rather than the data move: {@link
- * UserAccountMergeService} already owns and tests which rows follow the member, so what these cases
- * pin down is the ordering the unique {@code discord_user_id} forces, the Keycloak writes going out
- * in the sequence that makes a retry safe, and the guards that refuse rather than guess.
+ * <p>Covers the step ordering, the Keycloak write sequence and the refusal guards; the row moves
+ * belong to {@link UserAccountMergeService}.
  */
 @ExtendWith(MockitoExtension.class)
 class AccountConsolidationServiceTest {
@@ -277,9 +275,8 @@ class AccountConsolidationServiceTest {
   }
 
   /**
-   * Retry after a partial failure that already removed the duplicate's row: the merge and the purge
-   * are skipped and the survivor is simply stamped, so a second attempt completes instead of
-   * throwing on a row that is no longer there.
+   * When the duplicate's row is already gone, the merge and purge are skipped and the survivor is
+   * only stamped.
    */
   @Test
   void completeConsolidation_whenTheDuplicateRowIsAlreadyGone_justStampsTheSurvivor() {

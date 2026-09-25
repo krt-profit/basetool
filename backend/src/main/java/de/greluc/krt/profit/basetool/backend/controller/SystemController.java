@@ -36,10 +36,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Liveness/version probe endpoints. Two URI versions exist so the API contract for clients can
- * evolve without breaking the legacy {@code /v1} consumers — the {@code /v1} path is marked
- * deprecated via {@link ApiDeprecation} and emits sunset headers; new clients should target {@code
- * /v2}.
+ * Liveness/version probe endpoints; {@code /v1} is deprecated via {@link ApiDeprecation} with
+ * sunset headers, new clients target {@code /v2}.
  */
 @RestController
 @RequestMapping("/api")
@@ -47,7 +45,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class SystemController {
 
   /**
-   * Legacy plain-map ping. Kept for old clients; new clients should call {@link #pingV2}.
+   * Deprecated plain-map ping; new clients call {@link #pingV2}.
    *
    * @return {@code {status, version, message}} map
    */

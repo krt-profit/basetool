@@ -61,25 +61,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Owns the mission structure: its {@link MissionUnit}s (top-level team groupings) and their {@link
- * MissionCrew}s (ship-level participant groupings). Extracted from {@code MissionService} (L1 step
- * 2, #920) so the units/crews responsibility no longer shares that god-class's dependencies.
+ * Manages a mission's {@link MissionUnit}s and their {@link MissionCrew}s.
  *
- * <p>Units and crews are locked per row (not via a mission section counter), so a unit/crew edit
- * never collides with a concurrent core/schedule/flags/participant edit. Each mutator persists the
- * smallest owning child ({@code MissionUnit} / {@code MissionCrew}) and never {@code
- * save(mission)}, keeping the mission row's {@code @Version} stable. {@code MissionService} keeps
- * its public unit/crew methods as thin delegations, so the controller and transaction boundaries
- * are unchanged.
- *
- * <p><b>The child {@code @Version} alone does NOT prevent a stale-form lost update.</b> Both {@code
- * updateMissionUnit} and {@code updateCrewInShip} rewrite <em>every</em> field from the caller's
- * full-form snapshot, so the entity {@code @Version}'s Hibernate WHERE clause always matches the
- * freshly loaded row and never fires on a stale form — it only catches two flushes overlapping
- * in-flight. The real guard is the client-echoed {@code expectedVersion} these mutators check via
- * {@link OptimisticLock#checkOptionalClient} (#1131); without that echo two managers editing the
- * same unit/crew would silently clobber each other. {@code addUnitToMission} / {@code
- * addCrewToShip} create fresh rows and carry no such check.
+ * <p>Units and crews are locked per row and never save the mission, so their edits never collide
+ * with other mission sections. Updates check the client-echoed {@code expectedVersion} via {@link
+ * OptimisticLock#checkOptionalClient}, because a full-form rewrite never trips the entity
+ * {@code @Version}.
  */
 @Service
 @RequiredArgsConstructor
@@ -110,13 +97,10 @@ public class MissionStructureService {
   private final AuditService auditService;
 
   /**
-   * Adds a unit (team grouping) to a mission. Units are the top level of the participant hierarchy:
-   * each unit may contain several crews.
+   * Adds a unit (top-level team grouping) to a mission.
    *
-   * <p>{@code name} is an optional display name: when blank, the stored name is derived from the
-   * assigned ship respectively ship type (the unit-modal mock's "Anzeigename (optional)"); at least
-   * one of name / ship / ship type must be present. {@code responsibleUserId} (nullable) pins an
-   * explicit responsible person; {@code note} (nullable) is a free-text planning note.
+   * <p>At least one of name, ship or ship type must be present; a blank name is derived from the
+   * ship or ship type.
    */
   @Transactional
   public Mission addUnitToMission(
@@ -183,10 +167,8 @@ public class MissionStructureService {
   }
 
   /**
-   * Resolves the stored (NOT NULL) unit name from the optional display name: a non-blank caller
-   * value wins; otherwise the name is derived from the already-resolved ship (its hangar name)
-   * respectively ship type. Mirrors the unit-modal mock where the Anzeigename is optional because
-   * ship / ship type carry the unit's identity.
+   * Resolves the stored unit name: a non-blank caller value, otherwise the ship's hangar name or
+   * the ship type's name.
    *
    * @param name the caller-submitted display name (nullable/blank)
    * @param unit the unit with {@code ship} / {@code shipType} already resolved
@@ -210,8 +192,7 @@ public class MissionStructureService {
   /**
    * Resolves the optional explicit responsible person of a unit.
    *
-   * @param responsibleUserId the user id, or {@code null} for "no explicit responsible" (the UI
-   *     then falls back to the assigned ship's owner)
+   * @param responsibleUserId the user id, or {@code null} for no explicit responsible
    * @return the resolved user or {@code null}
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the id is
    *     unknown
@@ -227,19 +208,13 @@ public class MissionStructureService {
   }
 
   /**
-   * Updates a unit's name and the assigned ship. Guarded by the client-echoed {@code
-   * expectedVersion} (the {@code MissionUnit.@Version} the edit form last saw): because the update
-   * rewrites every unit field from the caller's full-form snapshot, the entity {@code @Version}'s
-   * own WHERE clause can never fire on a stale form (the fresh {@code findById} always matches the
-   * current row version), so this explicit check is the only thing that turns a two-manager lost
-   * update into a 409 instead of a silent clobber (#1131). A {@code null} {@code expectedVersion}
-   * skips the check (legacy / force-save). Per-unit scope — a rejected unit edit never blocks a
-   * concurrent core / schedule / flags / participant / crew edit.
+   * Updates a unit from the edit form, rejecting a stale {@code expectedVersion} with a 409; only
+   * the unit row is written.
    *
    * @param missionId owning mission
    * @param unitId the unit to update
    * @param expectedVersion the {@code MissionUnit.@Version} the client last saw, or {@code null} to
-   *     skip the optimistic-lock check
+   *     skip the check
    * @param name new display name (blank derives from ship / ship type)
    * @param shipTypeId new ship type, or {@code null}
    * @param shipId new ship, or {@code null}
@@ -247,7 +222,7 @@ public class MissionStructureService {
    * @param frequency new comms frequency (100.00–999.99), or {@code null}
    * @param responsibleUserId explicit responsible person, or {@code null}
    * @param note free-text planning note
-   * @return the owning mission (unchanged {@code @Version} — only the child unit row is written)
+   * @return the owning mission, its {@code @Version} unchanged
    */
   @Transactional
   public Mission updateMissionUnit(
@@ -330,15 +305,12 @@ public class MissionStructureService {
   }
 
   /**
-   * Tests whether the given ship's owner is signed up as a participant of the mission. Only
-   * participants backed by a real {@link User} account count — guest participants have no account
-   * and therefore never own hangar ships. Used by {@link #addUnitToMission} and {@link
-   * #updateMissionUnit} to keep a unit's assigned ship constrained to ships brought by people
-   * actually registered for the mission.
+   * Tests whether the ship's owner is an account-backed participant of the mission; guest
+   * participants never count.
    *
    * @param mission the mission whose participant roster is searched, never {@code null}
-   * @param ship the ship whose owner is checked for participation, never {@code null}
-   * @return {@code true} if the ship's owner is a registered (account-backed) participant
+   * @param ship the ship whose owner is checked, never {@code null}
+   * @return {@code true} if the ship's owner is a registered participant
    */
   private boolean isOwnerRegisteredParticipant(@NotNull Mission mission, @NotNull Ship ship) {
     UUID ownerId = ship.getOwner().getId();
@@ -349,16 +321,11 @@ public class MissionStructureService {
   }
 
   /**
-   * Collects the ships a unit of this mission may be crewed with: every ship owned by a registered
-   * participant <em>plus</em> every ship already pinned to one of the mission's units. Participant
-   * ships are intentionally NOT OrgUnit-scoped — a participant brings their own ship regardless of
-   * which OrgUnit they belong to (so a cross-OrgUnit participant's ship becomes selectable), which
-   * is why this reads {@link ShipRepository#findByOwnerIdIn} rather than the scoped hangar query.
-   * Already-assigned ships are kept so editing a unit never silently drops a ship whose owner has
-   * since left the roster. The result is deduplicated by ship id, participant ships first.
+   * Collects the ships selectable for this mission's units: every ship owned by a registered
+   * participant, regardless of org unit, plus every ship already assigned to a unit.
    *
    * @param missionId the mission whose selectable unit ships are collected, never {@code null}
-   * @return the candidate ships for this mission's unit ship pickers
+   * @return the deduplicated candidate ships, participant ships first
    * @throws NotFoundException when the mission id does not resolve
    */
   @NotNull
@@ -391,8 +358,7 @@ public class MissionStructureService {
   }
 
   /**
-   * Removes a unit. Participants that were assigned to the unit fall back to the unassigned bucket
-   * (their {@code unit}/{@code crew} references are cleared, the rows themselves stay).
+   * Removes a unit; its participants stay on the mission but lose their unit and crew assignment.
    */
   @Transactional
   public Mission removeMissionUnit(@NotNull UUID missionId, @NotNull UUID unitId) {
@@ -468,19 +434,16 @@ public class MissionStructureService {
   }
 
   /**
-   * Updates a crew's assigned job types. Guarded by the client-echoed {@code expectedVersion} (the
-   * {@code MissionCrew.@Version} the edit form last saw) so two leads editing the same crew's job
-   * types concurrently get a 409 for the loser instead of a silent last-write-wins revert (#1131).
-   * A {@code null} {@code expectedVersion} skips the check (legacy / force-save). Per-crew scope —
-   * a rejected crew edit never blocks a concurrent unit / core / schedule / participant edit.
+   * Replaces a crew's job types, rejecting a stale {@code expectedVersion} with a 409; only the
+   * crew row is written.
    *
    * @param missionId owning mission
    * @param missionUnitId owning unit
    * @param crewId the crew to update
    * @param expectedVersion the {@code MissionCrew.@Version} the client last saw, or {@code null} to
-   *     skip the optimistic-lock check
+   *     skip the check
    * @param jobTypeIds the full replacement set of job type ids
-   * @return the owning mission (unchanged {@code @Version} — only the child crew row is written)
+   * @return the owning mission, its {@code @Version} unchanged
    */
   @Transactional
   public Mission updateCrewInShip(
@@ -551,11 +514,9 @@ public class MissionStructureService {
   }
 
   /**
-   * Resolves and archetype-validates the crew job-type references. Every id must resolve to a
-   * {@link JobType} of archetype {@link JobTypeArchetype#CREW}; an unknown id 404s and a
-   * wrong-archetype id 400s. A {@code null} / empty set yields an empty set (a crew with no roles).
+   * Resolves crew job types, each of which must be of archetype {@link JobTypeArchetype#CREW}.
    *
-   * @param jobTypeIds the caller-submitted crew job-type ids (nullable)
+   * @param jobTypeIds the crew job-type ids; {@code null} or empty yields an empty set
    * @return the resolved, archetype-checked job types
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when an id is unknown
    * @throws IllegalArgumentException when a resolved job type is not of archetype {@code CREW}

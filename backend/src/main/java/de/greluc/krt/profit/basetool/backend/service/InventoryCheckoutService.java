@@ -77,31 +77,12 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Write side of the inventory aggregate — the checkout / book-out / rebook / bulk-mutation flows
- * that consume, move, sell or wipe squadron stock.
+ * Write side of the inventory: book-out, rebooking, stock merge, bulk checkout, delivered toggle
+ * and the admin global wipe.
  *
- * <p>Extracted from {@code InventoryItemService} (#921, L2) as the mutating cluster of the former
- * god-class: the book-out flow ({@link #bookOutInventoryItem} with its per-type {@link
- * #bookOutTransfer} / {@link #createSaleFinanceEntries} branches and the {@link #recordBookOutTail}
- * audit tail), the personal↔shared rebooking ({@link #rebookPersonal}), the bulk checkout ({@link
- * #bulkCheckout}), the delivered-flag toggle ({@link #updateDelivered}) and the admin global-wipe
- * ({@link #deleteAllGlobalInventory}). {@code InventoryItemService} keeps the identical public
- * method signatures and delegates to this service, so controllers and callers are unchanged.
- *
- * <p>Concurrency-relevant (CLAUDE.md): inventory is <em>append-only</em> — book-out {@code
- * TRANSFER} and {@code rebookPersonal} always insert a new target row and decrement (or delete) the
- * source row, never folding into an existing stack, which removes the read-add-write race a merge
- * path would carry. {@link #bulkCheckout} follows the bulk-update-after-loop discipline: the loop
- * only locks and ownership-checks each row, then all ids are deleted in a single batch, their
- * job-order / mission allocations cascading away with them (V217). {@link
- * #deleteAllGlobalInventory} is a one-shot bulk {@code DELETE} (the load-bearing FK was dropped in
- * {@code V64}), so no clearing loop is required. Partial book-outs / rebookings {@code
- * saveAndFlush} the reduced source row so its {@code @Version} stays current within the transaction
- * and a follow-up in-place edit cannot 409 (REQ-FE-003).
- *
- * <p>Each public method opens its own read-write {@code @Transactional} (the class carries no
- * class-level {@code readOnly} default), so a mutating method is never accidentally trapped in a
- * read-only transaction.
+ * <p>Inventory is append-only: a transfer or rebooking inserts a new row and decrements or deletes
+ * the source, and only {@link #mergeStockIfRequested} folds rows together. Partial moves {@code
+ * saveAndFlush} the reduced source so its {@code @Version} stays current (REQ-FE-003).
  */
 @Slf4j
 @Service
@@ -109,11 +90,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class InventoryCheckoutService {
 
   /**
-   * Tolerance used when comparing inventory amounts that are stored as {@code double}. Mirrors
-   * {@code JobOrderHandoverService.QUANTITY_EPSILON} — both services compare the same quantity
-   * column on {@link de.greluc.krt.profit.basetool.backend.model.InventoryItem} so they need the
-   * same rounding-safe threshold. Anything below 1e-4 is floating-point noise (quantities are
-   * user-edited at three decimals max), not a real residual.
+   * Tolerance for comparing {@code double} inventory amounts; smaller differences are
+   * floating-point noise, since quantities carry at most three decimals.
    */
   private static final double QUANTITY_EPSILON = 1e-4;
 
@@ -138,23 +116,17 @@ public class InventoryCheckoutService {
   private final AuditService auditService;
 
   /**
-   * Consumes or transfers an inventory item.
+   * Discards, transfers or sells part of an inventory item, deleting the row when the remainder
+   * falls below {@link #QUANTITY_EPSILON}.
    *
-   * <p>The {@code type} discriminator selects: DISCARD (just decrement), TRANSFER (decrement here,
-   * then insert a new row for the moved quantity at the target location/owner — inventory is
-   * append-only, so the moved stock is never folded into an existing target stack), SELL (decrement
-   * here, create a finance entry for the participant). When {@code type} is {@code null} it is
-   * inferred from the presence of a target (TRANSFER when a target user/location is given, else
-   * DISCARD); an <em>explicit</em> {@code TRANSFER} carrying neither target is rejected up front so
-   * it can never fall through and silently consume the source stock (REQ-INV-025). When the
-   * post-decrement quantity is below {@link #QUANTITY_EPSILON} the row is removed entirely.
+   * <p>A {@code null} type is inferred: {@code TRANSFER} when a target user or location is given,
+   * otherwise {@code DISCARD}. A transfer inserts a new row at the target; a sale books mission
+   * income.
    *
    * @throws NotFoundException when the item is unknown
-   * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when the requested
-   *     amount exceeds the available quantity, when a fractional amount is booked off a whole-unit
-   *     row (PIECE material / item stock) without depleting it entirely, when a SELL is missing its
-   *     terminal or a valid sell amount, or when a {@code TRANSFER} carries neither a target user
-   *     nor a target location
+   * @throws de.greluc.krt.profit.basetool.backend.exception.BadRequestException when the amount
+   *     exceeds the stock, is fractional on a whole-unit row without depleting it, a sale lacks its
+   *     terminal or amount, or a {@code TRANSFER} has no target
    */
   @Nullable
   @Transactional
@@ -268,18 +240,16 @@ public class InventoryCheckoutService {
   }
 
   /**
-   * Applies the {@code TRANSFER} book-out branch: an append-only move of {@code dto.amount()} to
-   * the resolved target user / location / owning-org-unit pool (a new row is inserted, never folded
-   * into an existing target stack), decrementing the source row (deleting it when it depletes below
-   * {@link #QUANTITY_EPSILON}), and records the transfer audit event.
+   * Books out a {@code TRANSFER}: inserts a new row for {@code dto.amount()} at the target,
+   * decrements or deletes the source, and records the audit event.
    *
    * @param item the managed source row
-   * @param dto the book-out request (target user/location/org-unit + amount)
+   * @param dto the book-out request (target user/location/org-unit and amount)
    * @param remainingAmount the source's post-decrement amount (already rounded)
    * @param sourceId the source row id snapshot
    * @param sourceLabel the source row's {@code material @ location} label snapshot
    * @param materialName the material name snapshot
-   * @param depleted whether the source row depletes to zero (audit detail)
+   * @param depleted whether the source row depletes to zero
    * @return the DTO of the newly created target row
    * @throws NotFoundException when the target user or location is unknown
    * @throws BadRequestException when the transfer changes neither user nor location
@@ -360,27 +330,17 @@ public class InventoryCheckoutService {
   }
 
   /**
-   * Books the coupled per-mission income for a {@code SELL} book-out (Variante C, REQ-INV-027). The
-   * proceeds follow the sale's mission "deduct from" plan: each mission the seller took sold SCU
-   * out of is credited a share of {@code dto.sellAmount()} proportional to that SCU — {@code
-   * sellAmount × deductedScu / totalSoldScu} — as one squadron {@code INCOME} {@link
-   * MissionFinanceEntry}. The uncredited remainder (SCU taken from the mission rest, plus any
-   * deducted from a mission the seller does not participate in) stays the seller's personal
-   * proceeds; no separate money-attribution input exists. An empty plan (nothing deducted from a
-   * mission earmark) is a fully-personal sale.
+   * Books the mission income of a {@code SELL} book-out (REQ-INV-027): each mission the sold SCU
+   * was deducted from gets {@code sellAmount × deductedScu / totalSoldScu} as a squadron {@code
+   * INCOME} {@link MissionFinanceEntry}. Shares of missions the seller does not participate in, and
+   * SCU not taken from a mission, stay the seller's personal proceeds. Must run before the
+   * reductions are applied.
    *
-   * <p>Read the mission slices BEFORE the reductions are applied (which shrinks / removes them). A
-   * mission the seller does not participate in cannot receive a {@link MissionFinanceEntry} (it
-   * structurally requires a {@link MissionParticipant}), so that share simply falls to personal
-   * rather than being an error.
-   *
-   * @param item the managed source row (its mission allocations loaded within the tx)
-   * @param dto the book-out request (read for the sell amount, terminal, total sold amount)
+   * @param item the managed source row with its mission allocations
+   * @param dto the book-out request (sell amount, terminal, total sold amount)
    * @param currentUserId the selling participant's user id
-   * @param missionReductions the resolved mission plan (missionId → deducted SCU), unique per
-   *     mission
-   * @return the created finance-entry ids (read off the managed entities, so a unit-test mock's
-   *     null {@code save()} return does not matter); empty for a fully-personal sale
+   * @param missionReductions the mission plan (missionId to deducted SCU)
+   * @return the created finance-entry ids; empty for a fully personal sale
    */
   @NotNull
   private List<UUID> createSaleFinanceEntries(
@@ -434,16 +394,14 @@ public class InventoryCheckoutService {
   }
 
   /**
-   * Carries the reduced tags of a transfer onto the moved row ("Marken mitnehmen", REQ-INV-027):
-   * each planned reduction becomes a same-size earmark on {@code target}, inheriting the source
-   * order slice's delivered flag. Must run BEFORE the reductions are applied, which shrinks the
-   * source slices, since it reads their managed {@code JobOrder} / {@code Mission} and delivered
-   * state.
+   * Copies the reduced earmarks of a transfer onto the moved row as same-size earmarks, inheriting
+   * each job-order slice's delivered flag (REQ-INV-027). Must run before the reductions are
+   * applied.
    *
-   * @param source the source row whose slices are read for the tags; never {@code null}
+   * @param source the source row whose slices are read; never {@code null}
    * @param target the freshly built moved row to earmark; never {@code null}
-   * @param orderReductions the job-order plan (orderId → SCU)
-   * @param missionReductions the mission plan (missionId → SCU)
+   * @param orderReductions the job-order plan (orderId to SCU)
+   * @param missionReductions the mission plan (missionId to SCU)
    */
   private void applyTransferInherit(
       InventoryItem source,
@@ -469,9 +427,8 @@ public class InventoryCheckoutService {
   }
 
   /**
-   * Records the audit event for the consume/sell tail of {@link #bookOutInventoryItem} (the
-   * transfer branch records its own event). SELL events carry the
-   * terminal/sell-amount/finance-entry; DISCARD events carry the consumed/remaining amounts.
+   * Records the audit event of a {@code DISCARD} or {@code SELL} book-out; a sale carries terminal,
+   * amount and finance entries, a discard the consumed and remaining amounts.
    *
    * @param type the resolved checkout type (never {@code TRANSFER} here)
    * @param sourceId the source row id (snapshotted before a possible delete)
@@ -480,8 +437,7 @@ public class InventoryCheckoutService {
    * @param ownerId the source row owner's id
    * @param dto the book-out request (read for terminal/sell amount)
    * @param remaining the post-decrement amount (0 when the row was depleted)
-   * @param financeEntryIds the created per-mission finance entry ids for a SELL (empty for a
-   *     fully-personal sale that credited no mission)
+   * @param financeEntryIds the finance entry ids created for a sale (empty otherwise)
    */
   private void recordBookOutTail(
       CheckoutType type,
@@ -526,33 +482,21 @@ public class InventoryCheckoutService {
   }
 
   /**
-   * Rebooks (Umbuchung) part or all of an inventory row between the owner's personal pool and the
-   * shared squadron pool by toggling its {@code personal} marker (REQ-INV-007).
+   * Moves part or all of a row between the owner's personal pool and the shared squadron pool
+   * (Umbuchung, REQ-INV-007). The direction follows the source row's current {@code personal} flag;
+   * the moved amount becomes a new row and the source is decremented or deleted.
    *
-   * <p>The direction is derived from the source row's current {@code personal} flag, never from the
-   * caller: a {@code personal = true} source is <em>de-personalized</em> (the moved quantity
-   * becomes shared squadron stock stamped on {@code dto.targetOwningOrgUnitId()}'s pool); a {@code
-   * personal = false} source is <em>personalized</em> (the moved quantity becomes the owner's
-   * private stock, carrying the source row's existing org-unit stamp over). Either way this is an
-   * append-only split mirroring the book-out {@code TRANSFER} branch: the moved {@code amount} is
-   * decremented off the source (the source row is deleted when it depletes below {@link
-   * #QUANTITY_EPSILON}) and inserted as its own new row with the opposite {@code personal} flag —
-   * never folded into an existing stack (REQ-INV-001).
-   *
-   * <p>The personalize direction refuses a source row bound to a job order or mission: a {@code
-   * personal = true} row may never carry either association (the invariant {@code
-   * InventoryItemService.createInventoryItem} and the allocation writes also enforce), and silently
-   * dropping the link would lose the assignment.
+   * <p>Personalizing a row earmarked for a job order or mission is refused.
    *
    * @param id the source inventory row id
    * @param dto the rebooking payload (amount, version, target org-unit pool)
    * @param currentUserId the authenticated caller's user id
-   * @param isAdmin whether the caller holds an admin role (bypasses the owner check)
-   * @return the persisted new-row DTO (the moved quantity in its new pool)
+   * @param isAdmin whether the caller is an admin (bypasses the owner check)
+   * @return the DTO of the new row
    * @throws NotFoundException when the source row or the picked org unit is unknown
-   * @throws BadRequestException when the amount is non-positive, exceeds the available quantity, is
-   *     fractional on a whole-unit row (PIECE material / item stock) without moving the row's exact
-   *     remaining amount, or a personalize would violate the personal/association invariant
+   * @throws BadRequestException when the amount is non-positive, exceeds the stock, is fractional
+   *     on a whole-unit row without moving the whole remainder, or a personalize would break the
+   *     no-earmark rule
    */
   @Transactional
   public InventoryItemDto rebookPersonal(
@@ -642,36 +586,17 @@ public class InventoryCheckoutService {
   }
 
   /**
-   * Folds a just-written warehouse row into a single merged stack when the merge applies
-   * (REQ-INV-026), and returns the surviving row (or the unchanged input when nothing merges).
+   * Folds every other row with the same physical stock identity into {@code row} (REQ-INV-026):
+   * amounts summed, distinct notes concatenated, earmarks unioned, siblings deleted.
    *
-   * <p>The merge runs <em>unconditionally</em> for a {@code PIECE} material and for a game-item row
-   * (item stock follows the PIECE whole-unit auto-merge rule, REQ-INV-029 — the client flag is
-   * irrelevant for both), and for an {@code SCU} material only when {@code clientRequestedMerge} is
-   * {@code true} — the per-action modal opt-in the caller ticked for this single write; it is never
-   * persisted. The survivor is the passed-in {@code row}: every other row that shares its
-   * <em>physical</em> stock identity (Variante C, REQ-INV-027: user · catalog reference · location
-   * · quality · personal · owningOrgUnit — the earmarks are NO longer part of the key; a game-item
-   * stack keys on the game item with material and quality {@code NULL}) is folded into it — amounts
-   * summed, distinct notes concatenated, their job-order / mission allocations unioned into the
-   * survivor (summed per target, job-order delivered OR-combined, rule R1) — and deleted. The merge
-   * group is loaded {@code FOR UPDATE} so two racing same-stack writers serialise (re-introducing,
-   * only here, the lock the append-only model of ADR-0003 removed).
+   * <p>Always applies to {@code PIECE} materials and game items; for {@code SCU} only when {@code
+   * clientRequestedMerge} is set. The group is locked {@code FOR UPDATE}, and rows backing a
+   * Materialbörse offer are never changed or folded. Must run inside the caller's transaction.
    *
-   * <p><strong>Materialbörse safety:</strong> a row that itself backs an offer is returned
-   * untouched (never a survivor that changes, never folded away), and offer-backed sibling rows are
-   * excluded by the query. This honours "a merge never changes a Materialbörse entry" (REQ-MARKET)
-   * and avoids the {@code ON DELETE CASCADE} FK (V210) silently destroying an offer.
-   *
-   * <p>Propagation is {@code MANDATORY}: this must join the caller's read-write transaction (the
-   * create / book-out transfer / personal rebook / bulk rebook / production book-in flow), never
-   * open its own.
-   *
-   * @param row the just-created / just-inserted target row (managed); the merge survivor.
+   * @param row the just-written target row (managed); the merge survivor
    * @param clientRequestedMerge the per-action opt-in for an {@code SCU} material (ignored for
-   *     {@code PIECE} materials and game-item rows, which always merge).
-   * @return the surviving merged row (== {@code row}) with the summed amount and combined notes, or
-   *     {@code row} unchanged when the merge does not apply or finds no matching sibling.
+   *     {@code PIECE} materials and game-item rows)
+   * @return {@code row}, merged or unchanged
    */
   @Transactional(propagation = Propagation.MANDATORY)
   public InventoryItem mergeStockIfRequested(
@@ -743,12 +668,10 @@ public class InventoryCheckoutService {
   }
 
   /**
-   * Whether a row's catalog kind restricts its amounts to whole units: game-item rows always
-   * (REQ-INV-029) and material rows measured in {@code PIECE}. Null-safe on both catalog
-   * references, so it can be asked of any loaded row.
+   * Whether a row's amounts must be whole numbers: game-item rows and {@code PIECE} material rows.
    *
-   * @param item the inventory row.
-   * @return {@code true} iff amounts on this row must be whole numbers.
+   * @param item the inventory row
+   * @return {@code true} iff amounts on this row must be whole numbers
    */
   private static boolean requiresWholeUnits(@NotNull InventoryItem item) {
     return item.getGameItem() != null
@@ -757,12 +680,11 @@ public class InventoryCheckoutService {
   }
 
   /**
-   * User-facing 400 detail for a fractional amount on a whole-unit row, naming the row's actual
-   * catalog kind — "PIECE materials" on a game-item row would be misleading because item rows carry
-   * no material at all (REQ-INV-029).
+   * Builds the 400 detail for a fractional amount on a whole-unit row, naming the row's catalog
+   * kind.
    *
-   * @param item the whole-unit row the amount was rejected for.
-   * @return the catalog-appropriate problem detail.
+   * @param item the whole-unit row the amount was rejected for
+   * @return the catalog-appropriate problem detail
    */
   @NotNull
   private static String wholeUnitAmountDetail(@NotNull InventoryItem item) {
@@ -772,13 +694,11 @@ public class InventoryCheckoutService {
   }
 
   /**
-   * Null-safe catalog display name of a row for audit/finance snapshots: the material name for a
-   * material row, the game-item name for a game-item row (REQ-INV-029), an em dash for an orphaned
-   * row missing both. Mirrors {@link InventoryAuditLabels#label(InventoryItem)}'s catalog branch
-   * without the location suffix.
+   * Returns a row's catalog display name for audit and finance snapshots: the material or game-item
+   * name, or an em dash when neither is set.
    *
-   * @param item the inventory row (associations lazily loaded but must be within the tx).
-   * @return the row's catalog display name.
+   * @param item the inventory row, read within the transaction
+   * @return the row's catalog display name
    */
   private static String catalogName(InventoryItem item) {
     if (item.getMaterial() != null) {
@@ -818,18 +738,12 @@ public class InventoryCheckoutService {
   }
 
   /**
-   * Ratchets down any active Materialbörse offer on a Lager row to the row's reduced stock in the
-   * decrementing transaction (REQ-MARKET-013/014) — kind-aware: a {@code MATERIAL} offer clamps its
-   * SCU {@code offeredAmount}, a stock-backed {@code ITEM} offer its whole-unit {@code
-   * itemQuantity} (the item clamp floors the stock to whole units — item stock is integral). Each
-   * atomic conditional update is a no-op for the other kind and for a row backing no offer, so
-   * invoking both at every decrement site is correct: a material row can back only a material
-   * offer, a game-item row only an item offer. Both are plain {@code @Modifying} updates (no {@code
-   * clearAutomatically}), so neither detaches the persistence context — safe to call after the
-   * saveAndFlush of the reduced row.
+   * Clamps any active Materialbörse offer on a Lager row down to the row's reduced stock
+   * (REQ-MARKET-013): SCU for a material offer, whole units for an item offer. A no-op for rows
+   * backing no offer; does not detach the persistence context.
    *
-   * @param itemId the backing Lager row whose active offer to clamp.
-   * @param stock the row's new (reduced) stock.
+   * @param itemId the backing Lager row whose active offer to clamp
+   * @param stock the row's new (reduced) stock
    */
   private void ratchetBoardOffersToStock(UUID itemId, double stock) {
     materialExchangeOfferRepository.clampOfferedAmountToStock(itemId, stock);
@@ -837,16 +751,8 @@ public class InventoryCheckoutService {
   }
 
   /**
-   * Removes every non-personal inventory item from the database — the admin "globales Lager leeren"
-   * action. Personal entries ({@code personal = true}) are kept on purpose: they belong to
-   * individual users and live outside the squadron's shared stock.
-   *
-   * <p>Implemented as a single bulk {@code DELETE} via {@link
-   * InventoryItemRepository#deleteAllNonPersonal}. The previously load-bearing FK {@code
-   * job_order_handover_item.inventory_item_id} was dropped in migration {@code V64} (handover rows
-   * snapshot the material data directly), so no pre-cleanup of dependent rows is needed and no
-   * {@code @Modifying(clearAutomatically = true)} loop is required — the operation is a one-shot
-   * bulk statement that does not collide with any sibling-aggregate {@code @Version}.
+   * Deletes every non-personal inventory item in one bulk statement (the admin "globales Lager
+   * leeren" action). Personal rows are kept.
    *
    * @return number of inventory rows deleted (0 if the global inventory was already empty)
    */
@@ -878,11 +784,8 @@ public class InventoryCheckoutService {
   }
 
   /**
-   * Bulk-checkout: removes all inventory items with the given IDs that belong to the authenticated
-   * user. Each row is loaded {@code FOR UPDATE} and ownership-checked inside the loop, which writes
-   * nothing; the single {@code deleteAllById} happens after the loop, in one batch. The rows'
-   * job-order / mission allocations cascade away with them (FK {@code ON DELETE CASCADE}, V217), so
-   * no per-row association clear is needed.
+   * Deletes all listed inventory items owned by the caller in one batch, after locking and
+   * ownership-checking each row. Their earmarks are removed by cascade.
    *
    * @param request the bulk checkout request containing item IDs
    * @param currentUserId the UUID of the authenticated user (JWT sub)
@@ -925,39 +828,12 @@ public class InventoryCheckoutService {
   }
 
   /**
-   * Bulk rebooking (Massen-Umbuchen, REQ-INV-036): moves every listed row of the caller's own
-   * inventory in one action — to another location / owner ({@link BulkRebookMode#LOCATION}) or
-   * across the personal marker ({@link BulkRebookMode#PERSONALIZE} / {@link
-   * BulkRebookMode#DEPERSONALIZE}). Each row moves in <em>full</em>; there is no per-row amount, so
-   * every moved row inherits all of its job-order / mission earmarks unchanged and no source
-   * remainder is ever left behind.
+   * Moves every listed row of the caller's inventory in full, to another location or owner or
+   * across the personal marker (Massen-Umbuchen, REQ-INV-036). Moved rows keep all their earmarks.
    *
-   * <p><strong>Skip vs. abort.</strong> A row that already sits in the requested target state —
-   * same user <em>and</em> location for {@code LOCATION}, already personal / already shared for the
-   * two personal modes — is <em>skipped</em> and counted, not treated as an error: a "Alle
-   * markieren" selection (REQ-INV-034) spans the whole filtered view, so it routinely contains rows
-   * that are already at the destination, and failing the action on them would make bulk rebooking
-   * unusable. Every <em>other</em> obstacle — an unknown id, a row owned by someone else, or a
-   * job-order / mission earmark blocking a {@code PERSONALIZE} — aborts the whole transaction so
-   * nothing is written, mirroring {@link #bulkCheckout}. The returned counts therefore never hide a
-   * failure.
-   *
-   * <p>Concurrency: the selection carries no client {@code @Version} to echo (the bulk bar holds
-   * only ids, and its server-resolved select-all set never carries versions), so each row is loaded
-   * under a pessimistic write lock via {@link InventoryItemRepository#findByIdForRebook} — the row
-   * lock, not an optimistic token, is what serialises two concurrent writers. The ids are
-   * deduplicated and locked in a deterministic (sorted) order so two concurrent bulk rebookings
-   * over overlapping selections cannot deadlock by grabbing the same rows in opposite orders. The
-   * whole selection is loaded and validated before the first write, which keeps a mid-loop abort
-   * from depending on how far the loop had got and lets the earmark rejection name the exact count.
-   *
-   * <p>Follows the bulk-update-after-loop discipline: the per-row writes go through JPA
-   * saves/deletes and {@link #mergeStockIfRequested} only — no {@code @Modifying(clearAutomatically
-   * = true)} query runs inside the loop, so the persistence context is never detached
-   * mid-iteration. Each source row is removed entirely (a full move always depletes it), so its
-   * allocations cascade away (FK {@code ON DELETE CASCADE}, V217) and no Materialbörse ratchet is
-   * needed — as with the single full-amount transfer, an offer backed by a moved row cascades away
-   * with it.
+   * <p>Rows already in the target state are skipped and counted; any other obstacle aborts the
+   * whole transaction. Rows are locked pessimistically in sorted id order and validated before the
+   * first write.
    *
    * @param request the selection, the mode and the mode's target fields
    * @param currentUserId the authenticated caller's user id; every listed row must belong to them
@@ -1098,9 +974,8 @@ public class InventoryCheckoutService {
   }
 
   /**
-   * Whether a row already sits at the requested transfer target and therefore has nothing to move —
-   * the {@code LOCATION} skip predicate. Mirrors the single transfer's "must change either the user
-   * or the location" rule (which rejects); in bulk the same situation is a skip.
+   * Whether a row already sits at the requested transfer target, so a {@code LOCATION} bulk
+   * rebooking skips it.
    *
    * @param item the source row
    * @param targetUser the row's resolved destination owner (never {@code null})
@@ -1121,13 +996,8 @@ public class InventoryCheckoutService {
 
   /**
    * The {@link BulkRebookMode#PERSONALIZE} / {@link BulkRebookMode#DEPERSONALIZE} branch of {@link
-   * #bulkRebook}: moves every row to the requested personal state. Rows already in that state are
-   * skipped.
-   *
-   * <p>Personalizing is refused for the whole selection when any row carries a job-order or mission
-   * earmark — a {@code personal = true} row may never hold either association, and silently
-   * dropping the link would lose the assignment. The check runs across all rows before the first
-   * write so the rejection can name how many rows block it rather than only the first one found.
+   * #bulkRebook}: moves every row to the requested personal state, skipping rows already there.
+   * Personalizing is refused for the whole selection when any row carries an earmark.
    *
    * @param rows the locked, owned source rows
    * @param request the bulk request (read for the org-unit pick)
@@ -1181,14 +1051,9 @@ public class InventoryCheckoutService {
   }
 
   /**
-   * Moves one row of a bulk rebooking in full: inserts the target row carrying the source's entire
-   * quantity and all of its earmarks, then removes the (now empty) source.
-   *
-   * <p>Append-only, exactly like the single-row transfer / rebooking: the moved quantity is
-   * inserted as its own row and only then optionally folded into a matching target stack by {@link
-   * #mergeStockIfRequested}. Because the whole quantity moves, the source always depletes and is
-   * deleted — its allocations cascade away (V217) after being copied onto the target, and no
-   * remainder is left to ratchet a Materialbörse offer against.
+   * Moves one row of a bulk rebooking in full: inserts a target row with the source's whole
+   * quantity and earmarks, optionally merges it via {@link #mergeStockIfRequested}, and deletes the
+   * source.
    *
    * @param source the locked source row
    * @param targetUser the destination owner

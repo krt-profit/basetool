@@ -30,11 +30,8 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
- * Pins the inert default of the tracing instrumentation (REQ-OBS-009, epic #936 Phase 1b): with
- * {@code MONITORING_TRACING_ENABLED} unset, {@code management.opentelemetry.enabled} is {@code
- * false} and the OpenTelemetry starter on the classpath must contribute nothing — no SDK tracer
- * provider, no span exporter, and therefore no network export attempts or exporter errors in
- * dev/test/e2e or a prod host without the monitoring stack.
+ * Verifies that with {@code management.opentelemetry.enabled=false} no tracer provider or span
+ * exporter is created (REQ-OBS-009).
  */
 @SpringBootTest(properties = "management.opentelemetry.enabled=false")
 class MonitoringTracingInertTest {

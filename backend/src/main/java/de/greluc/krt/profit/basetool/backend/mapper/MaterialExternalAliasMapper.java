@@ -34,12 +34,10 @@ import org.mapstruct.Mapping;
 public interface MaterialExternalAliasMapper {
 
   /**
-   * Maps an entity to its DTO. Denormalises {@code material.id} / {@code material.name} into flat
-   * fields so the admin table view does not need to traverse the lazy {@code Material} association
-   * after the response leaves the transaction boundary.
+   * Maps an alias entity to its DTO, flattening {@code material.id} and {@code material.name}.
    *
-   * @param entity persistent alias row
-   * @return DTO suitable for direct JSON serialisation
+   * @param entity the persistent alias row
+   * @return the DTO
    */
   @Mapping(target = "materialId", source = "material.id")
   @Mapping(target = "materialName", source = "material.name")

@@ -29,20 +29,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Read-only integrity sweep over the ordered-item lines of {@code ITEM} job orders
- * (REQ-ORDERS-033), mirroring {@link BankLedgerIntegrityService}'s shape: {@link #verify()}
- * collects the violations, logs each at {@code ERROR}, and hands the caller a report whose sizes
- * feed the integrity gauges.
+ * Read-only integrity sweep that finds ordered-item lines of {@code ITEM} job orders whose
+ * blueprint no longer produces the line's game item (REQ-ORDERS-033).
  *
- * <p>The invariant it guards is the one the write path can only enforce <em>at write time</em>: an
- * ordered-item line's blueprint must produce that line's game item. {@code
- * de.greluc.krt.profit.basetool.backend.service.scwiki.ScWikiBlueprintSyncService} re-resolves
- * every blueprint's output item from the Wiki feed on each run, so an upstream correction can
- * re-point a blueprint at a different item long after the order was placed. The line keeps its old
- * {@code blueprint_id} and its snapshotted materials then mirror a foreign recipe — with no error,
- * no audit event and, before this sweep, no signal at all. Detection is deliberately non-mutating:
- * silently re-pointing a line at another recipe would change what people have to supply, so the fix
- * stays a human decision (re-saving the order re-derives the line).
+ * <p>Findings are logged at {@code ERROR} and reported for the integrity gauges; nothing is
+ * repaired, since re-pointing a line would change what people have to supply.
  */
 @Service
 @RequiredArgsConstructor
@@ -53,8 +44,8 @@ public class JobOrderIntegrityService {
   private final JobOrderItemRepository jobOrderItemRepository;
 
   /**
-   * Runs the sweep: queries the drifted ordered-item lines and logs one {@code ERROR} per finding
-   * with the order's display id, the ordered item, and what its blueprint produces now.
+   * Runs the sweep and logs one {@code ERROR} per drifted line with the order's display id, the
+   * ordered item and what its blueprint produces now.
    *
    * @return the report; {@link IntegrityReport#isClean()} is {@code true} when nothing drifted
    */

@@ -37,20 +37,9 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * The one property of the admin Personensuche that needs seeded rows to prove: <b>it matches
- * case-insensitively, in both directions</b> (REQ-SEC-060, ADR-0184).
- *
- * <p>The casing the admin types and the casing the row happens to hold are independent of each
- * other. That is not a nicety. The search exists so that an Art. 16 rectification or a granted Art.
- * 17 erasure can cover <em>every</em> mention of a name, and a name written into free text six
- * months ago is written the way its author felt like writing it. A search that only matched the
- * typed casing would answer "no further mentions" and be wrong — the one failure mode this surface
- * must not have, because nothing downstream would reveal it.
- *
- * <p>The registry's completeness, the validity of its statements against the live schema, the
- * minimum term length and the wildcard escaping are asserted by {@link
- * de.greluc.krt.profit.basetool.backend.repository.PersonSearchCoverageTest} and are deliberately
- * not repeated here.
+ * Verifies that the admin Personensuche matches case-insensitively in both directions (REQ-SEC-060,
+ * ADR-0184); coverage and escaping are tested in {@link
+ * de.greluc.krt.profit.basetool.backend.repository.PersonSearchCoverageTest}.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -165,9 +154,6 @@ class PersonSearchIntegrationTest {
 
   /**
    * Searches for a term and keeps only the hits on one {@code app_user} column.
-   *
-   * <p>Narrowed to a single column because the assertions count seeded rows, and a seeded member
-   * matches in both of the columns this class writes.
    *
    * @param term the search term
    * @param column the {@code app_user} column to keep

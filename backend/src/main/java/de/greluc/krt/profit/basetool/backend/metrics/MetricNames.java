@@ -20,17 +20,11 @@
 package de.greluc.krt.profit.basetool.backend.metrics;
 
 /**
- * Single source of truth for the backend {@code basetool_*} business-metric names, tag keys and the
- * bounded tag values that are not already an application enum (REQ-OBS-011).
+ * Backend {@code basetool_*} business-metric names, tag keys and bounded tag values (REQ-OBS-011).
  *
- * <p>Meter <em>names</em> are declared in Micrometer's dotted convention; the Prometheus scrape
- * renders each dot as an underscore and appends the type/base-unit suffix, so {@code
- * basetool.scheduled.job.executions} surfaces as {@code basetool_scheduled_job_executions_total}.
- * The resulting Prometheus name is noted on each constant.
- *
- * <p>Every tag value used with these meters must come from a bounded, enumerable set (an
- * application enum such as {@code AuditDomain} / {@link ScheduledJob}, or one of the value
- * constants below) — never a username, id, path or other free/unbounded string (REQ-OBS-006).
+ * <p>Names use Micrometer's dotted convention; Prometheus renders dots as underscores and appends
+ * the type suffix. Every tag value must come from a bounded set (an application enum such as {@link
+ * ScheduledJob}, or a constant below), never a free string (REQ-OBS-006).
  */
 public final class MetricNames {
 
@@ -51,56 +45,26 @@ public final class MetricNames {
    * Gauge {@code basetool_scheduled_job_enabled} — {@code 1} while this job is configured to run,
    * tag {@code task}.
    *
-   * <p><b>What it is for.</b> The last-success gauge is registered lazily, on a job's first
-   * success, so {@code absent(last_success)} means "has never succeeded" — which covers two very
-   * different states: a job that is wedged, and a job that was switched off on purpose and was
-   * never going to run. All ten wrapped jobs can be switched off by configuration, and the {@code
-   * absent()} legs of the staleness alerts could not tell the two apart: following the documented
-   * instruction to disable a retention sweep before its first irreversible run raised a permanent
-   * warning for doing what the documentation asked.
-   *
-   * <p>Published at startup by each job's own bean, which is what makes it reliable — a bean
-   * {@code @ConditionalOnProperty} never created publishes nothing, and that absence is the signal.
-   * {@code ScWikiScheduler} is the one job whose switch is a runtime property rather than bean
-   * existence and publishes only when that property is on, which is why the metric means "this job
-   * is configured to run" rather than "this bean exists".
+   * <p>Published at startup by the job's own bean, so its absence means the job is switched off and
+   * lets staleness alerts tell "never succeeded" from "disabled on purpose".
    */
   public static final String SCHEDULED_JOB_ENABLED = "basetool.scheduled.job.enabled";
 
   /**
    * Counter {@code basetool_scheduled_job_step_failures_total} — tags {@code task}, {@code step}.
-   * Bumped when one step of a multi-step sync job throws and is swallowed so the remaining steps
-   * still run: the umbrella job then records {@code outcome=success} with a non-zero item tally
-   * from the other steps, so a single reliably-failing step is invisible to the outcome / items /
-   * stale signals. Only the SC-Wiki sync is multi-step today; {@code step} is a bounded literal
-   * ({@code commodity} / {@code vehicle} / {@code item} / {@code blueprint} / {@code manufacturer},
-   * REQ-OBS-011).
+   * Bumped when one step of a multi-step sync job throws and is swallowed while the other steps
+   * still run; {@code step} is a bounded literal (REQ-OBS-011).
    */
   public static final String SCHEDULED_JOB_STEP_FAILURES = "basetool.scheduled.job.step.failures";
 
   /**
    * Counter {@code basetool_catalogue_orphan_sweep_skipped_total} — tags {@code sweep}, {@code
-   * reason}. Bumped when a catalogue sync completes but stands its cross-kind orphan sweep down
-   * because the fetch was not a full census. The stand-down is the correct, conservative answer (a
-   * partial fetch must never tombstone rows the feed simply did not hand over), but until this
-   * counter existed it was a log line and nothing else — {@code business.yml} said so in as many
-   * words — so a sweep that had not run for weeks looked exactly like one running cleanly.
+   * reason}. Bumped when a catalogue sync stands its orphan sweep down because the fetch was not a
+   * full census.
    *
-   * <p>{@code reason} is the bounded triple {@link #SWEEP_SKIP_INCOMPLETE} / {@link
-   * #SWEEP_SKIP_NOT_MODIFIED} / {@link #SWEEP_SKIP_NO_ROWS}, and the split is load-bearing rather
-   * than decorative: an all-304 run is a <em>healthy</em> fully-cached run that also stands the
-   * sweep down, so an untagged counter would be non-zero on every healthy day and could carry no
-   * alert.
-   *
-   * <p>{@code sweep} carries exactly one value today, {@link #SWEEP_ITEM} — the cross-kind
-   * game-item sweep, the one the 2026-09-02 export showed standing down. The four other catalogue
-   * sweeps (vehicle, commodity, blueprint, manufacturer) stand down through the same gates and are
-   * <strong>not</strong> instrumented yet; three of them go through the static {@code
-   * ScWikiOrphanSweep} helper, which would need a skip callback threaded in from each caller. Said
-   * plainly here rather than left to be inferred from an alert that quietly watches one catalogue:
-   * {@code ScWikiOrphanSweepStandingDown} is blind to the other four, and {@code
-   * ScWikiCensusIncompleteStreak}'s fetch-error proxy is what still covers them. Bounded literal
-   * set either way (REQ-OBS-011).
+   * <p>{@code reason} is {@link #SWEEP_SKIP_INCOMPLETE} / {@link #SWEEP_SKIP_NOT_MODIFIED} / {@link
+   * #SWEEP_SKIP_NO_ROWS}; {@code sweep} is {@link #SWEEP_ITEM}, the only instrumented sweep
+   * (REQ-OBS-011).
    */
   public static final String CATALOGUE_ORPHAN_SWEEP_SKIPPED =
       "basetool.catalogue.orphan.sweep.skipped";
@@ -108,15 +72,7 @@ public final class MetricNames {
   /**
    * Gauge {@code basetool_redis_fanout_subscribed} — tag {@code fanout} ({@code livesync} / {@code
    * notifications}); 1 while the cross-instance pub/sub container is listening, 0 while it is not.
-   *
-   * <p>Exists because the failure it watches used to be loud and is now quiet. Until 2026-09-02 a
-   * Redis that was unreachable during context refresh aborted the refresh outright — the backend
-   * crash-looped, which no metric was needed to notice. {@code
-   * ResilientRedisMessageListenerContainer} makes that survivable, and a fan-out that retries
-   * forever without ever subscribing is otherwise indistinguishable from a healthy one: peers'
-   * changes simply never arrive. Bound to {@code isListening()}, not {@code isRunning()} — the
-   * latter reports the {@code started} flag, which upstream sets <em>before</em> the subscription
-   * can fail and which therefore reads 1 for a container that is subscribed to nothing.
+   * Bound to {@code isListening()}, not {@code isRunning()}.
    */
   public static final String REDIS_FANOUT_SUBSCRIBED = "basetool.redis.fanout.subscribed";
 
@@ -134,38 +90,22 @@ public final class MetricNames {
   /**
    * Counter {@code basetool_keycloak_sync_fetch_failures_total} (untagged). Bumped when the daily
    * user-sync roster fetch against the Keycloak Admin API throws and is swallowed into an empty
-   * list: the sync then records a {@code success} with zero users and {@code UserSyncStale} /
-   * {@code UserSyncZeroItems} stay quiet, so a Keycloak outage is otherwise indistinguishable from
-   * a legitimately empty roster. Access-control-relevant — a stalled sync means departed users keep
-   * their local roles (REQ-OBS-011).
+   * list, which would otherwise look like a legitimately empty roster (REQ-OBS-011).
    */
   public static final String KEYCLOAK_SYNC_FETCH_FAILURES = "basetool.keycloak.sync.fetch.failures";
 
   /**
    * Counter {@code basetool_account_deletion_keycloak_failures_total} (untagged). Bumped when an
    * erasure's local half has committed but the Keycloak user could not be deleted (REQ-SEC-061).
-   *
-   * <p>Access-control-relevant, and the only signal there is. The local row is gone, so the
-   * surviving account cannot show up in {@link #USERS_PENDING_DELETION} — that gauge counts the
-   * opposite orphan, a local row whose Keycloak account has already gone. The person can still log
-   * in, and the reconciliation then creates a fresh row for them: PENDING and refusable for an
-   * ordinary member, but <b>ACTIVE</b> for anyone holding the ADMIN realm role, because the
-   * approval gate carves admins out for bootstrap safety. Normally zero; any increment wants a
-   * human to delete that account in the Keycloak console (REQ-OBS-011).
+   * Normally zero; any increment needs manual deletion in Keycloak (REQ-OBS-011).
    */
   public static final String ACCOUNT_DELETION_KEYCLOAK_FAILURES =
       "basetool.account.deletion.keycloak.failures";
 
   /**
    * Counter {@code basetool_admin_registration_auto_activated_total} (untagged). Bumped when the
-   * reconciliation inserts a brand-new {@code app_user} row that is {@code ACTIVE} on arrival
-   * because the subject holds the Keycloak ADMIN realm role (REQ-SEC-017 bootstrap carve-out).
-   *
-   * <p>The carve-out is deliberate — the first admin must never be lockable out by the approval
-   * gate — but it is the one way an account gains full authority with no admin decision behind it,
-   * and it used to leave no trace at all. Normally zero: an admin account is created once. A
-   * non-zero value is the bootstrap, a re-provisioning, or somebody who was granted the realm role
-   * in Keycloak, and each of those wants a human to confirm it was intended (REQ-OBS-011).
+   * reconciliation inserts a new {@code app_user} row that is {@code ACTIVE} on arrival because the
+   * subject holds the Keycloak ADMIN realm role (REQ-SEC-017). Normally zero (REQ-OBS-011).
    */
   public static final String ADMIN_REGISTRATION_AUTO_ACTIVATED =
       "basetool.admin.registration.auto.activated";
@@ -173,12 +113,6 @@ public final class MetricNames {
   /**
    * Counter {@code basetool_notification_retention_deleted_total} — tag {@code kind} ({@code read}
    * / {@code unread}), the two halves of the inbox retention sweep (REQ-NOTIF-009).
-   *
-   * <p>Beside, not instead of, {@code basetool_scheduled_job_items_total{task=
-   * "notification_retention"}}: that counter is the job's total and stays the job's total, but a
-   * sum of two windows cannot answer "did the unread half delete anything", which is the question a
-   * half that has stopped working raises. The two halves are isolated from each other in the task,
-   * so one can be stuck while the other keeps deleting — and then only a split count shows it.
    */
   public static final String NOTIFICATION_RETENTION_DELETED =
       "basetool.notification.retention.deleted";
@@ -186,40 +120,26 @@ public final class MetricNames {
   /**
    * Counter {@code basetool_user_callsign_collisions_total} (untagged). Bumped when a login
    * presents a subject that matches no {@code app_user} row while another row holds the same {@code
-   * preferred_username} (ADR-0142 point 5, #1639).
+   * preferred_username} (ADR-0142).
    *
-   * <p>Access-control-relevant, and low-volume by nature: it is normally zero. Until this release
-   * the login silently adopted that row, so the case had no signal at all. A sustained non-zero
-   * rate means either a member is being re-provisioned repeatedly, or a Keycloak username is being
-   * reused after a deletion -- both want a human, and the admin queue shows the same collision.
-   * Untagged on purpose: a username is a member's callsign and would be both unbounded and PII
-   * (REQ-OBS-011, REQ-OBS-004).
+   * <p>Normally zero. Untagged because a username is unbounded and PII (REQ-OBS-011, REQ-OBS-004).
    */
   public static final String USER_CALLSIGN_COLLISIONS = "basetool.user.callsign.collisions";
 
   /**
    * Counter {@code basetool_user_sync_failures_total} (untagged). Bumped once per user whose
-   * reconciliation threw during a Keycloak sync run. The batch deliberately swallows such a failure
-   * so one bad row cannot abort the roster, which left the condition with no signal at all beyond a
-   * log line.
-   *
-   * <p>Access-control-relevant: a user that never reconciles keeps whatever roles the local row
-   * last carried, and until #1825 was additionally soft-deleted as though Keycloak had dropped
-   * them. Untagged for the same reason the callsign counter is: the only natural label would be the
-   * account id, which is unbounded (REQ-OBS-011).
+   * reconciliation threw during a Keycloak sync run; such a user keeps its last local roles
+   * (REQ-OBS-011).
    */
   public static final String USER_SYNC_FAILURES = "basetool.user.sync.failures";
 
   /**
    * Counter {@code basetool_user_discord_link_collisions_total} (untagged). Bumped when a
-   * reconciliation would have written a Discord snowflake that a <em>different</em> {@code
-   * app_user} row already holds, and skipped the write instead of failing the unique constraint
-   * (#1826).
+   * reconciliation skips writing a Discord snowflake that a <em>different</em> {@code app_user} row
+   * already holds.
    *
-   * <p>Normally flat zero. A non-zero value means one Discord identity is reachable from two
-   * accounts -- the duplicate-account situation the admin queue's link action resolves -- and it
-   * stays non-zero on every run until a human consolidates them, which is exactly the intent.
-   * Untagged: a snowflake is unbounded and personal data (REQ-OBS-004, REQ-OBS-011).
+   * <p>Normally zero; stays non-zero on every run until the duplicate accounts are consolidated.
+   * Untagged because a snowflake is unbounded personal data (REQ-OBS-004, REQ-OBS-011).
    */
   public static final String USER_DISCORD_LINK_COLLISIONS = "basetool.user.discord.link.collisions";
 
@@ -231,30 +151,22 @@ public final class MetricNames {
 
   /**
    * Counter {@code basetool_bank_audit_events_total} — tag {@code event_type} ({@code
-   * BankAuditEventType}). The bank keeps a physically separate {@code bank_audit_event} table
-   * excluded from {@code AuditDomain}, so this dedicated counter is the bank trail's only volume
-   * signal (counts only — never amounts or holder identities; #1041 item 10, REQ-OBS-011).
+   * BankAuditEventType}). The only volume signal for the separate {@code bank_audit_event} trail;
+   * counts only, never amounts or holder identities (REQ-OBS-011).
    */
   public static final String BANK_AUDIT_EVENTS = "basetool.bank.audit.events";
 
   /**
    * Counter {@code basetool_ratelimit_rejections_total} — tags {@code bucket} and {@code
-   * key_source} ({@link #KEY_SOURCE_FORWARDED} / {@link #KEY_SOURCE_PEER}). The {@code key_source}
-   * tag records where the bucket key came from: a trusted proxy's {@code X-Forwarded-For} chain —
-   * the first untrusted hop walking from the right — or the peer's own address when no proxy is
-   * trusted, the header is absent, or every hop in the chain is itself a trusted proxy. That
-   * distinction decides how to read a 429 spike — forwarded keys mean many real clients behind the
-   * edge tripped their own budgets, peer keys mean everything collapsed onto one shared bucket (a
-   * trusted-proxies misconfiguration or an untrusted hop), which throttles unrelated users
-   * together. Two bounded literals only: the address itself is never exported as a label
-   * (REQ-OBS-004, REQ-OBS-006).
+   * key_source} ({@link #KEY_SOURCE_FORWARDED} / {@link #KEY_SOURCE_PEER}), recording whether the
+   * bucket key came from a trusted proxy's {@code X-Forwarded-For} chain or the peer address. The
+   * address itself is never a label (REQ-OBS-004, REQ-OBS-006).
    */
   public static final String RATELIMIT_REJECTIONS = "basetool.ratelimit.rejections";
 
   /**
    * Counter {@code basetool_ratelimit_requests_total} — tag {@code bucket}. Bumped for <b>every</b>
-   * bucket evaluation (consumed or rejected), so rejections/requests gives a rejection ratio and a
-   * spike surfaces before the 429s alone would (#1041 item 19).
+   * bucket evaluation, consumed or rejected, so rejections/requests gives a rejection ratio.
    */
   public static final String RATELIMIT_REQUESTS = "basetool.ratelimit.requests";
 
@@ -268,44 +180,22 @@ public final class MetricNames {
 
   /**
    * Counter {@code basetool_api_client_requests_total} — tag {@code client_id}. Bumped once per
-   * authenticated {@code /api/**} request with the calling client's {@code azp}, so "which client
-   * software is driving the API" is answerable at all. Until the native app ships, every series but
-   * the web client's is a question worth asking; afterwards this is the only place a request can be
-   * attributed to the app rather than to the browser, and the only signal a client kill switch
-   * could ever act on.
+   * authenticated {@code /api/**} request with the calling client's {@code azp}.
    *
-   * <p>The label is bounded exactly as the ingest gateway bounds its own ({@code
-   * basetool_ingest_client_total}): the {@code azp} is used verbatim only while it names a client
-   * the deployment already knows — one of the client ids {@code ClientAttribution} knows or a
-   * configured ingest gateway — and collapses to {@link #CLIENT_ID_OTHER} otherwise, to {@link
-   * #CLIENT_ID_NONE} when the token carries no {@code azp} at all. Keycloak only ever stamps a
-   * registered client id, but deriving a Prometheus label from a token claim without a bound is the
-   * kind of thing that stays correct until the day it is not (REQ-OBS-006).
+   * <p>The {@code azp} is used verbatim only for a known client id; otherwise it collapses to
+   * {@link #CLIENT_ID_OTHER}, or {@link #CLIENT_ID_NONE} when the token has no {@code azp}
+   * (REQ-OBS-006).
    */
   public static final String API_CLIENT_REQUESTS = "basetool.api.client.requests";
 
   /**
    * Counter {@code basetool_auth_failures_total} — tag {@code reason}: the RFC 6750 bearer error
-   * code the resource server raised ({@link #AUTH_INVALID_TOKEN} / {@link #AUTH_INVALID_REQUEST} /
-   * {@link #AUTH_INSUFFICIENT_SCOPE}), plus {@link #AUTH_NO_CREDENTIALS} for a request that
-   * presented no credential at all and {@link #AUTH_OTHER} for anything left over.
+   * code ({@link #AUTH_INVALID_TOKEN} / {@link #AUTH_INVALID_REQUEST} / {@link
+   * #AUTH_INSUFFICIENT_SCOPE}), {@link #AUTH_NO_CREDENTIALS} for a request with no credential, or
+   * {@link #AUTH_OTHER}.
    *
-   * <p>The {@link #AUTH_NO_CREDENTIALS} split is what makes the counter readable. Without it every
-   * real 401 lands on {@link #AUTH_OTHER} — measured on production 2026-09-13, all 6&nbsp;618 of
-   * them — because a caller with no {@code Authorization} header never produces an {@code
-   * OAuth2AuthenticationException} to carry an RFC code. The dominant series is ordinary background
-   * traffic (the deployment's own blackbox probes answer 401 by design, REQ-OBS-018), so reading
-   * this counter's <em>total</em> as a security signal measures the monitoring plane. {@link
-   * #AUTH_INVALID_TOKEN} is the series that means somebody is presenting credentials that do not
-   * hold, and it is the one a credential-guessing alert watches.
-   *
-   * <p>{@link #HTTP_ERROR}{@code {code="UNAUTHENTICATED"}} already counts the 401s and drives
-   * {@code BackendAuthFailureSpike}; what it cannot say is <em>why</em>. A malformed header, an
-   * expired token, a wrong issuer and a failed audience check are one number there, and the
-   * operator has to raise a log level in production to tell them apart — which on an
-   * internet-facing surface means inviting every anonymous scanner into the log. That cost real
-   * time on the ingest gateway on 2026-08-03; this is the same signal on the backend, added before
-   * its surface becomes public rather than after.
+   * <p>{@link #AUTH_INVALID_TOKEN} is the series a credential-guessing alert watches; missing
+   * credentials are ordinary background traffic.
    */
   public static final String AUTH_FAILURES = "basetool.auth.failures";
 
@@ -313,8 +203,7 @@ public final class MetricNames {
    * Counter {@code basetool_discord_precheck_total} — tag {@code outcome} ({@link
    * #DISCORD_PRECHECK_OK} / {@link #DISCORD_PRECHECK_UNAUTHORIZED} / {@link
    * #DISCORD_PRECHECK_DISABLED}). The endpoint sits outside {@code /api/**}, the rate limiter and
-   * the {@code basetool_http_error} funnel, so without this counter secret-guessing or a broken
-   * secret after rotation is log-only (#1041 item 19).
+   * the {@code basetool_http_error} funnel.
    */
   public static final String DISCORD_PRECHECK = "basetool.discord.precheck";
 
@@ -341,34 +230,22 @@ public final class MetricNames {
 
   /**
    * Gauge {@code basetool_deletion_request_pending_oldest_age_seconds} — how long the
-   * longest-waiting erasure request has waited (REQ-SEC-061).
-   *
-   * <p>The one queue gauge in this class with a <b>statutory</b> threshold behind it: Art. 12(3)
-   * gives the controller one month to respond to a data-subject request, so the alert is set well
-   * inside that rather than at an operational comfort level.
+   * longest-waiting erasure request has waited (REQ-SEC-061). Its alert threshold sits well inside
+   * the one-month statutory deadline of GDPR Art. 12(3).
    */
   public static final String DELETION_REQUEST_PENDING_OLDEST_AGE =
       "basetool.deletion.request.pending.oldest.age";
 
   /**
    * Gauge {@code basetool_users_pending_deletion_count} — accounts present locally but already gone
-   * from Keycloak, i.e. waiting for the second half of their deletion (REQ-SEC-059).
-   *
-   * <p>Not a work queue like the others: nothing enqueues these. The row appears when the roster
-   * sync notices the Keycloak account is gone, and it leaves only when an admin clicks delete in
-   * the member list. A value that stays above zero is a deletion somebody started and did not
-   * finish, which keeps an e-mail address, a handle and a Discord snowflake for a person who has
-   * already left.
+   * from Keycloak, waiting for an admin to complete their deletion (REQ-SEC-059).
    */
   public static final String USERS_PENDING_DELETION = "basetool.users.pending.deletion.count";
 
   /**
    * Gauge {@code basetool_users_pending_deletion_oldest_age_seconds} — how long the longest-waiting
-   * orphaned account has been waiting (REQ-SEC-059).
-   *
-   * <p>Measured from {@code app_user.keycloak_absent_since}, which V241 added because no existing
-   * timestamp carries the fact. Rows that predate V241 were backfilled with the deploy time, so
-   * their age is a lower bound.
+   * orphaned account has been waiting, measured from {@code app_user.keycloak_absent_since}
+   * (REQ-SEC-059).
    */
   public static final String USERS_PENDING_DELETION_OLDEST_AGE =
       "basetool.users.pending.deletion.oldest.age";
@@ -426,10 +303,8 @@ public final class MetricNames {
   /**
    * Counter {@code basetool_mail_total} — tag {@code outcome} ({@link #MAIL_SENT} / {@link
    * #MAIL_FAILED} / {@link #MAIL_DROPPED_DISABLED} / {@link #MAIL_DROPPED_NO_HOST} / {@link
-   * #MAIL_DROPPED_NO_SENDER}). {@code SmtpMailService} swallows delivery failures and silently
-   * drops mail behind three config gates, so without this counter a broken relay or env-var
-   * regression is invisible until someone notices missing registration mail. Never the recipient or
-   * subject.
+   * #MAIL_DROPPED_NO_SENDER}). Counts the delivery failures and config-gated drops {@code
+   * SmtpMailService} swallows; never the recipient or subject.
    */
   public static final String MAIL = "basetool.mail";
 
@@ -444,30 +319,18 @@ public final class MetricNames {
    * Counter {@code basetool_sse_send_failures_total} — tags {@code event} ({@link
    * #SSE_EVENT_CONNECTED} / {@link #SSE_EVENT_NOTIFICATION} / {@link #SSE_EVENT_HEARTBEAT}) and
    * {@code cause} ({@link #CAUSE_IO} / {@link #CAUSE_ILLEGAL_STATE} / {@link #CAUSE_OTHER}), bumped
-   * at each drop-on-send-failure branch so a broken push (e.g. proxy buffering drift) is counted
-   * rather than only silently dropping the emitter.
+   * at each drop-on-send-failure branch.
    *
-   * <p>The {@code cause} split exists because the three branches catch {@code IOException |
-   * RuntimeException} and discard the exception: an ordinary client hang-up ({@code io}) and a
-   * write against an already-completed emitter ({@code illegal_state} — a registry lifecycle
-   * defect, not a dead client) are otherwise the same number. Distinguishing them without flipping
-   * a logger in production is the entire point. Derived from the caught exception's <em>type</em>,
-   * never its message (REQ-OBS-006).
+   * <p>{@code cause} is derived from the caught exception's type, never its message (REQ-OBS-006).
    */
   public static final String SSE_SEND_FAILURES = "basetool.sse.send.failures";
 
   /**
    * Counter {@code basetool_sse_emitters_evicted_total} (untagged) — bumped each time {@code
-   * NotificationStreamService.subscribe} retires the oldest stream of a recipient because the
-   * per-recipient emitter cap ({@code MAX_EMITTERS_PER_SUB}, currently 5) is already full. The
-   * eviction is deliberately quiet — the retired stream only receives a terminal {@code replaced}
-   * event — so a user whose tabs keep knocking each other off the push channel produces no signal
-   * at all today.
+   * NotificationStreamService.subscribe} retires a recipient's oldest stream because the
+   * per-recipient emitter cap ({@code MAX_EMITTERS_PER_SUB}) is full.
    *
-   * <p>Doubles as the tuning signal for the cap: the frontend admits up to 20 concurrent {@code
-   * /ws/sync} sockets per user, so a user can legitimately hold far more live tabs than 5 SSE
-   * streams. A sustained eviction rate means the notification cap, not the socket cap, is the
-   * binding one and is set too low. Untagged — the recipient {@code sub} must never become a label
+   * <p>A sustained rate means the cap is set too low. The recipient {@code sub} is never a label
    * (REQ-OBS-006).
    */
   public static final String SSE_EMITTERS_EVICTED = "basetool.sse.emitters.evicted";
@@ -493,13 +356,9 @@ public final class MetricNames {
   public static final String SSE_REDIS_ERRORS = "basetool.sse.redis.errors";
 
   /**
-   * Tag key: the scheduled job ({@link ScheduledJob#label()}). Named {@code task}, NOT {@code job}
-   * (#1041 item 23): the Prometheus scrape adds its own {@code job="basetool-backend"} label, and a
-   * metric tag also named {@code job} collides — Prometheus keeps the scrape value and renames the
-   * metric tag to {@code exported_job}, so alerts once had to match the awkward {@code
-   * exported_job} (and one silently never fired when they matched plain {@code job}). {@code task}
-   * sidesteps the collision so the job identity keeps its intended label. Do not rename back to
-   * {@code job}.
+   * Tag key: the scheduled job ({@link ScheduledJob#label()}). Named {@code task}, not {@code job},
+   * because the Prometheus scrape's own {@code job} label would rename a colliding tag to {@code
+   * exported_job}.
    */
   public static final String TAG_JOB = "task";
 
@@ -516,10 +375,9 @@ public final class MetricNames {
   public static final String TAG_BUCKET = "bucket";
 
   /**
-   * Tag key: where the rate-limit bucket key was derived from, on {@link #RATELIMIT_REJECTIONS} —
-   * {@link #KEY_SOURCE_FORWARDED} when a trusted proxy's {@code X-Forwarded-For} supplied the
-   * client address, {@link #KEY_SOURCE_PEER} when the immediate peer address was used. Carries only
-   * which of the two paths produced the key; the address itself is never a tag value (REQ-OBS-004).
+   * Tag key on {@link #RATELIMIT_REJECTIONS}: where the bucket key came from — {@link
+   * #KEY_SOURCE_FORWARDED} or {@link #KEY_SOURCE_PEER}. The address itself is never a tag value
+   * (REQ-OBS-004).
    */
   public static final String TAG_KEY_SOURCE = "key_source";
 
@@ -667,9 +525,7 @@ public final class MetricNames {
 
   /**
    * SSE failure cause: an {@link IllegalStateException} — the emitter had already completed or
-   * timed out when the push was attempted. Server-side lifecycle race in the registry rather than a
-   * dead client, so it is worth separating from {@link #CAUSE_IO} even though both end in the same
-   * drop.
+   * timed out, a server-side lifecycle race rather than a dead client.
    */
   public static final String CAUSE_ILLEGAL_STATE = "illegal_state";
 
@@ -700,8 +556,7 @@ public final class MetricNames {
 
   /**
    * Rate-limit key source: the key was resolved from a trusted proxy's {@code X-Forwarded-For}
-   * chain — the first untrusted hop walking from the right, which is the address the proxy appended
-   * — i.e. per-client bucketing behind the edge works as designed.
+   * chain, the first untrusted hop walking from the right.
    */
   public static final String KEY_SOURCE_FORWARDED = "forwarded";
 
@@ -722,9 +577,8 @@ public final class MetricNames {
 
   /**
    * Bounded {@code client_id} value for an authenticated caller whose token carries no {@code azp}
-   * claim. Kept distinct from {@link #CLIENT_ID_OTHER} because the two mean opposite things:
-   * "other" is a client nobody registered here, "none" is a Keycloak mapper regression that would
-   * silently blind the attribution for every client at once.
+   * claim, which points at a Keycloak mapper regression rather than an unregistered client ({@link
+   * #CLIENT_ID_OTHER}).
    */
   public static final String CLIENT_ID_NONE = "none";
 
@@ -738,30 +592,18 @@ public final class MetricNames {
   public static final String AUTH_INSUFFICIENT_SCOPE = "insufficient_scope";
 
   /**
-   * No credential was presented at all -- the caller sent no {@code Authorization} header and the
-   * chain rejected it with a plain {@link
+   * No credential was presented: the caller sent no {@code Authorization} header and was rejected
+   * with a plain {@link
    * org.springframework.security.authentication.InsufficientAuthenticationException} (or the
-   * method-security equivalent) rather than an {@code OAuth2AuthenticationException}.
+   * method-security equivalent).
    *
-   * <p>Deliberately <em>not</em> an RFC 6750 code: the spec says a resource server SHOULD omit the
-   * error code entirely when the request carries no authentication information, so there is none to
-   * map onto. Kept as its own bounded literal anyway, because it is the single most load-bearing
-   * distinction this counter draws -- a missing token is ordinary traffic (a monitoring probe, a
-   * scanner, a pre-login navigation), while a <em>rejected</em> token is somebody presenting
-   * credentials that do not hold, which is what {@link #AUTH_INVALID_TOKEN} means and what a
-   * credential-guessing alert must actually watch.
-   *
-   * <p>Added 2026-09-13 after production measurement: every one of the backend's 6&nbsp;618 401s
-   * and the ingest gateway's 4&nbsp;927 collapsed into {@link #AUTH_OTHER}, so the counter built to
-   * answer "why did authentication fail" answered nothing at all. See REQ-OBS-018.
+   * <p>Not an RFC 6750 code, since the spec omits the error code in that case (REQ-OBS-018).
    */
   public static final String AUTH_NO_CREDENTIALS = "no_credentials";
 
   /**
-   * Bearer error: anything outside the RFC set <em>and</em> not the no-credential case above,
-   * collapsed so the label stays bounded. Since {@link #AUTH_NO_CREDENTIALS} was split out this is
-   * genuinely rare, and a sustained non-zero rate on it means a failure mode nobody enumerated --
-   * worth reading the DEBUG line for rather than ignoring.
+   * Bearer error: anything outside the RFC set and not {@link #AUTH_NO_CREDENTIALS}, collapsed so
+   * the label stays bounded. A sustained non-zero rate means an unenumerated failure mode.
    */
   public static final String AUTH_OTHER = "other";
 
@@ -819,34 +661,18 @@ public final class MetricNames {
   public static final String TERMS_ACCEPTED_USERS = "basetool.terms.accepted.users";
 
   /**
-   * Gauge: how many <em>distinct</em> subjects the consent gate refused in the last 15 minutes
-   * (REQ-SEC-028). The counterpart to {@link #TERMS_ACCEPTED_USERS} — together they answer "how
-   * many are still outstanding, and is anyone getting through".
+   * Gauge: how many distinct subjects the consent gate refused in the last 15 minutes
+   * (REQ-SEC-028); the counterpart to {@link #TERMS_ACCEPTED_USERS}.
    *
-   * <p>Deliberately subjects rather than requests. The refusal <em>rate</em> ({@link
-   * #HTTP_ERROR}{@code {code="TERMS_NOT_ACCEPTED"}}) cannot tell one retrying client from a
-   * locked-out membership: a single looping tab sustains an arbitrary rate forever, which is how it
-   * fired {@code TermsConsentRolloutStalled} twice overnight on 2026-08-03 with nobody awake.
-   * Untagged, so the series stays a single bounded number (REQ-OBS-011). Per process — read it with
-   * {@code max()}, never {@code sum()}, or a subject refused on two instances counts twice.
+   * <p>Untagged (REQ-OBS-011). Per process — read it with {@code max()}, never {@code sum()}.
    */
   public static final String TERMS_REFUSED_SUBJECTS = "basetool.terms.refused.subjects";
 
   /**
    * Gauge: distinct subjects the role gate refused with {@code 403 NO_ROLE} in the last 15 minutes
-   * (REQ-SEC-053).
+   * (REQ-SEC-053); the counterpart of {@link #TERMS_REFUSED_SUBJECTS}.
    *
-   * <p>The exact counterpart of {@link #TERMS_REFUSED_SUBJECTS}, for the same reason and against a
-   * sharper failure. The refusal <em>rate</em> ({@link #HTTP_ERROR}{@code {code="NO_ROLE"}}) is a
-   * request rate answering a distinct-subject question, and it fails in <b>both</b> directions
-   * here: one member's tab polling in the background sustains it on its own, while a realm-side
-   * role rename at 03:00 - the event the alert exists for - locks the whole membership out at a
-   * moment when nobody is making requests, so the rate stays near zero until the morning. Whether
-   * one account is waiting for an administrator or four hundred are locked out is exactly the
-   * distinction the alert has to make, and only a subject count makes it.
-   *
-   * <p>Untagged, so the series stays a single bounded number (REQ-OBS-011). Per process - read it
-   * with {@code max()}, never {@code sum()}, or a subject refused on two instances counts twice.
+   * <p>Untagged (REQ-OBS-011). Per process — read it with {@code max()}, never {@code sum()}.
    */
   public static final String NO_ROLE_REFUSED_SUBJECTS = "basetool.norole.refused.subjects";
 
@@ -856,10 +682,8 @@ public final class MetricNames {
    * #ON_BEHALF_OF_NO_CALLER}, {@link #ON_BEHALF_OF_MALFORMED}, {@link
    * #ON_BEHALF_OF_MEMBER_NOT_LIVE}).
    *
-   * <p>A security signal, not noise. Since ADR-0129 the ingest gateway may name the member it acts
-   * for; anyone else presenting that header is refused and counted here. A non-zero {@code
-   * not_a_gateway} rate is either a misconfigured gateway client id or somebody probing for an
-   * impersonation primitive, and the two are worth telling apart quickly.
+   * <p>Counts on-behalf-of headers refused because the presenter is not the ingest gateway or the
+   * request is otherwise invalid (ADR-0129).
    */
   public static final String ON_BEHALF_OF_REFUSED = "basetool.on.behalf.of.refused";
 
@@ -873,15 +697,8 @@ public final class MetricNames {
    * {@link #ON_BEHALF_OF_REFUSED} reason: the header arrived at an ingest endpoint with no
    * authenticated caller behind it.
    *
-   * <p>Two causes, and they need different responses. Ordinarily it is a probe or a client whose
-   * token expired — the header ships in the extractor and is documented, so an unauthenticated
-   * caller can send it. A <em>sustained</em> rate alongside failing uploads means something else:
-   * the filter runs after authentication, so a persistent inability to see a caller points at the
-   * filter ordering having changed underneath it, which is the bug ADR-0129 was written after.
-   *
-   * <p>This was documented as structurally unreachable until the endpoint bound was moved ahead of
-   * the caller check; before that, any unauthenticated request to <em>any</em> path carrying the
-   * header landed here, and the alert on it fired for an hour off a single internet probe.
+   * <p>Usually a probe or an expired token; a sustained rate alongside failing uploads points at a
+   * changed filter ordering (ADR-0129).
    */
   public static final String ON_BEHALF_OF_NO_CALLER = "no_authenticated_caller";
 
@@ -891,11 +708,6 @@ public final class MetricNames {
   /**
    * {@link #ON_BEHALF_OF_REFUSED} reason: the named member is unknown here, or the last roster sync
    * no longer found them in the identity provider.
-   *
-   * <p>The highest-value signal of the five. A named subject never expires the way a token does, so
-   * this counter is what distinguishes "a member was offboarded and their extractor is still
-   * running" from "someone is probing which subjects exist". Both refuse identically to the caller;
-   * only this metric tells them apart.
    */
   public static final String ON_BEHALF_OF_MEMBER_NOT_LIVE = "member_not_live";
 
@@ -907,9 +719,7 @@ public final class MetricNames {
 
   /**
    * Gauge {@code basetool_livesync_streams} — app live-sync SSE streams currently open, summed
-   * across all members (ADR-0143). The app opens one per screen, so this tracks how many members
-   * are looking at a live surface right now; a value that climbs without a matching member count is
-   * the first sign that streams are not being retired.
+   * across all members (ADR-0143).
    */
   public static final String LIVESYNC_STREAMS = "basetool.livesync.streams";
 
@@ -929,9 +739,8 @@ public final class MetricNames {
 
   /**
    * Counter {@code basetool_livesync_frames_dropped_total} — tag {@code event} ({@link
-   * #TAG_EVENT}); a frame offered to an app live-sync stream whose bounded delivery queue was full,
-   * and therefore dropped instead of buffered (BE-PERF-13). Zero while every subscriber reads; a
-   * rising rate means streams stopped draining.
+   * #TAG_EVENT}); a frame dropped because an app live-sync stream's bounded delivery queue was
+   * full. A rising rate means streams stopped draining.
    */
   public static final String LIVESYNC_FRAMES_DROPPED = "basetool.livesync.frames.dropped";
 
@@ -953,28 +762,15 @@ public final class MetricNames {
    * ({@link #OUTCOME_ALLOWED} / {@link #OUTCOME_DENIED}) and {@code reason}; the verdict of an app
    * live-sync subscribe (ADR-0143).
    *
-   * <p><strong>Deliberately the same name, tags and values the frontend uses</strong> for the same
-   * verdict on {@code /ws/sync}. The two are separated by the {@code job} label, so a dashboard can
-   * show either half or both, and nobody has to learn a second vocabulary for one concept. It also
-   * means the panels and rules already built around this series cover the app the day it ships.
-   *
-   * <p>On a denial {@code reason} separates the two paths that both read as denied: the room's own
-   * read refused the caller ({@link #SUBSCRIBE_DENY_AUTHZ}) and the check itself threw ({@link
-   * #SUBSCRIBE_DENY_CHECK_FAILED}, which fails closed). Without the split a database wobble reads
-   * exactly like members hitting permission boundaries. Micrometer needs a uniform tag-key set per
-   * meter, so the allowed series carries {@link #REASON_NONE}.
+   * <p>Uses the same name, tags and values as the frontend's {@code /ws/sync} counter. A denial's
+   * {@code reason} is {@link #SUBSCRIBE_DENY_AUTHZ} or {@link #SUBSCRIBE_DENY_CHECK_FAILED}; an
+   * allowed subscribe carries {@link #REASON_NONE}.
    */
   public static final String LIVESYNC_SUBSCRIBE = "basetool.livesync.subscribe";
 
   /**
-   * Counter {@code basetool_livesync_invalid_topic_total} (unlabelled) — a subscribe or a publish
-   * naming a topic that does not parse against this backend's registry.
-   *
-   * <p>Unlabelled for the reason the frontend's counter of the same name is: the topic belongs to
-   * no class, and inflating the bounded {@code topic_class} set with an {@code unknown} sentinel
-   * would cost every other query its clean vocabulary (REQ-OBS-011). A sustained stream is the
-   * signature of client/server topic-vocabulary skew — an app build asking for a room this server
-   * no longer knows.
+   * Counter {@code basetool_livesync_invalid_topic_total} (unlabelled) — a subscribe or publish
+   * naming a topic that does not parse against this backend's registry (REQ-OBS-011).
    */
   public static final String LIVESYNC_INVALID_TOPIC = "basetool.livesync.invalid.topic";
 
@@ -1025,13 +821,8 @@ public final class MetricNames {
 
   /**
    * Counter {@code basetool_livesync_redis_skipped_total} — tag {@code reason}; a frame taken off
-   * the shared channel and deliberately not delivered.
-   *
-   * <p>Separate from {@link #LIVESYNC_REDIS_ERRORS} on purpose, and the distinction is the point:
-   * the frontend's staff rooms ride the same channel, so this backend sees a steady trickle of
-   * frames for rooms it does not serve. Counting those as errors would put a permanent non-zero
-   * rate under the series {@code LiveSyncRedisFanoutBroken} watches and teach everyone to ignore
-   * it.
+   * the shared channel and deliberately not delivered, such as one for a frontend-only room. Kept
+   * separate from {@link #LIVESYNC_REDIS_ERRORS}.
    */
   public static final String LIVESYNC_REDIS_SKIPPED = "basetool.livesync.redis.skipped";
 
@@ -1057,9 +848,8 @@ public final class MetricNames {
   public static final String SUBSCRIBE_DENY_AUTHZ = "authz";
 
   /**
-   * Subscribe-deny reason: the check threw, and the room was refused rather than admitted on an
-   * exception. Distinct from {@link #SUBSCRIBE_DENY_AUTHZ} because a rising rate here is an
-   * infrastructure signal, not a permissions one.
+   * Subscribe-deny reason: the check threw and the room was refused (fail closed); an
+   * infrastructure signal, unlike {@link #SUBSCRIBE_DENY_AUTHZ}.
    */
   public static final String SUBSCRIBE_DENY_CHECK_FAILED = "check_failed";
 
@@ -1086,23 +876,8 @@ public final class MetricNames {
    * Gauge {@code basetool_tracing_enabled} — {@code 1} while this module is configured to emit
    * spans, {@code 0} while it is not.
    *
-   * <p><b>What it is for.</b> The trace pipeline had no alert at either end until 2026-09-20, and
-   * that is why a dead one went unnoticed: on the Podman host the application containers could not
-   * resolve {@code alloy}, every span was dropped in this module's own exporter, and both {@code
-   * otelcol_receiver_accepted_spans_total} and {@code tempo_distributor_spans_received_total} were
-   * <em>absent</em> rather than zero. An alert on that absence alone cannot be written, because
-   * absence is also what a deliberately switched-off tracing stack looks like — the same problem
-   * the backend's {@code basetool_scheduled_job_enabled} solves for a switched-off job, and the
-   * same solution.
-   *
-   * <p><b>Reported as 0 rather than omitted</b>, which is the one way this differs from the
-   * scheduled-job gauge. That one is absent when off because the bean does not exist; here the
-   * series is registered unconditionally, so {@code basetool_tracing_enabled == 0} says "off on
-   * purpose" while <em>absence</em> says "this module is not being scraped at all". An alert that
-   * has to read "tracing is on" positively needs the difference.
-   *
-   * <p>Untagged: the deployment-wide {@code application} tag already separates the three modules,
-   * and a second identity for the same fact would only invite them to disagree (REQ-OBS-011).
+   * <p>Always registered, so {@code 0} means "off on purpose" while absence means "not scraped".
+   * Untagged (REQ-OBS-011).
    */
   public static final String TRACING_ENABLED = "basetool.tracing.enabled";
 

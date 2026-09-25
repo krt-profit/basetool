@@ -50,28 +50,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.core.ParameterizedTypeReference;
 
 /**
- * Unit tests for {@link ScWikiClient} using {@link MockWebServer} to stand in for {@code
- * api.star-citizen.wiki}.
- *
- * <p>The four behaviours this fixture pins are the ones called out as SC Wiki-specific in {@code
- * SC_WIKI_SYNC_PLAN.md} §5.3:
- *
- * <ol>
- *   <li>Pagination loop — {@link #fetchAllPages_walksEveryPage_andMergesData()} walks page 1
- *       through page 3 and asserts the merged list size + the {@code ?page[number]=…} query arrived
- *       in order.
- *   <li>ETag conditional GET — {@link #etag304ShortCircuitOnFirstPage_returnsEmptyList()} primes
- *       the cache on a first call and verifies the second call sends {@code If-None-Match} and
- *       returns an empty list when the server replies 304.
- *   <li>Rate-limit pacing — {@link #paceForRateLimit_isInvokedBetweenPagesNotBeforeFirstPage()}
- *       subclasses the client with a counter-only override of {@link
- *       ScWikiClient#paceForRateLimit()} and asserts the pacing hook is invoked exactly {@code
- *       lastPage - 1} times (once between each adjacent page pair) and never before the first
- *       request.
- *   <li>Empty-response idempotence — {@link #emptyData_returnsEmptyListIdempotently()} and {@link
- *       #serverError_returnsEmptyListInsteadOfThrowing()} match the {@code UexClient} fallback
- *       contract.
- * </ol>
+ * Unit tests for {@link ScWikiClient} against a {@link MockWebServer}: pagination, ETag conditional
+ * GET, rate-limit pacing between pages, and the empty-list fallback.
  */
 class ScWikiClientTest {
 

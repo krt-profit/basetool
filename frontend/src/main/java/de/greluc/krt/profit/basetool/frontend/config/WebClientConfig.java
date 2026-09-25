@@ -89,51 +89,18 @@ import reactor.netty.http.client.HttpClient;
 public class WebClientConfig {
 
   /**
-   * Max bytes a single backend response may buffer in memory before the reactive codec aborts with
-   * {@code DataBufferLimitException}. Sized for the heaviest read path — the materials trade matrix
-   * ({@code /api/v1/materials/matrix?size=100000}) returns one verbose row per material×terminal
-   * price and grows with the UEX catalog; at 16 MB a large universe tipped the buffer and the
-   * overview page failed outright. 64 MB leaves headroom for one such response.
-   *
-   * <p>Only ONE such response is ever buffered concurrently per catalogue: every {@code
-   * BackendApiClient.getCached} overload is {@code @Cacheable(sync = true)} (#1154), so Caffeine
-   * single-flights the loader and a cold-cache stampede (N users on the materials overview right
-   * after a deploy / domain evict) collapses to a single in-flight fetch instead of N parallel
-   * multi-ten-MB buffers + their decoded DTO graphs — which, on the ~768 MB heap the compose stack
-   * grants ({@code mem_limit: 1024m} × {@code MaxRAMPercentage=75}), could otherwise OOM-kill the
-   * single frontend instance and drop every live SSE relay / presence socket at once. If another
-   * &gt;10 MB catalogue is added, additionally guard the matrix path with a small semaphore.
+   * Maximum bytes a single backend response may buffer before the codec aborts with {@code
+   * DataBufferLimitException}, sized for the materials price matrix. Cached catalogue loads are
+   * single-flighted, so at most one such buffer exists per catalogue.
    */
   private static final int MAX_IN_MEMORY_BYTES = 64 * 1024 * 1024;
 
   /**
-   * How long a <b>backend-facing</b> pooled connection may sit idle before this side discards it.
+   * How long a backend-facing pooled connection may idle before this side discards it.
    *
-   * <p>This is one half of a two-sided timer and only the shorter half is safe. The backend's
-   * embedded Tomcat closes an idle HTTP/2 connection after its own keep-alive window — read out of
-   * the {@code Http2Protocol} actually on the classpath (11.0.25): {@code keepAliveTimeout =
-   * 20_000&nbsp;ms}, a default nothing in this repository overrides. Both sides were set to
-   * 20&nbsp;s, which is not "aligned" but <b>collided</b>: the client's window necessarily starts
-   * later than the server's (it begins when the last response finished arriving, the server's when
-   * it finished being written), so an equal length guarantees a slice of time in which this pool
-   * still considers a connection live and the peer has already sent its {@code GOAWAY}. Dispatching
-   * onto it loses every stream riding that connection at once — and under HTTP/2 with {@code
-   * strictConnectionReuse} that is the whole burst, not one request. Production,
-   * 2026-09-20T19:30:31Z: fourteen streams on one connection died in the same millisecond, nine
-   * before their response and five mid-body, against a backend that neither restarted nor logged
-   * anything but 200s.
-   *
-   * <p>10&nbsp;s restores the margin: this side always evicts first, by a factor of two, and the
-   * background sweep below halves with it so a connection is swept well inside the peer's window
-   * rather than after it. The cost is re-handshaking a connection that idled for ten seconds, which
-   * a pool carrying a page render's fan-out reaches only between bursts of user activity.
-   *
-   * <p>Not used by {@code frontend-oauth-pool}: that one talks to Keycloak, whose Quarkus HTTP idle
-   * timeout is minutes, so its 20&nbsp;s is genuinely below its upstream and is left alone.
-   *
-   * <p>Package-private so {@code WebClientBackendPoolIdleBoundTest} can assert the margin against
-   * the keep-alive default of the Tomcat actually on the classpath, rather than against a number
-   * copied into a test and free to drift from the one the server runs.
+   * <p>Must stay well below the backend Tomcat's HTTP/2 keep-alive timeout (20 s), so the client
+   * always evicts first and never dispatches onto a connection the server has already closed.
+   * Package-private for a test asserting that margin.
    */
   static final java.time.Duration BACKEND_POOL_MAX_IDLE_TIME = java.time.Duration.ofSeconds(10);
 
@@ -147,21 +114,11 @@ public class WebClientConfig {
 
   /**
    * Context-attributes mapper for the {@link DefaultOAuth2AuthorizedClientManager} that yields an
-   * empty map, deliberately replacing Spring's request-parameter-derived default.
+   * empty map, replacing Spring's default.
    *
-   * <p>Spring's {@code DEFAULT_CONTEXT_ATTRIBUTES_MAPPER} copies an HTTP request parameter
-   * literally named {@code scope} into {@code
-   * OAuth2AuthorizationContext.REQUEST_SCOPE_ATTRIBUTE_NAME}, and the {@code
-   * RefreshTokenOAuth2AuthorizedClientProvider} then forwards those values to Keycloak as the
-   * requested scope of the refresh-token grant. The job-orders page's "Staffel" filter submits
-   * {@code scope=all|mine} (the same own-vs-all squadron concept the refinery list exposes), so
-   * whenever a token refresh happens to coincide with such a request Keycloak rejects the grant
-   * with {@code invalid_scope ("Invalid scopes: all"/"Invalid scopes: mine")}; the whole SSO
-   * session is then bounced into re-authentication and the user sees "Fehler beim Laden". This is a
-   * refresh failure mode independent of refresh-token rotation/reuse detection (REQ-SEC-012), which
-   * is why disabling rotation did not stop it. The frontend never requests scopes dynamically —
-   * they are fixed on the {@code keycloak} client registration — so severing the request-parameter
-   * &rarr; OAuth-scope path entirely is both correct and the complete fix.
+   * <p>The default copies a request parameter named {@code scope} into the refresh-token grant, so
+   * a page filter such as {@code scope=all} made Keycloak reject the refresh with {@code
+   * invalid_scope}. Scopes are fixed on the client registration.
    */
   static final Function<OAuth2AuthorizeRequest, Map<String, Object>> NO_REQUEST_DERIVED_ATTRIBUTES =
       authorizeRequest -> Map.of();
@@ -177,39 +134,18 @@ public class WebClientConfig {
   private final SslBundles sslBundles;
 
   /**
-   * Micrometer observation registry wired into the request/response WebClients (REQ-OBS-009, epic
-   * #936 Phase 1b). These clients are hand-built via {@code WebClient.builder()} (not the
-   * auto-configured {@code WebClient.Builder} bean), so Boot's observation customizer does not
-   * apply — without this explicit wiring no {@code http.client.requests} metrics are recorded and,
-   * with tracing enabled, no {@code traceparent} header would propagate to the backend. With
-   * tracing disabled (the default) the registry only feeds metrics; no tracing machinery runs.
+   * Observation registry wired into the hand-built request/response WebClients, which Boot's
+   * observation customizer does not reach; records {@code http.client.requests} and propagates
+   * trace context when tracing is enabled (REQ-OBS-009).
    */
   private final io.micrometer.observation.ObservationRegistry observationRegistry;
 
   /**
-   * Dedicated reactor-netty connection pool for the OAuth2 token-endpoint backchannel to Keycloak
-   * (the {@code authorization_code} exchange at login and the recurring {@code refresh_token}
-   * grant).
+   * Dedicated connection pool for the OAuth2 token-endpoint calls to Keycloak ({@code
+   * authorization_code} and {@code refresh_token}), named {@code frontend-oauth-pool} (ADR-0115).
    *
-   * <p>Spring Security's default {@code RestClient}-based token-response clients run on
-   * reactor-netty's <b>global</b> connection pool, which has <b>no idle eviction</b>. The token
-   * endpoint ({@code spring.security.oauth2.client.provider.keycloak.token-uri}, derived from the
-   * public {@code issuer-uri}) is reached over the public NPM edge, which reaps idle keep-alive
-   * sockets after ~60&ndash;75&nbsp;s; a refresh grant that reuses such a server-closed socket
-   * fails with reactor-netty's {@code PrematureCloseException}, surfacing as an intermittent
-   * auth-path 5xx / forced re-login.
-   *
-   * <p>This pool evicts idle connections after 20&nbsp;s &mdash; comfortably <b>below</b> the
-   * upstream keep-alive &mdash; and sweeps them in the background every 10&nbsp;s, so a stale
-   * socket is discarded before it can be handed to a token call. {@code metrics(true)} exposes
-   * {@code reactor.netty.connection.provider.*} tagged {@code frontend-oauth-pool}, mirroring the
-   * {@code frontend-pool} / {@code frontend-sse-pool} request pools. It is a pure transport swap:
-   * the token request, the refresh-token replay semantics and the REQ-SEC-012 single-flight
-   * behaviour are unchanged (ADR-0115).
-   *
-   * <p>Initialised at the field (not via the Lombok constructor): a constant-config shared resource
-   * with no injected dependency, so {@code @RequiredArgsConstructor} leaves it out of the generated
-   * constructor.
+   * <p>Evicts idle connections after 20 s and sweeps every 10 s, below the edge proxy's keep-alive,
+   * so no token call reuses a server-closed socket. Exposes pool metrics.
    */
   private final reactor.netty.resources.ConnectionProvider oauthTokenPool =
       reactor.netty.resources.ConnectionProvider.builder("frontend-oauth-pool")
@@ -222,111 +158,16 @@ public class WebClientConfig {
           .build();
 
   /**
-   * Builds the Netty SSL context for the backend WebClient. Three behaviours, picked by active
-   * profile and presence of a configured SSL bundle:
+   * Builds the connector for the backend WebClients.
    *
-   * <ul>
-   *   <li>{@code dev} / {@code test}: {@link InsecureTrustManagerFactory} (= accept any
-   *       certificate). The bundled bootstrap {@code keystore.p12} cert is self-signed and the test
-   *       docker stack uses an ephemeral cert; trust validation would only get in the way.
-   *   <li>Other profiles WITH a {@code backend-trust} Spring SSL bundle configured (production
-   *       default — the bundle is defined in {@code application-prod.yml} and points at the same
-   *       bind-mounted {@code keystore.p12} that Tomcat uses for the frontend's own HTTPS
-   *       listener): the bundle's truststore is loaded and pinned as the only valid trust anchor
-   *       for the backend WebClient. This is what makes the {@code https://backend:11261} call work
-   *       when the backend serves a self-signed cert — without restoring the indiscriminate {@code
-   *       InsecureTrustManagerFactory} that the 2026-05-20 audit (finding M-13) closed.
-   *   <li>Other profiles WITHOUT the bundle (e.g. a future operator fronts the backend with a
-   *       publicly-trusted cert): falls back to the default JVM trust store. No MITM exposure
-   *       because the cert chain must validate against a well-known CA.
-   * </ul>
+   * <p>TLS: {@code dev}/{@code test} trust any certificate; other profiles pin the {@code
+   * backend-trust} SSL bundle when configured, otherwise use the JVM trust store. On the pinned
+   * paths hostname verification is off unless {@code app.http.verify-backend-hostname} is set
+   * (REQ-SEC-070, ADR-0211).
    *
-   * <h3>Hostname verification</h3>
-   *
-   * <p>On the two "pinned trust" paths (dev/test InsecureTrustManagerFactory and prod {@code
-   * backend-trust} bundle) endpoint identification is explicitly disabled via {@link
-   * SSLParameters#setEndpointIdentificationAlgorithm}. The trust set is already pinned to exactly
-   * the cert we ship (or accept-any in dev), so the hostname check only ever defends against the
-   * pinned cert being presented under a different hostname — which an attacker can only do by
-   * stealing the private key from {@code keystore.p12}, in which case the entire trust boundary has
-   * already collapsed. Disabling the check lets the prod stack work even when the operator's cert
-   * was generated without {@code dns:backend} / {@code dns:frontend} in its SAN list (the Docker
-   * network aliases used by service-to-service traffic), without weakening security further than
-   * M-13 deliberately allowed. The fallback (default JVM trust store) keeps hostname verification
-   * enabled — that path validates against a well-known CA pool where the hostname check is the only
-   * thing tying the cert to the target host.
-   *
-   * <p>That reasoning holds for ONE self-signed certificate and stops holding for a CA. Once every
-   * service serves its own leaf signed by the internal CA (REQ-SEC-070, ADR-0211), the pinned
-   * anchor vouches for all of them, and the name is the only thing that tells the backend's
-   * certificate from the ingest's. {@code app.http.verify-backend-hostname} ({@code
-   * INTERNAL_TLS_VERIFY_HOSTNAME}) keeps the check ON on the pinned prod path; it defaults to
-   * {@code false}, today's behaviour, and is switched on by the owner's rollout.
-   *
-   * <h3>Wire protocol (ADR-0161 §8.1)</h3>
-   *
-   * <p>Both applications have set {@code server.http2.enabled: true} since they were written, and
-   * until 2026-09-10 this client never took the offer: the {@code SslContext} advertised no ALPN
-   * protocol and the {@code HttpClient} named none, so Reactor Netty spoke HTTP/1.1 to a server
-   * that had been offering HTTP/2 all along. {@code app.http.backend-protocol} now decides, and
-   * defaults to {@code H2}.
-   *
-   * <p><b>Streaming stays on HTTP/1.1, deliberately.</b> The SSE relay holds one connection per
-   * viewing browser for as long as the page is open; multiplexing a thousand of those onto a
-   * handful of connections puts every viewer behind the same flow-control window and the same
-   * server-side execution limit. There is no win to collect either — the pool ceiling this change
-   * removes is a ceiling on *concurrent requests*, and a stream is not one.
-   *
-   * <h3>Why the pool is re-derived rather than carried over</h3>
-   *
-   * <p>Under HTTP/1.1 a pooled connection carries one request at a time, so {@code
-   * maxConnections(100)} was a ceiling on concurrent calls and was deliberately aligned with the
-   * {@code backendApi} Resilience4j bulkhead at 100. Under HTTP/2 that stops being true:
-   * connections multiplex, so the same 100 would bound *connections* and the concurrency ceiling
-   * would move somewhere else entirely — and where it moves is not obvious.
-   *
-   * <p><b>It moves onto a Tomcat setting that is never advertised to us.</b> Read out of the
-   * embedded Tomcat actually on the classpath (11.0.25, {@code Http2Protocol}): {@code
-   * maxConcurrentStreams} defaults to {@code 100} and {@code maxConcurrentStreamExecution} to
-   * {@code 20}. Only the first is sent in the SETTINGS frame. The second is a server-side
-   * thread-allocation limit per connection: beyond twenty streams, {@code Http2UpgradeHandler}
-   * stops dispatching and queues the rest. So a client that let the pool collapse onto one or two
-   * connections — which is exactly what an unconfigured HTTP/2 pool does — would have turned a
-   * hundred concurrent calls into twenty executing ones and eighty waiting, and called it a
-   * modernisation.
-   *
-   * <p>Hence the explicit {@link Http2AllocationStrategy}: {@code maxConcurrentStreams} is pinned
-   * to {@code app.http.max-concurrent-streams} (default 20, mirroring that Tomcat limit) so the
-   * pool opens a further connection rather than over-subscribing one, and {@code maxConnections}
-   * stays at 100 so the aggregate cannot be worse than HTTP/1.1 was. The bulkhead's 100 remains the
-   * real gate on concurrency; what changes is that those 100 calls now ride ~5 connections instead
-   * of 100, which is the saving.
-   *
-   * <p><b>And {@code strictConnectionReuse(true)}, without which there is no saving at all.</b>
-   * Reactor Netty defaults it to {@code false}: while the pool still has a connection permit, it
-   * opens a new connection in preference to putting another stream on an open one. So "enable
-   * HTTP/2" on its own negotiates h2 and then reproduces the HTTP/1.1 connection count exactly,
-   * which is the one outcome that would have looked like a success on every dashboard. The flag is
-   * what makes multiplexing the pool's actual behaviour rather than its theoretical capability.
-   *
-   * <p>{@code pendingAcquireTimeout} keeps its 5 s alignment with the {@code TimeLimiter} and
-   * simply stops mattering as often: acquiring a free stream on an open connection is not a wait.
-   *
-   * <h3>And why HTTP/2 drops the channel-level read timeout</h3>
-   *
-   * <p>The same collapse from a hundred connections to two turns a harmless timeout into an outage.
-   * A channel-level {@link ReadTimeoutHandler} bounds silence on a <em>connection</em>; under
-   * HTTP/1.1 that fired on an idle pooled connection and cost one spare out of a hundred. Under
-   * HTTP/2 the one or two connections that carry everything are idle between bursts by design, so
-   * the timeout closes the connection the application is riding and the next request fails with
-   * {@code PrematureCloseException}.
-   *
-   * <p>It cost five E2E write flows and 169 log lines before it was found, and the failure did not
-   * look like a transport problem from the outside: {@code krtFetch} falls back to a full page
-   * reload on a failed call, so the symptom was "the page reloaded" on five unrelated screens. The
-   * per-request bound is unaffected — {@code responseTimeout} arms a read timeout when the request
-   * is sent and disarms it when the response completes, which is the HTTP/2-correct unit, and the
-   * {@code backendApi} TimeLimiter closes the outer bound at 5 s.
+   * <p>Protocol: request/response clients use {@code app.http.backend-protocol} (default HTTP/2)
+   * with {@code strictConnectionReuse} and at most {@code app.http.max-concurrent-streams} streams
+   * per connection, and no channel-level read timeout; streaming stays on HTTP/1.1 (ADR-0161).
    */
   @NotNull
   private ReactorClientHttpConnector connector(boolean streaming) {
@@ -335,13 +176,6 @@ public class WebClientConfig {
 
   /**
    * Builds a connector with a named connection pool.
-   *
-   * <p>The name is a parameter because it is the metric label. {@code metrics(true)} publishes
-   * {@code reactor.netty.connection.provider.*} tagged with it, and this method is called three
-   * times for non-streaming clients — so a single hardcoded name meant three independent providers
-   * reporting into one series, which is precisely the pool observability the flag is bought for. It
-   * also meant {@code WebClientHttp2NegotiationTest} measured multiplexing on the probe's pool
-   * rather than the one carrying {@code ParallelPageLoader}'s fan-out.
    *
    * @param streaming whether this connector serves the SSE relay
    * @param poolName the connection provider's name, which is also its metric tag
@@ -511,30 +345,11 @@ public class WebClientConfig {
   }
 
   /**
-   * Builds a {@link RestClient} for the OAuth2 token endpoint that replicates Spring Security's
-   * default token-response-client HTTP stack &mdash; a {@link FormHttpMessageConverter} for the
-   * {@code application/x-www-form-urlencoded} grant request, an {@link
-   * OAuth2AccessTokenResponseHttpMessageConverter} for the token JSON, and an {@link
-   * OAuth2ErrorResponseErrorHandler} &mdash; and swaps <b>only</b> the transport for a
-   * reactor-netty {@link HttpClient} bound to the idle-evicting {@link #oauthTokenPool}. Only
-   * {@code setRestClient} is overridden on the token client, so its own parameters/headers
-   * converters are untouched: this is a transport-only change, neutral to the refresh-token replay
-   * semantics of REQ-SEC-012 (ADR-0115).
+   * Builds the {@link RestClient} for the OAuth2 token endpoint: Spring Security's default
+   * converters and error handler on a reactor-netty {@link HttpClient} bound to {@link
+   * #oauthTokenPool} (ADR-0115).
    *
-   * <p>No explicit {@code secure(...)} call: reactor-netty negotiates TLS per request from the URL
-   * scheme, so the {@code https} Keycloak endpoint uses the default system trust store (its edge
-   * cert is publicly trusted) while an {@code http} endpoint (e.g. a test double) stays plaintext.
-   * Both token clients share the single {@link #oauthTokenPool}, so pool metrics stay one series.
-   *
-   * <p><b>Every phase of the exchange is bounded.</b> {@code responseTimeout} only arms once the
-   * request has been <em>fully written</em>; a token POST whose body write stalls (peer stops
-   * reading mid-request) is invisible to it and used to hang until the edge reaped the connection
-   * after ~60&nbsp;s &mdash; the 2026-07-22 incident: every minute a burst of fresh token
-   * connections died with {@code PrematureCloseException: ... while sending request body}, each one
-   * a lost refresh grant with no client-side bound. The {@link ReadTimeoutHandler} /{@link
-   * WriteTimeoutHandler} pair (mirroring the backend WebClient transport above) closes that gap:
-   * any read silence or unfinished write beyond the configured read/write timeouts fails the
-   * exchange in seconds instead of leaving it to the edge's idle reaper.
+   * <p>Read and write timeouts bound every phase of the exchange, including a stalled request body.
    *
    * @return a {@code RestClient} whose transport is the idle-evicting OAuth pool
    */
@@ -566,14 +381,8 @@ public class WebClientConfig {
   }
 
   /**
-   * Token-response client for the {@code refresh_token} grant, hardened onto {@link
-   * #oauthTokenPool}.
-   *
-   * <p>This is the hot Keycloak backchannel: every active session refreshes its access token on
-   * expiry, so it is the path most exposed to reusing a stale, upstream-reaped keep-alive socket
-   * (the {@code PrematureClose} hairpin). Consumed by {@link #authorizedClientManager} as the
-   * {@code refreshToken} provider's token client, replacing Spring Security's default global-pool
-   * client (ADR-0115).
+   * Token-response client for the {@code refresh_token} grant on {@link #oauthTokenPool}, used by
+   * {@link #authorizedClientManager} (ADR-0115).
    *
    * @return the refresh-token response client on the idle-evicting OAuth pool
    */
@@ -588,13 +397,8 @@ public class WebClientConfig {
   }
 
   /**
-   * Token-response client for the {@code authorization_code} grant (the login token exchange),
-   * hardened onto {@link #oauthTokenPool}.
-   *
-   * <p>Wired into the security filter chain via {@code
-   * oauth2Login().tokenEndpoint().accessTokenResponseClient(...)} ({@code SecurityConfig}) so the
-   * interactive login exchange no longer runs on reactor-netty's un-evicting global pool either
-   * &mdash; closing the same {@code PrematureClose} hairpin on the login path (ADR-0115).
+   * Token-response client for the {@code authorization_code} login exchange on {@link
+   * #oauthTokenPool}, wired into {@code SecurityConfig} (ADR-0115).
    *
    * @return the authorization-code response client on the idle-evicting OAuth pool
    */
@@ -609,21 +413,10 @@ public class WebClientConfig {
   }
 
   /**
-   * OAuth2 authorised-client manager providing {@code authorization_code} and {@code refresh_token}
-   * flows for the authenticated backend WebClient.
-   *
-   * <p>The {@code DefaultOAuth2AuthorizedClientManager} is wrapped in a {@link
-   * SingleFlightAuthorizedClientManager} so the parallel backend calls a single page render fans
-   * out (page + notification SSE relay + unread-count poll) collapse into <b>one</b> refresh-token
-   * grant per expiry window. Without it, concurrent requests each replay the same refresh token and
-   * Keycloak's reuse detection revokes the whole token family, surfacing as a flood of {@code
-   * client_authorization_required} until the user logs in again (REQ-SEC-012, ADR-0019).
-   *
-   * <p>The {@code refresh_token} provider is given the {@link #oauthRefreshTokenResponseClient()
-   * pool-hardened refresh-token response client} (ADR-0115) so the recurring refresh grant runs on
-   * the idle-evicting {@link #oauthTokenPool} instead of reactor-netty's un-evicting global pool.
-   * This is a transport swap only; the single-flight and no-request-scope guards above are
-   * unchanged.
+   * OAuth2 authorized-client manager for the authenticated backend WebClient, wrapped in a {@link
+   * SingleFlightAuthorizedClientManager} so concurrent calls trigger only one refresh-token grant
+   * per expiry (REQ-SEC-012, ADR-0019). The refresh grant runs on the {@link
+   * #oauthRefreshTokenResponseClient() pool-hardened client}.
    *
    * @param clientRegistrationRepository the OAuth2 client registrations (Keycloak)
    * @param authorizedClientRepository the session-backed authorized-client store
@@ -696,26 +489,11 @@ public class WebClientConfig {
   }
 
   /**
-   * The {@code Accept} list for backend reads (ADR-0161 §8.5).
+   * Returns the {@code Accept} list for backend reads (ADR-0161): CBOR first, then JSON, when
+   * {@code app.http.codec} selects CBOR. Used by all request/response clients; request bodies stay
+   * JSON.
    *
-   * <p>CBOR first, JSON second, and the order is the negotiation: Spring picks the first acceptable
-   * type it has a converter for, so the backend answers the same objects in half the parse cost
-   * while everything that presets its own content type — RFC 7807 problems, PDF exports — skips
-   * negotiation entirely and is decoded by the JSON half or its own converter.
-   *
-   * <p>Only the response direction changes. Request bodies keep going out as JSON without being
-   * told to, because Spring registers the JSON encoder ahead of the CBOR one and {@code bodyValue}
-   * takes the first writer that can handle the type. That is worth knowing rather than relying on
-   * silently, which is why {@code WebClientCborNegotiationTest} asserts it.
-   *
-   * <p>Read by <b>all three</b> request/response clients — the main one, the anonymous
-   * terms-document client and the live-sync subscribe probe. One seam, one setting: a client left
-   * on a hardcoded {@code Accept} would be a path {@code app.http.codec} silently does not reach,
-   * and the reason for the exception would have to be re-derived by whoever found it. The SSE relay
-   * is the one client that does not read this, because it asks for {@code text/event-stream} and
-   * negotiates nothing.
-   *
-   * @return the media types this client accepts from the backend, most preferred first.
+   * @return the media types this client accepts from the backend, most preferred first
    */
   private java.util.List<MediaType> backendAcceptTypes() {
     if (httpProperties.codec() == AppHttpProperties.BackendCodec.CBOR) {
@@ -725,23 +503,9 @@ public class WebClientConfig {
   }
 
   /**
-   * The one anonymous WebClient left, and it reaches exactly one endpoint.
-   *
-   * <p>{@code GET /api/v1/terms/document} is the Terms-of-Use wording, which the public {@code
-   * /terms} page renders (ADR-0138 / REQ-SEC-028, REQ-SEC-052). A document everyone must be able to
-   * read before agreeing to anything cannot be fetched with a token the reader does not have yet,
-   * so this call has no bearer to relay.
-   *
-   * <p><strong>Named for its one caller on purpose.</strong> Its predecessor was called {@code
-   * publicWebClient} and was handed to roughly forty call sites through an {@code isPublic} boolean
-   * — the mission list, the order queue, the catalogue pickers, the home page. Each of those was a
-   * decision to send a request without an identity, taken by passing {@code true}, and none of them
-   * needed to be. A boolean parameter is the wrong shape for "this request has no caller": {@code
-   * TermsDocumentClientUsageTest} asserts that {@code BackendApiClient} is the only class holding
-   * this bean and {@code getTermsDocumentAnonymously()} the only method reading it — which a
-   * boolean could never do.
-   *
-   * <p>Same resilience and logging chain as {@link #webClient}, without the OAuth2 bearer relay.
+   * The only anonymous WebClient, used solely to fetch the Terms-of-Use document for the public
+   * {@code /terms} page (REQ-SEC-028). Same resilience and logging chain as {@link #webClient},
+   * without the OAuth2 bearer relay.
    */
   @Bean
   public WebClient termsDocumentClient(
@@ -771,35 +535,12 @@ public class WebClientConfig {
   }
 
   /**
-   * Streaming WebClient for the notification SSE relay (REQ-NOTIF-010). Relays the correlation /
-   * active-org-unit / locale / client-IP headers like {@link #webClient}, but deliberately omits
-   * both the Resilience4j chain (its 5-second {@code TimeLimiter} and retry would sever a
-   * long-lived stream) and the response / read timeouts (see {@link #connector(boolean)})
-   * <b>and</b> the OAuth2 {@code oauth2Configuration()} exchange filter.
+   * Streaming WebClient for the notification SSE relay (REQ-NOTIF-010).
    *
-   * <p>Dropping the OAuth2 filter is load-bearing for REQ-SEC-012 / ADR-0019. With the filter
-   * applied, attaching an authorized client routes the call into {@code
-   * ServletOAuth2AuthorizedClientExchangeFilterFunction.reauthorizeClient}, which invokes {@code
-   * OAuth2AuthorizedClientManager.authorize(...)} <i>unconditionally</i> — so on a stale/empty
-   * single-flight cache this 30-minute async relay could drive a refresh-token grant (and write the
-   * rotated client back to the session) against the snapshot it captured at stream-open, replaying
-   * a refresh token Keycloak's reuse detection then revokes the whole SSO session for. Without the
-   * filter the relay can never reach {@code authorize}; {@code NotificationPageController.stream}
-   * resolves the bearer read-only and sets it as a plain {@code Authorization} header instead, so
-   * the relay is structurally refresh-incapable rather than depending on a warm cache. Used only by
-   * the frontend stream relay; all request/response traffic still goes through {@link #webClient}.
-   *
-   * <p>The {@code X-Forwarded-For} client-IP relay is applied here just as on {@link #webClient}
-   * (REQ-SEC-011): without it every viewer's stream — and every browser reconnect after a frontend
-   * redeploy — is attributed to the one frontend-container IP and shares a single org-wide per-IP
-   * rate-limit bucket, so a reconnect burst can trip the shared limit and blank live push for
-   * everyone. The guest-edit-token relay is intentionally omitted: the notification stream is an
-   * authenticated-member surface, and since ADR-0159 there is no other kind.
-   *
-   * <p>Also deliberately NOT wired to the observation registry (REQ-OBS-009): a ~30-minute SSE
-   * relay would hold a single client observation/span open for the whole stream, skewing the
-   * latency metrics and delaying span export; the correlation-id relay already covers debuggability
-   * here.
+   * <p>Relays the correlation, org-unit, locale and client-IP headers like {@link #webClient}, but
+   * has no Resilience4j chain, no response/read timeouts, no observation and no OAuth2 exchange
+   * filter, so the long-lived relay can never trigger a refresh-token grant (REQ-SEC-012). The
+   * bearer is set as a plain header by the caller.
    *
    * @return the streaming WebClient
    */
@@ -818,22 +559,10 @@ public class WebClientConfig {
   }
 
   /**
-   * Backend WebClient for the {@code /ws/sync} subscribe-authorization probe (REQ-FE-015,
-   * ADR-0094).
+   * WebClient for the {@code /ws/sync} subscribe-authorization probe (REQ-FE-015, ADR-0094).
    *
-   * <p>Deliberately carries <b>no</b> OAuth2 exchange filter: a subscribe is authorized on a
-   * WebSocket message / auth-executor thread that has no servlet request context, so {@code
-   * ServletOAuth2AuthorizedClientExchangeFilterFunction} could not resolve a bearer there anyway —
-   * and, exactly as for {@link #sseWebClient}, letting it reach {@code
-   * OAuth2AuthorizedClientManager.authorize(...)} against a snapshot token could drive a
-   * refresh-token grant that Keycloak's reuse detection then punishes (REQ-SEC-012). {@code
-   * LiveSyncSubscriptionAuthorizer} therefore sets the captured bearer and active-org-unit pin as
-   * explicit headers instead. Unlike {@link #sseWebClient} this keeps the normal connect/read
-   * timeouts ({@link #connector(boolean)} with {@code false}) — an auth probe is a short request,
-   * and a timeout must abort quickly and fail the subscribe open — and does not need the
-   * Resilience4j chain (a one-shot probe with an explicit block timeout). The correlation-id /
-   * locale / client-IP relays are applied for parity with the other clients; the guest-edit-token
-   * relay is omitted (a {@code /ws/sync} socket is an authenticated-member surface).
+   * <p>Has no OAuth2 exchange filter and no Resilience4j chain; the caller sets the bearer and
+   * org-unit pin as headers. Keeps the normal timeouts so a probe fails fast.
    *
    * @return the subscribe-authorization WebClient
    */

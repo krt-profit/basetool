@@ -37,29 +37,12 @@ import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 
 /**
- * Dedicated, fail-closed security filter chain for the Prometheus scrape endpoint {@code
- * /actuator/prometheus} (REQ-OBS-005, ADR-0072, epic #936 Phase 1). Mirrors the backend/frontend
- * configs of the same name.
+ * Dedicated fail-closed security filter chain for {@code /actuator/prometheus} (REQ-OBS-005,
+ * ADR-0072).
  *
- * <p>Design decisions, all deliberate:
- *
- * <ul>
- *   <li><b>Own chain, ordered before the main chain</b> ({@code @Order(1)}, {@code securityMatcher}
- *       on exactly this path): the scrape must not ride the JWT resource-server rules of {@link
- *       SecurityConfig} — a Prometheus server holds no Keycloak token, and the metrics payload must
- *       never become reachable with a stolen extractor JWT either (particularly relevant on this
- *       internet-facing gateway). Only the dedicated basic-auth identity counts.
- *   <li><b>Fail-closed:</b> when {@link MonitoringScrapeProperties#isConfigured()} is {@code false}
- *       (env vars unset — dev, test, e2e, prod before the monitoring rollout) the chain is built
- *       with {@code denyAll()}; there is no unauthenticated fallback.
- *   <li><b>Basic auth against an in-memory user:</b> the single scrape principal exists only in
- *       this chain's local {@link InMemoryUserDetailsManager}; it is not a bean, so it can never
- *       leak into the main chain's authentication. The plaintext env value is BCrypt-hashed at
- *       startup via the delegating encoder ({@code {bcrypt}} storage format).
- *   <li><b>Stateless, no CSRF, no request cache:</b> the scraper is a machine calling with
- *       credentials on every request; sessions or saved requests would only create garbage state.
- *       CSRF does not apply to a credentialed GET with no browser session.
- * </ul>
+ * <p>Ordered before {@link SecurityConfig}, it accepts only an in-memory basic-auth scrape user
+ * (never a JWT), denies everything when no credentials are configured, and is stateless without
+ * CSRF.
  */
 @Configuration
 @RequiredArgsConstructor
@@ -74,12 +57,10 @@ public class MonitoringScrapeSecurityConfig {
   private final MonitoringScrapeProperties properties;
 
   /**
-   * Builds the scrape filter chain described in the class Javadoc. Ordered before the main {@link
-   * SecurityConfig} chain so {@code /actuator/prometheus} never falls through to the JWT
-   * resource-server rules.
+   * Builds the scrape filter chain, ordered before the main {@link SecurityConfig} chain.
    *
    * @param http the Spring Security builder for this chain
-   * @return the configured chain — basic-auth-gated when credentials are configured, deny-all
+   * @return the configured chain: basic-auth-gated when credentials are configured, deny-all
    *     otherwise
    * @throws Exception propagated from {@link HttpSecurity#build()}
    */

@@ -39,18 +39,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Collects sync findings into the append-only {@code external_sync_report} table (SC_WIKI_SYNC_
- * PLAN.md §8.8) and serves them back, paged, to the admin sync-report pages.
+ * Records sync findings in the append-only {@code external_sync_report} table and serves them,
+ * paged, to the admin sync-report pages.
  *
- * <p>Shared by every sync service across the rollout. R3 is the first writer (the Wiki commodity
- * merge). A sync cycle calls {@link #beginRun()} once to obtain a {@code run_id}, then {@link
- * #logCommodityEvent} (or a future per-aggregate variant) for each finding, then {@link #pruneRuns}
- * at the end to enforce the §8.8 "keep the last 30 runs per source" retention.
- *
- * <p>The write methods carry no transaction annotation of their own: they are designed to be called
- * from within the calling sync's {@code @Transactional} boundary so the audit rows commit (or roll
- * back) atomically with the data changes they describe. The read methods open their own read-only
- * transaction for the controller.
+ * <p>A sync run calls {@link #beginRun()}, logs its findings, then {@link #pruneRuns} to keep the
+ * last {@link #RUNS_TO_KEEP} runs per source. Write methods join the caller's transaction.
  */
 @Slf4j
 @Service
@@ -109,10 +102,8 @@ public class SyncReportService {
   }
 
   /**
-   * Records one SC Wiki sync finding for an arbitrary aggregate. Stamps {@code source = SCWIKI} and
-   * {@code ran_at = now}; the caller supplies the aggregate label ({@code "commodity"} / {@code
-   * "game_item"} / {@code "ship_type"} / {@code "blueprint"}). Used by the R4 blueprint / item /
-   * vehicle syncs; {@link #logCommodityEvent} delegates here for the R3 commodity merge.
+   * Records one SC Wiki sync finding for the given aggregate, stamping {@code source = SCWIKI} and
+   * {@code ran_at = now}.
    *
    * @param runId the current run's id (from {@link #beginRun()})
    * @param eventType the kind of finding
@@ -143,10 +134,8 @@ public class SyncReportService {
   }
 
   /**
-   * Records one UEX-sync finding for an arbitrary aggregate. Stamps {@code source = UEX} and {@code
-   * ran_at = now}; the caller supplies the aggregate label ({@code "game_item"} / {@code
-   * "commodity"} / …). The UEX side was previously log-only — only the SC Wiki syncs wrote here —
-   * so the {@code /admin/sync-reports/uex} tab stayed empty; this method is the first UEX writer.
+   * Records one UEX sync finding for the given aggregate, stamping {@code source = UEX} and {@code
+   * ran_at = now}.
    *
    * @param runId the current run's id (from {@link #beginRun()})
    * @param eventType the kind of finding
@@ -177,14 +166,8 @@ public class SyncReportService {
   }
 
   /**
-   * Records one KRT-P4K-Reader-import finding for an arbitrary aggregate. Stamps {@code source =
-   * P4K} and {@code ran_at = now}; the caller supplies the aggregate label ({@code "game_item"} /
-   * {@code "ship_type"} / {@code "manufacturer"} / {@code "material"} / {@code "blueprint"}). The
-   * P4K catalog import is the only writer — it emits {@link SyncEventType#LINKED_VIA_NAME} for a
-   * canonical-UUID backfill reached through the name/slug fallback, {@link
-   * SyncEventType#BACKFILL_AMBIGUOUS} when the existing canonical UUID disagrees with the P4K GUID
-   * (kept, not overwritten), {@link SyncEventType#CREATED_FROM_P4K} for an opt-in seeded row, and
-   * one {@link SyncEventType#SYNC_RUN_SUMMARY} per run.
+   * Records one P4K catalog-import finding for the given aggregate, stamping {@code source = P4K}
+   * and {@code ran_at = now}.
    *
    * @param runId the current run's id (from {@link #beginRun()})
    * @param eventType the kind of finding
@@ -215,15 +198,8 @@ public class SyncReportService {
   }
 
   /**
-   * Enforces the §8.8 retention: deletes every event of {@code source} whose run is older than the
-   * newest {@link #RUNS_TO_KEEP}. No-op when the source has fewer than the cap (the keep set would
-   * be the whole population). Skips the delete entirely on an empty keep set so the {@code NOT IN
-   * ()} clause is never generated.
-   *
-   * <p>Annotated {@code @Transactional} so the {@code @Modifying} delete always runs inside a
-   * transaction: it joins the caller's transaction when one is active and opens its own when a
-   * caller (e.g. the SC Wiki item / blueprint sync, whose per-row writes are isolated in their own
-   * {@code REQUIRES_NEW} transactions) invokes it without one.
+   * Deletes every event of {@code source} whose run is older than the newest {@link #RUNS_TO_KEEP}
+   * runs; a no-op when fewer runs exist. Joins the caller's transaction or opens one.
    *
    * @param source the catalogue whose old runs should be pruned
    */
@@ -244,15 +220,8 @@ public class SyncReportService {
   }
 
   /**
-   * Deletes every sync-report event older than {@code days} days, optionally scoped to one source.
-   * Backs the admin "delete reports older than X days" maintenance action. The cutoff is {@code now
-   * - days} computed at call time; rows with {@code ran_at} strictly before it are removed. When
-   * {@code source} is {@code null} the purge spans both catalogues; otherwise it is confined to
-   * that source.
-   *
-   * <p>Annotated {@code @Transactional} (read-write) so the {@code @Modifying} delete runs in its
-   * own writable transaction even though the controller class is {@code @Transactional(readOnly =
-   * true)}.
+   * Deletes sync-report events whose {@code ran_at} is more than {@code days} days in the past,
+   * optionally for one source.
    *
    * @param source the catalogue to scope the purge to, or {@code null} for both
    * @param days the minimum age in days a report must exceed to be deleted; must be at least 1

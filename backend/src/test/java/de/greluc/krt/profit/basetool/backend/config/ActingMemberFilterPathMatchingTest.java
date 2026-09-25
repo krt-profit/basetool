@@ -49,17 +49,8 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * The endpoint bound of the acting-member header, driven directly against a raw request URI.
- *
- * <p>Deliberately not part of {@link ActingMemberFilterChainTest}: MockMvc normalises the path
- * before any filter sees it, so the chain level cannot reproduce a percent-encoded spelling — the
- * same limitation {@code TermsAcceptanceAccessFilterTest} records for the identical guard. Testing
- * it there would produce a green assertion that never exercises the code it names.
- *
- * <p>What is at stake: {@code getRequestURI()} is the raw, still-encoded URI while MVC routes on
- * the decoded path (REQ-SEC-029). A {@code startsWith} bound would accept {@code
- * /%61pi/v1/missions} here and let the request dispatch as {@code /api/v1/missions} — impersonation
- * on an endpoint ADR-0129 never granted it.
+ * Tests the endpoint bound of the acting-member header against raw, possibly percent-encoded
+ * request URIs, which MockMvc would normalise away (REQ-SEC-029, ADR-0129).
  */
 class ActingMemberFilterPathMatchingTest {
 

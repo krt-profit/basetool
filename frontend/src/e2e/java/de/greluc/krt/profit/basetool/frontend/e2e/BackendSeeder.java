@@ -51,19 +51,11 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
 
 /**
- * Seeds the minimal backend state the ephemeral-stack create-flows need, via the backend REST API
- * with a bearer token for the synthetic test user.
+ * Seeds the backend state the ephemeral-stack flows need through the backend REST API, with a
+ * bearer token from a Keycloak password grant on the {@code basetool-frontend} client.
  *
- * <p>{@code UserService.syncUser} creates only an {@code app_user} row on first login, never an
- * {@code org_unit_membership}, so staffel-scoped creates (Mission, Ship, RefineryOrder) would
- * otherwise 400 with "user has no org-unit membership". This helper assigns the test user to the
- * seeded IRIDIUM Squadron via {@code PATCH /api/v1/users/{id}/squadron} so those flows can run.
- *
- * <p>Local-stack only: it talks to Keycloak on {@code http://localhost:18080} and the backend on
- * {@code https://localhost:11261} (self-signed dev cert — the HTTP client trusts only that cert).
- * The bearer token is minted with the Keycloak password grant on the {@code basetool-frontend}
- * client (confidential in the E2E realm since ADR-0001 was carried out, so with its throwaway
- * secret); the backend resource server accepts it on issuer + signature alone (no audience check).
+ * <p>Local-stack only: Keycloak on {@code http://localhost:18080}, backend on {@code
+ * https://localhost:11261}.
  */
 public final class BackendSeeder {
 
@@ -98,14 +90,11 @@ public final class BackendSeeder {
   }
 
   /**
-   * Ensures the given test user is a member of the IRIDIUM Squadron so staffel-scoped create
-   * endpoints accept its requests. Idempotent: a no-op when the user already has a squadron.
+   * Ensures the given test user is a member of the IRIDIUM Squadron; a no-op when it already has a
+   * squadron.
    *
-   * <p><b>Requires an ADMIN caller.</b> This <em>self-assigns</em> — it logs {@code username} in
-   * and PATCHes that user's own membership with that user's token. The membership endpoint ({@code
-   * PATCH /api/v1/users/&#123;id&#125;/memberships}) is {@code ADMIN}-gated, so calling this for a
-   * non-admin who has no squadron yet 403s ("Membership seeding PATCH failed: HTTP 403"). To home a
-   * non-admin fixture user, use {@link #assignStaffelMembership} with admin credentials instead.
+   * <p>Requires an ADMIN user, since it patches the user's own membership with that user's token;
+   * use {@link #assignStaffelMembership} for a non-admin.
    *
    * @param username the Keycloak username of the test user; must be an ADMIN
    * @param password the Keycloak password of the test user
@@ -242,9 +231,8 @@ public final class BackendSeeder {
   }
 
   /**
-   * Seeds a {@code PLANNED} operation via {@code POST /api/v1/operations} so the operation-detail
-   * in-place write flows (#576) have a target. The backend stamps the owning org unit from the
-   * actor's active scope, so only a name and status are sent.
+   * Seeds a {@code PLANNED} operation via {@code POST /api/v1/operations}; the backend stamps the
+   * owning org unit from the actor's active scope.
    *
    * @param username Keycloak username of the (mission-manager-or-above) test user
    * @param password Keycloak password
@@ -273,12 +261,8 @@ public final class BackendSeeder {
   }
 
   /**
-   * Resolves the id of an existing {@code Location} by its (unique) name via {@code GET
-   * /api/v1/locations/lookup}, so a test can anchor an inventory row at a location it did NOT
-   * create itself — notably the bootstrap catalog location {@code E2E Refinery Hub}, which (unlike
-   * a freshly {@link #createLocation}d one) is guaranteed to be present in the frontend's
-   * long-lived locations-lookup cache and therefore preselectable in the book-out transfer
-   * dropdown.
+   * Resolves the id of an existing {@code Location} by its unique name via {@code GET
+   * /api/v1/locations/lookup}.
    *
    * @param username the Keycloak username of the (authenticated) test user
    * @param password the Keycloak password of the test user
@@ -314,10 +298,8 @@ public final class BackendSeeder {
   }
 
   /**
-   * Resolves the id of an existing {@code ShipType} by its (unique) name via {@code GET
-   * /api/v1/ship-types?size=1000}, so a test can seed ships of the catalog-provided {@code E2E Ship
-   * Type} without hard-coding its UUID. The endpoint returns a {@code PageResponse}, so the match
-   * is scanned over the {@code content} array.
+   * Resolves the id of an existing {@code ShipType} by its unique name via {@code GET
+   * /api/v1/ship-types?size=1000}.
    *
    * @param username the Keycloak username of the (authenticated) test user
    * @param password the Keycloak password of the test user
@@ -354,11 +336,8 @@ public final class BackendSeeder {
   }
 
   /**
-   * Seeds a single ship into the test user's own hangar via {@code POST /api/v1/hangar/ships} so
-   * the personal-hangar pagination test (REQ-HANGAR-002) has enough rows to span multiple pages
-   * without driving the add-ship modal once per ship. The owning org unit is auto-stamped from the
-   * user's single IRIDIUM membership ({@code owningOrgUnitId} omitted), and {@code fitted} is
-   * always sent because the request record carries a primitive {@code boolean}.
+   * Seeds one ship into the test user's own hangar via {@code POST /api/v1/hangar/ships}; the
+   * owning org unit is auto-stamped from the user's single membership.
    *
    * @param username the Keycloak username of the test user (the ship owner)
    * @param password the Keycloak password of the test user
@@ -452,14 +431,8 @@ public final class BackendSeeder {
   }
 
   /**
-   * Get-or-create variant of {@link #createRefineryMaterial(String, String, String)}: returns the
-   * id of the existing material with that name, creating it only when absent.
-   *
-   * <p>Needed because the frontend caches the materials lookup for 10 minutes: the first
-   * create-page render of the suite freezes the dropdown list for every later test class, so every
-   * class that drives the refinery create form must be able to pre-seed the <em>union</em> of the
-   * dropdown materials idempotently — a blind {@code POST} would fail on the duplicate name when
-   * the sibling class seeded the material first.
+   * Returns the id of the existing material with that name, creating it via {@link
+   * #createRefineryMaterial(String, String, String)} only when absent.
    *
    * @param username admin username
    * @param password admin password
@@ -472,15 +445,8 @@ public final class BackendSeeder {
   }
 
   /**
-   * Get-or-creates a manual RAW refinery input material that POINTS AT a refined output material,
-   * so the create form's read-only "Ausgangsmaterial" display has a name to show once the input is
-   * picked. {@link #ensureRefineryMaterial(String, String, String)} deliberately creates a material
-   * without a refined counterpart (the backend then stamps the output equal to the input), which
-   * leaves the display at its "-" placeholder and cannot tell a working prefill from a broken one.
-   *
-   * <p>Seeds the refined output first (a plain {@code REFINED} material of the same quantity type),
-   * then the raw input carrying its {@code refinedMaterialId} — the backend honours that FK only on
-   * a raw or manually-raw material.
+   * Get-or-creates a manual RAW refinery input material whose {@code refinedMaterialId} points at a
+   * REFINED output material, seeding the output first.
    *
    * @param username admin username
    * @param password admin password
@@ -516,22 +482,17 @@ public final class BackendSeeder {
   }
 
   /**
-   * Creates a refinery order via {@code POST /api/v1/refinery-orders} owned by the caller and
-   * returns its id, so the refinery store / lifecycle / tenancy flows have a persisted order to
-   * drive against without round-tripping the create UI each time. The order targets the given
-   * refinery-hosting location (the catalog-seeded {@code E2E Refinery Hub}) with a single goods row
-   * over the given manual RAW input material — fixed input/output quantities of {@code 100} units
-   * (so the store dialog pre-fills {@code 1.00 SCU}) and quality {@code 750}. The input material
-   * has no refined counterpart, so the backend stamps the output material equal to the input, which
-   * is therefore also the material of every row the store flow later inserts into the Lager.
+   * Creates a refinery order via {@code POST /api/v1/refinery-orders} with a single goods row of
+   * 100 input/output units at quality 750, and returns its id. Without a refined counterpart, the
+   * output material equals the input.
    *
    * @param username the Keycloak username of the order owner (must be an org-unit member, or the
    *     order lands ownerless)
    * @param password the Keycloak password of the order owner
    * @param locationId the id of the refinery-hosting location the order runs at
    * @param inputMaterialId the id of the manual RAW input material of the single goods row
-   * @param owningOrgUnitId the R5.d owner-picker output: the OrgUnit to stamp the order onto, or
-   *     {@code null} to auto-stamp the owner's single membership (or leave it ownerless)
+   * @param owningOrgUnitId the OrgUnit to stamp the order onto, or {@code null} to auto-stamp the
+   *     owner's single membership
    * @param missionId the id of a mission to link the order to, or {@code null} for no mission
    * @return the created refinery order's id
    */
@@ -559,14 +520,8 @@ public final class BackendSeeder {
   }
 
   /**
-   * Attempts {@code POST /api/v1/refinery-orders} and returns the HTTP status WITHOUT throwing, so
-   * a test can assert the create-time OrgUnit-stamping matrix (REQ-ORG-004) and the create-time
-   * validation edges: a single-membership user auto-stamps; a membershipless user yields an
-   * ownerless order; a multi-membership user with no pick is rejected (400); any foreign pick is
-   * rejected (400); a non-refinery location is rejected (400); and an empty goods list is rejected
-   * (400). Passing a {@code null} {@code inputMaterialId} sends an empty goods array to exercise
-   * the {@code @NotEmpty} constraint; a {@code null} {@code owningOrgUnitId} sends no picker
-   * output.
+   * Attempts {@code POST /api/v1/refinery-orders} and returns the HTTP status without throwing, to
+   * assert the create-time OrgUnit stamping (REQ-ORG-004) and validation edges.
    *
    * @param username the Keycloak username of the creating user
    * @param password the Keycloak password of the creating user
@@ -626,19 +581,15 @@ public final class BackendSeeder {
   }
 
   /**
-   * Attempts {@code PUT /api/v1/refinery-orders/{id}} carrying the given optimistic-lock version
-   * and returns the HTTP status WITHOUT throwing, so a test can assert the update edges: a stale
-   * version surfaces as 409 (the version check runs first), while a non-owner non-logistician
-   * caller sending the <em>current</em> version is rejected by the service owner gate with 403. The
-   * body re-sends the order's location + a single goods row (the service replaces the goods
-   * wholesale) and flips the status to {@code IN_PROGRESS}.
+   * Attempts {@code PUT /api/v1/refinery-orders/{id}} with the given version, setting the status to
+   * {@code IN_PROGRESS}, and returns the HTTP status without throwing.
    *
    * @param username the Keycloak username of the acting user
    * @param password the Keycloak password of the acting user
    * @param orderId the refinery order id to update
    * @param locationId the id of the refinery-hosting location to re-send
    * @param inputMaterialId the id of the manual RAW input material to re-send
-   * @param version the optimistic-lock version to submit (current → passes; stale → 409)
+   * @param version the optimistic-lock version to submit (current passes; stale gives 409)
    * @return the HTTP status code of the update attempt
    */
   public int attemptUpdateRefineryOrderStatus(
@@ -667,13 +618,8 @@ public final class BackendSeeder {
   }
 
   /**
-   * Stores (einlagert) a refinery order's output into the Lager via {@code POST
-   * /api/v1/refinery-orders/{id}/store} and throws on a non-2xx status, so a test can seed an
-   * already-completed order or drive the store as a chosen assignee. The single store item carries
-   * the output material, the target location, the quality and the amount; an optional {@code
-   * assigneeUserId} redirects the resulting {@code InventoryItem} to another member (the stored row
-   * is then stamped with that assignee's owning org unit), and an optional {@code note} is
-   * propagated to the inventory row (REQ-INV-001).
+   * Stores a refinery order's output into the Lager via {@code POST
+   * /api/v1/refinery-orders/{id}/store}; throws on a non-2xx status (REQ-INV-001).
    *
    * @param username the Keycloak username of the acting user (owner, logistician or admin)
    * @param password the Keycloak password of the acting user
@@ -712,11 +658,8 @@ public final class BackendSeeder {
   }
 
   /**
-   * Attempts {@code POST /api/v1/refinery-orders/{id}/store} and returns the HTTP status WITHOUT
-   * throwing, so a test can assert the store edges: re-storing an already-{@code COMPLETED} order
-   * is rejected (400), a viewer outside the order's owning OrgUnit scope is rejected by the {@code
-   * canEditRefineryOrder} gate (403), and storing to a multi-membership assignee with no per-output
-   * picker is rejected (400). The item shape mirrors {@link #storeRefineryOrder}.
+   * Attempts {@code POST /api/v1/refinery-orders/{id}/store} and returns the HTTP status without
+   * throwing; same item shape as {@link #storeRefineryOrder}.
    *
    * @param username the Keycloak username of the acting user
    * @param password the Keycloak password of the acting user
@@ -986,10 +929,8 @@ public final class BackendSeeder {
   }
 
   /**
-   * Idempotently grants a user access to a bank account: creates the grant, tolerating a {@code
-   * 409} when the user already holds one on that account (an org-unit account auto-grants some
-   * members, so an explicit grant on top duplicates the unique {@code (user, account)} row). Either
-   * outcome leaves the grantee able to act on the account, which is all a test precondition needs.
+   * Grants a user access to a bank account, treating a {@code 409} for an existing grant as
+   * success.
    *
    * @param username the granting caller's Keycloak username
    * @param password the granting caller's Keycloak password
@@ -1032,11 +973,8 @@ public final class BackendSeeder {
   }
 
   /**
-   * Raises a confirm-before-post {@code DEPOSIT} booking request against the given account via
-   * {@code POST /api/v1/org-units/bank/requests} and returns the created request's id. The request
-   * is recorded {@code PENDING} and moves no money; a deposit may target any active account and is
-   * never approval-limited (REQ-BANK-042), so any authenticated caller may raise it. Used by the
-   * live-sync e2e to seed a pending request a staff decision then broadcasts to peer viewers.
+   * Raises a {@code PENDING} deposit booking request via {@code POST
+   * /api/v1/org-units/bank/requests} and returns its id (REQ-BANK-042).
    *
    * @param username the requester's Keycloak username
    * @param password the password
@@ -1118,9 +1056,7 @@ public final class BackendSeeder {
 
   /**
    * Get-or-creates the single {@code ORG_UNIT} bank account owned by the given org unit via {@code
-   * POST /api/v1/bank/accounts} (epic #666 F1) and returns its id. Idempotent across the shared
-   * ephemeral stack: the V150 partial unique index permits at most one account per org unit, so an
-   * existing one is reused rather than re-POSTed (which would 409).
+   * POST /api/v1/bank/accounts} and returns its id.
    *
    * @param mgmtUser a {@code BANK_MANAGEMENT} (or admin) Keycloak username
    * @param mgmtPassword the password
@@ -1168,9 +1104,7 @@ public final class BackendSeeder {
   }
 
   /**
-   * Reads the compute-on-read balance of a bank account via the management detail endpoint ({@code
-   * GET /api/v1/bank/accounts/{id}}), as whole aUEC. Used to assert a confirmation actually moved
-   * money (epic #666 F2).
+   * Reads a bank account's balance via {@code GET /api/v1/bank/accounts/{id}}, as whole aUEC.
    *
    * @param username a username that may see the account (management / admin / a grantee)
    * @param password the password
@@ -1185,9 +1119,8 @@ public final class BackendSeeder {
   }
 
   /**
-   * Finds the id of the caller's own {@code PENDING} booking request on the given account with the
-   * given amount, from {@code GET /api/v1/org-units/bank/requests} (epic #666 F2), or {@code null}.
-   * Lets a test target the exact request it just raised (distinct amounts per test method).
+   * Finds the caller's own {@code PENDING} booking request on the given account with the given
+   * amount, from {@code GET /api/v1/org-units/bank/requests}.
    *
    * @param username the requesting officer/lead's Keycloak username
    * @param password the password
@@ -1209,8 +1142,8 @@ public final class BackendSeeder {
   }
 
   /**
-   * Reads the lifecycle status of one of the caller's own booking requests by id, from {@code GET
-   * /api/v1/org-units/bank/requests} (epic #666 F2), or {@code null} when absent.
+   * Reads the status of one of the caller's own booking requests from {@code GET
+   * /api/v1/org-units/bank/requests}.
    *
    * @param username the requesting officer/lead's Keycloak username
    * @param password the password
@@ -1240,21 +1173,12 @@ public final class BackendSeeder {
   }
 
   /**
-   * Creates a Job Order via {@code POST /api/v1/orders} with a single material line and returns its
-   * id, so the handover flow has an order to record a handover against. The material line's {@code
-   * minQuality} must be at least 650 ({@code CreateJobOrderMaterialDto} constraint).
-   *
-   * <p>The given org unit is named as BOTH the responsible (processing) and the requesting
-   * (customer) unit — these flows model a squadron that owns and fulfils its own order. The backend
-   * requires a {@code responsibleOrgUnitId} that resolves to a <em>profit-eligible</em> unit; the
-   * canonical IRIDIUM Squadron is opted in once during stack bootstrap ({@link E2eStackExtension}),
-   * so passing it here succeeds. A squadron-responsible order is private to that squadron + admins,
-   * which is exactly the ownership these flows assert.
+   * Creates a job order with a single material line via {@code POST /api/v1/orders}, naming the
+   * given org unit as both responsible and requesting unit, and returns its id.
    *
    * @param username the Keycloak username of the (admin) test user
    * @param password the Keycloak password of the test user
-   * @param orgUnitId the org unit named as both the responsible (processing) and requesting
-   *     (customer) unit of the order; must be a profit-eligible squadron (see bootstrap seeding)
+   * @param orgUnitId the responsible and requesting org unit; must be a profit-eligible squadron
    * @param handle the free-text contact handle of the order
    * @param materialId the id of the (job-order) material to request
    * @param minQuality the minimum acceptable quality of the requested material ({@code >= 650})
@@ -1287,12 +1211,7 @@ public final class BackendSeeder {
   }
 
   /**
-   * Overload of {@link #createJobOrder(String, String, String, String, String, int, double)} that
-   * names <em>distinct</em> responsible (processing) and requesting (customer) org units — used to
-   * model an order a (possibly non-profit) ordering unit <em>placed</em> with a profit-eligible
-   * processing unit, so the requesting unit's members can exercise the requesting-owner escape
-   * (REQ-ORDERS-023). The responsible unit must be profit-eligible; the requesting unit may be any
-   * org unit.
+   * Creates a job order with distinct responsible and requesting org units (REQ-ORDERS-023).
    *
    * @param username the Keycloak username of the (admin) test user
    * @param password the Keycloak password of the test user
@@ -1370,23 +1289,14 @@ public final class BackendSeeder {
   }
 
   /**
-   * Books production (Herstellung) for an item order's single line up to its full ordered amount,
-   * so the manufactured amount reaches the ordered amount and the line becomes deliverable
-   * (REQ-ORDERS-025). For each derived recipe material it links exactly the required stock at the
-   * given location and consumes it through {@code POST
-   * /api/v1/orders/{id}/items/{itemId}/production}. Since delivery is now gated by manufacture,
-   * item handover flows must call this first.
-   *
-   * <p>The payload carries the now-mandatory {@code bookIn} block (REQ-INV-032 — a production
-   * booking without one is rejected 400), targeting the same location as the consumed stock: the
-   * produced units land as game-item Lager stock owned by the acting user, auto-earmarked to the
-   * producing order (the {@code allocateToOrder} default).
+   * Books production for an item order's single line up to its full ordered amount, linking and
+   * consuming the required recipe stock at the given location and booking the produced units in
+   * there (REQ-ORDERS-025, REQ-INV-032).
    *
    * @param username the Keycloak username of the (logistician/admin) test user
    * @param password the Keycloak password of the test user
    * @param orderId the item order whose single line to fully manufacture
-   * @param locationId the storage location for the linked recipe-material stock and the produced
-   *     item stock's book-in target
+   * @param locationId the location of the consumed stock and of the produced stock
    */
   public void manufactureItemOrderLineFully(
       String username, String password, String orderId, String locationId) {
@@ -1474,15 +1384,8 @@ public final class BackendSeeder {
   }
 
   /**
-   * Creates a non-personal inventory item linked to <em>neither</em> a job order <em>nor</em> a
-   * mission via {@code POST /api/v1/inventory} and returns its id — the overwhelmingly common Lager
-   * case (plain squadron stock). Because the seeding user is an IRIDIUM member, create-time
-   * stamping sets the item's {@code owningOrgUnit} to IRIDIUM while {@code jobOrder} and {@code
-   * mission} stay {@code null}. This is exactly the row shape the group-on-read stack queries
-   * ({@code findGlobalStacks} / {@code findUserStacks}) must still surface: a
-   * constructor-expression projection over those nullable associations renders an implicit inner
-   * join that silently drops such rows (REQ-INV-002), so this seeder backs the {@code
-   * InventoryStackViewE2eTest} regression.
+   * Creates a non-personal inventory item linked to neither a job order nor a mission via {@code
+   * POST /api/v1/inventory} and returns its id.
    *
    * @param username the Keycloak username of the test user (must be an org-unit member)
    * @param password the Keycloak password of the test user
@@ -1541,14 +1444,8 @@ public final class BackendSeeder {
   }
 
   /**
-   * Creates an ITEM job order with a single finished-item line via {@code POST
-   * /api/v1/orders/items} and returns its id, so item-allocation flows (REQ-INV-031) have a
-   * qualifying order requesting the given game item. The line's blueprint is resolved from the
-   * orderable-item catalog ({@code GET /api/v1/orders/item-catalog/{gameItemId}/blueprints} — the
-   * same source the create form's picker uses), taking the first offered recipe; the derived
-   * material requirements are snapshotted server-side. Like the material overload, the given org
-   * unit is named as both the responsible (processing, must be profit-eligible) and the requesting
-   * (customer) unit.
+   * Creates an ITEM job order with a single line via {@code POST /api/v1/orders/items}, using the
+   * first blueprint the item catalog offers, and returns its id.
    *
    * @param username the Keycloak username of the (admin) test user
    * @param password the Keycloak password of the test user
@@ -1622,11 +1519,8 @@ public final class BackendSeeder {
   }
 
   /**
-   * Creates a Mission that belongs to the given operation via {@code POST /api/v1/missions}, so the
-   * operation detail page's embedded missions table and finance roll-up render this mission — the
-   * setup the {@code operation:{id}} {@code missions}/{@code finance} cross-publish e2e (#1241)
-   * needs. Same auto-stamping and planned-start semantics as {@link #createMission(String, String,
-   * String, boolean)}, with {@code operationId} added to the request.
+   * Creates a mission linked to the given operation via {@code POST /api/v1/missions}; otherwise
+   * like {@link #createMission(String, String, String, boolean)}.
    *
    * @param username the Keycloak username of the creating user (a member of the owning Staffel)
    * @param password the Keycloak password
@@ -1653,26 +1547,13 @@ public final class BackendSeeder {
   }
 
   /**
-   * Adds a guest participant to a mission via {@code POST /api/v1/missions/{id}/participants/add},
-   * so the mission's finance "Neuer Eintrag" modal has a selectable entry in its {@code required}
-   * participant dropdown (a finance entry must be attributed to a participant). A free-text {@code
-   * guestName} with no {@code userId} takes the public self-signup path and is only ever linked to
-   * a registered member when it exactly matches an existing account name — so a synthetic name that
-   * no test user carries always yields a genuine guest. The endpoint answers with the full {@link
-   * de.greluc.krt.profit.basetool.frontend.model.dto.MissionDto}, whose top-level {@code id} is the
-   * mission id {@link #seedEntity} extracts and returns.
+   * Adds an external participant with no account to a mission via {@code POST
+   * /api/v1/missions/{id}/participants/add}.
    *
-   * <p>Called {@code addGuestParticipant} until ADR-0159. The row is unchanged — a named person
-   * with no account — but its author is not: it used to be the person themselves, signing up
-   * anonymously, and it is now a member who can see the Einsatz recording them (decision D4).
-   *
-   * @param username the Keycloak username of the mission's creator (who can see, and thus record
-   *     participants on, their own mission)
+   * @param username the Keycloak username of the mission's creator
    * @param password the Keycloak password
    * @param missionId the mission to add the participant to
-   * @param externalName the external participant's display name; must not match any registered
-   *     user's name, or the row is linked to that user instead and the caller needs {@code
-   *     canManageMission}
+   * @param externalName the external participant's name; must not match any registered user's name
    * @return the mission id echoed back by the endpoint's {@code MissionDto} response
    */
   public String addExternalParticipant(
@@ -1686,18 +1567,13 @@ public final class BackendSeeder {
 
   /**
    * Registers an existing app user as a mission participant via {@code POST
-   * /api/v1/missions/{id}/participants/slim} (naming somebody else needs {@code canManageMission},
-   * which the mission's creator has), so the user becomes a {@code p.user != null} participant. A
-   * unit's explicit responsible person is chosen from the mission's registered participants, so
-   * this is the precondition for seeding — and then clearing — a unit responsible in the unit-edit
-   * modal (REQ-FE-011).
+   * /api/v1/missions/{id}/participants/slim}.
    *
    * @param username the Keycloak username of the mission's manager (its creator)
    * @param password the Keycloak password
    * @param missionId the mission to add the participant to
    * @param userId the {@code app_user} id to register (see {@link #getUserId})
-   * @return the mission id, unchanged — the slim endpoint answers with the participant list, not
-   *     with the mission
+   * @return the mission id, unchanged
    */
   public String addRegisteredParticipant(
       String username, String password, String missionId, String userId) {
@@ -1734,16 +1610,12 @@ public final class BackendSeeder {
   }
 
   /**
-   * Attempts {@code POST /api/v1/orders} naming the given org unit as the responsible (processing)
-   * unit and returns the HTTP status WITHOUT throwing, so a test can assert the documented 400 when
-   * the named unit is not profit-eligible. Only profit-eligible squadrons / Spezialkommandos may
-   * process orders (V128); a freshly created SK is not profit-eligible by default, so naming it as
-   * the responsible unit is rejected with 400 ("not profit-eligible").
+   * Attempts {@code POST /api/v1/orders} with the given responsible org unit and returns the HTTP
+   * status without throwing; a non-profit-eligible responsible unit gives 400.
    *
    * @param username the Keycloak username (an admin, to create in all-squadrons scope)
    * @param password the Keycloak password
-   * @param responsibleOrgUnitId the responsible (processing) OrgUnit id under test (a
-   *     non-profit-eligible SK, to trigger the 400)
+   * @param responsibleOrgUnitId the responsible (processing) OrgUnit id under test
    * @param requestingOrgUnitId the requesting (customer) OrgUnit id
    * @param handle the order contact handle
    * @param materialId the requested material id
@@ -1839,10 +1711,7 @@ public final class BackendSeeder {
 
   /**
    * Posts a {@code RefineryExtract} JSON to {@code POST /api/v1/refinery-orders/import-extract} and
-   * returns the backend's draft answer verbatim — exactly what the ingest gateway forwards and then
-   * stages in Redis as a handoff's {@code draftJson}. Used by the ingest-handoff e2e to reproduce a
-   * staged handoff from the real backend matcher (resolving the fixture's names against the seeded
-   * catalog) rather than hand-crafting draft JSON with fragile per-run ids.
+   * returns the backend's draft answer verbatim.
    *
    * @param username the Keycloak username of the (member) test user
    * @param password the Keycloak password
@@ -1896,10 +1765,8 @@ public final class BackendSeeder {
   }
 
   /**
-   * Creates a {@code BEREICH} OrgUnit (area) via {@code POST /api/v1/org-hierarchy/bereiche}
-   * (admin-only) and returns its id (epic #692, REQ-ORG-014). Backs the Phase 7 org-hierarchy
-   * visibility-matrix e2e. Name/shorthand are unique across all OrgUnits; department/parent are
-   * omitted (the matrix wires leadership + ownership separately).
+   * Creates a {@code BEREICH} OrgUnit via {@code POST /api/v1/org-hierarchy/bereiche} and returns
+   * its id (REQ-ORG-014).
    *
    * @param adminUser an admin Keycloak username
    * @param adminPassword the admin password
@@ -1917,10 +1784,9 @@ public final class BackendSeeder {
   }
 
   /**
-   * Grants a user a Bereichsleitung role on a Bereich via {@code POST
-   * /api/v1/org-hierarchy/bereiche/{id}/members} (admin-only, epic #692 REQ-ORG-017). The user must
-   * hold no Staffel membership (the leader-excludes-Staffel invariant). Backs the Phase 7
-   * visibility-matrix e2e.
+   * Grants a user a Bereichsleitung role via {@code POST
+   * /api/v1/org-hierarchy/bereiche/{id}/members} (REQ-ORG-017). The user must hold no Staffel
+   * membership.
    *
    * @param adminUser an admin Keycloak username
    * @param adminPassword the admin password
@@ -1939,11 +1805,8 @@ public final class BackendSeeder {
   }
 
   /**
-   * Opts a squadron into (or out of) Job-Order processing by setting its {@code is_profit_eligible}
-   * flag via {@code PATCH /api/v1/squadrons/{id}/profit-eligible} (admin-only, body {@code
-   * {"eligible": …}}). Only profit-eligible org units may be a job order's responsible (processing)
-   * unit and appear in the create form's responsible picker (V128), so this is a precondition for
-   * seeding any order owned by the squadron. Throws on a non-2xx status.
+   * Sets a squadron's {@code is_profit_eligible} flag via {@code PATCH
+   * /api/v1/squadrons/{id}/profit-eligible}; throws on a non-2xx status.
    *
    * @param adminUser an admin Keycloak username (the endpoint is ADMIN-gated)
    * @param adminPassword the admin password
@@ -1990,12 +1853,8 @@ public final class BackendSeeder {
   }
 
   /**
-   * Opts a Spezialkommando into (or out of) Job-Order processing by setting its {@code
-   * is_profit_eligible} flag via {@code PATCH /api/v1/special-commands/{id}/profit-eligible}
-   * (admin-only, body {@code {"eligible": …}}). The SK counterpart of {@link
-   * #setSquadronProfitEligible}: only profit-eligible org units may be a job order's responsible
-   * (processing) unit and appear in the create form's responsible picker (V128). Throws on a
-   * non-2xx status.
+   * Sets a Spezialkommando's {@code is_profit_eligible} flag via {@code PATCH
+   * /api/v1/special-commands/{id}/profit-eligible}; throws on a non-2xx status.
    *
    * @param adminUser an admin Keycloak username (the endpoint is ADMIN-gated)
    * @param adminPassword the admin password
@@ -2022,13 +1881,8 @@ public final class BackendSeeder {
   }
 
   /**
-   * Seeds one orderable item — a {@code game_item} plus an active {@code blueprint} that outputs it
-   * with a single resolved RESOURCE ingredient — directly over JDBC, so the item-order create
-   * form's (frontend-cached) item picker has at least one entry. An item is "orderable" iff it is
-   * the output of an active blueprint that has a RESOURCE ingredient resolved to a {@code material}
-   * ({@code BlueprintRepository.findOrderableItems}); this seeds exactly that minimal shape, with
-   * the ingredient pointing at the given (already-created) material. Local-stack only (JDBC to the
-   * ephemeral Postgres). Returns the created game item's id.
+   * Seeds an orderable item over JDBC: a {@code game_item} plus an active {@code blueprint}
+   * outputting it with one RESOURCE ingredient resolved to the given material. Local-stack only.
    *
    * @param gameItemName the display name of the orderable item (shown in the picker)
    * @param materialId the id of an existing material used as the blueprint's RESOURCE ingredient
@@ -2074,19 +1928,8 @@ public final class BackendSeeder {
   }
 
   /**
-   * Makes a material sellable by seeding a {@code terminal} plus a {@code material_price} row that
-   * lists the terminal with a positive sell price, directly over JDBC. The book-out modal enables
-   * its "Verkauf" (SELL) radio only when {@code GET /api/v1/materials/{id}/terminals} returns a
-   * non-empty list, and that endpoint joins {@code material_price} to {@code terminal} filtering on
-   * {@code statusSell = true OR priceSell > 0} (both set here). Terminal/price rows are normally
-   * UEX-synced and not creatable via the admin REST API on a fresh DB, hence the direct insert —
-   * mirroring {@link #seedOrderableItem}. The backend stores the chosen terminal name as a free
-   * string (no FK validation on book-out), so this is purely the UI-enabling precondition.
-   *
-   * <p>Idempotency note: a fresh random {@code terminal_id} is used per call, so repeated calls for
-   * the same material never trip the {@code material_price (material_id, terminal_id)} unique
-   * constraint; {@code id_terminal} is left {@code null} (its unique index permits many nulls).
-   * Local-stack only (JDBC to the ephemeral Postgres).
+   * Makes a material sellable by seeding over JDBC a {@code terminal} and a {@code material_price}
+   * row with a positive sell price. Each call uses a fresh terminal. Local-stack only.
    *
    * @param materialId the id of the material to make sellable (a terminal offers to buy it)
    * @return the seeded terminal's display name (the value the SELL dropdown option carries)
@@ -2120,12 +1963,9 @@ public final class BackendSeeder {
   }
 
   /**
-   * Adds the given user to a Spezialkommando (SK) via {@code POST
-   * /api/v1/special-commands/{id}/members/{userId}} (admin-only here), creating an {@code
-   * org_unit_membership} row of kind {@code SPECIAL_COMMAND} with all role flags initially false.
-   * Independent of any squadron membership — a user may hold an SK membership with no squadron — so
-   * this is how multi-tenancy tests build the SK-only and squadron-plus-SK viewer profiles. A 409
-   * (already a member) is treated as success so the call is safe to repeat.
+   * Adds the given user to a Spezialkommando via {@code POST
+   * /api/v1/special-commands/{id}/members/{userId}}, with all role flags false; a 409 counts as
+   * success.
    *
    * @param adminUser an admin Keycloak username (the endpoint gates on ADMIN or SK-lead)
    * @param adminPassword the admin password
@@ -2159,13 +1999,8 @@ public final class BackendSeeder {
   }
 
   /**
-   * Removes the given user from a Spezialkommando (SK) via {@code DELETE
-   * /api/v1/special-commands/{id}/members/{userId}} (admin-only here), deleting the {@code
-   * org_unit_membership} row. Used by tenancy tests to model a user leaving an org unit they still
-   * own inventory in: when this is <em>not</em> the user's last membership, the {@code
-   * InventoryOrgUnitReconciler} leaves the {@code owning_org_unit_id} stamp untouched
-   * (REQ-INV-004), so the user keeps an org-stamped inventory item without belonging to that org
-   * unit — the REQ-ORG-011 owner-escape scenario.
+   * Removes the given user from a Spezialkommando via {@code DELETE
+   * /api/v1/special-commands/{id}/members/{userId}}.
    *
    * @param adminUser an admin Keycloak username (the endpoint gates on ADMIN or SK-lead)
    * @param adminPassword the admin password
@@ -2289,11 +2124,8 @@ public final class BackendSeeder {
   }
 
   /**
-   * Attempts {@code POST /api/v1/inventory/{id}/book-out} (a plain DISCARD) and returns the HTTP
-   * status WITHOUT throwing, so a test can assert the edit gate: a viewer outside the item's owning
-   * OrgUnit scope is rejected with 403 ({@code canEditInventoryItem}), while an in-scope owner
-   * succeeds. The body carries only the amount, the DISCARD type and the optimistic-lock version;
-   * for the 403 path the {@code @PreAuthorize} gate fires before the version is even consulted.
+   * Attempts a DISCARD book-out via {@code POST /api/v1/inventory/{id}/book-out} and returns the
+   * HTTP status without throwing.
    *
    * @param username the Keycloak username of the acting user
    * @param password the Keycloak password of the acting user
@@ -2362,11 +2194,8 @@ public final class BackendSeeder {
   }
 
   /**
-   * Reads back the Job Order carrying the given (unique) contact handle as an admin via {@code GET
-   * /api/v1/orders?size=1000&status=OPEN}, so a test can assert the responsible / requesting org
-   * units that an anonymous UI submission persisted — the guest cannot read the order back itself.
-   * An admin with no active org-unit pin sees the full cross-scope list, so the order is visible
-   * whatever its responsible unit. Returns {@code null} when no open order carries the handle.
+   * Reads the open job order carrying the given unique contact handle as an admin via {@code GET
+   * /api/v1/orders?size=1000&amp;status=OPEN}.
    *
    * @param adminUser an admin Keycloak username
    * @param adminPassword the admin password
@@ -2392,12 +2221,9 @@ public final class BackendSeeder {
   }
 
   /**
-   * Assigns {@code targetUserId} to a Staffel and sets its per-squadron role flags in one
-   * transaction via the membership-delta {@code PATCH /api/v1/users/{id}/memberships} (admin-only),
-   * sending the desired complete Staffel set {@code {staffeln:[{squadronId, isLogistician,
-   * isMissionManager}]}} (REQ-ORG-017). The reconcile adds the Staffel (re-homing the user, since
-   * the desired set is authoritative) and patches the flags; it is idempotent and needs no user-row
-   * version, so there is no 409 retry loop here.
+   * Assigns {@code targetUserId} to a Staffel with the given role flags via {@code PATCH
+   * /api/v1/users/{id}/memberships} (REQ-ORG-017). The sent Staffel set is authoritative;
+   * idempotent.
    *
    * @param adminUser an admin Keycloak username
    * @param adminPassword the admin password
@@ -2457,15 +2283,7 @@ public final class BackendSeeder {
     return response.statusCode();
   }
 
-  /**
-   * The body of the most recent {@link #patch} response, for failure messages.
-   *
-   * <p>A seeding step that fails during {@code beforeAll} takes the whole suite's bring-up with it,
-   * and the artifact a bring-up failure leaves behind carries no backend log — the extension never
-   * gets far enough to dump one. "HTTP 403" then costs a full CI cycle to turn into a cause, twice
-   * on 2026-09-06. The RFC 7807 body names it: {@code NO_ROLE}, {@code PENDING_APPROVAL}, {@code
-   * ACCESS_DENIED} and an unexpected 500 are four different problems behind two status codes.
-   */
+  /** The body of the most recent {@link #patch} response, included in failure messages. */
   private String lastResponseBody = "";
 
   /**
@@ -2561,21 +2379,9 @@ public final class BackendSeeder {
   }
 
   /**
-   * Records the seeded user's consent to the Terms of Use, so its API calls are not refused with
-   * {@code 403 TERMS_NOT_ACCEPTED} (REQ-SEC-028).
-   *
-   * <p>The E2E stack runs the {@code dev} profile, not {@code test}, so the consent gate is armed
-   * here — and this seeder is an API client, not a browser, so unlike {@code
-   * E2eSupport#acceptTermsIfPrompted} it can never click through a page. Without this every seeded
-   * fixture fails with a 403 before a single browser has opened.
-   *
-   * <p>Deliberately the real {@code POST /api/v1/terms/acceptance} rather than an inserted row or a
-   * profile carve-out: the seeder is acting as that user, and a user genuinely has to have
-   * accepted. Recording it through the endpoint the application uses keeps the seeder honest and
-   * keeps the gate itself exercised by the suite.
-   *
-   * <p>Done once per user per run — the call is idempotent server-side, but {@link #passwordGrant}
-   * runs on every seeder entry point, so caching it avoids ~30 redundant round trips.
+   * Records the user's Terms of Use consent via {@code POST /api/v1/terms/acceptance}, so its API
+   * calls are not refused with {@code 403 TERMS_NOT_ACCEPTED} (REQ-SEC-028). Runs once per user per
+   * run.
    *
    * @param username the user the token belongs to, used as the cache key
    * @param token that user's bearer token
@@ -2653,13 +2459,10 @@ public final class BackendSeeder {
   }
 
   /**
-   * Builds an {@link SSLContext} that trusts ONLY the committed test CA (ADR-0139), loaded from the
-   * CA-only test truststore -- the same shape production pins (REQ-SEC-070). The backend's leaf
-   * names {@code localhost}, so the JDK's default hostname verification still applies and does real
-   * work: the CA also signed the frontend's, ingest's and Keycloak's leaves, and none of those
-   * would be accepted here in the backend's place by name alone.
+   * Builds an HTTP client that trusts only the committed test CA (ADR-0139), with hostname
+   * verification left on.
    *
-   * @return a TLS context trusting only the test CA
+   * @return an HTTP client trusting only the test CA
    */
   /**
    * An HTTP client trusting only the committed test CA, for callers outside the seeder that talk to
@@ -2702,11 +2505,7 @@ public final class BackendSeeder {
 
   /**
    * Locates the committed test truststore under {@code docker/test-tls/} (ADR-0139) by walking up
-   * from the working directory, since the e2e tests run with the {@code frontend} module as CWD
-   * while the file sits under the repository root. It holds the CA that signed the leaf the compose
-   * stack mounts into the backend at {@code /run/secrets/keystore.p12}, so the certificate the
-   * backend serves chains to it by construction. Nothing generates the material at test time, so a
-   * miss means the repository checkout is incomplete rather than that an earlier step failed.
+   * from the working directory.
    *
    * @return the path to the committed test truststore
    * @throws IllegalStateException if the truststore is not found up to the filesystem root

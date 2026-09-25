@@ -31,12 +31,11 @@ import org.mapstruct.MappingTarget;
 public interface PromotionCategoryMapper {
 
   /**
-   * Converts a {@link PromotionCategory} into its {@link PromotionCategoryResponse} DTO, flattening
-   * the parent topic's id and name so the client can render the category in context without an
-   * extra fetch.
+   * Converts a {@link PromotionCategory} into its {@link PromotionCategoryResponse}, flattening the
+   * topic's id and name.
    *
-   * @param entity the managed category to convert
-   * @return the response DTO mirroring the entity's fields
+   * @param entity the category to convert
+   * @return the response DTO
    */
   @Mapping(target = "topicId", source = "topic.id")
   @Mapping(target = "topicName", source = "topic.name")

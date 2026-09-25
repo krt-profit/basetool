@@ -17,19 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/*
- * Announcement admin page module (/admin/announcement), extracted verbatim from the former
- * inline script of admin/announcement.html (ADR-0069, follow-up to #924).
- *
- * In-place save of the announcement (writes the bumped optimistic-lock version back into the
- * hidden input) and in-place delete (resets the form to its empty create state), both via
- * window.krtFetch with the classic POST->redirect forms as the no-JS fallback; plus the
- * delete-confirm modal wiring.
- *
- * The interpolated toast/conflict strings stay inline in the page bootstrap as the ANNOUNCE_MSG /
- * ANNOUNCE_CONFLICT globals this module reads.
- */
-
 /* global ANNOUNCE_MSG, ANNOUNCE_CONFLICT */
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -59,9 +46,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     };
 
-    // In-place save: post the update via the AJAX twin and write the bumped
-    // optimistic-lock version back into the hidden input so the next save
-    // does not 409. Without krtFetch (no-JS) the native POST->redirect runs.
     if (updateForm) {
         updateForm.addEventListener('submit', function (event) {
             event.preventDefault();
@@ -93,9 +77,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // In-place delete: on success the announcement is gone, so reset the form to
-    // its empty create state in place instead of reloading. The no-reload win is
-    // the failure path (inline toast, modal stays open).
     if (deleteForm) {
         deleteForm.addEventListener('submit', function (event) {
             event.preventDefault();

@@ -23,17 +23,15 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Data transfer record carrying Job Order Material payload.
+ * One material line of a {@code MATERIAL} job order.
  *
  * @param id material-line primary key
- * @param material the required material (with {@code quantityType} for unit-aware display)
- * @param minQuality the minimum acceptable quality (650) or {@code null} for "Keine"
+ * @param material the required material, with its {@code quantityType}
+ * @param minQuality the minimum acceptable quality (650) or {@code null} for none
  * @param amount the required amount in the material's own unit
  * @param currentStock the summed linked-inventory stock for this line
- * @param claims the per-squadron claims on this material's bucket; populated only for public SK
- *     orders (Phase 5, #345), empty otherwise
- * @param openAmount {@code required − Σ claims} for the bucket; {@code null} for non-SK orders (no
- *     claim columns are rendered then), a non-null value (possibly 0) for SK orders
+ * @param claims per-squadron claims on this bucket; populated only for public SK orders
+ * @param openAmount {@code required − Σ claims}; {@code null} for non-SK orders
  * @param version optimistic-lock version
  */
 public record JobOrderMaterialDto(

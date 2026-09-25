@@ -44,29 +44,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The OwnerScope-free responsible-holder ("Kontoverantwortliche") reverse-resolution and
- * change-audit slice of {@link OrgUnitBankAccessService}, split out under audit Thema 7 (#14,
- * REQ-BANK-034/-026/-047, ADR-0070). It answers two questions no current principal is available
- * for: who are the responsible holder(s) of a given account (the reverse of the interactive "am I
- * the responsible holder?" gate the {@link OrgUnitBankAccessService} core keeps), and — around a
- * leadership mutation — which of those derived sets changed, recording one {@code
- * ACCOUNT_RESPONSIBLE_CHANGED} bank audit event per account that did.
+ * Resolves the responsible holders (Kontoverantwortliche) of bank accounts from persisted
+ * membership ranks, and audits changes to them around leadership mutations (REQ-BANK-034,
+ * ADR-0070).
  *
- * <p>Unlike the {@link OrgUnitBankAccessService} core it wires <b>no</b> {@code OwnerScopeService}:
- * it reverse-resolves the holders purely from the persisted membership ranks ({@link
- * OrgUnitMembershipRepository}) and account owner labels ({@link BankAccountRepository}), carrying
- * no caller context (the resolution runs on the after-commit notification thread and around
- * membership writes). That absence of an {@code OwnerScopeService} dependency is exactly what lets
- * this seam live outside {@link OrgUnitBankAccessService} without tripping the {@code
- * orgUnitAwareBankSeamIsContainedToOneClass} ArchUnit rule (ADR-0020): only a class that couples
- * {@code OwnerScopeService} <em>and</em> the bank-account repository must be the one sanctioned
- * bridge. Being deliberately <em>not</em> {@code Bank*}-named it also stays clear of the {@code
- * bankClassesMustNotConsultOrgUnitScope} pin, so the bank remains org-unit-blind (REQ-BANK-008).
- *
- * <p>The interactive F1/F2/authorization core — the card list, the read-only drill-in, booking
- * requests and the responsibility settings, all of which read the current principal through {@code
- * OwnerScopeService} — stays in {@link OrgUnitBankAccessService}, the single sanctioned org-unit /
- * bank bridge.
+ * <p>It carries no caller context and depends on no {@code OwnerScopeService}, so the interactive
+ * org-unit/bank authorization stays in {@link OrgUnitBankAccessService} (ADR-0020) and the bank
+ * classes stay org-unit-blind (REQ-BANK-008).
  */
 @Service
 @RequiredArgsConstructor
@@ -78,24 +62,14 @@ public class OrgUnitBankResponsibilityService {
   private final BankAuditService bankAuditService;
 
   /**
-   * Resolves the user ids of an account's <em>responsible holder(s)</em> (Kontoverantwortliche,
-   * REQ-BANK-034) — the org-unit-aware reverse of {@code
-   * OrgUnitBankAccessService#isResponsibleHolder}, used by the notification engine to notify the
-   * responsible holder when a booking request on their account is created or decided
-   * (REQ-BANK-026). Unlike {@code isResponsibleHolder} it carries no current principal (it runs on
-   * the after-commit notification thread), so it reverse-resolves the holders via {@link
-   * OrgUnitMembershipRepository}. Keeping it in this OwnerScope-free seam lets the notification
-   * resolver reach the responsible holders while the {@code Bank*} classes stay org-unit-blind
-   * (REQ-BANK-008, ArchUnit pins).
+   * Resolves the user ids of an account's responsible holders (REQ-BANK-034), used to notify them
+   * of booking requests (REQ-BANK-026).
    *
-   * <p>Per account type: a Staffelkonto → its {@code STAFFELLEITER}; an SK-Konto → its {@code
-   * SK_LEAD}; a Bereichskonto → its {@code BEREICHSLEITER}; the {@code CARTEL}/KRT account → all
-   * {@code OL_MEMBER}s (the collegial owner and the top-band approver; since ADR-0109 the KRT
-   * middle band routes to the Bankleitung, a {@code BANK_MANAGEMENT} Keycloak role not enumerable
-   * via org-unit membership, so it is not notified through this seam); the {@code CARTEL_BANK} →
-   * the {@code BEREICHSLEITER} of every {@code Department.PROFIT} Bereich; a Sonderkonto → none.
+   * <p>Staffelkonto: its {@code STAFFELLEITER}; SK-Konto: its {@code SK_LEAD}; Bereichskonto: its
+   * {@code BEREICHSLEITER}; {@code CARTEL}: every {@code OL_MEMBER}; {@code CARTEL_BANK}: the
+   * {@code BEREICHSLEITER} of every {@code Department.PROFIT} Bereich; Sonderkonto: none.
    *
-   * @param accountId the account whose responsible holder(s) to resolve
+   * @param accountId the account whose responsible holders to resolve
    * @return the responsible holders' user ids; never {@code null}, empty for a Sonderkonto, an
    *     unlinked account or a missing account
    */
@@ -153,16 +127,11 @@ public class OrgUnitBankResponsibilityService {
   }
 
   /**
-   * Snapshots, per bank account whose derived responsible holder(s) depend on the given org unit's
-   * leadership, the CURRENT responsible-holder user-id set — the "before" side of a leadership
-   * change, to be diffed by {@link #recordResponsibleHolderChanges(Map)} right after the mutation
-   * (REQ-BANK-034 change audit, ADR-0070). Affected accounts: the account the org unit owns
-   * (Staffel/SK &rarr; {@code ORG_UNIT}, Bereich &rarr; {@code AREA}, OL &rarr; {@code CARTEL})
-   * and, when the org unit is a {@code Department.PROFIT} Bereich, the collegial {@code CARTEL} and
-   * the {@code CARTEL_BANK} accounts too, whose responsible sets include the Profit-Bereichsleiter
-   * (REQ-BANK-034/-047). Called by {@code OrgUnitMembershipService} around each leadership
-   * mutation: the sanctioned seam owns the bank access, so the membership service never touches
-   * bank repos.
+   * Snapshots the current responsible-holder sets of every account whose holders depend on the org
+   * unit's leadership, as the "before" side for {@link #recordResponsibleHolderChanges(Map)}.
+   *
+   * <p>Covers the account the org unit owns and, for a {@code Department.PROFIT} Bereich, the
+   * accounts whose responsible sets include the Profit-Bereichsleiter.
    *
    * @param orgUnitId the org unit whose leadership is about to change
    * @return the affected accounts mapped to their current responsible-holder user ids; empty when
@@ -179,22 +148,13 @@ public class OrgUnitBankResponsibilityService {
   }
 
   /**
-   * Snapshots the responsible holders of every bank account tied to any org unit the given user is
-   * a member of — the "before" side for a mutation that removes the user from several org units at
-   * once (a full user deletion, REQ-BANK-034/ADR-0070). Reuses {@link
-   * #snapshotResponsibleHolders(UUID)} per membership org unit (so the Profit ripple onto {@code
-   * CARTEL}/{@code CARTEL_BANK} is covered) and merges by account id. Over-covering a plain
-   * (non-leadership) membership is harmless — {@link #recordResponsibleHolderChanges(Map)} records
-   * nothing for an account whose set does not change.
+   * Snapshots the responsible holders of every account tied to any org unit the user belongs to, as
+   * the "before" side of removing the user from all of them (REQ-BANK-034).
    *
-   * <p>The member org units are resolved through the bare-id projection {@link
-   * OrgUnitMembershipRepository#findOrgUnitIdsByUserId(UUID)} rather than through {@code
-   * findAllByIdUserId}, and that choice is load-bearing: this method runs inside the {@code
-   * UserDeletionService.deleteUser} transaction right before the {@code app_user} row is removed.
-   * Attaching the user's {@code OrgUnitMembership} entities here would leave them managed and still
-   * pointing at the deleted {@code User} — the {@code org_unit_membership} rows disappear via the
-   * database {@code ON DELETE CASCADE}, which Hibernate never observes — so the following flush
-   * would abort with {@code TransientPropertyValueException}. Keep this a projection.
+   * <p>Resolves the org units through {@link
+   * OrgUnitMembershipRepository#findOrgUnitIdsByUserId(UUID)} without loading membership entities,
+   * because it runs inside the user-deletion transaction; delegates to {@link
+   * #snapshotResponsibleHolders(UUID)} per org unit.
    *
    * @param userId the user about to be removed from all their org units
    * @return the affected accounts mapped to their current responsible-holder user ids
@@ -212,13 +172,11 @@ public class OrgUnitBankResponsibilityService {
   }
 
   /**
-   * Records one {@code ACCOUNT_RESPONSIBLE_CHANGED} bank audit event (REQ-BANK-034, ADR-0070) for
-   * every account whose derived responsible-holder set differs from the {@code before} snapshot —
-   * called right after a leadership mutation, on the same transaction, so the recompute sees the
-   * new state and {@link BankAuditService} captures the acting user automatically. The old/new
-   * user-id sets go into the details payload (ids are system identifiers, not PII — REQ-BANK-012);
-   * {@code targetUserId} is the sole new holder when the set is a singleton, else null (collegial
-   * account).
+   * Records one {@code ACCOUNT_RESPONSIBLE_CHANGED} bank audit event (REQ-BANK-034) for every
+   * account whose responsible-holder set differs from the {@code before} snapshot.
+   *
+   * <p>Runs in the mutation's transaction; {@link BankAuditService} captures the actor. {@code
+   * targetUserId} is the sole new holder for a singleton set, else {@code null}.
    *
    * @param before the pre-mutation snapshot from {@link #snapshotResponsibleHolders(UUID)}
    */
@@ -240,12 +198,9 @@ public class OrgUnitBankResponsibilityService {
   }
 
   /**
-   * The bank accounts whose derived responsible holder(s) can change when the given org unit's
-   * leadership changes: the account the org unit owns, plus — for a {@code Department.PROFIT}
-   * Bereich — the {@code CARTEL_BANK} singleton (its responsible set is the Profit-Bereichsleiter,
-   * REQ-BANK-034). Since ADR-0109 the {@code CARTEL}/KRT responsible set is OL-only and so no
-   * longer ripples from a Profit-Bereich change — it is still covered for an OL leadership change
-   * through the owns-account path above (the OL org unit owns the CARTEL account).
+   * Returns the bank accounts whose responsible holders can change with the org unit's leadership:
+   * the account it owns plus, for a {@code Department.PROFIT} Bereich, the {@code CARTEL_BANK}
+   * account.
    *
    * @param orgUnitId the org unit whose leadership changes
    * @return the affected account ids; never {@code null}, possibly empty

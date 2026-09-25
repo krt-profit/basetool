@@ -35,18 +35,8 @@ import reactor.netty.http.HttpProtocol;
 import reactor.netty.http.server.HttpServer;
 
 /**
- * The way back from HTTP/2, without a redeploy.
- *
- * <p>ADR-0161 §8.1 asks for a load test before the switch is trusted, and a load test that cannot
- * be undone from configuration is a load test nobody runs on production. {@code
- * app.http.backend-protocol=HTTP11} is that undo, and this pins it: with the property set, the same
- * client that negotiates {@code h2} in {@link WebClientHttp2NegotiationTest} negotiates nothing
- * against a server that is still offering it.
- *
- * <p><b>No Spring context.</b> This used to fork a whole second one for a single assertion, because
- * the property has to be set before the context is built. Constructing {@link WebClientConfig}
- * directly through {@link WebClientTestSupport} says the same thing in one object, and it is what
- * the sibling CBOR test was already doing.
+ * Verifies that {@code app.http.backend-protocol=HTTP11} makes the backend client negotiate no
+ * HTTP/2 against a server offering it (ADR-0161).
  */
 class WebClientHttp11FallbackTest {
 

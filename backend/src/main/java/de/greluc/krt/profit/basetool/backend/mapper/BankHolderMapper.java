@@ -34,12 +34,11 @@ import org.mapstruct.Mapping;
 public interface BankHolderMapper {
 
   /**
-   * Maps one holder row plus its externally computed global custody total to the response DTO. The
-   * {@code userId} resolves through the lazy {@code user} proxy without initialising it (id-only
-   * access); {@code roleManaged} comes straight off the entity. The DTO {@code handle} carries the
-   * holder's <em>live</em> display label ({@link BankHolder#getDisplayName()}: the linked user's
-   * current effective name, snapshot fallback when the user is gone, REQ-BANK-003), so callers must
-   * have the {@code user} proxy available (fetch-join or open transaction) to avoid an N+1.
+   * Maps one holder row plus its global custody total to the response DTO.
+   *
+   * <p>The {@code handle} is the holder's live display label ({@link BankHolder#getDisplayName()},
+   * REQ-BANK-003), so the {@code user} association must be reachable (fetch-join or open
+   * transaction).
    *
    * @param holder the holder entity, with its {@code user} association reachable
    * @param totalHeld signed global sum the holder physically holds across the whole bank

@@ -50,12 +50,10 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC tests for the #577 in-place book-in twin {@link
- * InventoryWriteController#addInventoryItemAjax}: a valid {@code X-Requested-With} create returns
- * the source listing URL for the client to navigate to, the server-side cross-field rule (a
- * personal entry cannot carry an order/mission) returns {@code 422} {@code problem+json} with a
- * stable code and no backend call, a backend failure is propagated as {@code problem+json}, and a
- * header-less POST falls back to the classic redirect handler.
+ * MVC tests for the AJAX book-in endpoint {@link InventoryWriteController#addInventoryItemAjax}:
+ * success returns the listing URL, a personal entry with an order or mission is rejected with
+ * {@code 422} without a backend call, backend failures are relayed as {@code problem+json}, and a
+ * header-less POST reaches the redirect handler.
  */
 @SpringBootTest
 class InventoryInputAjaxControllerTest {

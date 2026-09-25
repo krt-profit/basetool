@@ -51,12 +51,9 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC-level render test for the holder detail page and its {@code holderBookings} AJAX fragment
- * (REQ-BANK-032): proves the template resolves and renders the holder header plus a custody-history
- * row — including the {@code DEPOSIT}→account annotation and the {@code HOLDER_TRANSFER}→counter
- * holder annotation — through the real {@code @moneyFormat} bean. A pure controller unit test only
- * pins the view-name string; this fails if the template breaks or a fragment selector is
- * misspelled.
+ * MVC render test for the holder detail page and its {@code holderBookings} fragment
+ * (REQ-BANK-032), including the {@code DEPOSIT} and {@code HOLDER_TRANSFER} annotations rendered
+ * through the real {@code @moneyFormat} bean.
  */
 @SpringBootTest
 class BankHolderDetailFragmentMvcTest {
@@ -112,9 +109,8 @@ class BankHolderDetailFragmentMvcTest {
   }
 
   /**
-   * A withdrawal's outgoing holder leg carrying a fee (negative: paid out). The fee is added on top
-   * (REQ-BANK-033, ADR-0052), so the leg is the gross debited (500) and the recipient received
-   * {@code 500 - 3 = 497} — the holder history shows that arriving amount.
+   * A withdrawal's outgoing holder leg of 500 carrying a fee of 3 (REQ-BANK-033, ADR-0052); the
+   * history shows the 497 received.
    */
   private static BankHolderBookingDto withdrawalRow() {
     return new BankHolderBookingDto(

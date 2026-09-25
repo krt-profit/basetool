@@ -41,42 +41,12 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 /**
- * Imports UEX Corp's {@code /companies} catalogue into the local {@code manufacturer} table.
+ * Imports UEX Corp's {@code /companies} catalogue into {@code manufacturer}, merging the duplicate
+ * companies UEX ships for one brand onto a single row (ADR-0023).
  *
- * <p><strong>UEX ships duplicate companies for one brand.</strong> The same real-world manufacturer
- * appears as several distinct {@code /companies} records with different ids and frequently
- * different names — observed in prod: {@code 87 "Esperia"} (the item-side record) and {@code 278
- * "Esperia Incorporation"} (the vehicle-side record); {@code 70 "Denim Manufacture Corporation"} /
- * {@code 287 "DMC"}; {@code 62 "Covalex Shipping"} / {@code 293 "Covalex"}. They are the same
- * brand, so they must collapse onto <em>one</em> manufacturer row — otherwise the brand's ships and
- * items split across two rows (the item sync resolves by {@code id_company}, the vehicle sync by
- * {@code id_company}, but the two surfaces reference different ids for the same brand).
- *
- * <p><strong>Merge model (ADR-0023, REQ-DATA-004).</strong> A manufacturer may own several UEX
- * company ids via the {@link ManufacturerUexCompany} alias table. The <em>canonical</em> company of
- * a brand — the lowest {@code uex_company_id}, since the feed is processed in ascending-id order —
- * owns the row's display identity ({@code name} / {@code abbreviation} / {@code uex_company_id}).
- * Every other company of the same brand resolves to that row, registers its id as an alias and only
- * <em>OR</em>s the {@code is_item_manufacturer} / {@code is_vehicle_manufacturer} flags so the
- * surviving row serves both surfaces; it never hijacks the canonical identity, which is what keeps
- * the result ping-pong-free across runs.
- *
- * <p>Match chain per company: alias-by-{@code id} → {@code byNameIgnoreCase} → {@code
- * byAbbreviation} (oldest row). The first company of a brand creates the row (canonical); the rest
- * adopt it as aliases. A row whose {@code uex_company_id} is still {@code null} (a legacy
- * hand-seeded or P4K-only row) is adopted as canonical by the first UEX company that matches it by
- * name or abbreviation.
- *
- * <p><strong>Per-company isolation.</strong> Each company is upserted in its own {@code
- * REQUIRES_NEW} transaction via {@link #upsertCompanyWithinTransaction(UexCompanyDto, Instant)},
- * invoked through the {@link #self} proxy (a direct {@code this} call would be self-invocation and
- * silently skip the new transaction — the CLAUDE.md self-invocation trap). A row that violates a
- * constraint rolls back only itself; the {@code catch} in the loop counts it as skipped and the
- * remaining companies still commit (REQ-DATA-004). Because the canonical company is always the
- * lowest id and the feed is processed ascending, the canonical row is committed before any of its
- * aliases are processed.
- *
- * <p>Empty UEX response short-circuits without wiping local data.
+ * <p>The lowest company id of a brand owns the row's identity; the others register as {@link
+ * ManufacturerUexCompany} aliases and only add their manufacturer-surface flags. Each company is
+ * upserted in its own transaction (REQ-DATA-004); an empty response leaves local data untouched.
  */
 @Slf4j
 @Service
@@ -84,9 +54,8 @@ import org.springframework.util.StringUtils;
 public class UexManufacturerService {
 
   /**
-   * Cap for the upstream-supplied company name / nickname in log lines. UEX is a third party we do
-   * not control, so both are untrusted free text and go through {@link LogSafe} first; 64
-   * characters comfortably fit any real brand name.
+   * Maximum length of an upstream company name / nickname in log lines, logged through {@link
+   * LogSafe}.
    */
   private static final int MAX_NAME_LOG_LENGTH = 64;
 
@@ -117,12 +86,8 @@ public class UexManufacturerService {
   }
 
   /**
-   * Pulls the company catalogue and upserts every row, each in its own {@code REQUIRES_NEW}
-   * transaction so one constraint violation cannot roll back the whole sweep. Companies are
-   * processed in ascending {@code id} order so the canonical (lowest-id) company of every brand is
-   * persisted before the duplicates that alias onto it. Deliberately not {@code @Transactional}:
-   * the HTTP fetch and the loop hold no transaction, and the only writes happen inside the
-   * per-company nested transactions. Counter summary at INFO when done.
+   * Pulls the company catalogue and upserts every company in ascending id order, each in its own
+   * transaction, so a brand's canonical company is persisted before its aliases.
    */
   public void syncManufacturers() {
     log.info("Starting synchronization of UEX manufacturers...");
@@ -184,22 +149,13 @@ public class UexManufacturerService {
   }
 
   /**
-   * Upserts a single UEX company DTO in its own {@code REQUIRES_NEW} transaction, merging duplicate
-   * companies of the same brand onto one manufacturer row (ADR-0023 / REQ-DATA-004).
+   * Upserts one UEX company in its own {@code REQUIRES_NEW} transaction, merging duplicates of a
+   * brand onto one manufacturer row (ADR-0023, REQ-DATA-004). Must be invoked through the {@link
+   * #self} proxy.
    *
-   * <p>Resolution chain: alias-by-{@code id} → {@code byNameIgnoreCase} → oldest {@code
-   * byAbbreviation}. The company is treated as the row's <em>canonical</em> owner when the row is
-   * brand new, still unclaimed ({@code uex_company_id IS NULL}, a legacy seed), or already stamped
-   * with this very company id; otherwise it is a duplicate that adopts the existing row as an alias
-   * — refreshing only the manufacturer-surface flags, never the canonical name / abbreviation /
-   * {@code uex_company_id}. In all cases this company's id is registered in the {@code
-   * manufacturer_uex_company} alias table so the item and vehicle syncs resolve it to the surviving
-   * row.
-   *
-   * <p>Running in a dedicated nested transaction means a failure here rolls back only this company
-   * and never poisons the rest of the sweep; the caller's loop catches it and continues. Must be
-   * invoked through the {@link #self} proxy — a direct {@code this} call would be self-invocation
-   * and skip the new transaction.
+   * <p>Matches by alias id, then name, then oldest abbreviation. The company owns the row's
+   * identity when the row is new, unclaimed or already stamped with its id; otherwise it registers
+   * as an alias and refreshes only the surface flags.
    *
    * @param dto inbound UEX row
    * @param now timestamp to stamp on the row

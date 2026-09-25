@@ -36,35 +36,19 @@ import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 
 /**
- * Cross-module contract test for the hand-mirrored frontend DTOs (S9, part of #905).
+ * Contract test diffing every hand-mirrored frontend {@code model/dto} record against the
+ * same-named schema in the committed backend {@code openapi.json}, without classpath coupling.
  *
- * <p>The frontend re-declares ~200 backend DTOs by hand with no shared module, no {@code
- * project(":backend")} dependency and no code generation — so a backend field rename, removal or
- * enum change would surface only at runtime as a template miss. This test is the drift gate: it
- * diffs every frontend {@code model/dto} record's component set against the committed {@code
- * backend/src/main/resources/api/openapi.json} schema of the same name — structurally, with no
- * classpath coupling to the backend.
- *
- * <p>It fails when:
+ * <p>It fails on:
  *
  * <ul>
- *   <li><b>Shape divergence</b> — a frontend record component has no matching property in the
- *       backend schema (the backend renamed or removed the field, and the frontend would read
- *       {@code null}).
- *   <li><b>Un-annotated enum-to-String demotion</b> — the schema types a property as an enum but
- *       the frontend mirrors it as a bare {@code String} without {@link BackendEnumAsString}. The
- *       frontend deliberately demotes some enums to drive i18n keys; the annotation makes that a
- *       choice, not silent drift.
- *   <li><b>Typed-enum value drift</b> — the frontend keeps a property as a typed enum but the
- *       backend enum has gained a value the frontend enum lacks (which would break
- *       deserialization).
- *   <li><b>Stale annotation</b> — a component carries {@link BackendEnumAsString} but the schema no
- *       longer types the property as an enum.
+ *   <li>a record component with no matching schema property;
+ *   <li>an enum property mirrored as {@code String} without {@link BackendEnumAsString};
+ *   <li>a typed-enum mirror lacking a backend enum value;
+ *   <li>a {@link BackendEnumAsString} on a property the schema no longer types as an enum.
  * </ul>
  *
- * <p>Frontend-only DTOs (records whose simple name has no matching schema — forms, view models) are
- * out of the contract and skipped; their count is asserted to be a small minority so a broken scan
- * or a mass rename cannot silently empty the check.
+ * <p>Frontend-only records are skipped, and their count is asserted to stay a small minority.
  */
 class FrontendDtoContractTest {
 

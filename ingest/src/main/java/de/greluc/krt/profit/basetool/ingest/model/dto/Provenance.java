@@ -24,19 +24,8 @@ import org.jetbrains.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 
 /**
- * The producing tool's self-declaration, carried identically by both ingest payloads: the {@code
- * RefineryExtract} envelope (ADR-0008) and the blueprint export both open with {@code
- * schemaVersion} / {@code tool} / {@code toolVersion}.
- *
- * <p>Having one type for both is what lets the provenance check and the accepted-payload log line
- * be written once instead of per endpoint. It also closed a real gap: the blueprint body is opaque
- * to the gateway ({@code JsonNode}, the backend does the parsing), so that path used to log nothing
- * but a byte count — an extractor sending structurally odd blueprint exports was invisible, while
- * the refinery path had recorded its shape since day one.
- *
- * <p>Every field is client-supplied free text and therefore <b>never</b> an authentication signal —
- * see {@code ProvenanceGuard} for what the check is and is not worth. Fields are nullable because a
- * caller may simply omit them; a missing value is a normal input to the guard, not an error here.
+ * The producing tool's self-declaration carried by both ingest payloads. All fields are
+ * client-supplied, optional and never an authentication signal.
  *
  * @param tool producing tool identifier, e.g. {@code basetool-sc-extractor}
  * @param toolVersion producing tool version, e.g. the extractor's MSI version
@@ -55,13 +44,8 @@ public record Provenance(
   private static final String FIELD_SCHEMA_VERSION = "schemaVersion";
 
   /**
-   * Reads the provenance triple out of an opaque payload body — the blueprint path, where the
-   * gateway deliberately does not bind the export to a DTO (the backend owns that contract).
-   *
-   * <p>Reads defensively: a field of the wrong JSON type yields {@code null} rather than throwing,
-   * because this runs on an unvalidated internet-facing body and a malformed value must degrade to
-   * "no provenance declared" — which the guard then rejects on its own terms — instead of surfacing
-   * as a parse crash.
+   * Reads the provenance triple from an opaque payload body; a field of the wrong JSON type yields
+   * {@code null} instead of an error.
    *
    * @param body the parsed payload body; must be a JSON object
    * @return the declared provenance, with {@code null} for any absent or non-conforming field

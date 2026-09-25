@@ -72,28 +72,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 /**
- * Spring MVC controller for the mission read pages ({@code /missions} list, {@code /missions/{id}}
- * detail — the squadron's single coordination surface — and the {@code /missions/new} create form),
- * plus the unassigned-participants AJAX read.
+ * Spring MVC controller for the mission read pages: the {@code /missions} list, the {@code
+ * /missions/{id}} detail page with its section fragments, the create form, and the
+ * unassigned-participants AJAX read.
  *
- * <p>The detail render is the largest read path in the project; it fans several backend calls out
- * through the {@code parallelPageLoader} and serves both the full page and, via {@code
- * fragment=...}, the individual section fragments the write side re-renders after a mutation. It
- * also carries the model-population helpers ({@code addFormsToModel}, {@code addOperationsToModel},
- * …) and the {@code propagateBackendError} problem+json re-emit that the write controller and
- * {@code MissionFinancePageController} reuse.
- *
- * <p>Since the #924 L5 read/write split this class keeps only that read-side surface. Every
- * state-mutating {@code /missions} endpoint — participants, units, crew, managers, frequencies and
- * their AJAX variants, including the sign-up paths that used to be reachable without a login
- * ({@code addParticipant}/{@code checkIn}/{@code checkOut}/{@code updatePayoutPreference}, members
- * only since ADR-0159) — moved verbatim to {@link MissionWriteController}, which delegates its
- * validation-failure re-renders back to this class.
- *
- * <p>REQ-SEC-052: the class-level {@code @PreAuthorize("isAuthenticated()")} is the floor. Every
- * handler here used to sit under a {@code permitAll} URL rule, and thirteen of them across this
- * package carried no gate of their own at all — protected by a matcher two folders away rather than
- * by anything next to the code. A method-level gate still wins where one is present.
+ * <p>Also provides the model-population helpers and {@code propagateBackendError} used by {@link
+ * MissionWriteController} and {@code MissionFinancePageController}. The class-level {@code
+ * isAuthenticated()} gate is the floor for every handler (REQ-SEC-052).
  */
 @Controller
 @UsesLayoutModel
@@ -144,11 +129,8 @@ public class MissionPageController {
           new ParameterizedTypeReference<PageResponse<MissionFinanceEntryDto>>() {};
 
   /**
-   * Page size for the mission-detail finance ENTRIES table (ADR-0078). The summary strip reads its
-   * totals from the SQL aggregate at {@code /finance-entries/summary}, so the table itself only
-   * needs a bounded page instead of the previous {@code size=1000} load-all — keeping a finance
-   * render from materializing thousands of rows under the multi-user live-update fan-out. The
-   * backend independently caps the endpoint at 500.
+   * Page size of the mission-detail finance entries table; the totals come from the summary
+   * aggregate (ADR-0078).
    */
   private static final int FINANCE_TABLE_PAGE_SIZE = 200;
 
@@ -180,22 +162,14 @@ public class MissionPageController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Resolves the "registered member or above" predicate against the request {@link
-   * org.springframework.security.core.Authentication} (the OAuth2 token authorities) — the same
-   * source {@code sec:authorize}/{@code @PreAuthorize} use. Gating the member-only finance/refinery
-   * fetches on the {@code OidcUser} principal's own authorities instead was the root cause of the
-   * silently-empty "Finanzen" panel (REQ-SEC-013): Spring maps the Keycloak realm roles onto the
-   * token, not the principal object.
+   * Resolves the "registered member or above" predicate against the request's token authorities,
+   * which carry the Keycloak realm roles (REQ-SEC-013).
    */
   private final FrontendAuthHelperService authHelperService;
 
   /**
-   * Runs independent backend reads concurrently on virtual threads with the full request-scoped
-   * context (SecurityContext / RequestAttributes / squadron / correlation id) restored, so the
-   * mission-detail render does not pay the sum of their latencies in series. Used for the
-   * member-only finance/sum/refinery-orders trio — three independent per-mission reads that
-   * previously ran back to back on every render (and, since the live-sync presence relay #755, on
-   * every peer's in-place fragment re-fetch too).
+   * Runs the independent member-only finance, sum and refinery-order reads of the detail render
+   * concurrently, with the request-scoped context restored.
    */
   private final ParallelPageLoader parallelPageLoader;
 
@@ -211,23 +185,14 @@ public class MissionPageController {
   }
 
   /**
-   * Seeds the various form-backing objects the mission-detail template needs (participant, crew,
-   * unit, finance, manager, etc.) when they are not already present in the model. Authenticated
-   * callers additionally get their own user record stuffed into the participant form so the "join
-   * as me" default works without an extra fetch in the template.
-   *
-   * <p>The "join as me" prefill costs an uncached backend {@code GET /api/v1/users/me}, and the
-   * add-participant modal it feeds is rendered only by the full page — never by any {@code
-   * *-results} fragment. {@code prefillParticipantUser} therefore gates that fetch: fragment
-   * refetches (which start with a fresh model and would otherwise re-issue the lookup on every
-   * live-sync burst for a form no fragment dereferences, REQ-OBS/ADR-0078) pass {@code false} and
-   * get an empty {@link ParticipantForm} instead, so no model attribute is missing (#1142).
+   * Seeds the form-backing objects the mission-detail template needs when they are not already in
+   * the model.
    *
    * @param model Thymeleaf model populated with the seeded forms
-   * @param principal authenticated OIDC user, or {@code null} for guests
+   * @param principal authenticated OIDC user, or {@code null}
    * @param prefillParticipantUser {@code true} to fetch {@code /users/me} and prefill the "join as
-   *     me" participant form (full-page renders only); {@code false} to seed an empty form and skip
-   *     the backend read (fragment refetches)
+   *     me" participant form (full-page renders); {@code false} to seed an empty form without the
+   *     backend read (fragment refetches)
    */
   public void addFormsToModel(Model model, OidcUser principal, boolean prefillParticipantUser) {
     if (!model.containsAttribute("participantForm")) {
@@ -276,17 +241,10 @@ public class MissionPageController {
   }
 
   /**
-   * Renders the mission list ({@code /missions}). Public endpoint — guests see the full upcoming
-   * mission catalog with sensitive fields stripped by the backend; authenticated callers see the
-   * full record. Pagination + sort follow the standard URL-driven pattern.
+   * Renders the mission list ({@code /missions}) with URL-driven filtering, paging and sorting.
    *
-   * <p>Every caller-supplied value reaches the backend URI in the shape the backend's own {@code
-   * GET /api/v1/missions/search} declares (REQ-SEC-051, ADR-0158): the free-text {@code search} as
-   * a {@code WebClient} URI-template variable, encoded exactly once; {@code start} / {@code end}
-   * bound as {@link Instant}; {@code status} narrowed to {@link #MISSION_STATUSES}. They used to be
-   * concatenated into the URI string, where {@code &} in a search opened a second backend query
-   * parameter, {@code #} cut the query off, {@code +} arrived as a space and {@code {x}} made the
-   * template expansion throw (FE-SEC-01).
+   * <p>Caller-supplied filters reach the backend as typed, individually encoded parameters
+   * (REQ-SEC-051).
    *
    * @param search optional free-text filter
    * @param start optional inclusive lower bound on the planned start, ISO-8601 instant
@@ -378,22 +336,15 @@ public class MissionPageController {
   }
 
   /**
-   * Renders the mission-detail page ({@code /missions/{id}}). Loads the mission, the finance
-   * entries, the unit/crew/participant hierarchy, the manager list and the frequencies. The heavy
-   * {@code addFormsToModel} call seeds every form-backing object the template needs for the inline
-   * modals so the same controller method serves both fresh renders and post-flash re-renders after
-   * a validation failure.
+   * Renders the mission-detail page ({@code /missions/{id}}) with its full model, including every
+   * form backer for the inline modals.
    *
-   * <p>When {@code fragment} is set the same fully populated model is rendered through a single
-   * Thymeleaf fragment instead of the whole page, so an in-place AJAX swap (epic #571) can
-   * re-render one section after a sub-mutation: {@code crew-board} → the crew board, {@code
-   * finance} → the finance &amp; payout pane, {@code mgmt} → the owner/manager management panel.
-   * The full model is still built for every fragment value, so the fragment never references a
-   * missing attribute.
+   * <p>A {@code fragment} value ({@code crew-board}, {@code finance}, {@code mgmt}) renders only
+   * that section from the same fully populated model, for in-place AJAX swaps.
    *
    * @param id the mission id
    * @param model the Spring MVC model populated with the mission aggregate and form backers
-   * @param principal the authenticated user, or {@code null} for an anonymous/guest visitor
+   * @param principal the authenticated user, or {@code null}
    * @param fragment the optional section key selecting an in-place fragment render
    * @return the {@code mission-detail} view name, or a {@code mission-detail :: <fragment>}
    *     selector
@@ -612,8 +563,8 @@ public class MissionPageController {
   }
 
   /**
-   * Renders the mission create form ({@code /missions/create}). Seeds the empty form plus the
-   * reference catalogs (operations, job types, locations) so the dropdowns work.
+   * Renders the mission create form with the operation, job-type and location catalogs for its
+   * dropdowns.
    *
    * @param model Thymeleaf model populated with the form and reference catalogs
    * @param principal authenticated OIDC user
@@ -699,15 +650,12 @@ public class MissionPageController {
   }
 
   /**
-   * Fetches the {@link OrgUnitMembershipOptionDto} list that drives the R5.d.d owner-picker on the
-   * mission-create form. Mission creation has no explicit owner selector — the caller is the
-   * implicit owner — so the picker reflects the caller's own memberships, not a separately-chosen
-   * owner's. Falls back to an empty list when the lookup fails (the fragment collapses to a hidden
-   * state for an empty option list).
+   * Fetches the caller's own org-unit membership options for the owner picker of the mission-create
+   * form.
    *
-   * @param principal authenticated OIDC user; the picker is resolved server-side for the caller via
-   *     {@code /api/v1/users/me/pickable-org-units}.
-   * @return picker options or empty list; never {@code null}.
+   * @param principal authenticated OIDC user; the options are resolved via {@code
+   *     /api/v1/users/me/pickable-org-units}.
+   * @return picker options, or an empty list when the lookup fails; never {@code null}.
    */
   private List<OrgUnitMembershipOptionDto> fetchCallerMembershipOptions(OidcUser principal) {
     if (principal == null) {
@@ -725,8 +673,8 @@ public class MissionPageController {
   }
 
   /**
-   * AJAX endpoint: returns all participants of a mission that are not yet assigned to any unit
-   * crew. Used to populate the "Crew zuweisen" dropdown with only unassigned participants.
+   * Returns the mission's participants not yet assigned to any unit crew, for the "Crew zuweisen"
+   * dropdown.
    */
   @GetMapping(
       value = "/{id}/participants/unassigned/ajax",

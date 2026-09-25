@@ -47,11 +47,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * Integration tests for the audit-log query against the real Testcontainers PostgreSQL — the path
- * the mocked {@code BankAuditServiceTest} cannot cover. Pins that {@code findFiltered} runs without
- * a "could not determine data type of parameter" failure when filters are absent (all-null), the
- * exact call the admin viewer and the e2e suite make; the {@code (CAST(:param AS type) IS NULL OR
- * ...)} pattern is what makes that work on PostgreSQL.
+ * Integration tests for the bank audit-log query against real Postgres: {@code findFiltered} runs
+ * with all filters absent.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -119,10 +116,6 @@ class BankAuditQueryIntegrationTest {
 
   /**
    * Persists one account-less bank audit row attributed to the given client.
-   *
-   * <p>Written straight through the repository rather than by booking a deposit: the point is two
-   * rows that differ in exactly one field, and a real booking would take its client from the test's
-   * own (absent) security context for both.
    *
    * @param clientId the bounded client label
    */

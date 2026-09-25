@@ -48,25 +48,14 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Integration tests for the DB-enforced mission section-counter locking (#1112/#1114/#1147) against
- * a real database. Complements the mocked {@code MissionServiceSectionPatchTest} / {@code
- * MissionStep|ObjectiveServiceTest} by proving the behaviour those mocks can only assume:
+ * Integration tests of the DB-enforced mission section counters.
  *
  * <ul>
- *   <li>the conditional bump query increments the counter on a matching echo and is a no-op on a
- *       stale one (the atomic guard that closes the in-memory TOCTOU window);
- *   <li>a section edit advances only its own counter and — thanks to
- *       {@code @OptimisticLock(excluded = true)} on every mutable scalar plus
- *       {@code @DynamicUpdate} — never bumps the row {@code @Version} or a sibling section counter,
- *       so concurrent edits on other sections cannot 409 it (#1114 / #1112);
- *   <li>the deferrable unique {@code (mission_id, order_index)} constraint (V208) tolerates the
- *       transient in-flush collision a reorder produces, yet still rejects a genuinely duplicate
- *       ordinal once the check is made immediate (#1147).
+ *   <li>The conditional bump increments on a matching version and is a no-op on a stale one.
+ *   <li>A section edit bumps only its own counter, never the row {@code @Version} or a sibling.
+ *   <li>The deferrable unique {@code (mission_id, order_index)} constraint tolerates a reorder but
+ *       rejects a real duplicate once checked immediately.
  * </ul>
- *
- * <p>{@code @Transactional} so every test rolls back. Duplicate-ordinal rejection is verified via
- * {@code SET CONSTRAINTS ALL IMMEDIATE} because the constraint is {@code INITIALLY DEFERRED} and
- * would otherwise only fire at commit, which the rollback never reaches.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -227,10 +216,8 @@ class MissionSectionLockDbEnforcementTest {
   }
 
   /**
-   * Promotes all deferred constraints to immediate on the current connection, forcing Postgres to
-   * validate the (otherwise commit-time) {@code INITIALLY DEFERRED} unique constraints now. Raw
-   * JDBC via {@code doWork} so the {@code SET CONSTRAINTS} statement is issued verbatim; a pending
-   * duplicate surfaces as a wrapped {@code SQLException}.
+   * Makes all deferred constraints immediate on the current connection, so a pending duplicate
+   * surfaces now as a wrapped {@code SQLException}.
    */
   private void forceImmediateConstraintCheck() {
     entityManager

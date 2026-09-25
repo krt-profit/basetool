@@ -50,11 +50,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
- * Unit tests for {@link NotificationStreamService}: the registry must emit the {@code connected},
- * {@code heartbeat} and {@code notification} signals as <b>named</b> SSE events. The heartbeat in
- * particular must NOT be an SSE comment — browsers' {@code EventSource} swallow comments, so only a
- * named event lets the frontend reset its liveness watchdog and detect a half-open stream
- * (REQ-NOTIF-010, REQ-SEC-012).
+ * Unit tests for {@link NotificationStreamService}: {@code connected}, {@code heartbeat} and {@code
+ * notification} are sent as named SSE events, never as comments (REQ-NOTIF-010).
  */
 class NotificationStreamServiceTest {
 
@@ -82,9 +79,8 @@ class NotificationStreamServiceTest {
   }
 
   /**
-   * A service whose {@link #newEmitter()} yields a fresh distinct mock per subscription, recorded
-   * in {@link #created} in subscription order — so a test can assert WHICH emitter the per-user cap
-   * retires (#1156).
+   * Service whose {@link #newEmitter()} returns a distinct mock per subscription, recorded in
+   * {@link #created} in order.
    */
   private static final class DistinctEmitterStreamService extends NotificationStreamService {
     private final List<SseEmitter> created = new ArrayList<>();

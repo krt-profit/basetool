@@ -41,38 +41,14 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Central correlation / MDC enrichment filter.
+ * Binds the correlation id, user id and squadron id to the MDC for each request and echoes the
+ * correlation id in the response header.
  *
- * <p>Each request is decorated with two MDC keys:
- *
- * <ul>
- *   <li><b>correlationId</b> – either taken from the inbound header (configurable via {@link
- *       LoggingProperties#getCorrelationIdHeader()}) or freshly generated as UUID. The effective id
- *       is echoed back in the response header of the same name so clients/proxies can trace the
- *       same request end-to-end.
- *   <li><b>userId</b> – the authenticated caller's {@code sub}, read through {@code
- *       AuthenticatedSubject} so a token-less acting member (ADR-0129) is attributed rather than
- *       logged as anonymous, or {@code anonymous} for unauthenticated traffic. Intentionally
- *       restricted to {@code sub}: the principal name is a callsign, and REQ-OBS-004 keeps it out
- *       of the log entirely.
- * </ul>
- *
- * <p>The MDC is cleared in a {@code finally} block to prevent bleed-through on pooled or virtual
- * threads. The filter runs after Spring Security (order {@link Ordered#LOWEST_PRECEDENCE} minus a
- * small delta) so that the {@code SecurityContext} is already populated when the MDC is set. A
- * secondary lightweight pass at filter start still generates / echoes the correlation id even for
- * unauthenticated requests, ensuring every log line has the same id.
- *
- * <p><b>Async dispatches re-bind what the initial dispatch resolved (2026-09-25).</b> The SSE
- * endpoints ({@code /api/v1/notifications/stream}, the live-sync stream) are dispatched a second
- * time — {@code DispatcherType.ASYNC}, on another container thread — when their async result
- * arrives, and a {@link OncePerRequestFilter} skips that pass by default. Every line logged there
- * therefore carried no correlation fields at all, and {@code GlobalExceptionHandler}'s catch-all
- * even minted a fresh id for its {@code ERROR} line that no other line of the request shared. The
- * initial dispatch now stashes the three resolved values as request attributes and the async
- * dispatch binds them again for its own duration, removing them in its own {@code finally}. The
- * async pass resolves nothing afresh: no new id, no header read, no security-context or database
- * lookup, and no response header — the initial dispatch set it and the stream is committed.
+ * <p>The correlation id comes from the inbound header ({@link
+ * LoggingProperties#getCorrelationIdHeader()}) or is a fresh UUID; the user id is the caller's
+ * {@code sub} via {@code AuthenticatedSubject} (ADR-0129), or {@code anonymous}. The MDC is cleared
+ * in a {@code finally} block, and async dispatches re-bind the values the initial dispatch
+ * resolved.
  */
 @Slf4j
 @Component
@@ -144,10 +120,8 @@ public class CorrelationIdFilter extends OncePerRequestFilter implements Ordered
   }
 
   /**
-   * Runs the async dispatch of a request with the three values its initial dispatch resolved bound
-   * to the MDC, and removes exactly the keys it bound once the chain returns, so nothing survives
-   * on the container thread. A value that was not stashed — possible only when the initial dispatch
-   * never passed this filter — stays unbound rather than being resolved or minted afresh.
+   * Runs an async dispatch with the MDC values its initial dispatch stashed, and removes exactly
+   * those keys afterwards. A value that was not stashed stays unbound.
    *
    * @param request the request being dispatched asynchronously
    * @param response the response of the same request
@@ -192,11 +166,9 @@ public class CorrelationIdFilter extends OncePerRequestFilter implements Ordered
   }
 
   /**
-   * Resolves the squadron context for the MDC: the active switcher selection for admins, the
-   * persistent home squadron for everyone else, or one of the sentinels {@code all} (admin without
-   * active selection) / {@code none} (unauthenticated / no squadron assigned / lookup failed).
-   * Defensive try-catch so a transient DB hiccup or a missing transaction context never brings down
-   * the request - logs just degrade to {@code none}.
+   * Resolves the squadron MDC value: an admin's active selection, else the home squadron; {@code
+   * all} for an admin without a selection, {@code none} when unauthenticated, unassigned or the
+   * lookup fails.
    */
   @NotNull
   private String resolveSquadronId() {
@@ -253,9 +225,8 @@ public class CorrelationIdFilter extends OncePerRequestFilter implements Ordered
   }
 
   /**
-   * Run very late in the servlet filter chain so Spring Security has already populated the {@link
-   * SecurityContextHolder}. Using {@link Ordered#LOWEST_PRECEDENCE} minus a constant lets
-   * downstream filters (e.g. request logging) still read the MDC values we set here.
+   * Orders the filter just before {@link Ordered#LOWEST_PRECEDENCE}, so the {@link
+   * SecurityContextHolder} is populated and later filters still see the MDC values.
    */
   @Override
   public int getOrder() {

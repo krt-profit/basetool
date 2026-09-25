@@ -49,10 +49,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.util.UriComponentsBuilder;
 
 /**
- * Renders the bank area's read surfaces (epic #556): the dashboard ({@code /bank}, D1 card grid,
- * REQ-BANK-016) and the account detail ({@code /bank/accounts/{id}}, K1 two-column layout). The
- * backend decides every visibility/capability question — this controller only fetches, scales the
- * sparkline series into SVG polyline points and fills the model.
+ * Renders the bank read surfaces: the dashboard {@code /bank} (REQ-BANK-016) and the account detail
+ * {@code /bank/accounts/{id}}. The backend decides all visibility; this controller fetches and
+ * fills the model.
  */
 @Controller
 @UsesLayoutModel
@@ -66,8 +65,7 @@ public class BankPageController {
 
   /**
    * Response type for the all-kinds active org-unit option list ({@code
-   * /api/v1/org-units/active-all-kinds}) feeding the external-counterparty unit picklist
-   * (REQ-BANK-044, #994).
+   * /api/v1/org-units/active-all-kinds}) feeding the external-counterparty picklist (REQ-BANK-044).
    */
   private static final ParameterizedTypeReference<List<OrgUnitMembershipOptionDto>>
       ORG_UNIT_OPTION_LIST = new ParameterizedTypeReference<>() {};
@@ -89,20 +87,14 @@ public class BankPageController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Renders the bank dashboard (REQ-BANK-016). Two per-user view options ride on the query string
-   * and are persisted client-side by {@code bank.js}: a {@code layout} (card grid vs. table) and a
-   * {@code group} mode (alphabetical vs. by Bereich). The cards are always sorted A→Z by name; the
-   * by-Bereich view additionally chunks them into coloured vertical groups (KRT rubric → Bereich
-   * groups → Sonderkonten → Ohne Bereich → Geschlossen). A {@code bankGrid} fragment request
-   * re-renders just the switchable grid for the in-place toggle swap (REQ-FE-005). The full-page
-   * render additionally assembles the header's direct-booking "Kontobewegung" modal ({@link
-   * #addMovementModalData}, REQ-BANK-023); the fragment swap skips it.
+   * Renders the bank dashboard (REQ-BANK-016) as card grid or table, alphabetical or grouped by
+   * Bereich. The full page also carries the "Kontobewegung" modal ({@link #addMovementModalData}).
    *
-   * @param layout {@code table} for the tabular view, otherwise the default card grid
-   * @param group {@code bereich} for the grouped view, otherwise the default alphabetical view
-   * @param fragment when {@code "bankGrid"} only the switchable grid is re-rendered (toggle swap)
+   * @param layout {@code table} for the tabular view, otherwise the card grid
+   * @param group {@code bereich} for the grouped view, otherwise alphabetical
+   * @param fragment {@code "bankGrid"} to re-render only the grid
    * @param model Spring MVC model
-   * @return the dashboard template, or its {@code bankGrid} fragment view
+   * @return the dashboard template, or its {@code bankGrid} fragment
    */
   @NotNull
   @GetMapping("/bank")
@@ -144,21 +136,12 @@ public class BankPageController {
   }
 
   /**
-   * Assembles the shared "Kontobewegung" direct-booking modal's catalog data for the dashboard's
-   * full-page render (REQ-BANK-023, #997). The modal's source account and transfer destination are
-   * server-side account-search comboboxes (remote-bank-accounts, REQ-FE-017/ADR-0106) that fetch
-   * matching active accounts on demand, so no account roster is preloaded here (a same-account
-   * transfer is still rejected by the backend, REQ-BANK-006); the holder registry, all-kinds
-   * org-unit picklist and the in-game transfer-fee rate feed the modal's selectors and live fee
-   * preview. The deposit/withdrawal counterparty picker is likewise a server-side searchable
-   * combobox (remote-bank-users, #1193 follow-up), so no user roster is preloaded either. The modal
-   * books through the unchanged {@code /deposits} / {@code /withdrawals} / {@code /transfers}
-   * endpoints, so this adds no new endpoint, audit event or metric. Mirrors {@code
-   * BankRequestQueuePageController}.
+   * Adds the catalog data of the "Kontobewegung" direct-booking modal (REQ-BANK-023): holder
+   * registry, org-unit picklist and transfer-fee rate. Account and user pickers are server-side
+   * search comboboxes and need no preloaded roster.
    *
-   * @param model the MVC model populated with the movement-modal catalogs
-   * @param canBook whether at least one active account is visible to the caller — gates the CTA +
-   *     modal; derived by the caller from the already-loaded page state, not a separate fetch
+   * @param model the MVC model to populate
+   * @param canBook whether the caller sees at least one active account; gates the modal
    */
   private void addMovementModalData(@NotNull Model model, boolean canBook) {
     model.addAttribute("canBook", canBook);
@@ -177,28 +160,20 @@ public class BankPageController {
   }
 
   /**
-   * Renders the account detail page (K1): facts strip, paged booking history and the booking
-   * modals. Since ADR-0039 holders are decoupled from accounts, so the page shows no per-account
-   * holder distribution; the booking modals' holder selects list the bank-wide holder registry. The
-   * modal selects need the holder registry and the caller's visible accounts (transfer
-   * destinations) — both fetched here so the page works without follow-up AJAX reads.
+   * Renders the account detail page: facts strip, balance chart, paged booking history and the
+   * booking modals with the holder registry and transfer targets they need.
    *
    * @param id the account id
    * @param page zero-based booking page
    * @param size booking-history page size (10 / 50 / 100, default 50; REQ-BANK-051)
-   * @param from optional booking-history period start ({@code yyyy-MM-dd}); default last 90 days
-   * @param to optional booking-history period end ({@code yyyy-MM-dd}); default today
-   * @param chartRange balance-chart range key ({@code 30d} / {@code 90d} / {@code 365d} / {@code
-   *     all}); default {@code 90d} (REQ-BANK-049)
-   * @param fragment when {@code "bookings"} only the paged booking-history fragment is rendered
-   *     (period filter + pager swap, REQ-FE-002); when {@code "balanceChart"} only the
-   *     balance-chart fragment (range swap); when {@code "accountBody"} the whole account body
-   *     (facts, chart, bookings and the booking modals) is re-rendered in place after a money write
-   *     (REQ-FE-005) so the balance, chart and booking history refresh without a reload; otherwise
-   *     the full page is returned
+   * @param from optional period start ({@code yyyy-MM-dd}); default last 90 days
+   * @param to optional period end ({@code yyyy-MM-dd}); default today
+   * @param chartRange chart range ({@code 30d} / {@code 90d} / {@code 365d} / {@code all}); default
+   *     {@code 90d} (REQ-BANK-049)
+   * @param fragment {@code "bookings"}, {@code "balanceChart"} or {@code "accountBody"} to render
+   *     only that fragment (REQ-FE-005); otherwise the full page
    * @param model Spring MVC model
-   * @return the detail template, or its {@code bookings} / {@code balanceChart} / {@code
-   *     accountBody} fragment for an AJAX swap
+   * @return the detail template or the requested fragment
    */
   @NotNull
   @GetMapping("/bank/accounts/{id}")
@@ -243,20 +218,15 @@ public class BankPageController {
   }
 
   /**
-   * Renders just the paged booking-history block for an AJAX period-filter / pager swap
-   * (REQ-FE-002). Fetches only the requested bookings page — the account detail, chart, holder
-   * registry and transfer-target accounts the full page loads are skipped. A backend failure
-   * degrades to an empty page (see {@link #addBookingsModel}) so the swapped-in fragment shows its
-   * empty state rather than injecting an error page into the sub-table; the reverse-button
-   * (delegated) and {@code .utc-time} localiser (re-run on {@code krt:swapped}) keep working on the
-   * swapped-in rows.
+   * Renders only the paged booking history for a period-filter or pager swap (REQ-FE-002); a
+   * backend failure yields an empty page.
    *
    * @param id the account id
    * @param page zero-based booking page (clamped to 0)
    * @param size requested page size, or {@code null} for the default
    * @param from optional period start ({@code yyyy-MM-dd})
    * @param to optional period end ({@code yyyy-MM-dd})
-   * @param model Spring MVC model populated with the bookings + period + pagination attributes
+   * @param model Spring MVC model to populate
    * @return the {@code bank-account-detail :: bookings} fragment view
    */
   @NotNull
@@ -267,13 +237,12 @@ public class BankPageController {
   }
 
   /**
-   * Renders just the balance-chart block for an AJAX range swap (REQ-BANK-049). Re-fetches the
-   * account detail only to resolve the creation instant the {@code "all"} range needs (the balance
-   * target rides on the series payload itself); a failure degrades to an empty chart.
+   * Renders only the balance chart for a range swap (REQ-BANK-049); a failure yields an empty
+   * chart.
    *
    * @param id the account id
    * @param chartRange the requested range key
-   * @param model Spring MVC model populated with the chart attributes
+   * @param model Spring MVC model to populate
    * @return the {@code bank-account-detail :: balanceChart} fragment view
    */
   @NotNull
@@ -289,10 +258,8 @@ public class BankPageController {
   }
 
   /**
-   * Resolves the booking-history period (default last 90 days), fetches the requested page for it
-   * and fills the bookings + period-filter + pagination model attributes shared by the full page
-   * and the {@code bookings} fragment (REQ-BANK-051). A backend failure degrades to an empty page
-   * so the table shows its empty state instead of an error.
+   * Resolves the booking-history period, fetches the page and fills the bookings, period and
+   * pagination attributes (REQ-BANK-051); a backend failure yields an empty page.
    *
    * @param id the account id
    * @param page zero-based page (clamped to 0)
@@ -330,13 +297,12 @@ public class BankPageController {
   }
 
   /**
-   * Resolves the balance-chart range (default 90 days), fetches its balance series and fills the
-   * chart model attributes shared by the full page and the {@code balanceChart} fragment
-   * (REQ-BANK-049). A backend failure degrades to an empty chart.
+   * Resolves the chart range, fetches the balance series and fills the chart attributes
+   * (REQ-BANK-049); a backend failure yields an empty chart.
    *
    * @param id the account id
    * @param chartRange the requested range key
-   * @param detail the account detail (for the {@code "all"} range's start), or {@code null}
+   * @param detail the account detail for the {@code "all"} range's start, or {@code null}
    * @param model the model to populate
    */
   private void addChartModel(UUID id, String chartRange, BankAccountDetailDto detail, Model model) {
@@ -362,16 +328,14 @@ public class BankPageController {
   }
 
   /**
-   * Fetches one page of an account's booking history for a period from the backend transactions
-   * endpoint — the single source of the booking query shared by the full-page render and the {@link
-   * #bookingsFragment} AJAX swap.
+   * Fetches one page of an account's booking history for a period.
    *
-   * @param id the account id whose transactions to page through
+   * @param id the account id
    * @param page zero-based, already-clamped page index
    * @param size requested page size, or {@code null} for the backend default
    * @param from inclusive period start instant
    * @param to inclusive period end instant
-   * @return the requested bookings page envelope
+   * @return the bookings page envelope
    */
   private PageResponse<BankBookingDto> fetchBookings(
       UUID id, int page, Integer size, Instant from, Instant to) {
@@ -386,9 +350,7 @@ public class BankPageController {
   }
 
   /**
-   * Fetches an account's balance-over-time series for a period from the backend balance-series
-   * endpoint (REQ-BANK-049), the single source shared by the full page and the {@code balanceChart}
-   * fragment swap.
+   * Fetches an account's balance-over-time series for a period (REQ-BANK-049).
    *
    * @param id the account id
    * @param from inclusive period start instant
@@ -405,18 +367,14 @@ public class BankPageController {
   }
 
   /**
-   * Renders the holder detail page (REQ-BANK-032): the holder's header (handle, status, global
-   * custody total) plus the paged custody history — every booking that touched the holder's stash.
-   * A bank employee reaches only their own holder, management any (the backend {@code canSeeHolder}
-   * gate enforces it; a forbidden id surfaces as the backend error). The page is read-only — no
-   * modals, no money writes.
+   * Renders the read-only holder detail page (REQ-BANK-032): header with custody total and the
+   * paged custody history. The backend restricts employees to their own holder.
    *
    * @param id the holder id
    * @param page zero-based history page
-   * @param fragment when {@code "holderBookings"} only the paged history fragment is rendered (AJAX
-   *     pager swap, REQ-FE-002); otherwise the full page is returned
+   * @param fragment {@code "holderBookings"} to render only the history fragment (REQ-FE-002)
    * @param model Spring MVC model
-   * @return the holder-detail template, or its {@code holderBookings} fragment for an AJAX swap
+   * @return the holder-detail template, or its {@code holderBookings} fragment
    */
   @NotNull
   @GetMapping("/bank/holders/{id}")
@@ -439,11 +397,8 @@ public class BankPageController {
   }
 
   /**
-   * Renders just the paged custody-history block for an AJAX pager swap (REQ-FE-002). Fetches only
-   * the requested history page — the holder header the full page loads is skipped. A backend
-   * failure degrades to an empty page so the swapped-in fragment shows its empty state rather than
-   * injecting an error page into the sub-table; the {@code .utc-time} localiser (re-run on {@code
-   * krt:swapped}) keeps the swapped-in rows live.
+   * Renders only the paged custody history for a pager swap (REQ-FE-002); a backend failure yields
+   * an empty page.
    *
    * @param id the holder id
    * @param page zero-based history page (clamped to 0)
@@ -469,13 +424,11 @@ public class BankPageController {
   }
 
   /**
-   * Fetches one page of a holder's custody history (page size 20) from the backend holder
-   * transactions endpoint — the single source of the history query shared by the full-page render
-   * and the {@link #holderBookingsFragment} AJAX swap.
+   * Fetches one page (size 20) of a holder's custody history.
    *
-   * @param id the holder id whose history to page through
+   * @param id the holder id
    * @param page zero-based, already-clamped page index
-   * @return the requested history page envelope
+   * @return the history page envelope
    */
   private PageResponse<BankHolderBookingDto> fetchHolderBookings(UUID id, int page) {
     return backendApiClient.get(
@@ -487,10 +440,8 @@ public class BankPageController {
   }
 
   /**
-   * Fetches the current in-game transfer-fee rate for the booking-modal preview (ADR-0052,
-   * REQ-BANK-033); a backend failure or absent rate degrades to {@link BigDecimal#ZERO} so the page
-   * still renders (the preview then simply shows no fee). The authoritative fee is always computed
-   * server-side at booking time.
+   * Fetches the in-game transfer-fee rate for the booking-modal preview (REQ-BANK-033); failure or
+   * absence yields {@link BigDecimal#ZERO}. The real fee is computed server-side.
    *
    * @return the fee rate as a fraction, never {@code null}
    */

@@ -22,13 +22,8 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 /**
- * Frontend mirror of the backend {@code P4kImportResultDto} returned by the P4K catalog import
- * endpoints ({@code /api/v1/admin/import/p4k/preview} and {@code .../apply}). A dry-run preview and
- * a real apply share this shape; the page renders it verbatim as a per-type count table plus the
- * scalar tallies.
- *
- * <p>Jackson-bindable (camelCase matching the backend JSON); {@code @JsonIgnoreProperties} keeps
- * the frontend resilient if the backend ever grows the payload.
+ * Frontend mirror of the backend {@code P4kImportResultDto}, shared by a P4K import preview and
+ * apply and rendered as a per-type count table; unknown fields are ignored.
  *
  * @param dryRun {@code true} for a preview (nothing written), {@code false} for an applied import
  * @param seedingEnabled whether seeding of brand-new game rows was enabled for this run

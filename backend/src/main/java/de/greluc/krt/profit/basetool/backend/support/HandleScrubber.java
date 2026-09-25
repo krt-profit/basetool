@@ -30,62 +30,13 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Removes other members' handles from free text going into a data export (REQ-SEC-058).
+ * Replaces other members' handles in free text going into a data export (REQ-SEC-058).
  *
- * <p><b>This is the second line, not the first.</b> Third-party data is kept out of the export
- * primarily by the projections in {@link DataExportSections} never selecting another member's id or
- * handle column. That handles structured data completely. It cannot handle prose: a note the
- * requester wrote is <em>their</em> data and belongs in the export, and it may name somebody else
- * in the middle of a sentence, where no {@code SELECT} list can reach.
- *
- * <p><b>Its limit is stated rather than hidden.</b> It replaces the handles of members it is given.
- * It cannot recognise a person who has no account, or a nickname, or a misspelling — nothing can,
- * from text alone. That residue is why {@code docs/privacy/data-subject-requests.md} requires an
- * admin to <em>read</em> the free text before releasing an export, per Art. 15(4): "if a note names
- * another member, redact that name rather than withholding the whole entry". This class makes that
- * review short; it does not replace it.
- *
- * <p><b>One forward pass over the original text, longest match wins.</b> Both halves of that
- * sentence are load-bearing, and each of them replaced a defect.
- *
- * <p>Scanning left to right and consuming each match means the output is never re-read. The earlier
- * implementation looped over the handles, each pass scrubbing the previous pass's result, so a
- * three-character handle that happens to be a substring of the replacement text was substituted
- * <em>inside</em> a placeholder an earlier pass had written. {@code displayName} is self-service
- * with only a length limit on it, so any member could pick such a handle and corrupt the free text
- * in every other member's export. Nothing can recurse into text this pass has already emitted.
- *
- * <p>Longest first, because replacing "Val" before "Valkyrie" would leave the fragment "kyrie"
- * behind, which is both a leak and a corruption. The handles are sorted by descending length, and
- * the first one that matches at a position is the one taken.
- *
- * <p><b>Case-insensitivity through {@link String#regionMatches(boolean, int, String, int, int)},
- * never through a lower-cased copy.</b> {@code toLowerCase} is not length-preserving -- U+0130
- * (capital I with dot above) lowercases to two characters -- so an index found in a lower-cased
- * copy does not address the same character in the original. The earlier implementation spliced the
- * original at exactly those indices: a match after such a character leaked a prefix of the third
- * party's handle while the export still reported the removal as complete, and a match near the end
- * threw {@code IndexOutOfBoundsException} out of the export entirely. Any member could put that
- * character in their own note and then request their own export. {@code regionMatches} compares
- * character for character, so the two cannot drift apart.
- *
- * <p><b>A match must be flanked by non-alphanumeric characters.</b> Without that, a name is
- * replaced inside unrelated words: a third party called "Ore" turned "Store gefuellt" into
- * "St#OTHER_MEMBER# gefuellt". The boundary is what makes the three-character floor below
- * defensible — the class used to argue only the two-character case and then assert that three was
- * safe. A mention next to punctuation still matches, because punctuation is a boundary.
- *
- * <p><b>Handles under {@value #MIN_HANDLE_LENGTH} characters are skipped.</b> A two-character
- * handle occurs inside ordinary words constantly and no boundary rule saves it — "Al" is a word in
- * several languages. A short handle that genuinely appears is left to the human review, which is
- * the correct trade: a readable export with a reviewed residue beats a mangled one.
- *
- * <p><b>The subject's own names are matched and passed through verbatim.</b> They are not in the
- * replaced set — the export is about them — but they have to be in the <em>matcher</em>, or
- * longest-match cannot see them. With a third party called "Val" and nothing protecting the
- * subject's own "Valkyrie", "Notiz von Valkyrie" became "Notiz von #OTHER_MEMBER#kyrie": the
- * subject's own name shredded, in their own export, and reported to the reviewing admin as a
- * third-party redaction because the caller's flag keys off any change at all.
+ * <p>Scans the original text in one forward pass, case-insensitively via {@link
+ * String#regionMatches(boolean, int, String, int, int)}, taking the longest term at each position.
+ * A match must be flanked by non-alphanumeric characters, handles shorter than {@value
+ * #MIN_HANDLE_LENGTH} characters are skipped, and the subject's own names are matched but emitted
+ * verbatim. Unknown persons, nicknames and misspellings are left to the admin review.
  */
 public final class HandleScrubber {
 
@@ -93,20 +44,8 @@ public final class HandleScrubber {
   public static final int MIN_HANDLE_LENGTH = 3;
 
   /**
-   * What a removed third-party handle is replaced with.
-   *
-   * <p>A token and not prose, for the same reason {@link HandleAnonymisation#SENTINEL} is one: this
-   * value is written into a document that has no language of its own. The JSON export is
-   * machine-readable and carries no locale, and the PDF is rendered in the reader's -- so German
-   * prose spliced into the text would be wrong in one of the two whichever language it was written
-   * in, and the root {@code CLAUDE.md} rule admits no hardcoded user-visible text at all. The
-   * surfaces that explain the token are localised instead: {@code pdf.export.note.thirdParty} names
-   * it, and the JSON carries {@code thirdPartyHandlesRemoved} for a reader to key off.
-   *
-   * <p>Deliberately in the same {@code #WORD#} shape as the erasure sentinel, and deliberately not
-   * the same token: this one means "a name that belongs to somebody else was removed here", the
-   * other means "this person exercised their right to erasure". Collapsing them would lose that
-   * distinction in the one place a reader has to be able to tell them apart.
+   * The token that replaces a removed third-party handle; distinct from {@link
+   * HandleAnonymisation#SENTINEL}.
    */
   public static final String REPLACEMENT = "#OTHER_MEMBER#";
 
@@ -122,17 +61,8 @@ public final class HandleScrubber {
   private final List<Term> terms;
 
   /**
-   * The terms bucketed by their first character, so a position in the text is tested only against
-   * the terms that could start there.
-   *
-   * <p>This is what keeps the pass affordable. The scan advances one position at a time, and a few
-   * hundred terms tested at every character of a few thousand values would be the one part of an
-   * export that could plausibly become slow — the concern the original hand-rolled match cited to
-   * justify not compiling a pattern. A character that starts no term costs one map lookup.
-   *
-   * <p>Bucketed under every case-folding of the first character that {@link
-   * String#regionMatches(boolean, int, String, int, int)} would accept, so the index cannot fold
-   * more narrowly than the comparison does and silently miss a match.
+   * The terms bucketed under every case-folding of their first character, longest first, so a
+   * position is tested only against terms that could start there.
    */
   private final Map<Character, List<Term>> byFirstChar;
 
@@ -148,12 +78,9 @@ public final class HandleScrubber {
   /**
    * Creates a scrubber that replaces one set of names and protects another.
    *
-   * @param otherHandles every other member's name in every spelling the schema stores; each
-   *     occurrence is replaced by {@link #REPLACEMENT}
-   * @param ownNames the subject's own names, in every spelling. Matched so that longest-match can
-   *     see them, and then emitted <b>verbatim</b>: the export is about this person, and without
-   *     them in the matcher a shorter third-party handle that is a prefix of the subject's own name
-   *     shreds it.
+   * @param otherHandles every other member's name in every stored spelling; each occurrence is
+   *     replaced by {@link #REPLACEMENT}
+   * @param ownNames the subject's own names in every spelling; matched and emitted verbatim
    */
   public HandleScrubber(
       @NotNull Collection<String> otherHandles, @NotNull Collection<String> ownNames) {
@@ -192,19 +119,8 @@ public final class HandleScrubber {
   }
 
   /**
-   * Every character a case-insensitive comparison could accept in place of this one.
-   *
-   * <p>{@code regionMatches(true, …)} compares {@code toUpperCase} and then {@code toLowerCase} of
-   * each pair, which accepts pairs that a single folding does not: {@code K} (U+212A) matches
-   * {@code k}, {@code ı} matches {@code I}, {@code ẞ} matches {@code ß}, {@code ς} matches {@code
-   * σ}, {@code İ} matches {@code i}. Bucketing under only two foldings made the index the narrower
-   * of the two, so such a pair was silently never tested at all.
-   *
-   * <p><b>Applied to both sides, which is what makes the index exactly as wide as the
-   * comparison.</b> Folding only the term's first character left the mirror case open: a handle
-   * {@code Kelvin} is indexed under {@code K} and {@code k}, and a note written with the Kelvin
-   * sign looks up U+212A, which no bucket holds. The term side alone is not symmetric because
-   * folding is not transitive through one key.
+   * Returns every character a case-insensitive {@code regionMatches} could accept in place of this
+   * one.
    *
    * @param first the character to fold
    * @return the distinct characters it can stand in for, itself included
@@ -220,10 +136,8 @@ public final class HandleScrubber {
   }
 
   /**
-   * Replaces every occurrence of a known third-party name in the text, case-insensitively.
-   *
-   * <p>Case-insensitive because whoever wrote the note was typing, not copying from a roster — the
-   * same reason the Personensuche matches that way (REQ-SEC-060).
+   * Replaces every occurrence of a known third-party name in the text, case-insensitively
+   * (REQ-SEC-060).
    *
    * @param text the free text, possibly {@code null}
    * @return the text with third-party names replaced, or {@code null} when the input was
@@ -260,18 +174,8 @@ public final class HandleScrubber {
   }
 
   /**
-   * The longest known term that starts at this position, ignoring case, flanked by boundaries.
-   *
-   * <p>The index is consulted under every {@link #caseFoldings(char)} of the text's own character,
-   * not only under the character itself: the buckets fold the term's first character, and folding
-   * one side is not symmetric. Without this a handle {@code Kelvin} — indexed under {@code K} and
-   * {@code k} — was never tested against a note written with the Kelvin sign, although {@code
-   * regionMatches(true, …)} accepts that pair.
-   *
-   * <p>Each bucket is longest-first, so the first match inside one is that bucket's best; across
-   * buckets the longest match wins, and the scan of a bucket stops as soon as its remaining terms
-   * are too short to beat what is already held. Longest-match-first is load-bearing — matching
-   * „Val“ before „Valkyrie“ leaves „kyrie“ behind, which is a leak and a corruption at once.
+   * Returns the longest known term that starts at this position, ignoring case and flanked by
+   * boundaries, looking up every {@link #caseFoldings(char)} of the text's character.
    *
    * @param text the text being scanned
    * @param at the position to test

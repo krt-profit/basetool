@@ -48,16 +48,9 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Render regression for the S12 (#918) {@code fragments/modal-wrapper :: modal(...)} extraction on
- * {@code /admin/audit-log}. Proves the Thymeleaf content-projection renders the export modal's
- * canonical HUD shell (overlay id, head, the unified {@code close-modal-display} close trigger) AND
- * projects the bespoke {@code <form>} body exactly once — a double-render would duplicate the whole
- * export form and is the classic content-projection failure mode.
- *
- * <p>Also renders the originating-client filter and column (REQ-AUDIT-005) through the real
- * Thymeleaf engine: those use {@code #messages.msgOrNull(...)} with an Elvis fallback, an
- * expression a unit test on the controller cannot exercise at all — it either resolves or takes the
- * whole admin page down at render time.
+ * Render test for {@code /admin/audit-log}: the export modal renders its shell through {@code
+ * fragments/modal-wrapper :: modal(...)} and projects its {@code <form>} body exactly once, and the
+ * originating-client filter and column render (REQ-AUDIT-005).
  */
 @SpringBootTest
 class AdminAuditLogModalRenderMvcTest {

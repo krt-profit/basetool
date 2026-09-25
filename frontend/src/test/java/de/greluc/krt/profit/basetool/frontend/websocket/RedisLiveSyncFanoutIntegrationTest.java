@@ -191,8 +191,8 @@ class RedisLiveSyncFanoutIntegrationTest {
   }
 
   /**
-   * Builds a fan-out whose mocked handler records the presence snapshots it is asked to mirror —
-   * the presence-channel counterpart of {@link #newFanout}.
+   * Builds a fan-out whose mocked handler records the presence snapshots it mirrors, the presence
+   * counterpart of {@link #newFanout}.
    *
    * @param template the Redis template both instances publish through
    * @param instanceId the instance id this fan-out publishes under and skips on consume

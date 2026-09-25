@@ -25,30 +25,15 @@ import java.util.UUID;
 
 /**
  * Custom-repository fragment giving {@link MissionRepository} a collection-free, {@code
- * EntityManager.find}-based mission lookup for the authorization gates (#1139).
- *
- * <p>The overridden {@link MissionRepository#findById(UUID)} eagerly graphs the {@code
- * participants} roster, and any derived / JPQL query alternative would auto-flush the persistence
- * context. The authorization gates ({@code AccessGateService.canSeeMission} / {@code
- * canEditMission}, {@code MissionSecurityService.canManageMission} / {@code canManageManagers} /
- * {@code canChangeOwner}) read only the mission's {@code owningOrgUnit} / {@code parent} chain or
- * {@code owner} / {@code managers} — never the roster — so loading the aggregate there was pure
- * per-request waste, doubling the heaviest query on the hottest endpoint. This fragment resolves
- * the gate load through {@code em.find}, which (a) fetches the plain entity with <em>no</em>
- * collection graph, so the gate lazy-loads only the one or two associations it actually reads, (b)
- * is first-level-cache aware, and (c) — unlike a JPQL query — never auto-flushes, matching the
- * production {@code readOnly} gate transaction even when the gate joins an outer read-write
- * transaction (a {@code @Transactional} test).
+ * EntityManager.find}-based mission lookup for the authorization gates.
  */
 public interface MissionRepositoryAuthorizationFragment {
 
   /**
-   * Loads a mission by id for an authorization decision via {@code EntityManager.find} — no
-   * collection graph, first-level-cache aware, and never auto-flushing (#1139). The caller
-   * lazy-loads the single associations it needs ({@code owningOrgUnit} / {@code parent} for the
-   * scope gates, {@code owner} / {@code managers} for the owner-manager gates) within its own
-   * transaction; the roster is never touched, so no {@code participants} / {@code assignedUnits}
-   * query runs.
+   * Loads a mission by id for an authorization decision via {@code EntityManager.find}: no
+   * collection graph, first-level-cache aware and never auto-flushing.
+   *
+   * <p>The caller lazy-loads the associations it needs within its own transaction.
    *
    * @param id the mission id
    * @return the mission, or empty when none exists

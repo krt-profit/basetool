@@ -36,10 +36,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
 /**
  * Mockito tests for the "delete reports older than X days" action on {@link
- * AdminSyncReportsPageController}. Pins the three behaviours that carry risk: (1) a blank source
- * purges the combined view and redirects to the combined tab, (2) a source tab is relayed to the
- * backend and the user lands back on that tab, and (3) invalid input / backend failure
- * short-circuit to an error flash without (respectively, regardless of) a backend call.
+ * AdminSyncReportsPageController}: a blank source purges the combined view, a source tab is relayed
+ * and returned to, and invalid input or a backend failure yields an error flash.
  */
 class AdminSyncReportsPageControllerTest {
 

@@ -50,11 +50,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * End-to-end coverage of the notification rule engine against the real Postgres test container: it
- * validates the V156 schema and seed, that every recipient-resolution query executes, and that the
- * creation pipeline persists rows for the resolved recipients (the seeded rule plus an extra rule
- * coexisting). The async listener is bypassed — the creation service is driven directly — so the
- * assertions are deterministic.
+ * Integration tests of the notification rule engine against Postgres: schema and seed, every
+ * recipient-resolution query, and persisted rows for the resolved recipients.
  */
 @SpringBootTest
 @ActiveProfiles("test")

@@ -33,17 +33,9 @@ import org.springframework.core.Ordered;
 import org.springframework.web.filter.ForwardedHeaderFilter;
 
 /**
- * Locks the ordering invariant the whole client-IP attribution rests on (REQ-SEC-011, ADR-0090
- * pattern): {@link ForwardedHeaderFilter} MUST run strictly after {@link ClientIpContextFilter}, so
- * the latter still sees the raw peer and the unconsumed {@code X-Forwarded-For} chain.
- *
- * <p>The assertions deliberately read the <b>registration</b> order rather than any {@code Ordered}
- * implementation on the filters. {@code ServletContextInitializerBeans} sorts {@code
- * RegistrationBean}s by their own order and never consults the wrapped filter, so a filter-level
- * order would be the value a reader trusts and the container ignores — and a test asserting it
- * would stay green while {@code registration.setOrder(HIGHEST_PRECEDENCE + 5)} silently restored
- * the original bug. This mirrors the frontend test of the same name, which asserts the filter order
- * because there the filter is a {@code @Component} and that order is the effective one.
+ * Asserts that {@link ForwardedHeaderFilter} is registered strictly after {@link
+ * ClientIpContextFilter}, so the latter still sees the raw peer and {@code X-Forwarded-For} chain
+ * (REQ-SEC-011). Reads the registration order, which is the order the container applies.
  */
 class ForwardedHeaderConfigTest {
 

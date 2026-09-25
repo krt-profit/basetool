@@ -24,13 +24,7 @@ import java.util.List;
 /**
  * Frontend mirror of the Terms-of-Use wording served by the backend (REQ-SEC-028, ADR-0138).
  *
- * <p>The wording used to live in this module's message bundle. It moved to the backend so the web
- * page, the consent gate and the Android app all render one source — a second copy is what lets a
- * gate show different text from the document it claims to reproduce.
- *
- * <p>Deliberately <strong>not</strong> a {@code CachedCatalog} entry: the response varies by {@code
- * Accept-Language}, and that cache is keyed by URI alone and documented as global-only, so caching
- * this would eventually serve one member the other language.
+ * <p>Not cached, because the response varies by {@code Accept-Language}.
  *
  * @param version content digest of this wording; the value an acceptance is recorded against
  * @param title the document's own heading

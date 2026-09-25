@@ -54,9 +54,8 @@ class BackendImportClientTest {
   private BackendImportClient client;
 
   /**
-   * Stands in for the gateway's own identity. The relay no longer forwards the caller's token
-   * (ADR-0129), so every outbound call now needs one — a fixed value keeps the assertions readable
-   * and makes a leaked CALLER token immediately visible as "not this string".
+   * Stands in for the gateway's own identity (ADR-0129) with a fixed value, so a forwarded caller
+   * token would stand out in the assertions.
    */
   private final ServiceAccountTokenProvider serviceAccountTokenProvider =
       org.mockito.Mockito.mock(ServiceAccountTokenProvider.class);
@@ -105,11 +104,9 @@ class BackendImportClientTest {
   }
 
   /**
-   * ING-SEC-02, end to end over real HTTP: the backend refuses the gateway's cached token with a
-   * {@code 401}; the relay surfaces that as a {@link RestClientResponseException} (never
-   * swallowed), the exception handler turns it into a {@code 502} and invalidates the cache, and
-   * the very next relay therefore carries a <em>freshly minted</em> token instead of replaying the
-   * refused one.
+   * Over real HTTP, a backend {@code 401} on the gateway's cached token surfaces as a {@link
+   * RestClientResponseException}, becomes a {@code 502}, invalidates the cache, and the next relay
+   * carries a freshly minted token.
    */
   @Test
   void aBackendAuthRefusalInvalidatesTheTokenSoTheNextRelayCarriesAFreshOne() throws Exception {

@@ -29,12 +29,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * The served-version policy the forced-update gate keys on (REQ-API-010).
- *
- * <p>The endpoint has no branches worth mocking a web layer for — its anonymity is asserted where
- * anonymity is decided, in {@code ApiVhostAnonymousSurfaceTest}, and its response shape is frozen
- * in {@code ExternalContractTest}. What is left, and what actually decides whether members can use
- * the app, are the property defaults: a server nobody has configured must answer "no floor".
+ * Tests the served-version policy of the forced-update gate (REQ-API-010), chiefly that an
+ * unconfigured server answers "no floor".
  */
 class AppVersionPolicyControllerTest {
 

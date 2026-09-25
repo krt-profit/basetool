@@ -46,9 +46,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 /**
- * Unit tests for the identity-seam and self-service halves of {@link UserService} left in place
- * after the Keycloak reconciliation moved to {@link UserReconciliationService} (audit Thema&nbsp;7,
- * #1252):
+ * Unit tests for the identity and self-service parts of {@link UserService}:
  *
  * <ul>
  *   <li>{@link UserService#getUserIdFromJwt} — JWT sub/UUID validation (fail-closed).

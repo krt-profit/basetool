@@ -28,21 +28,9 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
- * Bean-validation tests for {@link RefineryOrderDto}'s money-field constraints and its cascading
- * validation into the {@code goods} list elements.
- *
- * <p>Audit finding H-3: {@code expenses} lacked the {@code @PositiveOrZero} its sibling money
- * fields ({@code otherExpenses}, {@code oreSales}) carry. Because the operation/mission roll-up
- * computes {@code profit = oreSales - expenses - otherExpenses}, a negative {@code expenses}
- * increased the profit and therefore every PAYOUT participant's share — a finance-integrity
- * manipulation reachable by any authenticated owner of an operation-linked refinery order. These
- * tests pin that {@code expenses} is now bound to {@code >= 0} exactly like its siblings, while
- * remaining optional ({@code null} allowed).
- *
- * <p>The {@code goods} test pins that {@code goods} is declared {@code List<@Valid
- * RefineryGoodDto>} so a bad element (e.g. {@code inputQuantity < 1}) still surfaces a constraint
- * violation — the cascade must not regress if the {@code @Valid} type-argument is ever dropped
- * (issue #1206).
+ * Bean Validation tests for {@link RefineryOrderDto}: {@code expenses}, {@code otherExpenses} and
+ * {@code oreSales} are optional but non-negative, and constraints cascade into the {@code goods}
+ * elements.
  */
 class RefineryOrderDtoValidationTest {
 

@@ -46,12 +46,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * MVC-level test for {@link AdminSettingsPageController}'s in-place settings AJAX twin (epic #571 /
- * #582). Proves the {@code X-Requested-With} header routing: the twin is {@code @ResponseBody},
- * applies the cross-field invariants and per-setting PUTs, and returns the bumped optimistic-lock
- * versions as JSON ({@code 200}) so the page writes them back into the hidden inputs. A yellow >=
- * red violation returns {@code 422 problem+json}; the same URL without the header still hits the
- * classic redirect handler. Fails if the header gating or the validation short-circuit breaks.
+ * MVC test for {@link AdminSettingsPageController}'s settings AJAX twin: it applies the invariants
+ * and per-setting PUTs and returns the new versions as JSON, a yellow &gt;= red violation returns
+ * {@code 422 problem+json}, and without {@code X-Requested-With} the URL still redirects.
  */
 @SpringBootTest
 class AdminSettingsPageControllerMvcTest {

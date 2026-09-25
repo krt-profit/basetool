@@ -24,39 +24,21 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Wire shape for {@link de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership}. Carries the
- * embedded composite key unpacked as two separate UUID fields ({@link #userId}, {@link #orgUnitId})
- * plus a denormalised {@link #userDisplayName} (display name with username fallback) so the admin
- * roster page can render the member chip without a per-row join back to {@code app_user}. The
- * {@code kind} field mirrors {@link OrgUnitKind} so the client can branch on Squadron vs
- * Spezialkommando without a follow-up lookup against the parent {@code org_unit} row.
+ * Wire shape for {@link de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership}, with the
+ * composite key unpacked and a denormalized display name for the admin roster.
  *
- * <p>All flags are surfaced as {@code Boolean} (boxed) on the read side; that keeps the inbound
- * patch shape ({@link MembershipFlagsPatchRequest}) symmetric (an omitted field on a PATCH means
- * "no change", which only works with boxed values).
+ * <p>Flags are boxed to mirror {@link MembershipFlagsPatchRequest}, where {@code null} means "no
+ * change".
  *
- * @param userId Identifier of the user this membership belongs to. Always populated.
- * @param userDisplayName Convenience copy of {@code user.effectiveName} — the user's display name
- *     when set, otherwise the username — so the admin roster does not need a per-row join and never
- *     shows an empty cell for users without a configured display name.
- * @param orgUnitId Identifier of the org unit (Squadron or Spezialkommando) the user belongs to.
- *     Always populated.
- * @param kind Discriminator of the referenced org unit; {@link OrgUnitKind#SPECIAL_COMMAND} for SK
- *     memberships, {@link OrgUnitKind#SQUADRON} for the user's home Staffel. Denormalised on the
- *     wire so the client does not need to know about the JPA inheritance tree.
- * @param isLogistician Whether the membership grants the Logistician role within the referenced org
- *     unit. Once R5.c migrates the scoped-role authorisation onto the membership row, this is the
- *     authoritative source for "may this user perform a Logistician action in this org unit?".
- * @param isMissionManager Same as {@link #isLogistician} for the Mission Manager role.
- * @param isLead Whether the membership grants the Spezialkommando Lead capability. Derived from the
- *     unified rank ({@code role == SK_LEAD}) since the epic #800 Phase 5 cleanup dropped the {@code
- *     is_lead} column ({@code V187}); only ever {@code true} on a Spezialkommando membership (the
- *     {@code chk_org_unit_membership_role_kind} CHECK confines {@code SK_LEAD} to {@code
- *     SPECIAL_COMMAND}).
- * @param joinedAt Timestamp when the membership was granted. Surfaced as {@link Instant} (UTC) per
- *     the project's "all times in UTC" rule.
- * @param version Optimistic-lock counter; required on patch requests so concurrent admin edits do
- *     not silently lose a flag flip.
+ * @param userId the member's user id; always populated
+ * @param userDisplayName the user's display name, else the username
+ * @param orgUnitId the org unit the user belongs to; always populated
+ * @param kind the referenced org unit's {@link OrgUnitKind}
+ * @param isLogistician whether the membership grants the Logistician role in the org unit
+ * @param isMissionManager whether the membership grants the Mission Manager role in the org unit
+ * @param isLead whether the membership holds the {@code SK_LEAD} rank; only on a Spezialkommando
+ * @param joinedAt when the membership was granted, in UTC
+ * @param version optimistic-lock version; required on patch requests
  */
 public record OrgUnitMembershipDto(
     UUID userId,

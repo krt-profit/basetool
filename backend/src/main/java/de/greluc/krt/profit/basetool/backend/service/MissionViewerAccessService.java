@@ -25,16 +25,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
- * Service-layer implementation of the {@link MissionViewerAccess} seam the {@code MissionMapper}
- * depends on. Lives here (not in {@code support}) so the dependency on {@link AuthHelperService}
- * and {@link MissionSecurityService} stays in the {@code service} layer and the mapper depends only
- * on the leaf interface — see {@link MissionViewerAccess} and ADR-0047 for why this breaks the
- * {@code mapper} &harr; {@code service} package cycle.
- *
- * <p>It is a thin adapter: it folds the {@code (missionId, Authentication)} call shape of {@link
- * MissionSecurityService} into the mapper-friendly {@code (missionId)} shape by sourcing the {@code
- * Authentication} from {@link AuthHelperService}, so the mapper never has to touch the raw
- * authentication object.
+ * Implements {@link MissionViewerAccess} for the mission mapper by resolving the caller's
+ * authentication and delegating to {@link MissionSecurityService} (ADR-0047).
  */
 @Service
 @RequiredArgsConstructor
@@ -65,9 +57,8 @@ public class MissionViewerAccessService implements MissionViewerAccess {
   }
 
   /**
-   * Resolves the caller's {@code Authentication} via {@link AuthHelperService} and delegates to
-   * {@link MissionSecurityService#canManageMission(UUID,
-   * org.springframework.security.core.Authentication)}.
+   * Delegates to {@link MissionSecurityService#canManageMission(UUID,
+   * org.springframework.security.core.Authentication)} with the caller's authentication.
    *
    * @param missionId the mission to check; never {@code null}.
    * @return {@code true} iff the caller may manage the mission.
@@ -79,9 +70,8 @@ public class MissionViewerAccessService implements MissionViewerAccess {
   }
 
   /**
-   * Resolves the caller's {@code Authentication} via {@link AuthHelperService} and delegates to
-   * {@link MissionSecurityService#canManageManagers(UUID,
-   * org.springframework.security.core.Authentication)}.
+   * Delegates to {@link MissionSecurityService#canManageManagers(UUID,
+   * org.springframework.security.core.Authentication)} with the caller's authentication.
    *
    * @param missionId the mission to check; never {@code null}.
    * @return {@code true} iff the caller may manage the mission's managers.

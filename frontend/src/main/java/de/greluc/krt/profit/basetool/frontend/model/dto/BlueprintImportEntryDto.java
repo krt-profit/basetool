@@ -24,8 +24,8 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * One import preview row mirroring the backend {@code BlueprintImportEntryDto} (#327): an external
- * name plus how it resolved against the master product list.
+ * Frontend mirror of the backend {@code BlueprintImportEntryDto}: one import preview row, an
+ * external name and how it resolved against the product list.
  *
  * @param externalName the export {@code productName} exactly as uploaded
  * @param status the resolution outcome for this name

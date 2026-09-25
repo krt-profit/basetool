@@ -53,11 +53,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
- * Admin counterpart of {@link PersonalInventoryPageController}: lets administrators pick a target
- * user from the squadron member list and manage that user's personal inventory. Authorization is
- * enforced by {@code @PreAuthorize("hasRole('ADMIN')")} at the class level; the GET handler
- * additionally exposes the explicit "ADMIN MODE" banner flag to the template so the visual
- * distinction is unambiguous.
+ * Admin counterpart of {@link PersonalInventoryPageController}: manages a selected user's personal
+ * inventory, with an "ADMIN MODE" banner. ADMIN only.
  */
 @Controller
 @UsesLayoutModel
@@ -74,29 +71,19 @@ public class AdminPersonalInventoryPageController {
       PERSONAL_INVENTORY_PAGE_TYPE = new ParameterizedTypeReference<>() {};
 
   /**
-   * Renders the admin personal-inventory page.
+   * Renders the admin personal-inventory page: the user picker and, with {@code userSub}, that
+   * user's inventory under the "ADMIN MODE" banner.
    *
-   * <p>Without a {@code userSub} selected the page shows the user picker and an empty item list.
-   * With {@code userSub} the picker pre-selects that user and the item table shows their inventory.
-   * {@code adminMode=true} drives the "ADMIN MODE" banner in the template so admins are visually
-   * reminded they are looking at someone else's data.
-   *
-   * <p>{@code userSub} is parsed to a {@link UUID} before anything is relayed: Keycloak issues the
-   * {@code sub} as one and the backend declares it as one, so a value that is not a UUID selects no
-   * member — the same empty page the picker starts on — instead of travelling into the relayed URI
-   * as a raw string (REQ-SEC-051).
+   * <p>A {@code userSub} that is not a UUID selects no member (REQ-SEC-051).
    *
    * @param userSub Keycloak {@code sub} of the user whose inventory to show, or {@code null}
    * @param q optional free-text filter
    * @param page zero-based page index
    * @param size page size, defaults to 50
-   * @param sort optional sort spec; ignored unless it is a well-formed sort specification
-   * @param fragment when {@code "results"} only the item-list fragment is rendered (AJAX member-
-   *     select / filter swap, REQ-FE-002); the member dropdown sits outside the swap target, so the
-   *     user list is then not fetched. Otherwise the full page is returned
-   * @param model Thymeleaf model populated with users, items, page metadata and the admin banner
-   * @return the {@code admin/personal-inventory} view name, or its {@code results} fragment for an
-   *     AJAX swap
+   * @param sort optional sort spec; ignored unless well-formed
+   * @param fragment {@code "results"} to render only the item list (REQ-FE-002)
+   * @param model Thymeleaf model populated with items, page metadata and the admin banner
+   * @return the {@code admin/personal-inventory} view name, or its {@code results} fragment
    */
   @NotNull
   @GetMapping
@@ -133,21 +120,13 @@ public class AdminPersonalInventoryPageController {
   }
 
   /**
-   * Creates a personal-inventory item for the target user.
-   *
-   * <p>Validation errors re-render the target user's list inline with the modal open, exactly as
-   * {@link PersonalInventoryPageController} does. Until 2026-09-23 this handler flashed the {@code
-   * BindingResult} through the redirect instead, and that could never work: the session serializer
-   * writes a {@code BeanPropertyBindingResult} but cannot read one back — it has no constructor
-   * Jackson can use — so the redirect's GET dropped the whole flash map (REQ-SEC-063) and the admin
-   * saw a closed modal, no errors and an empty form. A {@code BindingResult} stays request-scoped;
-   * {@code FlashAttributeTypesTest} holds every controller to that.
+   * Creates a personal-inventory item for the target user; validation errors re-render the page
+   * with the modal open.
    *
    * @param userSub target user's Keycloak {@code sub}
    * @param form form-bound DTO
-   * @param bindingResult validation errors carrier; on failure it reaches the view through the
-   *     model, next to {@code form}
-   * @param model Thymeleaf model used for the inline re-render on validation failure
+   * @param bindingResult validation errors, passed to the view through the model
+   * @param model Thymeleaf model used for the inline re-render
    * @param redirectAttributes flash attributes carrier
    * @return the inline {@code admin/personal-inventory} view on validation failure, otherwise a
    *     redirect to the admin list
@@ -184,15 +163,14 @@ public class AdminPersonalInventoryPageController {
   }
 
   /**
-   * Updates a target user's personal-inventory item. A 409 surfaces as a dedicated optimistic-lock
-   * toast via {@link #classifyError}.
+   * Updates a target user's personal-inventory item; a 409 surfaces as the optimistic-lock toast
+   * via {@link #classifyError}.
    *
-   * @param userSub target user's Keycloak {@code sub} (used only for the redirect target)
+   * @param userSub target user's Keycloak {@code sub}, used for the redirect
    * @param id inventory item id
    * @param form form-bound DTO
-   * @param bindingResult validation errors carrier; on failure it reaches the view through the
-   *     model, as in {@link #add}
-   * @param model Thymeleaf model used for the inline re-render on validation failure
+   * @param bindingResult validation errors, passed to the view through the model
+   * @param model Thymeleaf model used for the inline re-render
    * @param redirectAttributes flash attributes carrier
    * @return the inline {@code admin/personal-inventory} view on validation failure, otherwise a
    *     redirect to the admin list
@@ -257,10 +235,8 @@ public class AdminPersonalInventoryPageController {
   }
 
   /**
-   * Re-renders the target user's full admin page with the item modal open, for a submission that
-   * failed validation. The submitted form and its {@code BindingResult} are already in {@code
-   * model} (Spring put them there for the {@code @ModelAttribute}), so {@link #view} keeps them and
-   * the modal shows the input and the field errors.
+   * Re-renders the target user's admin page with the item modal open after a failed validation; the
+   * submitted form and its errors are already in {@code model}.
    *
    * @param userSub the target user, whose inventory the page lists
    * @param modalAction the URL the re-opened modal posts to
@@ -281,13 +257,10 @@ public class AdminPersonalInventoryPageController {
   }
 
   /**
-   * Resolves a single member for the picker's edit-mode seed (#1193): the picker now searches
-   * server-side rather than preloading the roster, so only the currently-selected member's option
-   * is rendered and needs its display name. Returns {@code null} on any failure (a malformed sub is
-   * rejected by the backend {@code UUID} binding), leaving the picker with just its placeholder.
+   * Resolves the selected member for the picker's seed option.
    *
    * @param userSub the selected member's Keycloak {@code sub}; never {@code null} here.
-   * @return the member DTO for the seed option, or {@code null} when the lookup fails.
+   * @return the member DTO, or {@code null} when the lookup fails.
    */
   @Nullable
   private UserDto fetchUser(UUID userSub) {

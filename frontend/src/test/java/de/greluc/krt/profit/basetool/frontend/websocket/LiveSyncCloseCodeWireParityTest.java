@@ -29,15 +29,8 @@ import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 /**
- * Build-time parity guard for the application-defined WebSocket close codes.
- *
- * <p>Each code is a mirror point in the same sense as the deny {@code reason} ({@link
- * LiveSyncDenyReasonWireParityTest}) and the live-sync section maps: the server declares it in
- * {@link LiveSyncWebSocketHandler}, {@code krt-live-sync.js} compares the received {@code
- * CloseEvent.code} against its own literal, and a mismatch fails <em>silently</em> in the worst
- * possible direction — the close falls through to the generic reconnect path, which is precisely
- * the loop these codes exist to break. Both codes get the same guard because a drifting number
- * looks identical either way in a review diff.
+ * Verifies that the WebSocket close codes declared in {@link LiveSyncWebSocketHandler} match the
+ * literals {@code krt-live-sync.js} compares against.
  */
 class LiveSyncCloseCodeWireParityTest {
 
@@ -76,13 +69,7 @@ class LiveSyncCloseCodeWireParityTest {
   }
 
   /**
-   * Extracts a close code the client declares, as the literal text it wrote.
-   *
-   * <p>Compared as text against {@code String.valueOf(serverCode)} rather than parsed: the
-   * comparison is exactly as strict either way (the pattern admits four digits and nothing else),
-   * and not parsing keeps the method total — there is no input the caller could supply that makes
-   * it throw. This also matches how the sibling {@link LiveSyncDenyReasonWireParityTest} reads its
-   * mirror point.
+   * Extracts a client-declared close code as the literal text written in the script.
    *
    * @param pattern the declaration pattern, with the four-digit value in group 1
    * @param constantName the client-side constant name, for the failure message

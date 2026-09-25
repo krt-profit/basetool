@@ -37,16 +37,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Verifies the result ordering of {@link MissionRepository#findAllActiveReference} — the query that
- * feeds the Einsatz (mission) filter and per-item association select of the warehouse (Lager)
- * views. The picker must show the newest missions first, so the clause is {@code ORDER BY
- * plannedStartTime DESC NULLS LAST, name ASC}.
- *
- * <p>Run against the real Postgres test container (Flyway-migrated schema), so the {@code NULLS
- * LAST} semantics are validated at production parity rather than against an H2 default that
- * diverges from Postgres. The Testcontainer is shared and other suites commit mission rows, so the
- * assertion filters the result down to the ids created here and checks their <em>relative</em>
- * order rather than asserting an exact, suite-global list.
+ * Verifies against PostgreSQL that {@link MissionRepository#findAllActiveReference} orders by
+ * {@code plannedStartTime DESC NULLS LAST, name ASC}.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -89,12 +81,8 @@ class MissionRepositoryLookupOrderingTest {
   }
 
   /**
-   * Verifies the home-page "next mission" finder skips terminal-status missions. A {@code
-   * COMPLETED} mission with an <em>earlier</em> future planned start must not be returned ahead of
-   * a later {@code PLANNED} one — proving the {@code status IN (PLANNED, ACTIVE)} clause filters
-   * before the {@code ORDER BY plannedStartTime ASC} tiebreaker. The fixtures use far-future (year
-   * 2099) planned starts and a matching lower bound so they dominate the shared test container
-   * regardless of what other suites have committed.
+   * The next-mission finder skips a {@code COMPLETED} mission even when it starts earlier than a
+   * {@code PLANNED} one.
    */
   @Test
   void findFirstByPlannedStartTimeAfterAndStatusIn_skipsTerminalStatusEvenWhenItSortsEarlier() {
@@ -119,11 +107,8 @@ class MissionRepositoryLookupOrderingTest {
   }
 
   /**
-   * Verifies the org-unit-scoped next-mission lookup (REQ-MISSION-008) returns the caller's own
-   * unit's soonest {@code PLANNED}/{@code ACTIVE} mission and ignores both terminal-status missions
-   * and every foreign-unit mission — including a foreign <em>public</em> one with an earlier
-   * planned start. This is the core of the home-page banner narrowing: a member must see their own
-   * unit's next mission, never the organisation-wide one.
+   * The scoped next-mission lookup returns the own unit's soonest {@code PLANNED}/{@code ACTIVE}
+   * mission, ignoring terminal and foreign missions (REQ-MISSION-008).
    */
   @Test
   void findNextScopedMission_returnsOwnUnitNextSkippingForeignAndTerminal() {
@@ -161,15 +146,8 @@ class MissionRepositoryLookupOrderingTest {
   }
 
   /**
-   * An internal mission of the caller's own org unit is eligible for the banner, and beats a later
+   * An internal mission of the caller's own org unit is eligible for the banner and beats a later
    * public one.
-   *
-   * <p>This case used to prove the other half too: an {@code allowInternal=false} argument hid it,
-   * described as "the defensive flag the service passes for a (rare) non-member caller that
-   * nonetheless carries an org-unit scope". No caller ever passed {@code false} — the anonymous
-   * banner was its only audience and ADR-0159 removed it — so the parameter is gone and internal
-   * missions are unconditionally in scope. What is left is the half that describes the query as it
-   * now behaves.
    */
   @Test
   void findNextScopedMission_includesOwnInternalMission() {
@@ -206,8 +184,7 @@ class MissionRepositoryLookupOrderingTest {
   }
 
   /**
-   * Persists one {@code ACTIVE} mission so it is always returned by the lookup regardless of the
-   * three-month terminal cut-off.
+   * Persists an {@code ACTIVE} mission, which the lookup always returns.
    *
    * @param owner the owning org unit (a {@code NOT NULL} FK on the mission row).
    * @param name the mission display name used by the {@code name} tiebreaker.
@@ -219,8 +196,7 @@ class MissionRepositoryLookupOrderingTest {
   }
 
   /**
-   * Persists a non-internal mission with an explicit status, used by the next-mission status-filter
-   * test.
+   * Persists a non-internal mission with an explicit status.
    *
    * @param owner the owning org unit (a {@code NOT NULL} FK on the mission row).
    * @param name the mission display name used by the {@code name} tiebreaker.
@@ -233,14 +209,13 @@ class MissionRepositoryLookupOrderingTest {
   }
 
   /**
-   * Persists a mission with an explicit status and internal flag, used by the org-unit-scoped
-   * next-mission tests.
+   * Persists a mission with an explicit status and internal flag.
    *
    * @param owner the owning org unit (a {@code NOT NULL} FK on the mission row).
    * @param name the mission display name used by the {@code name} tiebreaker.
    * @param plannedStartTime the planned start, or {@code null} to exercise the NULLS-LAST branch.
    * @param status the mission status (e.g. {@code PLANNED}, {@code ACTIVE}, {@code COMPLETED}).
-   * @param isInternal whether the mission is internal (hidden from public/guest visibility).
+   * @param isInternal whether the mission is internal.
    * @return the generated mission id.
    */
   private UUID saveMission(

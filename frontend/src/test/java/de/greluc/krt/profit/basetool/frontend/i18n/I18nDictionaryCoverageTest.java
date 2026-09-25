@@ -36,27 +36,11 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
- * Every localized string a browser script reads is provided by the pages that load it.
+ * Tests that every literal i18n key a browser script reads through {@code window.krtI18nText} or a
+ * {@code krtFetch.sectionWrite} config is provided by some template, as a {@code data-*} attribute
+ * or a bootstrap object property.
  *
- * <p>Since 2026-09-23 the scripts carry no literal defaults: a string goes through {@code
- * window.krtI18nText(value, key)}, which renders the key name and reports an {@code i18n_missing}
- * client error when the page did not provide it. That makes a gap visible in production; this test
- * makes it visible before, by reading every literal {@code key} passed to {@code krtI18nText} (and
- * every dictionary key a {@code krtFetch.sectionWrite} config names) and finding its source:
- *
- * <ul>
- *   <li>{@code data-foo} — a markup attribute: some template must emit {@code data-foo=} (plainly,
- *       as {@code th:data-foo} or inside a {@code th:attr}).
- *   <li>{@code NAME.a.b} / {@code NAME[key]} — a bootstrap object: at least one template must
- *       declare {@code NAME = {…}}, and every template that declares it must name the property
- *       ({@code b:} or {@code 'key'}). A dictionary a fragment and its host page merge with {@code
- *       Object.assign} counts its contributors together.
- * </ul>
- *
- * <p>A key built at run time (the ones whose name is concatenated) is not visible here; those are
- * limited to {@code sectionWrite}'s per-section labels and the dictionary helpers of {@code
- * mission-detail.js} / {@code mission-presence.js}, whose fixed keys are covered by their own
- * literal call sites.
+ * <p>Keys built at run time are not covered.
  */
 class I18nDictionaryCoverageTest {
 

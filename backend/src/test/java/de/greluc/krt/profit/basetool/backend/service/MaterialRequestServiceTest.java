@@ -77,13 +77,9 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 
 /**
- * Unit coverage for the Materialbörse Gesuche domain's security-critical behaviour across the
- * read/write split (mirroring the offer suite, ADR-0116): the supplier-anonymity redaction (names
- * only for the owner) lives in {@link MaterialRequestBoardService} and is exercised via that
- * co-wired subject, while the owner-only write gates, the self-signal block, the optimistic-lock
- * guard, the kind-aware quantity validation and the fulfilment-signal notification live in {@link
- * MaterialRequestService}. The write service is co-wired to the real board service so a mutation's
- * redacted response goes through the identical projection.
+ * Unit tests for the material-request board: supplier redaction in {@link
+ * MaterialRequestBoardService}, and owner-only writes, the self-signal block, optimistic locking,
+ * quantity validation and the fulfilment notification in {@link MaterialRequestService}.
  */
 @ExtendWith(MockitoExtension.class)
 class MaterialRequestServiceTest {

@@ -78,22 +78,12 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The lifecycle engine for confirm-before-post bank booking requests (epic #666 F2,
- * REQ-BANK-022/-023). Deliberately <strong>org-unit-blind</strong>: like every {@code Bank*}-named
- * class it consults only bank roles and {@code bank_account_grant} rows (REQ-BANK-008, never {@code
- * OwnerScopeService}). The org-unit authorization for the requester side lives one layer up in
- * {@link OrgUnitBankAccessService}, which resolves the caller's overseen account and then delegates
- * the actual persistence here.
+ * Lifecycle engine for confirm-before-post bank booking requests (REQ-BANK-022/-023).
  *
- * <p><strong>Off-ledger, then booked.</strong> A request is a mutable aggregate (ADR-0021) and
- * moves no money while {@code PENDING}; it is audited on creation. Only {@link #confirm} books
- * value, by reusing the existing {@link BankLedgerService} path — which gives the request the same
- * account-locking, holder-at-confirmation, holder-activity and overdraft-at-confirmation guards as
- * a direct deposit/withdrawal for free (REQ-BANK-006). Every decision path locks the request row
- * first ({@code findByIdForUpdate}) so two decisions serialize, and the request's {@code @Version}
- * guards against a stale double-decision; the request is mutated in place and flushed by dirty
- * checking — no explicit {@code save} that would risk a second version bump (the {@code
- * …WithinTransaction} discipline of CLAUDE.md).
+ * <p>Org-unit-blind: it consults only bank roles and grants (REQ-BANK-008), while {@link
+ * OrgUnitBankAccessService} handles requester-side authorization. A {@code PENDING} request moves
+ * no money; only {@link #confirm} books it through {@link BankLedgerService}. Every decision locks
+ * the request row and checks its {@code @Version}.
  */
 @Service
 @RequiredArgsConstructor
@@ -115,37 +105,32 @@ public class BankBookingRequestService {
   private final ApplicationEventPublisher eventPublisher;
 
   /**
-   * Persists a new {@code PENDING} booking request against the given account, audits it and fires
-   * the notification event (REQ-BANK-022/-026/-040/-041). Called by {@link
-   * OrgUnitBankAccessService} after it has verified the caller may view the source account and
-   * resolved the org-unit-aware approval snapshot — this method itself only enforces the
-   * bank-domain rules (closed account, valid + active transfer destination, no self-transfer).
+   * Persists a new {@code PENDING} booking request, audits it and fires the notification event
+   * (REQ-BANK-022/-026). Enforces only the bank-domain rules; the caller has already checked
+   * visibility and resolved the approval snapshot.
    *
    * @param accountId the source account (already view-checked by the caller)
    * @param type deposit, withdrawal or transfer
    * @param amount the requested whole-aUEC amount
    * @param note the requester's optional note
-   * @param justification the requester's optional justification (Begr&uuml;ndung); required for a
-   *     {@code WITHDRAWAL} / {@code TRANSFER} from a {@linkplain
+   * @param justification the requester's optional Begr&uuml;ndung; required for a {@code
+   *     WITHDRAWAL} / {@code TRANSFER} from a {@linkplain
    *     de.greluc.krt.profit.basetool.backend.model.BankAccountType#requiresDebitJustification()
    *     justification-mandating} account (REQ-BANK-045)
    * @param targetAccountId the transfer destination, or {@code null} for deposit/withdrawal
    * @param requiresOwnerApproval whether the amount exceeds the requester's approval limit
    *     (snapshot)
    * @param applicableLimit the requester's resolved approval limit (snapshot), or {@code null}
-   * @param requiredApprover which approver class a flagged request needs (REQ-BANK-041/-046
-   *     snapshot), or {@code null} when it needs no approval; opaque to this org-unit-blind service
-   *     (the seam resolves the band&rarr;identity mapping)
-   * @param splitEnabled whether a deposit distributes a percentage across the squadron accounts on
-   *     confirmation (REQ-BANK-044); always {@code false} for withdrawal/transfer
-   * @param splitPercent the whole-percent (1–100) of the deposit gross to distribute; {@code null}
-   *     unless {@code splitEnabled}
+   * @param requiredApprover the approver class a flagged request needs (snapshot), or {@code null}
+   * @param splitEnabled whether a deposit is split across the squadron accounts on confirmation
+   *     (REQ-BANK-044); always {@code false} for withdrawal/transfer
+   * @param splitPercent the whole percent (1–100) to distribute; {@code null} unless {@code
+   *     splitEnabled}
    * @param counterpartyUserId the Empf&auml;nger of a {@code WITHDRAWAL} request (REQ-BANK-055), or
-   *     {@code null} to keep deriving the requester at confirmation
-   * @param counterpartyOrgUnitId that Empf&auml;nger's org unit, validated against their own
-   *     memberships; {@code null} when none was chosen
+   *     {@code null} to derive the requester at confirmation
+   * @param counterpartyOrgUnitId that Empf&auml;nger's org unit, or {@code null}
    * @return the created request
-   * @throws NotFoundException when the (source or destination) account does not exist
+   * @throws NotFoundException when the source or destination account does not exist
    * @throws BankConflictException with {@code BANK_ACCOUNT_CLOSED} on a closed account or {@code
    *     BANK_SELF_TRANSFER} when source equals destination
    * @throws BadRequestException when a counterparty is named on a non-withdrawal, or its org unit
@@ -238,17 +223,9 @@ public class BankBookingRequestService {
   }
 
   /**
-   * Resolves the Empf&auml;nger a requester named on a {@code WITHDRAWAL} request into a
-   * deletion-proof snapshot (REQ-BANK-055), or {@code null} when none was named.
-   *
-   * <p>The <strong>registered-user path only</strong>: unlike the bank employee's booking-time
-   * {@code BankLedgerService#resolveCounterparty}, this deliberately offers no free-text external
-   * counterparty. Recording an unverifiable name on the ledger stays a Bank-Employee capability
-   * (REQ-BANK-044/#994) — a requester picks a tool user or nobody.
-   *
-   * <p>The handle and org-unit name are snapshotted <em>now</em>, at request time, rather than
-   * re-resolved at confirmation: the named user (or their org unit) may be deleted in between, and
-   * the confirmation must still be able to stamp an attributable ledger row.
+   * Resolves the registered Empf&auml;nger named on a {@code WITHDRAWAL} request into a
+   * deletion-proof snapshot taken at request time (REQ-BANK-055). No free-text counterparty is
+   * accepted here.
    *
    * @param type the movement kind; anything but {@code WITHDRAWAL} must not carry a counterparty
    * @param userId the named Empf&auml;nger, or {@code null}
@@ -288,16 +265,9 @@ public class BankBookingRequestService {
   }
 
   /**
-   * The org unit to stamp on the booking a confirmation produces, for the counterparty {@code
-   * counterpartyId} (REQ-BANK-044/-055).
-   *
-   * <p>Confirmation happens an arbitrary time after the request was raised, and {@code
-   * BankLedgerService} re-validates that the org unit is still one of the counterparty's
-   * memberships — so passing the stored choice through blindly would let a membership change
-   * between request and confirmation turn into a <strong>400 that blocks the booking</strong>.
-   * Instead the stored choice is used only while it still holds, and otherwise degrades to the
-   * counterparty's current primary unit (and finally to none). A stale unit costs a less precise
-   * snapshot; it never costs the employee their ability to confirm.
+   * Resolves the org unit to stamp on a confirmed booking for the counterparty (REQ-BANK-055): the
+   * stored choice while it is still one of the counterparty's memberships, else their current
+   * primary unit, else none.
    *
    * @param request the request being confirmed
    * @param counterpartyId the resolved counterparty (the named Empf&auml;nger, else the requester),
@@ -322,9 +292,8 @@ public class BankBookingRequestService {
   }
 
   /**
-   * Writes a resolved counterparty snapshot onto the request, clearing all four columns when it is
-   * {@code null} so an edit that removes the Empf&auml;nger does not leave a half-populated row
-   * (the V232 CHECK ties the handle to the user id and the unit name to the unit id).
+   * Writes a resolved counterparty snapshot onto the request, clearing all four counterparty
+   * columns when it is {@code null}.
    *
    * @param request the request to stamp
    * @param counterparty the resolved snapshot, or {@code null} to clear
@@ -357,30 +326,10 @@ public class BankBookingRequestService {
   }
 
   /**
-   * Applies a requester's correction to their own still-pending booking request (REQ-BANK-056).
+   * Applies a requester's correction to their own pending, not yet owner-approved booking request
+   * (REQ-BANK-056), stamping the approval snapshot the caller re-derived from the new amount.
    *
-   * <p>Four guards, all evaluated under the row lock so a concurrent decision cannot slip between
-   * the check and the write:
-   *
-   * <ol>
-   *   <li><b>Ownership.</b> A request belonging to someone else is reported as <em>not found</em>,
-   *       never as forbidden — the same per-user isolation {@link #cancelOwn} uses, so the endpoint
-   *       cannot be used to probe which request ids exist.
-   *   <li><b>Still pending.</b> A confirmed request has already moved money and a
-   *       rejected/cancelled one is terminal ({@code BANK_REQUEST_NOT_PENDING}).
-   *   <li><b>Not yet owner-approved.</b> {@code BANK_REQUEST_ALREADY_APPROVED} — the approval was
-   *       granted for the amount and reason as they stood; editing afterwards would convert a small
-   *       approved request into an arbitrarily large pre-approved one.
-   *   <li><b>Version echo.</b> The usual optimistic-lock 409.
-   * </ol>
-   *
-   * <p>The caller ({@link OrgUnitBankAccessService}) has already re-derived the approval snapshot
-   * from the <em>new</em> amount and passes it in; this method only stamps it. That is what makes
-   * raising the amount past the requester's limit re-arm the approval gate instead of riding the
-   * original below-limit snapshot.
-   *
-   * <p>The request is mutated in place and flushed by dirty checking — no explicit {@code save}
-   * that would risk a second {@code @Version} bump (the {@code …WithinTransaction} discipline).
+   * <p>All guards run under the row lock; a foreign request is reported as not found.
    *
    * @param requestId the request to correct
    * @param update the corrected values plus the echoed version
@@ -774,13 +723,9 @@ public class BankBookingRequestService {
   }
 
   /**
-   * Applies (grants or revokes) the responsible holder's in-app approval on an already-loaded,
-   * locked request (REQ-BANK-041). Org-unit-blind: the org-unit authorization (the caller is the
-   * account's responsible holder) is enforced by {@link OrgUnitBankAccessService} before this is
-   * called; here we only enforce the bank-domain rules (the request is still pending and, for a
-   * grant, actually needs approval), mutate in place (dirty-checking, no {@code save} that would
-   * double-bump {@code @Version}) and audit. {@code MANDATORY} so it always runs inside the seam's
-   * transaction.
+   * Grants or revokes the responsible holder's approval on an already-locked request (REQ-BANK-041)
+   * and audits it. Must run inside the caller's transaction, after {@link OrgUnitBankAccessService}
+   * has authorized the caller.
    *
    * @param request the locked, managed request
    * @param granted whether to grant ({@code true}) or revoke ({@code false}) the approval

@@ -288,12 +288,8 @@ class MissionSecurityServiceTest {
   }
 
   /**
-   * An external row is not editable by an anonymous caller either.
-   *
-   * <p>Nothing anonymous reaches this service any more — the security matrix refuses first — but
-   * the gate must not depend on that. {@code canManageMission} spells the principal test out for
-   * exactly this reason: an {@code AnonymousAuthenticationToken} IS authenticated and carries
-   * {@code ROLE_ANONYMOUS}, so a bare {@code isAuthenticated()} check would let it through.
+   * An external participant row is not editable by an anonymous caller, independent of the security
+   * matrix.
    */
   @Test
   void canAccessParticipant_ExternalRowAnonymous_ShouldReturnFalse() {

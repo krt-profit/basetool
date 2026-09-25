@@ -28,12 +28,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Behaviour of the distinct-subject window behind {@code basetool_terms_refused_subjects}
- * (REQ-SEC-028, REQ-OBS-011).
- *
- * <p>{@link #countsOneRetryingSubjectAsOne} is the case the metric exists for. Counting refusal
- * requests instead fired {@code TermsConsentRolloutStalled} twice overnight on 2026-08-03 against a
- * single browser tab in a reconnect loop — the alert could not tell a locked-out membership from
- * one client retrying, and at night the difference is the entire signal.
+ * (REQ-SEC-028, REQ-OBS-011); one subject retrying repeatedly counts once.
  */
 class RefusedSubjectWindowTest {
 
@@ -82,10 +77,8 @@ class RefusedSubjectWindowTest {
   }
 
   /**
-   * A subject that keeps being refused keeps its place, rather than expiring mid-incident.
-   *
-   * <p>The window measures "refused recently", not "first refused recently" — a member who is still
-   * locked out an hour into a stalled rollout must still be counted.
+   * A subject that keeps being refused keeps its place; the window measures the most recent
+   * refusal.
    */
   @Test
   void refreshesASubjectThatIsStillBeingRefused() {

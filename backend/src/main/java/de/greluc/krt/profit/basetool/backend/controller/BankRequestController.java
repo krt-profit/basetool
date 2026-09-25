@@ -46,14 +46,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * The bank-staff side of the confirm-before-post booking requests (epic #666 F2, REQ-BANK-023),
- * living under {@code /api/v1/bank/requests} — inside the {@code /api/v1/bank/**} space whose
- * authenticated catch-all plus this class-level {@code BANK_EMPLOYEE} gate keep org-unit
- * officers/leads out entirely; they raise and cancel requests through {@code
- * /api/v1/org-units/bank} instead. The per-account capability (confirm) and visibility (reject,
- * queue) decisions depend on the request's account, which is only known after the request is
- * loaded, so they are enforced inside {@link BankBookingRequestService} rather than in a method
- * {@code @PreAuthorize} expression.
+ * The bank-staff side of the confirm-before-post booking requests (REQ-BANK-023), gated to {@code
+ * BANK_EMPLOYEE}. Per-account capability and visibility checks depend on the loaded request and are
+ * enforced in {@link BankBookingRequestService}.
  */
 @RestController
 @RequestMapping("/api/v1/bank/requests")

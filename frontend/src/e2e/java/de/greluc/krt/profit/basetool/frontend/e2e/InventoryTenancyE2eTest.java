@@ -38,43 +38,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Multi-org-unit tenancy matrix for the squadron Lager (REQ-ORG-002/003/004/008): who may SEE,
- * CREATE and EDIT inventory across every membership profile — a squadron-only member, an SK-only
- * member, a member of both a squadron and an SK, an admin, and a user with no membership at all.
- * The unauthenticated visitor is not covered here: since ADR-0159 there is no guest surface, and
- * who may reach the page at all is swept by {@code AnonymousSurfaceE2eTest} (REQ-SEC-052). The
- * direct Lager-View is <em>strict-staffel</em>: an item is scoped to its {@code owning_org_unit_id}
- * pool and never escapes it (REQ-ORG-003).
+ * Multi-org-unit tenancy matrix for the Lager (REQ-ORG-002/003/004/008): who may see, create and
+ * edit inventory as a squadron member, SK member, member of both, admin, and memberless user.
  *
- * <p><b>Fixtures.</b> Five real Keycloak users carry distinct membership profiles, assigned via the
- * REST seeder: {@code test-admin} (ADMIN, IRIDIUM = Staffel A), {@code test-member} (Staffel A
- * only), {@code test-both} (Staffel B + SK X), {@code test-sk} (SK X only), {@code test-none} (no
- * membership). One non-personal item is seeded per owner on its own material so a material maps 1:1
- * to an owner — Staffel A, Staffel B, SK X, and an ownerless ({@code owningOrgUnit = null}) item
- * recorded by the membershipless user. Items are created <em>as</em> the user homed in the target
- * unit so the create-time resolver stamps the intended owner.
- *
- * <p><b>Drive via UI, verify via API.</b> Mirroring {@code CrossStaffelJobOrderE2eTest}, the
- * visibility/stamping/edit matrix is asserted by calling the scoped backend endpoints as each user
- * through {@link BackendSeeder} — the established, race-free way to assert tenancy boundaries —
- * with the boundary additionally driven through the real {@code /inventory/all} UI for a
- * representative viewer. The admin pin is exercised by sending the {@code X-Active-Org-Unit-Id}
- * header the frontend relays, which the backend honours as the active scope.
- *
- * <p><b>The visibility grid this asserts</b> — for a non-personal item owned by org unit O, in the
- * global Lager-View ({@code /inventory/all}):
- *
- * <ul>
- *   <li>Admin without a pin → sees every unit's stock (incl. ownerless rows).
- *   <li>Admin pinned to O → scoped to O exactly like a member.
- *   <li>Member of O → sees O's stock; a member of another unit does not.
- *   <li>Member of (squadron + SK) → sees the union of both.
- *   <li>Membershipless user → sees no shared stock.
- *   <li>Ownerless stock → only the admin-without-pin and the owning user (in their personal view).
- * </ul>
- *
- * The personal view ({@code /inventory/my}) is purely owner-scoped: a user always sees their own
- * rows regardless of which unit owns them, and never another user's.
+ * <p>Asserted through the scoped backend endpoints per user, plus the {@code /inventory/all} UI for
+ * one viewer. Shared stock is strictly scoped to its owning unit; an unpinned admin sees all, a
+ * pinned admin only the pin. {@code /inventory/my} shows only the user's own rows.
  */
 @Tag("e2e")
 class InventoryTenancyE2eTest {
@@ -404,9 +373,8 @@ class InventoryTenancyE2eTest {
   }
 
   /**
-   * Reports whether the given user sees any shared stock of {@code materialId} in the global Lager
-   * -View ({@code /inventory/all/grouped}) — i.e. the grouped result for that material is
-   * non-empty.
+   * Reports whether the given user sees any shared stock of {@code materialId} in the global
+   * Lager-View ({@code /inventory/all/grouped}).
    *
    * @param username the viewer's Keycloak username
    * @param password the viewer's Keycloak password

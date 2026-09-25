@@ -69,11 +69,8 @@ class AuditReportServiceTest {
   @InjectMocks private AuditReportService auditReportService;
 
   /**
-   * The independent source of truth for the {@code AuditDomain -> *_AUDIT_EXPORTED} mapping, kept
-   * separate from the production {@code AuditReportService.exportEventType} switch so a copy-pasted
-   * or reused arm (e.g. {@code MISSION -> OPERATION_AUDIT_EXPORTED}) is caught. A future domain
-   * added without an entry here surfaces as a missing key in {@link
-   * #export_recordsDomainSpecificExportEventType(AuditDomain)}.
+   * Expected {@code AuditDomain -> *_AUDIT_EXPORTED} mapping, kept independent of the production
+   * switch so a wrong arm is caught.
    */
   private static final Map<AuditDomain, AuditEventType> EXPECTED_EXPORT_TYPE =
       Map.ofEntries(

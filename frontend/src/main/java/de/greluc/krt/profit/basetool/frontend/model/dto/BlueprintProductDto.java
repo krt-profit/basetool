@@ -20,9 +20,8 @@
 package de.greluc.krt.profit.basetool.frontend.model.dto;
 
 /**
- * Read DTO mirroring the backend {@code BlueprintProductDto} (#327). One searchable blueprint
- * product — the de-duplicated unit of ownership — surfaced by the type-ahead on the Blueprints
- * page.
+ * Frontend mirror of the backend {@code BlueprintProductDto}: one searchable blueprint product, the
+ * de-duplicated unit of ownership.
  *
  * @param productKey normalized product identity (echoed back when adding to the owned set)
  * @param name display name of the product (original SC Wiki spelling)

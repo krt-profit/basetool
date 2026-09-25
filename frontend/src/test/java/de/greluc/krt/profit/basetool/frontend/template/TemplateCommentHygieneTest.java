@@ -38,28 +38,14 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
- * Keeps developer text and page CSS out of every HTML response (FE-PERF-02).
- *
- * <p>Until 2026-09-23 each rendered page carried about 25 KB of HTML comments — the reasoning
- * behind the head's load order, test names, security considerations — and up to 25 KB of page CSS
- * in a {@code <style>} block, none of it cacheable, all of it sent with every navigation to a
- * {@code no-store} page. The comments became Thymeleaf parser-level comments ({@code <!--/* … *}
- * {@code /-->}), which the template engine drops at parse time, and the style blocks became {@code
- * static/css/pages/<page>.css}, linked in the same place so the cascade order did not change.
- *
- * <p>This test holds both. A plain comment is not a crash, it is a leak that nothing notices: the
- * page renders identically and the text ships. So the templates are scanned at source level:
+ * Keeps developer text and page CSS out of every HTML response by scanning template sources:
  *
  * <ul>
- *   <li>no plain HTML comment outside a {@code script}, {@code style} or {@code textarea} element;
- *   <li>no parser-level comment whose body contains the closing star-slash pair before its end —
- *       that pair closes the block early and dumps the rest of the text into the page, which is how
- *       an attribute name once leaked out of {@code head.html};
- *   <li>no {@code <style>} element: page CSS lives in {@code static/css/pages}, where it is linted,
- *       cached and served once;
- *   <li>every {@code /css/pages/…} link names a file that exists, and every file there is linked by
- *       exactly one template — an orphan is dead CSS, a shared file couples pages that were
- *       independent.
+ *   <li>no plain HTML comment outside {@code script}, {@code style} or {@code textarea};
+ *   <li>no parser-level comment whose body contains a premature closing star-slash pair;
+ *   <li>no {@code <style>} element; page CSS lives in {@code static/css/pages};
+ *   <li>every {@code /css/pages/…} link names an existing file, and every such file is linked by
+ *       exactly one template.
  * </ul>
  */
 class TemplateCommentHygieneTest {
@@ -169,9 +155,7 @@ class TemplateCommentHygieneTest {
   private record Comment(String body, int line) {}
 
   /**
-   * Lists the HTML comments of a template in document order, skipping the content of raw-text
-   * elements. The scan is sequential, so a {@code <script>} mentioned inside a comment never opens
-   * a raw-text span.
+   * Lists the HTML comments of a template in document order, skipping raw-text element content.
    *
    * @param html the template source
    * @return the comments found

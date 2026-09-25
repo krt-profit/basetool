@@ -48,11 +48,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Security-gate tests for {@link MaterialExternalAliasController}. The CRUD endpoints are
- * admin-only — anonymous callers must get 401, authenticated non-admins must get 403, admins must
- * pass. The service layer is {@code @MockitoBean}-stubbed so the test focuses on the
- * {@code @PreAuthorize("hasRole('ADMIN')")} class gate without dragging in JPA / TestContainers
- * setup for every assertion.
+ * Security-gate tests for the admin-only {@link MaterialExternalAliasController}: anonymous 401,
+ * non-admin 403, admin admitted.
  */
 @SpringBootTest
 @ActiveProfiles("test")

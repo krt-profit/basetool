@@ -75,11 +75,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 /**
- * Verifies that the order-detail page renders the ITEM-order branch end to end: the ordered-items
- * table (with sub-assembly provenance and delivery progress), the internal aggregated-materials
- * panel (one row per material+quality with a Gut/Keine badge), and the warning banner for items
- * whose blueprint derived no procurable material. Renders through the real Thymeleaf template so a
- * broken expression in the new branch fails the build rather than only surfacing at runtime.
+ * Verifies the ITEM-order branch of the order detail page: the ordered-items table, the aggregated
+ * materials panel and the warning for items without a procurable material.
  */
 @SpringBootTest
 @ActiveProfiles("test")

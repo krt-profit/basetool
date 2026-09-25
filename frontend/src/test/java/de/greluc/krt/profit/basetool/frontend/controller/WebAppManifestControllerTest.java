@@ -56,25 +56,10 @@ import org.springframework.web.servlet.LocaleResolver;
 import org.springframework.web.servlet.i18n.CookieLocaleResolver;
 
 /**
- * Pins the properties that decide whether an iPhone or iPad can install the Basetool at all
- * (REQ-UI-020, ADR-0164).
+ * Tests the properties that decide whether iOS devices can install the Basetool (REQ-UI-020,
+ * ADR-0164): the manifest response and the {@code <head>} tags of the rendered landing page.
  *
- * <p>Every assertion here stands for a failure mode that produces no error anywhere. A manifest
- * that redirects, arrives with the wrong content type, or names the app after the login page breaks
- * no build, no log line and no page — it silently degrades an install that nobody re-tests
- * afterwards. {@link AssetLinksController} beside it exists because exactly that happened once on
- * the Android side, and was found only from a member's account of a broken login.
- *
- * <p>The {@code <head>} half is asserted against the <strong>rendered</strong> landing page rather
- * than against the template source, for the same reason {@code BrandMarkRenderMvcTest} is: only the
- * rendered output proves that the tags survive the fragment include chain and that Thymeleaf
- * actually resolved the message key behind the iOS app title.
- *
- * <p><strong>Assert whole tags, never a bare attribute.</strong> An earlier revision checked for
- * the substring {@code crossorigin="use-credentials"} anywhere in the response; the rationale
- * comment above the tag contained those very characters and was emitted into the page, so deleting
- * the attribute from the {@code <link>} kept the suite green. Any assertion here that names an
- * attribute names the element it belongs to as well.
+ * <p>Assertions name whole tags, never a bare attribute.
  */
 @SpringBootTest
 @DisplayName("Web app manifest")
@@ -104,12 +89,8 @@ class WebAppManifestControllerTest {
   @MockitoBean private BackendApiClient backendApiClient;
 
   /**
-   * Keeps the real client registration out of the context.
-   *
-   * <p>Building it performs OIDC discovery against the configured issuer, which no unit test can
-   * reach — the context then fails with an {@code UnknownHostException} that says nothing about the
-   * endpoint under test. Every other {@code @SpringBootTest} in this module mocks it for the same
-   * reason.
+   * Mocks the client registration so the context does not perform OIDC discovery against an
+   * unreachable issuer.
    */
   @MockitoBean
   private org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
@@ -118,14 +99,10 @@ class WebAppManifestControllerTest {
   private MockMvc mockMvc;
 
   /**
-   * Reads one CSS custom property out of {@link #STYLES_CSS} and normalises it to six-digit hex.
-   *
-   * <p>Three-digit shorthand is expanded, because {@code --color-bg-black} is written {@code #000}
-   * while a manifest member has to be a full {@code #000000} — comparing the two literally would
-   * fail on a difference that does not exist.
+   * Reads one CSS custom property from {@link #STYLES_CSS}, expanding three-digit shorthand.
    *
    * @param property the custom-property name, including the leading {@code --}
-   * @return the declared colour as {@code #rrggbb}, lower-case
+   * @return the declared colour as lower-case {@code #rrggbb}
    * @throws IOException when the stylesheet cannot be read
    */
   private static String cssColour(String property) throws IOException {
@@ -355,16 +332,7 @@ class WebAppManifestControllerTest {
         .isEmpty();
   }
 
-  /**
-   * The manifest's fallback language is the one the application actually defaults to.
-   *
-   * <p>{@code WebAppManifestController.DEFAULT_LOCALE} and {@code LocaleConfig}'s {@code
-   * clr.setDefaultLocale(...)} are two declarations of one fact with nothing tying them together.
-   * Changing the resolver alone leaves the manifest emitting {@code "lang": "de"} over German
-   * {@code pwa.*} strings while every page renders English — and because the body is cached {@code
-   * public, max-age=1h} and read by installers, every home screen added afterwards keeps the wrong
-   * name, with no error raised anywhere. This is the assertion that makes the pair break loudly.
-   */
+  /** The manifest's fallback language equals the default locale of {@code LocaleConfig}. */
   @Test
   void theDefaultLocaleMatchesTheResolvers() throws Exception {
     LocaleResolver resolver = context.getBean(LocaleResolver.class);

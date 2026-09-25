@@ -20,18 +20,15 @@
 package de.greluc.krt.profit.basetool.backend.model.dto;
 
 /**
- * Candidate identity of an incoming Discord first-broker-login, sent by the Keycloak SPI to the
- * internal account-existence precheck (REQ-SEC-022). Every field is optional — the SPI sends
- * whatever it has, and a {@code null}/blank field is simply not matched.
+ * Candidate identity of a Discord first-broker-login, sent by the Keycloak SPI to the
+ * account-existence precheck (REQ-SEC-022).
  *
- * <p>The two name fields ({@code username}, {@code serverNickname}) are matched,
- * case-insensitively, against existing accounts' login username <em>and</em> in-app display name;
- * {@code email} is matched against existing accounts' e-mail. None of these values is ever logged
- * (REQ-OBS).
+ * <p>Every field is optional; a {@code null} or blank field is not matched. Values are never
+ * logged.
  *
- * @param username the brokered Discord username (global handle)
- * @param email the brokered Discord e-mail address, if the user shared it
- * @param serverNickname the user's per-guild server nickname in the das-kartell Discord, if any
+ * @param username the Discord username, matched against usernames and display names
+ * @param email the Discord e-mail address, if shared
+ * @param serverNickname the per-guild server nickname, matched like {@code username}
  */
 public record DiscordAccountExistenceRequest(
     String username, String email, String serverNickname) {}

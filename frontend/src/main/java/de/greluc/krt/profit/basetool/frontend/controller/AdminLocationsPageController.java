@@ -72,11 +72,9 @@ public class AdminLocationsPageController {
   private final BackendApiClient backendApiClient;
 
   /**
-   * Fetches <em>all</em> locations — every page, including hidden entries — sorts them
-   * case-insensitively by name and renders the table (REQ-ADMIN-001, ADR-0102). A backend failure
-   * puts an error key in the model rather than blanking the page; a page walk that hits its safety
-   * cap sets {@code catalogTruncated} so the template shows a loud warning banner instead of
-   * silently presenting a partial list (REQ-ADMIN-002).
+   * Fetches all locations, including hidden ones, sorts them by name and renders the table
+   * (REQ-ADMIN-001). A backend failure sets an error key; hitting the page-walk cap sets {@code
+   * catalogTruncated} for a warning banner (REQ-ADMIN-002).
    *
    * @param model Thymeleaf model populated with the sorted location list
    * @return the {@code admin/locations} view name
@@ -110,11 +108,8 @@ public class AdminLocationsPageController {
   }
 
   /**
-   * Toggles a single location's hidden flag.
-   *
-   * <p>Reads the current record first to copy the existing name/description/version into the PUT
-   * body — the backend endpoint expects a full {@link LocationDto}, not a JSON merge patch. A 409
-   * with problem type {@code concurrency-conflict} surfaces as a dedicated optimistic-lock toast.
+   * Toggles a location's hidden flag, re-reading the record to send a full {@link LocationDto} in
+   * the PUT. A {@code concurrency-conflict} 409 shows an optimistic-lock toast.
    *
    * @param id location id
    * @param hidden desired new hidden flag
@@ -158,13 +153,9 @@ public class AdminLocationsPageController {
   }
 
   /**
-   * Toggles a single location's home-location flag (the curated allowlist behind the hangar bulk
-   * "set home location" picker).
-   *
-   * <p>Like {@link #toggleLocationVisibility}, reads the current record first to copy the existing
-   * name/description/hidden/version into the PUT body — the backend endpoint expects a full {@link
-   * LocationDto}, not a JSON merge patch. A 409 with problem type {@code concurrency-conflict}
-   * surfaces as a dedicated optimistic-lock toast.
+   * Toggles a location's home-location flag (the allowlist behind the hangar "set home location"
+   * picker), re-reading the record to send a full {@link LocationDto}. A {@code
+   * concurrency-conflict} 409 shows an optimistic-lock toast.
    *
    * @param id location id
    * @param homeLocation desired new home-location flag
@@ -208,16 +199,13 @@ public class AdminLocationsPageController {
   }
 
   /**
-   * In-place (AJAX) twin of {@link #toggleLocationVisibility} — routed here ahead of the classic
-   * handler by the {@code X-Requested-With} header so the no-JS form keeps its redirect fallback.
-   * Flips the hidden flag server-side off a freshly-read record (so no stale client version can
-   * reach the PUT) and returns the persisted {@link LocationDto} so the page can re-render the
-   * row's toggle buttons in place. A concurrent-tab conflict is relayed as {@code
-   * application/problem+json} so the client surfaces the reload-confirm rather than reloading.
+   * In-place twin of {@link #toggleLocationVisibility}: flips the hidden flag on a freshly read
+   * record and returns the persisted {@link LocationDto}; conflicts are relayed as {@code
+   * application/problem+json}.
    *
    * @param id location id
-   * @return the updated {@link LocationDto} on success, the relayed backend status on conflict/
-   *     failure, {@code 500} on an unexpected error
+   * @return the updated {@link LocationDto}, the relayed backend status on conflict or failure, or
+   *     {@code 500} on an unexpected error
    */
   @ResponseBody
   @PostMapping(value = "/{id}/toggle-visibility", headers = "X-Requested-With=XMLHttpRequest")
@@ -244,13 +232,13 @@ public class AdminLocationsPageController {
   }
 
   /**
-   * In-place (AJAX) twin of {@link #toggleHomeLocation}. Flips the home-location flag server-side
-   * off a freshly-read record and returns the persisted {@link LocationDto} for an in-place row
-   * re-render; conflicts are relayed as {@code application/problem+json}.
+   * In-place twin of {@link #toggleHomeLocation}: flips the home-location flag on a freshly read
+   * record and returns the persisted {@link LocationDto}; conflicts are relayed as {@code
+   * application/problem+json}.
    *
    * @param id location id
-   * @return the updated {@link LocationDto} on success, the relayed backend status on conflict/
-   *     failure, {@code 500} on an unexpected error
+   * @return the updated {@link LocationDto}, the relayed backend status on conflict or failure, or
+   *     {@code 500} on an unexpected error
    */
   @ResponseBody
   @PostMapping(value = "/{id}/toggle-home-location", headers = "X-Requested-With=XMLHttpRequest")

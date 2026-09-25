@@ -23,23 +23,20 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Frontend mirror of one manageable org unit in the Leitung view (epic #800, REQ-ROLE-004), with
- * the two delegated-capability flags the page uses to gate its appointment buttons. The two caps
- * are tier-relative (see the backend {@code LeitungUnitDto}); the page branches on {@code kind}.
+ * Frontend mirror of one manageable org unit in the Leitung view (REQ-ROLE-004), with the
+ * tier-relative capability flags that gate the appointment buttons.
  *
  * @param id the org unit id.
  * @param name the org unit name.
  * @param shorthand the org unit shorthand.
  * @param kind the org-unit kind, driving which rank options + section the page renders.
  * @param canAppointLead whether the caller may set this unit's top seat.
- * @param canManageRoster whether the caller may manage this unit's subordinate roster; on a
- *     Spezialkommando it means the caller may manage its members, and the page links to {@code
- *     /organisation/special-commands/{id}} for that.
+ * @param canManageRoster whether the caller may manage this unit's subordinate roster; for a
+ *     Spezialkommando, its members.
  * @param members the unit's roster rows.
  * @param groups the unit's Kommandogruppen (Staffel only; empty otherwise).
- * @param grandAdmiralUserId the account id of this unit's Grand Admiral (REQ-ORG-021), or {@code
- *     null} — only ever set on the Organisationsleitung, so the page can badge the holder and gate
- *     the promote / vacate actions.
+ * @param grandAdmiralUserId the Grand Admiral's account id (REQ-ORG-021), set only on the
+ *     Organisationsleitung, or {@code null}.
  */
 public record LeitungUnitDto(
     UUID id,

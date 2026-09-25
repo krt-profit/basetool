@@ -28,39 +28,28 @@ import org.springframework.format.annotation.DateTimeFormat;
 /**
  * Form-binding object for the admin member-edit page.
  *
- * <p>A member may belong to up to two Staffeln (REQ-ORG-017), each carrying its own per-squadron
- * Logistician / Mission-Manager flags (REQ-SEC-005). The form models the two Staffel slots as two
- * fixed groups of fields ({@code staffel1*} / {@code staffel2*}) rather than a growable list, since
- * the cardinality is hard-capped at two. The page-controller folds the non-empty slots into the
- * {@code staffeln} list of the single-POST {@code PATCH /api/v1/users/{id}/memberships} delta,
- * which the backend reconciles against the user's current Staffel memberships (add / remove /
- * flag-patch in one transaction). An empty slot means "no membership in that slot"; clearing both
- * removes every Staffel membership.
+ * <p>A member may belong to up to two Staffeln (REQ-ORG-017), modelled as two fixed slots ({@code
+ * staffel1*} / {@code staffel2*}) with per-squadron flags (REQ-SEC-005). The controller folds the
+ * non-empty slots into one {@code PATCH /api/v1/users/{id}/memberships}; clearing both removes
+ * every Staffel membership.
  *
- * @param rank pay-grade rank (1-20).
- * @param description profile description.
- * @param displayName visible display name.
- * @param version {@code app_user} row {@code @Version} for the optimistic-lock check.
- * @param source origin marker — {@code "profile"} keeps the round-trip on the profile page,
- *     anything else lands back on the member list.
- * @param joinDate squadron-join date.
- * @param staffel1Id first Staffel slot's target Squadron id, or {@code null} when the slot is
- *     empty.
- * @param staffel1Logistician first slot's desired Logistician flag (defaults {@code false}).
- * @param staffel1MissionManager first slot's desired Mission Manager flag (defaults {@code false}).
- * @param staffel2Id second Staffel slot's target Squadron id, or {@code null} when the slot is
- *     empty; a value equal to {@code staffel1Id} is dropped as a duplicate by the controller.
- * @param staffel2Logistician second slot's desired Logistician flag (defaults {@code false}).
- * @param staffel2MissionManager second slot's desired Mission Manager flag (defaults {@code
- *     false}).
- * @param staffelDetailLoaded whether the authoritative Staffel-membership detail (each Staffel's
- *     own flags) was successfully loaded when the edit form was rendered. {@code false} when that
- *     fetch failed (resilience timeout / open circuit breaker), in which case the two slots render
- *     blank and the controller must NOT reconcile the Staffel set on save — otherwise the blank
- *     slots would be misread as "remove every Staffel" and silently strip the member's memberships.
- *     The hidden field round-trips the flag from the GET render to the POST. Defaults to {@code
- *     true} via the convenience constructor for callers that build the form without the membership
- *     detail.
+ * @param rank pay-grade rank (1-20)
+ * @param description profile description
+ * @param displayName visible display name
+ * @param version {@code app_user} row {@code @Version} for the optimistic-lock check
+ * @param source origin marker; {@code "profile"} returns to the profile page, anything else to the
+ *     member list
+ * @param joinDate squadron-join date
+ * @param staffel1Id first slot's target Squadron id, or {@code null} when the slot is empty
+ * @param staffel1Logistician first slot's desired Logistician flag (defaults {@code false})
+ * @param staffel1MissionManager first slot's desired Mission Manager flag (defaults {@code false})
+ * @param staffel2Id second slot's target Squadron id, or {@code null} when the slot is empty; a
+ *     duplicate of {@code staffel1Id} is dropped by the controller
+ * @param staffel2Logistician second slot's desired Logistician flag (defaults {@code false})
+ * @param staffel2MissionManager second slot's desired Mission Manager flag (defaults {@code false})
+ * @param staffelDetailLoaded whether the Staffel-membership detail loaded when the form was
+ *     rendered; when {@code false} the controller must not reconcile the Staffel set on save, since
+ *     the blank slots would strip every membership
  */
 public record MemberEditForm(
     Integer rank,

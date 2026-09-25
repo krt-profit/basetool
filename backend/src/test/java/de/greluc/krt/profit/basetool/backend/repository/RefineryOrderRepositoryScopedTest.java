@@ -39,29 +39,11 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Data-level regression coverage for {@link RefineryOrderRepository#findByOwnerIdScoped} against
- * the real Postgres test schema (Testcontainers + Flyway via the {@code test} profile).
+ * Integration tests for {@link RefineryOrderRepository#findByOwnerIdScoped} against real Postgres,
+ * verifying that the {@code owning_org_unit_id} predicate filters an owner's orders by org unit.
  *
- * <p>This is the DB-level half of the SEC-01 fix (the service-level half lives in {@code
- * RefineryOrderServiceLifecycleTest#getUserRefineryOrdersScoped_*}). It pins the trap the Mockito
- * tests cannot reach: that the {@code owning_org_unit_id} predicate in the JPQL actually filters
- * rows by org unit. The exploited gap was that the cross-user list endpoint {@code GET
- * /api/v1/refinery-orders/users/{userId}} read the <em>unscoped</em> {@link
- * RefineryOrderRepository#findByOwnerId(UUID, org.springframework.data.domain.Pageable)}: because a
- * member may belong to up to two Staffeln (REQ-ORG-017), a logistician who shares only one of them
- * passed the coarse {@code canViewUserRefineryOrders} {@code anyMatch} gate yet received the
- * target's orders stamped to the <em>other</em>, foreign Staffel too.
- *
- * <p>Fixture: one owner who holds refinery orders in two different Staffeln (IRIDIUM + a freshly
- * created second Staffel). The tests assert that a single-Staffel scope returns only that Staffel's
- * order (the foreign one is hidden), that the admin all-scope returns both, and that an active pin
- * narrows to the pinned Staffel.
- *
- * <p>{@link Transactional} so each method rolls back: the seeded users, locations, the second
- * Staffel and the refinery orders never commit to the shared Testcontainers database. The query
- * still observes them because they are flushed within the test transaction before the read, and
- * every assertion is scoped to the freshly created order ids so rows other suites committed cannot
- * perturb it.
+ * <p>The fixture owner holds orders in two Staffeln (REQ-ORG-017). Each test rolls back and asserts
+ * only on its own order ids.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -76,10 +58,8 @@ class RefineryOrderRepositoryScopedTest {
   @PersistenceContext private EntityManager entityManager;
 
   /**
-   * SEC-01 core regression: a caller scoped to a single Staffel must receive only the target's
-   * orders stamped to that Staffel, never the order stamped to the target's other (foreign) Staffel
-   * — proving the {@code owning_org_unit_id IN :memberOrgUnitIds} predicate filters rather than
-   * collapsing to "all the target owns".
+   * A caller scoped to one Staffel receives only the target's orders stamped to that Staffel, not
+   * those of the target's other Staffel.
    */
   @Test
   void findByOwnerIdScoped_singleStaffelScope_excludesForeignStaffelOrder() {
@@ -190,9 +170,8 @@ class RefineryOrderRepositoryScopedTest {
   }
 
   /**
-   * Persists a refinery order owned by {@code owner}, at {@code location}, stamped to {@code
-   * owningOrgUnit}. Status defaults to {@code OPEN}; the optional mission / refining-method / money
-   * fields are left unset.
+   * Persists an {@code OPEN} refinery order owned by {@code owner}, at {@code location}, stamped to
+   * {@code owningOrgUnit}.
    *
    * @param owner the owning user; never {@code null}.
    * @param location the order's refinery location; never {@code null}.

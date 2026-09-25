@@ -61,11 +61,9 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
 /**
- * Unit tests for {@link AuditService}: {@code record} derives the {@link AuditDomain} from the
- * event type, snapshots the actor handle (the trail must survive user deletion, REQ-AUDIT-001),
- * falls back to the {@code system} actor when no user resolves, clamps an over-long subject label,
- * stamps the bounded originating-client label (REQ-AUDIT-005), and {@code getEvents} delegates to
- * the filtered repository query for the selected domain.
+ * Unit tests for {@link AuditService}: domain derivation, actor-handle snapshot (REQ-AUDIT-001),
+ * {@code system} fallback, subject-label clamping, client label (REQ-AUDIT-005) and filtered {@code
+ * getEvents}.
  */
 @ExtendWith(MockitoExtension.class)
 class AuditServiceTest {

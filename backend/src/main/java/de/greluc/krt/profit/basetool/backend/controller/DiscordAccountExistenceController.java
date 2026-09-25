@@ -42,25 +42,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Internal, machine-to-machine endpoint the Keycloak Discord SPI calls during first-broker-login to
- * learn whether a Basetool account already exists for an incoming Discord identity (REQ-SEC-022,
- * ADR-0051).
+ * Internal endpoint the Keycloak Discord SPI calls during first-broker-login to check whether a
+ * Basetool account already exists for an incoming Discord identity (REQ-SEC-022, ADR-0051).
  *
- * <p>It lives <strong>outside {@code /api/**}</strong> on purpose: it carries no JWT (the caller is
- * Keycloak, outside the OAuth2 trust boundary), so it must skip the rate limiter and the {@code
- * PendingApprovalAccessFilter} that gate {@code /api/**}, and it is excluded from the public
- * OpenAPI document ({@link Hidden}). {@code SecurityConfig} {@code permitAll}s {@code /internal/**}
- * and exempts it from CSRF; this controller is therefore the sole gate, enforcing a constant-time
- * shared secret ({@code X-KRT-SPI-Secret}).
- *
- * <p><strong>Fail-open by contract.</strong> The SPI treats any non-200 response (and any transport
- * error) as "unknown" and lets the login proceed to the normal pending-approval queue. So a blank
- * (unconfigured) secret answers {@code 503} — disabling the feature on deployments that do not use
- * it — and a bad/absent secret answers {@code 401}; both simply skip the precheck SPI-side. Only a
- * {@code 200} with {@code exists=true} denies a registration.
- *
- * <p>No PII is logged: only the coarse decision and the auth outcome are recorded, never the
- * candidate names or e-mail.
+ * <p>Lives outside {@code /api/**}, carries no JWT and is hidden from OpenAPI; this controller is
+ * the sole gate via the constant-time shared secret {@code X-KRT-SPI-Secret}. Fail-open: a blank
+ * secret answers {@code 503}, a wrong or absent one {@code 401}, and only {@code 200} with {@code
+ * exists=true} denies a registration. Never logs the candidate names or e-mail.
  */
 @RestController
 @RequestMapping("/internal/discord/account-existence")
@@ -108,9 +96,8 @@ public class DiscordAccountExistenceController {
   }
 
   /**
-   * Bumps {@code basetool_discord_precheck_total} for one bounded {@code outcome}. Only the coarse
-   * outcome is recorded — never the candidate names or e-mail (PII), consistent with the endpoint's
-   * no-PII logging contract.
+   * Increments {@code basetool_discord_precheck_total} for one bounded {@code outcome}; never
+   * records the candidate names or e-mail.
    *
    * @param outcome one of {@link MetricNames#DISCORD_PRECHECK_OK} / {@link
    *     MetricNames#DISCORD_PRECHECK_UNAUTHORIZED} / {@link MetricNames#DISCORD_PRECHECK_DISABLED}

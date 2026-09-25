@@ -39,31 +39,12 @@ import lombok.ToString;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * A per-account, per-visibility-tier approval ceiling (REQ-BANK-041), persisted in the {@code
- * bank_account_approval_limit} table created by Flyway V193.
+ * A per-account, per-audience-tier approval ceiling (REQ-BANK-041): members of the tier may raise a
+ * booking request up to {@link #limitAmount} aUEC without the responsible holder's approval.
  *
- * <p>The row says: members of the named tier may raise a booking request against this account up to
- * {@link #limitAmount} whole aUEC <em>without</em> the account's responsible holder having to grant
- * an explicit approval; a request above it is flagged {@code requiresOwnerApproval} on creation.
- *
- * <p><strong>A <em>missing</em> row means the opposite of what it originally did.</strong> The
- * feature shipped with "no matching row = unlimited" (no approval ever required, preserving the
- * pre-feature behaviour); that default was later <em>inverted</em> by owner decision, so a
- * requester matching no tier now needs the responsible holder's approval for <em>any</em> amount
- * (REQ-BANK-041, {@code requires_owner_approval = (applicable_limit == null) || amount >
- * applicable_limit}). The V193 table/column comments still carry the retired wording — they are a
- * shipped migration and cannot be edited; {@code OrgUnitBankAccessService#resolveApplicableLimit}
- * is the authority.
- *
- * <p>The audience dimension mirrors {@link BankAccountViewGrant} one-for-one (V193 {@code
- * chk_bank_appr_limit_payload} enforces the column combination): a {@link MembershipRole} on the
- * owning unit ({@code MEMBERSHIP_ROLE}), a global role code ({@code GLOBAL_ROLE}, for {@link
- * BankAccountType#SPECIAL} accounts), a single user ({@code USER}), or all members ({@code
- * ALL_MEMBERS}). The limit is configured by the account's responsible holder, bank management or an
- * admin — never by a plain bank employee — exclusively through the org-unit-aware {@code
- * OrgUnitBankAccessService} seam. Setting a tier's limit is an idempotent upsert (partial unique
- * indexes prevent duplicate rows), so the row carries no client-echoed version of its own — the
- * inherited {@code @Version} only guards a rare concurrent write to the same row.
+ * <p>A requester matching no tier needs the holder's approval for any amount. The audience mirrors
+ * {@link BankAccountViewGrant}; limits are managed only through {@code OrgUnitBankAccessService} as
+ * an idempotent upsert.
  */
 @Entity
 @Table(name = "bank_account_approval_limit")

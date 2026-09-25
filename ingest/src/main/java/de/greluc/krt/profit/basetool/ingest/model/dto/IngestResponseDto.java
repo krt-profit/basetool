@@ -22,9 +22,7 @@ package de.greluc.krt.profit.basetool.ingest.model.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
- * What the gateway returns to the desktop extractor after a successful ingest: the unguessable
- * single-use handoff id, the draft kind, and the fully-formed frontend URL the extractor opens so
- * the browser lands on the pre-filled review form (REQ-INGEST-004).
+ * Response to the desktop extractor after a successful ingest (REQ-INGEST-004).
  *
  * @param handoffId the opaque, unguessable id keying the staged draft in Redis
  * @param kind which draft was staged ({@code REFINERY} / {@code BLUEPRINT})

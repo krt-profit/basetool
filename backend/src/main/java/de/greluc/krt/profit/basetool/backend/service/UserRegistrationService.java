@@ -54,23 +54,9 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Owns the Discord registration approval lifecycle (epic #720, Track&nbsp;1 / REQ-SEC-017) —
- * extracted out of {@link UserService} (audit Thema&nbsp;7, #1252) so the fail-safe approval gate
- * lives on its own seam. Covers the admin queue read ({@link #findPendingRegistrations()}) and the
- * two optimistic-locked, audited decisions ({@link #approveUser} / {@link #rejectUser} on top of
- * the shared {@link #decide}).
- *
- * <p>It also owns the reversal of an erroneous rejection (REQ-SEC-034): {@link
- * #findRejectedRegistrations()} makes a rejected row findable and {@link #reopenRegistration}
- * returns it to the queue as PENDING. The reversal is deliberately a separate action rather than a
- * widening of {@link #decide}, so the "only a still-PENDING registration may be decided" invariant
- * that protects an active member's authorities stays exactly as narrow as it is.
- *
- * <p>It also owns the shared entry side of the lifecycle: {@link #stampNewPendingRegistration}, the
- * fail-safe PENDING stamping that both Keycloak reconciliation sync paths apply to a brand-new
- * non-admin registration. That is the one place the {@code app.registration.require-approval} gate
- * is evaluated, so the JWT-login and the scheduled Admin-API paths can never drift on whether a new
- * non-admin lands PENDING.
+ * Owns the Discord registration approval lifecycle (REQ-SEC-017): the admin queue, the audited,
+ * optimistic-locked approve and reject decisions, reopening an erroneous rejection (REQ-SEC-034),
+ * and the fail-safe PENDING stamping both Keycloak sync paths apply to new registrations.
  */
 @Service
 @RequiredArgsConstructor
@@ -85,46 +71,32 @@ public class UserRegistrationService {
   private final UserDeletionService userDeletionService;
 
   /**
-   * Self-injection (lazy {@link ObjectProvider} to avoid an eager construction cycle) so {@link
-   * #linkRegistrationToExistingAccount} — a non-transactional orchestrator around external Keycloak
-   * writes — can invoke its transactional database half {@link #completeLinkTransactionally}
-   * through the Spring proxy rather than by self-invocation (which would bypass the
-   * {@code @Transactional} advice).
+   * Lazy self-reference so {@link #linkRegistrationToExistingAccount} can call {@link
+   * #completeLinkTransactionally} through the Spring proxy.
    */
   private final ObjectProvider<UserRegistrationService> selfProvider;
 
   /**
-   * Whether a brand-new non-admin registration must be approved by an admin before it is granted
-   * any authorities (REQ-SEC-017 fail-safe default). {@code true} in prod and by default. Set to
-   * {@code false} ONLY in controlled non-prod stacks (the Playwright e2e stack, via {@code
-   * APP_REGISTRATION_REQUIRE_APPROVAL=false}) where fixture users are provisioned on the fly and an
-   * interactive approval step would deadlock the seeder — there, a new non-admin keeps the {@code
-   * ACTIVE} entity default. Field-injected with a {@code true} initializer so Mockito unit tests
-   * (no Spring) exercise the secure default without extra wiring.
+   * Whether a new non-admin registration needs admin approval before gaining any authorities
+   * (REQ-SEC-017); {@code true} by default. Only controlled non-prod stacks such as the e2e stack
+   * set it to {@code false}.
    */
   @Value("${app.registration.require-approval:true}")
   private boolean requireApproval = true;
 
   /**
    * Stamps a brand-new non-admin registration {@link ApprovalStatus#PENDING} under the fail-safe
-   * approval gate (REQ-SEC-017). Shared by both Keycloak reconciliation sync paths (JWT login and
-   * the scheduled Admin-API sync) so they cannot diverge on whether a new non-admin is gated: a
-   * missing {@code discord_user_id} claim/mapper must never let a federated login inherit the
-   * {@code ACTIVE} entity default and skip approval.
+   * approval gate (REQ-SEC-017), for both Keycloak sync paths.
    *
-   * <p>Operates in place on the already-managed {@code user} and relies on the caller's transaction
-   * to flush the change — hence {@link Propagation#MANDATORY}; it performs no {@code save} / {@code
-   * flush} of its own. Only a brand-new row ({@code created}) that is not an admin is touched;
-   * existing rows and admins (bootstrap carve-out, entity default {@code ACTIVE}) are left
-   * untouched. The caller is responsible for marking its change flag and publishing the admin
-   * notification (REQ-NOTIF-012) when this returns {@code true}.
+   * <p>Works on the managed {@code user} inside the caller's transaction and saves nothing itself.
+   * The caller marks its change flag and publishes the admin notification (REQ-NOTIF-012) when this
+   * returns {@code true}.
    *
-   * @param user the managed user being reconciled; never {@code null}.
-   * @param created whether this reconciliation just created the row (only new rows are gated).
+   * @param user the managed user being reconciled; never {@code null}
+   * @param created whether this reconciliation just created the row (only new rows are gated)
    * @param localRoles the mapped local roles; an ADMIN among them suppresses the gate; never {@code
-   *     null}.
-   * @return {@code true} when this call stamped a new PENDING registration, {@code false}
-   *     otherwise.
+   *     null}
+   * @return {@code true} when this call stamped a new PENDING registration
    */
   @Transactional(propagation = Propagation.MANDATORY)
   public boolean stampNewPendingRegistration(
@@ -139,19 +111,10 @@ public class UserRegistrationService {
   }
 
   /**
-   * Of the given registrations' callsigns, the ones a second account already holds.
+   * Of the given registrations' callsigns, the ones a second account already holds, for the admin
+   * queue's collision marker (ADR-0142).
    *
-   * <p>Backs the "same callsign, different account" marker on the admin queue (#1639, ADR-0142
-   * point 5). Since a login whose subject matches no row no longer adopts an account found by name,
-   * the caller arrives as a new registration instead — and this is what tells the admin that
-   * approving it creates a <b>second</b> account for a callsign rather than admitting a new member.
-   * The remedy is an explicit merge, never an implicit inheritance.
-   *
-   * <p>One query for the whole page rather than a lookup per row (REQ-DATA-003). Keyed on {@code
-   * username} rather than on the displayed effective name: the collision that matters is the one a
-   * login can be confused by, and that is the Keycloak {@code preferred_username}. Matching is
-   * case-insensitive, because Keycloak treats usernames that way and an admin comparing two rows by
-   * eye does too.
+   * <p>One query for the whole page, matching {@code username} case-insensitively.
    *
    * @param users the registrations being rendered
    * @return the lower-cased colliding callsigns; empty when none collides
@@ -180,14 +143,8 @@ public class UserRegistrationService {
   }
 
   /**
-   * Returns the registrations an admin has rejected (status {@link ApprovalStatus#REJECTED}),
-   * oldest first. This is the read surface that makes an erroneous rejection findable at all: the
-   * approval queue itself is PENDING-only, so before this existed an admin had no way to see a
-   * rejected row — let alone reverse it — without querying the database directly (REQ-SEC-034).
-   *
-   * <p>Ordered oldest-first to match {@link #findPendingRegistrations()} rather than
-   * newest-rejection-first: both lists are small (rejections are rare in a squadron-sized realm)
-   * and one ordering across the page keeps the two tables readable side by side.
+   * Returns the registrations an admin has rejected, oldest registration first, so an erroneous
+   * rejection can be found and reversed (REQ-SEC-034).
    *
    * @return the rejected registrations, oldest registration first
    */
@@ -198,38 +155,20 @@ public class UserRegistrationService {
 
   /**
    * Reopens a rejected registration: moves it from {@link ApprovalStatus#REJECTED} back to {@link
-   * ApprovalStatus#PENDING} so it re-enters the approval queue and can be decided again through the
-   * normal {@link #approveUser}/{@link #rejectUser} path. This is the supported reversal of an
-   * erroneous rejection (REQ-SEC-034); without it the only recoveries were a manual production
-   * {@code UPDATE} (which bypasses the audit trail) or deleting the account outright (which
-   * destroys its data and history).
+   * ApprovalStatus#PENDING} so it can be decided again (REQ-SEC-034).
    *
-   * <p><strong>Deliberately not a REJECTED → ACTIVE shortcut.</strong> Routing the reversal back
-   * through PENDING keeps the "only a still-PENDING registration may be decided" invariant in
-   * {@link #decide} intact — the guard that stops an already-ACTIVE member from being silently
-   * stripped of their authorities by a re-decision. The admin therefore performs two explicit acts,
-   * and the audit records both.
-   *
-   * <p>The previous decision stamp ({@code approvedAt} / {@code approvedById}) is <em>cleared</em>
-   * so the row is indistinguishable from a fresh pending registration: a PENDING row still carrying
-   * a decision stamp would render a decision time for an undecided account. Nothing is lost — who
-   * rejected it and when survives in {@code user_approval_event}, which is the history of record.
-   *
-   * <p>No notification fires. The rejection mail (REQ-NOTIF-014) announces a verdict and a reopen
-   * is not one, and the new-registration admin mail (REQ-NOTIF-012) would page the whole admin body
-   * about a months-old registration that the acting admin is already looking at.
+   * <p>Goes through PENDING rather than straight to ACTIVE, so {@link #decide} still decides only
+   * pending rows. Clears the previous decision stamp (the history stays in {@code
+   * user_approval_event}) and sends no notification.
    *
    * @param userId the rejected registration to reopen
-   * @param reason optional free-text note recorded in the audit (e.g. why the rejection was wrong);
-   *     may be {@code null}
+   * @param reason optional free-text note recorded in the audit; may be {@code null}
    * @param version the optimistic-lock version echoed back from the rejected list; {@code null}
    *     bypasses the check
    * @param adminId the acting admin's id (for the audit row)
    * @return the now-pending user (with its bumped version)
    * @throws NotFoundException when the user is unknown
    * @throws BusinessConflictException when the registration is not {@link ApprovalStatus#REJECTED}
-   *     — a PENDING row needs no reopening and an ACTIVE member must never be pushed back into the
-   *     queue, which would strip their access
    * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
    */
   @Transactional
@@ -258,8 +197,7 @@ public class UserRegistrationService {
 
   /**
    * Approves a pending registration: moves it to {@link ApprovalStatus#ACTIVE}, stamps the
-   * approving admin + time, and writes an audit row. The user's Basetool roles/units stay manually
-   * managed (Track 1) — approval grants no roles by itself. Optimistic-locking via {@code version}.
+   * approving admin and time, and writes an audit row. Grants no roles by itself.
    *
    * @param userId the registration to approve
    * @param version the optimistic-lock version echoed back from the admin queue; {@code null}
@@ -339,31 +277,14 @@ public class UserRegistrationService {
   }
 
   /**
-   * Links a pending Discord registration onto an existing account (REQ-SEC-026): the Discord
-   * federated identity is moved from the throwaway Discord-registered user onto {@code
-   * targetUserId} in Keycloak, the throwaway Keycloak + {@code app_user} rows are removed, and the
-   * surviving account gains the {@code discord_user_id} (+ captured guild nickname). This is the
-   * admin-driven resolution for a member who already had an account but registered anew via Discord
-   * — typically because their Discord handle differs from their in-app name, so the automatic
-   * collision check never recognised them and let the registration reach the queue.
+   * Links a pending Discord registration onto an existing account (REQ-SEC-026): moves the Discord
+   * identity to {@code targetUserId} in Keycloak, removes the throwaway Keycloak user and {@code
+   * app_user} row, and stamps the target's {@code discord_user_id}.
    *
-   * <p><strong>Non-transactional orchestrator.</strong> The Keycloak writes are external
-   * side-effects that cannot roll back with a database transaction, so this method runs outside any
-   * transaction ({@link Propagation#NOT_SUPPORTED}). It moves the identity onto the target, commits
-   * the database merge through the self-proxied {@link #completeLinkTransactionally}, and only
-   * <em>then</em> deletes the throwaway Keycloak user. Deleting it <em>last</em> — after the DB is
-   * consistent — is what makes a retry safe: if the DB merge fails and rolls back, the throwaway
-   * Keycloak user still exists, so the next attempt re-reads its identity cleanly rather than
-   * stranding the registration. Each Keycloak write is itself idempotent (a re-link of the same
-   * identity and a delete of an already-gone user both succeed).
-   *
-   * <p>The incoming Discord snowflake is resolved <em>authoritatively from Keycloak</em> ({@link
-   * KeycloakService#readDiscordLink}) with a fallback to the persisted local {@code
-   * discord_user_id} (see {@link #resolveDiscordLink}): the Keycloak read makes linking work even
-   * when the claim mapper never persisted the id locally, and the local fallback recovers a
-   * registration whose throwaway Keycloak user was already deleted by an earlier partial failure
-   * (the reported case of a member stranded by the missing {@code LINKED} check-constraint value —
-   * see V223).
+   * <p>Runs outside any transaction: after moving the identity it commits the database half through
+   * {@link #completeLinkTransactionally} and deletes the throwaway Keycloak user last, so a failed
+   * attempt can be retried. The snowflake is read from Keycloak, falling back to the local {@code
+   * discord_user_id} (see {@link #resolveDiscordLink}).
    *
    * @param pendingId the pending Discord registration to link away
    * @param targetUserId the existing account to link the Discord identity into
@@ -373,8 +294,8 @@ public class UserRegistrationService {
    * @return the surviving target account, now carrying the Discord link
    * @throws NotFoundException when the pending registration or the target account is unknown
    * @throws BusinessConflictException when the pending row is no longer PENDING, the target is not
-   *     a distinct active account, the target is already Discord-linked, or the pending
-   *     registration has no Discord identity to move
+   *     a distinct active account or is already Discord-linked, or there is no Discord identity to
+   *     move
    * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
    */
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -420,15 +341,9 @@ public class UserRegistrationService {
   }
 
   /**
-   * Resolves the Discord identity to move off a pending registration, preferring the authoritative
-   * Keycloak federated identity and falling back to the locally persisted {@code discord_user_id}
-   * when Keycloak no longer knows the pending user. The Keycloak read covers the case where the
-   * {@code discord_user_id} claim mapper never persisted the snowflake locally; the local fallback
-   * covers recovery after a partial link failure has already deleted the throwaway Keycloak user
-   * (its {@code app_user} row, and thus the snowflake, survives the rolled-back DB half). The
-   * fallback carries the pending row's {@code username} as the Discord username — for a Discord
-   * registration that is the Discord handle — which {@link KeycloakService#linkDiscordIdentity}
-   * treats as optional.
+   * Resolves the Discord identity to move off a pending registration: the Keycloak federated
+   * identity, else the locally persisted {@code discord_user_id} with the row's {@code username} as
+   * Discord username.
    *
    * @param pending the managed pending registration being linked away; never {@code null}
    * @return the Discord identity to link onto the target account
@@ -466,16 +381,13 @@ public class UserRegistrationService {
 
   /**
    * The transactional database half of {@link #linkRegistrationToExistingAccount}, invoked through
-   * the self-proxy so its {@link Transactional} boundary actually applies (a plain self-invocation
-   * would bypass the proxy). Deletes the throwaway {@code app_user} <em>first</em> -- freeing the
-   * unique {@code discord_user_id} before the target claims it -- via the FK-safe {@link
-   * UserDeletionService#deleteUser(UUID, UserDeletionService.KeycloakPresenceCheck)}, after
-   * clearing its {@code inKeycloak} flag. Its Keycloak user is <em>not</em> gone yet -- the
-   * orchestrator removes it after this commits, for retry safety -- so the deletion service's live
-   * presence probe is waived here explicitly. Leaving it enforced made this method throw on every
-   * run from #1460 until #1827. It then stamps the surviving target account's {@code
-   * discord_user_id} (+ guild nickname) and writes the {@link ApprovalDecision#LINKED} audit row.
-   * On a retry where the throwaway row is already gone, the delete step is simply skipped.
+   * the self-proxy.
+   *
+   * <p>Deletes the throwaway {@code app_user} first, freeing the unique {@code discord_user_id},
+   * via {@link UserDeletionService#deleteUser(UUID, UserDeletionService.KeycloakPresenceCheck)}
+   * with the presence probe waived, then stamps the target's {@code discord_user_id} and guild
+   * nickname and writes the {@link ApprovalDecision#LINKED} audit row. On a retry where the
+   * throwaway row is already gone, the delete is skipped.
    *
    * @param pendingId the throwaway pending registration to delete (may already be gone on a retry)
    * @param targetUserId the surviving account to stamp with the Discord link

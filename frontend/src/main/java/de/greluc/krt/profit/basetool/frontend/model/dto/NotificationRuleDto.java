@@ -24,8 +24,8 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Frontend mirror of the backend {@code NotificationRuleDto}. Enum-typed backend fields are
- * mirrored as {@link String}; field names match the backend record (mirror-DTO rule).
+ * Frontend mirror of the backend {@code NotificationRuleDto}; backend enum fields are carried as
+ * {@link String}.
  *
  * @param id rule id
  * @param eventType the trigger the rule matches

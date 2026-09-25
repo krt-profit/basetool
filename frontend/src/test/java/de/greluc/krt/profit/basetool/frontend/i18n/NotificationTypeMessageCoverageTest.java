@@ -37,25 +37,10 @@ import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 /**
- * Every {@code NotificationType} the backend can persist must have a message template in all three
- * bundles (REQ-NOTIF-001, the root i18n rule).
+ * Tests that every {@code NotificationType} the backend can persist has a {@code
+ * notifications.type.*} template in all three bundles (REQ-NOTIF-001).
  *
- * <p><b>Why the existing bundle test cannot catch this.</b> {@code MessageBundleConsistencyTest}
- * compares the three bundles against each other and scans templates for keys they reference. The
- * key here is built at runtime in Java — {@code "notifications.type." + dto.type()} — so a missing
- * one is consistent across all three bundles and appears in no template. It fails silently: {@code
- * NotificationPageController} falls through to {@code notifications.type.generic}, and the member's
- * bell shows "Neue Benachrichtigung" with the render parameters dropped.
- *
- * <p>That is how {@code ACCOUNT_DELETION_REQUESTED} and {@code ACCOUNT_DELETION_REQUEST_DECLINED}
- * shipped contentless: every admin's inbox said nothing when a member asked to be erased — no
- * indication that the Art. 12(3) one-month clock had started — and the declined member, whom Art.
- * 12(4) obliges the controller to inform, got the same. The audit-viewer labels for the same two
- * events <em>were</em> added, which is what made the gap look like it was not there.
- *
- * <p>The enum is read from the backend's source rather than imported: the frontend module holds no
- * backend classes, and {@code NotificationDto.type} is a plain {@code String} on the wire. Reading
- * the file is the same approach {@code DtoMirrorConsistencyTest} takes for the DTO mirrors.
+ * <p>The enum is read from the backend's source file, since the frontend holds no backend classes.
  */
 class NotificationTypeMessageCoverageTest {
 

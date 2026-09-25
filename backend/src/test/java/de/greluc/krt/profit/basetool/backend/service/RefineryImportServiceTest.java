@@ -70,9 +70,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 /**
- * Unit tests of the refinery screenshot import draft building (#434): the §7.3 material-matching
- * stages, the §5 skip / un-quoted / checksum rules and the order-level field mapping — all against
- * mocked repositories with the real fuzzy matcher and real MapStruct mappers.
+ * Unit tests of the refinery screenshot import draft: material matching, the skip, un-quoted and
+ * checksum rules, and the order field mapping, with the real fuzzy matcher and mappers.
  */
 @ExtendWith(MockitoExtension.class)
 class RefineryImportServiceTest {

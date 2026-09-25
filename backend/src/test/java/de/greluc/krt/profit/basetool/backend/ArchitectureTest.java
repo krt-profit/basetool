@@ -50,25 +50,9 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /**
- * ArchUnit tests that mechanically enforce the architectural invariants from CLAUDE.md.
- *
- * <p>Each rule below corresponds to a bullet in the project guide:
- *
- * <ul>
- *   <li>"Authorization is centralized in {@code @PreAuthorize} annotations on services/controllers
- *       — keep checks out of business logic." → {@link
- *       #serviceLayerShouldNotReachIntoSecurityContext()}, {@link
- *       #controllerLayerShouldNotReachIntoSecurityContext()} and {@link
- *       #mapperLayerShouldNotReachIntoSecurityContext()} (no {@code SecurityContextHolder} outside
- *       the dedicated auth-helper services) plus {@link
- *       #everyRestControllerShouldDeclareAtLeastOneAuthorisationAnnotation()}.
- *   <li>"DTOs only at boundaries. Never expose JPA entities at controller boundaries." → {@link
- *       #controllerMethodsShouldNotReturnJpaEntities()}.
- * </ul>
- *
- * <p>These rules are static checks against the imported bytecode under {@code
- * de.greluc.krt.profit.basetool.backend.*}; tests on the test classpath are excluded so the rules
- * describe the production-code contract only.
+ * ArchUnit tests enforcing the backend's architectural invariants on production classes: no {@code
+ * SecurityContextHolder} outside the auth helper, an authorisation annotation on every endpoint, no
+ * JPA entities at controller boundaries, and the scoping, redaction and ledger rules below.
  */
 class ArchitectureTest {
 
@@ -107,15 +91,8 @@ class ArchitectureTest {
   private static final String GET_MAPPING = "org.springframework.web.bind.annotation.GetMapping";
 
   /**
-   * The verb-agnostic spelling, selected alongside every verb-specific one.
-   *
-   * <p>ArchUnit compares the annotation TYPE, not its meta-annotations, so {@code @GetMapping} and
-   * {@code @RequestMapping(method = GET)} are two different things to a rule even though Spring
-   * treats them alike. A read declared the second way would have shipped with no
-   * {@code @PreAuthorize} at all and left the build green - on the guard REQ-SEC-052 relies on now
-   * that the URL matrix names only the public surface. Selecting it here closes the spelling gap
-   * the same way the permitAll rule closes the matcher gap. It is deliberately added to the write
-   * rule too: the same reasoning holds for a write.
+   * The verb-agnostic {@code @RequestMapping} annotation, selected alongside the verb-specific ones
+   * because ArchUnit matches annotation types, not meta-annotations (REQ-SEC-052).
    */
   private static final String REQUEST_MAPPING =
       "org.springframework.web.bind.annotation.RequestMapping";
@@ -139,38 +116,16 @@ class ArchitectureTest {
   private static final String USER_FQN = "de.greluc.krt.profit.basetool.backend.model.User";
 
   /**
-   * Legacy entities that legitimately reference the {@code squadron_id} column today and are
-   * grandfathered by {@link #noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities()}.
-   * The destructive-cleanup release drops the column on both tables in a coordinated migration;
-   * until then, both fields stay. New staffel-scoped aggregates MUST use the {@code
-   * owning_squadron_id} (legacy mirror) or {@code owning_org_unit_id} (new column) name instead of
-   * {@code squadron_id}.
-   *
-   * <ul>
-   *   <li>{@code User.squadron} — the global user→squadron link on {@code app_user}. Migration to
-   *       per-membership ownership is the destructive-cleanup release.
-   * </ul>
-   *
-   * <p>{@code MissionParticipant} no longer references {@code squadron_id}: the per-participant
-   * affiliation snapshot moved to the {@code mission_participant_org_unit} join table (FK to {@code
-   * org_unit}, supporting Staffel + Spezialkommando), so the entity is no longer in this set. The
-   * legacy {@code mission_participant.squadron_id} column is dropped in the destructive-cleanup
-   * release.
+   * Entities still allowed to map the {@code squadron_id} column, exempt from {@link
+   * #noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities()}; currently only {@code
+   * User.squadron}.
    */
   private static final Set<String> SQUADRON_ID_COLUMN_GRANDFATHERED_FQNS = Set.of(USER_FQN);
 
   /**
-   * DTOs that are response-only — they may be returned from {@code @GetMapping} methods or used as
-   * {@code @PostMapping} return types, but MUST NOT be accepted as a {@code @RequestBody} on any
-   * state-changing endpoint. They carry server-managed fields ({@code id}, {@code version}, {@code
-   * owningSquadron}, {@code parent}, role-derived flags) which, if let through a write binding,
-   * become a mass-assignment vector (audit finding C-3: the original {@code POST /api/v1/missions}
-   * accepted the full {@code MissionDto} and let any authenticated caller overwrite a foreign
-   * squadron's mission via {@code EntityManager.merge}).
-   *
-   * <p>Add to this list when a new response DTO ships with server-managed fields. The corresponding
-   * write endpoints must then accept a dedicated {@code …Request} record from {@code dto/request/}
-   * carrying only caller-controllable fields.
+   * Response-only DTOs that must never be accepted as a {@code @RequestBody} on a write endpoint,
+   * because they carry server-managed fields ({@code id}, {@code version}, {@code owningSquadron},
+   * …). Write endpoints take a dedicated request record instead.
    */
   private static final Set<String> RESPONSE_ONLY_DTOS =
       Set.of("de.greluc.krt.profit.basetool.backend.model.dto.MissionDto");
@@ -192,11 +147,9 @@ class ArchitectureTest {
           "java.lang.Iterable");
 
   /**
-   * Method-name prefixes that the codebase uses for state-mutating service operations. Used by
-   * {@link #mutatingServiceMethodsInReadOnlyClassesNeedExplicitTransactional()} to find methods
-   * that must override a class-level {@code @Transactional(readOnly = true)} with their own
-   * {@code @Transactional}. The list is conservative — anything that does NOT start with one of
-   * these prefixes is treated as a read operation.
+   * Method-name prefixes identifying state-mutating service methods for {@link
+   * #mutatingServiceMethodsInReadOnlyClassesNeedExplicitTransactional()}; any other name counts as
+   * a read.
    */
   private static final Set<String> MUTATING_METHOD_PREFIXES =
       Set.of(
@@ -237,11 +190,9 @@ class ArchitectureTest {
           "sync");
 
   /**
-   * Classes that are allowed to reach into {@link
-   * org.springframework.security.core.context.SecurityContextHolder} despite being on the
-   * service-layer package. By design the list contains exactly one entry — {@code
-   * AuthHelperService} — so there is a single source of truth for "what is the current
-   * authentication" across the codebase.
+   * Service-layer classes allowed to use {@link
+   * org.springframework.security.core.context.SecurityContextHolder}: only {@code
+   * AuthHelperService}.
    */
   private static final java.util.Set<String> SECURITY_CONTEXT_HOLDER_EXCEPTIONS =
       java.util.Set.of("de.greluc.krt.profit.basetool.backend.service.AuthHelperService");
@@ -375,21 +326,9 @@ class ArchitectureTest {
   }
 
   /**
-   * The four methods that may declare {@code @PreAuthorize("permitAll()")} — and no others.
-   *
-   * <p>REQ-SEC-052 states the public surface as a list, and a list is only a requirement if
-   * something refuses to grow it. Two are the anonymous reads (D2 / D3 of ADR-0159): an app too old
-   * to log in must still learn that it is too old, and a document everyone must be able to read
-   * before agreeing to anything cannot require having agreed. The third is the Keycloak SPI's
-   * account-existence precheck, which is machine-to-machine behind a constant-time shared-secret
-   * header — not an anonymous data path, and it carries no JWT because Keycloak sits outside the
-   * resource server's trust boundary.
-   *
-   * <p>The fourth is {@code /error}, the fourth REQ-SEC-052 path and Spring's own dispatch. It
-   * gained the annotation on 2026-09-07, when the read/write rules learned to select
-   * {@code @RequestMapping} alongside the verb-specific spellings and found the one endpoint in the
-   * codebase declared that way — a read whose publicness had only ever been stated in the URL
-   * matrix. It carries no data of its own: only the status the failed request already produced.
+   * The only methods that may declare {@code @PreAuthorize("permitAll()")} (REQ-SEC-052): the two
+   * anonymous reads of ADR-0159, the Keycloak SPI's shared-secret account precheck, and {@code
+   * /error}.
    */
   private static final Set<String> PERMIT_ALL_ALLOWED_METHODS =
       Set.of(
@@ -442,15 +381,8 @@ class ArchitectureTest {
   }
 
   /**
-   * Every read endpoint carries an authorisation decision of its own, class-level or method-level.
-   *
-   * <p>The write sibling of this rule has existed since the 2026-05-20 audit. Reads were left out
-   * because the URL matrix answered for them — and that is exactly what REQ-SEC-052 removed. Before
-   * ADR-0159 twelve {@code InventoryItemController} reads, both {@code MaterialCategoryController}
-   * reads, {@code AnnouncementController}, {@code TerminalController} and the two {@code
-   * HangarController} reads carried no gate at all; they were safe only because a matcher two
-   * folders away said {@code authenticated()}. A read is where data leaves, so it gets the same
-   * treatment as a write.
+   * Every read endpoint must carry its own class- or method-level authorisation annotation
+   * (REQ-SEC-052).
    */
   @Test
   void readEndpointsMustDeclareAnAuthorisationAnnotation() {
@@ -905,11 +837,9 @@ class ArchitectureTest {
   }
 
   /**
-   * {@code true} iff one of the method's request-mapping annotations declares a path that contains
-   * the literal {@code "{id}"} placeholder. Used by {@link
-   * #staffelScopedWriteEndpointsMustGateOnOwnerScopeService()} to scope the rule to endpoints that
-   * target a primary-resource aggregate id (and skip create / bulk / cross-user-administrative
-   * endpoints whose only {@code UUID} path variable is a related entity like {@code userId}).
+   * Whether one of the method's request mappings has a path containing the literal {@code "{id}"}
+   * placeholder; scopes {@link #staffelScopedWriteEndpointsMustGateOnOwnerScopeService()} to
+   * endpoints addressing a primary-resource id.
    */
   private static boolean mappingPathContainsIdPlaceholder(JavaMethod method) {
     String[] candidateAnnotations = {POST_MAPPING, PUT_MAPPING, PATCH_MAPPING, DELETE_MAPPING};
@@ -938,26 +868,8 @@ class ArchitectureTest {
   }
 
   /**
-   * Staffel-scoped aggregate services MUST consult either {@code AuthHelperService} (for raw
-   * principal / role lookups) or {@code OwnerScopeService} (for canSee/canEdit + active-context
-   * resolution) - otherwise the data they emit might leak across org units. Phase 3 of
-   * MULTI_SQUADRON_PLAN.md tracks this as a defensive ArchUnit guard against future drift, and
-   * SPEZIALKOMMANDO_PLAN.md §5.3 carried the rule forward from the now-deleted {@code
-   * SquadronScopeService} shim to its successor in R2.c.
-   *
-   * <p>{@code JobOrderService} is included as of Phase 3 (#343): Job Orders are no longer an
-   * unconditional cross-staffel workspace but a <em>conditionally</em> staffel-scoped aggregate
-   * (SK-responsible = public, squadron-responsible = private to that squadron + admins), so the
-   * service now wires {@code OwnerScopeService} to resolve the visibility scope. {@code
-   * JobOrderHandoverService} stays excluded — handover writes inherit their access gate from the
-   * parent order's {@code @ownerScopeService.canEditJobOrder} controller check, and the service
-   * itself only injects {@code AuthHelperService} for the audit stamp on the handover record.
-   *
-   * <p>{@code InventoryAggregationService} and {@code InventoryCheckoutService} are included as of
-   * the L2 split (#921): the org-unit scoping the {@code InventoryItemService} facade used to carry
-   * ({@code OwnerScopeService.currentScopePredicate()}) moved wholesale into these two extracted
-   * services, so the guard follows the scoped data rather than staying pinned to the now-thin
-   * facade.
+   * Staffel-scoped aggregate services must inject {@code AuthHelperService} or {@code
+   * OwnerScopeService}, so their data cannot leak across org units.
    */
   @Test
   void staffelScopedServicesMustWireOwnerScopeOrAuthHelper() {
@@ -1010,30 +922,12 @@ class ArchitectureTest {
   }
 
   /**
-   * Plan-compliant ArchUnit guard #3 (MULTI_SQUADRON_PLAN.md section 4.6 + SPEZIALKOMMANDO_PLAN.md
-   * §5.3): write endpoints on staffel-scoped aggregates MUST use a {@code @PreAuthorize} expression
-   * that calls into the {@code OwnerScopeService} (canEdit* / canSee*). A bare
-   * {@code @PreAuthorize("isAuthenticated()")} on POST / PUT / PATCH / DELETE for {@code
-   * /api/v1/missions}, {@code /api/v1/operations}, {@code /api/v1/hangar}, {@code
-   * /api/v1/inventory} or {@code /api/v1/refinery-orders} would silently allow cross-staffel writes
-   * — exactly the regression class this rule prevents.
+   * Write endpoints with an {@code {id}} path on the staffel-scoped controllers (missions,
+   * operations, hangar, inventory, refinery orders) must use a {@code @PreAuthorize} expression
+   * that references {@code ownerScopeService}.
    *
-   * <p>The rule inspects all write methods (POST/PUT/PATCH/DELETE) on the affected controllers but
-   * only fires when the URL path carries a primary-resource id placeholder (i.e. {@code /{id}}).
-   * POSTs that do not target a specific resource (top-level create, bulk operations,
-   * cross-user-administrative endpoints like {@code /users/{userId}/...}) are skipped — the service
-   * layer enforces ownership there and a per-id org-unit gate has nothing to bind to.
-   *
-   * <ul>
-   *   <li>Read endpoints stay free of the rule — list endpoints lean on service-layer filtering
-   *       rather than per-row {@code @PreAuthorize}.
-   *   <li>{@code /api/v1/orders} (job orders) and {@code /api/v1/admin/**} are excluded — job
-   *       orders are a cross-staffel workspace by design, admin endpoints already require {@code
-   *       hasRole('ADMIN')} which carries no squadron component.
-   *   <li>Endpoints that use a role-only check ({@code hasRole('LOGISTICIAN')} etc.) without
-   *       additionally calling the owner-scope service still violate — the rule looks for the
-   *       literal {@code ownerScopeService} reference in the SpEL expression.
-   * </ul>
+   * <p>Reads, id-less writes, {@code /api/v1/orders} and {@code /api/v1/admin/**} are out of scope;
+   * a role-only check still violates.
    */
   @Test
   void staffelScopedWriteEndpointsMustGateOnOwnerScopeService() {
@@ -1121,29 +1015,12 @@ class ArchitectureTest {
   }
 
   /**
-   * Audit finding C-1 guard, re-keyed by ADR-0159: a mission endpoint whose gate admits a member
-   * <b>below Logistician</b> and which returns a PII-carrying mission DTO MUST call one of the
-   * {@code cleanup…ForPeer} helpers, or it ships participant e-mail and real name to a peer
-   * (REQ-SEC-007).
+   * Mission endpoints whose gate admits members below Logistician ({@code canSeeMission}, {@code
+   * canAccessParticipant}) and return a PII-carrying mission DTO must call a {@code
+   * cleanup…ForPeer} helper (REQ-SEC-007).
    *
-   * <p><b>What changed, and why the rule had to be rewritten rather than renamed.</b> It used to
-   * select endpoints whose {@code @PreAuthorize} carried <em>no</em> {@code isAuthenticated()} /
-   * {@code hasRole(...)} clause — the shape that made an endpoint anonymously reachable under the
-   * old {@code permitAll} matrix. Every one of those gates now carries {@code isAuthenticated()},
-   * so the old predicate would select <b>nothing</b> and the rule would pass by matching no
-   * members: a guard that is green because it checks an empty set is worse than no guard, which is
-   * why the non-empty assertion below is part of the test rather than a nicety.
-   *
-   * <p>The replacement keys on <em>which</em> gate rather than on the absence of one. {@code
-   * canSeeMission} and {@code canAccessParticipant} both admit an ordinary member; {@code
-   * canManageMission}, {@code canManageManagers}, {@code canChangeOwner} and any {@code hasRole}
-   * gate do not, and those endpoints legitimately return the unredacted aggregate to the
-   * leadership.
-   *
-   * <p>The check is structural: it asserts the helper is referenced in the bytecode, NOT that the
-   * call is conditional. The conditional branching is verified by the per-endpoint unit tests. The
-   * intent is to catch the "I forgot the redaction entirely" regression, which was the actual C-1
-   * root cause in {@code addParticipantPublic} / {@code addParticipantSlim}.
+   * <p>The check is structural: it asserts the helper is referenced, not that the call is
+   * conditional, and it fails when it selects no endpoints at all.
    */
   @Test
   void peerReadableMissionEndpointsMustRedactPii() {
@@ -1183,12 +1060,9 @@ class ArchitectureTest {
   }
 
   /**
-   * Mission DTOs whose participant nesting carries PII (email, first/last name, roles). Used by
-   * {@link #peerReadableMissionEndpointsMustRedactPii} to recognise return shapes that must go
-   * through guest-redaction before reaching an anonymous caller. {@code MissionFinanceEntryDto} is
-   * included because it embeds {@link
-   * de.greluc.krt.profit.basetool.backend.model.dto.MissionParticipantDto} directly — the audit
-   * found this transitive leak (C-2) in {@code MissionFinanceEntryController.createFinanceEntry}.
+   * Mission DTOs whose participant data carries PII, recognised by {@link
+   * #peerReadableMissionEndpointsMustRedactPii}. Includes {@code MissionFinanceEntryDto}, which
+   * embeds {@link de.greluc.krt.profit.basetool.backend.model.dto.MissionParticipantDto}.
    */
   private static final Set<String> MISSION_PII_CARRYING_DTOS =
       Set.of(
@@ -1197,13 +1071,8 @@ class ArchitectureTest {
           "de.greluc.krt.profit.basetool.backend.model.dto.MissionFinanceEntryDto");
 
   /**
-   * Naming convention for helper methods that strip participant PII for a peer: {@code
-   * cleanup<EntityName>ForPeer}. The helpers live in {@code MissionPeerRedactor} and are called by
-   * the controllers: {@code cleanupMissionForPeer}, {@code cleanupParticipantForPeer}, {@code
-   * cleanupUserForPeer}, {@code cleanupUnitForPeer}, {@code cleanupShipForPeer}. The rule
-   * recognises any call to a method matching this pattern as a valid redaction call — so adding a
-   * new peer-reachable controller with its own entity-specific redactor (named accordingly) does
-   * not require updating this test.
+   * Whether a method name follows the {@code cleanup<EntityName>ForPeer} convention of the
+   * participant-PII redaction helpers in {@code MissionPeerRedactor}.
    *
    * @param name candidate method name
    * @return {@code true} iff {@code name} matches the {@code cleanup…ForPeer} convention
@@ -1232,12 +1101,8 @@ class ArchitectureTest {
   }
 
   /**
-   * The PII-carrying mission DTOs a method's return type exposes.
-   *
-   * <p>The raw type when it is one of {@link #MISSION_PII_CARRYING_DTOS}, otherwise the matching
-   * type arguments of a known generic wrapper. Returned as a set rather than a boolean because the
-   * redaction rule needs to compare a handler's protected type against its helper's: a hop that
-   * only proves "some redaction happened somewhere" proves nothing about the object being returned.
+   * Returns the PII-carrying mission DTOs a method's return type exposes, directly or as a type
+   * argument of a known generic wrapper.
    *
    * @param method the method whose return type to inspect
    * @return the matching entries of {@link #MISSION_PII_CARRYING_DTOS}; empty when the return type
@@ -1277,20 +1142,8 @@ class ArchitectureTest {
   }
 
   /**
-   * Audit finding C-3 guard (2026-05-20 security audit): write endpoints on REST controllers must
-   * not accept a response-only DTO as {@code @RequestBody}. Response DTOs carry server-managed
-   * fields ({@code id}, {@code version}, {@code owningSquadron}, …) which, if let through a JSON
-   * binding into a fresh entity, become a mass-assignment vector — the original {@code POST
-   * /api/v1/missions} accepted a full {@code MissionDto} and let any authenticated caller overwrite
-   * a foreign squadron's mission row via {@code EntityManager.merge}. The fix migrated those
-   * endpoints to dedicated {@code CreateMissionRequest} / {@code UpdateMissionRequest} records that
-   * physically lack the dangerous fields.
-   *
-   * <p>This rule keeps the migration one-way: any future {@code @PostMapping} / {@code @PutMapping}
-   * / {@code @PatchMapping} that tries to take a listed response-only DTO as its request body fails
-   * the build. The {@code RESPONSE_ONLY_DTOS} allowlist at the top of this test file is the
-   * explicit registry — extend it when a new response DTO ships with server-managed fields (every
-   * staffel-scoped aggregate's main DTO is a candidate).
+   * Write endpoints must not accept a DTO listed in {@code RESPONSE_ONLY_DTOS} as
+   * {@code @RequestBody}, which would allow mass assignment of server-managed fields.
    */
   @Test
   void responseOnlyDtosMustNotBeAcceptedAsRequestBodyOnWriteEndpoints() {
@@ -1416,24 +1269,10 @@ class ArchitectureTest {
   }
 
   /**
-   * Audit finding C-4 guard (2026-05-20 security audit): the unconditional server-side stamping of
-   * {@code owningSquadron} / {@code owner} / {@code parent} in {@link
-   * de.greluc.krt.profit.basetool.backend.service.MissionService#createMission} and {@link
-   * de.greluc.krt.profit.basetool.backend.service.MissionService#addSubMission} relies on the
-   * corresponding columns NEVER being present on the request DTOs. The C-3 refactor enforces this
-   * structurally by giving the records only safe components, but a future maintainer could ship a
-   * "small convenience" patch like adding {@code UUID owningSquadronId} to {@code
-   * CreateMissionRequest} and re-wiring the service to honour it — that single step re-opens the
-   * squadron-stamp-forgery vector (an authenticated KRT_MEMBER of squadron A creates a mission
-   * stamped as squadron B's, optionally with {@code isInternal=true} so it is hidden from A's
-   * roster).
-   *
-   * <p>This rule locks down the shape: {@code CreateMissionRequest} and {@code
-   * UpdateMissionRequest} must not declare any record component whose name matches a server-
-   * managed concern. Adding a new column to {@link
-   * de.greluc.krt.profit.basetool.backend.model.dto.MissionDto} response side is fine; adding
-   * {@code owningSquadronId} / {@code parentId} / {@code ownerId} / {@code id} / etc. to the
-   * write-side records is what this guard prevents.
+   * {@code CreateMissionRequest} and {@code UpdateMissionRequest} must not declare server-managed
+   * components ({@code id}, {@code owningSquadronId}, {@code parentId}, {@code ownerId}, …), which
+   * {@link de.greluc.krt.profit.basetool.backend.service.MissionService#createMission} and {@link
+   * de.greluc.krt.profit.basetool.backend.service.MissionService#addSubMission} stamp server-side.
    */
   @Test
   void missionWriteRequestDtosMustNotCarryServerManagedFields() {
@@ -1529,16 +1368,9 @@ class ArchitectureTest {
       "de.greluc.krt.profit.basetool.backend.service.MissionParticipantService";
 
   /**
-   * The multi-user signup concurrency contract (see the inline comment block in {@link
-   * de.greluc.krt.profit.basetool.backend.service.MissionService#addParticipant} and the {@code
-   * MissionParticipantConcurrencyTest} integration test): adding or removing a participant must
-   * never bump {@link de.greluc.krt.profit.basetool.backend.model.Mission#getVersion()}, so
-   * concurrent "Anmelden" clicks on the same mission cannot trigger an {@code
-   * ObjectOptimisticLockingFailureException} on the parent row. The annotation that enforces this
-   * at the Hibernate level is {@code @OptimisticLock(excluded = true)} on the {@code participants}
-   * collection in {@code Mission}. Removing the annotation — or flipping {@code excluded} to {@code
-   * false} — silently re-opens the 409-on-concurrent-signup regression class, which only surfaces
-   * in prod under contention. This rule fails the build the moment that annotation drifts.
+   * The {@code participants} collection of {@code Mission} must keep
+   * {@code @OptimisticLock(excluded = true)}, so concurrent signups never bump {@link
+   * de.greluc.krt.profit.basetool.backend.model.Mission#getVersion()} and 409.
    */
   @Test
   void missionParticipantsCollectionMustExcludeOptimisticLock() {
@@ -1556,18 +1388,10 @@ class ArchitectureTest {
   }
 
   /**
-   * R6.a / SPEZIALKOMMANDO_PLAN.md §8.2 + §11 R4: {@link
-   * de.greluc.krt.profit.basetool.backend.model.PromotionTopic#owningSquadron} MUST stay typed
-   * {@link de.greluc.krt.profit.basetool.backend.model.Squadron}, never loosened to {@link
-   * de.greluc.krt.profit.basetool.backend.model.OrgUnit}. The V97 CHECK constraint blocks the
-   * column-level case (Postgres rejects an SK row in {@code promotion_topic.owning_squadron_id} via
-   * the trigger from §3.3), but a careless Java-side refactor that retypes the field to {@code
-   * OrgUnit} would let a service-layer setter accept a {@link
-   * de.greluc.krt.profit.basetool.backend.model.SpecialCommand} reference, bypass the V97
-   * application-side guard ({@code SpecialCommand} constructor sets {@code isPromotionEnabled =
-   * false}), and only fail at flush time with a generic constraint-violation 500 instead of a clean
-   * 400 at the service boundary. This rule catches the type loosening before the code compiles its
-   * way into prod.
+   * {@link de.greluc.krt.profit.basetool.backend.model.PromotionTopic#owningSquadron} must stay
+   * typed {@link de.greluc.krt.profit.basetool.backend.model.Squadron}, not {@link
+   * de.greluc.krt.profit.basetool.backend.model.OrgUnit}, so a {@link
+   * de.greluc.krt.profit.basetool.backend.model.SpecialCommand} can never be assigned.
    */
   @Test
   void promotionTopicOwningSquadronMustStayTypedSquadronNotOrgUnit() {
@@ -1614,25 +1438,11 @@ class ArchitectureTest {
   }
 
   /**
-   * Pins the second half of the signup concurrency contract: the {@code addParticipant} overloads
-   * must never call {@code missionRepository.save(...)} (or {@code saveAndFlush}). The save is the
-   * only realistic way to dirty the parent {@code mission} row from inside this method — and a
-   * dirty parent row would issue an {@code UPDATE mission} statement that, under contention, races
-   * between threads and surfaces as {@code ObjectOptimisticLockingFailureException}. Persisting the
-   * new participant via {@code missionParticipantRepository.save(participant)} is the supported
-   * path; Hibernate's cascade + dirty-check on the inverse-side collection handles the rest without
-   * touching the parent row.
-   *
-   * <p>The rule is structural: it walks the bytecode of every method named {@code addParticipant}
-   * declared on {@link de.greluc.krt.profit.basetool.backend.service.MissionParticipantService}
-   * (where the real signup logic lives since the L1 step-2 split, #920) <em>and</em> on the {@link
-   * de.greluc.krt.profit.basetool.backend.service.MissionService} facade (whose overloads are thin
-   * delegations that must likewise stay save-free), rejecting any direct call into {@code
-   * MissionRepository#save*}. Covering both classes keeps the guard pointed at the actual signup
-   * body — a rule scoped to the facade alone would pass vacuously after the method body moved.
-   * False positives (e.g. a future legitimate reason to re-save the mission inside the signup flow)
-   * should be carved out by renaming the method or by extracting the save into a dedicated helper
-   * that is itself documented.
+   * The {@code addParticipant} methods of {@link
+   * de.greluc.krt.profit.basetool.backend.service.MissionParticipantService} and {@link
+   * de.greluc.krt.profit.basetool.backend.service.MissionService} must not call {@code
+   * MissionRepository#save*}, which would dirty the mission row and cause 409s on concurrent
+   * signups.
    */
   @Test
   void missionServiceAddParticipantMustNotSaveMission() {
@@ -1733,31 +1543,14 @@ class ArchitectureTest {
   }
 
   /**
-   * Pure-helper classes under {@code integration.scwiki} that legitimately do NOT inject {@code
-   * ScWikiClient}. Empty since the cycle cleanup (ADR-0047) relocated the SC-Wiki sync
-   * orchestrators — including the curated {@code BlueprintOutputNameOverrides} map (#327) — to the
-   * {@code service.scwiki} package, leaving {@code integration.scwiki} with only {@code
-   * ScWikiClient} itself. Re-add a simple name here only if a new stateless, HTTP-free helper
-   * genuinely belongs beside the client in {@code integration.scwiki}; anything that talks to the
-   * Wiki must inject the client.
+   * Classes in {@code integration.scwiki} exempt from injecting {@code ScWikiClient}; empty. Only a
+   * stateless, HTTP-free helper belonging beside the client may be added.
    */
   private static final Set<String> SCWIKI_CLIENT_INJECTION_EXEMPT_SIMPLE_NAMES = Set.of();
 
   /**
-   * SC_WIKI_SYNC_PLAN.md §3.4 / R1 guard: every class in the {@code integration.scwiki} package
-   * MUST depend on {@code ScWikiClient}. The rule keeps the package focused on classes that
-   * interact with the SC Wiki HTTP API — a helper / DTO / scheduler that does not consult the
-   * client belongs elsewhere (most likely under {@code service.scwiki} once R3 ships).
-   *
-   * <p>{@code ScWikiClient} itself is exempt: it IS the dependency target. Future sync services
-   * ({@code ScWikiCommoditySyncService}, {@code ScWikiBlueprintSyncService}, …) added in R3+
-   * inherit the requirement automatically. Stateless pure-helper beans that encode SC-Wiki domain
-   * knowledge without making any HTTP call are also exempt via {@link
-   * #SCWIKI_CLIENT_INJECTION_EXEMPT_SIMPLE_NAMES} (e.g. {@code BlueprintOutputNameOverrides},
-   * #327).
-   *
-   * <p>Modelled on {@link #staffelScopedServicesMustWireOwnerScopeOrAuthHelper}: walks the declared
-   * fields of each candidate class and checks the raw-type FQN for the client.
+   * Every class in {@code integration.scwiki} except {@code ScWikiClient} itself must depend on
+   * {@code ScWikiClient}, unless listed in {@link #SCWIKI_CLIENT_INJECTION_EXEMPT_SIMPLE_NAMES}.
    */
   @Test
   void scWikiIntegrationClassesMustWireScWikiClient() {
@@ -1799,16 +1592,9 @@ class ArchitectureTest {
   }
 
   /**
-   * R6.a / SPEZIALKOMMANDO_PLAN.md §8.5: no new {@code @JoinColumn(name = "squadron_id")} outside
-   * the grandfathered legacy entities listed in {@link #SQUADRON_ID_COLUMN_GRANDFATHERED_FQNS}.
-   * Those columns are on the destructive-cleanup release's drop list — once {@code
-   * app_user.squadron_id} (and the matching {@code mission_participant.squadron_id} snapshot) are
-   * gone, every reference to that column name in JPA mappings becomes a Hibernate validation
-   * failure at boot. Re-introducing the name on a new entity (e.g. a fresh staffel-scoped aggregate
-   * that forgets to follow the {@code owning_squadron_id} convention) would silently re-create the
-   * legacy coupling. This rule keeps the migration one-way: only the allowlisted entities may
-   * reference the column; anything else has to use {@code owning_squadron_id} (legacy mirror) or
-   * {@code owning_org_unit_id} (new column).
+   * No entity outside {@link #SQUADRON_ID_COLUMN_GRANDFATHERED_FQNS} may map
+   * {@code @JoinColumn(name = "squadron_id")}; new aggregates use {@code owning_squadron_id} or
+   * {@code owning_org_unit_id}.
    */
   @Test
   void noNewJoinColumnReferencingSquadronIdOutsideGrandfatheredEntities() {
@@ -1898,11 +1684,8 @@ class ArchitectureTest {
   }
 
   /**
-   * REQ-BANK-008 (org-unit independence): bank authorization evaluates only the two bank roles and
-   * the grant table. No bank class may consult {@code OwnerScopeService} — org-unit scoping,
-   * contextual authorities and the admin pin must have zero influence on bank decisions, by
-   * construction. (The {@code BankAccount.orgUnit} reference is an owner <em>label</em> resolved
-   * via {@code OrgUnitRepository}, not a scope, and stays allowed.)
+   * No bank class may use {@code OwnerScopeService}; bank authorization depends only on the bank
+   * roles and grants (REQ-BANK-008).
    */
   @Test
   void bankClassesMustNotConsultOrgUnitScope() {
@@ -1919,18 +1702,8 @@ class ArchitectureTest {
   }
 
   /**
-   * Epic #692 / REQ-ORG-015 (the HARD INVARIANT) + REQ-SEC cascading-scope security: the
-   * cascading-scope expansion ({@code OrgUnitCascadeService}) must be a pure function of the
-   * caller's memberships plus the persisted hierarchy — it must NEVER consult the security context
-   * (admin status). If it could read {@code AuthHelperService.isAdmin()} it could branch on admin
-   * and route an OL/Bereich principal through an admin-all grant; pinning the absence of that
-   * dependency keeps the cascade strictly officer-equivalent and leaves the {@code
-   * adminAllScope=true} branch reachable only from the genuine admin path in {@code
-   * OwnerScopeService}. This is the durable, structural guarantee behind "an OL/Bereich principal
-   * can never satisfy {@code isAdmin()}" — the cascade literally cannot know whether the caller is
-   * an admin, so its output (a concrete org-unit-id union) can never be an admin marker. The
-   * runtime value invariant (the cascade path always builds {@code adminAllScope=false}) is pinned
-   * by {@code OwnerScopeServiceTest} ({@code cascade_neverSetsAdminAllScope}).
+   * {@code OrgUnitCascadeService} must not consult the security context, so the cascading scope is
+   * a pure function of memberships and hierarchy and can never yield an admin scope (REQ-ORG-015).
    */
   @Test
   void cascadeServiceMustNotConsultTheSecurityContext() {
@@ -1949,14 +1722,9 @@ class ArchitectureTest {
   }
 
   /**
-   * Epic #800 / REQ-ROLE-004: the delegated-appointment authoriser ({@code
-   * OrgRoleManagementSecurityService}) must compute its verdict purely from the caller's own
-   * membership ranks plus the persisted hierarchy. It must NEVER depend on {@code
-   * OwnerScopeService} — that bean folds in the admin-pin header, the admin-all scope and the
-   * cascading reach, none of which may leak into a delegated appointment verdict (a Bereichsleiter
-   * pinned to a subordinate unit must not thereby gain appointment rights there). The "no
-   * SecurityContextHolder" half of the invariant is already covered globally by {@link
-   * #serviceLayerShouldNotReachIntoSecurityContext()}.
+   * {@code OrgRoleManagementSecurityService} must not depend on {@code OwnerScopeService}, so
+   * delegated appointment verdicts use only the caller's own membership ranks and the hierarchy
+   * (REQ-ROLE-004).
    */
   @Test
   void delegatedRoleAuthoriserMustNotConsultOwnerScope() {
@@ -1975,12 +1743,8 @@ class ArchitectureTest {
   }
 
   /**
-   * ADR-0020 (org-unit-aware bank seam): the bank stays org-unit-blind (see {@link
-   * #bankClassesMustNotConsultOrgUnitScope()}), and the officer/lead features (REQ-BANK-021/-022)
-   * route their org-unit logic through exactly one sanctioned, deliberately non-{@code Bank*}-named
-   * bridge — {@code OrgUnitBankAccessService}. Any class that couples {@code OwnerScopeService} to
-   * the bank-account repository must be that seam, so a future accidental bridge fails the build
-   * instead of silently eroding REQ-BANK-008.
+   * Only {@code OrgUnitBankAccessService} may couple {@code OwnerScopeService} with the
+   * bank-account repository (ADR-0020), keeping the rest of the bank org-unit-blind.
    */
   @Test
   void orgUnitAwareBankSeamIsContainedToOneClass() {
@@ -2018,12 +1782,8 @@ class ArchitectureTest {
   }
 
   /**
-   * REQ-BANK-004 / ADR-0010/0039 (append-only ledgers): {@code bank_transaction}, {@code
-   * bank_posting} and the holder ledger {@code bank_holder_posting} rows are never updated or
-   * deleted — corrections are {@code REVERSAL} transactions. Two static pins: the ledger
-   * repositories declare no {@code @Modifying} methods, and no production class calls a {@code
-   * delete*} method on them (the inherited {@code JpaRepository} deleters exist but must stay
-   * unused).
+   * The bank ledger repositories stay insert-only (REQ-BANK-004): they declare no
+   * {@code @Modifying} methods, and no production class calls their {@code delete*} methods.
    */
   @Test
   void bankLedgerRepositoriesMustStayInsertOnly() {

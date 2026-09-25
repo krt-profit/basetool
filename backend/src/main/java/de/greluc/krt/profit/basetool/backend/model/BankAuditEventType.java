@@ -39,14 +39,9 @@ public enum BankAuditEventType {
   ACCOUNT_REOPENED,
 
   /**
-   * An org-unit bank account's <em>derived</em> responsible holder (Kontoverantwortliche/r,
-   * REQ-BANK-034) changed because the underlying org-unit leadership changed — a new/removed
-   * Staffelleiter, SK-Lead, Bereichsleiter or OL member (and the Profit-Bereichsleiter ripple onto
-   * the collegial {@code CARTEL} / {@code CARTEL_BANK} sets, REQ-BANK-047). The acting user is the
-   * event's actor (whoever performed the leadership change); the details payload carries the old
-   * and new responsible-holder user-id sets (system identifiers, not PII — REQ-BANK-012), and
-   * {@code targetUserId} is the sole new holder when the set is a singleton, else null (collegial
-   * account).
+   * An account's derived responsible holder (REQ-BANK-034) changed because the underlying org-unit
+   * leadership changed. The details carry the old and new holder user-id sets; {@code targetUserId}
+   * is the new holder only when the set is a singleton.
    */
   ACCOUNT_RESPONSIBLE_CHANGED,
 
@@ -72,11 +67,9 @@ public enum BankAuditEventType {
   DEPOSIT_BOOKED,
 
   /**
-   * A split {@code DEPOSIT} was booked (REQ-BANK-043): one transaction crediting the named account
-   * the remainder and distributing a percentage of the gross evenly across all active squadron
-   * accounts. One summarizing event (like {@code WIPE_RESET_EXECUTED}), not one per credited
-   * account; the details payload carries the gross, holder handle, percentage and target count — no
-   * free text or PII beyond the holder handle the plain deposit event already records.
+   * A split {@code DEPOSIT} was booked (REQ-BANK-043), crediting the named account the remainder
+   * and distributing a percentage evenly across all active squadron accounts. One summarising event
+   * carrying gross, holder handle, percentage and target count.
    */
   DEPOSIT_SPLIT_BOOKED,
 
@@ -93,8 +86,8 @@ public enum BankAuditEventType {
   HOLDER_TRANSFER,
 
   /**
-   * Legacy: an intra-account holder rebooking (the pre-ADR-0039 model, REQ-BANK-011 variant 2). No
-   * longer produced — kept so historical audit rows still render.
+   * An intra-account holder rebooking (REQ-BANK-011). Not emitted; retained so stored audit rows
+   * still render.
    */
   HOLDER_REBOOKED,
 
@@ -208,16 +201,8 @@ public enum BankAuditEventType {
   CARTEL_APPROVAL_TIERS_CLEARED,
 
   /**
-   * An admin granted a member's Art. 17 wish and anonymised that member's surviving handle
-   * snapshots in the bank's records (REQ-SEC-062): {@code bank_audit_event.actor_handle}, {@code
-   * bank_transaction.counterparty_handle} and the four handle columns on {@code
-   * bank_booking_request}.
-   *
-   * <p>The one event type in this enum that records a <b>mutation of the trail itself</b>. It is
-   * written after the update and is therefore not anonymised by it, so the anonymisation always
-   * leaves a receipt — the same property that makes {@link #AUDIT_LOG_PURGED} safe. Its details
-   * payload carries the per-column row counts and never the handle that was removed: writing the
-   * value back would undo the erasure in the very row that records it.
+   * An admin anonymised a member's surviving handle snapshots in the bank's records (REQ-SEC-062).
+   * Written after the update; the details carry per-column row counts, never the removed handle.
    */
   HANDLE_SNAPSHOTS_ANONYMISED
 }

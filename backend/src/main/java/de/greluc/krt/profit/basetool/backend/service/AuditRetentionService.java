@@ -29,22 +29,11 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 
 /**
- * Bounds how long the activity and bank audit trails are kept (REQ-AUDIT-006).
+ * Bounds how long the activity and bank audit trails are kept by periodically purging old rows
+ * (REQ-AUDIT-006).
  *
- * <p>Every audit row carries a denormalised actor-handle snapshot that deliberately survives the
- * user's deletion (REQ-AUDIT-001) — which is what makes the trail useful after a member leaves, and
- * also what makes an unbounded trail a permanent record of a named person. The organisation is
- * under no legal obligation to retain these, so "keep forever" had nothing holding it up except the
- * absence of anything that removed them: REQ-AUDIT-004's purge is a manual admin action, and the
- * repositories said so in as many words — <em>there is no automatic retention sweep</em>.
- *
- * <p>This is that sweep. It reuses the manual purge rather than issuing its own deletes, so the two
- * paths cannot diverge in what they remove or in the {@code *_AUDIT_PURGED} marker they leave
- * behind, and so an automatic purge is as visible in the trail as a deliberate one.
- *
- * <p><b>Each domain is purged in its own transaction</b> — {@code purgeBefore} opens one per call —
- * so one domain that cannot be purged does not roll back the domains already done, and a sweep
- * interrupted halfway keeps its committed work.
+ * <p>Reuses the manual admin purge, so an automatic purge leaves the same {@code *_AUDIT_PURGED}
+ * marker. Each domain is purged in its own transaction.
  */
 @Service
 @RequiredArgsConstructor
@@ -59,17 +48,11 @@ public class AuditRetentionService {
   /**
    * Purges every activity-audit domain and the bank audit trail of rows older than the cutoff.
    *
-   * <p>Each domain is asked first whether it holds anything that old. That guard is not an
-   * optimisation: {@code purgeBefore} records its marker event unconditionally, which is correct
-   * for an admin who deliberately purged and found nothing, and wrong for a job that runs every day
-   * — without the guard this sweep would mint ten marker rows a day forever, growing the very table
-   * it exists to bound.
-   *
-   * <p>Failures are per domain and never abort the run: one area that cannot be purged is logged
-   * and left for the next sweep.
+   * <p>Domains holding no such rows are skipped, so no empty purge marker is written. A failing
+   * domain is logged and does not abort the run.
    *
    * @param cutoff purge audit rows that occurred strictly before this instant
-   * @return the total number of audit rows deleted this run, across all domains and the bank trail
+   * @return the total number of audit rows deleted across all domains and the bank trail
    */
   public int purgeOlderThan(@NotNull Instant cutoff) {
     int total = 0;

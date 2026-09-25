@@ -34,17 +34,9 @@ import org.springframework.security.web.access.AccessDeniedHandlerImpl;
 import org.springframework.security.web.csrf.CsrfException;
 
 /**
- * {@link AccessDeniedHandler} that counts CSRF-token rejections into {@code
- * basetool_csrf_rejections_total} (unlabelled) before delegating to the default handler, which
- * still writes the usual {@code 403}.
- *
- * <p>Without this counter a systematic CSRF-wiring regression is invisible: {@code krtFetch}'s
- * silent single-retry self-heal (re-fetch {@code GET /csrf}, retry the write once) turns a
- * structural failure into what merely looks like intermittent failed writes. The counter makes the
- * rejection <b>rate</b> observable so {@code CsrfRejectionSpike} can distinguish a genuine wiring
- * regression from the occasional stale token (#1041 item 18). Only {@link CsrfException} (and its
- * subtypes {@code MissingCsrfTokenException} / {@code InvalidCsrfTokenException}) is counted; every
- * other {@link AccessDeniedException} passes through uncounted.
+ * {@link AccessDeniedHandler} that counts {@link CsrfException} rejections into {@code
+ * basetool_csrf_rejections_total} before delegating to the default 403 handler; other {@link
+ * AccessDeniedException}s pass through uncounted.
  */
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 public class CsrfMetricsAccessDeniedHandler implements AccessDeniedHandler {
@@ -67,8 +59,7 @@ public class CsrfMetricsAccessDeniedHandler implements AccessDeniedHandler {
   }
 
   /**
-   * Counts the rejection when it is a CSRF failure, then delegates the {@code 403} response
-   * unchanged.
+   * Counts the rejection when it is a CSRF failure, then delegates the {@code 403} response.
    *
    * @param request the current HTTP request
    * @param response the HTTP response the delegate writes the {@code 403} to

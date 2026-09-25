@@ -36,25 +36,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Functional flow: edit an existing MATERIAL job order through the detail-page edit modal and
- * verify the change persists.
- *
- * <p>The edit modal ({@code #edit-modal}) is gated {@code sec:authorize="hasRole('LOGISTICIAN')"}
- * and posts to {@code POST /orders/{id}/update}; the controller relays it to {@code PUT
- * /api/v1/orders/{id}} (also LOGISTICIAN-gated). The modal is pre-populated by the page controller
- * from the loaded order — its material rows, handle and comment — so the test only mutates the
- * material amount and the comment, then asserts both round-trip. The actor is {@code test-admin}:
- * Admin reaches {@code LOGISTICIAN} through the role hierarchy, so the modal renders for it without
- * a contextual logistician grant.
- *
- * <p>Verification reads the order back through the backend ({@code GET /api/v1/orders/{id}}) rather
- * than re-asserting on the reloaded detail page: that avoids both a second post-submit navigation
- * (which WebKit can abort under CI load — HTTP/2 {@code INTERNAL_ERROR}) and the strict-mode
- * ambiguity that the comment text shows in two places on the reloaded page (the display span and
- * the modal's pre-filled textarea). The read-back is <em>polled</em> until it reflects the new
- * amount rather than being gated on the submit's own POST/navigation event, which WebKit likewise
- * drops intermittently under CI load. The UI still drove the change end to end; the polled
- * read-back just proves it landed.
+ * Edits a MATERIAL job order through the detail-page edit modal and verifies the new amount and
+ * comment via a polled backend read-back. Runs as {@code test-admin}, which reaches {@code
+ * LOGISTICIAN} through the role hierarchy.
  */
 @Tag("e2e")
 class JobOrderEditE2eTest {
@@ -149,12 +133,9 @@ class JobOrderEditE2eTest {
   }
 
   /**
-   * Polls the order read-back ({@code GET /api/v1/orders/{id}}) until its first material's amount
-   * reaches {@code expectedAmount}, then returns that order JSON. Used in place of waiting on the
-   * edit submit's POST/navigation event, which WebKit drops intermittently under CI load. The first
-   * read happens immediately; each subsequent read backs off by {@link #EDIT_POLL_BACKOFF_MILLIS},
-   * up to {@link #EDIT_POLL_ATTEMPTS} reads. On timeout the last-seen order is returned so the
-   * caller's assertions report the actual persisted amount rather than a poll-internal error.
+   * Polls {@code GET /api/v1/orders/{id}} until the first material's amount reaches {@code
+   * expectedAmount}, up to {@link #EDIT_POLL_ATTEMPTS} reads spaced by {@link
+   * #EDIT_POLL_BACKOFF_MILLIS}.
    *
    * @param page the page, used only to pace the poll via {@code waitForTimeout}
    * @param orderId the order to read back

@@ -55,13 +55,9 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Pure-Mockito unit tests for {@link P4kImportJobService}: the two repositories are mocked and a
- * real {@link SimpleMeterRegistry} captures the terminal-outcome counter, no Spring context and no
- * database. {@code jobRepository.save} is stubbed to assign an id, standing in for the Hibernate
- * {@code GenerationType.UUID} generator, so the create paths can wire the payload to the persisted
- * job id. Covers job creation (preview + apply-from-preview with its guards), the lifecycle
- * transitions (with their {@code basetool_p4k_import_jobs_total} increments), payload reclaim,
- * prune delegation and the startup orphan reconciliation.
+ * Unit tests for {@link P4kImportJobService} with mocked repositories and a real {@link
+ * SimpleMeterRegistry}: job creation and its guards, lifecycle transitions with the outcome
+ * counter, payload reclaim, pruning and the startup orphan reconciliation.
  */
 @ExtendWith(MockitoExtension.class)
 class P4kImportJobServiceTest {

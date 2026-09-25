@@ -47,22 +47,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
 
 /**
- * Pins the {@code 304 Not Modified} branch that H6 added to every migrated UEX sync service.
+ * Pins the {@code 304 Not Modified} branch of every UEX sync service: an unchanged feed logs an
+ * INFO naming the 304, no WARN or ERROR, and changes nothing locally.
  *
- * <p>Before this, {@link UexClient} discarded the {@code notModified} flag it had already computed,
- * so an unchanged feed reached the sync services as a bare empty list — indistinguishable from a
- * broken one. All of them then emitted the same alarming {@code WARN No X received from UEX API.
- * Aborting…} for a perfectly healthy fully-cached night. <b>The log level is the contract here</b>,
- * so each case asserts it explicitly: an unchanged catalogue must produce an INFO naming the 304
- * and <em>no</em> WARN or ERROR at all.
- *
- * <p>The second half of the contract is that a 304 changes nothing locally. Every service is
- * constructed with <b>null repositories</b> on purpose: if a 304 run reached a single query, upsert
- * or orphan sweep, it would fail with a {@link NullPointerException} instead of passing. That is a
- * stronger statement than a {@code verifyNoInteractions} on a mock, and it needs no per-service
- * repository fixture. Only the two services whose 304 branch legitimately does touch a collaborator
- * get one: {@link UexCategoryRefService}, which must still return the persisted rows, and {@link
- * UexItemPriceSyncService}, which reads its feature flag off a real {@link UexProperties}.
+ * <p>Services are built with {@code null} repositories, so any query or write on a 304 run fails
+ * with a {@link NullPointerException}. Only {@link UexCategoryRefService} and {@link
+ * UexItemPriceSyncService} get the collaborator their 304 branch legitimately uses.
  */
 @ExtendWith(MockitoExtension.class)
 class UexSyncNotModifiedTest {

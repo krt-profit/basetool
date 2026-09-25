@@ -64,11 +64,7 @@ class TermsControllerTest {
   }
 
   /**
-   * The wording the backend now serves, as small as the assertions allow.
-   *
-   * <p>Structure over length: what the page has to prove is that it renders whatever sections the
-   * endpoint reports, including a paragraph that carries bullets and one that does not — a fixture
-   * reproducing all fourteen real sections would assert nothing extra.
+   * Returns a minimal two-section terms document, one paragraph with bullets and one without.
    *
    * @return a two-section document
    */
@@ -99,14 +95,7 @@ class TermsControllerTest {
   }
 
   /**
-   * A backend that cannot be read renders the notice, not the error view.
-   *
-   * <p>The template's {@code terms == null} branch used to cover only a {@code 200} with an empty
-   * body — a case that does not occur — because the controller caught nothing. {@code executeGet}
-   * raises {@link BackendServiceException} for every 4xx/5xx and for an open circuit, which is the
-   * case the template comment and the CHANGELOG both describe. Asserted here because this is the
-   * one page reachable without a session and the one every member must read before consenting: an
-   * error view there is the worst of the available answers.
+   * A backend failure renders the notice, not the error view.
    *
    * @throws Exception when the request could not be performed
    */
@@ -127,14 +116,7 @@ class TermsControllerTest {
                             "Sie gelten zwischen Betreiber und Nutzer."))));
   }
 
-  /**
-   * The page shows the wording the backend served, not a copy of its own.
-   *
-   * <p>This is the assertion the move exists for: the clause text, the section headings and the
-   * bullets all have to come out of the response body, because a page that still rendered from a
-   * local bundle would pass the view-name test above unchanged while showing different terms from
-   * the ones consent is recorded against.
-   */
+  /** The page renders the headings, clauses and bullets served by the backend, not a local copy. */
   @Test
   void rendersTheDocumentServedByTheBackend() throws Exception {
     mockMvc

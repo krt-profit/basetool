@@ -65,15 +65,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /**
- * Pure-Mockito unit tests for the Variante-C per-allocation write methods of {@link
- * InventoryItemService} (REQ-INV-027): {@code addAllocation} / {@code changeAllocation} / {@code
- * removeAllocation}. Every guard is pinned — the over-allocation 422 (rule R5), the
- * personal-no-assignment reject, the material-required gate, the duplicate-target reject, the
- * whole-number-for-PIECE reject, the optimistic-lock echo, and the not-found paths — because each
- * is a silent regression at the type level.
- *
- * <p>The three write methods live on the facade and use the injected mocks directly (they never
- * touch the aggregation / checkout sub-services), so no delegate wiring is needed.
+ * Mockito unit tests for the per-allocation write methods of {@link InventoryItemService}
+ * (REQ-INV-027): {@code addAllocation}, {@code changeAllocation} and {@code removeAllocation},
+ * covering every guard, the optimistic-lock echo and the not-found paths.
  */
 @ExtendWith(MockitoExtension.class)
 class InventoryItemServiceAllocationTest {
@@ -336,8 +330,8 @@ class InventoryItemServiceAllocationTest {
   }
 
   /**
-   * Builds a managed-like game-item stock row sharing the fixture entry shape: gameItem set,
-   * material and quality {@code null} (the V220 catalog XOR), non-personal, version 1.
+   * Builds a managed-like game-item stock row: game item set, material and quality {@code null},
+   * non-personal, version 1.
    *
    * @param amount the row's amount.
    * @param gameItemId the stocked game item's id.

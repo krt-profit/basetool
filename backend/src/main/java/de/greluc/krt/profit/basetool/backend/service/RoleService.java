@@ -44,14 +44,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Manages the {@code role} table that holds the local copy of every Keycloak realm role plus the
- * project-specific permission set attached to each role.
- *
- * <p>The role names are populated by {@link
- * de.greluc.krt.profit.basetool.backend.config.DataInitializer} at boot (matched by {@code code},
- * not by {@code name} — see CLAUDE.md). This service only handles the editable subset: description
- * and permission set. Cache is the {@code roles} cache, evicted on every write so a refreshed
- * permission set takes effect immediately for the next authentication.
+ * Manages the {@code role} table: the local copy of every Keycloak realm role with its permission
+ * set. Only description and permissions are editable; writes evict the {@code roles} cache.
  */
 @Service
 @RequiredArgsConstructor
@@ -60,17 +54,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class RoleService {
 
   /**
-   * The closed permission vocabulary the audit payload and the log line are allowed to name,
-   * derived by reflection from the {@code public static final String} constants {@link Permissions}
-   * declares. Deriving it rather than copying it is the point: the earlier hand-maintained list
-   * silently excluded every permission constant added after it was written, so a grant or revoke of
-   * such a permission produced an audit row reading {@code added=- removed=-}.
-   *
-   * <p>The endpoint accepts an arbitrary {@code Set<String>} body, so a permission string is
-   * client-supplied text; rendering the difference through this fixed set keeps free text out of
-   * the {@code details} payload (REQ-AUDIT-001) and out of the logger (log forging). Values outside
-   * the vocabulary are still applied — that behaviour is unchanged — and are reported as the {@code
-   * unknownAdded} / {@code unknownRemoved} counts, never by value.
+   * The permission names audit rows and log lines may name, read from the constants of {@link
+   * Permissions}. Values outside it are still applied but reported only as counts (REQ-AUDIT-001).
    */
   private static final Set<String> KNOWN_PERMISSIONS = readPermissionVocabulary();
 
@@ -82,15 +67,8 @@ public class RoleService {
   private final AuthHelperService authHelperService;
 
   /**
-   * Paged role list, every role's permission set initialised.
-   *
-   * <p>The page is cached and outlives this transaction, and the caller maps each role's
-   * permissions after it has committed, so the collections are initialised here: the first {@link
-   * Hibernate#initialize(Object)} batch-loads the whole page's permissions in one query under
-   * {@code default_batch_fetch_size}. The repository's former {@code @EntityGraph} on the paged
-   * {@code findAll} did the same by fetch-joining a collection into a paged query, which forces
-   * Hibernate to paginate in memory (HHH90003004) and fails outright under {@code
-   * fail_on_pagination_over_collection_fetch} (REQ-DATA-003).
+   * Returns a cached page of roles with every role's permission set initialised, batch-loaded
+   * (REQ-DATA-003).
    *
    * @param pageable page request
    * @return cached page result, permissions initialised
@@ -103,33 +81,13 @@ public class RoleService {
   }
 
   /**
-   * Replaces the permission set for the named role. Used by the role-management page; the
-   * JWT-to-authorities converter re-reads permissions on every authentication so the change
-   * propagates without a server restart.
+   * Replaces the permission set of the named role; takes effect on the next authentication.
    *
-   * <p>"Rollen" is an audited area (REQ-AUDIT-001), and this is the one mutation in it that
-   * rewrites what a role may DO rather than who holds it. {@code role_permissions} keeps current
-   * state only, so the previous grant and the acting admin are unrecoverable from the table itself
-   * — hence a {@link AuditEventType#ROLE_PERMISSIONS_CHANGED} row carrying the symmetric difference
-   * (added / removed, over the closed {@link Permissions} vocabulary) plus the {@code unknownAdded}
-   * / {@code unknownRemoved} tallies of the changed members that vocabulary cannot name, and one
-   * INFO line with the same four values and the actor's {@code sub}. INFO, not WARN: an admin
-   * editing a role is the intended use of the screen, not an anomaly. The role's free-text
-   * description and the list of affected users are deliberately absent from both.
+   * <p>Records a {@link AuditEventType#ROLE_PERMISSIONS_CHANGED} event and an INFO line with the
+   * added and removed permissions from the {@link Permissions} vocabulary plus counts of unknown
+   * ones (REQ-AUDIT-001). Concurrent edits of the same role collide with a 409.
    *
-   * <p>The tallies exist so a change is never invisible: a permission outside the vocabulary is
-   * persisted like any other, and without a count the audit row for such an edit would read {@code
-   * added=- removed=-} as though nothing had happened. A non-zero {@code unknown*} value therefore
-   * means "this edit moved something this build cannot name" — the value itself stays out of both
-   * sinks because it is client-supplied free text.
-   *
-   * <p>Concurrency: the role row carries a JPA {@code @Version}, so two admins committing edits to
-   * the same role still collide into a 409 at flush. The write API takes no client-echoed version
-   * (the request body is a bare permission set), so no {@code support.OptimisticLock} check applies
-   * here; the snapshot below is read before the mutation so the audited difference is the one this
-   * transaction actually applied.
-   *
-   * @param roleName role display name (looked up case-sensitively via repository's findByName)
+   * @param roleName role display name, matched case-sensitively
    * @param permissions new permission set
    * @return the persisted role
    * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when no role matches
@@ -166,24 +124,12 @@ public class RoleService {
   }
 
   /**
-   * Splits the members of {@code from} that {@code to} does not contain into the ones the closed
-   * {@link #KNOWN_PERMISSIONS} vocabulary can name — sorted, so the rendered difference is stable
-   * across calls — and a plain count of the ones it cannot.
-   *
-   * <p>Membership in {@code to} is tested first for every non-{@code null} candidate, so a
-   * permission outside the vocabulary that is present on both sides stays uncounted: an unchanged
-   * leftover must not read as a change on every subsequent save.
-   *
-   * <p>The {@code null} check runs before any lookup into {@code to}, which keeps a stray {@code
-   * null} element in the request body (the endpoint takes a raw {@code Set<String>}) from turning
-   * the audit composition into a 500 on an otherwise valid admin edit — an immutable {@code Set}
-   * throws on {@code contains(null)}. Such an element counts as out-of-vocabulary even in the
-   * practically unreachable case where {@code to} carries one too.
+   * Splits the members of {@code from} missing from {@code to} into sorted names known to {@link
+   * #KNOWN_PERMISSIONS} and a count of unknown ones. A {@code null} element counts as unknown.
    *
    * @param from the side whose exclusive members are wanted
    * @param to the side subtracted from it
-   * @return the sorted in-vocabulary difference plus the number of out-of-vocabulary members; both
-   *     parts possibly empty / zero
+   * @return the sorted in-vocabulary difference plus the out-of-vocabulary count
    */
   @NotNull
   private static PermissionDifference difference(
@@ -205,9 +151,7 @@ public class RoleService {
   }
 
   /**
-   * Renders one side of the difference as a comma-separated list for the audit payload and the log
-   * line, collapsing the empty case to {@link #NONE} so the {@code key=value} detail never ends up
-   * with an empty value.
+   * Joins one side of the difference with commas for the audit payload and the log line.
    *
    * @param permissions the sorted difference to render
    * @return the joined permission names, or {@code "-"} when there are none
@@ -218,17 +162,11 @@ public class RoleService {
   }
 
   /**
-   * Reads the audited permission vocabulary out of {@link Permissions} by reflection over its
-   * declared {@code public static final String} constants, so the vocabulary <em>is</em> the
-   * constant holder instead of a copy that can fall behind it.
-   *
-   * <p>Synthetic fields (coverage instrumentation injects one) and any non-public, non-static or
-   * non-{@code String} member are skipped. {@link Permissions} is a public final holder of public
-   * constants in this module, so the read needs no {@code setAccessible} call.
+   * Reads the {@code public static final String} constants of {@link Permissions} by reflection,
+   * skipping synthetic fields.
    *
    * @return the immutable set of permission strings the audit payload and the log line may name
-   * @throws IllegalStateException if a constant cannot be read, which would leave the audit trail
-   *     permanently blind to that permission
+   * @throws IllegalStateException if a constant cannot be read
    */
   @NotNull
   private static Set<String> readPermissionVocabulary() {
@@ -269,14 +207,11 @@ public class RoleService {
   }
 
   /**
-   * One side of the permission difference, split by whether the closed {@link #KNOWN_PERMISSIONS}
-   * vocabulary can name a member: named members reach the audit row and the log line verbatim, the
-   * rest only as a count, because an unnamed member is client-supplied free text and must not enter
-   * either sink (REQ-AUDIT-001, log forging).
+   * One side of a permission difference: members named in {@link #KNOWN_PERMISSIONS}, and a count
+   * of the rest, which never reach the audit or log (REQ-AUDIT-001).
    *
-   * @param named the sorted in-vocabulary members, safe to render by value
-   * @param unknownCount how many changed members fell outside the vocabulary; the sole trace such a
-   *     member leaves, and non-zero only when the edit really moved one
+   * @param named the sorted in-vocabulary members
+   * @param unknownCount how many changed members fell outside the vocabulary
    */
   private record PermissionDifference(@NotNull List<String> named, int unknownCount) {}
 }

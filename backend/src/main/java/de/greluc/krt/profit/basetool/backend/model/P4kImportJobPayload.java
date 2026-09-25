@@ -29,11 +29,9 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * The raw uploaded catalog bytes for one {@link P4kImportJob}, split into a 1:1 side table keyed by
- * the job id (= {@link #jobId}, not generated) so that listing / polling jobs never drags the
- * multi-MB upload through the persistence context. Written once when the job is enqueued and read
- * once by the worker; the {@code job_id} foreign key is {@code ON DELETE CASCADE}, so pruning a job
- * drops its payload with it.
+ * The raw uploaded catalog bytes of one {@link P4kImportJob}, in a 1:1 side table keyed by the job
+ * id ({@link #jobId}, not generated) so listing and polling jobs never loads the upload. Deleted
+ * with its job via {@code ON DELETE CASCADE}.
  */
 @Entity
 @Table(name = "p4k_import_job_payload")

@@ -33,20 +33,10 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 /**
- * The ratchet behind REQ-API-004's fetch-or-throw rule (BE-SIMP-01): a service-layer lookup raises
- * its 404 through {@link Entities#require}, never through a hand-written {@code
- * optional.orElseThrow(() -> new NotFoundException(…))}.
+ * Fails the build on any hand-written {@code orElseThrow(() -> new NotFoundException(…))} outside
+ * {@link Entities}, enforcing fetch-or-throw via {@link Entities#require} (REQ-API-004).
  *
- * <p>The 312 hand-written sites were migrated on 2026-09-23, message by message, so the ceiling is
- * zero — 287 that threw {@code NotFoundException} and 25 that threw JPA's {@code
- * jakarta.persistence.EntityNotFoundException}, which {@code GlobalExceptionHandler.handleNotFound}
- * answers with the identical 404 problem. It may only ever go down: a new hand-written site fails
- * the build here and names its file and line. {@link Entities} itself is the one place the idiom is
- * allowed — it is the implementation.
- *
- * <p>A source scan rather than an ArchUnit rule on purpose: the compiled form of the lambda is an
- * anonymous synthetic method, which ArchUnit cannot tell apart from any other {@code
- * NotFoundException} construction.
+ * <p>The allowed count is zero; each offending file and line is named.
  */
 class EntitiesRequireRatchetTest {
 
@@ -58,10 +48,8 @@ class EntitiesRequireRatchetTest {
   private static final int CEILING = 0;
 
   /**
-   * The idiom, tolerant of the line breaks google-java-format puts into a long chain, of a
-   * fully-qualified name — 37 sites were written that way and only surfaced once their names were
-   * shortened to imports — and of JPA's {@code EntityNotFoundException}, which answers the same
-   * 404.
+   * Matches the hand-written idiom, tolerating line breaks, fully-qualified names and JPA's {@code
+   * EntityNotFoundException}.
    */
   private static final Pattern HAND_WRITTEN =
       Pattern.compile(

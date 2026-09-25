@@ -47,43 +47,16 @@ import org.springframework.boot.ssl.SslBundles;
 import org.springframework.core.env.Environment;
 
 /**
- * Unit tests for the frontend's {@link BackendHealthIndicator}. The indicator is driven against an
- * in-process {@link MockWebServer} so the backend's {@code /actuator/health/readiness} response —
- * including failure modes such as 4xx/5xx upstream codes and connection-refused — can be staged
- * deterministically without a real backend.
+ * Unit tests for {@link BackendHealthIndicator} against a {@link MockWebServer}: a 2xx readiness
+ * answer is {@link Status#UP}; a 4xx/5xx answer or a transport failure is {@link Status#DOWN} with
+ * a detail.
  *
- * <p>Three behaviour classes are covered:
- *
- * <ol>
- *   <li>Happy path — a 2xx response from {@code /actuator/health/readiness} yields {@link
- *       Status#UP}.
- *   <li>Upstream error — a 4xx/5xx response yields {@link Status#DOWN} with the upstream status
- *       code attached as a detail for log correlation; this models the case where the backend is
- *       reachable but its OWN readiness is degraded (e.g. backend cannot reach Keycloak, Postgres,
- *       or its disk).
- *   <li>Transport failure — the upstream port is closed (server shut down before the probe), so the
- *       {@code JdkClientHttpRequestFactory} surfaces an I/O failure that maps to {@link
- *       Status#DOWN} with the exception class as a detail.
- * </ol>
- *
- * <p>Each test pins the request path to {@code /actuator/health/readiness} so a future refactor
- * that accidentally pointed the indicator at the bare {@code /actuator/health} (different
- * semantics) or some other actuator endpoint would fail loud. The trailing-slash trimming in the
- * constructor is also exercised so a {@code BACKEND_URL=https://backend:11261/} setup cannot
- * produce a double-slash URL.
- *
- * <p>End-to-end TLS is NOT exercised here — {@link MockWebServer} defaults to plain HTTP, which is
- * sufficient for the behavioural coverage above. The per-profile trust resolution added by audit
- * L-5 is covered separately below: the missing-bundle fallback (which must degrade to trust-all,
- * never the default JVM trust store) and the pinned-path hostname-skip routing inside {@code
- * HostnameAgnosticTrustManager}.
+ * <p>Also pins the request path {@code /actuator/health/readiness}, the trailing-slash trimming and
+ * the per-profile trust resolution.
  */
 class BackendHealthIndicatorTest {
 
-  /**
-   * Short timeouts keep transport-failure tests millisecond-fast — the production indicator uses
-   * 2&nbsp;s / 3&nbsp;s but we do not need those margins against an in-process server.
-   */
+  /** Short connect timeout that keeps transport-failure tests fast. */
   private static final Duration TEST_CONNECT_TIMEOUT = Duration.ofMillis(500);
 
   private static final Duration TEST_READ_TIMEOUT = Duration.ofMillis(500);

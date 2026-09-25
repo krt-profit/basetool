@@ -52,16 +52,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Regression tests for the optimistic-lock {@code @Version} write-back on the in-place inventory
- * edits (epic #571 / #577). The in-place edits ({@code updateNote} and the reducing {@code
- * bookOutInventoryItem}) return the item DTO whose version the frontend writes back onto every
- * control in the same row. Because the service is {@code @Transactional} (the commit — and thus the
- * {@code @Version} increment — happens after the method returns), the DTO must be mapped from a
- * {@code saveAndFlush}, not a plain {@code save}: a plain {@code save} leaves the version
- * unflushed, so the response carries the STALE version and the user's next in-place edit of the
- * same row fails with {@code ObjectOptimisticLockingFailureException} (HTTP 409). These tests pin
- * {@code saveAndFlush}, mirroring the {@code verify(...).flush()} guard in {@code
- * InventoryItemServiceBulkCheckoutTest}.
+ * Verifies that in-place inventory edits ({@code updateNote}, reducing {@code
+ * bookOutInventoryItem}) map their DTO from {@code saveAndFlush}, so the returned {@code @Version}
+ * is current and the next edit does not 409.
  */
 @ExtendWith(MockitoExtension.class)
 class InventoryItemServiceVersionFlushTest {

@@ -22,8 +22,7 @@ package de.greluc.krt.profit.basetool.frontend.model.dto;
 import java.util.UUID;
 
 /**
- * Frontend-side projection of the {@code City} payload returned by the backend's UEX-overrides
- * endpoint. Mirrors {@code de.greluc.krt.profit.basetool.backend.model.dto.CityDto} exactly.
+ * Frontend mirror of the backend {@code CityDto} returned by the UEX-overrides endpoint.
  *
  * @param id city primary key
  * @param name canonical city name as supplied by UEX

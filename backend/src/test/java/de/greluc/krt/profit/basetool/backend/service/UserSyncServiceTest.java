@@ -124,11 +124,8 @@ class UserSyncServiceTest {
   }
 
   /**
-   * #1825: the set handed to {@code markMissingUsers} answers "who does Keycloak still hold", so it
-   * must carry the user whose own reconciliation threw. Collecting the ids only on success made a
-   * transient per-user failure indistinguishable from an upstream deletion, and soft-deleted a
-   * member who was present and enabled in the realm — with the member administration, which reads
-   * {@code in_keycloak} as presence, then offering an admin the hard-delete action on that row.
+   * Verifies that a user whose own reconciliation threw is still counted as present in Keycloak, so
+   * {@code markMissingUsers} does not soft-delete them.
    */
   @Test
   void syncFromKeycloak_aUserWhoseSyncThrew_isStillCountedAsPresentInKeycloak() {
@@ -151,9 +148,8 @@ class UserSyncServiceTest {
   }
 
   /**
-   * The failure must leave a signal an alert can watch ({@code UserSyncPerUserFailure}). Before
-   * #1825 it existed only as a log line, so the condition that soft-deleted a present member had no
-   * metric behind it at all.
+   * Verifies that every per-user sync failure increments the metric behind the {@code
+   * UserSyncPerUserFailure} alert.
    */
   @Test
   void syncFromKeycloak_countsEveryPerUserFailure() {

@@ -34,20 +34,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /**
- * Browser flow for the collapsible Lager filter panels (REQ-INV-037) — "Mein Lager" and the shared
- * "Globales Lager", which run the same panel off two page-local scripts and two separate storage
- * keys.
- *
- * <p>The collapse exists entirely in the browser: the server always renders the panel expanded so a
- * client without JavaScript keeps its filters, and {@code inventory-my.js} / {@code
- * inventory-admin.js} apply the stored preference on load. Everything worth guarding is therefore
- * invisible to a MockMvc test — the rendering contract is pinned by {@code
- * InventoryPageControllerMvcTest}, the behaviour by this test.
- *
- * <p>Two failure modes motivate it. A broken {@code data-trigger} wiring turns the toggle into a
- * dead button that still looks right in the rendered HTML. And a collapse that forgets to surface
- * the active-filter count produces the one state the requirement forbids: a narrowed table whose
- * reason is folded out of sight.
+ * Verifies the collapsible Lager filter panels of "Mein Lager" and "Globales Lager" in a browser
+ * (REQ-INV-037): the toggle works, the choice persists, and a collapsed panel shows the
+ * active-filter count.
  */
 @Tag("e2e")
 class InventoryFilterPanelCollapseE2eTest {
@@ -88,11 +77,8 @@ class InventoryFilterPanelCollapseE2eTest {
   }
 
   /**
-   * Walks the whole preference lifecycle in one browser context, because each step's meaning
-   * depends on the one before it: the unfiltered first visit starts collapsed (no preference
-   * stored, nothing filtered), an explicit expand survives a reload, and an explicit collapse
-   * survives one too — the last step being the one that would regress if the toggle wrote its state
-   * only into the DOM.
+   * On "Mein Lager", an unfiltered first visit starts collapsed, and both an explicit expand and an
+   * explicit collapse survive a reload.
    */
   @Test
   void filterPanelCollapsesAndRemembersTheChoiceAcrossReloads() {
@@ -175,15 +161,8 @@ class InventoryFilterPanelCollapseE2eTest {
   }
 
   /**
-   * The same lifecycle on the shared "Globales Lager". It is a separate page module with its own
-   * storage key, so nothing about a working "Mein Lager" panel proves this one is wired: an
-   * unregistered {@code data-trigger} or a preference written under the wrong key both leave the
-   * markup asserted by the MockMvc test perfectly intact.
-   *
-   * <p>The chip is checked in the same context at the end, after the collapse legs, so the
-   * "unfiltered first visit starts collapsed" leg still sees an untouched Lager. The
-   * minimum-quality select drives it because it needs no seeded stock — it renders on every Lager,
-   * empty or not.
+   * On "Globales Lager", the same collapse lifecycle holds under its own storage key, and a
+   * collapsed panel shows the active-filter count chip.
    */
   @Test
   void globalFilterPanelCollapsesRemembersTheChoiceAndCountsActiveFilters() {

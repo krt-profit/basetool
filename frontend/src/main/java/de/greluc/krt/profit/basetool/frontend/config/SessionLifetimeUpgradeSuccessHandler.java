@@ -31,26 +31,11 @@ import org.springframework.security.web.authentication.AuthenticationSuccessHand
 
 /**
  * {@link AuthenticationSuccessHandler} decorator that promotes the just-authenticated session from
- * the short <em>anonymous</em> idle timeout to the long <em>authenticated</em> idle timeout, then
- * delegates the actual post-login navigation to the wrapped handler (REQ-SEC-025, ADR-0088).
+ * the short anonymous idle timeout to the long authenticated one, then delegates the post-login
+ * navigation (REQ-SEC-025, ADR-0088).
  *
- * <p><strong>Why this exists.</strong> The Redis session store is created with a deliberately short
- * default idle timeout ({@code app.session.anonymous-timeout}, see {@code RedisSessionConfig}) so
- * that the throwaway sessions minted for <em>un-authenticated</em> traffic — chiefly the one Spring
- * Security creates to hold a CSRF token when an anonymous client renders a form-bearing permit-all
- * page, plus pre-login OAuth2 {@code authorizationRequest} state — expire in minutes instead of
- * lingering for the full login window. Without that split, every anonymous probe / crawler hit
- * accreted a 30-day Redis session; production reached &gt;16 000 orphan CSRF-only sessions against
- * ~30 real principals (basetool_active_sessions runaway), on a collision course with the {@code
- * maxmemory noeviction} Redis ceiling. This handler restores the intended 30-day "stay logged in"
- * window the moment a login actually succeeds, so real users are unaffected while orphans stay
- * short-lived.
- *
- * <p>Runs after Spring Security's session-fixation {@code changeSessionId} (which preserves the
- * session's {@code maxInactiveInterval}), so it operates on the final authenticated session id. If
- * no session exists at this point (it always does after an OAuth2 login — the security context and
- * authorized client are persisted into it) the bump is skipped rather than a throwaway session
- * created.
+ * <p>Runs after the session-fixation id change; when no session exists the promotion is skipped
+ * rather than a session created.
  */
 public class SessionLifetimeUpgradeSuccessHandler implements AuthenticationSuccessHandler {
 

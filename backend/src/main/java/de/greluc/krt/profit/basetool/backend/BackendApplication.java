@@ -27,11 +27,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 /**
  * Spring Boot entry point for the backend module.
  *
- * <p>{@code @SpringBootApplication} enables auto-configuration and component scanning rooted at
- * this package, {@code @EnableScheduling} activates the {@code @Scheduled} hooks used by the
- * Keycloak sync and other periodic tasks, and {@code @ConfigurationPropertiesScan} registers every
- * {@code @ConfigurationProperties} record across the backend packages (e.g. {@code config} and the
- * {@code support} leaf) without requiring an explicit {@code @EnableConfigurationProperties} list.
+ * <p>Enables scheduling for the periodic tasks and registers every {@code @ConfigurationProperties}
+ * record in the backend packages by scanning.
  */
 @SpringBootApplication
 @EnableScheduling

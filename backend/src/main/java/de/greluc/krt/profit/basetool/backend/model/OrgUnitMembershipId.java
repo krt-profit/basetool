@@ -31,21 +31,8 @@ import lombok.Setter;
 import lombok.ToString;
 
 /**
- * Composite primary key for {@link OrgUnitMembership}: the pair {@code (user_id, org_unit_id)}.
- * Matches the composite PK declared on the {@code org_unit_membership} table in Flyway migration
- * V95.
- *
- * <p>This is the first composite-key entity in the project — every existing aggregate uses a single
- * UUID primary key. The pair-based PK is intentional here because a membership has no standalone
- * identity outside the {@code (user, org_unit)} relationship: re-adding a user to an org unit they
- * previously left should re-use the same row, and the partial unique index in V95 (one Staffel per
- * user) leans on the pair being the key, not an arbitrary surrogate.
- *
- * <p>JPA requires {@link Embeddable} composite IDs to implement {@link Serializable} and to provide
- * value-based {@link #equals(Object)} / {@link #hashCode()} (so the second-level cache and
- * persistence-context lookups work correctly when the entity is detached and re-attached). Lombok's
- * default {@code equals}/{@code hashCode} would use class identity rather than field values, so the
- * methods are hand-written below.
+ * Composite primary key {@code (user_id, org_unit_id)} of {@link OrgUnitMembership}, with
+ * value-based {@link #equals(Object)} and {@link #hashCode()}.
  */
 @Embeddable
 @Getter
@@ -72,24 +59,16 @@ public class OrgUnitMembershipId implements Serializable {
   @Column(name = "user_id", nullable = false)
   private UUID userId;
 
-  /**
-   * Foreign-key half of the composite: identifies the org unit the membership belongs to. Stored as
-   * a plain UUID rather than a JPA relation to {@link OrgUnit} so the membership row can reference
-   * a {@code kind = 'SQUADRON'} row that has no Java subclass during the R2.a soak window — see the
-   * class-level Javadoc on {@link OrgUnit} for why Squadron is not in the JPA inheritance hierarchy
-   * yet.
-   */
+  /** The org unit the membership belongs to, stored as a plain UUID rather than a JPA relation. */
   @Column(name = "org_unit_id", nullable = false)
   private UUID orgUnitId;
 
   /**
-   * Value-based equality on the two UUID fields. Required by the JPA contract for composite keys —
-   * without it, persistence-context lookups for a detached membership re-attach would miss the
-   * cache and Hibernate would issue redundant SELECTs.
+   * Compares both UUID fields by value.
    *
    * @param other the object to compare; may be {@code null}.
-   * @return {@code true} iff {@code other} is an {@link OrgUnitMembershipId} carrying the same
-   *     {@code userId} and {@code orgUnitId}.
+   * @return {@code true} iff {@code other} is an {@link OrgUnitMembershipId} with the same {@code
+   *     userId} and {@code orgUnitId}.
    */
   @Override
   public boolean equals(Object other) {
