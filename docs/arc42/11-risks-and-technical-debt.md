@@ -161,7 +161,14 @@ until then the risk is bounded, named and watched, which is the most this layer 
   provider-JAR delivery — takes the app down with it: about two minutes of maintenance page, measured
   on production 2026-09-25. Documented at every restart in the runbooks
   ([`deployment.md` → *Driving the stack*](../deployment.md#driving-the-stack)); whether those
-  dependencies should stay `Requires=` is not decided.
+  dependencies should stay `Requires=` is not decided. `systemctl restart` returns when keycloak is
+  healthy, before its dependents are, and the provider-JAR step trusted exactly that: on 2026-09-25
+  it logged success while frontend and ingest had no container. **Fixed in the repository** the same
+  day — the step now waits for the whole stack (`REQ-OPS-007`); it reaches a host with the role's
+  `--tags deploy,scripts` run. What remains is the cost: a release that moves the
+  JAR takes two full-app outages, the app apply's and the JAR's, because the JAR is swapped only
+  after the app passed its gate (ADR-0055, amendment of 2026-09-25, which records why merging them
+  was not done inside the fix).
 - **A configured Discord precheck can fail open with nobody noticing.** The account-existence
   precheck (REQ-SEC-022) is fail-open by design, and its only witness is a Keycloak `WARN`. On
   production the truststore `.env` named never existed and the warning repeated at every start for

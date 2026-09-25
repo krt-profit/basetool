@@ -79,3 +79,28 @@ separate artifact.
 - **Build the JAR multi-arch inside the Dockerfile** (Gradle per platform) — rejected: the JAR is
   architecture-independent bytecode, so per-arch compilation (emulated under QEMU for the non-native
   arch) is pure waste. Build once natively, package the identical layer.
+
+## Amendment — 2026-09-25: the recreate is not keycloak alone, and neither is its gate
+
+The decision stands: the JAR is still swapped **after** the app stack passed its health gate, and a
+failed JAR still restores the previous one while the app release stays. What was wrong is the
+Decision's "recreates **only** keycloak". That held under Compose's `--no-deps`. Under Quadlet
+(since 2026-09-22) the recreate is `systemctl --user restart keycloak.service`, and `backend`
+`Requires=` keycloak while `frontend` and `ingest` require backend — so systemd restarts all three
+with it. `systemctl` returns once **keycloak** is healthy; the others are still restarting, and
+frontend and ingest have no container until backend is up (reproduced under systemd 255). The v1.12.0
+deploy on production, 2026-09-25, logged "deploy successful" at 17:43:17 in exactly that window; the
+next tick's drift check found frontend and ingest with no container and re-applied.
+
+So the gate is now the whole application stack: after keycloak is healthy, `deploy.sh` starts —
+never restarts — every stack unit and waits for each (`rt_await_stack`), and records success only
+then. A stack that does not return to health is treated like a keycloak that does not: previous JAR
+back, keycloak recreated, the stack waited for again, failure recorded and backed off. REQ-OPS-007
+says so. A provider-JAR change therefore costs a second, full-app outage of about two minutes after
+the app apply's own.
+
+**Considered and not taken:** staging the JAR *before* the app apply, so keycloak's restart happens
+inside it and a release takes one outage instead of two. It would change what this ADR decided — a
+health-gate failure could no longer tell a bad JAR from a bad app release, so the rollback would have
+to revert both, and a bad JAR would roll back a healthy app release. That is an owner decision, and
+it is left open rather than taken inside a fix.

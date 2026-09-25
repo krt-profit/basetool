@@ -563,7 +563,10 @@ Within about five minutes the timer fires `deploy.sh`, which:
    every application service whose pin or unit changed, starts the rest of the application stack,
    and waits for health; then stages a moved provider JAR and restarts keycloak — which, through
    `Requires=`, restarts backend, frontend and ingest with it (see
-   [Driving the stack](#driving-the-stack); *corrected 2026-09-25*, this said "keycloak alone");
+   [Driving the stack](#driving-the-stack); *corrected 2026-09-25*, this said "keycloak alone") —
+   and waits until every application service is healthy again before it counts as a success; a
+   stack that does not come back puts the previous JAR back (see
+   [Keycloak provider JAR](#keycloak-provider-jar));
 6. on success writes the marker, clears the failure records, reconciles the monitoring units and
    the edge (config drift or renewed certificates → edge recreate), and prunes dangling images older
    than 30 days;
@@ -674,6 +677,19 @@ ${UPOD} exec -it db-backend sh                       # a shell in a running cont
 > until 15:54:50 — about **two minutes**, 175 maintenance-page 502/503/504 answers at the edge;
 > frontend and ingest were briefly `failed` and came back by `Restart=always`. Treat every Keycloak
 > restart as planned downtime, and do not restart the dependents again afterwards "to be sure".
+>
+> **The restart returns before the outage ends.** `restart keycloak.service` blocks until
+> *keycloak* is healthy, not until the units that require it are. At that moment backend is still
+> starting, and frontend and ingest are stopped — **no container at all** — with a start job queued
+> behind backend (reproduced under systemd 255 on 2026-09-25; the same day `deploy.sh`'s provider-JAR
+> step reported success in that window). To wait for the outage to end, **start** them — a start
+> joins the queued job and returns when it is done, while a second `restart` would stop what just
+> came up:
+>
+> ```bash
+> ${UCTL} restart keycloak.service
+> ${UCTL} start backend.service ingest.service frontend.service   # returns once all three are healthy
+> ```
 
 The application stack, in dependency order, is `db-backend db-keycloak redis keycloak backend ingest
 frontend edge`, plus `acme`. The monitoring units are `prometheus loki tempo grafana alertmanager
@@ -930,7 +946,27 @@ Delivered automatically (REQ-OPS-007, ADR-0055): when `basetool-keycloak-spi:sta
 healthy and restarts keycloak; a failure restores the previous JAR. *(Corrected 2026-09-25: this
 said "restarts keycloak alone". The restart is `systemctl --user restart keycloak.service`, and
 backend, frontend and ingest `Requires=` keycloak, so they restart with it — see
-[Driving the stack](#driving-the-stack).)* The JAR is Java-21
+[Driving the stack](#driving-the-stack).)*
+
+**It is gated on the whole application stack, not on keycloak** (since 2026-09-25). Once keycloak
+is healthy on the new JAR, `deploy.sh` starts every application service and waits for each; only
+then does it write the marker and log `deploy successful`. If keycloak or any of them does not come
+back, it restores the previous JAR, restarts keycloak, waits for the stack again, and records the
+run as failed (`DeployFailed`, backoff). The deploy log reads:
+
+```text
+keycloak-spi changed → staging provider JAR + recreating keycloak (backend, ingest and frontend restart with it: Requires=)
+keycloak healthy on the new provider JAR — waiting for the application services systemd restarted with it
+keycloak-spi provider JAR applied — keycloak and the application stack are healthy
+deploy successful
+```
+
+**Expected outage:** one keycloak start, then one backend start, then the slower of frontend and
+ingest — about two minutes of maintenance page — **in addition to** the app apply's own when the
+release moves both, because the JAR is swapped only after the app apply passed its gate (ADR-0055).
+Until this fix the step trusted keycloak's restart alone: on 2026-09-25 the v1.12.0 deploy logged
+`deploy successful` at 17:43:17 while frontend and ingest still had no container, and only the next
+tick (`drift: frontend: no container`) re-applied. The JAR is Java-21
 bytecode for Keycloak's JVM. The Discord realm setup is a one-time step in
 [`keycloak/DISCORD_KEYCLOAK_SETUP.md`](keycloak/DISCORD_KEYCLOAK_SETUP.md).
 
@@ -941,6 +977,7 @@ Manual fallback only:
 install -o deploy -g deploy -m 0644 keycloak-spi-<version>.jar /var/iri/code/keycloak/providers/keycloak-spi.jar
 restorecon -F /var/iri/code/keycloak/providers/keycloak-spi.jar
 ${UCTL} restart keycloak.service      # ~2 min full outage: restarts backend, frontend, ingest too
+${UCTL} start backend.service ingest.service frontend.service   # waits until the outage is over
 ${UPOD} logs --since 2m keycloak | grep -iE 'error|exception|provider' | head
 ```
 
@@ -1410,6 +1447,7 @@ D=/etc/containers/systemd/users/${IRI_UID}/keycloak.container.d
 printf '[Container]\nVolume=/var/iri/secrets/backend-truststore.p12:/run/secrets/backend-truststore.p12:ro\n' > "$D/50-backend-truststore.conf"
 chown deploy:deploy "$D/50-backend-truststore.conf"; chmod 0644 "$D/50-backend-truststore.conf"
 ${UCTL} daemon-reload && ${UCTL} restart keycloak.service   # restarts backend, frontend, ingest too (Requires=) -- ~2 min outage
+${UCTL} start backend.service ingest.service frontend.service   # returns once they are healthy again, not before
 ```
 
 Output on production: `Certificate was added to keystore` twice; the drop-in landed beside the
@@ -1813,6 +1851,7 @@ goes.
 | nothing answers on 80/443 | `systemctl status haproxy`, `firewall-cmd --list-all` | haproxy not started (fresh host), or a firewall layer — probe from a third machine |
 | Stack comes back after a manual stop | `drift:` lines in the deploy log | the drift check (REQ-OPS-013); stop the timer first |
 | `CARVE-OUT: postgres/Keycloak image pin changed` | the deploy log, `config-blocked.marker` | a gated upgrade — see [Stateful-infra upgrades](#stateful-infra-upgrades) |
+| `keycloak did not become healthy with the new provider JAR` or `… the application stack it restarted did not return to health — rolling back the JAR`; `DeployFailed` fires | the deploy log, `${UPOD} logs --since 10m keycloak`, `${UCTL} status backend.service frontend.service ingest.service` | the new provider JAR broke keycloak or what logs in through it; the previous JAR is live again and the target backs off. If the log then says `WARNING: the application stack did not return to health on the previous provider JAR`, something else is wrong — `${UCTL} start backend.service ingest.service frontend.service` waits for them without restarting anything. See [Keycloak provider JAR](#keycloak-provider-jar) |
 | Deploy stuck on a config apply: `PRE-FLIGHT: … is not owned or not writable by deploy`, or `FATAL: deploy aborted before the health gate — step 'mirror …' failed (exit 23)` after an `rsync: … mkstemp … Permission denied (13)`; `DeployFailed` fires, then `target failed Nx; in backoff window` | the deploy log, `find /var/iri/code/{docker,keycloak-theme,monitoring,quadlet} ! -user deploy` | a release-owned subtree (here `docker/acme`, 2026-09-25) was created or copied as root. Fix the owner — `chown -R deploy:deploy /var/iri/code/docker` (or the subtree named), or the role with `--tags directories` — then `sudo -u deploy /var/iri/code/scripts/deploy.sh --force` to skip the backoff. If the log also says **INCONSISTENT**, the restore failed too: the same fix, then `--force`; `config-previous/` was kept |
 | A promoted unit change is ignored | `ls ~iri/.config/containers/systemd/` | a hand-placed unit of the same name shadows the delivered one |
 | Monitoring config changes never load | the deploy log (`IRI_MONITORING_ENABLED != 'true'`) | set `IRI_MONITORING_ENABLED=true` in `.env`; `MonitoringReconcileDisabled` fires meanwhile |

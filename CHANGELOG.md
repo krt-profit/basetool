@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Deploy: ein neues Keycloak-Provider-JAR meldet erst Erfolg, wenn die ganze App wieder läuft.**
+  Der Keycloak-Neustart startet über `Requires=` Backend, Frontend und Ingest mit neu; `deploy.sh`
+  wartet jetzt auf alle und stellt sonst das vorige JAR wieder her (`DeployFailed`), statt Erfolg zu
+  melden, während Frontend und Ingest noch ohne Container sind. Wirkt erst nach einem Lauf der
+  Ansible-Rolle (`--tags deploy,scripts`).
+
 ## [v1.12.0](https://github.com/krt-profit/basetool/releases/tag/v1.12.0) - 2026-09-25
 
 ### Fixed

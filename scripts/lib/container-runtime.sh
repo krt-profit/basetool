@@ -603,18 +603,63 @@ rt_apply_stack() {
 # -----------------------------------------------------------------------------
 # rt_recreate <service>
 #
-# Replace one service's container and wait for it to be healthy, without
-# touching its dependencies. This is the Keycloak provider-JAR path: the JAR is
-# staged on the host and only `kc.sh start` re-running the provider build picks
-# it up, so the container has to be recreated rather than restarted in place.
+# Replace one service's container and wait for IT to be healthy. This is the
+# Keycloak provider-JAR path: the JAR is staged on the host and only `kc.sh start`
+# re-running the provider build picks it up, so the container has to be recreated
+# rather than restarted in place.
 #
 # A restart IS a recreate: the generated ExecStart carries `--replace --rm`, so
 # the old container is removed and a new one is created from the current unit on
 # every start.
+#
+# It leaves the service's DEPENDENCIES alone, but not its DEPENDENTS: systemd
+# stops and restarts every unit that `Requires=` the one restarted, and returns
+# once the named unit's own job is done -- while theirs are still running. A
+# caller that restarts a unit anything requires follows with rt_await_stack.
 # -----------------------------------------------------------------------------
 rt_recreate() {
   ${RT_SYSTEMCTL} daemon-reload || return 1
   ${RT_SYSTEMCTL} restart "$1.service"
+}
+
+# -----------------------------------------------------------------------------
+# rt_await_stack [service]...
+#
+# START -- never restart -- each named service, by default every one in
+# RT_STACK_SERVICES in stack order, and wait for each to be healthy. Returns
+# non-zero when any of them does not get there. The call to make after a
+# restart of a unit that others `Requires=`.
+#
+# WHY IT HAS TO EXIST. `systemctl restart keycloak.service` returns as soon as
+# KEYCLOAK is healthy. systemd restarts backend, frontend and ingest with it --
+# `Requires=` propagates a stop and a restart to the requiring unit -- but their
+# jobs are not the one systemctl waits for. When it returns, backend is still
+# starting, and frontend and ingest are stopped with a start job queued behind
+# backend: no main process, and no container, because the ExecStart's --rm
+# removed it. Reproduced 2026-09-25 under systemd 255 with three Type=notify
+# units chained like these (`restart` of the first returned after 4 s with the
+# second `activating` and the third `inactive`, its start job `waiting`). The same
+# day on production the provider-JAR step logged "deploy successful" in exactly
+# that window, and the next tick found frontend and ingest with no container.
+#
+# `start` fits every state a dependent can be in at that point. A queued or
+# running start job absorbs it, so the call blocks until that job ends and
+# returns its result; an already active unit returns 0 at once; a unit whose
+# restart failed with the unit it requires is started again. A `restart` here
+# would be wrong: on an active unit it stops what just came up (the same
+# reproduction started such a unit twice).
+# -----------------------------------------------------------------------------
+rt_await_stack() {
+  local svc rc=0
+  if [[ $# -eq 0 ]]; then
+    local -a svcs=()
+    read -ra svcs <<< "${RT_STACK_SERVICES:?RT_STACK_SERVICES is unset and no services were named}"
+    set -- "${svcs[@]}"
+  fi
+  for svc in "$@"; do
+    ${RT_SYSTEMCTL} start "${svc}.service" || rc=1
+  done
+  return "${rc}"
 }
 
 # -----------------------------------------------------------------------------
