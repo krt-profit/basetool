@@ -1236,7 +1236,9 @@ at exactly the same point. `IRI_TRUSTSTORE_HOST_PATH` mounts a trust store at
 `/run/secrets/truststore.p12` and `IRI_EXTRA_JAVA_OPTS` appends the `javax.net.ssl.trustStore*`
 switches that select it. Both default to no-ops: the mount resolves to the same file as the
 keystore, and with no extra options nothing reads it. Under Quadlet the mount path is baked into the
-units at that default, so a rootless host with a privately signed edge gets its truststore from a
+units — since the per-service internal TLS (REQ-SEC-070) at the CA-only
+`/var/iri/secrets/tls/truststore.p12`, so the shared keystore's private key is no longer mounted into
+every app through this path — so a rootless host with a privately signed edge gets its truststore from a
 second role-written drop-in instead (`basetool_host_jvm_truststore_path` →
 `/run/secrets/jvm-truststore.p12`, `20-jvm-truststore.conf`), and `IRI_EXTRA_JAVA_OPTS` names that
 path. Production's edge certificate is publicly signed and sets neither.

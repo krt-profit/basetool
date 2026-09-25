@@ -1078,10 +1078,11 @@ and every new switch defaults to today's behaviour:
 | `INTERNAL_TLS_VERIFY_HOSTNAME` | host `.env` → `env.d` (frontend, ingest) | `false` | `true` |
 | `IRI_BACKEND_KEYSTORE_HOST_PATH` / `_FRONTEND_` / `_INGEST_` / `_KEYCLOAK_` | baked into the units by `generate-quadlet.py` (`PATH_VARS`) | `/var/iri/secrets/keystore.p12` | `/var/iri/secrets/tls/<service>.p12` |
 | `IRI_INTERNAL_TRUSTSTORE_HOST_PATH` → `/run/secrets/internal-truststore.p12` | baked, as above | `/var/iri/secrets/keystore.p12` | `/var/iri/secrets/tls/truststore.p12` |
+| `IRI_TRUSTSTORE_HOST_PATH` → `/run/secrets/truststore.p12` (REQ-OPS-022's JVM-truststore default; production's JVM truststore is the role's separate `jvm-truststore.p12` drop-in) | baked, as above | `/var/iri/secrets/keystore.p12` — the shared **private key**, mounted into all three apps | `/var/iri/secrets/tls/truststore.p12`, so no container holds the old key |
 | `/var/iri/monitoring/certs/basetool-ca.crt` (edge, Prometheus, blackbox) | host file | the shared certificate | the internal CA |
 | `/var/iri/secrets/backend-truststore.p12` (Keycloak SPI precheck, if configured) | host file | the backend's shared certificate | the internal CA |
 
-The four `*_KEYSTORE_HOST_PATH` and the truststore path are **baked**: setting them in `.env` does
+The four `*_KEYSTORE_HOST_PATH` and the two truststore paths are **baked**: setting them in `.env` does
 nothing on the Podman host (`check-conformance.py` → `env-reaches-the-units` says so). They move with
 the follow-up release that flips `PATH_VARS`, and that release must not be promoted before step 2.
 
@@ -1251,9 +1252,12 @@ systemctl start iri-cert-expiry.service      # the metric now reports the CA's o
 ```
 
 Also drop the old entry from the SPI truststore if 2f was done. From here on, **the old
-`keystore.p12` is no longer a trust anchor anywhere**; keep it until the next backup has captured
-`/var/iri/secrets/tls`, then remove it. **Rollback:** re-import `legacy-shared.crt` as in 2c, rebuild
-the bundle as in 2e, restart the same units.
+`keystore.p12` is no longer a trust anchor anywhere**, and since step 3 no unit mounts it any more
+(the step-3 release also moved the REQ-OPS-022 `/run/secrets/truststore.p12` mount onto the CA-only
+truststore), so no container holds the old key. **Leave the file in place** anyway: it is what the
+rollback of step 3 — the previous release — mounts. Confirm the next nightly backup carries
+`config/internal-tls.tar`. **Rollback:** re-import `legacy-shared.crt` as in 2c, rebuild the bundle
+as in 2e, restart the same units.
 
 **Rotation after the rollout** is a re-mint: all leaves and the CA together, into a fresh directory,
 then the same widening (old CA as second anchor) → switch → narrowing. No single leaf can be
