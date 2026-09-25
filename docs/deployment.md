@@ -257,7 +257,7 @@ own users (ingest connects on demand), `REDIS_DEFAULT_USER=off`. Verified: an un
 health check is healthy and the exporter reports `redis_up 1`. A release rollback now needs
 `default` back **on** first (see *Rollback* below).
 
-> [!note] A refused `CONFIG GET` per frontend start — on 1.11.0 only, gone once #2067 is released
+> [!note] A refused `CONFIG GET` per frontend start — on 1.11.0 only, verified gone on production after the v1.12.0 deploy, 2026-09-25
 > On release 1.11.0 the frontend's `TolerantKeyspaceNotificationsAction` still runs Spring
 > Session's `CONFIG GET notify-keyspace-events` at every start under its own user; the ACL refuses it
 > by design and the action carries on. It shows in `ACL LOG` as `reason=command`,
@@ -265,7 +265,9 @@ health check is healthy and the exporter reports `redis_up 1`. A release rollbac
 > 2026-09-25 at a count of **2 per frontend start** — and increments
 > `redis_acl_access_denied_cmd_total`; `RedisAclDenials` did not fire for it that day. #2067
 > (merged 2026-09-25) sends a `PING` instead under a named user, so from the release that carries it
-> **no** refusal is expected at all. Until then that one entry is benign; any other `ACL LOG` entry —
+> **no** refusal is expected at all — verified gone on production after the v1.12.0 deploy, 2026-09-25 (after the frontend's
+> restarts at 17:43, 18:01 and 18:03 UTC `ACL LOG` gained no entry; the only two `config|get`
+> refusals were more than an hour old, from 1.11.0). On 1.11.0 that one entry is benign; any other `ACL LOG` entry —
 > another user, another command, a `key` or `channel` reason, an `auth` refusal — is a real finding.
 
 **Render and apply** (as root, from `/`; `${UCTL}` / `${UPOD}` from
@@ -388,7 +390,7 @@ can be stopped and rolled back on its own.
    LIST' | grep -o 'user=[^ ]*' | sort | uniq -c` shows the three service users and no application
    on `default`; `RedisAclDenials` stays silent; log in, open a mission (live sync), run one
    refinery import. On 1.11.0, `ACL LOG` shows the frontend's refused `config|get` from its
-   restart (see the note above; gone once #2067 is released); nothing else.
+   restart (see the note above; verified gone on production after the v1.12.0 deploy, 2026-09-25); nothing else.
 5. **Switch `default` off**: append `REDIS_DEFAULT_USER=off` to `.env`, render, `ACL LOAD` as
    `admin`. Verify `${UPOD} exec redis sh -c 'redis-cli ping'` answers `NOAUTH`,
    `${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli ping'` (password-only, i.e.
@@ -628,6 +630,13 @@ sudo -u deploy /var/iri/code/scripts/deploy.sh --force          # bypass the bac
 delete `/var/lib/iri/last-deployed.digests` and start `iri-deploy.service`; a missing marker also
 re-stages the config bundle.
 
+> [!warning] Rolling production back past a host switch *(added 2026-09-25)*
+> Some switches applied on production pin the releases that support them, and a rollback below
+> them needs the switch undone **first**: to 1.11.0 or older, the internal-TLS step 4
+> ([Step 4 → release rollback](#step-4--drop-the-old-certificate)); to 1.10.0 or older, additionally
+> Redis `default` back on ([The Redis ACL](#the-redis-acl)) and the confidential frontend client
+> back to public ([`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md)).
+
 `--check-only` doubles as the signature preflight in the real `deploy` context and writes no metric.
 
 ---
@@ -758,6 +767,19 @@ The frontend reads a stored session value only if the class it names is on `Sess
 and a class outside the list is only counted and logged. Switching production to **`enforce`** is a
 `.env` change plus a frontend restart: a production write, so it waits for the owner's yes.
 
+> [!note] Applied on production 2026-09-25, 17:58 UTC — after ~5 hours of report data, not a week
+> The owner chose to enforce the same day rather than wait out the week below. The evidence at the
+> time: `basetool_session_type_refused_total` had not moved and the log had named no class since
+> 1.11.0 went live (12:40 UTC) — about five hours of ordinary use, **not** the seven days the
+> precondition asks for, so the classes that only a rarer path writes are covered by the parity
+> test and the E2E suite (which runs `enforce`) rather than by production evidence. `.env` had no
+> `APP_SESSION_TYPE_ALLOW_LIST` line (the template defaulted to `report`); one line
+> `APP_SESSION_TYPE_ALLOW_LIST=enforce` was appended, the render changed only `frontend.env`, and
+> the frontend logged `Session type allow-list mode: ENFORCE` with no refusal afterwards. **The
+> watch that replaces the missing days:** `SessionTypeOutsideAllowList` and
+> `SessionValueDropsSustained` — either firing names a class the list lacks; add it in a PR, or go
+> back to `report` with the rollback below while it lands.
+
 **Precondition** — since the release carrying the list went live, over at least a week of ordinary
 use (logins, token refresh, a failed form, a refinery import, a live-sync page), the report counter
 has stayed at zero and the log names no class:
@@ -783,7 +805,7 @@ sudo -u deploy /var/iri/code/scripts/render-env-d.py \
   --env /var/iri/code/.env --templates /var/iri/code/quadlet/env.d --out /var/iri/code/env.d
 grep -c '^APP_SESSION_TYPE_ALLOW_LIST=enforce$' /var/iri/code/env.d/frontend.env   # 1
 ${UCTL} restart frontend.service                        # blocks until healthy; sessions live in Redis
-${UPOD} logs --since 5m frontend 2>&1 | grep 'Session type allow-list mode'   # ... mode: ENFORCE
+journalctl CONTAINER_NAME=frontend --since -5m -o cat | grep 'Session type allow-list mode'   # ... mode: ENFORCE
 ```
 
 **Expected effect:** none a member can see. Nobody is signed out by the restart, and every value the
@@ -1181,9 +1203,17 @@ sets.
 >   blackbox restarted with no edge verify error. **2f** turned up a pre-existing defect — the SPI
 >   truststore `.env` named had never existed — and was done by building it (see 2f below and
 >   [`DISCORD_KEYCLOAK_SETUP.md` §7.3](keycloak/DISCORD_KEYCLOAK_SETUP.md#73-truststore-for-the-backend-certificate)).
-> - **Step 3** — open on production: the release that flips `PATH_VARS` (#2036) is merged to
->   `main` (2026-09-25) and reaches production with the next promoted release.
-> - **Step 4** — open, a day after step 3 without TLS errors.
+> - **Step 3** — done with **v1.12.0** (promote run 36168223771 at 17:39 UTC, deploy 17:38–17:44
+>   UTC): backend, frontend, ingest and Keycloak mount `/var/iri/secrets/tls/<service>.p12`, the
+>   three apps mount `/var/iri/secrets/tls/truststore.p12` as the internal truststore, and all four
+>   answer `Verification: OK` against `/var/iri/secrets/tls/ca.crt` with `-verify_hostname`.
+> - **Step 4** — done 17:58–18:03 UTC, the owner's choice the same evening rather than a day
+>   later. `basetool-ca.crt` is the CA alone (one anchor), the SPI truststore holds only
+>   `internal-ca`, `truststore.p12` only `ca`, and `iri-cert-expiry` reports the CA's expiry (2036).
+>   The step-4 command as documented **failed** on the root-owned truststore and was redone with a
+>   working copy at 18:01 — the step below is now written in that form (see *As run on
+>   production*). **Rollout complete on production.** A release rollback to 1.11.0 or older now
+>   needs the old certificate re-trusted first ([Step 4](#step-4--drop-the-old-certificate)).
 
 **Why.** The shared `/var/iri/secrets/keystore.p12` is the identity of backend, frontend, ingest and
 Keycloak at once, and — self-signed — also the anchor every one of them trusts. A key read out of
@@ -1296,6 +1326,9 @@ sudo --preserve-env=TLS_STORE_PASSWORD -u iri podman run --rm --user 0 -e TLS_ST
   -importcert -noprompt -alias legacy-shared -file /work/legacy-shared.crt \
   -keystore /work/truststore.p12 -storepass:env TLS_STORE_PASSWORD
 unset TLS_STORE_PASSWORD
+#     This in-place write works only HERE, while the minted store is still iri-owned. From 2d on it is
+#     root:root 0644, and root in the rootless container is iri on the host: any later keytool write
+#     (step 4, its rollback, a rotation) goes through an iri-owned working copy -- see step 4.
 
 # 2d. Ownership: app keystores readable by the app group (10001), Keycloak's by its uid (1000), all
 #     by iri for the backup helper; the truststore and the CA hold no key.
@@ -1387,7 +1420,10 @@ have: the drop-in directory `$D` already existed on production (create it first 
 it must be exactly what that variable names.
 
 **If the store exists**, add only the CA the same way (one `-importcert` with `-alias internal-ca`
-on a working copy in such a scratch directory, then `install` it back), and restart keycloak.
+on a working copy in such a scratch directory, then `install` it back), and restart keycloak. The
+installed store is `root:root 0644`, which the container's root (= `iri` on the host) cannot
+write: copy it **into** `$W` together with `ca.crt` *before* the `chown -R iri:iri "$W"`, never
+point `keytool` at `/var/iri/secrets/backend-truststore.p12` itself.
 
 Verify: `journalctl CONTAINER_NAME=keycloak --since -5m -o cat | grep -c 'Failed to load the backend truststore'`
 is `0`, and `${UPOD} exec keycloak ls /run/secrets` lists `backend-truststore.p12` (both held on
@@ -1415,13 +1451,21 @@ for svc in backend:11261 frontend:18081 ingest:11262 keycloak:18443; do
     openssl s_client -connect "${IP}:${svc##*:}" -servername "$n" -verify_hostname "$n" \
     -CAfile /var/iri/secrets/tls/ca.crt -verify_return_error </dev/null 2>&1 | grep -E 'Verification|subject='
 done
-${UPOD} logs --since 10m backend frontend ingest 2>&1 | grep -iE 'PKIX|No subject alternative|certificate_unknown' || echo "no TLS errors"
+for n in backend frontend ingest; do journalctl CONTAINER_NAME="$n" --since -10m -o cat; done \
+  | grep -iE 'PKIX|No subject alternative|certificate_unknown' || echo "no TLS errors"
 curl -fsS https://profit-base.online/auth/realms/iri/.well-known/openid-configuration >/dev/null && echo OK
 ```
 
 Expected: `Verification: OK` against **the CA alone**, and each `subject=` names its own service.
+*(Changed 2026-09-25: the log check reads the journal instead of `podman logs`. The 1.11.0 runbook
+§9 saw `podman logs` return nothing for the Quadlet containers in one context, and a grep over
+empty input prints "no TLS errors" just the same.)*
 
-**kcadm after step 3** *(added 2026-09-25)*: the documented kcadm session trusts
+**On production** this step arrived with **v1.12.0** on 2026-09-25 (promote run 36168223771 at
+17:39 UTC, the deploy 17:38–17:44 UTC): all four services `Verification: OK` against `ca.crt` with
+`-verify_hostname`, each on its own leaf, the apps on the CA-only truststore.
+
+**kcadm after step 3** *(added 2026-09-25; still untested on production after v1.12.0)*: the documented kcadm session trusts
 `/run/secrets/keystore.p12` inside the keycloak container. From this release on, that path is
 Keycloak's own leaf keystore, and the keycloak unit mounts no truststore. The session probably keeps
 working, but nobody has verified it; the fallback, and whether keycloak should mount the CA-only
@@ -1432,36 +1476,127 @@ untouched and still trusted by every client).
 
 ### Step 4 — drop the old certificate
 
-Only once step 3 has run for a day without TLS errors:
+Once step 3 has run without TLS errors (the plan said a day; production did it the same evening, see
+below). Every store step 4 edits is **root-owned** by then — `truststore.p12` since 2d,
+`backend-truststore.p12` since 2f — and root inside the rootless container is `iri` on the host, so
+`keytool` cannot write either in place. Each one is edited on an `iri`-owned working copy and
+`install`ed back, the pattern 2f already used. Do all file changes first and restart once at the
+end: the restart of keycloak and the apps is a ~2-minute full outage, and one is enough.
 
 ```bash
+T=/var/iri/secrets/tls; S=$(date +%Y%m%d-%H%M%S)
 IMG=$(${UPOD} container inspect backend --format '{{.ImageName}}')
+
+# 4a. Backups beside the originals -- the rollback below, and the basis of a release rollback.
+cp -p "$T/truststore.p12" "$T/truststore.p12.backup-$S"
+cp -p /var/iri/monitoring/certs/basetool-ca.crt "/var/iri/monitoring/certs/basetool-ca.crt.backup-$S"
+cp -p /var/iri/secrets/backend-truststore.p12 "/var/iri/secrets/backend-truststore.p12.backup-$S"   # only if 2f was done
+
+# 4b. The internal truststore: delete legacy-shared on a working copy, check, install back.
+W=$(mktemp -d /var/iri/secrets/.tls-trust.XXXXXX)
+cp "$T/truststore.p12" "$W/"; chown -R iri:iri "$W"; chmod 0700 "$W"
 export TLS_STORE_PASSWORD="$(sed -n 's/^SERVER_SSL_KEY_STORE_PASSWORD=//p' /var/iri/code/.env | tail -1)"
 sudo --preserve-env=TLS_STORE_PASSWORD -u iri podman run --rm --user 0 -e TLS_STORE_PASSWORD \
-  --entrypoint keytool -v /var/iri/secrets/tls:/work "${IMG}" \
-  -delete -alias legacy-shared -keystore /work/truststore.p12 -storepass:env TLS_STORE_PASSWORD
+  --entrypoint keytool -v "$W":/work "${IMG}" \
+  -delete -alias legacy-shared -storetype PKCS12 -keystore /work/truststore.p12 -storepass:env TLS_STORE_PASSWORD
+sudo --preserve-env=TLS_STORE_PASSWORD -u iri podman run --rm --user 0 -e TLS_STORE_PASSWORD \
+  --entrypoint keytool -v "$W":/work "${IMG}" \
+  -list -storetype PKCS12 -keystore /work/truststore.p12 -storepass:env TLS_STORE_PASSWORD   # one entry: ca
 unset TLS_STORE_PASSWORD
-install -m 0644 /var/iri/secrets/tls/ca.crt /var/iri/monitoring/certs/basetool-ca.crt
+install -o root -g root -m 0644 "$W/truststore.p12" "$T/truststore.p12"
+restorecon -F "$T/truststore.p12"
+rm -rf "$W"
+
+# 4c. Only if 2f was done: the SPI truststore keeps internal-ca alone -- same pattern, its own password.
+W=$(mktemp -d /var/iri/secrets/.kc-trust.XXXXXX)
+cp /var/iri/secrets/backend-truststore.p12 "$W/"; chown -R iri:iri "$W"; chmod 0700 "$W"
+export KRT_TS_PASSWORD="$(sed -n 's/^KRT_BACKEND_TRUSTSTORE_PASSWORD=//p' /var/iri/code/.env | tail -1)"
+sudo --preserve-env=KRT_TS_PASSWORD -u iri podman run --rm --user 0 -e KRT_TS_PASSWORD \
+  --entrypoint keytool -v "$W":/work "${IMG}" \
+  -delete -alias backend -storetype PKCS12 -keystore /work/backend-truststore.p12 -storepass:env KRT_TS_PASSWORD
+sudo --preserve-env=KRT_TS_PASSWORD -u iri podman run --rm --user 0 -e KRT_TS_PASSWORD \
+  --entrypoint keytool -v "$W":/work "${IMG}" \
+  -list -storetype PKCS12 -keystore /work/backend-truststore.p12 -storepass:env KRT_TS_PASSWORD   # one entry: internal-ca
+unset KRT_TS_PASSWORD
+install -o root -g root -m 0644 "$W/backend-truststore.p12" /var/iri/secrets/backend-truststore.p12
+restorecon -F /var/iri/secrets/backend-truststore.p12
+rm -rf "$W"
+
+# 4d. The edge, Prometheus and blackbox anchor: the CA alone.
+install -m 0644 "$T/ca.crt" /var/iri/monitoring/certs/basetool-ca.crt
 restorecon -F /var/iri/monitoring/certs/basetool-ca.crt
+grep -c 'BEGIN CERTIFICATE' /var/iri/monitoring/certs/basetool-ca.crt    # 1
+
+# 4e. Restart. One combined job: systemd orders it along Requires= and restarts each unit once.
 ${UCTL} restart edge.service prometheus.service blackbox-exporter.service
-${UCTL} restart backend.service ingest.service frontend.service
+${UCTL} restart keycloak.service backend.service ingest.service frontend.service   # ~2 min full outage
+#   (without 2f: ${UCTL} restart backend.service ingest.service frontend.service)
 systemctl start iri-cert-expiry.service      # the metric now reports the CA's own expiry
 ```
 
-Also drop the old entry from the SPI truststore if 2f was done: `keytool -delete -alias backend`
-on a working copy in a scratch directory (as in 2f), `install` it back, then
-`${UCTL} restart keycloak.service` — which restarts backend, frontend and ingest as well, so it can
-take the place of the app restart above rather than follow it. From here on, **the old
-`keystore.p12` is no longer a trust anchor anywhere**, and since step 3 no unit mounts it any more
-(the step-3 release also moved the REQ-OPS-022 `/run/secrets/truststore.p12` mount onto the CA-only
-truststore), so no container holds the old key. **Leave the file in place** anyway: it is what the
-rollback of step 3 — the previous release — mounts. Confirm the next nightly backup carries
-`config/internal-tls.tar`. **Rollback:** re-import `legacy-shared.crt` as in 2c, rebuild the bundle
-as in 2e, restart the same units.
+Verify: the step-3 loop again (`Verification: OK` for all four against `ca.crt`), no
+`PKIX|No subject alternative|certificate_unknown` in the app logs,
+`journalctl CONTAINER_NAME=keycloak --since -5m -o cat | grep -c 'Failed to load the backend truststore'`
+is `0`, the edge serves the app, and in Prometheus
+`basetool_certificate_expiry_timestamp_seconds{path=~".*/basetool-ca.crt"}` carries
+`subject="CN=Profit Basetool internal CA,…"`.
+
+> [!warning] As run on production, 2026-09-25 17:58–18:03 UTC — and why this step was rewritten
+> *(corrected 2026-09-25)* This step used to run `keytool -delete -alias legacy-shared -keystore
+> /work/truststore.p12` directly against `-v /var/iri/secrets/tls:/work`. On production that failed
+> with `keytool error: java.io.FileNotFoundException: /work/truststore.p12 (Permission denied)`:
+> 2d had made the store `root:root 0644`, and the container's root is `iri` on the host. The rest of
+> the step went through — the three backups (paths in the box below), `basetool-ca.crt` with one anchor, the
+> SPI truststore down to `internal-ca` on a working copy (4c), the edge/Prometheus/blackbox restart
+> and one combined `${UCTL} restart keycloak.service backend.service ingest.service frontend.service`.
+> That restart cost the edge's maintenance page **74, 121 and 7** 5xx answers per minute over
+> 17:58–18:00. At 18:01 the truststore was redone exactly as 4b above (`-list` showed only `ca`),
+> followed by `${UCTL} restart backend.service ingest.service frontend.service` (18:01:47–18:03:36)
+> — a second outage of about two minutes that the order above avoids. `iri-cert-expiry` then
+> reported the CA (`CN=Profit Basetool internal CA`, expiring 2036).
+
+From here on, **the old `keystore.p12` is no longer a trust anchor anywhere**, and since step 3 no
+unit mounts it any more (the step-3 release also moved the REQ-OPS-022 `/run/secrets/truststore.p12`
+mount onto the CA-only truststore), so no container holds the old key. **Leave the file in place**
+anyway: it is what the rollback of step 3 — the previous release — mounts. Confirm the next nightly
+backup carries `config/internal-tls.tar`.
+
+**Rollback:** `install -o root -g root -m 0644` each `*.backup-$S` file from 4a back over its
+original, `restorecon -F` each, and restart as in 4e. Without the backups: re-import
+`legacy-shared.crt` into `truststore.p12` and `backend` into the SPI truststore on working copies
+as in 4b/4c (copy the `.crt` into `$W` too; `-importcert -noprompt -storetype PKCS12 -alias … -file
+/work/…`), rebuild the bundle as in 2e, restart the same units.
+
+> [!important] A release rollback to 1.11.0 or older needs the old certificate trusted again first
+> *(added 2026-09-25, after step 4 on production)* 1.11.0's units mount the shared `keystore.p12`
+> as every service's identity again, and after step 4 nothing trusts it: the edge, Prometheus and
+> blackbox would refuse every upstream. **And the Discord duplicate-account precheck would fail
+> open again, silently** (REQ-SEC-022): the SPI truststore holds only `internal-ca`, so Keycloak's
+> call to a backend back on the shared certificate fails its handshake — no outage, the guard just
+> stops working, and the only signal is the `Account-existence probe could not reach the backend`
+> `WARN` per first login. **Before** `promote.yml -f version=1.11.0`, undo step 4 as in its rollback
+> above:
+>
+> 1. `legacy-shared` back into `/var/iri/secrets/tls/truststore.p12`, so services still on 1.12.0
+>    during the lock-step restarts accept those already back on the shared certificate;
+> 2. the old certificate back into `basetool-ca.crt` (edge, Prometheus, blackbox restarted);
+> 3. the `backend` alias (the old shared certificate, `/var/iri/secrets/tls/legacy-shared.crt`)
+>    back into `/var/iri/secrets/backend-truststore.p12`, then restart keycloak.
+>
+> Production's step-4 backups are `/var/iri/secrets/tls/truststore.p12.backup-20260925-175805`,
+> `/var/iri/monitoring/certs/basetool-ca.crt.backup-20260925-175805` and
+> `/var/iri/secrets/backend-truststore.p12.backup-20260925-175805` (plus
+> `/var/iri/code/.env.backup-20260925-175805-step4`). A rollback to **1.10.0 or older** also needs
+> `REDIS_DEFAULT_USER` back on ([The Redis ACL](#the-redis-acl)) and the frontend client back to
+> public (`--frontend-client public --apply` through a new provisioner session,
+> [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md)) — then promote.
 
 **Rotation after the rollout** is a re-mint: all leaves and the CA together, into a fresh directory,
 then the same widening (old CA as second anchor) → switch → narrowing. No single leaf can be
-re-issued, by design — the CA key is gone.
+re-issued, by design — the CA key is gone. The ownership trap holds here too: `keytool` may write
+in place only into a directory and stores that are still `iri`-owned, as the fresh mint's are
+before its 2d-style `chown`; every edit of a store that is already root-owned — the narrowing, the
+SPI truststore — goes through a working copy as in 4b/4c.
 
 ---
 
@@ -1469,7 +1604,9 @@ re-issued, by design — the CA key is gone.
 
 > [!note] Applies to the **shared** keystore, i.e. until step 3 of
 > [*Internal TLS: per-service certificates from a private CA*](#internal-tls-per-service-certificates-from-a-private-ca)
-> has run. Afterwards a rotation is a re-mint (the last paragraph of that section).
+> has run. Afterwards a rotation is a re-mint (the last paragraph of that section). **Production
+> is past that point** since 2026-09-25 (step 3 with v1.12.0, step 4 the same evening): there, this
+> section describes only the file a rollback to 1.11.0 or older would mount again.
 
 The shared `/var/iri/secrets/keystore.p12` is the internal TLS identity of backend, frontend,
 ingest and Keycloak, **and** their truststore: frontend and ingest pin it to call the backend, the

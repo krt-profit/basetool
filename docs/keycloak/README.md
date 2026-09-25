@@ -324,7 +324,11 @@ Docker Compose stack the root filesystem is writable: plain `docker exec keycloa
 >   step 6 with the session file. That is a write into the container like the session file itself.
 >
 > Whether the keycloak unit should mount the CA-only truststore like the three apps, so kcadm has a
-> proper anchor, is an open doc/code question. The same step appears in
+> proper anchor, is an open doc/code question.
+>
+> *(2026-09-25, evening)* #2036's release is **v1.12.0, on production since 17:44 UTC**, and step 4
+> has made the CA the only anchor there — so production is now in the untested shape above. Step 1
+> as written has **not** been run against it yet; the next kcadm session is the first test. The same step appears in
 > [`KEYCLOAK_HARDENING_RUNBOOK.md` § 0.4](../KEYCLOAK_HARDENING_RUNBOOK.md#04-open-a-session).
 
 ### Why a service account and not the admin user

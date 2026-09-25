@@ -23,7 +23,8 @@ Beyond roles there are three mechanisms that are easy to miss:
   removed both audiences.
 - **The session store is not a trust boundary** — a session value names its own class, so the
   frontend reads only classes on `SessionTypeAllowList` (REQ-SEC-067, ADR-0206). Shipped in
-  `report` mode, enforced in the E2E stack; production switches to `enforce` by one `.env` value.
+  `report` mode, enforced in the E2E stack; production switches to `enforce` by one `.env` value,
+  and has run `enforce` since 2026-09-25.
 - **Each service reaches Redis as its own ACL user** — `basetool-frontend`, `-backend` and `-ingest`,
   each confined to its own keys and channels, with `default` switched off at the end of the rollout
   (REQ-SEC-068, ADR-0207). The ACL is rendered from a committed template with hashes, never
@@ -32,8 +33,8 @@ Beyond roles there are three mechanisms that are easy to miss:
   destroyed at mint time signs a leaf for backend, frontend, ingest and Keycloak; clients pin the
   CA and verify the hostname (REQ-SEC-070, ADR-0211). Shipped inert behind
   `INTERNAL_TLS_VERIFY_HOSTNAME` and fallback mounts; the committed test material already has the
-  shape (ADR-0139 amendment 1). Production: hostname verification on and the material minted
-  (2026-09-25); serving the leaves waits for the `PATH_VARS` release.
+  shape (ADR-0139 amendment 1). Production completed the rollout on 2026-09-25: each service on
+  its own leaf since v1.12.0, every anchor the CA alone since step 4 the same evening.
 
 Authority: [`security-and-access.md`](../specs/security-and-access.md) (`REQ-SEC-*`),
 [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md), `ArchitectureTest`.

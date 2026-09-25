@@ -1,6 +1,6 @@
 # ADR-0211 — Each internal service holds its own leaf from a private CA
 
-- **Status:** Accepted — shipped inert; the production rollout awaits the owner
+- **Status:** Accepted — shipped inert; rolled out on production 2026-09-25 (steps 0–4; step 3 with v1.12.0)
 - **Date:** 2026-09-23
 - **Deciders:** @greluc
 - **Requirement:** [REQ-SEC-070](../specs/security-and-access.md)

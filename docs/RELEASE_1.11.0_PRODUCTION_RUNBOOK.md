@@ -218,6 +218,20 @@ back). **Before** rolling back, undo any §7 switch that pins the new release:
 the confidential frontend client (#2028 → `--frontend-client public --apply` first) and a Redis
 `REDIS_DEFAULT_USER=off` (#2023 → `default` back on first). The others are harmless under 1.10.0.
 
+> [!warning] Added 2026-09-25 (evening) — production is on 1.12.0 and past ING-SEC-04 step 4
+> A rollback from 1.12.0 to **1.11.0 or older** puts every service back on the shared
+> `keystore.p12`, which after step 4 no anchor trusts. Undo step 4 **first**: `legacy-shared`
+> back into `/var/iri/secrets/tls/truststore.p12`, the old certificate back into `basetool-ca.crt`,
+> and the `backend` alias back into `/var/iri/secrets/backend-truststore.p12` with a keycloak
+> restart — without that last one the Discord duplicate-account precheck fails open again, silently.
+> Production's backups are `/var/iri/secrets/tls/truststore.p12.backup-20260925-175805`,
+> `/var/iri/monitoring/certs/basetool-ca.crt.backup-20260925-175805` and
+> `/var/iri/secrets/backend-truststore.p12.backup-20260925-175805` (plus
+> `/var/iri/code/.env.backup-20260925-175805-step4`). For 1.10.0 or older the two switches above
+> come on top: `REDIS_DEFAULT_USER` on, and `--frontend-client public --apply` through a new
+> provisioner session. Procedure:
+> [`deployment.md` → Step 4](deployment.md#step-4--drop-the-old-certificate).
+
 ---
 
 ## 7. After the deploy — separate, optional, each owner-gated
@@ -270,7 +284,8 @@ production's `.env`; the leftover `/var/iri/code/scripts/lib/container-runtime.s
 >   restarted with it. The runbooks now warn at every Keycloak restart.
 > - **APPSEC-04 steps 2–5** — ~15:47–15:51 UTC with `iri-deploy.timer` stopped; `REDIS_DEFAULT_USER=off`.
 >   From now on a rollback to 1.10.0 needs `default` back on first (§6). The frontend's refused
->   `CONFIG GET` at each start is expected on 1.11.0 and gone once #2067 is released
+>   `CONFIG GET` at each start is expected on 1.11.0 and gone once #2067 is released —
+>   verified gone on production after the v1.12.0 deploy, 2026-09-25
 >   (`deployment.md` → *The Redis ACL*).
 > - **Tidy-ups** — the duplicate `IRI_BACKEND_EXPECTED_AUDIENCES` line removed from `.env` (inode
 >   kept); `container-runtime.sh.bak-2026-09-22` deleted.
@@ -298,8 +313,30 @@ production's `.env`; the leftover `/var/iri/code/scripts/lib/container-runtime.s
 > skipped): the five data networks are `internal=true` since 16:24 UTC after a ~2.5-minute
 > maintenance ([`deployment.md` → Network changes](deployment.md#network-changes-are-installed-not-applied));
 > the testing host still has the old networks. The frontend's refused `CONFIG GET` noted above
-> disappears with the release that carries #2067. The Android release v0.3.1 (versionCode 16) was
+> disappears with the release that carries #2067 (verified gone on production after the v1.12.0 deploy, 2026-09-25). The Android release v0.3.1 (versionCode 16) was
 > tagged; the served-version floor moves to 16 only once it is published.
+>
+> **Later still (added 2026-09-25):**
+> - **ING-SEC-04 step 3 — via v1.12.0**, not a separate step: promote run 36168223771 at 17:39 UTC,
+>   deploy 17:38–17:44 UTC. Backend, frontend, ingest and Keycloak mount
+>   `/var/iri/secrets/tls/<service>.p12`, the apps mount the CA-only truststore, and all four
+>   answer `Verification: OK` against `ca.crt` with `-verify_hostname`.
+> - **ING-SEC-04 step 4** — 17:58–18:03 UTC: `basetool-ca.crt` is the CA alone, the SPI truststore
+>   holds only `internal-ca`, `truststore.p12` only `ca`; `iri-cert-expiry` reports the CA (expires
+>   2036). The documented `keytool -delete` against `/var/iri/secrets/tls` failed (`Permission
+>   denied` — the store is root-owned since step 2d) and was redone on a working copy at 18:01,
+>   costing a second app restart (18:01:47–18:03:36) after the combined one at 17:58–18:00 (edge
+>   maintenance-page 5xx 74/121/7 per minute). `deployment.md` → *Step 4* is rewritten in the
+>   working form. **§6 now applies to 1.11.0 as well** (see the note there).
+> - **APPSEC-05 `enforce`** — 17:58 UTC, the owner's choice after ~5 hours of `report` with zero
+>   refusals since 12:40 UTC, **not** the ≥ 7 days the table asks for. Only `frontend.env` changed;
+>   the frontend logs `Session type allow-list mode: ENFORCE`, no refusal since.
+>   `SessionTypeOutsideAllowList` and `SessionValueDropsSustained` are the watch.
+>
+> **Still open after that:** the host's `realm-export.json` seed for the confidential client, the
+> Android release (basetool-android #182), and the kcadm truststore question after step 3
+> ([`keycloak/README.md`](keycloak/README.md#runbook--provisioning-the-mobile-client-basetool-android),
+> untested).
 
 ---
 

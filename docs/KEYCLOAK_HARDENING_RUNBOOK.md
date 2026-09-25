@@ -223,8 +223,9 @@ sudo -u iri podman exec -it keycloak /opt/keycloak/bin/kcadm.sh config credentia
 Every `kc …` line below is that helper. The read-only root and the `--config` workaround were
 derived from the generated unit on 2026-09-22 and first exercised on the production host on
 2026-09-25: if `config truststore` answers with a read-only-filesystem error, the `--config` is
-missing. **Once the internal-TLS step-3 release (#2036) is deployed**, `/run/secrets/keystore.p12` is
-Keycloak's own leaf keystore and the unit mounts no truststore — see the open question in
+missing. **Since the internal-TLS step-3 release (#2036, v1.12.0 — on production since
+2026-09-25)**, `/run/secrets/keystore.p12` is Keycloak's own leaf keystore and the unit mounts no
+truststore; the `config truststore` line above is **untested** in that shape — see the open question in
 [`keycloak/README.md` → *Runbook — provisioning the mobile client*](keycloak/README.md#runbook--provisioning-the-mobile-client-basetool-android).
 On a Docker Compose host (the local stack) the root filesystem is writable, and
 `kc …` without `--config` works as before.

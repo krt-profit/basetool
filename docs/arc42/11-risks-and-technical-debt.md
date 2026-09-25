@@ -207,18 +207,18 @@ not happened.
   `REDIS_DEFAULT_USER` is `off` there
   ([`deployment.md` → *The Redis ACL*](../deployment.md#the-redis-acl)). Left behind: a release
   rollback to 1.10.0 or older now needs `default` switched back on first.
-- **One internal TLS key is every service's identity until the per-service rollout.** Backend,
-  frontend, ingest and Keycloak serve the same self-signed `keystore.p12`, which is also the anchor
-  every client pins — so the internet-facing ingest container holds the backend's and Keycloak's
-  key, and the relay and the frontend's backend client check no hostname (ING-SEC-04).
-  REQ-SEC-070 / ADR-0211 shipped the minter, the switches, the fallback mounts and the
-  per-service test material; the switch is the owner's four-step rollout in
-  [`deployment.md` → *Internal TLS*](../deployment.md#internal-tls-per-service-certificates-from-a-private-ca).
-  Closed when step 4 has run: the units mount `/var/iri/secrets/tls/<service>.p12`,
-  `INTERNAL_TLS_VERIFY_HOSTNAME=true`, and no anchor carries the old certificate. *(2026-09-25:
-  steps 1 and 2 are done on production — hostname verification is on and every anchor already
-  trusts the new CA; the shared key is still every service's identity until step 3, the release
-  flipping `PATH_VARS` (#2036), and step 4.)*
+- ~~**One internal TLS key is every service's identity until the per-service rollout.**~~ —
+  **closed on production 2026-09-25.** Backend, frontend, ingest and Keycloak served the same
+  self-signed `keystore.p12`, which was also the anchor every client pinned — so the
+  internet-facing ingest container held the backend's and Keycloak's key, and the relay and the
+  frontend's backend client checked no hostname (ING-SEC-04). REQ-SEC-070 / ADR-0211 shipped the
+  minter, the switches and the fallback mounts; the owner ran the four-step rollout
+  ([`deployment.md` → *Internal TLS*](../deployment.md#internal-tls-per-service-certificates-from-a-private-ca)):
+  steps 1–2 at ~15:40/~15:52 UTC, step 3 with v1.12.0 (deployed 17:38–17:44 UTC), step 4 at
+  17:58–18:03 UTC. The units mount `/var/iri/secrets/tls/<service>.p12`,
+  `INTERNAL_TLS_VERIFY_HOSTNAME=true`, and no anchor carries the old certificate. Left behind: a
+  release rollback to 1.11.0 or older now needs step 4 undone first — above all the Discord
+  precheck's truststore, or that guard fails open again without an outage to notice it by.
 
 ## 11.8 Smaller, known, and deliberately left
 
