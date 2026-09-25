@@ -279,11 +279,18 @@ production's `.env`; the leftover `/var/iri/code/scripts/lib/container-runtime.s
 >   succeeds. The code fix is an open follow-up (`deployment.md` → host patching, arc42 §7.4b).
 >
 > - **APPSEC-07 step 1** — `KEYCLOAK_FRONTEND_CLIENT_SECRET` generated on the host, frontend
->   restarted, log `OAuth2 client 'keycloak' is CONFIDENTIAL`; Keycloak's client still public.
+>   restarted, log `OAuth2 client 'keycloak' is CONFIDENTIAL`.
+> - **APPSEC-07 step 2** — 16:15 UTC, through a temporary `basetool-provisioner` session the owner
+>   opened: the `--frontend-client confidential` dry run planned only `publicClient: true -> false`
+>   and the secret, `--apply` succeeded, a second run planned nothing; no `invalid_client` since, a
+>   private-window login works. Session file, rollback basis and scripts removed afterwards.
+>   **§6 now applies:** a rollback to 1.10.0 needs `--frontend-client public --apply` first, and
+>   that needs a new provisioner session. The table's "**no** `--frontend-client`" for the #2053 run
+>   is superseded too: every provisioner run now passes `--frontend-client confidential` with the
+>   secret ([`INGEST_KEYCLOAK_SETUP.md`](INGEST_KEYCLOAK_SETUP.md#new-or-out-of-date-realm-run-the-provisioner)).
 >
 > **Still open:** APPSEC-05 `enforce` (not before 2026-10-02, once both report queries are empty);
-> APPSEC-07 step 2, switching Keycloak's client to confidential (§6's rollback hazard applies once it
-> is done); ING-SEC-04 step 3 (the `PATH_VARS` release, #2036)
+> the host's `realm-export.json` seed for the confidential client (a host write); ING-SEC-04 step 3 (the `PATH_VARS` release, #2036)
 > and step 4; #1992, the `Internal=true` networks — testing first, and the testing host is still
 > held; the Android release (basetool-android #182).
 

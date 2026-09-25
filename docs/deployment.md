@@ -928,7 +928,10 @@ On production an `--apply` is a gated write like any other.
 `--frontend-client public|confidential`; a run without it leaves the type as it is. The switch to
 confidential is a two-step owner rollout with no login window — the frontend receives
 `KEYCLOAK_FRONTEND_CLIENT_SECRET` first, then the provisioner flips Keycloak with the same value:
-[`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md).
+[`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md). **Production
+is confidential since 2026-09-25** (both steps applied), so every production provisioner run passes
+`--frontend-client confidential` with the secret from `.env`, and a release rollback to 1.10.0 or
+older needs `--frontend-client public --apply` first — through a new provisioner session.
 
 The backend refuses to start under `prod` without `IRI_BACKEND_EXPECTED_AUDIENCES`, and the
 frontend's token carries that audience only once the realm is in shape — so on a host whose realm
@@ -1395,6 +1398,13 @@ curl -fsS https://profit-base.online/auth/realms/iri/.well-known/openid-configur
 ```
 
 Expected: `Verification: OK` against **the CA alone**, and each `subject=` names its own service.
+
+**kcadm after step 3** *(added 2026-09-25)*: the documented kcadm session trusts
+`/run/secrets/keystore.p12` inside the keycloak container. From this release on, that path is
+Keycloak's own leaf keystore, and the keycloak unit mounts no truststore. The session probably keeps
+working, but nobody has verified it; the fallback, and whether keycloak should mount the CA-only
+truststore, are an open question in
+[`keycloak/README.md` → *Runbook — provisioning the mobile client*](keycloak/README.md#runbook--provisioning-the-mobile-client-basetool-android).
 **Rollback:** re-promote the previous release (the old units mount the shared keystore, which is
 untouched and still trusted by every client).
 

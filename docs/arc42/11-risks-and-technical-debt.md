@@ -172,15 +172,15 @@ Neither item is required for the members-only posture to be correct — that is 
 application and asserted by the probes — but each is a decided reduction of blast radius that has
 not happened.
 
-- **The frontend is still a public OAuth2 client in production.** ADR-0001 decided to make it
+- ~~**The frontend is still a public OAuth2 client in production.**~~ — **closed 2026-09-25**: both
+  rollout steps ran and the provisioner applied `--frontend-client confidential` at 16:15 UTC; the
+  host's `realm-export.json` seed is still the public shape (an open host write). ADR-0001 decided to make it
   confidential (PKCE **and** a client secret), closing security-audit finding M-6. The code shipped
   on 2026-09-23 (REQ-SEC-069) and is inert until `KEYCLOAK_FRONTEND_CLIENT_SECRET` is set; the
   production switch is two owner steps with no login window —
   [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](../OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md). Until
   then the frontend client carries PKCE `S256` as the interim state. Closed when the provisioner
-  reports `basetool-frontend` confidential in production. *(2026-09-25: step 1 is applied — the
-  production frontend holds the secret and logs itself `CONFIDENTIAL`; Keycloak's client is still
-  public until step 2.)*
+  reports `basetool-frontend` confidential in production.
 - **Three of the twelve Keycloak hardening steps are open** —
   [`KEYCLOAK_HARDENING_RUNBOOK.md`](../KEYCLOAK_HARDENING_RUNBOOK.md): step 2 (decide *Forgot
   password* on Keycloak's own SMTP; `resetPasswordAllowed` was still on at the last recorded

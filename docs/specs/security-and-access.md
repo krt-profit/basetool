@@ -4776,8 +4776,10 @@ pattern is **PKCE + client secret**, never one instead of the other.
 - [x] Production rollout step 1: the frontend holds the secret. _(2026-09-25, owner-approved:
   `KEYCLOAK_FRONTEND_CLIENT_SECRET` generated on the host, frontend restarted, log `OAuth2 client
   'keycloak' is CONFIDENTIAL`.)_
-- [ ] Production rollout step 2: Keycloak's `basetool-frontend` is confidential with the same
-  secret. _(Pending as of 2026-09-25 —
+- [x] Production rollout step 2: Keycloak's `basetool-frontend` is confidential with the same
+  secret. _(2026-09-25 16:15 UTC, owner-approved: the provisioner's `--frontend-client confidential`
+  dry run planned only `publicClient: true -> false` and the secret, `--apply` succeeded and a
+  second run planned nothing; no `invalid_client` since and a fresh login works —
   [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](../OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md).)_
 
 **Enforced by:** `FrontendClientAuthenticationConfigTest` (Boot's real OAuth2 client

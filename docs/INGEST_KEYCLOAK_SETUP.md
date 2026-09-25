@@ -117,6 +117,12 @@ What to know before running it:
   secret from `$KEYCLOAK_FRONTEND_CLIENT_SECRET` in the same update (refused without it);
   `--frontend-client public` is the rollback. Without the flag a run never changes the type, in
   either direction ([`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md)).
+  **Since 2026-09-25 production's frontend client is confidential**, so every run below passes
+  `--frontend-client confidential` with the secret from `.env`; on an already-confidential client
+  that plans nothing for the type and never rewrites the secret. On a host whose frontend does
+  **not** yet hold `KEYCLOAK_FRONTEND_CLIENT_SECRET` (the testing host, as of 2026-09-25) do step 1
+  of that migration first — the flag without it is refused, and a confidential Keycloak client
+  facing a frontend without the secret breaks every login.
 - **Origins are arguments.** `--public-origin https://<the environment's host>` feeds the frontend's
   and the app's redirect URIs, web origins and post-logout list; nothing production-specific is
   hard-coded.
@@ -157,12 +163,15 @@ kc get client-scopes -r iri             > /root/kc-realm/client-scopes.before.js
 kc get client-policies/profiles -r iri  > /root/kc-realm/profiles.before.json
 kc get client-policies/policies -r iri  > /root/kc-realm/policies.before.json
 kc get realms/iri                       > /root/kc-realm/realm.before.json
-# 4. dry run, read it
+# 4. dry run, read it -- with the frontend's client type named and its secret passed, so a run can
+#    never leave production's confidential frontend client in any other state
+export KEYCLOAK_FRONTEND_CLIENT_SECRET="$(sed -n 's/^KEYCLOAK_FRONTEND_CLIENT_SECRET=//p' /var/iri/code/.env | tail -1)"
 python3 /root/kc-realm/provision-keycloak-realm.py --realm iri \
-  --public-origin https://<the environment's host> --kcadm-command "$KCADM"
+  --public-origin https://<the environment's host> --kcadm-command "$KCADM" --frontend-client confidential
 # 5. apply — a second run must then report "No changes"
 python3 /root/kc-realm/provision-keycloak-realm.py --realm iri \
-  --public-origin https://<the environment's host> --kcadm-command "$KCADM" --apply
+  --public-origin https://<the environment's host> --kcadm-command "$KCADM" --frontend-client confidential --apply
+unset KEYCLOAK_FRONTEND_CLIENT_SECRET
 # 6. clean up the session file (it holds a token and the truststore password in cleartext)
 sudo -u iri podman exec keycloak rm -f "$KCCFG"
 ```
