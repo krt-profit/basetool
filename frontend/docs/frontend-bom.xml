@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bom serialNumber="urn:uuid:f93bf31f-8402-4f17-8c63-fee78318a8ce" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
+<bom serialNumber="urn:uuid:b734c014-2f45-410a-a845-c55a79123325" version="1" xmlns="http://cyclonedx.org/schema/bom/1.6">
   <metadata>
-    <timestamp>2026-09-22T19:54:34Z</timestamp>
+    <timestamp>2026-09-25T11:14:11Z</timestamp>
     <tools>
       <components>
         <component type="application">
@@ -19,7 +19,7 @@
       <modified>false</modified>
       <externalReferences>
         <reference type="build-system">
-          <url>https://github.com/krt-profit/basetool/actions/runs/35775681189</url>
+          <url>https://github.com/krt-profit/basetool/actions/runs/36128198185</url>
         </reference>
         <reference type="vcs">
           <url>https://github.com/krt-profit/basetool</url>
@@ -649,6 +649,16 @@
           <url>https://gitbox.apache.org/repos/asf/commons-logging</url>
         </reference>
       </externalReferences>
+      <properties>
+        <property name="cdx:maven:package:test">false</property>
+      </properties>
+    </component>
+    <component type="library" bom-ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@0.0.1-SNAPSHOT?project_path=%3Alogging-support">
+      <group>de.greluc.krt.profit.basetool</group>
+      <name>logging-support</name>
+      <version>0.0.1-SNAPSHOT</version>
+      <purl>pkg:maven/de.greluc.krt.profit.basetool/logging-support@0.0.1-SNAPSHOT?project_path=%3Alogging-support</purl>
+      <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
@@ -1383,177 +1393,177 @@
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.netty/netty-buffer@4.2.17.Final?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.netty/netty-buffer@4.2.18.Final?type=jar">
       <group>io.netty</group>
       <name>netty-buffer</name>
-      <version>4.2.17.Final</version>
+      <version>4.2.18.Final</version>
       <hashes>
-        <hash alg="MD5">5ea817ded4fca341ad462486a8b45e64</hash>
-        <hash alg="SHA-1">daba397ff4ce7b22f6ac1e1f419e6e7754c135be</hash>
-        <hash alg="SHA-256">0d249178ec0204b35a6ad3e5ac8a6c2ecb3eb496c6cdae40b8eca4fa3cb6a0c7</hash>
-        <hash alg="SHA-512">eff949d26755496e00b99864dc521bd9f27bfbc4cbd3e24f3b37f0a826869b54492722970ee9d07595f938cab1ef04963d88a044da7d4bca66c27baa6614bcf1</hash>
-        <hash alg="SHA3-256">9cb1d7f2686bc335c45a1616855da3889a358767a2b68ef959f2f47a4d720c6d</hash>
-        <hash alg="SHA3-512">5606a80f55f781ad64fc4c338ec8140a23ff3ef814af81451c1f6a4e925677c71ed6ef2ec34b10c2c3cce15eab3f029e6bfd9b9e0c6cb9c5192a16e6e6a02e55</hash>
-        <hash alg="SHA-384">776ccfa5e6e77b759b834cbb2c3efc874d5f5d56c944eef868c4a269b4a0fc9650732e8056fa992dca21e211970d926d</hash>
-        <hash alg="SHA3-384">0c388d1e693fe08b49e017cbc12ca5853f9c3748972abd0e5e3a5c01da01637742bbba696dbee4479e745e55905b772a</hash>
+        <hash alg="MD5">34385ae3157b9f9c8d73383aad53e871</hash>
+        <hash alg="SHA-1">62e970871a61c58ff7164e076bb8032a1ea444af</hash>
+        <hash alg="SHA-256">fdf236d2b76aa9710684401fdad7dff9dec56e43da5d39172c9a55ba5f14b360</hash>
+        <hash alg="SHA-512">d32db67722f3d8d12f7766df5693cbfe99cac0d162d13d33d3e16776e5b5f53c7a8d5922c2c2dd284d07e466a07e8c798daad97360a02b967fc7b5600ce1cc4c</hash>
+        <hash alg="SHA3-256">801abf21c3273e9d8b6933e2f59e6cc45e68d932d9ea5bd7264a35bb17f0b2d3</hash>
+        <hash alg="SHA3-512">0f5f68b7e0f5571df4a781af8d631f4057f0f9a316f27516fb4d2613b5c0bc98fbae976616a44d447dff4db2d16bdd67d09e23a931a69c58226b80454e8b2bd4</hash>
+        <hash alg="SHA-384">ba0c8ffb494a1854b803a66f6615fb3b00fa7bf68bb86dd8c911886b955242ea057cb5518af8efda71054139a2aba166</hash>
+        <hash alg="SHA3-384">f765568a01ae55527d56f58de771f66e5f3d51c297f47e769580536d224c2330b8a7d0424829317ba81f647773aa6f0e</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/io.netty/netty-buffer@4.2.17.Final?type=jar</purl>
+      <purl>pkg:maven/io.netty/netty-buffer@4.2.18.Final?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.netty/netty-codec-base@4.2.17.Final?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.netty/netty-codec-base@4.2.18.Final?type=jar">
       <group>io.netty</group>
       <name>netty-codec-base</name>
-      <version>4.2.17.Final</version>
+      <version>4.2.18.Final</version>
       <hashes>
-        <hash alg="MD5">12b3b00718ba067e304b12570a05314c</hash>
-        <hash alg="SHA-1">7034de26b574322f365c790b9d6eb0634edab854</hash>
-        <hash alg="SHA-256">3b92bc3b7d231fa6f4889b2b9281cae6b634428b8121fb1b9b5fccba1543d352</hash>
-        <hash alg="SHA-512">96bbfff843e47769a7bad6112919ac73eeceb89d0735520f67b464c2d8d2f9e28a217604807cb20b76fed1c64de6f3e3015986ef6d50ac4149dc8cf8012e1df9</hash>
-        <hash alg="SHA3-256">4ebc4d4ddf24f8becd087cd1f674e04d33ced87fb0d8be3b014b9e9f0a03dcd5</hash>
-        <hash alg="SHA3-512">578f2131fa9826522d6089337b03ffa4536a8b9e8ad84e0cf667815f4cae459198ba1b3323d18032ba84d443a0093abab079b4840950a6bcacdcf5eec61c64f7</hash>
-        <hash alg="SHA-384">e47ea344f9568102c2f0f985e1ed5af966de5b954b9866b278f61243ff8e0e900514e0786afb2fc1aedf259f8e730639</hash>
-        <hash alg="SHA3-384">870f5dc0f6d13d516d50f6af5151fea854cf2e1abae0066443a7dda061df53de4cf5100accffc88328389d4f95a2c4bd</hash>
+        <hash alg="MD5">1877d0d0e3a42b091d6fde46c8bd6a54</hash>
+        <hash alg="SHA-1">058739f9f05f1806e1117401e1982b04d7a02f3b</hash>
+        <hash alg="SHA-256">7e4612bead7ba88ac6f7908fa722f90ad6835ea96505c9e40b2f93686c1f61f3</hash>
+        <hash alg="SHA-512">ba1ebed41db5aa17bcc0b90bbabebce4a1fd7286a101b24a2821e5d19c8cab8a4f42cbcdda1c56dffd1fbc5c89baa600debdde676db56482d0fd0e40b8831250</hash>
+        <hash alg="SHA3-256">bc6232af360f126cac685096ac0883f2012c8c8ec04cec95370b0562ee013d21</hash>
+        <hash alg="SHA3-512">213259e74a085d40127a1b83240cee0334fe28fe938a40d772ad8acb76d1114bef3609977a7e1930c3557370a856ecad62e038ddb6197c19b043f0fe065efbf1</hash>
+        <hash alg="SHA-384">6f490ff955eaadaed8f8c7464e05afdddfa44c4b17e195136b42d64c7fd02b7cf91022404c7b4bcdee5b6388e70b4cae</hash>
+        <hash alg="SHA3-384">27e3a840470e05606c27f71147340aaf0531c4a6ff196fcd4b128fd3c4e4df7fa8ebfb9e276a9e70d2feed5347b2ad55</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/io.netty/netty-codec-base@4.2.17.Final?type=jar</purl>
+      <purl>pkg:maven/io.netty/netty-codec-base@4.2.18.Final?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.netty/netty-codec-classes-quic@4.2.17.Final?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.netty/netty-codec-classes-quic@4.2.18.Final?type=jar">
       <group>io.netty</group>
       <name>netty-codec-classes-quic</name>
-      <version>4.2.17.Final</version>
+      <version>4.2.18.Final</version>
       <hashes>
-        <hash alg="MD5">4001f59d44018891d9fd89bc73c1f24f</hash>
-        <hash alg="SHA-1">29e7763142b0221d412ea7c8d4f0cc1c08bfb526</hash>
-        <hash alg="SHA-256">542e718fdd8fa4f6d57bef9f91a5fa01200940cb8b381fd4c21fb5c170276c71</hash>
-        <hash alg="SHA-512">383c3c9f96cd416141e14c68a87c6880cea8256b5858a004576c31379ed98290d1e5dc2e4271745dd4a529b1a69fa4c59f98b4b289d134162ab40e6896ce84c5</hash>
-        <hash alg="SHA3-256">b8fa3749a706e5ab21a85b7b8e289f9fee33062a7e5b324c9b14a88bd2716374</hash>
-        <hash alg="SHA3-512">5e08c1386b86e4566d0851810cc5a98c76b0b2a70395428f012a93a92bb7b8881612683241a404213a29b94687e089d876a1d2e738a625fe61118ecfb246ed75</hash>
-        <hash alg="SHA-384">2632fa9869e1fce94ddb0e667af6ecf93450c635be9ea9b5d0ea0bf57d19241d2a4b3e754cc524eb92d289044e891478</hash>
-        <hash alg="SHA3-384">f0944ed2f13c83dbd06567369ca52408215d363083f6a1344db6f6e86b55b57a192f1a355f408f2947a535783b3aa731</hash>
+        <hash alg="MD5">8bdbbd36ed1ebb7da9cf5f441ebf7db9</hash>
+        <hash alg="SHA-1">cc350fcbcd92876d5de11d54e68f63f0ebb6e10b</hash>
+        <hash alg="SHA-256">d1c4c4327fde2bf6ec773b070344907a7a4844f1843528ae917905e2c3547478</hash>
+        <hash alg="SHA-512">5349f8b5ce9fdeb4db2277ec60e950efb72681e95040a711e6f7c80994ca8aa67930600c39060312b40e16b51687388c6c99dde5ace51296e58f142374bf08cb</hash>
+        <hash alg="SHA3-256">5525d88f1b64e480fea8beab6f35b32fb331cc4e682abab4b5c27f285cb85011</hash>
+        <hash alg="SHA3-512">dd9e56045d13d56fba5c13b1b79cd5c4387b4ff91aebe2469b4ce28a0effc1fbf0bd8ef506df6553db9095fa3423a0b3f73294f2cbae536722bbfb22ddfb9171</hash>
+        <hash alg="SHA-384">b679a5f116807da753c5425af144f16c377010c8865e9da3130cdfa183c047aff87cec6ea0272ae309bf0bd3de381503</hash>
+        <hash alg="SHA3-384">1c2036f41a5dd9aec416dd16ad97bc8029b754fb813878b30211d6c3a7ec76c57e8e759a78d4691e2636532d74ea3048</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/io.netty/netty-codec-classes-quic@4.2.17.Final?type=jar</purl>
+      <purl>pkg:maven/io.netty/netty-codec-classes-quic@4.2.18.Final?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.netty/netty-codec-compression@4.2.17.Final?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.netty/netty-codec-compression@4.2.18.Final?type=jar">
       <group>io.netty</group>
       <name>netty-codec-compression</name>
-      <version>4.2.17.Final</version>
+      <version>4.2.18.Final</version>
       <hashes>
-        <hash alg="MD5">0a6333fdc827c129fc8836a3fc7ba887</hash>
-        <hash alg="SHA-1">ac6829387c962174e2efbcc94e833c9524ca1459</hash>
-        <hash alg="SHA-256">425b287a1f36986a5c8edd76379a49decdf99d284f3454f3fa607a073bfb2c18</hash>
-        <hash alg="SHA-512">89085758691b6bd056d4ba9608422c23a2a927831d326e4c110ce5c86497b05d5f36e174bb6f98116aa8e39628835631aa8c94e425c7c491f880aa0d39fac04a</hash>
-        <hash alg="SHA3-256">5f9a4e2479dd0281ac4b172ab9d2b9dbfa6a70fdfc377968149ef6ae838544ef</hash>
-        <hash alg="SHA3-512">3127a33d94fbf9cabcd06dc6c5f6ef61bf3f4674736974c101f67c4bdbba7b55f082b7873c552b9005574564474b28e6226d6375fc02cbc41e26b579a4335f6a</hash>
-        <hash alg="SHA-384">55817e154895866864eba655fe5b8797ce83a0d3f4aaaaee149c17a714772e8d4abd7ba036334e5c73883878faad8790</hash>
-        <hash alg="SHA3-384">80f7ab871f8eeca5040557c4c94b9730e0b2e3254512f0a4b22411c76d36d4b3b4c4635e2aa30b4d4e0f9d2bd86131ab</hash>
+        <hash alg="MD5">44dd5f7d6e4c00871c0c329cf441cfb3</hash>
+        <hash alg="SHA-1">f6f9e4372da33ca4f96b7af528ec8c26932f9fde</hash>
+        <hash alg="SHA-256">9d8a4b9a6a2a166ec5a4bbe51a78b4f6a726457c51d81495743c7e7ccb9f4765</hash>
+        <hash alg="SHA-512">1eb0707e9a8645c5091cf48e2ccfc74aa2ac2e5337db739c364c157650e4dd88f3972c022ee4ba9c23aa5f029382aad7e413db4276a8839353aa463b0f764e88</hash>
+        <hash alg="SHA3-256">3f26b8c9db7d04edaf720264263c9606c674978abd9e64d05524af1edf889b23</hash>
+        <hash alg="SHA3-512">b266f4b74d0d9468a0f229a1de5e9bc28c55a9a75cf41aafcda63790f67fc53e18202bfe3ec151ab8f584b13df149b1540148568ac97a5fbcbcee699e3f6317d</hash>
+        <hash alg="SHA-384">33b4cead99332ffa821064bd6c3847cb8ee224f93a31fcf7de692f8d52aba07d52816aa2007786be185d15ccf21fd3e1</hash>
+        <hash alg="SHA3-384">1900496f68bf3d9681d72c274ae4c2969e54c6583ad9948b006285276b124d14daa805ed2745d7fa45092077df4fbe15</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/io.netty/netty-codec-compression@4.2.17.Final?type=jar</purl>
+      <purl>pkg:maven/io.netty/netty-codec-compression@4.2.18.Final?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.netty/netty-codec-dns@4.2.17.Final?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.netty/netty-codec-dns@4.2.18.Final?type=jar">
       <group>io.netty</group>
       <name>netty-codec-dns</name>
-      <version>4.2.17.Final</version>
+      <version>4.2.18.Final</version>
       <hashes>
-        <hash alg="MD5">ec4d4ae87e9fbd73b8cf90b47d79177c</hash>
-        <hash alg="SHA-1">300fd8d673cf801b36bfae0f2557d46ebc9658e5</hash>
-        <hash alg="SHA-256">394f4649a824683735f28b299d0a48caff059ae30e654e2abf8b3f392af4d374</hash>
-        <hash alg="SHA-512">0428e3f0fd4e9a274af5e1a76f45103e04e0c6199e0719d12220566c56fff2a264b01f3a5cc2a476aee3429b5775a601e798dfd57509cdd13bb8b596227c914b</hash>
-        <hash alg="SHA3-256">eb0c959e037523bd29b45b0750b649d86b67589b7521d2c7cdc8af873e0035b9</hash>
-        <hash alg="SHA3-512">2640e712e35b580e792cfb6cc5676989222fc0bb131ee8526f61d928eaf14b6b9fdeda93413dd49f43189056f684fe6579be64ebc43be73b63c90c87a5281bd3</hash>
-        <hash alg="SHA-384">a9b0afaaf2222e52be665a32e7435f566619e966f826c55ef4c77012586a7ff881cdea99d24717dcbfcc6b8fc00260d6</hash>
-        <hash alg="SHA3-384">6b108085b95196577a009cc1718ee8397a4e32ee90af76c4ccf2b95e1d3100508ba250aa43dd3a4f5f8c93ef6a8d48d7</hash>
+        <hash alg="MD5">82bbdd94118354399b9b5f04cea0cd30</hash>
+        <hash alg="SHA-1">b89710bfb47ad07d5fd936829aba9a06fcfbcd0a</hash>
+        <hash alg="SHA-256">6f4b6da1483a82a637804740c2fb61385c9337a5e7ae5e357720cc03ba60b728</hash>
+        <hash alg="SHA-512">08fd9de1643b0bab11b34eed03a94f9f6b4897d49105e89b80ce1fbb4276a4db94746ec1f6f595449a0278c6c5e785a0d678532fa130005334b466acaff57bbe</hash>
+        <hash alg="SHA3-256">875e09aa15e08079a7e9cfd49e9bc073408ff0cf091eb17636d1275d7a3a4ecc</hash>
+        <hash alg="SHA3-512">89d94ff58d7aad074838d7da9c9bac4cd2518a4382419ecace062084277215e588079883a37931387c2d176ca2cbdd70aac40ba2540a907255c12195f1887608</hash>
+        <hash alg="SHA-384">3d3df3688da9955bb5ecaa66dc85ac739e821b1cc3119b1e9da3040fac359d101a77f7ce1e7b47debed524b0543d0f46</hash>
+        <hash alg="SHA3-384">a8f0e68ace3955614d35766d84489771342c204069945ad647b662b7ceb91834a2bfd4af1c36195230b6a888a253c170</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/io.netty/netty-codec-dns@4.2.17.Final?type=jar</purl>
+      <purl>pkg:maven/io.netty/netty-codec-dns@4.2.18.Final?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.netty/netty-codec-http2@4.2.17.Final?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.netty/netty-codec-http2@4.2.18.Final?type=jar">
       <group>io.netty</group>
       <name>netty-codec-http2</name>
-      <version>4.2.17.Final</version>
+      <version>4.2.18.Final</version>
       <hashes>
-        <hash alg="MD5">a73b8e1ad276ab4e4035fede45993235</hash>
-        <hash alg="SHA-1">cf440d723f9679df95a1c5b89dbff8867deee41e</hash>
-        <hash alg="SHA-256">450af97424cf58d2d72ad4d476d9e290f2fdf69fa181c289a6e6dd176bb86a7b</hash>
-        <hash alg="SHA-512">827bdb89e649ca242be172b91576f47d8cdcb7fe1f2d4dd943100d2039e99b6ff7bb0666625a8821e8cafa615166c21fa012485a769599a048f7366a6be34cfc</hash>
-        <hash alg="SHA3-256">e4de88716c2c0d5cd23f7bac9ef7a7976ee1115084d7b850f8ac9c799c309299</hash>
-        <hash alg="SHA3-512">596a4f5eedd8927bcefb8f73331132fb20f3d55178bf65d9df51cfc906bf88c5af2d4e8e89148e500960897adf335f9cd27147814018e44ea9af581db94779f2</hash>
-        <hash alg="SHA-384">74e6feccb68efcf765792a21cc95d9ce908366c0006c5f8831f7cdf921effe3d7863c691527ab267225d413e0dd3c21f</hash>
-        <hash alg="SHA3-384">e39789ba2489100c82dc3e1d2c85f051327359aef35bbe5a8affad8efb85a0eee0005bf1f9afab90d5fec0f442ee2063</hash>
+        <hash alg="MD5">a9ea2ce366e5200bdd8adcee82b8e663</hash>
+        <hash alg="SHA-1">a0f08f3697a570cb1eae4abfd6637f6facb2fe57</hash>
+        <hash alg="SHA-256">a45a2b06c377b9c87c21ae2b37f04c8d808192590a73d977e7a60fd59921f283</hash>
+        <hash alg="SHA-512">ffc2170c446fb12cbdd7cfbde3961fba1c23e00fd32e5129c7063538a91af6b67b7536838cc0795135402b227156eaa289216572303f60406916c0472459e345</hash>
+        <hash alg="SHA3-256">07f7dab836ef7ca5b83dd87b0be2999b83bca7e7babd45a6d9a9756f1190ed42</hash>
+        <hash alg="SHA3-512">c9d1997386d5e5312d36a0178b1e8e5433a04cf3b5f9d5efaa0f31b091da9101c2fa09f184a2ae9bd85223c48b6f131822f62a3daf6de0297d57ba7207c3706d</hash>
+        <hash alg="SHA-384">5e526bd6b994229d57b5fd28c4f11d3ac962125927f0da35abff5966f7c8c7c2031bbac857ba2e90c98ca168caaa67dc</hash>
+        <hash alg="SHA3-384">8db8ffc36098570dee015e469c5c9cd08becdbc44b09d736d9b1a7e4065e2d084cb39a9dbd4feaccfe84a85e52e67d56</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/io.netty/netty-codec-http2@4.2.17.Final?type=jar</purl>
+      <purl>pkg:maven/io.netty/netty-codec-http2@4.2.18.Final?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.netty/netty-codec-http3@4.2.17.Final?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.netty/netty-codec-http3@4.2.18.Final?type=jar">
       <group>io.netty</group>
       <name>netty-codec-http3</name>
-      <version>4.2.17.Final</version>
+      <version>4.2.18.Final</version>
       <description>Netty is an asynchronous event-driven network application framework for rapid development of maintainable high performance protocol servers and clients.</description>
       <hashes>
-        <hash alg="MD5">b3e40ec83a1d2ddabd85381b3fa260cf</hash>
-        <hash alg="SHA-1">33d1459544fcc35f58cb307b47106d447cccb125</hash>
-        <hash alg="SHA-256">9fcf9873e31b2899c407b42d320aaf6afeb69807e63d9a865c391b4339fa24c7</hash>
-        <hash alg="SHA-512">24bee63c430f585f999149623dedb6f8f804da5006f9f7b0bf9d0f36ee117730a0cecfff6276726811f0035fc6209ed04e84b67c2c9cd94fa2642ee218c5bd44</hash>
-        <hash alg="SHA3-256">0bfcbbec28f641b6e89bf71702d13e730666335d40301e0e41e7d727f0467f49</hash>
-        <hash alg="SHA3-512">d0b94082ae5eb66fe2393568fe88f6e0d8768f0d4dfbcfbef80ca273773f0bf5ed3485bc27d451892b503af91fdba0faa3466672efddc265984b243dab70be68</hash>
-        <hash alg="SHA-384">e362ff2f5d96d52cb4aa59922d4fbb26f65310bbf5156f5e828777a1b8010e35242da84da70e7bebef8f1a63ac932925</hash>
-        <hash alg="SHA3-384">93253133106592f33a1c8a42333105370ccdddd8f1eefefcd6538b5d28ebaa1554c966a3090ebb4ef34c4e26fe644c4d</hash>
+        <hash alg="MD5">ad79db1986be55731ed4883f0b46113d</hash>
+        <hash alg="SHA-1">2776049d9acabac6a2da9346c5ffb9ac1436fc29</hash>
+        <hash alg="SHA-256">cc1652ece111e35a7677c8260499cc6709950061998f9d1a36496b352f456273</hash>
+        <hash alg="SHA-512">89b6b6d922d9f2d1a262d6929c66640b9db8a3bcf37d71b557d672bf6540d02854db6b5d5c9c45276338fb68c2ab6f208ceb693a529ece9b267624df08325a08</hash>
+        <hash alg="SHA3-256">5e4309e6db51d3c2c7a11d981e84f55972ea1788152b3c5e50453c10d5a45cc6</hash>
+        <hash alg="SHA3-512">8d5d1246f186822d84cfa17f323a5fd453645946ef23381c013ee7d969128ae8335f7419a97cd48313aec5111af80890af866aaf02b1fec249c5581abcf2bb78</hash>
+        <hash alg="SHA-384">ed6ebbd4095afe4ee7a5c5a63123422cddc2306060120c1eff56cf44f39715ca0999c01daacd34fffb952558b168d2cf</hash>
+        <hash alg="SHA3-384">b276bf64c2e954694daa0eb8be6307995c187729edc4d8765f98fe3ec45c9a4f4cfd91d5d55bf751a15bba5f62f5bacf</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/io.netty/netty-codec-http3@4.2.17.Final?type=jar</purl>
+      <purl>pkg:maven/io.netty/netty-codec-http3@4.2.18.Final?type=jar</purl>
       <modified>false</modified>
       <externalReferences>
         <reference type="vcs">
@@ -1564,352 +1574,358 @@
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.netty/netty-codec-http@4.2.17.Final?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.netty/netty-codec-http@4.2.18.Final?type=jar">
       <group>io.netty</group>
       <name>netty-codec-http</name>
-      <version>4.2.17.Final</version>
+      <version>4.2.18.Final</version>
       <hashes>
-        <hash alg="MD5">1439d80263b75e5d3b23c9c93518fe2d</hash>
-        <hash alg="SHA-1">67610763a8f351161a9bad705a83e9a96a49e92f</hash>
-        <hash alg="SHA-256">a5bde91ac82ab90579df6559c0bd7ea6ae37460e3f18116ab4122194283b3669</hash>
-        <hash alg="SHA-512">96ca6fc95322880f429aa95d739e32852245618ebc2b449bdd623073e9d87347f454dcc9cf78b70ff6412bb84b099909bc1fc7787bb37280f62cc3501e874e2e</hash>
-        <hash alg="SHA3-256">abde6049539673f1559d54c92581fb5bebe86fc779c4fcfb4ccc2e70e30af0fc</hash>
-        <hash alg="SHA3-512">5929e48abe128ab0d7b25858eab083b19c72c2cbe8668544cbe1259f364edc85283c5820296800a54c0eb29795e62bf1cd4918abe1f25fc346b94aed0d88e96d</hash>
-        <hash alg="SHA-384">cab28f41d86cf4299231415c6ddeaa46e930c97a1cfee5338be43d1fc8b88e86c2f330c61086d1964028ec8353780709</hash>
-        <hash alg="SHA3-384">c3bc8609df3996e8d1bf60e77ec4025d206e7ef286aec2ad91ad163548bcb23cf536ee502bdda64a48aff41c569c0328</hash>
+        <hash alg="MD5">28f394665ff94da8415c501340f57535</hash>
+        <hash alg="SHA-1">25d8eed33ee14c6691250df4115604cf6a41340a</hash>
+        <hash alg="SHA-256">2d50765eb58591ce35146c54ca032a257808d2165d8985a8522c70ea1470e8d7</hash>
+        <hash alg="SHA-512">f8979bd3f898f366e67571f978ff821a4b94103e82483d6a16ee0a091eeb2516a7bea88747454938a6a209fdf515822a5f325ba50e39bb96f88e574002dffc10</hash>
+        <hash alg="SHA3-256">95f0fe1a6e1cfc0573f9bba22ec08099ba8c6b0a237a5e88ea28f7438d029c3d</hash>
+        <hash alg="SHA3-512">dc78c2066feb429fa6b19072d383150c209e065bf7d6ad1b8bfaa94a4163cc47b27edbf445c5ed811ebe98b40d2bb92f14bdd7df20d8b0f6f54588b404feffdd</hash>
+        <hash alg="SHA-384">b3efa985cd36193e98121fffdc9138eccd15c788379073752566dec6556c05786605d3ce5e2de4314effe5784ac4d39a</hash>
+        <hash alg="SHA3-384">b59467e16f7ea7c6fe9c4f1bf084e83ac443f63d1fc6ac905724a483ae081309124a69d47dfe897c08181af5cc5c25aa</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/io.netty/netty-codec-http@4.2.17.Final?type=jar</purl>
+      <purl>pkg:maven/io.netty/netty-codec-http@4.2.18.Final?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.netty/netty-codec-native-quic@4.2.17.Final?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.netty/netty-codec-native-quic@4.2.18.Final?type=jar">
       <group>io.netty</group>
       <name>netty-codec-native-quic</name>
-      <version>4.2.17.Final</version>
+      <version>4.2.18.Final</version>
+      <description>Netty is an asynchronous event-driven network application framework for rapid development of maintainable high performance protocol servers and clients.</description>
       <hashes>
-        <hash alg="MD5">5a0b93d04af21830486374d3d6ab887d</hash>
-        <hash alg="SHA-1">6bd5c6f3c896cb23810de68847b583d5b1f09854</hash>
-        <hash alg="SHA-256">9225b069850e2238126359b6d3ad00df1c8c528ce5123682b8090c09ec37bdbf</hash>
-        <hash alg="SHA-512">189ebbd3261112af6b7fa358627b5956f2987c17e8e1c94a217a7a4453a30a20918f71c1bb2985369ee4603ec01cd975a3fc0d9ffa3f55561159308771c120a1</hash>
-        <hash alg="SHA3-256">865bdea1581981661a8bbc4d279643df957f2c8778bd57ad50635e5c0820501f</hash>
-        <hash alg="SHA3-512">2d2cd7f5a930f2a03b0b1cd1f5554e6befce6b4355de110200daa3458bb6cf844da0ae68284174742d50e1072c2d505da1b64981394a1eff1a77d6f794299f56</hash>
-        <hash alg="SHA-384">a772b8a1c0994f556f2714cc3b431ec15704afef8047aad7a998d18073430d539383eec9b56f22ba416d17a34f4e5d20</hash>
-        <hash alg="SHA3-384">bd06d4f369a15fab20b8a37c96856ac22476566144b7aace4d1e292d33347ed872afdfb8f0dddd6296deb486fdd31a08</hash>
+        <hash alg="MD5">f7de471a6e38b915216135b6961dd3f5</hash>
+        <hash alg="SHA-1">4841f339d9e4729712da0988d767d38ee1829ed2</hash>
+        <hash alg="SHA-256">45952dcfa200317add275fbbedf32967cb3e5528fc84a5d2b7ccc4439e8d3f88</hash>
+        <hash alg="SHA-512">938021d2279aac7c82dfe189afe968bb552fc71b1e80eefb41502be5fe6eab772000a154bf90aa2d83d23d2bef78cf5967eeb384a20e731792850f47abe55c6a</hash>
+        <hash alg="SHA3-256">6b00ecbc392c3df90de75662e8d6251bc4d5ab8bad561d996468bf908585a56e</hash>
+        <hash alg="SHA3-512">245f4dcfcca146cd85abfee5b7e51898549cc8e28912c8720015f0b1a579b135921eabab2f86bae479505fe75e8f6e0f496c4b962fd7089a392332d20769d9f3</hash>
+        <hash alg="SHA-384">08c62e910a39fbbbaaaeb1a5db7db386164861bc92f75da7c99869d7de3a2cf8d6a286e7cc16c9b9765685188b1c3c00</hash>
+        <hash alg="SHA3-384">c00ca982cc5c2c8f423f795727ae3a797734270e07db416b68ecd09ea42f02eccdbd03609ec4ed9a051fd04c5f959bc5</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/io.netty/netty-codec-native-quic@4.2.17.Final?type=jar</purl>
+      <purl>pkg:maven/io.netty/netty-codec-native-quic@4.2.18.Final?type=jar</purl>
       <modified>false</modified>
+      <externalReferences>
+        <reference type="vcs">
+          <url>https://github.com/netty/netty/netty-codec-native-quic</url>
+        </reference>
+      </externalReferences>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.netty/netty-codec-socks@4.2.17.Final?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.netty/netty-codec-socks@4.2.18.Final?type=jar">
       <group>io.netty</group>
       <name>netty-codec-socks</name>
-      <version>4.2.17.Final</version>
+      <version>4.2.18.Final</version>
       <hashes>
-        <hash alg="MD5">1b3650c324fba87975167e0534932b37</hash>
-        <hash alg="SHA-1">ff173f7fff8473232eaa89a915d75af38b2bef48</hash>
-        <hash alg="SHA-256">6b5760cc512cee1f7515e25010892471f3995045f84cd6c1d1b6e6cee534733c</hash>
-        <hash alg="SHA-512">1b7a85c267b42b2e9cfe43607bba938ddd807f648bde387e4a9d97e20ad93aa1e22beb5a16a481eeef82fc5636aa6068075e82a6b1d8e1142b66dcd36af45420</hash>
-        <hash alg="SHA3-256">8fb61d11d6e633f8a5820dcad42fdd1eace636d165c93c25d845e419f8e76fe2</hash>
-        <hash alg="SHA3-512">2c54db1b6084010af90f91ebb186619ece22d5c017f20711be017b99cebd637ea695999eb2c54b7aa145b35f21b14bc8a9a6490a9ed218ea519d8837c8c0ea84</hash>
-        <hash alg="SHA-384">4f24377fd8b2f0cd053217600ca76cade8076cdbae6a5f9570df323bb357c27f29ab52aaff1eec4dcbed8e5fa95a4b2f</hash>
-        <hash alg="SHA3-384">4761a7ac4f4d1f58dd41e1e14c84ecaac9502287f02a45c67a6aacfdd4558e47f62ba2c9d447f5707fd969b0c9eeef50</hash>
+        <hash alg="MD5">6d88960ef3fb5c7f673a3f738f093e9b</hash>
+        <hash alg="SHA-1">4a3bf2cc5051c3c35076d0dd8528ebcce440258e</hash>
+        <hash alg="SHA-256">25dea7bc1ad990ab8959065f0690b63574d8db4f51033cd98458fc84c59367f3</hash>
+        <hash alg="SHA-512">a91811523b255b0273d29dd1786daacce395868646c311a773d5cd4e6dbd99bf5c83a72b264ed1b4650c8e082a241fcad25675632d676a2091dfb6d915b1d0f6</hash>
+        <hash alg="SHA3-256">55cb2ff0b9bcebf44c35f04d7222db80aed5f99a2f0fc793c43a8890b435e4c8</hash>
+        <hash alg="SHA3-512">350efae8b3bb0b301ccc70a60a123843a0609697d33905ad6b57617210e500052510896654285cc21b1e7f6e9bfc1a5c2fab304411261fee4b1fa5430d2519bb</hash>
+        <hash alg="SHA-384">58d801aa649d07c64a03cc9880889fc7654fb0c3bdaafe3e33d0568dfd8b12e90bcb50263a4adebdfda70cbffa5afee7</hash>
+        <hash alg="SHA3-384">4cac418f4a9b40de373f5742f0aa12c9d0e41b6d6f323733fb521ba1e257c558edde30af0ab872fdf6862a9609d460aa</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/io.netty/netty-codec-socks@4.2.17.Final?type=jar</purl>
+      <purl>pkg:maven/io.netty/netty-codec-socks@4.2.18.Final?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.netty/netty-common@4.2.17.Final?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.netty/netty-common@4.2.18.Final?type=jar">
       <group>io.netty</group>
       <name>netty-common</name>
-      <version>4.2.17.Final</version>
+      <version>4.2.18.Final</version>
       <hashes>
-        <hash alg="MD5">fe50eabfdf19b59022b133b7d5e7de8d</hash>
-        <hash alg="SHA-1">57fa9e9af0bf70530e2fe1c8c8d6138f9167cf7a</hash>
-        <hash alg="SHA-256">502aae2a6680e9bca3558a3fa098f06dc4d87340b8b714e925a6d690871c092a</hash>
-        <hash alg="SHA-512">6cf9bf400da093ad36b5a9dc2d1fd3e9d5596cf58822b3d8b1ed2807933756e8340b4385c511c1c574f4e0cc04cafeb0ac29f36c27e57a2082cd1fc5451c0c16</hash>
-        <hash alg="SHA3-256">96b81d5b608c036d11c9525e75479ba55580b602672be7c7252fcc9397fe9e92</hash>
-        <hash alg="SHA3-512">45aa43b5d770ba0c3922dd185a6df969da97b147ce096a913dfe7ce0e2f6e2de1ae6a8b99a56fee832dd6e744650dff213c1368ac3ff594bcaaed1af695f8bee</hash>
-        <hash alg="SHA-384">237285d33bf81b935cf706ae44b2e899932d67f789d56cca578133c818ddeac9cf1748d90b77361076bc6ebec6168b90</hash>
-        <hash alg="SHA3-384">4c8c3d95cbe200e1f115b5a93b2ddb10d1c57228f34a18b94ec1d80065ad593bbfa2818301f05eb0f11dc73f9a68a35b</hash>
+        <hash alg="MD5">d9a640f410fd5db89ae10992860c499a</hash>
+        <hash alg="SHA-1">aa06ef3310c8ad1e506ec14ab3794f9e26438121</hash>
+        <hash alg="SHA-256">5d97cae5669685872339698efe13f74fe3cdb2dccdb36963b2352bd95acf7070</hash>
+        <hash alg="SHA-512">069be6ee940f54be7700529d6dce31ec191a78189529d406b4baa2f21728d37098ff4ab2ffddedc1a054212c1a455ad526e0ef6ad65f0b21e2a2a442d425623f</hash>
+        <hash alg="SHA3-256">a0e549a4466304f4dd8e0f16952b153364df89568ea37926bb94648811ef3fb9</hash>
+        <hash alg="SHA3-512">6dd0fc27544aa05569d3057a3bbd6cdf099de26c722819ac716fadb49dcb5a08d31d87258979f08122f9e02e9562a34217e0be07c598e055e39e86cafecc7497</hash>
+        <hash alg="SHA-384">0405e15299ff57fc02c62f14158b37be60e4b219b422cb4c6080760d2d8ee436124247d2bf5ba3eb85f5490dae21207e</hash>
+        <hash alg="SHA3-384">72397c2e4b2a70619a6ecf6feb5b35b2c9814d93a6a1191d8c2b3cdc392975971bbcfd1579de25c5be4e0d60832103bc</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/io.netty/netty-common@4.2.17.Final?type=jar</purl>
+      <purl>pkg:maven/io.netty/netty-common@4.2.18.Final?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.netty/netty-handler-proxy@4.2.17.Final?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.netty/netty-handler-proxy@4.2.18.Final?type=jar">
       <group>io.netty</group>
       <name>netty-handler-proxy</name>
-      <version>4.2.17.Final</version>
+      <version>4.2.18.Final</version>
       <hashes>
-        <hash alg="MD5">4c06881243497b73751b85f998b60e2f</hash>
-        <hash alg="SHA-1">17f50f65e784e1cc2ddc5bbe30fdaa1193f93265</hash>
-        <hash alg="SHA-256">94089bea6ba6f3248725f2bf233aa2bc70ac1547c21b9bdfc7548f710a845aa0</hash>
-        <hash alg="SHA-512">f6ea1b36d70658b9555cb3de5d7f74b34e63d1348b99f305b1ea276eaed6fb7b005e314037a4d99c50a975d90e361f90b5c7e3d8c1785d88545cebc31fc23521</hash>
-        <hash alg="SHA3-256">9e55b88c9e13c1a24981b10d02cabdd13bd10d209c7c30aa190416c51cf402c0</hash>
-        <hash alg="SHA3-512">fbd846e58283f0c3fa07d6d952f6f445f0c84f84c6e3e8d8b4b61b939e143c183a7198b7ac5a55c91116475c640f5dc1221c98447546d1721158296a918997de</hash>
-        <hash alg="SHA-384">a0ed9dd5c3e71cb43882eb75e3d34ac3ed9bafba5332a60259614bbcabd40844cd5a23ed239f3cf01b2be1e3d8e290af</hash>
-        <hash alg="SHA3-384">3ec828ec2fee38e12b66958ec44afcac7eb29932a3e79de097abc4a71d0e12ce8620d7005323178f513f8fffa5de1af9</hash>
+        <hash alg="MD5">47dcfd1ad78ef02513d3aec464663860</hash>
+        <hash alg="SHA-1">56176147f9e2d8186a277695a49cff2dab70d747</hash>
+        <hash alg="SHA-256">d7786de71c0d405b80b4262e0c585618e6f20e7fd3188cb4f599ffc4029ee9ea</hash>
+        <hash alg="SHA-512">ed4e2d27ce3fde25716a6d90e6bbe2bef618c5c51b8bb51b0ce0e1d6869fb159ee0ad6d62edf3bf4a6db632ffdd0ef12f22291aaa53710bbf419311819b7b43b</hash>
+        <hash alg="SHA3-256">74ac3d661dd268dab1c7d03cfe5255596e8ff80ae8f1b2a3bacd6e884ada216a</hash>
+        <hash alg="SHA3-512">2d21767ebf7f0f8279ed25f2d928373aaaa121fb73be9e46f74aea68a0cec3c2469cce636de15ac2686f6a1113534c9afe8074470b327aae3d8717776302b53a</hash>
+        <hash alg="SHA-384">96cbe444ed970ea1a89ebcc279c9f3e72e2523d866794a2b96f725dbc650914397d1cd2d66c47039173b00442193f99b</hash>
+        <hash alg="SHA3-384">77b545c3c0eb6713fdcff13c95b236aef346186c7e345eb80c3a3f8eb45adc5c09f258295a5e50d60cb275dd97905f1d</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/io.netty/netty-handler-proxy@4.2.17.Final?type=jar</purl>
+      <purl>pkg:maven/io.netty/netty-handler-proxy@4.2.18.Final?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.netty/netty-handler@4.2.17.Final?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.netty/netty-handler@4.2.18.Final?type=jar">
       <group>io.netty</group>
       <name>netty-handler</name>
-      <version>4.2.17.Final</version>
+      <version>4.2.18.Final</version>
       <hashes>
-        <hash alg="MD5">e32139e4772b66f72955f802bba2c699</hash>
-        <hash alg="SHA-1">ed53dae90d09306b42bc886fa292510abdf5c5dc</hash>
-        <hash alg="SHA-256">4df11c7520b556c5e2c84b939182699d48fcbb09e97a6bb5e1c0b6835227d126</hash>
-        <hash alg="SHA-512">35729574d4ee86b456d660064beda8a0603dec80f2ed9c27ef149911290368c3535411b8099789beec76fdd1e8c440e13f68b06b8a0f6f453459a2388b390525</hash>
-        <hash alg="SHA3-256">2e6d5b62f92bb18349a5db45b6f3505b27df9fa10b51bdcd3417532fd7144749</hash>
-        <hash alg="SHA3-512">88dc0ef4859931ef1d6f1ebcf11f3caed4670a4184846838772f7ef2cedf67cb6e5c01e6de16c8d8553d8fae4ae3d90ccbadcdafd397a48c17ce2750cb675fe5</hash>
-        <hash alg="SHA-384">32375ffdbd7cc66e0414ac0666d1c09b4b72330ccf130c34e1084463d697e987d87748c564279d93dde905e475fa0009</hash>
-        <hash alg="SHA3-384">3743af9a0f28e49f039dd77fa800ab4cbaec833497a015ba2a005695b133dd93c49026bf2d373041c65f62318d9050e8</hash>
+        <hash alg="MD5">e44f75ee547b2b97d13fd5651d05ba19</hash>
+        <hash alg="SHA-1">b946698c37ab69603a4f0df8180f9594d89cf4b7</hash>
+        <hash alg="SHA-256">6d5a08d9dd6d7d0211202e22dbb1629b23a62550335c7e80892da1d4cb115540</hash>
+        <hash alg="SHA-512">faa71bf33447b96ed59b0fdd7e9c28aa7709d3c4f8cb9daf571a6347a7462046a90c02f892e322f5924d83d93fb9e7bc47439b3ac81d99e4bdd4b13ccc12199c</hash>
+        <hash alg="SHA3-256">af05f43c47dcbf62ac2a95c9fe61cdfa3b45a2822d4cac5fa5d658ff64b7ea74</hash>
+        <hash alg="SHA3-512">2cc423766734ccc0d2fbabf6c55f92fb43dfac1cae8f516a68b68bd70961cfcee4bfa8cbc0f23d98a3d9c8b145c55d82ed260b2ff5969877d2fc51bf92d41b66</hash>
+        <hash alg="SHA-384">e989a7e251bdbd1bd1af05542d083390266b7002f8f9e2fa56e269d5dc989d7a911636b8c84ee6175fe32b598cde6cd0</hash>
+        <hash alg="SHA3-384">ae07a23d1598008f554a36bbba169c4318dfb76974c25098ff3cbffd2a239e8716fb258855fa56fa3b185a4f12873bf8</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/io.netty/netty-handler@4.2.17.Final?type=jar</purl>
+      <purl>pkg:maven/io.netty/netty-handler@4.2.18.Final?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.netty/netty-resolver-dns-classes-macos@4.2.17.Final?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.netty/netty-resolver-dns-classes-macos@4.2.18.Final?type=jar">
       <group>io.netty</group>
       <name>netty-resolver-dns-classes-macos</name>
-      <version>4.2.17.Final</version>
+      <version>4.2.18.Final</version>
       <hashes>
-        <hash alg="MD5">fa0632d50f23899031fe0ea39136de7a</hash>
-        <hash alg="SHA-1">f2d1c08d8b7a9125ce5aa494d67bbacd517bc0bd</hash>
-        <hash alg="SHA-256">e5708301fe173ce03d31f1a76ac0682d0a7b955451c968314a13e661855b33c5</hash>
-        <hash alg="SHA-512">a68de48b9ed89f4a97d6669ed964b118bc81f55887c664f7b1cab2f50a7fac088ace669c1ee2adf04eb9a730eeadb831f9e84bd2d5f958a2220d36570a12150c</hash>
-        <hash alg="SHA3-256">d34f24733fa9c3aa73c790f6fd3e434ce08010b758975ee64cf8cf802059dd55</hash>
-        <hash alg="SHA3-512">0c0526379b73ac29b7017f9330b58fa0a363444b32f1096b66c1e0734a9eb78d5b575ca6f1fd692165941fdf4c85aeadc34e28c9b91ce3373f4e3ca75c5f31fc</hash>
-        <hash alg="SHA-384">6f502444123a3638cfd430bbfd1f93dbfdd96758d74a58181c30bf668b5ca3ccd8df7c89272ac4f951ca60112920c80d</hash>
-        <hash alg="SHA3-384">cd2aca1986160dc5e4928857f3212fb8ae46c3c748ea8ca938060267bcb7bab68c4c7d19669b792f7e9604298a1a9563</hash>
+        <hash alg="MD5">f812639c54501c5653cd6c2dadf5a3f5</hash>
+        <hash alg="SHA-1">5dfec8173e4646dd150917f44eeb029fc632136e</hash>
+        <hash alg="SHA-256">377abd8b198bde174d18b74ef9bac84251b56c8e5ce373d7099bde0d297055c7</hash>
+        <hash alg="SHA-512">52f4d1a0cda6b19e9236279744235d4869405d3e6d08b8448b9b8cd36811800e8f9fa9262baf5e32ac60019ede1f45a1c8b4129839c6075c0d8d3f1d8cd5ac95</hash>
+        <hash alg="SHA3-256">ca5f73dde306f0da26eab3004fc4220b18b8bcd12f9b31baaf8d890644e8570f</hash>
+        <hash alg="SHA3-512">46a25b0a573c303df4c5f084b97b91fb7c8a9f9bf63ce7735f22eff7cc829dbddc15e06a5cf617791d2c8d7979eaa66603d36a84bbdd56b887f01eac30c16f0c</hash>
+        <hash alg="SHA-384">02346d439eebecb38d3d43701e252d026ec9db671113eeff95f70a85be8a2174bc53686e30dd836834e709ffd2caae69</hash>
+        <hash alg="SHA3-384">61a3a94b97ebb7678db440146ad75b1bd3be481bc58b7f3ff2b79c1913c65df8aea2617d0555b77d3fb0547950d798de</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/io.netty/netty-resolver-dns-classes-macos@4.2.17.Final?type=jar</purl>
+      <purl>pkg:maven/io.netty/netty-resolver-dns-classes-macos@4.2.18.Final?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.netty/netty-resolver-dns-native-macos@4.2.17.Final?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.netty/netty-resolver-dns-native-macos@4.2.18.Final?type=jar">
       <group>io.netty</group>
       <name>netty-resolver-dns-native-macos</name>
-      <version>4.2.17.Final</version>
+      <version>4.2.18.Final</version>
       <hashes>
-        <hash alg="MD5">b8cd627b9812c2823276e64cf6942abc</hash>
-        <hash alg="SHA-1">0fc5e5b282fe7f90dfd5b2e2fc0e74618ab9e391</hash>
-        <hash alg="SHA-256">69ba9124d88cde3c5d96237aabd7cadcdf416200e52f2933c275863d5ee8831e</hash>
-        <hash alg="SHA-512">16055890d736ce8ebc2d96a5c6bc4438041d4e82ce5a2f4b86fbf828025afaf60ad005f798de3ed990d4bd1604673566cdada5ad347f7fbdd4051641b021ed19</hash>
-        <hash alg="SHA3-256">81039e23971f8f5d8576540e37d3b5888cce9b910838a9165f0a71c31f3028b5</hash>
-        <hash alg="SHA3-512">f94562f5241a33935cd49937ca13d7e255f1a6fe93a53f7d83970ca7e8ad0cdbcd3f6af07bf3153f4af52ad0e0108d7259be96f97fe4d64889b1f9ed54d71818</hash>
-        <hash alg="SHA-384">544052becd2e8eae7cd4fe9694159b4bc4186a0d4b7a60eaa6f59b6d938b70b5a4fa8e86f8ea8626d0c8653c471ea7ed</hash>
-        <hash alg="SHA3-384">b20b1accd58e64b6c233e176fcdbb5ff1303d6fe7dc14cac12dacdd8c02191b2cf90c75dc13c71dc9f66b02c0ebfcb19</hash>
+        <hash alg="MD5">f3b1a70a0284b413a7d366b1f67b4275</hash>
+        <hash alg="SHA-1">1c465834487b71623d2746a2859ab89f9c992717</hash>
+        <hash alg="SHA-256">144823796e9b8222cce8ee8ab3f632f263564bdb4231c8569615506530df83f4</hash>
+        <hash alg="SHA-512">69379c2e46c5e625d90b3310c2d90d0e3de76f1b1483e9bd3a8032fdc07267289d3f561324511d0d6d547879109e54250e819fdbb73ac907285c26d53ccfc506</hash>
+        <hash alg="SHA3-256">f77b3c37bd1f4fa0c6e355a7c564a8eee445b64c271faf583924b4e0cc2d326a</hash>
+        <hash alg="SHA3-512">f4cac14f780e091bd63c6c3730f50e95c0bfc8e63723be24c589d92b63a3911714cad1e2197f31006502bface512f4e430c3d3f8b9f116537e051760b1a8899c</hash>
+        <hash alg="SHA-384">c9ee2b3708acb5214cac77f548a416d4eb1170c78270df4e18de213476034554b161340e4f006daec9e5c88d33bf078a</hash>
+        <hash alg="SHA3-384">d217e2946b2beb5499662dc6090b3cc2eec9ddd5d1c606bfbc2d0bd5b3691f65eec1432e13765eb4ad127959eeb764b0</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/io.netty/netty-resolver-dns-native-macos@4.2.17.Final?type=jar</purl>
+      <purl>pkg:maven/io.netty/netty-resolver-dns-native-macos@4.2.18.Final?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.netty/netty-resolver-dns@4.2.17.Final?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.netty/netty-resolver-dns@4.2.18.Final?type=jar">
       <group>io.netty</group>
       <name>netty-resolver-dns</name>
-      <version>4.2.17.Final</version>
+      <version>4.2.18.Final</version>
       <hashes>
-        <hash alg="MD5">d8afc13bef95685c5ddcf77b3b0cc166</hash>
-        <hash alg="SHA-1">1f42702711fab2b44e8aa8be4ccbd23441ea9024</hash>
-        <hash alg="SHA-256">d332481c22136a68c2ee9e45e86212174932587d93a5dd4d201e196828bf9f91</hash>
-        <hash alg="SHA-512">25f2758b11862a1e024ddb91397907fc51eebb9e9d93270c314ce15f4f7c2ee3f59b5b4f413fe1c5e9c8b3941eb7909cf08469737245addd880c522449a1862c</hash>
-        <hash alg="SHA3-256">0fcb2664c1d6b7458f4a03c93ba12d3347e5aa174d3ddbaeb11f137225860a4f</hash>
-        <hash alg="SHA3-512">9f659d8593e67297a473ca811b1d342860de1c04d9ff2ab3829e660c9db8b2d80a343307da7d998a4b2520d183e004b8592476c8333b033363ff3bacc9b77b92</hash>
-        <hash alg="SHA-384">0f921103ee2205388469e53c6eb3498f8db3239cf6ca204b4adf410353d8608952d1655fdd3f551a9a4dd2bf0ddfe10d</hash>
-        <hash alg="SHA3-384">240920999159a82e58ec444229a45a372a6adc51485ec959daa62a980b689fd6d6be26b8f57c954239ff1d94533c1d82</hash>
+        <hash alg="MD5">d81ff340684dc5a9dca2a20b850fae20</hash>
+        <hash alg="SHA-1">139f12718e993ebb19f64ef5eb95167f69dc97bf</hash>
+        <hash alg="SHA-256">7dd3ec96bef04abc91a0f461f8acc19ebc0738c257ea653aea9dd0ad67b3b1ce</hash>
+        <hash alg="SHA-512">b10299355265dde2fc1defe38f682564096afa0fa19a453ad39c9ce703a4f9150943ee2022005617349d9a10c571ba448ec3f3aef6f5d36b252ce8dd3b870813</hash>
+        <hash alg="SHA3-256">7e83710dc60abeca524d14aaf2cdac5e236d44e76188053f6f008f3567d10b4c</hash>
+        <hash alg="SHA3-512">d236df904cc34347aca05ff64a00ae366b49236096b8d181d4ba122bc3b45a2f101321a8d9213956c99411ffb3d178d1c2c2e055fcdac1865672077ceaa9493e</hash>
+        <hash alg="SHA-384">f5ffe30321608d3a530896b7def058b730fcacf9f9024efa89c58d12100df77d21034051eda7c410bda9d795cb7006ff</hash>
+        <hash alg="SHA3-384">7cba2d2d1791d087da66441a9340a4b8a454a15827cfcdd598dc1db35fa986c03508312961c48428ec5429385fe3eb8b</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/io.netty/netty-resolver-dns@4.2.17.Final?type=jar</purl>
+      <purl>pkg:maven/io.netty/netty-resolver-dns@4.2.18.Final?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.netty/netty-resolver@4.2.17.Final?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.netty/netty-resolver@4.2.18.Final?type=jar">
       <group>io.netty</group>
       <name>netty-resolver</name>
-      <version>4.2.17.Final</version>
+      <version>4.2.18.Final</version>
       <hashes>
-        <hash alg="MD5">ffc4fd6b3d092275c4b5f12e07eb733e</hash>
-        <hash alg="SHA-1">6cba9d93bb06297cef0b7ac34e3873b6a25b4e3b</hash>
-        <hash alg="SHA-256">7a4b599b9c0c29a505d3b7311f142df883fb27d0f67495a7cbaf533b0e456623</hash>
-        <hash alg="SHA-512">b3c5b769248a71f8ba251bb7f16e9ce13e131e6b9cb316c7324adb28a9c4e744220cf41633b12d6e09f6db2b33f825060a35a8c30a423677d71b1b661da770f7</hash>
-        <hash alg="SHA3-256">7220b44e6a37bbd718e296881ae1690a648e70da17c89596727eb01337e51893</hash>
-        <hash alg="SHA3-512">6735bdaf904622f4458a84af867421d94af5c54593f9d932af0e7eb6a412c56559c50fd310b5524352f28b2035b95c8d3cc810906969cadaad3f889dd66dbfef</hash>
-        <hash alg="SHA-384">0b03656a3f97fa3d3cacecafda8ce9c4f5c722a21346f21d83b4e4cc967d5cc42a4aa799cd560b222522731b8a4e5a80</hash>
-        <hash alg="SHA3-384">7b2f0035b1781867e62de7a5368550431fe9bc28b5b47e3d58ee9f520eb5fe0d04a68be6f032454c6b3ac5a28392872c</hash>
+        <hash alg="MD5">cc5b70a75432db82fe251489cb0626f2</hash>
+        <hash alg="SHA-1">9d21e01c476a1f92b9dc07d968d2a02810b2fba1</hash>
+        <hash alg="SHA-256">68373ec544cf769ba17bf2ef455166d98f2c260dff536edf35ef57067a9c155f</hash>
+        <hash alg="SHA-512">dba4b4f83a281d395e9c2286fa3b334d6daa240f12ca74038cc52525852d88a028fd9cbf4f346da2ab6a4ae3e1a2f00e18ee99f580c9f12e0f2f816c1b25627d</hash>
+        <hash alg="SHA3-256">108da02a019db32e8e247fe3423854f3b55b861d4cdb44e418dc79eccceb2a64</hash>
+        <hash alg="SHA3-512">15dc00b35f71d072ea8b42877b2efdabd8e7c3c1de73e56b54a2bd08d33fcfbf1e1d67ebc391143890c1ceb42fc5342dec02fa68be8a172bd1bbe05701dc8687</hash>
+        <hash alg="SHA-384">711beb1a0dc97ed1ac01d5aadb7a9cbafb28b8c6dfdc4d8cba4a4bff6f9f877087c0f025663ce91e6958562189389970</hash>
+        <hash alg="SHA3-384">f090d6b65562614e7fea0b2f5076d112c55f60e3618c8b6e69cd990a6e21c667410e186685ef4aba68291e31c0e7c960</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/io.netty/netty-resolver@4.2.17.Final?type=jar</purl>
+      <purl>pkg:maven/io.netty/netty-resolver@4.2.18.Final?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.netty/netty-transport-classes-epoll@4.2.17.Final?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.netty/netty-transport-classes-epoll@4.2.18.Final?type=jar">
       <group>io.netty</group>
       <name>netty-transport-classes-epoll</name>
-      <version>4.2.17.Final</version>
+      <version>4.2.18.Final</version>
       <hashes>
-        <hash alg="MD5">2bc8649641487007bb1f4ec9b8deac3e</hash>
-        <hash alg="SHA-1">ac30be5ef672aa7a213c7753ed803eeaf2943783</hash>
-        <hash alg="SHA-256">4e21d8a2e3429d9de967a716d58119f57585786bd2f7213bf5b27770425269de</hash>
-        <hash alg="SHA-512">16f09a11ae0de718334e98a31df546a2b1d947bda81153e6836e5930c6437002235903d78e33c03a858351474f396b25480e23b7dcf41fcb2a2f404d45285007</hash>
-        <hash alg="SHA3-256">f0d5ab6bf41a36be794b979b7cb715512999f1729c10e006660eac19d568b528</hash>
-        <hash alg="SHA3-512">4fc13970558d72f8c14568b48bce4cc82f17bd7cf84326ad1fdd073a7a6c67654e756705862c83a00db811312b7f2a4a73e0f8fd3e9dfc4caa9494da6100214e</hash>
-        <hash alg="SHA-384">979ec4dbea5c535bc6c5e36a238977de7c95a6a77e94e75ea561c5b3a2c92f4cc2662898ee43222a94aa9beb771ee098</hash>
-        <hash alg="SHA3-384">a6c69c7823d9b3b6e9c205cb97adc85cca22cbcdf7e0c33b3775125d28494a3a8278a54c9ae3ccbc6ae87b3ddb27adae</hash>
+        <hash alg="MD5">388ee1d6656435c8dff76d8ef94f0d7d</hash>
+        <hash alg="SHA-1">f8ecad45ec66d1b3b860f78f0e74612fd62c48c3</hash>
+        <hash alg="SHA-256">3677ca998f3db749d3fdb0fb1b1674f9809f4fbe8f819a346f4858dfb16c4d95</hash>
+        <hash alg="SHA-512">8cacf547131783df9f708ed6f86b8d59453b0b9942ce305f68fd4fbf548e270b4e6d37610e9f6ce892eea422e1fc2aa9af7e941ff953a51be7dbce6077a7d9ae</hash>
+        <hash alg="SHA3-256">a0807ee0cc69890efd125b39804612bc0d300f0deeb2bfbf54303dccaa54d5c2</hash>
+        <hash alg="SHA3-512">3cc0f0cab245af4faf4b92791d0507c1c4519030e5d357806ed8f2ecee858110b22395f42ff5397fa27f1bded2c91a3a8fa192c351b553d43ce868080ef2e6cb</hash>
+        <hash alg="SHA-384">1a646367641dfe5cd39957d661a4e12c4d17607f70f67e48d70a050f03146e2c81fd7028325c9eda1483935c1e273c07</hash>
+        <hash alg="SHA3-384">f438392e252fffcc30370b23b53d4f007993828d692869602f7743e369388c3d57bf3277554fda5fe81b857b16bca55f</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/io.netty/netty-transport-classes-epoll@4.2.17.Final?type=jar</purl>
+      <purl>pkg:maven/io.netty/netty-transport-classes-epoll@4.2.18.Final?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.netty/netty-transport-native-epoll@4.2.17.Final?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.netty/netty-transport-native-epoll@4.2.18.Final?type=jar">
       <group>io.netty</group>
       <name>netty-transport-native-epoll</name>
-      <version>4.2.17.Final</version>
+      <version>4.2.18.Final</version>
       <hashes>
-        <hash alg="MD5">68c4275951d498839e5bcf94207457e4</hash>
-        <hash alg="SHA-1">f7283f9f4bc6ceb16568aaf0a8038d5eaf284d3f</hash>
-        <hash alg="SHA-256">c295b1d7f46e3c7375c93fa4c8abcc3944398c5e4eb53e31587cbbf0bf559d4f</hash>
-        <hash alg="SHA-512">174dcb36ab1f3e4018ab9d0ef9dc0e8cf10b4e7261b41d110e2330a53e0c6c02dcf2142341778fb67bc1b459272bfdeb18b46b9e7c0c885bd305876cb613e56b</hash>
-        <hash alg="SHA3-256">3dcc5eaf4c26c0d0b0ed80db821d7ab702950baf5136a4dc7090db9ad07bdfe9</hash>
-        <hash alg="SHA3-512">51f58c2280f4d610843be40db32cc9debabc9f6186f92bb386b91f334206cce4753908789ecb810e692af9af96cac2a810cb8f05455126aa0dd9d95b9521238c</hash>
-        <hash alg="SHA-384">37ddf1b1f7845cdd2757beb678fe0ff7caa4308f09769de0492196fe5660ab22c0dad71cf436ca3d6ab4598983bf19f5</hash>
-        <hash alg="SHA3-384">e047e085832bc748668c16cba5f4f0973a9a709b7bbfed827ee36b1b70b2370a6d7479e29ce366cb01332a119ae26ec7</hash>
+        <hash alg="MD5">0cfb6f916a3c6c7781e021592b74a886</hash>
+        <hash alg="SHA-1">1e4e4669e1e7b98f898b322f29c9106bb37d7952</hash>
+        <hash alg="SHA-256">32a340971182d901cea513588549cfadc392bb7342f930379a6e34d853a331f0</hash>
+        <hash alg="SHA-512">b185ddaaa706b8776491e7c238d63ed90e0e50330df86709bd4afd07e14ea2deb4b373dfa489a73dc5da63017ed3d0e85a84e81b8f50d4aa257be226470f0339</hash>
+        <hash alg="SHA3-256">75ebe500bd29ee6a8a14b1737c0b4c859cdbe1bcfe6737331d473fee9c5a6937</hash>
+        <hash alg="SHA3-512">ce96208f2f71bf85cf0caa13f016a521098c951fb02346f980507727f25db2fbb27722f2b41681d2350708ba64c6dab9579875d5fa30ea91fd6b75c8dec20e37</hash>
+        <hash alg="SHA-384">66769b3bd08e561f885577886ebb80d73bc1f0e0b6f2e1e08f6baee7c508b06e054a1876230313df6a53a1897cebf480</hash>
+        <hash alg="SHA3-384">2f7ca07acdb48beef95c86b57a863898dcda0a473c207573b4c5281ca6a729403f40ae55459751f13cbb0348080dca2f</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/io.netty/netty-transport-native-epoll@4.2.17.Final?type=jar</purl>
+      <purl>pkg:maven/io.netty/netty-transport-native-epoll@4.2.18.Final?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.netty/netty-transport-native-unix-common@4.2.17.Final?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.netty/netty-transport-native-unix-common@4.2.18.Final?type=jar">
       <group>io.netty</group>
       <name>netty-transport-native-unix-common</name>
-      <version>4.2.17.Final</version>
+      <version>4.2.18.Final</version>
       <description>Static library which contains common unix utilities.</description>
       <hashes>
-        <hash alg="MD5">bc05fe306c299f5fa22a1f13aa81c288</hash>
-        <hash alg="SHA-1">c404f2366b51136d4a2fde678eec95be6d10ca16</hash>
-        <hash alg="SHA-256">e01aa467b9104de54a57c08c290f70b22e53ec97cf5583c87c112170ef5832cc</hash>
-        <hash alg="SHA-512">1d6450affa2f59fb1743678b979ed1fdd43c3821f18037c8ca7ea35e0c9ad2cb1c331b3a680886a8a2f84e8a1589139ba75d6d196afe83450c22d4d750cda8de</hash>
-        <hash alg="SHA3-256">75fa4ac2769f5166313b661642b43a9290d8d41d5b84c747686a0a3faae83bd7</hash>
-        <hash alg="SHA3-512">d1a175351895b5ab1b1766b6cc4da02f201a581453fc4faeca28c1d91c924c398f61f8b2b8857d01f6eb7959b470d1bd9a803d6a8f63ca46778f7db1dab52208</hash>
-        <hash alg="SHA-384">8a16407e98d644186e1a3c4d91af3c41f061f588aeb74898a7126269582860dc840967285ba245d9872d8160eab74a9b</hash>
-        <hash alg="SHA3-384">2687d402268aea32fdf5302c91207b81ecde672367b066590edd2f1d375f054e8c76f4887f57c0fce91aeb1bdfd5273f</hash>
+        <hash alg="MD5">00baea2ea6f0e3392a033171ff1be3d9</hash>
+        <hash alg="SHA-1">b9dbd51d2802e447630ef2b8bba56bb5aaad1f82</hash>
+        <hash alg="SHA-256">cada7023d09136af128511ca94421d69dc84d0f1f64c9e1f127a1271bb62932a</hash>
+        <hash alg="SHA-512">32ce641c88cca2736df45cc14039f0751cca23e1b6fc36e0bb6bc51b513d53d5659d0bccff850be9131bd230555fe53c0c0e5340458adf655dc7f1a038e294e4</hash>
+        <hash alg="SHA3-256">e273d26cad201cd721877713c5f14ef8ada247296708534b4e72db362afa29d5</hash>
+        <hash alg="SHA3-512">4097e057691a29a1ec7ed495cc6a8433df006507171ced2e01a6203ec92a0693cfc1c9027590b446f9a3d98945743d0328ed070de1e8457e05ed4522afc2921b</hash>
+        <hash alg="SHA-384">f3735af136304a2061894ec70118f91756cb6d8a06672848f784e4ef376ac82b5d7a44ba86bececed022fd8704b8d831</hash>
+        <hash alg="SHA3-384">4217715fcb36b255a04b2949c0b89ce0621e8d2756a535da0da38ac92318931c2ee8b8a8691de16a9d1d2b0615934966</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/io.netty/netty-transport-native-unix-common@4.2.17.Final?type=jar</purl>
+      <purl>pkg:maven/io.netty/netty-transport-native-unix-common@4.2.18.Final?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
       </properties>
     </component>
-    <component type="library" bom-ref="pkg:maven/io.netty/netty-transport@4.2.17.Final?type=jar">
+    <component type="library" bom-ref="pkg:maven/io.netty/netty-transport@4.2.18.Final?type=jar">
       <group>io.netty</group>
       <name>netty-transport</name>
-      <version>4.2.17.Final</version>
+      <version>4.2.18.Final</version>
       <hashes>
-        <hash alg="MD5">81ff6c65c703d34a26599f435f858f75</hash>
-        <hash alg="SHA-1">34335dc106caa0aefc242900d38ade65c8de64f4</hash>
-        <hash alg="SHA-256">d2409ce3a735cbab4188d0ea5d82abed823a6a07a8389f49af4a9e1243a562bc</hash>
-        <hash alg="SHA-512">61a0ae4c8dcb7a16c60145e1c6e8a1120b88cb2873167a3d6ca1cef358485a1330204cea0f1d41079517662ccec4a74cf2868de319e2065c3b3fa679c9e3fb18</hash>
-        <hash alg="SHA3-256">2fbecc1ebf6263d3e1b2b655c562bf37739bfd7b1e65dadaa461e39b12728f3d</hash>
-        <hash alg="SHA3-512">14b865431e8272b535e71dd091967761d7c839c1c4a58914f6c5b04b56f3405da85ea03a57b81a54cd63ba39956fa15dcf25676388577760b340e49ec9e94b08</hash>
-        <hash alg="SHA-384">92efbea90fdd01715ff7007f04aacd5da339601ec0a034f3c32db2d9853b44608f268e828cc5409ab8ac4d7c7cc8e1db</hash>
-        <hash alg="SHA3-384">802d5f0603a07e6e8c3baf3accca4e809060f4be054f9a34ce725b45080465f4cd2e0296121b285bb6aca1b16e11c9a3</hash>
+        <hash alg="MD5">0281402fa35ef33f339f5e5db0a66d55</hash>
+        <hash alg="SHA-1">14ad66183e0456621161e60b41ca2abdcf9bd15c</hash>
+        <hash alg="SHA-256">eac4f12068db4489e60c6520fad663e5d872f0436a7c641aa9e08db649947863</hash>
+        <hash alg="SHA-512">6b56ea4f4fb58530f104d899e2b0156e92da34a786ba54df6ed0e0fcbd7ddf7a37fac75877f46fb149b5d84cabf09c510be7f13e8714dd1a6a3a2142a6a5d967</hash>
+        <hash alg="SHA3-256">fe7cd846a0c8bbdde856106eb1fa45169a239bbf7340523dc623cf0b6dd71034</hash>
+        <hash alg="SHA3-512">72853d16b39ed83f4e5d0d7b2591669b947dbcbc5991dec924bc033c88aabac4cc9041da92e9a3d7b933b192597f5930ceb66abfa218eef7b330dc2eb6aa9e39</hash>
+        <hash alg="SHA-384">41296e74dd08a6bc6219d23b733eede57e7384df58f18d258742106ca758822d700673f59b4588e66686b2adeee20dbc</hash>
+        <hash alg="SHA3-384">6afe25178ac172c202f393966d75d37406a27ceb132ac81e62ecb52c87d89082e7617bb078db06b064bb0337678ac838</hash>
       </hashes>
       <licenses>
         <license>
           <id>Apache-2.0</id>
         </license>
       </licenses>
-      <purl>pkg:maven/io.netty/netty-transport@4.2.17.Final?type=jar</purl>
+      <purl>pkg:maven/io.netty/netty-transport@4.2.18.Final?type=jar</purl>
       <modified>false</modified>
       <properties>
         <property name="cdx:maven:package:test">false</property>
@@ -6524,6 +6540,7 @@
       <dependency ref="pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.5?type=jar"/>
       <dependency ref="pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.21.5?type=jar"/>
       <dependency ref="pkg:maven/com.github.ben-manes.caffeine/caffeine@3.2.4?type=jar"/>
+      <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@0.0.1-SNAPSHOT?project_path=%3Alogging-support"/>
       <dependency ref="pkg:maven/io.github.resilience4j/resilience4j-reactor@2.4.0?type=jar"/>
       <dependency ref="pkg:maven/io.github.resilience4j/resilience4j-spring-boot3@2.4.0?type=jar"/>
       <dependency ref="pkg:maven/io.micrometer/context-propagation@1.2.1?type=jar"/>
@@ -6544,6 +6561,10 @@
       <dependency ref="pkg:maven/org.springframework.session/spring-session-data-redis@4.1.1?type=jar"/>
       <dependency ref="pkg:maven/org.thymeleaf.extras/thymeleaf-extras-springsecurity6@3.1.5.RELEASE?type=jar"/>
       <dependency ref="pkg:maven/tools.jackson.dataformat/jackson-dataformat-cbor@3.1.5?type=jar"/>
+    </dependency>
+    <dependency ref="pkg:maven/de.greluc.krt.profit.basetool/logging-support@0.0.1-SNAPSHOT?project_path=%3Alogging-support">
+      <dependency ref="pkg:maven/ch.qos.logback/logback-classic@1.5.38?type=jar"/>
+      <dependency ref="pkg:maven/net.logstash.logback/logstash-logback-encoder@9.0?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/io.github.resilience4j/resilience4j-annotations@2.4.0?type=jar">
       <dependency ref="pkg:maven/org.slf4j/slf4j-api@2.0.18?type=jar"/>
@@ -6620,10 +6641,10 @@
       <dependency ref="pkg:maven/org.slf4j/slf4j-api@2.0.18?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/io.lettuce/lettuce-core@7.5.2.RELEASE?type=jar">
-      <dependency ref="pkg:maven/io.netty/netty-common@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-handler@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-resolver-dns@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-transport@4.2.17.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-common@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-handler@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-resolver-dns@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-transport@4.2.18.Final?type=jar"/>
       <dependency ref="pkg:maven/io.projectreactor/reactor-core@3.8.7?type=jar"/>
       <dependency ref="pkg:maven/redis.clients.authentication/redis-authx-core@0.1.1-beta2?type=jar"/>
     </dependency>
@@ -6673,131 +6694,127 @@
       <dependency ref="pkg:maven/io.micrometer/micrometer-observation@1.17.1?type=jar"/>
       <dependency ref="pkg:maven/org.jspecify/jspecify@1.0.1?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/io.netty/netty-buffer@4.2.17.Final?type=jar">
-      <dependency ref="pkg:maven/io.netty/netty-common@4.2.17.Final?type=jar"/>
+    <dependency ref="pkg:maven/io.netty/netty-buffer@4.2.18.Final?type=jar">
+      <dependency ref="pkg:maven/io.netty/netty-common@4.2.18.Final?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/io.netty/netty-codec-base@4.2.17.Final?type=jar">
-      <dependency ref="pkg:maven/io.netty/netty-buffer@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-common@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-transport@4.2.17.Final?type=jar"/>
+    <dependency ref="pkg:maven/io.netty/netty-codec-base@4.2.18.Final?type=jar">
+      <dependency ref="pkg:maven/io.netty/netty-buffer@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-common@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-transport@4.2.18.Final?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/io.netty/netty-codec-classes-quic@4.2.17.Final?type=jar">
-      <dependency ref="pkg:maven/io.netty/netty-buffer@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-codec-base@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-common@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-handler@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-transport@4.2.17.Final?type=jar"/>
+    <dependency ref="pkg:maven/io.netty/netty-codec-classes-quic@4.2.18.Final?type=jar">
+      <dependency ref="pkg:maven/io.netty/netty-buffer@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-codec-base@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-common@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-handler@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-transport@4.2.18.Final?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/io.netty/netty-codec-compression@4.2.17.Final?type=jar">
-      <dependency ref="pkg:maven/io.netty/netty-buffer@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-codec-base@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-common@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-transport@4.2.17.Final?type=jar"/>
+    <dependency ref="pkg:maven/io.netty/netty-codec-compression@4.2.18.Final?type=jar">
+      <dependency ref="pkg:maven/io.netty/netty-buffer@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-codec-base@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-common@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-transport@4.2.18.Final?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/io.netty/netty-codec-dns@4.2.17.Final?type=jar">
-      <dependency ref="pkg:maven/io.netty/netty-buffer@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-codec-base@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-common@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-transport@4.2.17.Final?type=jar"/>
+    <dependency ref="pkg:maven/io.netty/netty-codec-dns@4.2.18.Final?type=jar">
+      <dependency ref="pkg:maven/io.netty/netty-buffer@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-codec-base@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-common@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-transport@4.2.18.Final?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/io.netty/netty-codec-http2@4.2.17.Final?type=jar">
-      <dependency ref="pkg:maven/io.netty/netty-buffer@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-codec-base@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-codec-http@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-common@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-handler@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-transport@4.2.17.Final?type=jar"/>
+    <dependency ref="pkg:maven/io.netty/netty-codec-http2@4.2.18.Final?type=jar">
+      <dependency ref="pkg:maven/io.netty/netty-buffer@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-codec-base@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-codec-http@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-common@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-handler@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-transport@4.2.18.Final?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/io.netty/netty-codec-http3@4.2.17.Final?type=jar">
-      <dependency ref="pkg:maven/io.netty/netty-buffer@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-codec-base@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-codec-classes-quic@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-codec-compression@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-codec-http@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-codec-native-quic@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-common@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-handler@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-resolver@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-transport-native-unix-common@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-transport@4.2.17.Final?type=jar"/>
+    <dependency ref="pkg:maven/io.netty/netty-codec-http3@4.2.18.Final?type=jar">
+      <dependency ref="pkg:maven/io.netty/netty-buffer@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-codec-base@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-codec-classes-quic@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-codec-http@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-codec-native-quic@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-common@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-transport@4.2.18.Final?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/io.netty/netty-codec-http@4.2.17.Final?type=jar">
-      <dependency ref="pkg:maven/io.netty/netty-buffer@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-codec-base@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-codec-compression@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-common@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-handler@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-transport@4.2.17.Final?type=jar"/>
+    <dependency ref="pkg:maven/io.netty/netty-codec-http@4.2.18.Final?type=jar">
+      <dependency ref="pkg:maven/io.netty/netty-buffer@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-codec-base@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-codec-compression@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-common@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-handler@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-transport@4.2.18.Final?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/io.netty/netty-codec-native-quic@4.2.17.Final?type=jar">
-      <dependency ref="pkg:maven/io.netty/netty-codec-classes-quic@4.2.17.Final?type=jar"/>
+    <dependency ref="pkg:maven/io.netty/netty-codec-native-quic@4.2.18.Final?type=jar">
+      <dependency ref="pkg:maven/io.netty/netty-codec-classes-quic@4.2.18.Final?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/io.netty/netty-codec-socks@4.2.17.Final?type=jar">
-      <dependency ref="pkg:maven/io.netty/netty-buffer@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-codec-base@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-common@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-transport@4.2.17.Final?type=jar"/>
+    <dependency ref="pkg:maven/io.netty/netty-codec-socks@4.2.18.Final?type=jar">
+      <dependency ref="pkg:maven/io.netty/netty-buffer@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-codec-base@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-common@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-transport@4.2.18.Final?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/io.netty/netty-common@4.2.17.Final?type=jar"/>
-    <dependency ref="pkg:maven/io.netty/netty-handler-proxy@4.2.17.Final?type=jar">
-      <dependency ref="pkg:maven/io.netty/netty-buffer@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-codec-base@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-codec-http@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-codec-socks@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-common@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-handler@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-transport@4.2.17.Final?type=jar"/>
+    <dependency ref="pkg:maven/io.netty/netty-common@4.2.18.Final?type=jar"/>
+    <dependency ref="pkg:maven/io.netty/netty-handler-proxy@4.2.18.Final?type=jar">
+      <dependency ref="pkg:maven/io.netty/netty-buffer@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-codec-base@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-codec-http@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-codec-socks@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-common@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-handler@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-transport@4.2.18.Final?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/io.netty/netty-handler@4.2.17.Final?type=jar">
-      <dependency ref="pkg:maven/io.netty/netty-buffer@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-codec-base@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-common@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-resolver@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-transport-native-unix-common@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-transport@4.2.17.Final?type=jar"/>
+    <dependency ref="pkg:maven/io.netty/netty-handler@4.2.18.Final?type=jar">
+      <dependency ref="pkg:maven/io.netty/netty-buffer@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-codec-base@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-common@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-resolver@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-transport-native-unix-common@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-transport@4.2.18.Final?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/io.netty/netty-resolver-dns-classes-macos@4.2.17.Final?type=jar">
-      <dependency ref="pkg:maven/io.netty/netty-common@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-resolver-dns@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-transport-native-unix-common@4.2.17.Final?type=jar"/>
+    <dependency ref="pkg:maven/io.netty/netty-resolver-dns-classes-macos@4.2.18.Final?type=jar">
+      <dependency ref="pkg:maven/io.netty/netty-common@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-resolver-dns@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-transport-native-unix-common@4.2.18.Final?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/io.netty/netty-resolver-dns-native-macos@4.2.17.Final?type=jar">
-      <dependency ref="pkg:maven/io.netty/netty-resolver-dns-classes-macos@4.2.17.Final?type=jar"/>
+    <dependency ref="pkg:maven/io.netty/netty-resolver-dns-native-macos@4.2.18.Final?type=jar">
+      <dependency ref="pkg:maven/io.netty/netty-resolver-dns-classes-macos@4.2.18.Final?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/io.netty/netty-resolver-dns@4.2.17.Final?type=jar">
-      <dependency ref="pkg:maven/io.netty/netty-buffer@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-codec-base@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-codec-dns@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-common@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-handler@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-resolver@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-transport@4.2.17.Final?type=jar"/>
+    <dependency ref="pkg:maven/io.netty/netty-resolver-dns@4.2.18.Final?type=jar">
+      <dependency ref="pkg:maven/io.netty/netty-buffer@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-codec-base@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-codec-dns@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-common@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-handler@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-resolver@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-transport@4.2.18.Final?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/io.netty/netty-resolver@4.2.17.Final?type=jar">
-      <dependency ref="pkg:maven/io.netty/netty-common@4.2.17.Final?type=jar"/>
+    <dependency ref="pkg:maven/io.netty/netty-resolver@4.2.18.Final?type=jar">
+      <dependency ref="pkg:maven/io.netty/netty-common@4.2.18.Final?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/io.netty/netty-transport-classes-epoll@4.2.17.Final?type=jar">
-      <dependency ref="pkg:maven/io.netty/netty-buffer@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-common@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-transport-native-unix-common@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-transport@4.2.17.Final?type=jar"/>
+    <dependency ref="pkg:maven/io.netty/netty-transport-classes-epoll@4.2.18.Final?type=jar">
+      <dependency ref="pkg:maven/io.netty/netty-buffer@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-common@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-transport-native-unix-common@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-transport@4.2.18.Final?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/io.netty/netty-transport-native-epoll@4.2.17.Final?type=jar">
-      <dependency ref="pkg:maven/io.netty/netty-buffer@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-common@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-transport-classes-epoll@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-transport-native-unix-common@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-transport@4.2.17.Final?type=jar"/>
+    <dependency ref="pkg:maven/io.netty/netty-transport-native-epoll@4.2.18.Final?type=jar">
+      <dependency ref="pkg:maven/io.netty/netty-buffer@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-common@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-transport-classes-epoll@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-transport-native-unix-common@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-transport@4.2.18.Final?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/io.netty/netty-transport-native-unix-common@4.2.17.Final?type=jar">
-      <dependency ref="pkg:maven/io.netty/netty-buffer@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-common@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-transport@4.2.17.Final?type=jar"/>
+    <dependency ref="pkg:maven/io.netty/netty-transport-native-unix-common@4.2.18.Final?type=jar">
+      <dependency ref="pkg:maven/io.netty/netty-buffer@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-common@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-transport@4.2.18.Final?type=jar"/>
     </dependency>
-    <dependency ref="pkg:maven/io.netty/netty-transport@4.2.17.Final?type=jar">
-      <dependency ref="pkg:maven/io.netty/netty-buffer@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-common@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-resolver@4.2.17.Final?type=jar"/>
+    <dependency ref="pkg:maven/io.netty/netty-transport@4.2.18.Final?type=jar">
+      <dependency ref="pkg:maven/io.netty/netty-buffer@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-common@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-resolver@4.2.18.Final?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/io.opentelemetry.semconv/opentelemetry-semconv@1.41.1?type=jar"/>
     <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-api@1.62.0?type=jar">
@@ -6856,21 +6873,21 @@
       <dependency ref="pkg:maven/io.opentelemetry/opentelemetry-sdk-trace@1.62.0?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/io.projectreactor.netty/reactor-netty-core@1.3.7?type=jar">
-      <dependency ref="pkg:maven/io.netty/netty-handler-proxy@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-handler@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-resolver-dns-native-macos@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-resolver-dns@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-transport-native-epoll@4.2.17.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-handler-proxy@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-handler@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-resolver-dns-native-macos@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-resolver-dns@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-transport-native-epoll@4.2.18.Final?type=jar"/>
       <dependency ref="pkg:maven/io.projectreactor/reactor-core@3.8.7?type=jar"/>
       <dependency ref="pkg:maven/org.jspecify/jspecify@1.0.1?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/io.projectreactor.netty/reactor-netty-http@1.3.7?type=jar">
-      <dependency ref="pkg:maven/io.netty/netty-codec-http2@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-codec-http3@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-codec-http@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-resolver-dns-native-macos@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-resolver-dns@4.2.17.Final?type=jar"/>
-      <dependency ref="pkg:maven/io.netty/netty-transport-native-epoll@4.2.17.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-codec-http2@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-codec-http3@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-codec-http@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-resolver-dns-native-macos@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-resolver-dns@4.2.18.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-transport-native-epoll@4.2.18.Final?type=jar"/>
       <dependency ref="pkg:maven/io.projectreactor.netty/reactor-netty-core@1.3.7?type=jar"/>
       <dependency ref="pkg:maven/io.projectreactor/reactor-core@3.8.7?type=jar"/>
       <dependency ref="pkg:maven/org.jspecify/jspecify@1.0.1?type=jar"/>
@@ -7004,7 +7021,7 @@
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot@4.1.1?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/org.springframework.boot/spring-boot-netty@4.1.1?type=jar">
-      <dependency ref="pkg:maven/io.netty/netty-common@4.2.17.Final?type=jar"/>
+      <dependency ref="pkg:maven/io.netty/netty-common@4.2.18.Final?type=jar"/>
       <dependency ref="pkg:maven/org.springframework.boot/spring-boot@4.1.1?type=jar"/>
     </dependency>
     <dependency ref="pkg:maven/org.springframework.boot/spring-boot-opentelemetry@4.1.1?type=jar">
