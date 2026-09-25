@@ -231,6 +231,34 @@ public class GlobalExceptionHandler {
     return ProblemResponseFactory.correlationId();
   }
 
+  /**
+   * Runs {@code logStatement} with {@code cid} in the {@code correlationId} MDC key, then hands the
+   * key back exactly as it was: removed when it was absent, the previous value put back otherwise.
+   *
+   * <p>The key belongs to whoever set it — on a real request that is {@code CorrelationIdFilter},
+   * which keeps it for the whole chain. Removing it unconditionally here (as both ERROR branches
+   * did until 2026-09-25) emptied it for every line written later on the same thread, above all
+   * {@code RequestLoggingFilter}'s access-log line for the resulting 5xx, which then could not be
+   * joined to this ERROR line or to the id in the problem body (REQ-OBS-001, REQ-OBS-002).
+   *
+   * @param cid the id the ERROR line and the problem body share; when {@link #correlationId()}
+   *     returned the request's own id this put is a no-op, otherwise it is the minted one
+   * @param logStatement the single log call to run while {@code cid} is in the MDC
+   */
+  private static void underCorrelationId(@NotNull String cid, @NotNull Runnable logStatement) {
+    String previous = MDC.get(MDC_CORRELATION_ID);
+    MDC.put(MDC_CORRELATION_ID, cid);
+    try {
+      logStatement.run();
+    } finally {
+      if (previous == null) {
+        MDC.remove(MDC_CORRELATION_ID);
+      } else {
+        MDC.put(MDC_CORRELATION_ID, previous);
+      }
+    }
+  }
+
   /** Package prefix that tells this application's stack frames from the framework's. */
   private static final String APP_PACKAGE = "de.greluc.krt.profit.basetool";
 
@@ -644,12 +672,11 @@ public class GlobalExceptionHandler {
         problem(ex.status(), tr(ex.titleKey()), detail, request, ex.typeSuffix(), ex.code());
     if (suppressed) {
       String cid = correlationId();
-      MDC.put(MDC_CORRELATION_ID, cid);
-      try {
-        log.error("{} at {} [correlationId={}]", ex.logLabel(), request.getRequestURI(), cid, ex);
-      } finally {
-        MDC.remove(MDC_CORRELATION_ID);
-      }
+      underCorrelationId(
+          cid,
+          () ->
+              log.error(
+                  "{} at {} [correlationId={}]", ex.logLabel(), request.getRequestURI(), cid, ex));
       // Overwrite the freshly generated correlation id with the one we used for the log
       // line so the client-visible id matches the server log entry exactly.
       pd.setProperty("correlationId", cid);
@@ -1218,12 +1245,11 @@ public class GlobalExceptionHandler {
     }
     String cid = correlationId();
     // Make sure the correlation id is the same for both the log line and the response.
-    MDC.put(MDC_CORRELATION_ID, cid);
-    try {
-      log.error("Unexpected error at {} [correlationId={}]", request.getRequestURI(), cid, ex);
-    } finally {
-      MDC.remove(MDC_CORRELATION_ID);
-    }
+    underCorrelationId(
+        cid,
+        () ->
+            log.error(
+                "Unexpected error at {} [correlationId={}]", request.getRequestURI(), cid, ex));
     ProblemDetail pd =
         ProblemDetail.forStatusAndDetail(
             HttpStatus.INTERNAL_SERVER_ERROR, tr("problem.internal_error.detail"));
