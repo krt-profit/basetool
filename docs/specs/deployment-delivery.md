@@ -1939,7 +1939,8 @@ there.
   decision 2026-09-22, ADR-0202 amendment): `basetool-sc-extractor`'s authorization-code flow and
   its two loopback wildcard redirect URIs (`REQ-INGEST-002`); both ingest scopes on
   `basetool-android` (`REQ-INGEST-011`); `basetool-frontend`'s `http://frontend:18081` redirect URI
-  and web origin. Production keeps them until the owner applies the provisioner there.
+  and web origin. Gone from production since the owner-approved provisioner apply of 2026-09-23;
+  the testing realm keeps them until it is provisioned.
 - **`basetool-frontend` carries `baseUrl` = `<--public-origin>/`** (2026-09-25, ADR-0202
   amendment 3, `REQ-SEC-071`) — an added field, not in the 2026-09-22 production snapshot, so that
   Keycloak's error pages for the web login link back to the app. Production gets it on the owner's

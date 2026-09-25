@@ -1286,9 +1286,10 @@ sibling subdomain and no plain-http response can plant or overwrite the session 
 into a session-fixation). All three conditions already held; the prefix makes the browser enforce
 them. It also makes them load-bearing: a `domain:`, a non-root `path:` or `secure: false` in any
 profile would not weaken the cookie quietly — the browser would drop it and every login would fail.
-The rename dropped every live session once, at the deploy that shipped it: the old `SESSION` cookie
-names nothing the app reads any more, so each member signed in again exactly once. The owner approved
-that trade.
+The rename drops every live session once, at the deploy that ships it — release **1.11.0**, not yet
+on production as of 2026-09-25: the old `SESSION` cookie names nothing the app reads any more, so
+each member signs in again exactly once (the Redis entries behind the old cookies simply age out;
+no flush). The owner approved that trade.
 
 **Acceptance**
 
