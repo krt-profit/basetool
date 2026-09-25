@@ -97,14 +97,9 @@ class HangarAddShipE2eTest {
         E2eSupport.navigate(page, baseUrl + "/hangar");
         page.getByTestId("hangar-add-ship").click();
 
-        // The add-ship modal opens via JS; the ship-type / insurance selects are server-rendered.
         page.locator("#ship-type").selectOption(new SelectOption().setLabel("E2E Ship Type"));
         page.locator("#ship-insurance").selectOption("LTI");
 
-        // In-place AJAX (#578): mark the window and drop the position:fixed footer (it can
-        // intercept
-        // the trusted click on WebKit), then submit and wait on the XHR POST to /hangar/add so the
-        // backend has provably answered before we read the table back.
         page.evaluate("window.__krtNoReload = true;");
         page.evaluate(
             "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
@@ -113,8 +108,6 @@ class HangarAddShipE2eTest {
             r -> r.url().contains("/hangar/add") && "POST".equals(r.request().method()),
             () -> page.getByTestId("hangar-ship-submit").click());
 
-        // The page must not have reloaded, and the new row must appear via the in-place table
-        // re-swap — no re-navigation. The web-first assertion auto-retries while the swap settles.
         assertEquals(
             Boolean.TRUE,
             page.evaluate("window.__krtNoReload === true"),

@@ -141,8 +141,6 @@ public final class KrtPdfSupport {
   public static @NotNull KrtDocument open(@NotNull OutputStream target) {
     Document document = new Document(PageSize.A4, 40, 40, 60, 60);
     PdfWriter writer = PdfWriter.getInstance(document, target);
-    // Disable stream compression so PDF text content is searchable as plain bytes
-    // (required for content-based assertions in tests and basic text extraction).
     writer.setCompressionLevel(0);
     writer.setPageEvent(new KrtPageBackground());
     document.open();
@@ -403,8 +401,6 @@ public final class KrtPdfSupport {
     cell.setUseVariableBorders(true);
     cell.setBorderColor(COLOR_HAIRLINE);
     cell.setBorderWidth(0.3f);
-    // Drop the top border and its padding so the sub-row butts against — and reads as part of — the
-    // booking row above it, rather than as a standalone row.
     cell.setBorderWidthTop(0f);
     cell.setPaddingTop(0f);
     cell.setPaddingBottom(6f);

@@ -175,8 +175,6 @@ class RequestBodySizeLimitFilterTest {
 
   @Test
   void chunkedOversizedBody_withoutContentLength_isRejected413() throws Exception {
-    // A chunked request declares no Content-Length (getContentLengthLong() == -1); the filter must
-    // count the stream and reject once it crosses the cap rather than trust the missing length.
     MockHttpServletRequest req =
         new MockHttpServletRequest("POST", CAPPED_PATH) {
           @Override

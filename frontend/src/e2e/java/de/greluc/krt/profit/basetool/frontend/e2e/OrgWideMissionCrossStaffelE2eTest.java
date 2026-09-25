@@ -98,7 +98,6 @@ class OrgWideMissionCrossStaffelE2eTest {
           staffelBId,
           false,
           false);
-      // Both missions are owned by Staffel A (test-officer auto-stamps its home Staffel).
       orgWideMissionId =
           seeder.createMission(OFFICER_USER, OFFICER_PASSWORD, ORG_WIDE_MISSION, false);
       seeder.createMission(OFFICER_USER, OFFICER_PASSWORD, INTERNAL_MISSION, true);
@@ -140,7 +139,6 @@ class OrgWideMissionCrossStaffelE2eTest {
                     .filter(new Locator.FilterOptions().setHasText(INTERNAL_MISSION)))
             .hasCount(0);
 
-        // B can open A's organisation-wide mission detail cross-Staffel.
         E2eSupport.navigate(page, baseUrl + "/missions/" + orgWideMissionId);
         page.waitForLoadState();
         assertThat(page.getByText(ORG_WIDE_MISSION).first()).isVisible();

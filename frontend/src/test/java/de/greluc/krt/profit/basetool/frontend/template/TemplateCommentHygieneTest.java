@@ -99,7 +99,6 @@ class TemplateCommentHygieneTest {
         String body = comment.body();
         if (body.startsWith("/*") && body.endsWith("*/")) {
           String inner = body.substring(2, body.length() - 2);
-          // The prototype-only form <!--/*/ … /*/--> legitimately starts and ends with a slash.
           String trimmed = inner.startsWith("/") ? inner.substring(1) : inner;
           if (trimmed.contains("*/")) {
             offenders.add(template.getFileName() + ":" + comment.line());
@@ -154,7 +153,6 @@ class TemplateCommentHygieneTest {
 
   @Test
   void theScanSeesComments() {
-    // The guard's own sanity check: a scanner that finds nothing passes every test above.
     String html =
         "<p>a</p><!-- plain --><script>var s = '<!-- not a comment -->';</script>"
             + "<!--/* parser level */-->";

@@ -63,7 +63,6 @@ class AuditRetentionServiceTest {
 
   @InjectMocks private AuditRetentionService service;
 
-  // covers REQ-AUDIT-006 — every activity domain and the bank trail are swept
   @Test
   void purgesEveryActivityDomainAndTheBankTrail() {
     when(auditEventRepository.existsByDomainAndOccurredAtBefore(any(), eq(CUTOFF)))
@@ -81,7 +80,6 @@ class AuditRetentionServiceTest {
     assertThat(deleted).isEqualTo(AuditDomain.values().length * 2 + 5);
   }
 
-  // covers REQ-AUDIT-006 — a domain with nothing that old is not purged, so no marker is minted
   @Test
   void skipsDomainsThatHoldNothingOlderThanTheCutoff() {
     when(auditEventRepository.existsByDomainAndOccurredAtBefore(any(), eq(CUTOFF)))
@@ -99,7 +97,6 @@ class AuditRetentionServiceTest {
     assertThat(deleted).isEqualTo(3);
   }
 
-  // covers REQ-AUDIT-006 — one failing domain does not abort the sweep
   @Test
   void continuesAfterADomainThatCannotBePurged() {
     when(auditEventRepository.existsByDomainAndOccurredAtBefore(any(), eq(CUTOFF)))
@@ -119,7 +116,6 @@ class AuditRetentionServiceTest {
     assertThat(deleted).isEqualTo(AuditDomain.values().length - 1 + 4);
   }
 
-  // covers REQ-AUDIT-006 — a failing bank purge is isolated the same way
   @Test
   void continuesAfterABankTrailThatCannotBePurged() {
     when(auditEventRepository.existsByDomainAndOccurredAtBefore(any(), eq(CUTOFF)))

@@ -79,19 +79,11 @@ class MissionFinancePageControllerTest {
     principal = mock(OidcUser.class);
   }
 
-  // ---------------------------------------------------------------
-  // addFinanceEntry
-  // ---------------------------------------------------------------
-
   @Nested
   class AddFinanceEntryTests {
 
     @Test
     void validationErrors_delegateToMissionDetail_andSetOpenModal() {
-      // The validation-error path must NOT redirect — it re-renders the
-      // mission-detail view directly so BindingResult stays request-scoped
-      // (no Redis FlashMap round-trip). The "openModal" attribute is set so
-      // the front-end re-opens the same dialog the user was filling in.
       Model model = new ConcurrentModel();
       MissionFinanceEntryForm form = newForm(FinanceType.INCOME, BigDecimal.TEN);
       BindingResult br = mock(BindingResult.class);
@@ -124,7 +116,6 @@ class MissionFinancePageControllerTest {
           controller.addFinanceEntry(MISSION_ID, form, br, model, redirectAttributes, principal);
 
       assertEquals("redirect:/missions/" + MISSION_ID, view);
-      // POST body shape: missionId + participantId + note + type + amount.
       ArgumentCaptor<Map<String, Object>> bodyCaptor = ArgumentCaptor.captor();
       verify(backendApiClient)
           .post(eq("/api/v1/finance-entries"), bodyCaptor.capture(), eq(Void.class));
@@ -140,16 +131,12 @@ class MissionFinancePageControllerTest {
 
     @Test
     void anonymousCaller_passesIsPublicTrueToBackend() {
-      // An anonymous request -> isPublic=true on the backend call (guest submitting from a public
-      // mission RSVP form). The anonymous signal that used to be stubbed here is gone with the
-      // caller (ADR-0159): the controller requires a login at the class level now.
       Model model = new ConcurrentModel();
       MissionFinanceEntryForm form = newForm(FinanceType.INCOME, BigDecimal.TEN);
       BindingResult br = mock(BindingResult.class);
       when(br.hasErrors()).thenReturn(false);
 
-      controller.addFinanceEntry(
-          MISSION_ID, form, br, model, redirectAttributes, /* principal= */ null);
+      controller.addFinanceEntry(MISSION_ID, form, br, model, redirectAttributes, null);
 
       verify(backendApiClient).post(anyString(), any(), eq(Void.class));
     }
@@ -173,10 +160,6 @@ class MissionFinancePageControllerTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // updateFinanceEntry
-  // ---------------------------------------------------------------
-
   @Nested
   class UpdateFinanceEntryTests {
 
@@ -195,8 +178,6 @@ class MissionFinancePageControllerTest {
 
       assertEquals("mission-detail", view);
       assertEquals("edit-finance-entry-modal", model.getAttribute("openModal"));
-      // The action attribute must include the actual entry id so the front-end
-      // posts back to the right edit endpoint.
       assertEquals(
           "/missions/" + MISSION_ID + "/finance-entries/" + ENTRY_ID + "/update",
           model.getAttribute("modalAction"));
@@ -217,8 +198,6 @@ class MissionFinancePageControllerTest {
               MISSION_ID, ENTRY_ID, form, br, model, redirectAttributes, principal);
 
       assertEquals("redirect:/missions/" + MISSION_ID, view);
-      // PUT body: note + type + amount + version. NO missionId/participantId
-      // (immutable after creation).
       ArgumentCaptor<Map<String, Object>> bodyCaptor = ArgumentCaptor.captor();
       verify(backendApiClient)
           .put(eq("/api/v1/finance-entries/" + ENTRY_ID), bodyCaptor.capture(), eq(Void.class));
@@ -252,10 +231,6 @@ class MissionFinancePageControllerTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // deleteFinanceEntry
-  // ---------------------------------------------------------------
-
   @Nested
   class DeleteFinanceEntryTests {
 
@@ -284,10 +259,6 @@ class MissionFinancePageControllerTest {
       assertNull(redirectAttributes.getFlashAttributes().get("successToast"));
     }
   }
-
-  // ---------------------------------------------------------------
-  // AJAX endpoints (#574): in-place create / update / delete
-  // ---------------------------------------------------------------
 
   @Nested
   class AjaxEndpointTests {
@@ -330,10 +301,6 @@ class MissionFinancePageControllerTest {
       verify(backendApiClient).delete("/api/v1/finance-entries/" + ENTRY_ID, Void.class);
     }
   }
-
-  // ---------------------------------------------------------------
-  // helpers
-  // ---------------------------------------------------------------
 
   private static MissionFinanceEntryForm newForm(FinanceType type, BigDecimal amount) {
     MissionFinanceEntryForm form = new MissionFinanceEntryForm();

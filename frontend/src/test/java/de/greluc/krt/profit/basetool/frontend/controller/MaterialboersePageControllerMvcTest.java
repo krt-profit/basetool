@@ -125,7 +125,6 @@ class MaterialboersePageControllerMvcTest {
         .andExpect(content().string(containsString("Agricium")))
         .andExpect(content().string(containsString("data-mb-tab")))
         .andExpect(content().string(containsString("<strong>Titanium</strong>")))
-        // The Anbieter's org-unit affiliation badge renders next to the username.
         .andExpect(content().string(containsString("squadron-badge")))
         .andExpect(content().string(containsString(">IRI<")));
   }
@@ -146,10 +145,8 @@ class MaterialboersePageControllerMvcTest {
     mockMvc
         .perform(get("/materialboerse"))
         .andExpect(status().isOk())
-        // The offers board is present ...
         .andExpect(content().string(containsString("id=\"mb-listwrap\"")))
         .andExpect(content().string(containsString("data-mb-search")))
-        // ... and the request board is NOT included on top of it.
         .andExpect(content().string(not(containsString("id=\"mg-listwrap\""))))
         .andExpect(content().string(not(containsString("data-mg-search"))));
   }

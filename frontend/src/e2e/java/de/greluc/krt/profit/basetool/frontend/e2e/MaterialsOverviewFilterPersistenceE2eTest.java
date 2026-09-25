@@ -101,33 +101,21 @@ class MaterialsOverviewFilterPersistenceE2eTest {
         assertThat(page.locator("#tableContainer"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(15_000));
 
-        // Decide up front whether the material multi-select can be narrowed to a subset: with
-        // fewer than two options an uncheck would leave zero checked, which the query builder
-        // (and the stored preference) deliberately treats as "no filter" again.
         boolean narrowMaterials = page.locator("input.matCheck").count() > 1;
 
-        // Change the filters inside the waitForResponse window so the debounced refetch they
-        // trigger is provably consumed here and cannot bleed into the post-reload assertion.
         page.waitForResponse(
             response -> isFilteredDataUrl(response.url()),
             () -> {
               page.locator("#filterLoadingDock").check();
               page.locator("#filterAutoLoad").check();
               if (narrowMaterials) {
-                // Open the dropdown (the option checkboxes are hidden until it is open) and
-                // exclude the first material, turning the dimension into a persisted subset.
                 page.locator("#materialHeader").click();
                 page.locator("input.matCheck").first().uncheck();
               }
             });
 
-        // Drain any second debounced dispatch (200 ms debounce per change) so every pre-reload
-        // data request has been issued before the reload's request-observation window opens —
-        // otherwise a straggler carrying the same parameters could satisfy the assertion below
-        // without the restore-before-fetch path ever running.
         page.waitForTimeout(500);
 
-        // Reload and require the *initial* data request to already carry the restored selection.
         Request initialFetch =
             page.waitForRequest(
                 request -> isFilteredDataUrl(request.url()),
@@ -140,8 +128,6 @@ class MaterialsOverviewFilterPersistenceE2eTest {
                   + initialFetch.url());
         }
 
-        // The widgets themselves are restored (checked-state assertions work on the closed,
-        // hidden dropdown options — they read the DOM property, not visibility).
         assertThat(page.locator("#filterLoadingDock")).isChecked();
         assertThat(page.locator("#filterAutoLoad")).isChecked();
         if (narrowMaterials) {

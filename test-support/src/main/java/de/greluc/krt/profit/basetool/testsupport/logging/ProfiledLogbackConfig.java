@@ -62,9 +62,7 @@ public final class ProfiledLogbackConfig {
       Pattern.compile(
           "<springProfile\\s+name=\"([^\"]*)\"\\s*>(.*?)</springProfile>", Pattern.DOTALL);
 
-  private ProfiledLogbackConfig() {
-    // Static helper — not instantiable.
-  }
+  private ProfiledLogbackConfig() {}
 
   /**
    * Configures and starts a new {@link LoggerContext} from the classpath resource {@code resource}

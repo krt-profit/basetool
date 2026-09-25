@@ -131,14 +131,6 @@ public class UserService {
   public UUID getUserIdFromJwt(@NotNull Jwt jwt) {
     String sub = jwt.getSubject();
     if (sub == null) {
-      // The OIDC standard requires `sub` on every ID token. A missing subject
-      // indicates a misconfigured authorization server. Refuse rather than
-      // falling back to a different claim and silently identifying users by
-      // a value an admin might rename in Keycloak.
-      // Audit finding H-10: only log the claim keys, never the values. The claims map still
-      // carries PII (preferred_username / email — and, on a Keycloak that has not yet had its
-      // name mappers removed, possibly given_name / family_name) which PiiMasker only partially
-      // scrubs — the keys still help diagnose a Keycloak mapper misconfiguration.
       log.error(
           "JWT has no subject (sub). Refusing the request. Claim keys: {}",
           jwt.getClaims().keySet());
@@ -148,10 +140,6 @@ public class UserService {
     try {
       return UUID.fromString(sub);
     } catch (IllegalArgumentException e) {
-      // Standard Keycloak issues UUIDs as subjects. A non-UUID sub is a
-      // configuration deviation; deriving a UUID via UUID.nameUUIDFromBytes
-      // would mix up identities (renaming the underlying value, two realms
-      // with similar usernames, casing differences, ...). Fail-closed.
       log.error(
           "JWT subject is not a valid UUID: '{}'. Refusing the request to avoid identity mix-up.",
           sub);
@@ -211,7 +199,6 @@ public class UserService {
       requireAssignableDisplayName(displayName, id);
       user.setDisplayName(displayName.isBlank() ? null : displayName);
     }
-    // joinDate can be explicitly set to null (clear the date)
     user.setJoinDate(joinDate);
     return userRepository.save(user);
   }
@@ -240,9 +227,6 @@ public class UserService {
       requireAssignableDisplayName(displayName, id);
       user.setDisplayName(displayName.isBlank() ? null : displayName);
     }
-    // saveAndFlush so the bumped @Version is in the response — the profile page writes the returned
-    // version back onto every hidden version input in place via syncAllVersions (no reload), so a
-    // stale save() version 409s the next consecutive profile edit.
     return userRepository.saveAndFlush(user);
   }
 
@@ -271,9 +255,6 @@ public class UserService {
     User user = Entities.require(userRepository.findById(id), "User not found");
     OptimisticLock.checkOptionalClient(user.getVersion(), version, User.class, id);
     user.setDefaultPayoutPreference(preference);
-    // saveAndFlush so the bumped @Version reaches the response — the profile payout-preference
-    // dropdown writes the returned version back in place via syncAllVersions (no reload), so a
-    // stale save version 409s the next consecutive change.
     return userRepository.saveAndFlush(user);
   }
 
@@ -301,9 +282,6 @@ public class UserService {
     User user = Entities.require(userRepository.findById(id), "User not found");
     OptimisticLock.checkOptionalClient(user.getVersion(), version, User.class, id);
     user.setShareBlueprintsGlobally(shareBlueprintsGlobally);
-    // saveAndFlush so the bumped @Version reaches the response — the profile blueprint-sharing
-    // toggle writes the returned version back in place via syncAllVersions (no reload), so a stale
-    // save version 409s the next consecutive change.
     return userRepository.saveAndFlush(user);
   }
 
@@ -449,16 +427,6 @@ public class UserService {
    *     caller's subject is not a UUID
    */
   public Optional<User> getCurrentUser() {
-    // Asked of AuthenticatedSubject, not of the type. This is the canonical "who is calling"
-    // accessor, and a Jwt-principal test made it answer "nobody" for an acting member (ADR-0129) —
-    // latent today because neither ACTING_PATH reaches it, and an ownership check silently
-    // evaluated against no current user the moment a third endpoint joins that list.
-    //
-    // NOT idOf(). That would fold "there is no caller" and "the caller's subject is malformed" into
-    // the same empty Optional, and those must stay apart: the first is a guest, the second is a
-    // misconfigured realm. Callers act on the difference — MissionService does
-    // getCurrentUser().ifPresent(mission::setOwner), so a silent empty would persist an OWNERLESS
-    // mission where this used to refuse the request outright.
     Optional<String> subject = AuthenticatedSubject.of(authHelperService.rawAuthentication());
     if (subject.isEmpty()) {
       return Optional.empty();
@@ -483,8 +451,6 @@ public class UserService {
     try {
       return UUID.fromString(subject);
     } catch (IllegalArgumentException malformed) {
-      // Deliberately without the value: it reaches the log unfiltered otherwise, and a subject from
-      // a deviating realm can be a username (REQ-OBS-004).
       log.error("Authenticated subject is not a UUID. Refusing to avoid an identity mix-up.");
       throw new AuthenticationServiceException("Authenticated subject must be a UUID");
     }
@@ -558,10 +524,6 @@ public class UserService {
         OrgUnitMembership fresh = orgUnitMembershipService.addMember(change.orgUnitId(), userId);
         if (Boolean.TRUE.equals(change.isLogistician())
             || Boolean.TRUE.equals(change.isMissionManager())) {
-          // The freshly-created row has version 0 and is still managed in this transaction.
-          // Mutate it in place; Hibernate dirty-checking flushes the second update on commit
-          // without a second explicit save call (avoiding the intra-transaction @Version race
-          // documented in CLAUDE.md).
           if (Boolean.TRUE.equals(change.isLogistician())) {
             fresh.setLogistician(true);
           }

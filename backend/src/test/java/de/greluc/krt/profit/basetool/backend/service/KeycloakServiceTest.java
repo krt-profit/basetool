@@ -167,7 +167,6 @@ class KeycloakServiceTest {
                   "client",
                   "client-secret",
                   "secret"));
-      // The client-credentials token request fails → getAccessToken throws → fetchUsers swallows.
       server.enqueue(new MockResponse().setResponseCode(500));
 
       KeycloakService service =
@@ -215,10 +214,6 @@ class KeycloakServiceTest {
       UUID userB = UUID.fromString("00000000-0000-0000-0000-0000000000b2");
       UUID userC = UUID.fromString("00000000-0000-0000-0000-0000000000c3");
 
-      // 1) client-credentials token, 2) full first page (== pageSize → keep paging),
-      // 3) short second page (< pageSize → stop). No role names are passed, so no /roles member
-      // page is requested; then one federated-identity lookup per roster user (A, B, C) since none
-      // is pre-known-linked — all empty here, so this stays a pure pagination check.
       server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
       server.enqueue(
           jsonResponse(
@@ -243,7 +238,7 @@ class KeycloakServiceTest {
           Set.of("a", "b", "c"),
           users.stream().map(KeycloakUserDto::username).collect(Collectors.toSet()));
 
-      server.takeRequest(); // token
+      server.takeRequest();
       RecordedRequest firstPage = server.takeRequest();
       assertTrue(firstPage.getPath().contains("first=0"), "first page must request first=0");
       assertTrue(firstPage.getPath().contains("max=2"), "first page must bind the page size");
@@ -288,8 +283,6 @@ class KeycloakServiceTest {
 
       UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
 
-      // token, single short page (stop); no role names → no /roles member page; then federated
-      // identities A (one discord link) since A is not pre-known-linked.
       server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
       server.enqueue(
           jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\",\"enabled\":true}]"));
@@ -396,16 +389,11 @@ class KeycloakServiceTest {
 
       UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
 
-      // token, single short roster page (stop), the realm-role listing (ADMIN), one ADMIN member
-      // page (A, short → stop), the default-role composite read, then federated identities A
-      // (empty, A is not pre-known-linked).
       server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
       server.enqueue(
           jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\",\"enabled\":true}]"));
       server.enqueue(jsonResponse("[{\"name\":\"ADMIN\"}]"));
       server.enqueue(jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\"}]"));
-      // REQ-SEC-053: the default-role composite read. 404 = this realm fixture models no
-      // `default-roles-iri`, which is exactly how every realm looked before WP-K1.
       server.enqueue(errorResponse(404));
       server.enqueue(jsonResponse("[]"));
 
@@ -417,8 +405,8 @@ class KeycloakServiceTest {
       assertEquals(1, users.size());
       assertEquals(Set.of("ADMIN"), users.get(0).roles());
 
-      server.takeRequest(); // token
-      server.takeRequest(); // roster page
+      server.takeRequest();
+      server.takeRequest();
       RecordedRequest rolesList = server.takeRequest();
       assertTrue(
           rolesList.getPath().contains("/roles?"),
@@ -467,16 +455,11 @@ class KeycloakServiceTest {
 
       UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
 
-      // token, roster (A), realm-role listing names the role "admin" (lower case), member page for
-      // /roles/admin/users lists A, the default-role composite read, federated identities A
-      // (empty).
       server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
       server.enqueue(
           jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\",\"enabled\":true}]"));
       server.enqueue(jsonResponse("[{\"name\":\"admin\"}]"));
       server.enqueue(jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\"}]"));
-      // REQ-SEC-053: the default-role composite read. 404 = this realm fixture models no
-      // `default-roles-iri`, which is exactly how every realm looked before WP-K1.
       server.enqueue(errorResponse(404));
       server.enqueue(jsonResponse("[]"));
 
@@ -491,9 +474,9 @@ class KeycloakServiceTest {
           users.get(0).roles(),
           "a case-mismatched realm role must still resolve, stored under the local casing");
 
-      server.takeRequest(); // token
-      server.takeRequest(); // roster page
-      server.takeRequest(); // realm-role listing
+      server.takeRequest();
+      server.takeRequest();
+      server.takeRequest();
       RecordedRequest rolePage = server.takeRequest();
       assertTrue(
           rolePage.getPath().contains("/roles/admin/users"),
@@ -539,7 +522,6 @@ class KeycloakServiceTest {
 
       UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
 
-      // token, roster (A), realm-role listing (ADMIN), then a 500 on the member query.
       server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
       server.enqueue(
           jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\",\"enabled\":true}]"));
@@ -593,16 +575,11 @@ class KeycloakServiceTest {
 
       UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
 
-      // token, roster (A), realm-role listing (ADMIN), a 404 on the member query, the default-role
-      // composite read, then federated identities A (empty — A is not pre-known-linked, so the
-      // read still happens).
       server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
       server.enqueue(
           jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\",\"enabled\":true}]"));
       server.enqueue(jsonResponse("[{\"name\":\"ADMIN\"}]"));
       server.enqueue(errorResponse(404));
-      // REQ-SEC-053: the default-role composite read. 404 = this realm fixture models no
-      // `default-roles-iri`, which is exactly how every realm looked before WP-K1.
       server.enqueue(errorResponse(404));
       server.enqueue(jsonResponse("[]"));
 
@@ -654,7 +631,6 @@ class KeycloakServiceTest {
 
       UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
 
-      // token, roster (A), then a 403 on GET /roles (missing view-realm) → skip the whole run.
       server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
       server.enqueue(
           jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\",\"enabled\":true}]"));
@@ -755,7 +731,7 @@ class KeycloakServiceTest {
           new KeycloakService(properties, observedBuilder(), sslBundles, meterRegistry);
       service.unlinkDiscordIdentity(pending);
 
-      server.takeRequest(); // token
+      server.takeRequest();
       RecordedRequest delete = server.takeRequest();
       assertEquals("DELETE", delete.getMethod());
       assertTrue(
@@ -817,7 +793,7 @@ class KeycloakServiceTest {
           new KeycloakService(properties, observedBuilder(), sslBundles, meterRegistry);
       service.linkDiscordIdentity(target, "123456789012345678", "examplehandle4711");
 
-      server.takeRequest(); // token
+      server.takeRequest();
       RecordedRequest post = server.takeRequest();
       assertEquals("POST", post.getMethod());
       assertTrue(
@@ -918,7 +894,7 @@ class KeycloakServiceTest {
           new KeycloakService(properties, observedBuilder(), sslBundles, meterRegistry);
       service.deleteUser(pending);
 
-      server.takeRequest(); // token
+      server.takeRequest();
       RecordedRequest delete = server.takeRequest();
       assertEquals("DELETE", delete.getMethod());
       assertTrue(delete.getPath().endsWith("/users/" + pending));
@@ -1064,18 +1040,14 @@ class KeycloakServiceTest {
     MockWebServer server = new MockWebServer();
     server.start();
     try {
-      // writeProperties leaves page-size at its default of 100.
       KeycloakSyncProperties properties = writeProperties(server);
 
       UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
       server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
       server.enqueue(
           jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\",\"enabled\":true}]"));
-      // The realm knows ADMIN but not the app's local-only role.
       server.enqueue(jsonResponse("[{\"name\":\"ADMIN\"}]"));
       server.enqueue(jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\"}]"));
-      // REQ-SEC-053: the default-role composite read. Empty here — its own folding is covered by
-      // fetchUsers_foldsInWhatTheDefaultRoleCompositeGrants().
       server.enqueue(jsonResponse("[]"));
       server.enqueue(jsonResponse("[]"));
 
@@ -1145,9 +1117,6 @@ class KeycloakServiceTest {
 
       UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
 
-      // token, roster (A), realm-role listing (ADMIN + KRT Member), no direct ADMIN member, no
-      // direct KRT Member member, the composite granting KRT Member, its member page listing A,
-      // then federated identities A.
       server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
       server.enqueue(
           jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\",\"enabled\":true}]"));
@@ -1170,11 +1139,11 @@ class KeycloakServiceTest {
           users.get(0).roles(),
           "a member who holds the role only through the default-role composite must resolve");
 
-      server.takeRequest(); // token
-      server.takeRequest(); // roster page
-      server.takeRequest(); // realm-role listing
-      server.takeRequest(); // direct ADMIN members
-      server.takeRequest(); // direct KRT Member members
+      server.takeRequest();
+      server.takeRequest();
+      server.takeRequest();
+      server.takeRequest();
+      server.takeRequest();
       RecordedRequest composites = server.takeRequest();
       assertTrue(
           composites.getPath().contains("/roles/default-roles-iri/composites/realm"),
@@ -1224,8 +1193,6 @@ class KeycloakServiceTest {
 
       UUID userA = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
 
-      // token, roster (A), then a realm-role listing that names nothing the app maps — the shape a
-      // realm-wide rename produces.
       server.enqueue(jsonResponse("{\"access_token\":\"test-token\"}"));
       server.enqueue(
           jsonResponse("[{\"id\":\"" + userA + "\",\"username\":\"a\",\"enabled\":true}]"));
@@ -1288,7 +1255,6 @@ class KeycloakServiceTest {
           new KeycloakService(properties, observedBuilder(), sslBundles, meterRegistry);
       service.fetchUsers(List.of(), Set.of());
 
-      // One timer per uri (token endpoint, users listing), so the count is summed across them.
       long observed =
           meterRegistry
               .find("http.client.requests")

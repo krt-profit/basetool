@@ -127,15 +127,6 @@ public class PersonalBlueprintImportProxyController {
    */
   @PostMapping(value = "/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   public BlueprintImportPreviewDto preview(@RequestParam("file") @NotNull MultipartFile file) {
-    // Refuse before file.getBytes() pulls the whole upload into frontend heap and then copies it
-    // again into the relay body. The backend parser has its own 8 MiB cap, but it only sees the
-    // upload AFTER this process has buffered it twice - so without a cap here the relay is the
-    // cheaper target of the two. Mirrors RefineryImportProxyController.MAX_EXTRACT_BYTES, sized to
-    // the backend parser's own limit for this format.
-    //
-    // A ResponseStatusException, not the IllegalArgumentException this used to throw: that one had
-    // no handler and reached the caller as a 500 + ERROR stack trace for ordinary client input.
-    // GlobalExceptionHandler#handleResponseStatus keeps the status (APPSEC-11).
     if (file.isEmpty()) {
       throw new ResponseStatusException(
           HttpStatus.BAD_REQUEST, "The uploaded blueprint export is empty.");

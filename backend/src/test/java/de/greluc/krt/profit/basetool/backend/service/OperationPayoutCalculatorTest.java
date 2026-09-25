@@ -71,12 +71,11 @@ class OperationPayoutCalculatorTest {
     void incomeMinusExpensePlusRefineryProfit() {
       MissionFinanceEntry income = financeEntry(FinanceType.INCOME, new BigDecimal("1000"));
       MissionFinanceEntry expense = financeEntry(FinanceType.EXPENSE, new BigDecimal("250"));
-      RefineryOrder order = refineryOrder(500d, 100d, 50d); // profit = 350
+      RefineryOrder order = refineryOrder(500d, 100d, 50d);
 
       BigDecimal total =
           OperationPayoutCalculator.computeTotalSum(List.of(income, expense), List.of(order));
 
-      // 1000 - 250 + 350 = 1100
       assertEquals(
           0, total.compareTo(new BigDecimal("1100")), "income - expense + refinery profit");
     }
@@ -126,7 +125,7 @@ class OperationPayoutCalculatorTest {
     @Test
     void refineryCostsAreAttributedToTheOwner_salesAreNot() {
       User owner = user("owner");
-      RefineryOrder order = refineryOrder(1000d, 120d, 30d); // costs 120 + 30 = 150
+      RefineryOrder order = refineryOrder(1000d, 120d, 30d);
       order.setOwner(owner);
 
       Map<String, BigDecimal> byKey =
@@ -213,7 +212,6 @@ class OperationPayoutCalculatorTest {
       User alice = user("alice");
       Mission m1 = mission(T0, T0_PLUS_30M);
       Mission m2 = mission(T0_PLUS_60M, T0_PLUS_60M.plus(30, ChronoUnit.MINUTES));
-      // p starts before m1 -> clamped to T0; second stint fully inside m2.
       addUser(m1, alice, T0.minus(30, ChronoUnit.MINUTES), T0_PLUS_30M, PayoutPreference.PAYOUT);
       addUser(
           m2,
@@ -248,8 +246,6 @@ class OperationPayoutCalculatorTest {
       assertEquals(0L, breakdown.totalDuration());
     }
   }
-
-  // ----- helpers ----------------------------------------------------
 
   private static User user(String username) {
     User u = new User();

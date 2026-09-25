@@ -70,7 +70,6 @@ class NotificationRetentionTaskTest {
         .count();
   }
 
-  // covers REQ-NOTIF-009 — read notifications age from readAt against the read window
   @Test
   void purgesReadNotificationsOlderThanMaxAge() {
     when(notificationService.purgeReadOlderThan(any())).thenReturn(3);
@@ -79,12 +78,10 @@ class NotificationRetentionTaskTest {
 
     ArgumentCaptor<Instant> cutoff = ArgumentCaptor.forClass(Instant.class);
     verify(notificationService).purgeReadOlderThan(cutoff.capture());
-    // Cutoff is "now - 90d"; allow a small window around the captured value.
     assertThat(cutoff.getValue()).isBeforeOrEqualTo(Instant.now().minus(89, ChronoUnit.DAYS));
     assertThat(cutoff.getValue()).isAfter(Instant.now().minus(91, ChronoUnit.DAYS));
   }
 
-  // covers REQ-NOTIF-009 — unread notifications are bounded too, on their own longer window
   @Test
   void purgesUnreadNotificationsOlderThanUnreadMaxAge() {
     when(notificationService.purgeUnreadOlderThan(any())).thenReturn(2);
@@ -97,7 +94,6 @@ class NotificationRetentionTaskTest {
     assertThat(cutoff.getValue()).isAfter(Instant.now().minus(181, ChronoUnit.DAYS));
   }
 
-  // covers REQ-NOTIF-009 — one run sweeps both windows, never only the read half
   @Test
   void sweepsBothWindowsInOneRun() {
     when(notificationService.purgeReadOlderThan(any())).thenReturn(3);
@@ -109,8 +105,6 @@ class NotificationRetentionTaskTest {
     verify(notificationService).purgeUnreadOlderThan(any());
   }
 
-  // covers REQ-NOTIF-009 — the unread cutoff is strictly older than the read one, so a notification
-  // is never reaped sooner for being unread than it would have been for being read
   @Test
   void unreadCutoffIsOlderThanReadCutoff() {
     task().purgeExpiredNotifications();
@@ -126,7 +120,6 @@ class NotificationRetentionTaskTest {
   void swallowsFailuresSoSchedulerSurvives() {
     when(notificationService.purgeReadOlderThan(any())).thenThrow(new RuntimeException("db down"));
 
-    // Must not propagate.
     task().purgeExpiredNotifications();
   }
 

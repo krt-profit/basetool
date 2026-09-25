@@ -170,8 +170,6 @@ public class BankBookingRequestService {
     BankAccount account =
         Entities.require(accountRepository.findById(accountId), "Bank account not found");
     requireActiveForRequest(account);
-    // REQ-BANK-045: a withdrawal/transfer request leaving a justification-mandating account
-    // (CARTEL, CARTEL_BANK, SPECIAL) must carry a non-blank Begründung; a deposit never does.
     if (type == BankBookingRequestType.WITHDRAWAL || type == BankBookingRequestType.TRANSFER) {
       BankBookingGuards.requireDebitJustification(account, justification);
     }
@@ -199,7 +197,6 @@ public class BankBookingRequestService {
     request.setAmount(amount);
     request.setNote(note);
     request.setJustification(justification);
-    // Nothing is persisted until save() below, so a rejected counterparty aborts cleanly here.
     applyCounterparty(
         request, resolveRequestCounterparty(type, counterpartyUserId, counterpartyOrgUnitId));
     request.setStatus(BankBookingRequestStatus.PENDING);
@@ -420,8 +417,6 @@ public class BankBookingRequestService {
     }
 
     BankBookingRequestType type = request.getType();
-    // REQ-BANK-045: the Begründung rule is re-checked against the (unchanged) source account, so an
-    // edit cannot blank a mandatory reason.
     if (type == BankBookingRequestType.WITHDRAWAL || type == BankBookingRequestType.TRANSFER) {
       BankBookingGuards.requireDebitJustification(request.getAccount(), update.justification());
     }
@@ -437,9 +432,6 @@ public class BankBookingRequestService {
     request.setApplicableLimit(applicableLimit);
     request.setRequiredApprover(requiredApprover);
 
-    // REQ-AUDIT-001: the new amount is a system value, not user free text, so it may be named. The
-    // corrected note/Begründung/Empfaenger deliberately are NOT — the details payload carries no
-    // user free text and no PII.
     bankAuditService.record(
         BankAuditEventType.BOOKING_REQUEST_UPDATED,
         request.getAccount().getId(),
@@ -543,9 +535,6 @@ public class BankBookingRequestService {
         null,
         caller,
         "cancelled request " + shortId(request.getId()));
-    // REQ-NOTIF-018: withdrawing the request clears the now-stale "new booking request"
-    // notifications the bank staff were shown for it. The event notifies nobody itself (the actor
-    // is the requester); its sole pipeline effect is that removal.
     eventPublisher.publishEvent(
         new BankBookingRequestCancelledEvent(
             request.getId(), request.getAccount().getId(), caller));
@@ -626,8 +615,6 @@ public class BankBookingRequestService {
     BankBookingRequest request = lockRequest(requestId);
     requireVersion(request, version);
     requirePending(request);
-    // REQ-BANK-041: an over-limit request needs the bank employee to attest the responsible
-    // holder's approval was obtained before any money moves.
     if (request.isRequiresOwnerApproval() && !ownerApprovalConfirmed) {
       throw new BankConflictException(
           BankConflictException.CODE_BANK_OWNER_APPROVAL_REQUIRED,
@@ -637,13 +624,6 @@ public class BankBookingRequestService {
     UUID accountId = request.getAccount().getId();
     requireConfirmCapability(request.getType(), accountId, authentication);
 
-    // REQ-BANK-044/-055: a confirmed deposit/withdrawal records a counterparty
-    // (Einzahler/Empfänger). An Empfänger the requester NAMED on the request wins; otherwise the
-    // requester is derived — for a deposit request (REQ-BANK-042) the requester IS the depositor,
-    // and for a withdrawal that named nobody it is the historical default the pre-V232 rows carry.
-    // requested_by is ON DELETE SET NULL, so a non-null id always still resolves; the requester may
-    // belong to several units, so the deterministic primary unit is recorded (name-sorted primary
-    // Staffel, or a leader's Bereich/OL), null when they have none.
     UUID namedCounterparty = request.getCounterpartyUserId();
     UUID requesterId = namedCounterparty != null ? namedCounterparty : request.getRequestedBy();
     UUID counterpartyOrgUnitId = confirmCounterpartyOrgUnitId(request, requesterId);
@@ -651,10 +631,6 @@ public class BankBookingRequestService {
     BankTransactionDto booked =
         switch (request.getType()) {
           case DEPOSIT ->
-              // REQ-BANK-043: a split deposit request carries the snapshotted percentage; the
-              // concrete per-squadron legs are resolved by bookDeposit against the squadron
-              // accounts
-              // active NOW (at confirmation), not at request time.
               bankLedgerService.bookDeposit(
                   new BankDepositRequest(
                       accountId,
@@ -678,9 +654,6 @@ public class BankBookingRequestService {
                       staffNote,
                       requesterId,
                       counterpartyOrgUnitId,
-                      // A booking request never carries the fee-inclusive flag (REQ-BANK-033,
-                      // #999);
-                      // confirmation always books the default on-top fee mode.
                       false,
                       null));
           case TRANSFER -> {
@@ -689,13 +662,6 @@ public class BankBookingRequestService {
               throw new NotFoundException(
                   "A transfer confirmation requires the destination account and holder");
             }
-            // REQ-BANK-040: confirming a transfer *request* is not a direct employee-initiated
-            // transfer. The requester (an authorized source-account viewer) already chose the
-            // destination from any active account, and requireConfirmCapability above already
-            // checked the employee's can_transfer on the SOURCE. The direct-transfer
-            // destination-visibility gate (REQ-BANK-011) therefore does not apply here, so a
-            // scoped employee without a grant on the destination can still execute the request
-            // (passing destinationVisible = true) instead of hitting a permanent dead-end.
             yield bankLedgerService.bookTransfer(
                 new BankTransferRequest(
                     accountId,
@@ -706,8 +672,6 @@ public class BankBookingRequestService {
                     request.getNote(),
                     request.getJustification(),
                     staffNote,
-                    // A booking request never carries the fee-inclusive flag (REQ-BANK-033, #999);
-                    // confirmation always books the default on-top fee mode.
                     false),
                 true);
           }
@@ -737,7 +701,6 @@ public class BankBookingRequestService {
             + shortId(request.getId())
             + " @"
             + holder.getHandle());
-    // REQ-BANK-041: record the employee's over-limit approval attestation as its own audit event.
     if (request.isRequiresOwnerApproval()) {
       bankAuditService.record(
           BankAuditEventType.BOOKING_REQUEST_OWNER_APPROVAL_CONFIRMED,

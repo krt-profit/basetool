@@ -83,7 +83,7 @@ public class InventoryMissionAllocation extends AbstractEntity<UUID> {
 
   @Min(0)
   @Column(nullable = false)
-  private Double amount; // SCU
+  private Double amount;
 
   /**
    * Rounds {@link #amount} to SCU storage precision (three decimals) before every {@code INSERT}

@@ -172,7 +172,6 @@ class RefineryOrderStorageCalculationTest {
     assertEquals(1, storeForm.getItems().size());
     RefineryOrderStoreItemForm item = storeForm.getItems().get(0);
 
-    // 1234 / 100.0 = 12.34
     assertEquals(12.34, item.getAmount());
     assertEquals("SCU", item.getQuantityType());
     assertTrue(item.getAmountFixed());
@@ -193,7 +192,7 @@ class RefineryOrderStorageCalculationTest {
             UUID.randomUUID(),
             "Ouratite",
             "REFINED",
-            null, // ← reproduces the bug: UEX-imported material with NULL quantity_type
+            null,
             null,
             null,
             null,
@@ -248,10 +247,7 @@ class RefineryOrderStorageCalculationTest {
     assertEquals(1, storeForm.getItems().size());
     RefineryOrderStoreItemForm item = storeForm.getItems().get(0);
 
-    // 221 / 100.0 = 2.21 — the user's reproduction in issue #230. Pre-fix this asserted 221.0.
     assertEquals(2.21, item.getAmount());
-    // The displayed unit label must follow the converted amount, otherwise the user sees
-    // "2.21 Stück" instead of "2.21 SCU" and gets confused.
     assertEquals("SCU", item.getQuantityType());
     assertTrue(item.getAmountFixed());
   }

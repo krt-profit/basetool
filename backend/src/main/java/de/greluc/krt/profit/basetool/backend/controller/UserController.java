@@ -436,8 +436,6 @@ public class UserController {
     if (authHelperService.isAdmin()) {
       return false;
     }
-    // Post-R9 D3 (V101): the user's home Staffel(n) are sourced from org_unit_membership — the
-    // legacy User.squadron column was dropped.
     List<UUID> targetSquadronIds =
         orgUnitMembershipQueryService.findStaffelMembershipOrgUnitIds(user.getId());
     if (targetSquadronIds.isEmpty()) {
@@ -792,8 +790,6 @@ public class UserController {
   public static class UserAttributesRequest {
     @jakarta.validation.constraints.NotNull private Integer rank;
 
-    // Bound the free-text fields (security audit L1): description is a TEXT column with no DB
-    // backstop, so without @Size an authenticated caller could store a multi-MB blob per write.
     @Size(max = 10_000)
     private String description;
 
@@ -807,11 +803,6 @@ public class UserController {
   /** Body for {@link #updateMyDescription}. */
   @Data
   public static class UserDescriptionRequest {
-    // Bound the free-text self-service fields (security audit L1): description maps to a TEXT
-    // column
-    // with no DB length backstop. @Size only rejects over-length input; the fields stay nullable
-    // (a null description means "no change", a blank displayName clears it) so partial-update
-    // semantics are unchanged — do NOT add @NotBlank.
     @Size(max = 10_000)
     private String description;
 
@@ -903,10 +894,6 @@ public class UserController {
    * @return the slim peer-view DTO
    */
   private UserDto redactToPeerShape(@NotNull UserDto dto) {
-    // The projection itself moved to the shared support class: every surface that NESTS a UserDto
-    // must apply the same shape, and while it lived here as a private helper only this controller
-    // did - so the same caller got the slim record from GET /users/{id} and the full one from any
-    // aggregate that embedded it.
     return UserDtoRedaction.toPeerShape(dto);
   }
 

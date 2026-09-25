@@ -98,10 +98,6 @@ class LocationControllerTest {
 
   @Test
   void lookup_returnsReferenceListDirectlyFromService_noMapper() {
-    // The lookup endpoint exposes a stripped-down ReferenceDto for
-    // dropdowns; the service produces it directly so the mapper is not
-    // involved. A refactor that re-routed through the mapper would
-    // accidentally expose internal fields.
     List<LocationReferenceDto> refs =
         List.of(
             new LocationReferenceDto(UUID.randomUUID(), "Lorville"),
@@ -159,10 +155,6 @@ class LocationControllerTest {
 
   @Test
   void create_stripsServerManagedFields_andDelegatesToService() {
-    // SECURITY: a client must not be able to set `id` or `version` via the
-    // POST body and trigger an UPDATE instead of an INSERT. The controller
-    // calls stripServerManaged() on the freshly mapped entity to guarantee
-    // an INSERT path. This test pins that contract.
     LocationDto request = new LocationDto(UUID.randomUUID(), "New Loc", "desc", false, false, 99L);
     Location mappedEntity = new Location();
     mappedEntity.setId(request.id());
@@ -182,8 +174,6 @@ class LocationControllerTest {
 
     assertSame(response, result);
 
-    // Capture the entity actually passed to the service — its id/version
-    // MUST be null (stripped).
     ArgumentCaptor<Location> entityCap = ArgumentCaptor.forClass(Location.class);
     verify(service).createLocation(entityCap.capture());
     Location forwarded = entityCap.getValue();
@@ -193,8 +183,6 @@ class LocationControllerTest {
 
   @Test
   void update_forwardsIdAndDtoToService_withoutEntityMapping() {
-    // Note: the update endpoint forwards the DTO directly (NOT the mapped
-    // entity) so the service can apply only the user-mutable fields.
     UUID id = UUID.randomUUID();
     LocationDto request = new LocationDto(id, "Renamed", "desc", false, false, 4L);
     Location updated = new Location();

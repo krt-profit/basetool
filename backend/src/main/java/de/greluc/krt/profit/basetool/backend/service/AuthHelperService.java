@@ -191,11 +191,6 @@ public class AuthHelperService {
    */
   @NotNull
   public Optional<UUID> currentUserId() {
-    // Through the seam, not through getName(). This method predates the ingest gateway's identity
-    // swap and happened to keep working for it only because the acting member's name equals its
-    // sub — an accident, not a contract. Reading getName() is the idiom that split every consumer
-    // into fail-open and fail-closed when a second authentication type appeared (ADR-0129), and it
-    // is the one that would put a callsign here for a username/password caller (REQ-OBS-004).
     return AuthenticatedSubject.idOf(currentAuthentication().orElse(null));
   }
 

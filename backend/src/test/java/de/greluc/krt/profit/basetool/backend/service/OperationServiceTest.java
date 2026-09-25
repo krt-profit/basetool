@@ -75,23 +75,18 @@ class OperationServiceTest {
 
   @Test
   void shouldCreateOperation() {
-    // Given
     Operation operation = new Operation();
     operation.setName("Test Op");
     operation.setStatus(OperationStatus.PLANNED);
 
     when(operationRepository.save(any(Operation.class))).thenReturn(operation);
-    // No caller resolved → service falls back to currentOrgUnit(), which we leave empty here
-    // because the test doesn't care about the stamp value, only that the save runs.
     when(userService.getCurrentUser()).thenReturn(java.util.Optional.empty());
     org.mockito.Mockito.lenient()
         .when(ownerScopeService.currentOrgUnit())
         .thenReturn(java.util.Optional.empty());
 
-    // When
     Operation result = operationService.createOperation(operation, null);
 
-    // Then
     assertNotNull(result);
     assertEquals("Test Op", result.getName());
     verify(operationRepository, times(1)).save(operation);
@@ -130,10 +125,6 @@ class OperationServiceTest {
 
   @Test
   void createOperation_membershiplessLeadershipCaller_stampsNullOwningOrgUnit() {
-    // #500 / REQ-ORG-009: organisation leadership ("Bereichsleitung") belongs to no Staffel/SK but
-    // may plan org-wide operations. The nullable picker resolver returns null for such a
-    // membershipless caller (instead of 400ing), so the operation persists ownerless — visible to
-    // organisation members-or-above (operations have no public escape).
     Operation operation = new Operation();
     operation.setName("Bereichsleitung-Operation");
     operation.setStatus(OperationStatus.PLANNED);
@@ -153,16 +144,13 @@ class OperationServiceTest {
 
   @Test
   void shouldGetOperationById() {
-    // Given
     UUID id = UUID.randomUUID();
     Operation operation = new Operation();
     operation.setId(id);
     when(operationRepository.findById(id)).thenReturn(Optional.of(operation));
 
-    // When
     Operation result = operationService.getOperationById(id);
 
-    // Then
     assertNotNull(result);
     assertEquals(id, result.getId());
   }
@@ -177,7 +165,6 @@ class OperationServiceTest {
 
   @Test
   void shouldGetAllOperations() {
-    // Given
     PageRequest pageable = PageRequest.of(0, 10);
     Page<Operation> page = new PageImpl<>(List.of(new Operation()));
     when(ownerScopeService.currentScopePredicate())
@@ -185,24 +172,17 @@ class OperationServiceTest {
     when(operationRepository.findAllScoped(true, null, Set.of(), false, null, pageable))
         .thenReturn(page);
 
-    // When
     Page<Operation> result = operationService.getAllOperations(pageable);
 
-    // Then
     assertNotNull(result);
     assertEquals(1, result.getTotalElements());
   }
-
-  // --- searchOperations ----------------------------------------------------
 
   @Nested
   class SearchOperationsTests {
 
     @Test
     void forwardsCallerSuppliedStatusList_andResolvesScopeFromSquadronService() {
-      // The service must (1) honour the caller's status list verbatim and (2) read the squadron
-      // scope through OwnerScopeService, NOT bypass it - operations are a strict-staffel
-      // aggregate and a missing scope filter would leak other squadrons' operations.
       PageRequest pageable = PageRequest.of(0, 20);
       UUID squadronId = UUID.randomUUID();
       List<String> requestedStatus = List.of("PLANNED", "ACTIVE");
@@ -242,9 +222,6 @@ class OperationServiceTest {
 
     @Test
     void nullStatusList_fallsBackToFullEnumSet() {
-      // The repository query uses `status IN (:status)` and an empty list would yield no results;
-      // the service must therefore expand `null`/empty to every OperationStatus name so callers
-      // can omit the parameter to mean "all statuses".
       PageRequest pageable = PageRequest.of(0, 20);
       when(ownerScopeService.currentScopePredicate())
           .thenReturn(new ScopePredicate(true, null, Set.of()));
@@ -274,7 +251,6 @@ class OperationServiceTest {
 
     @Test
     void emptyStatusList_alsoFallsBackToFullEnumSet() {
-      // `List.of()` is a separate code path from `null` — both must produce the same fallback.
       PageRequest pageable = PageRequest.of(0, 20);
       when(ownerScopeService.currentScopePredicate())
           .thenReturn(new ScopePredicate(true, null, Set.of()));
@@ -299,9 +275,6 @@ class OperationServiceTest {
 
     @Test
     void adminAllSquadronsMode_passesNullScopeToRepository() {
-      // OwnerScopeService.currentScopePredicate() returns adminAllScope=true for admins without
-      // an active squadron selection ("all squadrons" mode). The service must forward that to the
-      // repository so the JPA query disables the scope filter.
       PageRequest pageable = PageRequest.of(0, 20);
       when(ownerScopeService.currentScopePredicate())
           .thenReturn(new ScopePredicate(true, null, Set.of()));
@@ -327,10 +300,6 @@ class OperationServiceTest {
 
     @Test
     void forwardsTimeRangeBoundsToRepositoryVerbatim() {
-      // The start/end bounds filter on the operation's derived mission span (earliest planned
-      // start / latest planned end). The service does no interpretation of its own — it forwards
-      // both instants straight to the repository, whose CAST(... AS timestamp) IS NULL guard
-      // disables a null bound.
       PageRequest pageable = PageRequest.of(0, 20);
       Instant start = Instant.parse("2026-06-01T00:00:00Z");
       Instant end = Instant.parse("2026-06-30T23:59:00Z");
@@ -359,26 +328,18 @@ class OperationServiceTest {
 
   @Test
   void shouldDeleteOperation() {
-    // Given
     UUID id = UUID.randomUUID();
     Operation operation = new Operation();
     when(operationRepository.findById(id)).thenReturn(Optional.of(operation));
     doNothing().when(operationRepository).delete(operation);
 
-    // When
     operationService.deleteOperation(id);
 
-    // Then
     verify(operationRepository, times(1)).delete(operation);
   }
 
   @Test
   void deleteOperation_unlinksMissions_butDoesNotDeleteThem() {
-    // The contract of deleteOperation is to clear the mission -> operation
-    // back-reference and clear the in-memory collection, then delete the
-    // operation itself. Missions and everything hanging off them (participants,
-    // finance entries, inventory items, refinery orders) MUST survive — only
-    // the operation aggregate root vanishes.
     UUID id = UUID.randomUUID();
     Operation operation = new Operation();
     operation.setId(id);
@@ -414,8 +375,6 @@ class OperationServiceTest {
     assertThrows(NotFoundException.class, () -> operationService.deleteOperation(missing));
   }
 
-  // --- updateOperation -----------------------------------------------------
-
   @Nested
   class UpdateOperationTests {
 
@@ -429,7 +388,6 @@ class OperationServiceTest {
       existing.setStatus(OperationStatus.PLANNED);
       existing.setVersion(2L);
 
-      // PLANNED -> ACTIVE is allowed by the state machine.
       OperationUpdateDto incoming =
           new OperationUpdateDto("new", "new-desc", OperationStatus.ACTIVE, 2L);
 
@@ -445,7 +403,6 @@ class OperationServiceTest {
 
     @Test
     void rejectsForbiddenStatusTransition_whenNotAdmin() {
-      // PLANNED -> COMPLETED skips the ACTIVE phase and is not a valid transition.
       UUID id = UUID.randomUUID();
       Operation existing = new Operation();
       existing.setId(id);
@@ -466,7 +423,6 @@ class OperationServiceTest {
 
     @Test
     void terminalStatusCannotBeChanged_whenNotAdmin() {
-      // COMPLETED has no outgoing transitions.
       UUID id = UUID.randomUUID();
       Operation existing = new Operation();
       existing.setId(id);
@@ -483,8 +439,6 @@ class OperationServiceTest {
 
     @Test
     void sameStatusIsAlwaysAllowed_evenWithoutAdmin() {
-      // Updating only the name/description on a COMPLETED operation must NOT
-      // trip the state-machine guard. Same-status transitions are always fine.
       UUID id = UUID.randomUUID();
       Operation existing = new Operation();
       existing.setId(id);
@@ -506,8 +460,6 @@ class OperationServiceTest {
 
     @Test
     void adminMayOverrideStatusMachine() {
-      // ADMIN reverses a CANCELED operation back to PLANNED — disallowed for
-      // regular MISSION_MANAGER callers, but the override flag opens the gate.
       UUID id = UUID.randomUUID();
       Operation existing = new Operation();
       existing.setId(id);
@@ -552,13 +504,6 @@ class OperationServiceTest {
 
     @Test
     void acceptsNullVersionInIncoming_asBypassToken() {
-      // Mirrors the bypass behavior used by other services: a null version on
-      // the inbound DTO skips the explicit check (Hibernate still catches stale
-      // writes via the UPDATE ... WHERE version=N fallback on commit).
-      // Note: in practice OperationUpdateDto declares @NotNull on version so
-      // this code path is guarded at the controller boundary; the service-
-      // level branch still has to remain forgiving so internal callers can
-      // bypass the check explicitly.
       UUID id = UUID.randomUUID();
       Operation existing = new Operation();
       existing.setId(id);
@@ -566,9 +511,6 @@ class OperationServiceTest {
       existing.setName("old");
       existing.setStatus(OperationStatus.PLANNED);
 
-      // Same-status update with a null version on the DTO. The status gate
-      // is a no-op (PLANNED -> PLANNED is always fine), and the manual
-      // optimistic-lock check is skipped due to the null version.
       OperationUpdateDto incoming =
           new OperationUpdateDto("new", null, OperationStatus.PLANNED, null);
 

@@ -116,7 +116,6 @@ class JobOrderHandoverE2eTest {
           seeder.createInventoryItemForJobOrder(
               USERNAME, PASSWORD, materialId, locationId, jobOrderId, 750, 100.0);
 
-      // Single-entry book-out: order requests 200 so a 40-unit handover never completes it.
       singleEntryOrderId =
           seeder.createJobOrder(
               USERNAME, PASSWORD, IRIDIUM_ID, "E2E Handover Single", materialId, 650, 200.0);
@@ -124,7 +123,6 @@ class JobOrderHandoverE2eTest {
           seeder.createInventoryItemForJobOrder(
               USERNAME, PASSWORD, materialId, locationId, singleEntryOrderId, 750, 100.0);
 
-      // Multi-entry book-out: two linked items (100 + 60) on an order requesting 200.
       multiEntryOrderId =
           seeder.createJobOrder(
               USERNAME, PASSWORD, IRIDIUM_ID, "E2E Handover Multi", materialId, 650, 200.0);
@@ -166,10 +164,6 @@ class JobOrderHandoverE2eTest {
       try {
         E2eSupport.navigate(page, baseUrl + "/orders/" + jobOrderId + "?tab=handovers");
 
-        // Opening the modal lazily fetches the order's linked inventory per material; the "add row"
-        // button snapshots that cache at click time, so the cache must be populated first. Gate on
-        // the network response rather than a page-side waitForFunction, which would trip the strict
-        // CSP (script-src has no 'unsafe-eval').
         page.waitForResponse(
             response ->
                 response.url().contains("/materials/") && response.url().contains("/inventory"),
@@ -179,17 +173,10 @@ class JobOrderHandoverE2eTest {
         page.locator("select[name='items[0].inventoryItemId']").selectOption(inventoryItemId);
         page.locator("input[name='items[0].amount']").fill("50");
 
-        // The split date/time inputs sync into the hidden #handoverTime (UTC ISO); past times are
-        // allowed here (data-validate-not-past='false'), so today's date is fine.
         page.locator("#handover-modal .date-part").fill(LocalDate.now().toString());
         page.locator("#handover-modal .time-part").fill("12:00");
         page.locator("#recipientHandle").fill("E2E Recipient");
 
-        // Submit in place (#575): the material handover swaps the materials/handover/header
-        // sections via AJAX and closes the modal — there is no Post/Redirect/Get navigation to
-        // await. Mark the window to prove no full reload happened, submit, then web-first-wait for
-        // the recorded handover row to appear in the re-rendered history (which also proves the
-        // entry persisted), and assert the marker survived.
         page.evaluate("window.__krtNoReload = true;");
         page.getByTestId("order-handover-submit").click();
         assertThat(
@@ -231,16 +218,12 @@ class JobOrderHandoverE2eTest {
         page.locator("input[name='items[0].amount']").fill("40");
         fillRecipientAndTime(page, "E2E Single Book-out");
 
-        // Submit in place (#575): the handover books out inventory in one transaction and swaps
-        // sections via AJAX — await the handover XHR POST (the commit) rather than a document
-        // navigation that never comes; the backend read-back below then sees the booked-out amount.
         page.waitForResponse(
             response ->
                 response.url().contains("/orders/" + singleEntryOrderId + "/handovers")
                     && "POST".equals(response.request().method()),
             () -> page.getByTestId("order-handover-submit").click());
 
-        // The linked entry must now hold the original 100 minus the 40 handed over.
         assertEquals(
             60.0,
             linkedInventoryAmount(singleEntryOrderId, singleEntryItemId),
@@ -272,25 +255,20 @@ class JobOrderHandoverE2eTest {
         E2eSupport.navigate(page, baseUrl + "/orders/" + multiEntryOrderId + "?tab=handovers");
         openHandoverModal(page);
 
-        // First entry: hand over 40 of 100.
         page.locator("#add-handover-item-btn").click();
         page.locator("select[name='items[0].inventoryItemId']").selectOption(multiEntryItemAId);
         page.locator("input[name='items[0].amount']").fill("40");
-        // Second entry: hand over 30 of 60, in the same handover.
         page.locator("#add-handover-item-btn").click();
         page.locator("select[name='items[1].inventoryItemId']").selectOption(multiEntryItemBId);
         page.locator("input[name='items[1].amount']").fill("30");
         fillRecipientAndTime(page, "E2E Multi Book-out");
 
-        // Submit in place (#575): await the handover XHR POST (the book-out commit) rather than a
-        // document navigation that never comes; the per-entry read-backs below then see the result.
         page.waitForResponse(
             response ->
                 response.url().contains("/orders/" + multiEntryOrderId + "/handovers")
                     && "POST".equals(response.request().method()),
             () -> page.getByTestId("order-handover-submit").click());
 
-        // Each entry is reduced by its own handed-over amount, not the pooled total.
         assertEquals(
             60.0,
             linkedInventoryAmount(multiEntryOrderId, multiEntryItemAId),

@@ -235,8 +235,6 @@ public class RequestBodySizeLimitFilter extends OncePerRequestFilter {
             + "\"}";
     byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
     response.setStatus(HttpStatus.PAYLOAD_TOO_LARGE.value());
-    // Set the header directly and write UTF-8 bytes so the media type stays a clean
-    // application/problem+json without a `;charset=` suffix (matches RateLimitingFilter).
     response.setHeader("Content-Type", "application/problem+json");
     response.setHeader("X-Correlation-Id", correlationId);
     response.setContentLength(bytes.length);

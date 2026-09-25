@@ -44,8 +44,6 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 @SpringBootTest
-// REQ-SEC-052: every route these cases exercise requires a login now, so the class carries a
-// principal. What each case asserts is unchanged — only the caller is.
 @org.springframework.security.test.context.support.WithMockUser
 class TermsControllerTest {
 
@@ -121,9 +119,6 @@ class TermsControllerTest {
         .perform(get("/terms"))
         .andExpect(status().isOk())
         .andExpect(view().name("terms"))
-        // Asserted as the absence of the document rather than the presence of the notice: the
-        // notice is a resolved message and would tie this case to one locale's wording, while
-        // "no clause reached the page" is the property that matters and holds in every language.
         .andExpect(
             content()
                 .string(

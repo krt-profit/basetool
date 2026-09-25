@@ -1,22 +1,3 @@
-# promtool unit test for the container-runtime normalisation (REQ-OBS-014, ADR-0163, 2026-09-18).
-#
-# The Podman migration deletes cAdvisor and renames every container family the four alerts below
-# are written against. `alerts/containers-runtime.yml` normalises the two shapes into one set of
-# `basetool:container:*` recording rules, and this file is what makes that a measurement rather
-# than a claim:
-#
-#   - each alert FIRES from the cgroup-collector series        (the Podman host);
-#   - the collector's own liveness alerts fire when it stops, matches nothing, or has never
-#     written at all (the absent() leg, 2026-09-22 -- the Docker host it used to stay silent for is
-#     retired).
-#
-# The last one is the whole reason the collector has alerts at all. Its docstring puts it plainly:
-# a parsing bug here is "an alert that never fires, which looks exactly like a healthy system".
-#
-# Run locally (no promtool on the host — use an ephemeral container, see monitoring/README.md):
-#   docker run --rm --entrypoint promtool -v "$PWD/monitoring/prometheus:/work" -w /work \
-#     prom/prometheus:v3.14.0 test rules tests/container_runtime_normalisation_test.yml
-
 rule_files:
   - ../alerts/containers-runtime.yml
   - ../alerts/infrastructure.yml
@@ -24,14 +5,11 @@ rule_files:
 evaluation_interval: 1m
 
 tests:
-  # =============================================================================================
-  # The post-cutover host: only basetool_container_* exists.
-  # =============================================================================================
   - name: podman shape - anonymous memory over the line fires ContainerMemoryHigh
     interval: 1m
     input_series:
       - series: 'basetool_container_memory_anon_bytes{name="backend"}'
-        values: "966367641x30"   # 0.9375 of the limit below
+        values: "966367641x30"
       - series: 'basetool_container_memory_limit_bytes{name="backend"}'
         values: "1030792151x30"
     alert_rule_test:
@@ -63,8 +41,6 @@ tests:
               summary: "Container pids >80% of the cgroup cap: grafana"
               description: "Container grafana holds more than 80% of its pids cgroup cap (basetool:container:pids is the cgroup pids.current count, basetool:container:pids_max its pids.max). At the cap the kernel refuses new tasks: a JVM throws 'unable to create native thread' and child-process spawns (healthcheck wget, ssl_client) fail — the 2026-07-12 ingest native-thread OOM and the 2026-07-26 grafana zombie exhaustion. A steady climb is a task/zombie leak — investigate before it reaches the cap; do not raise the cap to silence it."
 
-  # memory.events -> oom_kill. This one has NO prometheus-podman-exporter equivalent at all, so the
-  # cgroup collector is the only source after the cutover -- and on 2026-09-18 nothing read it.
   - name: podman shape - an OOM kill fires ContainerOomKilled
     interval: 1m
     input_series:
@@ -81,14 +57,13 @@ tests:
               summary: "Container OOM-killed: ingest"
               description: "Container ingest recorded an out-of-memory kill in the last 15 minutes. Check its memory limit and working set; on the memory-capped host this is the designed sacrifice order — confirm it was the intended victim."
 
-  # cpu.stat -> nr_periods / nr_throttled. Also cgroup-only after the cutover.
   - name: podman shape - sustained throttling fires ContainerCpuThrottledHigh
     interval: 1m
     input_series:
       - series: 'basetool_container_cpu_periods_total{name="frontend"}'
         values: "0+100x40"
       - series: 'basetool_container_cpu_throttled_periods_total{name="frontend"}'
-        values: "0+50x40"     # 50% of periods throttled, over the 25% line
+        values: "0+50x40"
     alert_rule_test:
       - eval_time: 35m
         alertname: ContainerCpuThrottledHigh
@@ -100,15 +75,9 @@ tests:
               summary: "Container CPU throttled >25%: frontend"
               description: "Container frontend had more than 25% of its CFS periods throttled for 15 minutes — it is CPU-starved against its limit, degrading latency. Consider raising its cpus limit."
 
-
-
-  # =============================================================================================
-  # The collector's own liveness.
-  # =============================================================================================
   - name: collector - a stale textfile fires, and takes every container alert down with it
     interval: 1m
     input_series:
-      # A timestamp frozen 30 minutes in the past while `time()` advances.
       - series: 'basetool_container_metrics_timestamp_seconds'
         values: "0x40"
     alert_rule_test:
@@ -124,7 +93,6 @@ tests:
   - name: collector - a fresh textfile is silent
     interval: 1m
     input_series:
-      # Tracks `time()`: 0s at t=0, 60s at t=1m, ... so the age never exceeds one interval.
       - series: 'basetool_container_metrics_timestamp_seconds'
         values: "0+60x40"
     alert_rule_test:
@@ -132,8 +100,6 @@ tests:
         alertname: ContainerCgroupCollectorStale
         exp_alerts: []
 
-  # The nastier failure: the file is FRESH and lists nothing, because the cgroup layout stopped
-  # matching. Staleness stays green while every series has quietly disappeared.
   - name: collector - a fresh file listing zero containers fires its own alert
     interval: 1m
     input_series:
@@ -154,11 +120,6 @@ tests:
               summary: "The cgroup container-metrics collector found no containers"
               description: "The collector is running and writing, but matched zero container cgroups for 10 minutes. Either nothing is running on this host, or the cgroup layout stopped matching its pattern -- in which case the file is fresh, ContainerCgroupCollectorStale stays green, and every container-level alert has no data to fire on."
 
-  # A collector that has NEVER written (OPS-MON-04, 2026-09-22). This scenario used to assert
-  # silence, because the Docker host never ran the collector and must not be paged for it. That host
-  # is retired, and on the Podman host "no series at all" -- a timer never enabled, a textfile
-  # directory node_exporter does not read -- is the worst form of the failure. FoundNothing stays
-  # silent: it reads a gauge the collector writes, and there is none.
   - name: collector - a collector that never wrote fires the staleness alert
     interval: 1m
     input_series:

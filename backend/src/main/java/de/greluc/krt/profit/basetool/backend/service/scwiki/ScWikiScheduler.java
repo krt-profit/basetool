@@ -150,10 +150,6 @@ public class ScWikiScheduler {
       return step.getAsInt();
     } catch (Exception e) {
       log.error("Scheduled SC Wiki {} sync failed", label, e);
-      // REQ-OBS-011: the umbrella scwiki_sync run still records outcome=success (the other steps
-      // ran
-      // and produced rows), so a single reliably-failing step is invisible to the outcome / items /
-      // stale signals — count it so ScWikiStepFailing can alert on a persistent step break.
       meterRegistry
           .counter(
               MetricNames.SCHEDULED_JOB_STEP_FAILURES,

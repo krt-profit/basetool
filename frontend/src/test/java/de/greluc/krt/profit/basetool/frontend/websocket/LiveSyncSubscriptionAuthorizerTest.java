@@ -93,9 +93,6 @@ class LiveSyncSubscriptionAuthorizerTest {
 
   @Test
   void authorize_401_failsOpen() {
-    // A 401 means the captured token expired, not that the user lacks access: fail open (opaque
-    // keys
-    // only; each fragment re-pull re-authorizes with a fresh token).
     server.enqueue(new MockResponse().setResponseCode(401));
     assertThat(authorizer.authorize(operationTopic, TOKEN, PIN)).isEqualTo(Decision.ALLOW);
   }
@@ -108,26 +105,18 @@ class LiveSyncSubscriptionAuthorizerTest {
 
   @Test
   void authorize_nullToken_allowsWithoutProbing() {
-    // No captured token snapshot: fail open without issuing a probe at all.
     assertThat(authorizer.authorize(operationTopic, null, PIN)).isEqualTo(Decision.ALLOW);
     assertThat(server.getRequestCount()).isZero();
   }
 
   @Test
   void authorize_transportError_failsOpen() throws Exception {
-    // A connection error (server gone) is a transient failure, not an authorization denial.
     server.shutdown();
     assertThat(authorizer.authorize(operationTopic, TOKEN, PIN)).isEqualTo(Decision.ALLOW);
   }
 
-  // ── F1: a PRESENCE-enabled class (mission) fails CLOSED on every indeterminate verdict, because
-  // an allowed subscribe immediately exposes the editor-identity presence snapshot. ─────────────
-
   @Test
   void authorize_missionPresence_2xx_allows() throws Exception {
-    // Positive control: a definitive backend 2xx still allows a mission subscribe — fail-closed
-    // only
-    // changes the INDETERMINATE outcomes, not a genuine authorization.
     LiveSyncTopic mission = LiveSyncTopic.parse("mission:" + UUID.randomUUID());
     server.enqueue(new MockResponse().setResponseCode(200).setBody("{}"));
     assertThat(authorizer.authorize(mission, TOKEN, PIN)).isEqualTo(Decision.ALLOW);
@@ -135,9 +124,6 @@ class LiveSyncSubscriptionAuthorizerTest {
 
   @Test
   void authorize_missionPresence_401_failsClosed() {
-    // A lapsed captured token is indeterminate; the presence class must refuse (not admit the
-    // editor snapshot of a mission the caller may not read) — but as DENY_INDETERMINATE, so the
-    // relay's deny metric can tell a backend/token outage from a real permission boundary.
     LiveSyncTopic mission = LiveSyncTopic.parse("mission:" + UUID.randomUUID());
     server.enqueue(new MockResponse().setResponseCode(401));
     Decision decision = authorizer.authorize(mission, TOKEN, PIN);
@@ -154,8 +140,6 @@ class LiveSyncSubscriptionAuthorizerTest {
 
   @Test
   void authorize_missionPresence_nullToken_failsClosedWithoutProbing() {
-    // No captured token: the presence class refuses without a probe (the non-presence classes fail
-    // open here — authorize_nullToken_allowsWithoutProbing).
     LiveSyncTopic mission = LiveSyncTopic.parse("mission:" + UUID.randomUUID());
     assertThat(authorizer.authorize(mission, null, PIN)).isEqualTo(Decision.DENY_INDETERMINATE);
     assertThat(server.getRequestCount()).isZero();
@@ -163,8 +147,6 @@ class LiveSyncSubscriptionAuthorizerTest {
 
   @Test
   void authorize_missionPresence_403_denies() {
-    // An explicit refusal is a real permission verdict and stays plain DENY for every class — this
-    // is the distinction the fail-closed cases above must NOT collapse into.
     LiveSyncTopic mission = LiveSyncTopic.parse("mission:" + UUID.randomUUID());
     server.enqueue(new MockResponse().setResponseCode(403));
     assertThat(authorizer.authorize(mission, TOKEN, PIN)).isEqualTo(Decision.DENY);
@@ -172,8 +154,6 @@ class LiveSyncSubscriptionAuthorizerTest {
 
   @Test
   void decisionDenied_isTrueForBothRefusals_andFalseForAllow() {
-    // Call sites gate on denied() rather than comparing constants, so a new deny flavour can never
-    // be silently admitted into a room.
     assertThat(Decision.ALLOW.denied()).isFalse();
     assertThat(Decision.DENY.denied()).isTrue();
     assertThat(Decision.DENY_INDETERMINATE.denied()).isTrue();
@@ -193,11 +173,6 @@ class LiveSyncSubscriptionAuthorizerTest {
 
   @Test
   void authorize_orderResourceProbe_allows2xx_andTargetsThePerOrderRead() throws Exception {
-    // The `order:{id}` detail room authorizes via GET /api/v1/orders/{id}. A requesting owner who
-    // reaches their own order through the requester escape (REQ-ORDERS-023) gets a redacted 2xx and
-    // is allowed (a foreign order would 403/404 and deny). The probe targets the per-order read,
-    // exactly like the page's own load — distinct from the global `orders` queue's capability
-    // probe.
     LiveSyncTopic order = LiveSyncTopic.parse("order:" + UUID.randomUUID());
     server.enqueue(new MockResponse().setResponseCode(200).setBody("{}"));
 
@@ -210,14 +185,11 @@ class LiveSyncSubscriptionAuthorizerTest {
 
   @Test
   void authorize_orderResourceProbe_403_denies() {
-    // A foreign order the caller may not read denies the subscribe.
     LiveSyncTopic order = LiveSyncTopic.parse("order:" + UUID.randomUUID());
     server.enqueue(new MockResponse().setResponseCode(403));
 
     assertThat(authorizer.authorize(order, TOKEN, PIN)).isEqualTo(Decision.DENY);
   }
-
-  // ── Global-room capability probe (the `orders` queue: canViewJobOrders) ──────────────────────
 
   @Test
   void authorize_globalCapabilityGranted_allows_viaCapabilitiesEndpoint() throws Exception {
@@ -236,7 +208,6 @@ class LiveSyncSubscriptionAuthorizerTest {
   @Test
   void authorize_globalCapabilityWithheld_denies() {
     LiveSyncTopic orders = LiveSyncTopic.parse("orders");
-    // A non-profit requester / guest lacks canViewJobOrders — refused from the staff queue room.
     server.enqueue(jsonResponse("{\"canViewJobOrders\":false}"));
 
     assertThat(authorizer.authorize(orders, TOKEN, PIN)).isEqualTo(Decision.DENY);
@@ -253,7 +224,6 @@ class LiveSyncSubscriptionAuthorizerTest {
   @Test
   void authorize_globalCapabilityProbeFails_failsOpen() {
     LiveSyncTopic orders = LiveSyncTopic.parse("orders");
-    // The DENY signal is the flag being false, not an HTTP error — a failed read fails open.
     server.enqueue(new MockResponse().setResponseCode(503));
 
     assertThat(authorizer.authorize(orders, TOKEN, PIN)).isEqualTo(Decision.ALLOW);
@@ -267,8 +237,6 @@ class LiveSyncSubscriptionAuthorizerTest {
     assertThat(server.getRequestCount()).isZero();
   }
 
-  // ── Bank account dual resource probe (staff read, org-unit fallback) ─────────────────────────
-
   @Test
   void authorize_bankAccountPrimary2xx_allows_withoutTouchingTheFallback() throws Exception {
     LiveSyncTopic bank = LiveSyncTopic.parse("bank:" + UUID.randomUUID());
@@ -278,15 +246,14 @@ class LiveSyncSubscriptionAuthorizerTest {
     RecordedRequest request = server.takeRequest(2, TimeUnit.SECONDS);
     assertThat(request).isNotNull();
     assertThat(request.getPath()).isEqualTo("/api/v1/bank/accounts/" + bank.resourceId());
-    // A 2xx staff read is final — the org-unit fallback is never issued.
     assertThat(server.getRequestCount()).isEqualTo(1);
   }
 
   @Test
   void authorize_bankAccountPrimaryDeniesButFallbackAllows() throws Exception {
     LiveSyncTopic bank = LiveSyncTopic.parse("bank:" + UUID.randomUUID());
-    server.enqueue(new MockResponse().setResponseCode(403)); // not bank staff
-    server.enqueue(new MockResponse().setResponseCode(200).setBody("{}")); // but an org-unit owner
+    server.enqueue(new MockResponse().setResponseCode(403));
+    server.enqueue(new MockResponse().setResponseCode(200).setBody("{}"));
 
     assertThat(authorizer.authorize(bank, TOKEN, PIN)).isEqualTo(Decision.ALLOW);
     RecordedRequest primary = server.takeRequest(2, TimeUnit.SECONDS);
@@ -304,8 +271,6 @@ class LiveSyncSubscriptionAuthorizerTest {
 
     assertThat(authorizer.authorize(bank, TOKEN, PIN)).isEqualTo(Decision.DENY);
   }
-
-  // ── Local role-gated global rooms (bank staff / orgunit-bank) — no backend call ──────────────
 
   @Test
   void authorize_bankStaffWithBankEmployeeRole_allows_withoutProbing() {
@@ -332,7 +297,6 @@ class LiveSyncSubscriptionAuthorizerTest {
 
   @Test
   void authorize_bankStaffNullAuthorities_failsOpen() {
-    // A capture miss fails open (opaque keys only; the fragment GET re-authorizes per viewer).
     LiveSyncTopic staff = LiveSyncTopic.parse("bank");
     assertThat(authorizer.authorize(staff, TOKEN, PIN, null)).isEqualTo(Decision.ALLOW);
   }
@@ -347,18 +311,13 @@ class LiveSyncSubscriptionAuthorizerTest {
 
   @Test
   void authorize_orgUnitBankWithOnlyTheNoRoleMarker_denies() {
-    // ROLE_GUEST until V239 deleted the role; ROLE_NO_ROLE is its successor (REQ-SEC-053).
     LiveSyncTopic orgUnit = LiveSyncTopic.parse("orgunit-bank");
     assertThat(authorizer.authorize(orgUnit, TOKEN, PIN, Set.of("ROLE_NO_ROLE")))
         .isEqualTo(Decision.DENY);
   }
 
-  // ── Authenticated-only global room (the materialboard board) — no probe, no role gate ────────
-
   @Test
   void authorize_materialboard_allowsOnAuthenticationAlone_withoutProbing() {
-    // The materialboard room carries no probe path and no role gate: an authenticated socket is
-    // authorized by its authentication alone, so the authorizer never touches the backend.
     LiveSyncTopic board = LiveSyncTopic.parse("materialboard");
     assertThat(authorizer.authorize(board, TOKEN, PIN, null)).isEqualTo(Decision.ALLOW);
     assertThat(authorizer.authorize(board, null, null, Set.of("ROLE_NO_ROLE")))

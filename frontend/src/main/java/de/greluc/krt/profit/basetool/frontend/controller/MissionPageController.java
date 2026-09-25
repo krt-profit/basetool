@@ -241,9 +241,6 @@ public class MissionPageController {
                 (me.displayName() != null && !me.displayName().isBlank())
                     ? me.displayName()
                     : me.username();
-            // Org-unit affiliations for a registered participant are derived server-side from the
-            // caller's memberships, so the form carries no org-unit prefill — the picker is
-            // guest-only and hidden once a registered user is selected.
             form =
                 new ParticipantForm(
                     me.id(), name, null, null, "", List.of(), null, null, null, null);
@@ -338,15 +335,8 @@ public class MissionPageController {
     if (size != null) {
       uri.append("size=").append(size).append("&");
     }
-    // Mission overview default: newest planned start at the top (the mission furthest in the
-    // future, descending by plannedStartTime). The backend API default for /api/v1/missions/search
-    // is ASC via PaginationUtil; the missions page deliberately overrides that. PaginationUtil
-    // already appends `id` as a stable tiebreaker for equal plannedStartTime values, so this
-    // covers the deterministic ordering contract.
     uri.append("sort=plannedStartTime,desc&");
 
-    // Only the four statuses the backend knows are relayed; they are constants, so they may be
-    // written into the template literally. An unknown value is dropped, not relayed (REQ-SEC-051).
     List<String> knownStatuses =
         status == null
             ? List.of()
@@ -356,8 +346,6 @@ public class MissionPageController {
                 .toList();
     if (knownStatuses.isEmpty()) {
       if (showPast) {
-        // The "only if authenticated" half of this condition is gone with the anonymous caller
-        // (ADR-0159): every caller here holds a session, so the archive toggle means what it says.
         uri.append("status=PLANNED&status=ACTIVE&status=COMPLETED&status=CANCELLED&");
       } else {
         uri.append("status=PLANNED&status=ACTIVE&");
@@ -383,7 +371,6 @@ public class MissionPageController {
       log.error("Error loading missions", e);
       model.addAttribute("error", "error.missions.load");
     }
-    // AJAX live-filter requests only need the results fragment.
     if (fragment != null && "results".equalsIgnoreCase(fragment)) {
       return "missions :: missionsResults";
     }
@@ -421,26 +408,12 @@ public class MissionPageController {
     try {
       MissionDto mission = backendApiClient.get("/api/v1/missions/" + id, MISSION);
 
-      // Fragment-gated reads (mission-scale hardening, ADR-0078): an in-place section refetch
-      // (GET /missions/{id}?fragment=X) must issue ONLY the backend reads its own fragment renders,
-      // not the full page's ~8-read fan-out. Without this, one peer's live-update refetch of e.g.
-      // the crew board still pulled the finance ledger (size=1000) + manager pickers, so a
-      // 200-viewer save burst multiplied into thousands of backend GETs, starved the DB pool and
-      // tripped the shared circuit breaker into a fleet-wide outage. `fullRender` (the top-level
-      // page load) keeps fetching everything; a fragment fetches only its slice. The attribute->
-      // fragment mapping is verified against mission-detail.html (finance attrs -> financeSection,
-      // ownerOptions -> mgmtPanels, unitShipOptions -> unit modals) so a skipped read is
-      // never dereferenced by the fragment actually rendered.
       final boolean fullRender = fragment == null;
       final String frag = fullRender ? null : fragment.toLowerCase(java.util.Locale.ROOT);
       final boolean needMgmt = fullRender || "mgmt".equals(frag);
       final boolean needCrewBoard = fullRender || "crew-board".equals(frag);
       final boolean needFinance = fullRender || "finance".equals(frag);
 
-      // Every attribute below is a pure function of the fetched mission (participant sort +
-      // groupings, facts-bar leader, unit-assignment lookups, participation percentages,
-      // frequency split); MissionDetailModelBuilder computes them so this handler keeps only
-      // the orchestration (fragment-gating, catalog reads, the finance fan-out below).
       MissionDetailModelBuilder.MissionDetailViewModel detail =
           MissionDetailModelBuilder.build(mission);
       model.addAttribute("mission", mission);
@@ -457,15 +430,7 @@ public class MissionPageController {
       model.addAttribute("frequencyByTypeId", detail.frequencyByTypeId());
       model.addAttribute("customFrequencies", detail.customFrequencies());
 
-      // Fetch the owner/manager org-unit options for the Verwaltung (mgmt) panel ONLY — the
-      // owning-org-unit select lives in the mgmtPanels fragment, so a crew/finance/overview/...
-      // refetch does not need it (fragment-gating, see fullRender note above). Default to an empty
-      // list when skipped so a stray reference never NPEs. The owner/manager USER pickers are now
-      // server-side searchable comboboxes (remote-users, #1193) that fetch matches from
-      // /users/search on demand, so the full roster is no longer preloaded here.
       if (needMgmt) {
-        // Owning-org-unit reassignment picker (REQ-ORG-018): the caller's assignable org units feed
-        // the Verwaltung "Verantwortliche Einheit" control, mirroring the create-form owner-picker.
         model.addAttribute("ownerOptions", fetchCallerMembershipOptions(principal));
       } else {
         model.addAttribute("ownerOptions", List.of());
@@ -490,65 +455,44 @@ public class MissionPageController {
                 mission.coreVersion(),
                 mission.scheduleVersion(),
                 mission.flagsVersion(),
-                // Edit path: owningOrgUnitId is not editable, the existing stamp survives.
                 null,
                 mission.meetingPoint(),
-                // Ziele / Ablauf are edited via their own AJAX section editors on the edit page,
-                // never through the create form's JSON carriers.
                 null,
                 null,
-                // dirtyCore / dirtySchedule / dirtyFlags default to true so the no-JS fallback
-                // saves every section; the edit JS overwrites them with the real state (#1136).
                 true,
                 true,
                 true));
       }
       model.addAttribute("isNew", false);
       model.addAttribute("authUserId", CurrentUser.userIdText(principal));
-      // Prefill the "join as me" participant form (an uncached /users/me read) only on a full-page
-      // render — fragment refetches never paint the add-participant modal it feeds (#1142).
       addFormsToModel(model, principal, fullRender);
-      // The operation-picker options feed the mission edit form only (rendered on the full page,
-      // never inside a swapped fragment). Skip the uncapped /operations/lookup read on fragment
-      // refetches that never repaint the picker (#1124, mirrors the #1142 users/me gate above).
       if (fullRender) {
         addOperationsToModel(model);
       }
 
-      // roundingMode only feeds the finance/refinery display; skip its backend read for non-finance
-      // fragment refetches. The "UP" default matches fetchRoundingMode's own fallback.
       model.addAttribute("roundingMode", needFinance ? fetchRoundingMode() : "UP");
 
-      // Fetch Mission JobTypes
       try {
         PageResponse<Map<String, Object>> jobTypesPage =
             backendApiClient.getCached(CachedCatalog.JOB_TYPES_MISSION, STRING_OBJECT_MAP_PAGE);
         model.addAttribute("jobTypes", jobTypesPage.content());
-      } catch (Exception e) {
-        // Ignore if job types fail
+      } catch (Exception ignored) {
       }
 
-      // Fetch Crew JobTypes
       try {
         PageResponse<Map<String, Object>> crewJobTypesPage =
             backendApiClient.getCached(CachedCatalog.JOB_TYPES_CREW, STRING_OBJECT_MAP_PAGE);
         model.addAttribute("crewJobTypes", crewJobTypesPage.content());
-      } catch (Exception e) {
-        // Ignore
+      } catch (Exception ignored) {
       }
 
-      // Fetch Squadrons
       try {
         PageResponse<Map<String, Object>> squadronsPage =
             backendApiClient.getCached(CachedCatalog.SQUADRONS_UNSORTED, STRING_OBJECT_MAP_PAGE);
         model.addAttribute("squadrons", squadronsPage.content());
-      } catch (Exception e) {
-        // Ignore
+      } catch (Exception ignored) {
       }
 
-      // Active org units (Staffel + Spezialkommandos) for the org-unit picker in the
-      // participant add/edit modals — the control a member uses when recording an external
-      // participant (ADR-0159, decision D4).
       try {
         List<OrgUnitMembershipOptionDto> orgUnits =
             backendApiClient.getCached(
@@ -558,31 +502,21 @@ public class MissionPageController {
         model.addAttribute("orgUnits", List.of());
       }
 
-      // Fetch FrequencyTypes
       try {
         PageResponse<Map<String, Object>> freqTypesPage =
             backendApiClient.getCached(
                 CachedCatalog.FREQUENCY_TYPES_ACTIVE, STRING_OBJECT_MAP_PAGE);
         model.addAttribute("frequencyTypes", freqTypesPage.content());
-      } catch (Exception e) {
-        // Ignore
+      } catch (Exception ignored) {
       }
 
-      // Fetch Ships
-      // Unit ship pickers are populated from the mission-scoped endpoint, not the caller's
-      // OrgUnit-scoped hangar: it returns ships of registered participants (any OrgUnit) plus
-      // ships already assigned to a unit. Only fetched when the caller may edit the mission —
-      // otherwise the modals don't render and the endpoint would 403.
-      // unit-ship-options only populates the unit add/edit modals (crew board area); skip its
-      // backend read for finance/mgmt/overview/steps/... fragment refetches.
       Boolean canEdit = mission.canEdit();
       if (canEdit != null && canEdit && needCrewBoard) {
         try {
           List<ShipDto> unitShipOptions =
               backendApiClient.get("/api/v1/missions/" + id + "/unit-ship-options", SHIP_LIST);
           model.addAttribute("unitShipOptions", unitShipOptions);
-        } catch (Exception e) {
-          // Ignore, e.g. if the caller cannot manage the mission
+        } catch (Exception ignored) {
         }
       }
 
@@ -590,23 +524,11 @@ public class MissionPageController {
         PageResponse<ShipTypeDto> allShipTypesPage =
             backendApiClient.getCached(CachedCatalog.SHIP_TYPES, SHIP_TYPE_PAGE);
         model.addAttribute("allShipTypes", allShipTypesPage.content());
-      } catch (Exception e) {
-        // Ignore, e.g. if user has no HANGAR_READ or other issue
+      } catch (Exception ignored) {
       }
 
-      // Fetch Finance Entries and Refinery Orders — member-only (the finance ledger is the
-      // mission's payout view). A guest is treated like an anonymous visitor here: the backend
-      // would reject these reads with 403 anyway, and skipping them keeps the "Finanzen" panel
-      // empty/collapsed instead of leaking refinery expenses through the shared finance table.
       if (authHelperService.isMemberOrAbove() && needFinance) {
         try {
-          // ADR-0078 mission-scale hardening: the summary strip reads its totals from a single
-          // backend SQL aggregate (/finance-entries/summary) instead of loading the whole ledger
-          // and
-          // summing in Java, and the entries table is bounded to a page instead of size=1000. Under
-          // the multi-user live-update fan-out this stops a finance render from pinning a DB
-          // connection on a thousand-row query. The three reads are independent per-mission lookups
-          // run concurrently; on any failure the whole Finanzen panel collapses to its empty state.
           CompletableFuture<MissionFinanceTotalsDto> totalsFuture =
               parallelPageLoader.loadAsync(
                   () ->
@@ -627,9 +549,6 @@ public class MissionPageController {
                   () ->
                       backendApiClient.get(
                           "/api/v1/refinery-orders/mission/" + id, REFINERY_ORDER_LIST));
-          // #1138: the mission inventory list moved off the embedded MissionDto field onto its own
-          // dedicated read; fetch it in parallel with the finance/refinery reads for the Wirtschaft
-          // "Lagereinträge" table.
           CompletableFuture<List<InventoryItemDto>> inventoryFuture =
               parallelPageLoader.loadAsync(
                   () ->
@@ -637,8 +556,6 @@ public class MissionPageController {
           CompletableFuture.allOf(totalsFuture, entriesFuture, refineryFuture, inventoryFuture)
               .join();
 
-          // Summary strip (Gesamtsumme / Einnahmen / Ausgaben / je Anteil) straight from the
-          // aggregate — the expense figures already fold in refinery-order expenses backend-side.
           MissionFinanceTotalsDto totals = totalsFuture.join();
           model.addAttribute("financeSum", totals.total());
           model.addAttribute("financeIncomeSum", totals.incomeSum());
@@ -657,15 +574,10 @@ public class MissionPageController {
                           java.math.RoundingMode.HALF_UP)
                   : null);
 
-          // Bounded entries table + the (small, bounded) refinery-order list for the ledger table,
-          // plus the mission inventory list for the Wirtschaft "Lagereinträge" table (#1138).
           model.addAttribute("financeEntries", entriesFuture.join().content());
           model.addAttribute("refineryOrders", refineryFuture.join());
           model.addAttribute("inventoryEntries", inventoryFuture.join());
         } catch (Exception e) {
-          // join() reports a supplier failure wrapped in a CompletionException; log its concrete
-          // cause so the line still names the real backend exception. Any failure collapses the
-          // whole Finanzen panel to its empty state.
           Throwable cause =
               (e instanceof java.util.concurrent.CompletionException && e.getCause() != null)
                   ? e.getCause()
@@ -677,27 +589,12 @@ public class MissionPageController {
     } catch (Exception e) {
       log.error("Error loading mission details", e);
       if (fragment != null) {
-        // In-place fragment path (#571/#574): a redirect here would be followed by
-        // krtFetch.swap and the whole /missions page painted into the small section
-        // container. Answer with a section-sized inline error fragment instead — the swap
-        // renders it in place. (An expired-session login redirect happens in the security
-        // filter before this controller; krtFetch.swap catches that via res.redirected.)
         return "mission-detail :: fragmentError";
       }
       model.addAttribute("error", "error.mission.details.load");
       return "redirect:/missions?error=error.mission.details.load";
     }
-    // Expose the authenticated user's JWT sub (Keycloak UUID) so Thymeleaf can
-    // robustly decide whether a participant row belongs to the current user
-    // and enable self-edit on the member's own entry.
-    // NOTE: currentAuth.getName() returns the preferred_username (configured via
-    // user-name-attribute), NOT the user id. CurrentUser.userIdText is the app_user.id that
-    // matches p.user.id in the participant list.
     model.addAttribute("authUserId", CurrentUser.userIdText(principal));
-    // In-place AJAX swap (epic #571): re-render only the section the caller mutated. The model is
-    // built fragment-gated above (see fullRender), so each fragment renders with exactly the
-    // attributes its own section needs — a section refetch no longer pays the full page's read
-    // fan-out (ADR-0078).
     if (fragment != null) {
       return switch (fragment.toLowerCase(java.util.Locale.ROOT)) {
         case "crew-board" -> "mission-detail :: crewBoard";
@@ -707,9 +604,6 @@ public class MissionPageController {
         case "steps-editor" -> "mission-detail :: stepsEditor";
         case "objectives-editor" -> "mission-detail :: objectivesEditor";
         case "frequencies-editor" -> "mission-detail :: frequenciesEditor";
-        // #1120: the Verwaltung "Organisation" panel (party lead + typed-frequency overview). Its
-        // model — mission, frequencyTypes, frequencyByTypeId — is built unconditionally above, so a
-        // live-sync `organisation` refetch renders with exactly the data it references.
         case "organisation" -> "mission-detail :: organisationPanel";
         default -> "mission-detail";
       };
@@ -732,8 +626,6 @@ public class MissionPageController {
       @AuthenticationPrincipal OidcUser principal,
       @RequestParam(required = false) UUID operationId) {
     if (!model.containsAttribute("missionForm")) {
-      // operationId preselects the parent operation when the create form is opened from an
-      // operation's Einsätze tab ("Einsatz hinzufügen"); null for the plain create flow.
       model.addAttribute(
           "missionForm",
           new MissionForm(
@@ -754,12 +646,8 @@ public class MissionPageController {
               null,
               null,
               null,
-              // objectivesJson / stepsJson: empty on a fresh create form; the client fills them
-              // from the Ziele / Ablauf rows on submit.
               null,
               null,
-              // dirtyCore / dirtySchedule / dirtyFlags are unused on the create path (it does not
-              // fan out section PATCHes); default to true for consistency with the edit form.
               true,
               true,
               true));
@@ -804,7 +692,6 @@ public class MissionPageController {
             0L,
             null,
             0L));
-    // Create page: always a full-page render, so prefill the "join as me" participant form.
     addFormsToModel(model, principal, true);
     addOperationsToModel(model);
     model.addAttribute("ownerOptions", fetchCallerMembershipOptions(principal));
@@ -827,9 +714,6 @@ public class MissionPageController {
       return List.of();
     }
     try {
-      // Epic #692 Phase 5: drill-down owner picker — the caller's direct memberships plus their
-      // cascading leadership reach (own Bereich/OL + overseen subordinate Staffeln/SKs). Unchanged
-      // for an ordinary member.
       List<OrgUnitMembershipOptionDto> options =
           backendApiClient.get(
               "/api/v1/users/me/pickable-org-units", ORG_UNIT_MEMBERSHIP_OPTION_LIST);
@@ -905,11 +789,6 @@ public class MissionPageController {
         return String.valueOf(instantObj);
       }
       java.time.ZonedDateTime zdt = instant.atZone(MISSION_TIME_ZONE);
-      // Truncate to seconds: the splitter's date/time inputs are minute-granular and write back a
-      // seconds-precision value on edit, so sub-second digits would only be DOM noise. The
-      // microsecond local form (YYYY-MM-DDThh:mm:ss.SSSSSS) is also exactly what the splitter's
-      // local-datetime regex cannot match and what parseToInstant used to choke on; truncating
-      // keeps the value in the documented zoneless YYYY-MM-DDThh:mm[:ss] shape.
       return zdt.toLocalDateTime().truncatedTo(java.time.temporal.ChronoUnit.SECONDS).toString();
     } catch (Exception e) {
       log.warn("Failed to format instant: {}", instantObj);

@@ -77,8 +77,6 @@ public class MissionTimelineService {
   /** Records the state-mutating timeline activities into the audit log (REQ-AUDIT-001). */
   private final AuditService auditService;
 
-  // --- Ablauf steps (procedure timeline) ---
-
   /**
    * Appends a step to the mission's Ablauf timeline. The new step lands at the end ({@code
    * orderIndex = max + 1}) and is initially not done. Validates and bumps the dedicated {@code
@@ -321,8 +319,6 @@ public class MissionTimelineService {
       ordered.get(i).setOrderIndex(i);
     }
   }
-
-  // --- Mission goals (Ziele) ---
 
   /**
    * Appends a goal (Ziel) to a mission at the end of the list (next {@code orderIndex}) and bumps

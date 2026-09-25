@@ -1,47 +1,6 @@
 #!/usr/bin/env bash
-# =============================================================================================
-# Self-test for scripts/cert-expiry-metrics.py
-#
-# The collector reads certificate FILES and writes them where node_exporter's textfile collector
-# will serve them. It exists because a blackbox probe can only see a certificate something is
-# SERVING, and the internal CA is served by nothing -- so the certificate whose expiry breaks every
-# verified upstream at once, together with the probes that would otherwise have warned about the
-# leaves, was the one with no coverage at all (measured on the testing host 2026-09-20).
-#
-# Which is exactly why it is worth testing hermetically. The values feed two alerts with different
-# thresholds, and the one thing that decides between them -- `self_signed`, which is issuer ==
-# subject -- is a string comparison over openssl output that nothing else would ever notice getting
-# wrong. A CA silently labelled `self_signed="false"` gets 14 days instead of 90 and the rotation
-# is started too late to finish; a leaf labelled `"true"` gets 90 and pages three months early
-# until it is ignored. Neither failure looks like a failure.
-#
-# So the test mints throwaway certificates with openssl -- a self-signed root whose DN carries the
-# commas and spaces a real one does, and a leaf it signed -- plus one long-expired certificate
-# embedded as a literal, and asserts what comes out. It also drops in the two file kinds that MUST
-# NOT be read: a private key, and a .pem that is not a certificate at all.
-#
-# None of the material here is a credential in any sense: it is generated at run time into a temp
-# directory, used to check a string comparison, and deleted. It never leaves this script.
-#
-# If docker is available it also runs `promtool check metrics` over the result, because "I read the
-# output and it looked like exposition format" is not the same claim as "Prometheus accepts it" --
-# and a DN containing a comma is precisely the case that would prove the difference. Skipped, not
-# failed, where docker is absent.
-#
-# Requires: bash, python3, openssl. Optional: docker (for the promtool leg).
-#
-#   bash scripts/cert-expiry-metrics.test.sh
-# =============================================================================================
 set -uo pipefail
 
-# Git-Bash/MSYS rewrites an argument that looks like an absolute path, and an openssl -subj is
-# exactly that shape: "/C=DE/O=..." arrives as "C:/Program Files/Git/C=DE/O=..." and openssl
-# rejects the name. Ignored on Linux -- but without it this script cannot run on the workstation it
-# was written on, and a test that only runs in CI is a test nobody runs before pushing.
-#
-# The EXCLUSION list and not MSYS_NO_PATHCONV=1: that one switches conversion off wholesale, which
-# then breaks the conversion this script NEEDS -- python here is a native Windows binary and cannot
-# open the /d/... form of the collector's path. Measured both ways 2026-09-20.
 export MSYS2_ARG_CONV_EXCL='/C=;/CN=;/O=;/OU='
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -68,7 +27,6 @@ say() { printf '%s\n' "$*"; }
 ok()  { PASSED=$((PASSED + 1)); printf '  ok    %s\n' "$*"; }
 bad() { FAILED=$((FAILED + 1)); printf '  FAIL  %s\n' "$*"; }
 
-# assert_line <label> <extended-regex>
 assert_line() {
   local label=$1 pattern=$2
   if grep -Eq -- "$pattern" "$OUT"; then
@@ -87,38 +45,19 @@ assert_absent() {
   fi
 }
 
-# ---------------------------------------------------------------------------------------------
-# The material. Everything here is minted now and deleted on exit.
-# ---------------------------------------------------------------------------------------------
 mkdir -p "$CERTS"
 cd "$CERTS" || exit 1
 
-# A self-signed root, 60 days out: outside the 14-day rule, inside the 90-day one. Its DN carries
-# commas and spaces, because a real one does and that is what exercises the label quoting.
 openssl req -x509 -newkey rsa:2048 -nodes -keyout ca.key -out basetool-ca.crt -days 60 \
   -subj "/C=DE/O=DAS KARTELL/OU=basetool/CN=DAS KARTELL basetool CA" >/dev/null 2>&1 \
   || { echo "openssl could not mint the root" >&2; exit 1; }
 
-# A leaf the root signed, 10 days out: inside the 14-day rule, and NOT self-signed.
 openssl req -newkey rsa:2048 -nodes -keyout service.key -out service.csr \
   -subj "/CN=service.internal" >/dev/null 2>&1
 openssl x509 -req -in service.csr -CA basetool-ca.crt -CAkey ca.key -CAcreateserial \
   -out service.crt -days 10 >/dev/null 2>&1
 rm -f service.csr
 
-# One that has already expired -- notAfter 2020-01-02T00:00:00Z, i.e. 1577923200.
-#
-# EMBEDDED rather than minted, because it cannot be minted portably: `openssl req -not_before/
-# -not_after` arrived in OpenSSL 3.5, and the CI runner and the WSL used to cross-check this script
-# both ship 3.0.13. An earlier version of this file generated it conditionally and skipped the leg
-# otherwise -- which meant the one assertion about an expiry that has ALREADY passed ran on exactly
-# one machine in the world, and not on the one gating the merge.
-#
-# It is a certificate and nothing more: CN=expired.invalid (RFC 2606 reserves `.invalid`, so it can
-# never name anything real), the private key was destroyed at generation, and it was already four
-# years dead when it was pasted here. Publishing a deliberately worthless artefact and leaking a
-# real one are opposite acts -- the same reasoning ADR-0139 sets out for the committed test TLS
-# material.
 cat > expired.crt <<'PEM'
 -----BEGIN CERTIFICATE-----
 MIIDFTCCAf2gAwIBAgIUWTlSw2mTesxGLy9khfZY+RVW22MwDQYJKoZIhvcNAQEL
@@ -141,17 +80,12 @@ llhOp49ykojmDkAtXPoINEPDCyPw/oLw3w==
 -----END CERTIFICATE-----
 PEM
 
-# The two things it must NOT read: a .pem that is not a certificate, and a private key. The first
-# must be skipped LOUDLY without costing the others their coverage; the second must never be opened
-# at all -- this collector has no business touching private material and the alerts need none.
 echo "this is not a certificate" > notacert.pem
 cp ca.key looks-important.key
 
 cd "$HERE" || exit 1
 
-# =============================================================================================
 say "== it reads what it should and writes exposition format =="
-# =============================================================================================
 RUN_OUT="$("$PY" "$COLLECTOR" --dir "$CERTS" --output "$OUT" 2>&1)"
 RUN_RC=$?
 
@@ -175,12 +109,8 @@ assert_line "notBefore is reported too" '^basetool_certificate_not_before_timest
 assert_line "the file count is present" '^basetool_certificate_files [0-9]+$'
 assert_line "the run is stamped"        '^basetool_certificate_metrics_timestamp_seconds [0-9]+$'
 
-# =============================================================================================
 say ""
 say "== self_signed is what decides between a 14-day and a 90-day alert =="
-# =============================================================================================
-# The whole reason the label exists. Getting it wrong in either direction produces an alert that
-# is wrong in a way nobody would look for.
 assert_line "the root is self_signed=true" \
   '^basetool_certificate_expiry_timestamp_seconds\{path="[^"]*basetool-ca\.crt".*self_signed="true"\}'
 assert_line "the CA-issued leaf is self_signed=false" \
@@ -188,29 +118,15 @@ assert_line "the CA-issued leaf is self_signed=false" \
 assert_line "the leaf names its issuer" \
   '^basetool_certificate_expiry_timestamp_seconds\{path="[^"]*service\.crt",subject="CN=service\.internal",issuer="CN=DAS KARTELL basetool CA,OU=basetool,O=DAS KARTELL,C=DE"'
 
-# =============================================================================================
 say ""
 say "== a DN is rendered as RFC 2253, identically on every openssl =="
-# =============================================================================================
-# openssl's DEFAULT DN format is not stable across versions -- measured 2026-09-20 on one file,
-# 3.0.13 prints `C = DE, O = ...` and 3.5.7 prints `C=DE, O=...`. Prometheus identifies a series by
-# its labels, so the default would retire every certificate series on an openssl upgrade and start
-# new ones, the old set going stale exactly like a collector that stopped. RFC 2253 is defined by
-# the RFC and not by the tool: most-specific-first, no spaces, its own escaping.
-#
-# This pair of assertions is what found that, by being run on a second openssl.
 assert_line "the root's full DN is carried, in RFC 2253 order" \
   'subject="CN=DAS KARTELL basetool CA,OU=basetool,O=DAS KARTELL,C=DE"'
 assert_absent "openssl's version-dependent default form is not used" \
   'subject="C ?= ?DE,'
 
-# =============================================================================================
 say ""
 say "== the arithmetic the alerts do =="
-# =============================================================================================
-# Not "a number appeared" but "the number means 60 days and 10 days", because a timezone bug in the
-# date parse is worth up to a day and would be invisible in any other assertion. calendar.timegm
-# rather than mktime is the fix it guards.
 if "$PY" - "$OUT" <<'PY'
 import re, sys, time
 
@@ -222,10 +138,6 @@ for line in open(sys.argv[1], encoding="ascii"):
         continue
     path = re.search(r'path="([^"]+)"', line).group(1)
     value = int(line.rsplit(" ", 1)[1])
-    # Both separators. The collector reports the path it was handed, and on the workstation this
-    # test is also run by hand on, that is a backslash path -- a rsplit("/") there silently keeps
-    # the whole path as the key and every lookup below misses, which reads as "the collector did
-    # not report it" rather than as a bug in the test.
     seen[path.replace("\\", "/").rsplit("/", 1)[-1]] = (value - now) / 86400.0
 
 failed = 0
@@ -234,10 +146,6 @@ for name, days in want.items():
     if got is None:
         print("  FAIL  %s is missing from the output" % name)
         failed += 1
-    # Five minutes of slack and no more. The certificate was minted seconds ago, so the remainder
-    # is a hair under the requested whole number and a strict equality would fail for the wrong
-    # reason -- but a day of slack would swallow exactly the error worth catching here, a date
-    # parsed in local time instead of GMT.
     elif not (days - (5.0 / 1440.0) < got <= days):
         print("  FAIL  %s should expire in ~%d days, reports %.3f" % (name, days, got))
         failed += 1
@@ -264,22 +172,11 @@ print("  ok    notBefore precedes notAfter for all %d certificates" % len(after)
 PY
 then PASSED=$((PASSED + 1)); else FAILED=$((FAILED + 1)); fi
 
-# =============================================================================================
 say ""
 say "== the parse does not depend on the host's timezone =="
-# =============================================================================================
-# openssl prints notAfter in GMT and nothing else, so the parse must be GMT too. The trap is
-# time.mktime, which interprets the struct in the HOST's zone -- a silent offset of up to a day in
-# the half-hour zones, applied to the one number two alerts subtract time() from. calendar.timegm
-# is the fix; this is what holds it.
-#
-# Asserted by running the collector under two zones and demanding byte-identical output, which is
-# true regardless of which zone the machine running the test happens to be in.
 TZ_PROBE="$("$PY" -c 'import time; print(time.mktime(time.gmtime(0)))' 2>/dev/null)"
 TZ_PROBE_OTHER="$(TZ='Asia/Kolkata' "$PY" -c 'import time; print(time.mktime(time.gmtime(0)))' 2>/dev/null)"
 if [ "$TZ_PROBE" = "$TZ_PROBE_OTHER" ]; then
-  # Without this guard the comparison below would pass for the wrong reason on a platform that
-  # ignores TZ -- a green check that checked nothing.
   say "  skip  timezone leg - TZ has no effect on this platform's mktime"
 else
   A="$(TZ='UTC'           "$PY" "$COLLECTOR" --dir "$CERTS" --dry-run 2>/dev/null \
@@ -294,19 +191,11 @@ else
   fi
 fi
 
-# =============================================================================================
 say ""
 say "== what it must never read =="
-# =============================================================================================
-# A private key carries no expiry and this collector must not hold private material. The rule is
-# by construction (the suffix list), and it is asserted because a later "just add .key so the pair
-# is complete" is an easy and terrible change.
 assert_absent "the private key is not reported" 'looks-important\.key'
 assert_absent "the CA's key is not reported"    'path="[^"]*ca\.key"'
 
-# A .pem that is not a certificate is skipped LOUDLY -- and must not cost the others. A directory
-# with a stray text file in it is a configuration mistake; a CA that goes unwatched because of one
-# is the expensive kind.
 case "$RUN_OUT" in
   *notacert.pem*) ok "the unreadable file is named on stderr" ;;
   *)              bad "the unreadable file is named on stderr - got: ${RUN_OUT}" ;;
@@ -317,14 +206,10 @@ case "$RUN_OUT" in
 esac
 assert_absent "the unreadable file produced no series" 'notacert\.pem'
 
-# =============================================================================================
 say ""
 say "== an expiry that has already passed =="
-# =============================================================================================
 assert_line "an expired certificate is still reported" \
   '^basetool_certificate_expiry_timestamp_seconds\{path="[^"]*expired\.crt"'
-# The exact instant, not just "in the past" -- this is the one certificate in the set whose notAfter
-# is a fixed, known number, so it pins the date parse to the second on every machine that runs it.
 assert_line "its notAfter is 2020-01-02T00:00:00Z exactly" \
   '^basetool_certificate_expiry_timestamp_seconds\{path="[^"]*expired\.crt".*\} 1577923200$'
 if "$PY" - "$OUT" <<'PY'
@@ -344,12 +229,8 @@ sys.exit(1)
 PY
 then PASSED=$((PASSED + 1)); else FAILED=$((FAILED + 1)); fi
 
-# =============================================================================================
 say ""
 say "== the file is written the way a scraped file has to be =="
-# =============================================================================================
-# node_exporter reads the whole textfile directory on every scrape, so a half-written file is a
-# parse error served to Prometheus. The write is a sibling plus a rename; nothing may be left over.
 if find "$(dirname "$OUT")" -maxdepth 1 -name '.*.tmp' | grep -q .; then
   bad "no temporary file is left behind"
 else
@@ -362,12 +243,8 @@ else
   bad "ends with a newline"
 fi
 
-# =============================================================================================
 say ""
 say "== it refuses to produce a misleading file =="
-# =============================================================================================
-# An empty metrics file and a mistyped directory look identical to Prometheus, and only one of them
-# is benign -- so finding nothing is an error rather than a file with nothing in it.
 EMPTY="${WORK}/empty"
 mkdir -p "$EMPTY"
 if "$PY" "$COLLECTOR" --dir "$EMPTY" --dry-run >/dev/null 2>&1; then
@@ -381,8 +258,6 @@ else
   ok "a missing directory is an error"
 fi
 
-# A directory holding ONLY unreadable files is the same claim as an empty one: no coverage. It must
-# not write a file that says "0 certificates, all is well".
 ONLYBAD="${WORK}/onlybad"
 mkdir -p "$ONLYBAD"
 echo "not a certificate" > "${ONLYBAD}/x.pem"
@@ -408,17 +283,14 @@ else
   ok "an unwritable output is an error"
 fi
 
-# --dry-run prints and writes nothing.
 DRY="$("$PY" "$COLLECTOR" --dir "$CERTS" --dry-run 2>/dev/null)"
 case "$DRY" in
   *basetool_certificate_expiry_timestamp_seconds*) ok "--dry-run prints the exposition text" ;;
   *)                                               bad "--dry-run prints the exposition text" ;;
 esac
 
-# =============================================================================================
 say ""
 say "== Prometheus itself accepts the output =="
-# =============================================================================================
 if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
   if docker run --rm -i --entrypoint promtool prom/prometheus:v3.14.0 check metrics < "$OUT" \
        >/dev/null 2>&1; then
@@ -432,7 +304,6 @@ else
   say "  skip  promtool leg - docker is not available here"
 fi
 
-# =============================================================================================
 say ""
 say "-------------------------------------------------------------"
 say "${PASSED} passed, ${FAILED} failed"

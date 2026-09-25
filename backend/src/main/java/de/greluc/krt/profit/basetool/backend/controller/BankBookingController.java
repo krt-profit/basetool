@@ -131,9 +131,6 @@ public class BankBookingController {
   @Transactional
   public ResponseEntity<BankBookingOutcomeDto> bookWithdrawal(
       @RequestBody @Valid BankWithdrawalRequest request) {
-    // REQ-BANK-047/ADR-0109: a plain bank employee may directly withdraw from the KRT account only
-    // up to the employee ceiling T1; above it the attempt is filed as a band-routed approval
-    // request (Bankleitung / Organisationsleitung) instead of being booked.
     if (bankBookingGuards.exceedsCartelDirectBookingCeiling(
         request.accountId(), request.amount())) {
       BankBookingRequestDto raised =
@@ -175,9 +172,6 @@ public class BankBookingController {
   @Transactional
   public ResponseEntity<BankBookingOutcomeDto> bookTransfer(
       @RequestBody @Valid BankTransferRequest request, Authentication authentication) {
-    // REQ-BANK-047/ADR-0109: a plain bank employee may directly transfer FROM the KRT account only
-    // up to the employee ceiling T1; above it the attempt is filed as a band-routed approval
-    // request (Bankleitung / Organisationsleitung) instead of being booked.
     if (bankBookingGuards.exceedsCartelDirectBookingCeiling(
         request.sourceAccountId(), request.amount())) {
       BankBookingRequestDto raised =

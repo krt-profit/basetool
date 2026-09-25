@@ -74,9 +74,6 @@ public class AdminDeletionRequestController {
               + "an anonymous request.")
   public List<DeletionRequestDto> pending() {
     List<DeletionRequest> pending = deletionRequestService.listPending();
-    // One query for the whole page, not one per row (REQ-DATA-003). A queue of twenty requests
-    // used to issue twenty-one statements, on the page an admin refreshes while working through a
-    // month of Art. 12(3) deadlines.
     Map<UUID, String> handles =
         deletionRequestService.handlesOf(pending.stream().map(DeletionRequest::getUserId).toList());
     return pending.stream()
@@ -144,9 +141,6 @@ public class AdminDeletionRequestController {
   })
   public ResponseEntity<Void> execute(
       @PathVariable UUID id, @NotNull @Valid @RequestBody DecideDeletionRequestRequest request) {
-    // request.note() is deliberately not read here: an execution has nowhere durable to
-    // record a note (see DeletionRequestService#decline). The field stays on the shared
-    // request record because a refusal requires it.
     deletionRequestService.execute(id, request.grantHistoryErasure(), request.version());
     return ResponseEntity.noContent().build();
   }

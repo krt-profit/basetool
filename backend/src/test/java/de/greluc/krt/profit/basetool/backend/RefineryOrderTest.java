@@ -136,8 +136,6 @@ class RefineryOrderTest {
     mission.setName("Mining Op");
     missionRepository.save(mission);
 
-    // REQ-SEC-042: an order may only be linked to a mission its owner takes part in, so the owner
-    // of the mission-linked order below is signed up for it. adminUser deliberately is not.
     MissionParticipant participation = new MissionParticipant();
     participation.setMission(mission);
     participation.setUser(user1);
@@ -192,7 +190,6 @@ class RefineryOrderTest {
     goods.add(good1);
     order.setGoods(goods);
 
-    // Create
     String response =
         mockMvc
             .perform(
@@ -224,12 +221,6 @@ class RefineryOrderTest {
     assertEquals("Quantanium", saved.getGoods().iterator().next().getInputMaterial().getName());
     assertEquals(mission.getId(), saved.getMission().getId());
 
-    // Build a fresh detached payload for the update — mutating the managed `saved` entity
-    // (returned by findById above) would dirty-mark it in the persistence context. The
-    // controller's getRefineryOrder reloads via the same context, and the subsequent
-    // explicit version check sees the bumped @Version, surfacing as a 409. Sending a
-    // detached payload mirrors what the frontend actually does and dodges the
-    // managed-entity quirk.
     RefineryOrder updatePayload = new RefineryOrder();
     updatePayload.setId(saved.getId());
     updatePayload.setVersion(saved.getVersion());
@@ -271,7 +262,6 @@ class RefineryOrderTest {
     assertEquals(1, updated.getGoods().size());
     assertEquals("Gold", updated.getGoods().iterator().next().getInputMaterial().getName());
 
-    // Delete
     mockMvc
         .perform(
             delete("/api/v1/refinery-orders/" + saved.getId())
@@ -294,8 +284,6 @@ class RefineryOrderTest {
 
   @Test
   void createLinkedToAMissionTheOwnerIsNotOn_isRejectedWithItsOwnCode() throws Exception {
-    // REQ-SEC-042: the mission link feeds the operation payout, so the owner must be a participant.
-    // adminUser shares the mission's Staffel but never signed up, and nothing may be persisted.
     RefineryOrder order = new RefineryOrder();
     order.setOwningOrgUnit(iridium);
     order.setLocation(station);
@@ -333,12 +321,11 @@ class RefineryOrderTest {
 
   @Test
   void testAdminManageUserRefineryOrder() throws Exception {
-    // User creates order
     RefineryOrder order = new RefineryOrder();
     order.setOwningOrgUnit(iridium);
     order.setLocation(station);
     order.setOwner(user1);
-    order.setRefiningMethod(dinyx); // Set a method
+    order.setRefiningMethod(dinyx);
     RefineryGood good = new RefineryGood();
     good.setInputMaterial(quantanium);
     good.setInputQuantity(100);
@@ -349,7 +336,6 @@ class RefineryOrderTest {
     order.setGoods(new HashSet<>(Set.of(good)));
     order = refineryOrderRepository.save(order);
 
-    // Admin updates it
     order.setRefiningMethod(ferron);
     mockMvc
         .perform(
@@ -371,7 +357,6 @@ class RefineryOrderTest {
     RefineryOrder updated = refineryOrderRepository.findById(order.getId()).orElseThrow();
     assertEquals("Ferron Exchange", updated.getRefiningMethod().getName());
 
-    // Admin deletes it
     mockMvc
         .perform(
             delete("/api/v1/refinery-orders/users/" + user1.getId() + "/" + order.getId())
@@ -394,7 +379,6 @@ class RefineryOrderTest {
 
   @Test
   void testAccessControl() throws Exception {
-    // User1 creates order
     RefineryOrder order = new RefineryOrder();
     order.setOwningOrgUnit(iridium);
     order.setLocation(station);
@@ -415,7 +399,6 @@ class RefineryOrderTest {
     userRepository.save(user2);
     saveIridiumMembership(user2);
 
-    // User2 tries to update User1's order
     mockMvc
         .perform(
             put("/api/v1/refinery-orders/" + order.getId())
@@ -431,9 +414,8 @@ class RefineryOrderTest {
                             new SimpleGrantedAuthority("REFINERY_WRITE")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(order)))
-        .andExpect(status().isForbidden()); // AccessDeniedException
+        .andExpect(status().isForbidden());
 
-    // User2 tries to admin-update User1's order (should be forbidden 403)
     mockMvc
         .perform(
             put("/api/v1/refinery-orders/users/" + user1.getId() + "/" + order.getId())
@@ -446,7 +428,7 @@ class RefineryOrderTest {
                             new SimpleGrantedAuthority("HANGAR_WRITE"),
                             new SimpleGrantedAuthority("MISSION_READ"),
                             new SimpleGrantedAuthority("REFINERY_READ"),
-                            new SimpleGrantedAuthority("REFINERY_WRITE"))) // No ROLE_ADMIN
+                            new SimpleGrantedAuthority("REFINERY_WRITE")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(order)))
         .andExpect(status().isForbidden());
@@ -502,7 +484,7 @@ class RefineryOrderTest {
     order.setDurationMinutes(120L);
     order.setRefiningMethod(dinyx);
     order.setExpenses(500.00);
-    order.setMission(null); // Explicitly null
+    order.setMission(null);
 
     Set<RefineryGood> goods = new HashSet<>();
     RefineryGood good1 = new RefineryGood();
@@ -544,7 +526,6 @@ class RefineryOrderTest {
 
   @Test
   void testStoreRefineryOrder_WithDecimalAmount() throws Exception {
-    // User creates order
     RefineryOrder order = new RefineryOrder();
     order.setOwningOrgUnit(iridium);
     order.setLocation(station);
@@ -557,7 +538,7 @@ class RefineryOrderTest {
             quantanium.getId(),
             station.getId(),
             100,
-            32.543, // Decimal amount
+            32.543,
             user1.getId(),
             null,
             null,
@@ -593,7 +574,6 @@ class RefineryOrderTest {
 
   @Test
   void testStoreRefineryOrder_WithNoteAndAmountOverride() throws Exception {
-    // Given: ein Raffinerieauftrag mit einem Output-Material
     RefineryOrder order = new RefineryOrder();
     order.setOwningOrgUnit(iridium);
     order.setLocation(station);
@@ -612,7 +592,6 @@ class RefineryOrderTest {
     order = refineryOrderRepository.save(order);
     UUID orderId = order.getId();
 
-    // When: Nutzer ueberschreibt die Menge im Einlager-Dialog und ergaenzt eine Notiz
     RefineryOrderStoreItemDto itemDto =
         new RefineryOrderStoreItemDto(
             quantanium.getId(),
@@ -639,8 +618,6 @@ class RefineryOrderTest {
                 .content(objectMapper.writeValueAsString(storeDto)))
         .andExpect(status().isOk());
 
-    // Then: Notiz am InventoryItem persistiert, Raffinerieauftrag-Output ist auf neue Menge
-    // angepasst
     java.util.List<InventoryItem> items =
         inventoryItemRepository
             .findMaterialRowsByUser(user1, org.springframework.data.domain.Pageable.unpaged())
@@ -658,8 +635,6 @@ class RefineryOrderTest {
 
     RefineryOrder stored = refineryOrderRepository.findById(order.getId()).orElseThrow();
     RefineryGood updated = stored.getGoods().iterator().next();
-    // Quantanium is an SCU material (entity defaults to QuantityType.SCU; see issue #230 fix).
-    // The user-entered 42.125 SCU is written back as units (centi-SCU): round(42.125 * 100) = 4213.
     assertEquals(
         4213,
         updated.getOutputQuantity().intValue(),

@@ -55,9 +55,6 @@ class AdminSettingsPageControllerTest {
 
   @Test
   void updateSettings_neverTouchesTheDroppedIntakeSetting() {
-    // The intake Spezialkommando went with the anonymous order form (ADR-0149, V234). Pinned as a
-    // negative rather than deleted outright, because a settings page that silently starts writing
-    // a key nothing reads is exactly the rot the removal was for.
     RedirectAttributesModelMap ra = new RedirectAttributesModelMap();
 
     controller.updateSettings("30", 0L, "90", 0L, "UP", 0L, "0.5", 0L, ra);
@@ -66,11 +63,8 @@ class AdminSettingsPageControllerTest {
         .put(eq("/api/v1/settings/job_order.intake_special_command_id"), any(), any());
   }
 
-  // covers REQ-ADMIN-001 — a squadron beyond the first backend page still gets its promotion
-  // toggle rendered on the settings page
   @Test
   void viewSettings_walksAllSquadronPickerPages() {
-    // Given — the squadron catalog spans two backend pages
     SquadronDto first = new SquadronDto(UUID.randomUUID(), "Alpha", "AL", "", true, true, true, 0L);
     SquadronDto second = new SquadronDto(UUID.randomUUID(), "Zulu", "ZU", "", true, true, true, 0L);
     String squadronsBase = "/api/v1/squadrons?size=1000&sort=name,asc";
@@ -80,10 +74,8 @@ class AdminSettingsPageControllerTest {
         .thenReturn(new PageResponse<>(List.of(first), 1, 1000, 2, 2, List.of()));
     ConcurrentModel model = new ConcurrentModel();
 
-    // When
     controller.viewSettings(model);
 
-    // Then — both pages land in the toggle list, sorted, with no truncation flagged
     @SuppressWarnings("unchecked")
     List<SquadronDto> squadrons = (List<SquadronDto>) model.getAttribute("squadrons");
     assertEquals(2, squadrons.size(), "the second backend page must not be dropped");

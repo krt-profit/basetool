@@ -114,17 +114,9 @@ class OrdersCreateScuHintRevealE2eTest {
       try {
         E2eSupport.navigate(page, baseUrl + "/orders/create");
 
-        // Material mode is the default; add a fresh row (the SCU hint of which is built by
-        // scuHintMarkup and starts hidden via krtm-hidden).
         page.locator("[data-trigger=\"orders-add-material\"]").click();
         Locator row = page.locator("#materials-container .material-row").last();
 
-        // The row's material picker is a server-side-search combobox (REQ-FE-016): the page no
-        // longer preloads the catalog as <option>s, so an SCU-typed material is discovered by
-        // querying the same catalog proxy the picker's remote source uses (fetched in-page so the
-        // session cookie authenticates the call), then picked in the combobox by its id — the
-        // enhancer mirrors each fetched option's value into data-value, and the seeded e2e
-        // catalog is small enough that the empty-query first page contains every material.
         Object catalog =
             page.evaluate(
                 "() => fetch('/catalog/material-search?jobOrder=true&q=')"
@@ -147,10 +139,6 @@ class OrdersCreateScuHintRevealE2eTest {
           assertThat(row.locator(".scu-hint"))
               .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(15_000));
 
-          // Metadata-mirror contract (REQ-FE-016): the pick above must have mirrored the option's
-          // data-quantity-type onto the hidden input, and clearing the picker via the programmatic
-          // setValue path must REMOVE the previously mirrored key — the stale-key half of the
-          // contract, which no user-driven flow exercises.
           Locator hiddenMaterial = row.locator("input[data-role=\"material-select\"]");
           assertEquals(
               "SCU",

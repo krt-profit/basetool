@@ -1,48 +1,9 @@
-# ===================================================================
-# Production Configuration for Backend
-#
-# JVM flags are NOT set here. They live in the backend service's JAVA_TOOL_OPTIONS in
-# docker-compose.yml (the Quadlet units are generated from it), which is the only source of truth:
-# -XX:+UseContainerSupport -XX:+UseG1GC -XX:+UseCompactObjectHeaders -XX:MaxRAMPercentage=57.0
-# -XX:InitialRAMPercentage=35.0, with the heap-budget rationale next to it (REQ-OPS-028, ADR-0175).
-# Corrected 2026-09-22: this header used to recommend MaxRAMPercentage=75, InitialRAMPercentage=50
-# and a heap dump to /tmp -- values production does not run.
-# ===================================================================
 spring:
   datasource:
     url: jdbc:postgresql://db-backend:15432/krt_basetool
     username: ${SPRING_DATASOURCE_USERNAME}
     password: ${SPRING_DATASOURCE_PASSWORD}
     hikari:
-      # Production pool sizing — raised from the previous 10/30000 ms defaults after the
-      # performance audit (H-5). Resilience4j's bulkhead caps fan-out at 100 concurrent
-      # backend calls (see frontend application.yml) and Tomcat now runs virtual threads,
-      # so 10 JDBC connections starved the pool under ~10 concurrent users. Raised 15 -> 100
-      # to fully match the 100-slot frontend bulkhead, so even a worst-case multi-user
-      # mission-page live-update refetch burst never queues on the DB funnel -> 500 ->
-      # shared-breaker outage (mission-scale hardening, ADR-0078). This requires the
-      # matching infra change: db-backend Postgres now runs max_connections=150 with a
-      # 1536M RAM limit (docker-compose.yml), so 100 app connections + postgres_exporter +
-      # Flyway + admin sessions all fit with headroom and cannot exhaust the server or OOM
-      # the container. The complementary defences are cutting the per-fragment read fan-out
-      # (the primary fix) and the finance-summary SQL aggregate that stops a 1000-row load-
-      # all from pinning a connection per render. connection-timeout 5 s (was 10 s): aligned
-      # with the frontend caller's real patience -- the backendApi Resilience4j TimeLimiter
-      # cancels the exchange at 5 s, so a request that cannot get a JDBC connection inside that
-      # window must fail fast (5xx) rather than acquire a slot 5 s later and run its query as an
-      # orphan for a client that already gave up, deepening the pool pressure under saturation.
-      #
-      # #937 verdict (2026-08-03) — REVISITED against a 7-day production baseline and KEPT at 100.
-      # Measured: active peak 10, total peak 30, pending peak 0, connection timeouts 0, acquire
-      # time max 0.444 s; Postgres saw a peak of 31 of its 150 slots. So the pool is ~10x the
-      # observed demand and has never once made a caller wait. It is kept anyway, deliberately:
-      # HikariCP grows lazily, so an unreached ceiling costs nothing at all, while the scenario it
-      # was sized for (ADR-0078: a multi-user mission-page live-update refetch burst arriving
-      # through the frontend's 100-slot Resilience4j bulkhead) is a spike that a quiet baseline
-      # week simply does not contain -- and the failure mode it prevents is a pool-funnel 500 that
-      # trips the shared breaker into a tool-wide outage. Cutting a free ceiling to buy nothing,
-      # at the risk of re-opening that outage class, is the wrong trade. Re-open this only if
-      # `hikaricp_connections_pending` is measured at zero THROUGH an actual mission-page burst.
       maximum-pool-size: 100
       minimum-idle: 2
       connection-timeout: 5000
@@ -54,9 +15,6 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
-  # The Redis connection for the notification SSE fan-out (ADR-0094) now lives in the base
-  # application.yml (host from REDIS_HOST, which the compose anchor sets to the `redis` service). Prod
-  # only flips the fan-out and the Redis health indicator ON (below); the connection config is shared.
   lifecycle:
     timeout-per-shutdown-phase: 20s
   security:
@@ -64,53 +22,22 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: ${KEYCLOAK_ISSUER_URI:https://profit-base.online/auth/realms/iri}
-  # Truststore for the internal Keycloak Admin API call (KeycloakService / the scheduled user sync).
-  # In prod the backend reaches Keycloak directly over https://keycloak:18443 (net-backend-keycloak),
-  # and Keycloak presents the same bind-mounted self-signed keystore.p12 the other modules use. By
-  # pinning that cert as the only trust anchor, the admin client validates the connection without the
-  # InsecureTrustManagerFactory (mirrors the frontend's `backend-trust` bundle, audit finding M-13).
-  # Hostname verification stays ON, so the cert's SAN must carry `dns:keycloak`. If this bundle is
-  # absent (dev/test, or an operator fronting Keycloak with a publicly-trusted cert) KeycloakService
-  # falls back to the default JVM trust store / plain HTTP.
   ssl:
     bundle:
       jks:
         keycloak-trust:
           truststore:
-            # REQ-SEC-070: the INTERNAL TRUSTSTORE -- the internal CA once the per-service
-            # certificates are rolled out; until then compose points it at the shared keystore,
-            # so nothing changes. Falls back to the own keystore when the variable is absent.
             location: ${INTERNAL_TLS_TRUSTSTORE:${SERVER_SSL_KEY_STORE:classpath:keystore.p12}}
             password: ${INTERNAL_TLS_TRUSTSTORE_PASSWORD:${SERVER_SSL_KEY_STORE_PASSWORD}}
             type: PKCS12
 server:
   shutdown: graceful
 
-# Swagger UI has been removed project-wide (springdoc -api starter). In production the raw OpenAPI
-# document is additionally disabled so the API surface is never enumerable from outside a deployed
-# environment — the committed backend/src/main/resources/api/openapi.json (regenerated by
-# OpenApiGeneratorTest in the test profile) is the single source of API documentation.
 springdoc:
   api-docs:
     enabled: false
 
 management:
-  # ADR-0134 (extending ADR-0090): Actuator moves off the 11261 application connector onto a
-  # dedicated internal-only management port. ADR-0090 deliberately left the backend out because it
-  # was not internet-reachable at all; the public API vhost removes that premise, so the connector a
-  # proxy will forward must serve no Actuator — a 404 from the application itself, independent of
-  # the edge's own `location /actuator` deny (docker/edge/include/api-allowlist.conf).
-  #
-  # Reachable only from net-monitoring-scrape (Prometheus) and localhost (the container
-  # healthcheck), never host-published, never on an edge proxy network. HTTPS with the same keystore so the scrape
-  # keeps its pinned CA (REQ-OBS-008 unchanged).
-  #
-  # Unlike frontend and ingest this module does NOT set `endpoint.loggers.access: read-only`, and
-  # that asymmetry is now the other way round from before: ManagementPortSecurityConfig permits only
-  # the three READ endpoints, so POST /actuator/loggers/** still falls through to SecurityConfig and
-  # keeps its ROLE_ADMIN gate (REQ-OBS-016) — verified by ManagementPortIsolationTest. The two
-  # unauthenticated-by-construction modules have no identity to gate on and therefore delete the
-  # write instead; the backend is a resource server and can keep it.
   server:
     port: 11271
     ssl:
@@ -119,12 +46,6 @@ management:
       key-store-password: ${SERVER_SSL_KEY_STORE_PASSWORD}
       key-store-type: PKCS12
       key-alias: basetool
-  #
-  # Prod turns the notification SSE Redis fan-out ON (ADR-0094), so a notification pushed on one
-  # backend replica reaches a user connected to another. The Redis health indicator is re-enabled
-  # for monitoring visibility of an outage; Redis stays OUT of the readiness group (base config), so
-  # a Redis blip surfaces in the root health aggregate + metrics without flipping the container
-  # unhealthy (ADR-0084).
   health:
     redis:
       enabled: ${MANAGEMENT_HEALTH_REDIS_ENABLED:true}
@@ -135,55 +56,17 @@ app:
       enabled: ${APP_NOTIFICATIONS_REDIS_FANOUT_ENABLED:true}
   live-sync:
     redis-fanout:
-      # On in prod: without it the app and the web frontend each see only their own writes
-      # (ADR-0143).
       enabled: ${APP_LIVE_SYNC_REDIS_FANOUT_ENABLED:true}
   logging:
-    # Enables the JSON/LogstashEncoder appender defined in logback-spring.xml for the prod profile.
     structured-enabled: true
   rate-limit:
-    # Audit finding H-8: behind the native nginx edge (itself behind the host haproxy, ADR-0162 /
-    # ADR-0187) the backend's immediate peer is a container — the frontend, or the edge for the API
-    # vhost — on the internal bridge networks. Every one of them is PINNED under 172.28.0.0/16
-    # (docker-compose.yml since #974, and the Quadlet .network units generated from it) — NOT the
-    # default Docker bridge (172.17.0.0/16).
-    # Trusting the wrong range silently collapses every per-IP bucket onto the single relaying
-    # container IP, degrading the per-user limiter into one shared org-wide budget — exactly the
-    # 2026-07-06 multi-user mission-page outage, where all traffic was attributed to 172.28.3.2 and
-    # a handful of concurrent users exhausted the shared bucket for everyone. This MUST match the
-    # real compose subnet; override via APP_RATE_LIMIT_TRUSTED_PROXIES only if you re-pin the networks.
     trusted-proxies:
       - 172.28.0.0/16
   security:
     jwt:
-      # REQ-SEC-024: opt-in. Fetch the JWKS from the INTERNAL Keycloak (https://keycloak:18443) so
-      # backend JWT validation no longer hairpins through the public edge, where an edge or
-      # public-Keycloak blip turns every authenticated request into a 5xx. Empty (default) keeps the
-      # current behaviour: keys are derived from issuer-uri (the public host). When set, the key
-      # fetch reuses the keycloak-trust bundle above, so the cert's SAN must carry dns:keycloak.
-      # Recommended value once verified on the host:
-      #   https://keycloak:18443/auth/realms/iri/protocol/openid-connect/certs
       jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:}
-      # Audit L-1 / security review: enforce the JWT `aud` claim so the backend accepts only tokens
-      # minted for it (aud=basetool-backend), not any validly-signed token from the realm. The value
-      # comes from the compose env (IRI_BACKEND_EXPECTED_AUDIENCES). REQUIRED under this profile
-      # since 2026-09-22 (APPSEC-08): JwtAudienceStartupCheck refuses to start the prod backend
-      # when it is blank, because blank meant "no aud check" and a lost .env line silently turned
-      # enforcement off. Production enforces aud=basetool-backend since 2026-08-28 (#1247); the
-      # realm's `extractor-ingest` client scope stamps it. Every other profile keeps blank = off.
-      # The default below stays empty on purpose, so a missing value reaches the startup check and
-      # its named error instead of a bare unresolved-placeholder failure. A wrong value rejects
-      # every token.
       expected-audiences: ${APP_SECURITY_JWT_EXPECTED_AUDIENCES:}
 
-# SC Wiki catalogue sync. The per-sync feature flags default to false in code
-# (ScWikiProperties -- "ships dark"); enabled here so each scheduler step runs on the
-# live instance and the admin sync-report log (/admin/sync-reports) gets populated.
-# This generates real traffic against api.star-citizen.wiki. sync-all-items is ON (Weg 2):
-# the full ~12 700-row item backfill plus the name/slug reconciliation that merges uuid-less
-# UEX rows into their Wiki twins (~10-15 min per cycle at 5 req/s, vs the lighter closure mode).
-# Any flag is overridable per the deployment runbook via env var, e.g.
-# KRT_SCWIKI_SYNC_ALL_ITEMS=false, without a redeploy.
 krt:
   scwiki:
     scheduler-enabled: true

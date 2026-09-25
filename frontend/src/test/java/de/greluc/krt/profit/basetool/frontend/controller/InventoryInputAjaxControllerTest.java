@@ -97,8 +97,6 @@ class InventoryInputAjaxControllerTest {
     verify(backendApiClient).post(eq("/api/v1/inventory"), any(), eq(InventoryItemDto.class));
   }
 
-  // covers REQ-INV-031 (item-mode passthrough: the create payload carries gameItemId with a null
-  // quality/material/mission side, and the merge opt-in is forced off — items always auto-merge)
   @Test
   @WithMockUser
   void addInventoryItemAjax_itemMode_sendsGameItemIdWithNullQuality() throws Exception {
@@ -124,9 +122,6 @@ class InventoryInputAjaxControllerTest {
     org.assertj.core.api.Assertions.assertThat(request.missionAllocations()).isEmpty();
   }
 
-  // covers REQ-INV-027 R4 (single-target shorthand): one mission row with a blank amount earmarks
-  // the entry's whole amount, and the same shorthand applies independently on the job-order
-  // dimension.
   @Test
   @WithMockUser
   void addInventoryItemAjax_singleAllocationWithoutAmount_earmarksFullEntryAmount()
@@ -156,8 +151,6 @@ class InventoryInputAjaxControllerTest {
         .containsExactly(new InventoryAllocationInput(jobOrderId, 23d));
   }
 
-  // covers REQ-INV-027 R4 (shorthand does not extend to several targets): with two mission rows the
-  // amounts must be explicit, so the blank one is dropped instead of swallowing the entry amount.
   @Test
   @WithMockUser
   void addInventoryItemAjax_multipleAllocations_dropsBlankAmountRow() throws Exception {
@@ -183,8 +176,6 @@ class InventoryInputAjaxControllerTest {
         .containsExactly(new InventoryAllocationInput(firstMission, 5d));
   }
 
-  // covers REQ-INV-027 R4: an explicit amount on a single row still wins over the shorthand, and a
-  // trailing not-yet-picked row (no target) neither counts as a second target nor is sent.
   @Test
   @WithMockUser
   void addInventoryItemAjax_singleAllocationWithAmount_keepsExplicitAmount() throws Exception {
@@ -209,8 +200,6 @@ class InventoryInputAjaxControllerTest {
         .containsExactly(new InventoryAllocationInput(missionId, 7.5d));
   }
 
-  // covers REQ-INV-027 R4 + the standing personal invariant: the shorthand row counts as an
-  // assignment even with no amount typed, so a personal book-in carrying it is refused pre-backend.
   @Test
   @WithMockUser
   void addInventoryItemAjax_personalWithBlankAmountAllocation_returns422() throws Exception {
@@ -233,8 +222,6 @@ class InventoryInputAjaxControllerTest {
     verify(backendApiClient, never()).post(anyString(), any(), eq(InventoryItemDto.class));
   }
 
-  // covers REQ-INV-031 (item mode has no mission dimension): the shorthand fills the job-order
-  // dimension of an item book-in, while the mission list stays empty even if rows were crafted in.
   @Test
   @WithMockUser
   void addInventoryItemAjax_itemModeSingleOrderWithoutAmount_earmarksFullAmountAndNoMission()
@@ -274,7 +261,6 @@ class InventoryInputAjaxControllerTest {
     return (InventoryItemCreateDto) captor.getValue();
   }
 
-  // covers REQ-INV-031 (catalog XOR: both references set -> 422 VALIDATION, no backend call)
   @Test
   @WithMockUser
   void addInventoryItemAjax_bothCatalogReferences_returns422() throws Exception {
@@ -295,7 +281,6 @@ class InventoryInputAjaxControllerTest {
     verify(backendApiClient, never()).post(anyString(), any(), eq(InventoryItemDto.class));
   }
 
-  // covers REQ-INV-031 (catalog XOR: neither reference set -> 422 VALIDATION, no backend call)
   @Test
   @WithMockUser
   void addInventoryItemAjax_noCatalogReference_returns422() throws Exception {
@@ -313,8 +298,6 @@ class InventoryInputAjaxControllerTest {
     verify(backendApiClient, never()).post(anyString(), any(), eq(InventoryItemDto.class));
   }
 
-  // covers REQ-INV-031 (material mode still requires a quality — the @NotNull moved into the
-  // cross-field rule so item mode can omit the field)
   @Test
   @WithMockUser
   void addInventoryItemAjax_materialWithoutQuality_returns422() throws Exception {
@@ -380,8 +363,6 @@ class InventoryInputAjaxControllerTest {
   @Test
   @WithMockUser
   void addInventoryItem_withoutHeader_fallsBackToClassicRedirect() throws Exception {
-    // No X-Requested-With → Spring routes to the classic form-post handler (the no-JS fallback),
-    // which redirects to the source listing instead of returning JSON.
     mockMvc
         .perform(
             post("/inventory/input")

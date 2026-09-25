@@ -46,16 +46,6 @@
                     <div class="form-group krtm-margin-0-position-relative-9ca0">
                         <label for="terminalFilter" class="visually-hidden" th:text="#{materials.detail.filterPlaceholder}">Terminal suchen</label>
                         <input type="text" id="terminalFilter" th:placeholder="#{materials.detail.filterPlaceholder}" placeholder="Terminal suchen..." data-trigger="material-detail-filter-terminals" autocomplete="off">
-                        <!--/*
-                          Terminal names are exposed to JavaScript via this server-
-                          rendered <datalist> instead of a Thymeleaf JS-inline
-                          expression. Thymeleaf 3.1 truncates the surrounding
-                          <script> block right after the first List/Collection
-                          JS-inline serialisation, so the data-trigger handler
-                          registrations further down for filterTerminals + sortTable
-                          would silently never bind. Keep the datalist; do NOT move
-                          this back into the <script> block.
-                        */-->
                         <datalist id="terminalNames-data" class="krtm-display-none-5790">
                             <option th:if="${prices != null}" th:each="p : ${prices}" th:value="${p.terminalName}"></option>
                         </datalist>

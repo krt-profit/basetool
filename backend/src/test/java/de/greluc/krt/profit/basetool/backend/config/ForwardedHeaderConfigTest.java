@@ -102,8 +102,6 @@ class ForwardedHeaderConfigTest {
 
   @Test
   void bothRegistrationsCoverTheWholeUriSpaceAndTheSameDispatcherTypes() {
-    // A mismatch here would leave a dispatch on which one filter runs and the other does not —
-    // exactly the split that makes attribution silently inconsistent rather than broken.
     assertThat(clientIpRegistration().getUrlPatterns()).containsExactly("/*");
     assertThat(config.forwardedHeaderFilter(NO_CUSTOMIZER).getFilter())
         .as("mirrors Boot's own registration, so scheme/host rewriting is unchanged")
@@ -112,9 +110,6 @@ class ForwardedHeaderConfigTest {
 
   @Test
   void theCustomizerHookBootAppliesIsHonoured() {
-    // Boot's own registration applies a ForwardedHeaderFilterCustomizer before wrapping. None ships
-    // in Boot 4.1, so dropping it breaks nothing today and silently disables a documented extension
-    // point on this module alone tomorrow.
     boolean[] applied = {false};
     ObjectProvider<ForwardedHeaderFilterCustomizer> provider =
         new ObjectProvider<>() {

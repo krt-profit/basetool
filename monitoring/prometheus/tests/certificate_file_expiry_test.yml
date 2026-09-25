@@ -1,37 +1,14 @@
-# promtool unit test for the certificate-FILE expiry alerts (REQ-OBS-008, REQ-OBS-014).
-#
-# The probe-based CertificateExpiringSoon covers everything this deployment SERVES. These three
-# rules cover the blind spot that is structural rather than an oversight: a probe can only see a
-# certificate something is serving, and the internal CA is served by nothing. When it expires, every
-# `proxy_ssl_verify on` upstream fails at once AND the probes that would otherwise have warned about
-# the leaves fail with it -- so the one certificate whose expiry is most expensive was the one with
-# no coverage at all (measured on the testing host 2026-09-20).
-#
-# What is locked here:
-#   - a CA-issued file gets 14 days, a SELF-SIGNED certificate gets 90, and neither borrows the
-#     other's threshold. The split is not cosmetic: replacing a leaf is a file and a restart;
-#     replacing a root CA means re-issuing everything it signed and rolling the trust anchor through
-#     the edge and the probe module together.
-#   - a stale collector alerts, because an expiry metric that stopped updating reads exactly like a
-#     certificate that is fine.
-#
-# Run it the way the other tests in this directory are run -- see monitoring/README.md.
-
 rule_files:
   - ../alerts/infrastructure.yml
 
 evaluation_interval: 1m
 
 tests:
-  # --- the CA, which is the whole reason these rules exist --------------------------------------
-  # 60 days out: comfortably outside the 14-day threshold, deliberately inside the 90-day one. A
-  # rule that only had 14 days would say nothing here, and the operator would first hear about the
-  # CA a fortnight before every internal TLS hop stops verifying.
   - name: fires - the internal CA is 60 days from expiry
     interval: 1m
     input_series:
       - series: 'basetool_certificate_expiry_timestamp_seconds{path="/var/iri/monitoring/certs/basetool-ca.crt", subject="CN=DAS KARTELL basetool CA", issuer="CN=DAS KARTELL basetool CA", self_signed="true"}'
-        values: "5184000+0x180"     # 60 days, held flat; time() advances under it
+        values: "5184000+0x180"
     alert_rule_test:
       - eval_time: 2h
         alertname: SelfSignedCertificateExpiring
@@ -45,14 +22,10 @@ tests:
             exp_annotations:
               summary: "Self-signed certificate /var/iri/monitoring/certs/basetool-ca.crt expires in <90 days"
               description: "CN=DAS KARTELL basetool CA at /var/iri/monitoring/certs/basetool-ca.crt is self-signed and expires in under 90 days. If it is the internal CA, replacing it means re-issuing every certificate it signed and rolling the trust anchor through the edge's proxy_ssl_trusted_certificate and the blackbox https_internal module together -- start now, not at 14 days."
-      # ...and the 14-day rule must NOT also fire for it, or one certificate pages twice under two
-      # different deadlines.
       - eval_time: 2h
         alertname: CertificateFileExpiringSoon
         exp_alerts: []
 
-  # --- a CA with real notice left: silent -------------------------------------------------------
-  # 2046, which is what the testing host's CA actually says. Nothing fires for two decades.
   - name: silent - a CA valid for another twenty years
     interval: 1m
     input_series:
@@ -63,14 +36,11 @@ tests:
         alertname: SelfSignedCertificateExpiring
         exp_alerts: []
 
-  # --- a CA-issued file, which gets the ordinary fourteen days ----------------------------------
-  # self_signed="false": issued by something else, so replacing it is a file and a restart. Ten days
-  # is inside 14 and must fire; the 90-day rule must stay out of it.
   - name: fires - a CA-issued certificate file is 10 days from expiry
     interval: 1m
     input_series:
       - series: 'basetool_certificate_expiry_timestamp_seconds{path="/var/iri/monitoring/certs/service.crt", subject="CN=service", issuer="CN=DAS KARTELL basetool CA", self_signed="false"}'
-        values: "864000+0x180"      # 10 days
+        values: "864000+0x180"
     alert_rule_test:
       - eval_time: 2h
         alertname: CertificateFileExpiringSoon
@@ -88,27 +58,21 @@ tests:
         alertname: SelfSignedCertificateExpiring
         exp_alerts: []
 
-  # --- 30 days for a CA-issued file: silent -----------------------------------------------------
-  # Guards the boundary from the other side. A leaf must not inherit the CA's 90-day lead time, or
-  # every routine certificate in the directory pages three months early and the alert gets ignored.
   - name: silent - a CA-issued certificate 30 days out
     interval: 1m
     input_series:
       - series: 'basetool_certificate_expiry_timestamp_seconds{path="/var/iri/monitoring/certs/service.crt", subject="CN=service", issuer="CN=CA", self_signed="false"}'
-        values: "2592000+0x180"     # 30 days
+        values: "2592000+0x180"
     alert_rule_test:
       - eval_time: 2h
         alertname: CertificateFileExpiringSoon
         exp_alerts: []
 
-  # --- an expired certificate still alerts ------------------------------------------------------
-  # "< 14 days" is satisfied by a negative remainder too, and it has to be: an expiry that has
-  # already passed is the loudest case, not an out-of-range one.
   - name: fires - an already-expired CA-issued file
     interval: 1m
     input_series:
       - series: 'basetool_certificate_expiry_timestamp_seconds{path="/var/iri/monitoring/certs/service.crt", subject="CN=service", issuer="CN=CA", self_signed="false"}'
-        values: "-86400+0x180"      # expired a day before the window opens
+        values: "-86400+0x180"
     alert_rule_test:
       - eval_time: 2h
         alertname: CertificateFileExpiringSoon
@@ -123,14 +87,9 @@ tests:
               summary: "Certificate file /var/iri/monitoring/certs/service.crt expires in <14 days"
               description: "The certificate at /var/iri/monitoring/certs/service.crt (CN=service) expires in under 14 days and is served by no listener, so no probe covers it. It was issued by CN=CA -- re-issue it from that CA, put the new file in place and restart whatever reads it."
 
-  # --- the collector itself ---------------------------------------------------------------------
-  # A metric that stopped updating reads exactly like a certificate that is fine: the expiry value
-  # is still there, still in the future, and increasingly a lie. node_exporter keeps serving the
-  # .prom file after the collector dies, so nothing else would notice.
   - name: fires - the collector stopped writing
     interval: 1m
     input_series:
-      # Stamped 40 hours before the test's zero and never refreshed.
       - series: "basetool_certificate_metrics_timestamp_seconds"
         values: "-144000+0x180"
     alert_rule_test:
@@ -143,7 +102,6 @@ tests:
               summary: "Certificate expiry metrics are stale"
               description: "iri-cert-expiry.timer writes basetool_certificate_* once a day and the newest sample is over 36 hours old -- or the metric is absent entirely, which for a textfile metric means the collector has never written. Either way every certificate-file alert is running on a stale reading or on none, and neither will fire. Check `systemctl status iri-cert-expiry.timer iri-cert-expiry.service` and /var/iri/monitoring/textfile/certificates.prom on the host."
 
-  # A collector that ran this morning is not stale, however far off the certificates it reports are.
   - name: silent - the collector wrote an hour ago
     interval: 1m
     input_series:
@@ -154,19 +112,9 @@ tests:
         alertname: CertificateMetricsStale
         exp_alerts: []
 
-  # --- the case the `or absent(...)` companion exists for ---------------------------------------
-  # A collector that has NEVER written emits no series, and `time() - <nothing>` is not an alert, it
-  # is an empty result. That is the state a host rebuild actually produces, and it is the one state
-  # the first branch cannot see while still reading as coverage.
-  #
-  # The companion is BARE, like BackupStaleOrMissing's and unlike the scheduled-job rules' -- see
-  # the rule's own comment for why the kind of metric decides that. This case is what would break
-  # if someone "made it consistent" with the wrong one of the two.
   - name: fires - the collector has never written
     interval: 1m
     input_series:
-      # Deliberately the only series in the test: no basetool_certificate_* at all. An input_series
-      # is still required, or promtool has no timeline to evaluate over.
       - series: 'up{job="node", instance="host:9100"}'
         values: "1+0x180"
     alert_rule_test:
@@ -179,15 +127,13 @@ tests:
               summary: "Certificate expiry metrics are stale"
               description: "iri-cert-expiry.timer writes basetool_certificate_* once a day and the newest sample is over 36 hours old -- or the metric is absent entirely, which for a textfile metric means the collector has never written. Either way every certificate-file alert is running on a stale reading or on none, and neither will fire. Check `systemctl status iri-cert-expiry.timer iri-cert-expiry.service` and /var/iri/monitoring/textfile/certificates.prom on the host."
 
-  # ...and one sample is enough to silence it. The absent() leg must not survive the moment the
-  # collector starts working, which is what `absent()` over a selector that now matches guarantees.
   - name: silent - the collector has written once, recently
     interval: 1m
     input_series:
       - series: 'up{job="node", instance="host:9100"}'
         values: "1+0x180"
       - series: "basetool_certificate_metrics_timestamp_seconds"
-        values: "-600+0x180"       # written ten minutes before the window opens
+        values: "-600+0x180"
     alert_rule_test:
       - eval_time: 2h
         alertname: CertificateMetricsStale

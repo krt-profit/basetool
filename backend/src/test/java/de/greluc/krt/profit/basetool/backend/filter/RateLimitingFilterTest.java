@@ -89,7 +89,7 @@ class RateLimitingFilterTest {
     properties = new Spec();
     properties.setEnabled(true);
     properties.setPaths(List.of("/api/**"));
-    properties.setCapacity(2); // tight bucket so we can hit the limit quickly
+    properties.setCapacity(2);
     properties.setRefillTokens(2);
     properties.setRefillPeriod(Duration.ofMinutes(1));
 
@@ -134,16 +134,10 @@ class RateLimitingFilterTest {
   private void runChain(
       RateLimitingFilter limiter, MockHttpServletRequest request, MockHttpServletResponse response)
       throws ServletException, IOException {
-    // Chained by hand rather than through MockFilterChain(servlet, filters...): that overload
-    // ends in a bare HttpServlet, whose default doGet answers 405 and masks every assertion.
     new ClientIpContextFilter(properties.getTrustedProxies())
         .doFilter(
             request, response, (req, res) -> limiter.doFilter(req, res, new MockFilterChain()));
   }
-
-  // ---------------------------------------------------------------
-  // shouldNotFilter — path matching + global disable
-  // ---------------------------------------------------------------
 
   @Nested
   class ShouldNotFilterTests {
@@ -202,8 +196,6 @@ class RateLimitingFilterTest {
 
     @Test
     void singleSegmentWildcard_matchesOneSegmentOnly() {
-      // A `*` matches exactly one path segment — the participant-rule shape `/api/v1/missions/*`
-      // must match a one-segment id but NOT a deeper path, where only `**` would.
       properties.setPaths(List.of("/api/v1/missions/*"));
 
       assertEquals(false, filter().shouldNotFilter(newRequest("/api/v1/missions/m1")));
@@ -212,8 +204,6 @@ class RateLimitingFilterTest {
 
     @Test
     void globalUmbrella_matchesSubPathsAndTrailingSlash() {
-      // Parity with the AntPathMatcher the filter replaced: `/api/**` must still cover every shape
-      // a real request can take under the umbrella — a deep sub-path and a trailing-slash variant.
       properties.setPaths(List.of("/api/**"));
 
       assertEquals(false, filter().shouldNotFilter(newRequest("/api/v1/missions")));
@@ -223,18 +213,11 @@ class RateLimitingFilterTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // Startup validation — a misconfigured pattern must fail fast at construction (boot), not
-  // silently disable rate limiting for the matching endpoints at runtime.
-  // ---------------------------------------------------------------
-
   @Nested
   class StartupValidationTests {
 
     @Test
     void constructor_failsFast_onUnparseableGlobalPattern() {
-      // A mid-path ** is rejected by PathPattern. The filter must refuse to start rather than boot
-      // with an umbrella that silently never matches — that would leave /api/** unprotected.
       Spec bad = newValidProperties();
       bad.setPaths(List.of("/api/**/legacy/**"));
 
@@ -255,7 +238,6 @@ class RateLimitingFilterTest {
 
     @Test
     void constructor_failsFast_onUnparseableRulePattern() {
-      // The same guard covers per-rule patterns, naming the rule so the operator can find it.
       Spec bad = newValidProperties();
       RateLimitProperties.Rule rule =
           new RateLimitProperties.Rule(
@@ -287,8 +269,6 @@ class RateLimitingFilterTest {
 
     @Test
     void constructor_succeeds_onAllValidPatterns() {
-      // A representative valid configuration (global umbrella + a single-* + final-** rule) must
-      // construct cleanly — proving the validator does not reject the shapes actually shipped.
       Spec ok = newValidProperties();
       RateLimitProperties.Rule rule =
           new RateLimitProperties.Rule(
@@ -316,10 +296,6 @@ class RateLimitingFilterTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // resolveClientKey + bucket bookkeeping — the spoofable-header guard
-  // ---------------------------------------------------------------
-
   @Nested
   class ClientIpResolutionTests {
 
@@ -328,7 +304,7 @@ class RateLimitingFilterTest {
       properties.setTrustedProxies(null);
       MockHttpServletRequest req = newRequest("/api/v1/missions");
       req.setRemoteAddr("198.51.100.10");
-      req.addHeader("X-Forwarded-For", "1.1.1.1"); // spoofed header — must be ignored
+      req.addHeader("X-Forwarded-For", "1.1.1.1");
 
       assertConsumesBucketKeyContaining("198.51.100.10", req);
     }
@@ -345,9 +321,6 @@ class RateLimitingFilterTest {
 
     @Test
     void wildcardOnlyTrustedProxies_ignoresXForwardedFor() throws Exception {
-      // The "*" literal is NOT a valid trust value — must be silently filtered out
-      // by the lambda. This is the core rate-limit-bypass guard called out in
-      // the production Javadoc.
       properties.setTrustedProxies(List.of("*"));
       MockHttpServletRequest req = newRequest("/api/v1/missions");
       req.setRemoteAddr("198.51.100.10");
@@ -361,7 +334,6 @@ class RateLimitingFilterTest {
       properties.setTrustedProxies(List.of("10.0.0.1"));
       MockHttpServletRequest req = newRequest("/api/v1/missions");
       req.setRemoteAddr("10.0.0.1");
-      // no XFF set
 
       assertConsumesBucketKeyContaining("10.0.0.1", req);
     }
@@ -380,7 +352,7 @@ class RateLimitingFilterTest {
     void untrustedPeerWithXff_ignoresXForwardedFor() throws Exception {
       properties.setTrustedProxies(List.of("10.0.0.1"));
       MockHttpServletRequest req = newRequest("/api/v1/missions");
-      req.setRemoteAddr("198.51.100.10"); // NOT in trustedProxies
+      req.setRemoteAddr("198.51.100.10");
       req.addHeader("X-Forwarded-For", "1.1.1.1");
 
       assertConsumesBucketKeyContaining("198.51.100.10", req);
@@ -398,8 +370,6 @@ class RateLimitingFilterTest {
 
     @Test
     void trustedPeerWithCommaSeparatedXff_usesRightmostUntrustedHop() throws Exception {
-      // An appending proxy puts the truth on the RIGHT. Walking right-to-left and skipping our own
-      // hops lands on the client; the old leftmost read landed on whatever the client typed.
       properties.setTrustedProxies(List.of("10.0.0.1"));
       MockHttpServletRequest req = newRequest("/api/v1/missions");
       req.setRemoteAddr("10.0.0.1");
@@ -410,8 +380,6 @@ class RateLimitingFilterTest {
 
     @Test
     void spoofedLeadingEntry_cannotMintAFreshBucket() throws Exception {
-      // The bypass this change closes: two requests whose only difference is the attacker-supplied
-      // leading entry must share one bucket, because both resolve to the proxy-appended client.
       properties.setTrustedProxies(List.of("10.0.0.1"));
       properties.setCapacity(1);
       properties.setRefillTokens(1);
@@ -437,8 +405,6 @@ class RateLimitingFilterTest {
 
     @Test
     void everyHopTrusted_fallsBackToPeer() throws Exception {
-      // A chain consisting only of our own proxies carries no client address at all. Falling back
-      // to the peer keeps the budget shared rather than keying on one of our own hops.
       properties.setTrustedProxies(List.of("10.0.0.0/24"));
       MockHttpServletRequest req = newRequest("/api/v1/missions");
       req.setRemoteAddr("10.0.0.1");
@@ -449,9 +415,6 @@ class RateLimitingFilterTest {
 
     @Test
     void trustedPeerWithXffWhitespace_trimsBeforeUsing() throws Exception {
-      // The padded hop is a TRUSTED one on purpose: if trimming were dropped, " 10.0.0.1 " would
-      // miss the trusted entry, terminate the walk and be returned as the client. A padded client
-      // hop alone would not catch that.
       properties.setTrustedProxies(List.of("10.0.0.1"));
       MockHttpServletRequest req = newRequest("/api/v1/missions");
       req.setRemoteAddr("10.0.0.1");
@@ -462,8 +425,6 @@ class RateLimitingFilterTest {
 
     @Test
     void trustedProxiesListContainsBothWildcardAndRealIp_realIpStillWorks() throws Exception {
-      // Defensive: if someone misconfigures with "*" mixed in, the real IP must
-      // still be honoured (the "*" entry is filtered out, not the whole list).
       properties.setTrustedProxies(List.of("*", "10.0.0.1"));
       MockHttpServletRequest req = newRequest("/api/v1/missions");
       req.setRemoteAddr("10.0.0.1");
@@ -475,15 +436,10 @@ class RateLimitingFilterTest {
     @Test
     void twoRequestsFromSameSpoofedXffShareABucket_whenTrustedProxyNotConfigured()
         throws Exception {
-      // The "rate-limit bypass" attacker scenario: client puts a random IP in
-      // X-Forwarded-For on every request hoping for a fresh bucket. With NO
-      // trusted proxy configured, the filter must ignore the header entirely
-      // and bucket on remoteAddr — so 2 such requests share one bucket.
-      properties.setTrustedProxies(List.of()); // not trusted
+      properties.setTrustedProxies(List.of());
       properties.setCapacity(1);
       properties.setRefillTokens(1);
 
-      // First request: capacity=1 -> consumed, no 429 yet.
       MockHttpServletRequest req1 = newRequest("/api/v1/missions");
       req1.setRemoteAddr("198.51.100.10");
       req1.addHeader("X-Forwarded-For", "1.1.1.1");
@@ -491,8 +447,6 @@ class RateLimitingFilterTest {
       filter().doFilter(req1, resp1, new MockFilterChain());
       assertEquals(200, resp1.getStatus(), "first request must pass");
 
-      // Second request: same remote, different spoofed XFF -> would have been a
-      // fresh bucket if XFF were honoured -> 429.
       MockHttpServletRequest req2 = newRequest("/api/v1/missions");
       req2.setRemoteAddr("198.51.100.10");
       req2.addHeader("X-Forwarded-For", "2.2.2.2");
@@ -505,14 +459,8 @@ class RateLimitingFilterTest {
           "spoofed XFF must NOT yield a fresh bucket when proxy not in trust list");
     }
 
-    // ----- helper --------------------------------------------------------
-
     private void assertConsumesBucketKeyContaining(String expectedIp, MockHttpServletRequest req)
         throws ServletException, IOException {
-      // Assert the resolved address FIRST. Draining a capacity-1 bucket twice yields 429 for any
-      // deterministic key, so on its own it cannot tell a leftmost read from a rightmost one — the
-      // same chain passed this helper before and after the walk was reversed. Reading the published
-      // attribute is what makes `expectedIp` load-bearing rather than decorative.
       MockHttpServletRequest probe = copy(req);
       new ClientIpContextFilter(properties.getTrustedProxies())
           .doFilter(probe, new MockHttpServletResponse(), new MockFilterChain());
@@ -521,10 +469,6 @@ class RateLimitingFilterTest {
           probe.getAttribute(ClientIpContextFilter.CLIENT_IP_ATTRIBUTE),
           "the resolver must key on " + expectedIp);
 
-      // Tight bucket (capacity=1). The first call consumes; a second call with
-      // the same bucket key MUST be rate-limited (429). If the resolved IP
-      // doesn't match, the second call would land in a different bucket and
-      // still pass.
       properties.setCapacity(1);
       properties.setRefillTokens(1);
 
@@ -552,10 +496,6 @@ class RateLimitingFilterTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // doFilterInternal — happy path + 429 response shape
-  // ---------------------------------------------------------------
-
   @Nested
   class DoFilterInternalTests {
 
@@ -582,10 +522,8 @@ class RateLimitingFilterTest {
       MockHttpServletRequest req = newRequest("/api/v1/missions");
       req.setRemoteAddr("192.0.2.20");
 
-      // Drain the bucket.
       filter().doFilter(req, new MockHttpServletResponse(), new MockFilterChain());
 
-      // Second hit: rejected.
       MockHttpServletResponse resp2 = new MockHttpServletResponse();
       filter().doFilter(copyRequest(req), resp2, new MockFilterChain());
 
@@ -594,16 +532,10 @@ class RateLimitingFilterTest {
       assertEquals("1", resp2.getHeader("X-Rate-Limit-Limit"));
       assertEquals("0", resp2.getHeader("X-Rate-Limit-Remaining"));
       assertNotNull(resp2.getHeader("X-Rate-Limit-Retry-After-Seconds"));
-      // The STANDARD header, which is the one a client's HTTP library reads. The Android app's
-      // retry ladder is documented to honour the server's wait and could not, because only the
-      // vendor header above was ever sent; a rate-limited device is what showed it. Both carry the
-      // same number, and both are delta-seconds -- an HTTP-date would make the client trust its own
-      // clock against ours.
       assertEquals(
           resp2.getHeader("X-Rate-Limit-Retry-After-Seconds"),
           resp2.getHeader("Retry-After"),
           "Retry-After must carry the same delta-seconds as the vendor header");
-      // Body must look like a problem document.
       String body = resp2.getContentAsString();
       assertTrue(body.contains("\"status\":429"), body);
       assertTrue(body.contains("\"title\":\"Too Many Requests\""), body);
@@ -617,16 +549,11 @@ class RateLimitingFilterTest {
       assertTrue(
           body.matches("(?s).*\"correlationId\":\"[0-9a-fA-F-]{36}\".*"),
           "body must carry a per-response UUID correlationId: " + body);
-      // The minted correlationId is also echoed as the app-wide X-Correlation-Id response header:
-      // the rate limiter rejects before CorrelationIdFilter runs, so it must echo it here
-      // (RFC-7807 hardening, REQ-OBS).
       String correlationHeader = resp2.getHeader("X-Correlation-Id");
       assertNotNull(correlationHeader, "429 response must echo X-Correlation-Id");
       assertTrue(
           body.contains("\"correlationId\":\"" + correlationHeader + "\""),
           "X-Correlation-Id header must match the body correlationId");
-      // The rejection is counted once under the bounded `global` bucket label (the umbrella
-      // /api/** budget), never under the client IP or URI (REQ-OBS-011).
       assertEquals(
           1.0d,
           meterRegistry
@@ -634,9 +561,6 @@ class RateLimitingFilterTest {
               .tag(MetricNames.TAG_BUCKET, MetricNames.BUCKET_GLOBAL)
               .counter()
               .count());
-      // (#1041 item 19) Every bucket evaluation — the successful consumptions AND the rejection —
-      // is counted under the same bounded bucket label, so requests > rejections here. This is the
-      // denominator for the rejection ratio.
       assertTrue(
           meterRegistry
                   .get(MetricNames.RATELIMIT_REQUESTS)
@@ -654,10 +578,6 @@ class RateLimitingFilterTest {
       return copy;
     }
   }
-
-  // ---------------------------------------------------------------
-  // chain continuation — make sure the filter actually delegates to the next link
-  // ---------------------------------------------------------------
 
   @Test
   void successful_consume_invokesNextFilterInChain() throws Exception {
@@ -678,7 +598,6 @@ class RateLimitingFilterTest {
 
     MockHttpServletRequest req = newRequest("/api/v1/missions");
     req.setRemoteAddr("192.0.2.40");
-    // Drain
     filter().doFilter(req, new MockHttpServletResponse(), new MockFilterChain());
 
     MockHttpServletRequest req2 = new MockHttpServletRequest("GET", "/api/v1/missions");
@@ -695,21 +614,11 @@ class RateLimitingFilterTest {
         "downstream filters must NOT be invoked when the request is rate-limited");
   }
 
-  // ---------------------------------------------------------------
-  // Endpoint-specific rules layered on top of the global default — audit finding L-5.
-  // The per-rule budgets are designed to trip before the loose global budget on the
-  // anonymous-spam POST endpoints (mission create, joborder create, finance-entry,
-  // participant CRUD); the tests below pin the layered semantics.
-  // ---------------------------------------------------------------
-
   @Nested
   class EndpointSpecificRuleTests {
 
     @Test
     void specificRule_runsOutFirst_andDoesNotDrainGlobalBucket() throws Exception {
-      // Global default leaves plenty of headroom (10/min), the rule is tight (2/min). After 2
-      // POSTs the per-rule bucket is empty -> 429, but the global bucket has only consumed 2 of
-      // 10 tokens, so a different endpoint covered only by the global default still goes through.
       properties.setCapacity(10);
       properties.setRefillTokens(10);
 
@@ -717,42 +626,27 @@ class RateLimitingFilterTest {
           newRule("mission-create", List.of("POST"), List.of("/api/v1/missions"), 2);
       properties.setRules(List.of(missionCreate));
 
-      // Drain the per-rule bucket with two POSTs to /api/v1/missions.
       assertEquals(200, post("/api/v1/missions", "192.0.2.50"));
       assertEquals(200, post("/api/v1/missions", "192.0.2.50"));
-      // Third POST: rule depleted -> 429.
       MockHttpServletResponse blocked = postResponse("/api/v1/missions", "192.0.2.50");
       assertEquals(429, blocked.getStatus());
-      // Headers attribute the rejection to the per-rule limit (2), not the global (10).
       assertEquals("2", blocked.getHeader("X-Rate-Limit-Limit"));
 
-      // Different endpoint, same IP -> global bucket still has tokens -> 200. Proves the per-rule
-      // failure short-circuited without draining the global bucket for unrelated paths.
       assertEquals(200, get("/api/v1/orders", "192.0.2.50"));
     }
 
     @Test
     void specificRule_consumed_alsoDebitsGlobalBucket() throws Exception {
-      // The global bucket DOES still tick on every request that matches a tight rule — that's the
-      // layered "defense-in-depth" semantics: an attacker who finds an unlimited rule can't use
-      // it to escape the global cap.
       properties.setCapacity(3);
       properties.setRefillTokens(3);
 
       RateLimitProperties.Rule missionCreate =
-          newRule(
-              "mission-create",
-              List.of("POST"),
-              List.of("/api/v1/missions"),
-              100); // huge per-rule budget
+          newRule("mission-create", List.of("POST"), List.of("/api/v1/missions"), 100);
       properties.setRules(List.of(missionCreate));
 
-      // Three POSTs drain the global bucket.
       assertEquals(200, post("/api/v1/missions", "192.0.2.60"));
       assertEquals(200, post("/api/v1/missions", "192.0.2.60"));
       assertEquals(200, post("/api/v1/missions", "192.0.2.60"));
-      // Fourth POST: global bucket empty -> 429 with the GLOBAL capacity reflected in the header
-      // (the per-rule bucket is the loose one this time).
       MockHttpServletResponse blocked = postResponse("/api/v1/missions", "192.0.2.60");
       assertEquals(429, blocked.getStatus());
       assertEquals("3", blocked.getHeader("X-Rate-Limit-Limit"));
@@ -760,8 +654,6 @@ class RateLimitingFilterTest {
 
     @Test
     void specificRule_doesNotApply_whenMethodMismatches() throws Exception {
-      // The rule targets POST; a GET to the same path must NOT be limited by the rule. The global
-      // bucket (capacity 10) is the only check.
       properties.setCapacity(10);
       properties.setRefillTokens(10);
 
@@ -769,7 +661,6 @@ class RateLimitingFilterTest {
           newRule("mission-create", List.of("POST"), List.of("/api/v1/missions"), 1);
       properties.setRules(List.of(missionCreate));
 
-      // Three GETs to /api/v1/missions are fine even though the per-rule capacity is 1.
       assertEquals(200, get("/api/v1/missions", "192.0.2.70"));
       assertEquals(200, get("/api/v1/missions", "192.0.2.70"));
       assertEquals(200, get("/api/v1/missions", "192.0.2.70"));
@@ -777,8 +668,6 @@ class RateLimitingFilterTest {
 
     @Test
     void specificRule_emptyMethodsList_matchesAnyMethod() throws Exception {
-      // Empty methods list means "any HTTP method" — mirrors how Spring's @RequestMapping treats
-      // an empty methods array.
       properties.setCapacity(10);
       properties.setRefillTokens(10);
 
@@ -788,7 +677,6 @@ class RateLimitingFilterTest {
       properties.setRules(List.of(mutateParticipants));
 
       assertEquals(200, put("/api/v1/missions/abc/participants/xyz/slim", "192.0.2.71"));
-      // Second mutation of any kind on a participants sub-resource -> 429.
       MockHttpServletResponse blocked =
           postResponse("/api/v1/missions/abc/participants/xyz/check-in/slim", "192.0.2.71");
       assertEquals(429, blocked.getStatus());
@@ -796,9 +684,6 @@ class RateLimitingFilterTest {
 
     @Test
     void twoRulesMatchSameRequest_tightestRunsOutFirst() throws Exception {
-      // Two overlapping rules: a wider participants umbrella (5/min) and a tighter check-in slot
-      // (2/min). The filter must trip the tightest first; the wider one only kicks in if the
-      // request streams keep hitting after the tight cap recovers.
       properties.setCapacity(50);
       properties.setRefillTokens(50);
 
@@ -815,17 +700,13 @@ class RateLimitingFilterTest {
       String path = "/api/v1/missions/m1/participants/p1/check-in/slim";
       assertEquals(200, post(path, "192.0.2.80"));
       assertEquals(200, post(path, "192.0.2.80"));
-      // Third hit: tight bucket exhausted; wide still has 3 tokens, global has 47.
       MockHttpServletResponse blocked = postResponse(path, "192.0.2.80");
       assertEquals(429, blocked.getStatus());
-      // The 429 must attribute the rejection to the tight rule (capacity 2).
       assertEquals("2", blocked.getHeader("X-Rate-Limit-Limit"));
     }
 
     @Test
     void specificRule_buckets_perIp_independently() throws Exception {
-      // The per-rule bucket key includes the client IP, so a flooder on one IP cannot starve a
-      // legitimate user on another IP.
       properties.setCapacity(100);
       properties.setRefillTokens(100);
 
@@ -833,18 +714,13 @@ class RateLimitingFilterTest {
           newRule("mission-create", List.of("POST"), List.of("/api/v1/missions"), 1);
       properties.setRules(List.of(missionCreate));
 
-      // IP A drains its rule bucket.
       assertEquals(200, post("/api/v1/missions", "203.0.113.1"));
       assertEquals(429, postResponse("/api/v1/missions", "203.0.113.1").getStatus());
-      // IP B still has its own fresh bucket.
       assertEquals(200, post("/api/v1/missions", "203.0.113.2"));
     }
 
     @Test
     void orderCreateRule_coversTheItemOrderChildPath() throws Exception {
-      // Regression for the rate-limit coverage gap: the anonymous item-order create at
-      // POST /api/v1/orders/items must share the tight order-create budget. Listing the child path
-      // explicitly is required because PathPattern uses exact-segment matching.
       properties.setCapacity(100);
       properties.setRefillTokens(100);
 
@@ -856,7 +732,6 @@ class RateLimitingFilterTest {
               1);
       properties.setRules(List.of(orderCreate));
 
-      // First item-order POST consumes the tight per-rule bucket; the second is blocked by it.
       assertEquals(200, post("/api/v1/orders/items", "203.0.113.10"));
       MockHttpServletResponse blocked = postResponse("/api/v1/orders/items", "203.0.113.10");
       assertEquals(429, blocked.getStatus());
@@ -865,9 +740,6 @@ class RateLimitingFilterTest {
 
     @Test
     void orderCreateRule_parentPathAlone_doesNotCoverItemChild() throws Exception {
-      // Documents WHY the child path must be listed: with only `/api/v1/orders`, the item-order
-      // create at `/api/v1/orders/items` is NOT matched by the rule (exact-segment PathPattern), so
-      // a tight per-rule budget of 1 never bites it — the coverage gap the fix closes.
       properties.setCapacity(100);
       properties.setRefillTokens(100);
 
@@ -875,7 +747,6 @@ class RateLimitingFilterTest {
           newRule("order-create", List.of("POST"), List.of("/api/v1/orders"), 1);
       properties.setRules(List.of(orderCreateParentOnly));
 
-      // Two POSTs to the child path both pass — the parent-only pattern does not cover it.
       assertEquals(200, post("/api/v1/orders/items", "203.0.113.11"));
       assertEquals(200, post("/api/v1/orders/items", "203.0.113.11"));
     }
@@ -915,12 +786,6 @@ class RateLimitingFilterTest {
       return resp.getStatus();
     }
   }
-
-  // ---------------------------------------------------------------
-  // key_source — the 2026-07-06 bucket-collapse diagnosis. A 429 spike must be attributable to
-  // either "many clients tripped their own budgets" (forwarded) or "trusted-proxies drifted and
-  // everyone collapsed onto one bucket" (peer), without ever writing a client IP to the log.
-  // ---------------------------------------------------------------
 
   @Nested
   class KeySourceTests {
@@ -991,10 +856,6 @@ class RateLimitingFilterTest {
     @Test
     void rejection_withAnEmptyLeadingXffEntry_stillFindsTheClientAndReportsForwarded()
         throws Exception {
-      // The leftmost read had to special-case " , 1.2.3.4", because an empty first element would
-      // key every such request on the empty string while still reporting `forwarded` — hiding the
-      // very collapse this tag exists to expose. Walking from the right removes the special case:
-      // the empty element is simply skipped and the real client is found.
       properties.setTrustedProxies(List.of("10.0.0.1"));
 
       assertEquals(429, drainAndReject("10.0.0.1", " , 203.0.113.7").getStatus());
@@ -1011,7 +872,6 @@ class RateLimitingFilterTest {
 
     @Test
     void rejection_withoutTheResolverInTheChain_isTaggedPeer() throws Exception {
-      // Defensive: a dispatch the resolver is not mapped to must not silently trust a header.
       properties.setTrustedProxies(List.of("10.0.0.1"));
       properties.setCapacity(1);
       properties.setRefillTokens(1);
@@ -1074,10 +934,6 @@ class RateLimitingFilterTest {
       }
     }
   }
-
-  // ---------------------------------------------------------------
-  // helpers
-  // ---------------------------------------------------------------
 
   private static MockHttpServletRequest newRequest(String path) {
     return new MockHttpServletRequest("GET", path);

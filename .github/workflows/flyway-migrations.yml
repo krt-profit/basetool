@@ -1,29 +1,6 @@
 name: Flyway Migrations
 
-# Validates the Flyway migration directory's version numbering on every PR:
-#
-#   1. No duplicate V<n> across migration files.
-#   2. Every newly added migration is numbered strictly after the highest
-#      version currently on the base branch.
-#
-# Both failure modes are invisible to a single-branch local Gradle run — a
-# duplicate or a colliding number only blows up once the branch shares a tree
-# with main (the merge commit CI tests), where it aborts every Spring Boot
-# context. This check surfaces the problem early, on the PR, with a clear
-# message instead of a stack of failed @SpringBootTest contexts.
-#
-# The actual logic lives in scripts/check-flyway-migrations.sh so it can also
-# be run locally before pushing:
-#
-#   FLYWAY_BASE_REF=origin/main scripts/check-flyway-migrations.sh
-
 on:
-  # Runs on every PR to main — deliberately NOT path-filtered. A path filter
-  # would skip PRs that don't touch the migration dir, but a skipped run never
-  # reports its status; once this is a required check in the branch ruleset,
-  # those PRs would hang forever waiting on a check that never arrives. The
-  # job finishes in seconds, so running it unconditionally is the cheap, safe
-  # choice. (The duplicate/ordering checks are no-ops when nothing changed.)
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
@@ -44,33 +21,20 @@ jobs:
 
     steps:
       - name: Checkout PR with full history
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          # fetch-depth: 0 so the script can compute the merge-base against
-          # the base branch; a shallow checkout would have no merge-base and
-          # the ordering check would silently degrade to "no new migrations".
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
 
       - name: Fetch base branch tip
         if: github.event_name == 'pull_request'
-        # checkout fetched the PR head with full history; this brings the base
-        # branch into origin/<base_ref> so the script can resolve both the ref
-        # and the merge-base against it. Through the environment, not `${{ }}` in
-        # the script: a branch name is attacker-chosen text (zizmor
-        # `template-injection`).
         env:
           BASE_REF: ${{ github.base_ref }}
         run: git fetch --no-tags origin "${BASE_REF}"
 
       - name: Self-test the migration checker
         shell: bash
-        # Guards the checker's own logic — in particular that a branch's
-        # migration already merged to the base (squash-merge in flight) is not
-        # flagged as colliding with itself, while genuine duplicates and
-        # out-of-order additions still fail. Self-contained (builds throwaway
-        # git repos); needs no PR migrations or base fetch.
         run: |
           chmod +x scripts/check-flyway-migrations.test.sh
           scripts/check-flyway-migrations.test.sh
@@ -78,9 +42,6 @@ jobs:
       - name: Validate Flyway migration numbering
         shell: bash
         env:
-          # Compare against the freshly fetched base tip, not the PR event's
-          # base.sha, so a number that landed on main after the PR opened is
-          # caught as soon as the PR re-runs.
           FLYWAY_BASE_REF: origin/${{ github.base_ref }}
         run: |
           chmod +x scripts/check-flyway-migrations.sh

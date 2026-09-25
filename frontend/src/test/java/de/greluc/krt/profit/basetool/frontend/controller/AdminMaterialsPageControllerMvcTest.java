@@ -131,11 +131,6 @@ class AdminMaterialsPageControllerMvcTest {
         .andExpect(content().string(containsString("</html>")));
   }
 
-  // covers the create-modal flag-checkbox regression (#1405) — the page-scoped .form-group input
-  // rule ties the global KRT square-checkbox rule at (0,1,1) and, rendering after styles.css,
-  // would win and stretch the five flag checkboxes into full-width padded bars. Pins the
-  // zero-specificity :where(:not(...)) exclusion so the page rule can never re-capture
-  // checkbox/radio inputs while still ranking below the (0,2,0) combobox input rule.
   @Test
   @WithMockUser(roles = "ADMIN")
   void listMaterials_ShouldExcludeCheckboxesFromFormGroupInputRule() throws Exception {
@@ -157,8 +152,6 @@ class AdminMaterialsPageControllerMvcTest {
                     ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
   }
 
-  // covers #582 — the category-create twin (X-Requested-With + JSON body) relays to the backend and
-  // returns the created MaterialCategoryDto so the page appends it without reloading.
   @Test
   @WithMockUser(roles = "ADMIN")
   void createCategoryAjax_withHeader_returns200WithCategory() throws Exception {
@@ -177,7 +170,6 @@ class AdminMaterialsPageControllerMvcTest {
         .andExpect(content().string(containsString("X")));
   }
 
-  // covers #582 — a blank category name is rejected with 400 before any backend call.
   @Test
   @WithMockUser(roles = "ADMIN")
   void createCategoryAjax_withHeaderBlankName_returns400() throws Exception {
@@ -191,8 +183,6 @@ class AdminMaterialsPageControllerMvcTest {
         .andExpect(status().isBadRequest());
   }
 
-  // covers #582 — the category-delete twin (X-Requested-With) returns 200 so the page removes the
-  // category row in place rather than reloading.
   @Test
   @WithMockUser(roles = "ADMIN")
   void deleteCategoryAjax_withHeader_returns200() throws Exception {
@@ -208,9 +198,6 @@ class AdminMaterialsPageControllerMvcTest {
         .andExpect(status().isOk());
   }
 
-  // covers #582 — header routing: the same create URL WITHOUT the header still hits the classic
-  // form
-  // handler and redirects (no-JS fallback preserved).
   @Test
   @WithMockUser(roles = "ADMIN")
   void createCategory_withoutHeader_redirects() throws Exception {

@@ -75,9 +75,6 @@ public class DatabaseActingMemberAuthorities implements ActingMemberAuthorities 
   public @NotNull Collection<GrantedAuthority> authoritiesFor(@NotNull UUID member) {
     Optional<User> found = userRepository.findById(member);
     if (found.isEmpty()) {
-      // Deliberately NOT created. The login path creates a row for a first-seen subject, which is
-      // right when a person authenticated; here nobody did, and inventing a member from a header
-      // would turn that header into a registration primitive.
       log.warn("Refusing to act for a subject with no local account");
       throw new AccessDeniedException("The named member is not known here.");
     }
@@ -87,20 +84,9 @@ public class DatabaseActingMemberAuthorities implements ActingMemberAuthorities 
       throw new AccessDeniedException("The named member is no longer active.");
     }
     if (!user.isEnabledInKeycloak()) {
-      // Separate from the branch above on purpose: "deleted" and "deactivated" have different
-      // remedies, and the log line is the only place the two are distinguishable — the answer to
-      // the caller is byte-identical so the endpoint cannot be used to enumerate subjects.
       log.warn("Refusing to act for a member whose Keycloak account is disabled");
       throw new AccessDeniedException("The named member is no longer active.");
     }
-    // Uncached, unlike the login path, which caches the same assembly per token (#1141). No cache
-    // here on purpose: the natural key would be the member's id, and a header can name a different
-    // member on every request, so the hit rate would be whatever the extractor population happens
-    // to be while the entries pin authority sets for callers who are not currently calling. The
-    // cost is one findById plus the assembler's own reads per ingest upload — an upload is already
-    // a multi-second screenshot-extraction round trip, so this is not the expensive part of it.
-    // Revisit only if ingest volume makes it one; correctness first, since a stale cached authority
-    // set here would outlive a revoked member exactly the way the liveness check above refuses to.
     return authorityAssembler.assembleFor(user);
   }
 }

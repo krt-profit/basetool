@@ -4,26 +4,7 @@
 # Copyright (C) 2026 Lucas Greuloch
 #
 # SPDX-License-Identifier: GPL-3.0-only
-#
-# image-pin-gate: ignore-file — the fixtures below pin WRONG tags on purpose. "Repairing" them would
-# make this suite pass vacuously, the one outcome a regression suite must never have.
-#
-# Regression tests for scripts/check-monitoring-image-pins.sh.
-#
-# Builds throwaway git repositories that reproduce the drift scenarios the gate is meant to (and
-# meant NOT to) flag, then asserts its exit status, its report, and — for --fix — what it wrote.
-# No network, no Gradle — pure git + bash, runs in a couple of seconds.
-#
-# Usage:
-#   scripts/check-monitoring-image-pins.test.sh
-#
-# The headline cases are the three the code review caught:
-#   * an ADR is a historical record, so a Tempo bump must not turn the gate red and must never let
-#     --fix rewrite an accepted decision to a version that decision never made;
-#   * `grep -H` — with a single file in the list, grep omits the filename and the report parses the
-#     line number as the filename;
-#   * the --fix `sed` interpolations — 'ghcr.io/google/cadvisor' contains dots today, and an
-#     unescaped dot rewrites neighbouring text that merely looks alike.
+# image-pin-gate: ignore-file
 
 set -euo pipefail
 
@@ -40,15 +21,10 @@ tests_run=0
 tests_failed=0
 LAST_OUTPUT=""
 
-# Creates a throwaway temp directory and prints its absolute path. Each scenario gets its own so
-# they cannot interfere with one another.
 mktmp() {
   mktemp -d "${TMPDIR:-/tmp}/image-pin-check-test.XXXXXX"
 }
 
-# Initialises a fresh git repo at $1 with a deterministic identity, gpg signing off and `main` as
-# the initial branch — independent of the host's git config. autocrlf stays off so a Windows host
-# does not rewrite the fixtures under the checker's feet.
 init_repo() {
   local repo="$1"
   git -C "$repo" init -q -b main
@@ -58,8 +34,6 @@ init_repo() {
   git -C "$repo" config core.autocrlf false
 }
 
-# Writes the compose fixture of repo $1 from the remaining arguments, each a full `repository:tag`
-# reference, in the same shape the real docker-compose.monitoring.yml has.
 write_compose() {
   local repo="$1" ref
   shift
@@ -71,23 +45,18 @@ write_compose() {
   } >"${repo}/${COMPOSE_FILE}"
 }
 
-# Writes file $2 (repo-relative, directories created on demand) of repo $1 from stdin.
 write_doc() {
   local repo="$1" path="$2"
   mkdir -p "$(dirname "${repo}/${path}")"
   cat >"${repo}/${path}"
 }
 
-# Stages everything and commits in repo $1. `git ls-files` reads the index, so this is what puts the
-# fixtures in the checker's field of view.
 commit_all() {
   local repo="$1"
   git -C "$repo" add -A
   git -C "$repo" commit -q -m "fixture"
 }
 
-# Runs the checker inside repo $1, passing the remaining arguments through (e.g. --fix). Returns the
-# checker's exit code; its merged output lands in the global LAST_OUTPUT.
 run_checker() {
   local repo="$1" rc=0
   shift
@@ -95,8 +64,6 @@ run_checker() {
   return "$rc"
 }
 
-# Records a passed/failed assertion with a description; dumps LAST_OUTPUT on failure so a red test
-# is self-diagnosing.
 record() {
   local ok="$1" desc="$2"
   tests_run=$((tests_run + 1))
@@ -111,7 +78,6 @@ record() {
   fi
 }
 
-# assert_exit <expected-rc> <actual-rc> <description>.
 assert_exit() {
   local expected="$1" actual="$2" desc="$3"
   if [[ "$actual" -eq "$expected" ]]; then
@@ -121,9 +87,6 @@ assert_exit() {
   fi
 }
 
-# assert_contains <substring> <description> — fails unless LAST_OUTPUT contains the substring.
-# Distinguishes a correct verdict from an incidental exit code (a set -e or parse error also exits
-# non-zero), so a test cannot pass red-for-the-wrong-reason.
 assert_contains() {
   local needle="$1" desc="$2"
   if [[ "$LAST_OUTPUT" == *"$needle"* ]]; then
@@ -133,7 +96,6 @@ assert_contains() {
   fi
 }
 
-# assert_excludes <substring> <description> — fails if LAST_OUTPUT contains it.
 assert_excludes() {
   local needle="$1" desc="$2"
   if [[ "$LAST_OUTPUT" != *"$needle"* ]]; then
@@ -143,7 +105,6 @@ assert_excludes() {
   fi
 }
 
-# assert_file_contains <file> <substring> <description>.
 assert_file_contains() {
   local file="$1" needle="$2" desc="$3"
   if grep -qF -- "$needle" "$file"; then
@@ -153,7 +114,6 @@ assert_file_contains() {
   fi
 }
 
-# assert_file_excludes <file> <substring> <description>.
 assert_file_excludes() {
   local file="$1" needle="$2" desc="$3"
   if grep -qF -- "$needle" "$file"; then
@@ -163,10 +123,6 @@ assert_file_excludes() {
   fi
 }
 
-# ---------------------------------------------------------------------------
-# Scenario 1: a stale pin in an ordinary runbook is flagged, and --fix repairs it. This is the gate
-# doing its job; every exclusion below is only defensible while this still holds.
-# ---------------------------------------------------------------------------
 scenario_ordinary_doc_is_gated() {
   echo "Scenario: stale pin in an ordinary doc (must FAIL, then be fixable)"
   local repo rc=0
@@ -196,11 +152,6 @@ DOC
   rm -rf "$repo"
 }
 
-# ---------------------------------------------------------------------------
-# Scenario 2 (the review finding): an ADR quotes the tag its decision pinned. The next Dependabot
-# bump must not turn the gate red — and --fix must not rewrite an accepted decision record to a
-# version that decision never made.
-# ---------------------------------------------------------------------------
 scenario_adr_is_a_historical_record() {
   echo "Scenario: ADR quoting the tag it decided on (must PASS, must stay verbatim)"
   local repo rc=0
@@ -231,9 +182,6 @@ DOC
   rm -rf "$repo"
 }
 
-# ---------------------------------------------------------------------------
-# Scenario 3: the changelog exclusion still holds — the case the gate shipped with.
-# ---------------------------------------------------------------------------
 scenario_changelog_is_excluded() {
   echo "Scenario: release note naming the shipped version (must PASS)"
   local repo rc=0
@@ -260,10 +208,6 @@ DOC
   rm -rf "$repo"
 }
 
-# ---------------------------------------------------------------------------
-# Scenario 4: the inline escape hatch — a frozen document outside docs/adr/ opts out through the
-# repository's existing "Doc type: ... Historical ..." front matter.
-# ---------------------------------------------------------------------------
 scenario_frozen_front_matter_exempts() {
   echo "Scenario: frozen plan with historical front matter (must PASS)"
   local repo rc=0
@@ -285,11 +229,6 @@ DOC
   rm -rf "$repo"
 }
 
-# ---------------------------------------------------------------------------
-# Scenario 5: the exemption is front matter, not a magic word anywhere in the file. docs/specs/
-# INDEX.md quotes the very same header deep in its body as an authoring example, and that file is a
-# living index that must stay gated.
-# ---------------------------------------------------------------------------
 scenario_late_front_matter_does_not_exempt() {
   echo "Scenario: 'Doc type: Historical' quoted below the header (must FAIL)"
   local repo rc=0
@@ -323,18 +262,12 @@ DOC
   rm -rf "$repo"
 }
 
-# ---------------------------------------------------------------------------
-# Scenario 6 (the review nit): with exactly ONE file in the list, `grep` without -H omits the
-# filename, and the report's field split reads the line number as the filename. Asserting the
-# rendered "<file>:<line>" catches that; asserting only the exit code would not.
-# ---------------------------------------------------------------------------
 scenario_single_file_list_keeps_filename() {
   echo "Scenario: single non-excluded doc (report must still name the file)"
   local repo rc=0
   repo="$(mktmp)"
   init_repo "$repo"
   write_compose "$repo" "grafana/loki:3.7.4"
-  # The only tracked Markdown besides the excluded trees, so doc_files holds exactly one entry.
   write_doc "$repo" "CHANGELOG.md" <<'DOC'
 # Changelog
 DOC
@@ -361,10 +294,6 @@ DOC
   rm -rf "$repo"
 }
 
-# ---------------------------------------------------------------------------
-# Scenario 7 (the review nit): the --fix search half is a BRE. 'ghcr.io/google/cadvisor' contains
-# dots today, so an unescaped '.' matches any character and rewrites text that merely looks alike.
-# ---------------------------------------------------------------------------
 scenario_fix_does_not_leak_through_regex_metacharacters() {
   echo "Scenario: --fix on a dotted repository (must not touch look-alike text)"
   local repo rc=0
@@ -392,11 +321,6 @@ DOC
   rm -rf "$repo"
 }
 
-# ---------------------------------------------------------------------------
-# Scenario 8: a repository whose every documented pin is already correct passes, and the run reports
-# that it actually looked at something. Guards the "green because it could not look" failure mode
-# that the exclusions make easier to reach.
-# ---------------------------------------------------------------------------
 scenario_all_docs_excluded_is_an_error() {
   echo "Scenario: nothing left to scan (must ERROR, not pass)"
   local repo rc=0
@@ -417,12 +341,6 @@ DOC
   rm -rf "$repo"
 }
 
-# ---------------------------------------------------------------------------
-# Scenario 9 (the 2026-08-16 widening): the same copy-pasteable command in a NON-Markdown file. Nine
-# of the ten promtool test files under monitoring/prometheus/tests/ had drifted while the gate only
-# looked at *.md, so this is the headline case for the widened scan — a pinned tag is a pinned tag
-# whatever the file extension.
-# ---------------------------------------------------------------------------
 scenario_non_markdown_file_is_gated() {
   echo "Scenario: stale pin in a .yml header comment (must FAIL, then be fixable)"
   local repo rc=0
@@ -450,11 +368,6 @@ DOC
   rm -rf "$repo"
 }
 
-# ---------------------------------------------------------------------------
-# Scenario 10: the compose file is the AUTHORITY, not a document about it. Two services pinning the
-# same repository at different tags is legal there (a canary, a staged bump); with the widened scan
-# the gate would otherwise compare the source of truth against itself and report the loser.
-# ---------------------------------------------------------------------------
 scenario_compose_authority_is_never_flagged() {
   echo "Scenario: compose pins the same repository twice (must PASS)"
   local repo rc=0
@@ -468,16 +381,10 @@ DOC
 
   run_checker "$repo" || rc=$?
   assert_exit 0 "$rc" "the authority is not scanned against itself"
-  # The success line names the compose file, so match the report's `file:line` shape instead.
   assert_excludes "${COMPOSE_FILE}:1" "the compose file is absent from the drift report"
   rm -rf "$repo"
 }
 
-# ---------------------------------------------------------------------------
-# Scenario 11: the inline opt-out for files whose tags are deliberately not pins — this suite's own
-# fixtures are the case it exists for. --fix must leave them byte-identical, or a red gate would
-# "repair" a regression suite into passing vacuously.
-# ---------------------------------------------------------------------------
 scenario_ignore_marker_exempts() {
   echo "Scenario: 'image-pin-gate: ignore-file' in the header (must PASS and stay unwritten)"
   local repo rc=0
@@ -507,11 +414,6 @@ DOC
   rm -rf "$repo"
 }
 
-# ---------------------------------------------------------------------------
-# Scenario 12: the ignore marker is header matter, not a magic word anywhere in the file — the same
-# guard scenario 5 puts on the "Doc type:" convention. A document that DOCUMENTS the marker (this
-# suite, the gate's own header, a future contributing guide) must not exempt itself by talking.
-# ---------------------------------------------------------------------------
 scenario_late_ignore_marker_does_not_exempt() {
   echo "Scenario: ignore marker quoted below the header (must FAIL)"
   local repo rc=0
@@ -520,7 +422,6 @@ scenario_late_ignore_marker_does_not_exempt() {
   write_compose "$repo" "grafana/alloy:v1.18.0"
   {
     printf '# Contributing\n'
-    # Push the marker past EXEMPTION_HEADER_LINES, exactly as a prose document would.
     for _ in $(seq 1 20); do printf '\n'; done
     printf 'A file opts out with "image-pin-gate: ignore-file" in its header.\n'
     printf '\n    docker run --rm grafana/alloy:v1.17.1 fmt /cfg/config.alloy\n'
@@ -533,11 +434,6 @@ scenario_late_ignore_marker_does_not_exempt() {
   rm -rf "$repo"
 }
 
-# ---------------------------------------------------------------------------
-# Scenario 13: binary files are skipped rather than scanned. `git ls-files` lists the keystore, the
-# fonts and every image in the repository; grep -I is what keeps them out of both the exemption pass
-# and the scan, and a NUL byte next to a plausible tag is the cheapest way to prove it.
-# ---------------------------------------------------------------------------
 scenario_binary_files_are_skipped() {
   echo "Scenario: a binary file carrying a tag-like byte sequence (must PASS)"
   local repo rc=0

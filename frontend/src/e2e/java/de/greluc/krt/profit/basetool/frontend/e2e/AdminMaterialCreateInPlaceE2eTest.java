@@ -119,7 +119,6 @@ class AdminMaterialCreateInPlaceE2eTest {
         E2eSupport.navigate(page, baseUrl + "/admin/materials");
         page.waitForLoadState();
 
-        // A full navigation wipes this marker, so its survival proves the create stayed in place.
         page.evaluate("() => { window.__krtNoReload = true; }");
 
         page.locator("[data-trigger='materials-open-create-modal']").click();
@@ -133,10 +132,6 @@ class AdminMaterialCreateInPlaceE2eTest {
                 page.locator("#modal-create-material [data-trigger='materials-submit-create']")
                     .dblclick());
 
-        // The in-place refresh re-renders the table from a fresh GET of the page; the new row
-        // arriving is the signal that the whole round-trip — write and re-render — has finished.
-        // Match the row by its NAME cell only: every row also carries a per-row material <select>
-        // whose options list the whole catalog, so a row-wide hasText matches all of them.
         Locator newRow =
             page.locator("#materialsTable tbody tr")
                 .filter(

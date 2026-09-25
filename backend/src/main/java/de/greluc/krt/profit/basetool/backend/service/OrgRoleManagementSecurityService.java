@@ -235,8 +235,6 @@ public class OrgRoleManagementSecurityService {
     return callerIsBereichsleiterOfParent(specialCommandId);
   }
 
-  // ----------------------------------------------------------------- helpers --
-
   /**
    * {@code true} when the authentication is missing or anonymous (the framework hands SpEL a
    * non-null anonymous token in that case), so the caller is denied before any lookup.

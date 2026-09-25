@@ -41,8 +41,6 @@ import org.springframework.web.filter.ShallowEtagHeaderFilter;
 
 @SpringBootTest
 @ActiveProfiles("test")
-// REQ-SEC-052: every route these cases exercise requires a login now, so the class carries a
-// principal. What each case asserts is unchanged — only the caller is.
 @org.springframework.security.test.context.support.WithMockUser
 class HttpCachingTest {
 
@@ -79,7 +77,6 @@ class HttpCachingTest {
             .getResponse()
             .getHeader("ETag");
 
-    // Conditional GET with If-None-Match
     mockMvc
         .perform(get("/api/v1/job-types").header("If-None-Match", etag))
         .andExpect(status().isNotModified());
@@ -87,11 +84,6 @@ class HttpCachingTest {
 
   @Test
   void protectedEndpoint_unauthenticatedConditionalGet_isClientErrorNot304() throws Exception {
-    // L-9: the ShallowEtagHeaderFilter sits at the front of the chain, but it computes the 304 from
-    // the *generated* body. For an unauthenticated caller on a protected endpoint that body is
-    // Spring Security's 401, not the resource — so a fabricated If-None-Match can never short-
-    // circuit to a 304 of protected content. is4xxClientError() asserts the denial (401/403) and,
-    // by construction, excludes the 304 (3xx) that an ETag oracle would need.
     mockMvc
         .perform(get("/api/v1/users").header("If-None-Match", "\"fabricated-etag\""))
         .andExpect(status().is4xxClientError());
@@ -129,8 +121,6 @@ class HttpCachingTest {
         .andExpect(header().string("Cache-Control", "private, no-store"))
         .andExpect(header().doesNotExist("ETag"));
 
-    // A fabricated ETag must still be denied rather than short-circuited to a 304 of protected
-    // content: security answers before any comparison, exactly as it did before.
     mockMvc
         .perform(get("/api/v1/users").header("If-None-Match", "\"fabricated-etag\""))
         .andExpect(status().is4xxClientError());
@@ -157,9 +147,6 @@ class HttpCachingTest {
             .getResponse()
             .getContentAsString();
 
-    // Deliberately shape-agnostic: what matters is that bytes arrived at all, not whether this
-    // family answers with an array or a page envelope -- pinning that here would make an unrelated
-    // DTO change fail a caching test.
     org.assertj.core.api.Assertions.assertThat(body).isNotBlank();
     org.assertj.core.api.Assertions.assertThat(body.charAt(0)).isIn('[', '{');
   }

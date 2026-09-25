@@ -211,8 +211,6 @@ public class ShipDataPageController {
     return "redirect:/ship-data";
   }
 
-  // ----------------------------------------------------- AJAX twins (epic #571 / REQ-FE-001)
-
   /**
    * Header-gated AJAX twin of {@link #resetAllFitted}: clears the {@code fitted} flag on every ship
    * and returns {@code 204} so {@code ship-data.html} surfaces a toast and closes the confirm modal

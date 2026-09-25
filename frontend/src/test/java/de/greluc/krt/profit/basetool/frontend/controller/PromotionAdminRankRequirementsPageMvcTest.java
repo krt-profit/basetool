@@ -112,7 +112,6 @@ class PromotionAdminRankRequirementsPageMvcTest {
             null,
             null);
 
-    // OrgUnitContextAdvice fan-out: squadrons list + non-admin /me/active-org-unit lookup.
     PageResponse<SquadronDto> squadronPage =
         new PageResponse<>(
             List.of(new SquadronDto(squadronId, "IRIDIUM", "IRI", null, true, true, false, 0L)),
@@ -123,8 +122,6 @@ class PromotionAdminRankRequirementsPageMvcTest {
             List.of());
     when(backendApiClient.get(contains("/api/v1/squadrons"), anyTypeRef()))
         .thenReturn(squadronPage);
-    // availableSquadrons() reads the catalogue through the SQUADRON cache (getCached) now
-    // (REQ-DATA-007); stub that path too or the officer's promotion-feature flag resolves empty.
     when(backendApiClient.getCached(eq(CachedCatalog.SQUADRONS), anyTypeRef()))
         .thenReturn(squadronPage);
     when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
@@ -143,15 +140,9 @@ class PromotionAdminRankRequirementsPageMvcTest {
     mockMvc
         .perform(get("/promotion/admin/rank-requirements"))
         .andExpect(status().isOk())
-        // The create button must be present with its data-trigger so the inline JS wiring
-        // can find it.
         .andExpect(content().string(containsString("data-trigger=\"ar-open-create\"")))
-        // The page loads the extracted rank-requirements module (ADR-0069, rendered with a real
-        // nonce) whose tail wires the ar-* click handlers.
         .andExpect(
             content().string(containsString("src=\"/js/promotion-admin-rank-requirements.js\"")))
-        // The Thymeleaf-inlined categories map (now in the bootstrap) must be valid JSON, not the
-        // literal placeholder.
         .andExpect(
             content()
                 .string(containsString("var AR_CATEGORIES_BY_TOPIC = {\"" + topicId + "\":[")));

@@ -59,7 +59,6 @@ import org.junit.jupiter.api.Test;
  */
 class DataExportScrubCoverageTest {
 
-  // covers REQ-SEC-058 - a column that can name a person is scrubbed, or exempted with a reason
   @Test
   void everyPersonNameColumnIsEitherScrubbedOrExemptedWithAReason() {
     List<String> unaccounted = new ArrayList<>();
@@ -109,7 +108,6 @@ class DataExportScrubCoverageTest {
         .containsAll(PersonSearchTargets.EXEMPT_BUT_MAY_HOLD_A_NAME);
   }
 
-  // covers REQ-SEC-058 - the scrub registry cannot drift out of step with the sections it names
   @Test
   void everyScrubbedColumnExists() {
     Map<String, Set<String>> aliasesBySection = aliasesBySection();
@@ -135,7 +133,6 @@ class DataExportScrubCoverageTest {
         .isEmpty();
   }
 
-  // covers REQ-SEC-058 - an exemption has to be about a column that is really selected
   @Test
   void everyExemptedColumnExists() {
     Map<String, Set<String>> aliasesBySection = aliasesBySection();
@@ -157,7 +154,6 @@ class DataExportScrubCoverageTest {
         .isEmpty();
   }
 
-  // covers REQ-SEC-058 - no exemption may be left without a stated reason
   @Test
   void everyExemptionStatesAReason() {
     assertThat(DataExportSections.UNSCRUBBED_PERSON_COLUMNS)
@@ -170,7 +166,6 @@ class DataExportScrubCoverageTest {
                     .doesNotContainIgnoringCase("todo"));
   }
 
-  // covers REQ-SEC-058 - and no column may be claimed by both registries at once
   @Test
   void noColumnIsBothScrubbedAndExempted() {
     List<String> both = new ArrayList<>();
@@ -184,12 +179,8 @@ class DataExportScrubCoverageTest {
     assertThat(both).as("a column is scrubbed or it is not; both entries cannot be true").isEmpty();
   }
 
-  // covers REQ-SEC-058 - the classification's reason stays recorded beside the statement
   @Test
   void everySectionStatesWhyItCarriesItsLegalBasis() {
-    // The reason used to be shipped to the member as English prose in the JSON download, which the
-    // i18n rule forbids and the PDF never rendered. It is developer-facing now -- which only works
-    // if it keeps being written, so it is checked rather than trusted.
     assertThat(DataExportSections.SECTIONS)
         .allSatisfy(
             section ->
@@ -200,7 +191,6 @@ class DataExportScrubCoverageTest {
                     .doesNotContainIgnoringCase("todo"));
   }
 
-  // covers REQ-SEC-058 - and the basis itself is one of the two the export knows
   @Test
   void everySectionCarriesAKnownLegalBasis() {
     assertThat(DataExportSections.SECTIONS)

@@ -73,7 +73,6 @@ class MaterialServiceCachingTest {
     Material material = new Material();
     material.setName(name);
     material.setType(MaterialType.RAW);
-    // quantityType / isVisible / isJobOrder / isManualRawMaterial carry NOT-NULL entity defaults.
     return material;
   }
 
@@ -125,7 +124,6 @@ class MaterialServiceCachingTest {
     Pageable pageable = PageRequest.of(0, 10, Sort.by("name"));
     materialService.getMaterial(beta.getId());
     materialService.getAllMaterials(pageable);
-    // Sanity: both caches primed
     assertNotNull(byIdCache().get(beta.getId()));
     assertNotNull(listCache().get("all-" + pageable));
 
@@ -138,7 +136,6 @@ class MaterialServiceCachingTest {
   @Test
   void byIdCacheRepopulatesAfterAWriteEvictsIt() {
     materialService.getMaterial(alpha.getId());
-    // A write to any material evicts the whole by-id cache (allEntries=true).
     materialService.deleteMaterial(beta.getId());
     assertNull(byIdCache().get(alpha.getId()), "the surviving material's entry is evicted too");
 

@@ -31,21 +31,12 @@
                th:text="#{bank.requests.subtitle}">Antr&auml;ge der Org-Einheiten best&auml;tigen oder ablehnen.</p>
         </div>
         <div class="bank-requests-head-right">
-            <!--/* Direct-booking CTA (REQ-BANK-023, #997): bank staff post a deposit/withdrawal/transfer
-                 straight against a chosen account (not a request). The modal carries a source-account
-                 selector because this page is not account-scoped. Shown when any active account
-                 exists. */-->
             <button type="button" class="btn btn--cta" th:if="${canBook}"
                     data-trigger="open-modal-display" data-modal-id="bank-movement-modal"
                     data-testid="bank-movement-open">
                 <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-swap"/></svg>
                 <span th:text="#{bank.action.movement}">Kontobewegung</span>
             </button>
-            <!--/* Parallel status filters (REQ-BANK-023): independent checkboxes, not exclusive tabs and
-                 not filled toggle buttons. Selection is persisted per user in localStorage by bank.js
-                 and replayed via the `status` query param; the checkboxes live outside the swapped
-                 `requestQueue` fragment, so bank.js owns their checked state. Default (no saved pref)
-                 is Ausstehend only, rendered server-side. */-->
             <div class="bank-status-filter" role="group" data-bank-status-filter-bar
                  th:aria-label="#{bank.requests.filter.aria}">
                 <label class="bank-check-inline">
@@ -72,11 +63,8 @@
         </div>
     </div>
 
-    <!--/* requestQueue fragment: the filtered request table; swapped in place after a decision or a
-         status-filter toggle (REQ-BANK-023 / REQ-FE-005). */-->
     <div id="bank-request-queue-results" th:fragment="requestQueue">
         <div class="hud-box mt-2">
-            <!--/* All filters off (deselected): a distinct hint, not "no requests match". */-->
             <p class="text-center" th:if="${#lists.isEmpty(selectedStatuses)}"
                data-testid="bank-requests-nofilter" th:text="#{bank.requests.empty.noFilter}">
                 Kein Status-Filter aktiv.
@@ -86,23 +74,6 @@
                data-testid="bank-requests-empty" th:text="#{bank.requests.empty}">
                 Keine Antr&auml;ge in diesem Status.
             </p>
-            <!--/* .table-responsive (REQ-UI-009): six columns plus the expand chevron do not fit a
-                 phone, and REQ-UI-009 lets a wide TABLE scroll inside its own container — it does
-                 not let the page scroll. Without the wrapper this table widened the layout viewport
-                 to 912px on a 375px screen, which is worse than a clipped table: `position: fixed`
-                 resolves against the layout viewport, so all three confirm/reject/movement modals
-                 then centred themselves at 456px and sat almost entirely off-screen, and the header
-                 bell was pushed out with them. Measured 2026-09-13; this was the only data-table in
-                 the whole template tree without the wrapper. */-->
-            <!--/* The wrapper carries the SAME condition as the table it wraps. Every sibling
-                 gates the wrapper this way (admin/audit-log.html, admin-settings.html); an
-                 unconditional one emits a stray empty scroll container after the "Keine
-                 Anträge" paragraph on an empty queue, in a fragment that is swapped on
-                 every filter toggle. The condition is stated ONCE, here — the table inside
-                 carried a verbatim copy of it, evaluated a second time per render, and a
-                 later change relaxing one and not the other yields either a wrapper with no
-                 table or a table with no scroll container, the latter re-introducing the
-                 912px overflow this wrapper exists to fix. */-->
             <div class="table-responsive"
                  th:if="${requests != null and !#lists.isEmpty(requests.content())}">
             <table class="data-table" data-testid="bank-requests-table">
@@ -115,8 +86,6 @@
                     <th th:text="#{bank.request.col.requester}">Antragsteller</th>
                     <th th:text="#{bank.request.col.status}">Status</th>
                     <th th:text="#{bank.request.col.created}">Erstellt</th>
-                    <!--/* "Entscheidung", not "Aktionen": the cell only carries confirm/reject while the
-                         request is PENDING; on a decided request it shows who decided it. */-->
                     <th th:text="#{bank.request.col.decision}">Entscheidung</th>
                 </tr>
                 </thead>
@@ -150,12 +119,6 @@
                         <span class="chip"
                               th:classappend="${r.status() == 'REJECTED' or r.status() == 'CANCELLED'} ? ' chip--muted' : ''"
                               th:text="#{'bank.request.status.' + ${r.status()}}">Ausstehend</span>
-                        <!--/* Over-limit marker (REQ-BANK-041): flags a request that needs the
-                             responsible holder's approval; a chip once it has been granted. The
-                             ungranted marker is deliberately status-neutral ("&Uuml;ber Limit") and only
-                             warning-toned while the request is still PENDING: on a decided request the
-                             approval either happened out-of-band (employee checkbox) or is moot, so a
-                             "Freigabe n&ouml;tig" call to action would be plain wrong there. */-->
                         <span th:if="${r.requiresOwnerApproval() and r.ownerApprovalGranted()}"
                               class="chip chip--success" data-testid="bank-request-approval-granted"
                               th:text="#{bank.approvalLimit.granted}">Freigegeben</span>
@@ -182,9 +145,6 @@
                               th:text="${r.deciderHandle() != null} ? ${@handles.display(r.deciderHandle())} : '&ndash;'">&ndash;</span>
                     </td>
                 </tr>
-                <!--/* Detail sub-row (REQ-BANK-045): Begr&uuml;ndung first (more important), then Notiz;
-                     revealed by clicking the row / chevron, hidden by default. Mirrors the
-                     account-detail booking history; reuses the delegated bank.js toggle (no new JS). */-->
                 <tr class="bank-booking-detail" th:if="${hasDetail}" th:id="${detailId}" hidden
                     data-testid="bank-request-detail">
                     <td colspan="8" class="bank-booking-detail-cell">
@@ -211,7 +171,6 @@
         </div>
     </div>
 
-    <!--/* Confirm modal (records the holder; books the ledger). _id + version primed per row. */-->
     <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='bank-confirm-request-modal', titleKey='bank.request.confirm.modal.title', body=~{::bank-confirm-request-modal-body})}">
         <th:block th:ref="bank-confirm-request-modal-body">
             <form class="bank-ajax-form no-track" data-refresh="requestQueue"
@@ -220,17 +179,10 @@
                 <div class="krt-modal-body">
                     <input type="hidden" name="_id">
                     <input type="hidden" name="version">
-                    <!--/* Publish-only account ids (REQ-FE-015): primed per-row by primeModal from the
-                         confirm trigger so a confirmed booking also re-renders the affected account's
-                         detail room for its viewers. `_`-prefixed, so submitBankForm never sends them
-                         in the confirm body; _livesyncDestination stays empty for a non-transfer. */-->
                     <input type="hidden" name="_livesyncAccount">
                     <input type="hidden" name="_livesyncDestination">
                     <p class="text-muted"><span data-bank-label="reqlabel">KB-0001 &middot; Einzahlung 5.000</span></p>
 
-                    <!--/* Split deposit notice (REQ-BANK-043): shown when the request distributes a
-                         percentage across the squadron accounts, so the staffer sees what they confirm.
-                         State applied per-row by bank.js (applyConfirmModalState). */-->
                     <p class="bank-field-hint bank-split-confirm" data-split-confirm hidden
                        data-testid="bank-confirm-split">
                         <span th:text="#{bank.split.confirm.label}">Split-Einzahlung:</span>
@@ -238,19 +190,12 @@
                         <span th:text="#{bank.split.confirm.note}">des Betrags werden gleichm&auml;&szlig;ig auf alle aktiven Staffelkonten verteilt.</span>
                     </p>
 
-                    <!--/* Requester's Begründung (REQ-BANK-045): read-only context for the confirming
-                         employee, shown only when the request carries one. Primed per row by bank.js
-                         (applyConfirmModalState) from the trigger's data-field-justification. */-->
                     <p class="bank-field-hint" data-confirm-justification hidden
                        data-testid="bank-confirm-justification">
                         <span th:text="#{bank.field.justification} + ':'">Begr&uuml;ndung:</span>
                         <span data-bank-label="justification"></span>
                     </p>
 
-                    <!--/* Over-limit owner-approval gate (REQ-BANK-041): shown only when the request
-                         exceeds the requester's limit. The checkbox is pre-ticked when the responsible
-                         holder already granted approval in-app; the confirm button stays disabled until
-                         it is ticked. State applied per-row by bank.js (applyConfirmModalState). */-->
                     <div class="bank-owner-approval-warning" data-owner-approval-block hidden
                          data-testid="bank-owner-approval-block">
                         <p th:text="#{bank.approvalLimit.employeeWarning}">Dieser Antrag &uuml;berschreitet das Freigabe-Limit des Antragstellers.</p>
@@ -273,8 +218,6 @@
                         <span class="bank-field-error" data-error-for="holderId"></span>
                     </div>
 
-                    <!--/* Transfer destination holder (REQ-BANK-040): only for a TRANSFER request;
-                         disabled while hidden so it is omitted for deposit/withdrawal. */-->
                     <div class="bank-form-row" data-confirm-destination-holder hidden>
                         <label for="bank-confirm-destination-holder" th:text="#{bank.field.holder.target}">Ziel-Halter</label>
                         <select id="bank-confirm-destination-holder" name="destinationHolderId" disabled
@@ -287,11 +230,6 @@
 
                     <p class="bank-field-hint" th:text="#{bank.request.confirm.modal.hint}">Erfasse den Halter, der das Geld erhalten bzw. ausgezahlt hat.</p>
 
-                    <!--/* Notiz Bankmitarbeiter (REQ-BANK-054): the confirming employee's own note.
-                         Always optional; snapshotted on the request and copied onto the transaction
-                         the confirmation books, so it shows up in the queue, the approval tab and the
-                         booking history alike. Not primed per row — it is written here, not carried
-                         over from the request. */-->
                     <div class="bank-form-row">
                         <label for="bank-confirm-staff-note">
                             <span th:text="#{bank.field.staffNote}">Notiz Bankmitarbeiter</span>
@@ -313,7 +251,6 @@
         </th:block>
     </th:block>
 
-    <!--/* Reject modal. _id + version primed per row. */-->
     <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='bank-reject-request-modal', titleKey='bank.request.reject.modal.title', body=~{::bank-reject-request-modal-body})}">
         <th:block th:ref="bank-reject-request-modal-body">
             <form class="bank-ajax-form no-track" data-refresh="requestQueue"
@@ -341,12 +278,6 @@
         </th:block>
     </th:block>
 
-    <!--/* Direct-booking movement modal (REQ-BANK-017/-023, #997): outside the swapped requestQueue
-         fragment, with a source-account selector; a successful booking re-renders the queue in place
-         (unchanged, since a direct booking is not a request) and shows the saved toast. */-->
-    <!--/* th:if must NOT share an element with th:replace: th:replace (attribute precedence 1) runs
-         BEFORE th:if (3), so a same-element guard is dead and the modal renders even when canBook is
-         false. The condition gates an outer th:block, mirroring the correctly-gated CTA button above. */-->
     <th:block th:if="${canBook}">
         <th:block th:replace="~{fragments/bank-movement-modal :: movementModal('bank-movement-modal', 'requestQueue', null, true, false, true, true, true)}"></th:block>
     </th:block>

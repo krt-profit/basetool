@@ -144,8 +144,6 @@ public class ClientIpContextFilter extends OncePerRequestFilter {
       throws ServletException, IOException {
     String peer = request.getRemoteAddr();
     String resolved = resolveClientIp(peer, forwardedForChain(request), trustedProxyMatchers);
-    // The Servlet API treats setAttribute(name, null) as removeAttribute, which would break the
-    // "always set" contract above for a peer-less request; skip instead of publishing a hole.
     if (resolved != null) {
       request.setAttribute(CLIENT_IP_ATTRIBUTE, resolved);
       request.setAttribute(CLIENT_IP_FORWARDED_ATTRIBUTE, !resolved.equals(peer));
@@ -203,8 +201,6 @@ public class ClientIpContextFilter extends OncePerRequestFilter {
     if (remoteAddr == null) {
       return null;
     }
-    // A direct connection can never influence attribution: its header is not trusted, so the peer
-    // wins. This is the branch that protects a container reached around the proxy.
     if (xffHeader == null || xffHeader.isBlank() || !isTrusted(remoteAddr, trustedProxies)) {
       return remoteAddr;
     }
@@ -215,7 +211,6 @@ public class ClientIpContextFilter extends OncePerRequestFilter {
         return candidate;
       }
     }
-    // Every hop was itself a trusted proxy, so the chain carries no client address.
     return remoteAddr;
   }
 
@@ -230,10 +225,6 @@ public class ClientIpContextFilter extends OncePerRequestFilter {
    */
   private static boolean isTrusted(
       @NotNull String ip, @NotNull List<IpAddressMatcher> trustedProxies) {
-    // Cheap shape check first. Without it a non-IP hop costs one IllegalArgumentException per
-    // configured matcher per request — Spring Security's parser builds the message and fills in a
-    // stack trace before it even attempts to parse — and a token like "unknown" is a value some
-    // proxies emit routinely rather than an anomaly.
     if (!looksLikeIpLiteral(ip)) {
       return false;
     }
@@ -242,8 +233,7 @@ public class ClientIpContextFilter extends OncePerRequestFilter {
         if (matcher.matches(ip)) {
           return true;
         }
-      } catch (IllegalArgumentException ex) {
-        // Unparseable candidate: it cannot be one of our proxies, so it stays untrusted.
+      } catch (IllegalArgumentException ignored) {
       }
     }
     return false;
@@ -292,7 +282,6 @@ public class ClientIpContextFilter extends OncePerRequestFilter {
     }
     List<IpAddressMatcher> matchers = new ArrayList<>(entries.size());
     for (String entry : entries) {
-      // "*" is rejected on purpose: blanket trust lets any client spoof the header.
       if (entry == null || entry.isBlank() || "*".equals(entry)) {
         continue;
       }

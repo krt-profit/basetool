@@ -123,8 +123,6 @@ public final class FrontendPageRoutes {
           "/promotion/admin/topics",
           "/promotion/admin/rank-requirements",
           "/admin/audit-log",
-          // The two data-protection admin pages (REQ-SEC-060, REQ-SEC-061). Both render the
-          // app shell and both carry the 44px touch floor, so both belong in the sweeps.
           "/admin/deletion-requests",
           "/admin/person-search",
           "/admin/bank",
@@ -150,33 +148,12 @@ public final class FrontendPageRoutes {
           "/admin/special-commands",
           "/admin/uex-data",
           "/organisation/leitung",
-          // Measured with an APPROVED session, which this route redirects away from — so the
-          // REDIRECT CHECK in the touch sweep's `measure()` skips it and says so. Corrected
-          // 2026-09-13: this entry used to claim the route "cancels out of the coverage
-          // comparison", and it did not. `PendingApprovalPageController` answers `redirect:/`, the
-          // browser landed on the dashboard, the shell check passed, and the route was counted as
-          // MEASURED while every device class measured the dashboard twice.
-          //
-          // It is listed anyway, and the escape hatch is real rather than decorative now: the day
-          // it stops redirecting, it is a page like any other and gets measured. It is also one of
-          // the two non-error templates with no `fragments/sidebar`, so it has no `.krt-footer` and
-          // could not satisfy the phone-class footer contract even if it did render.
           "/pending-approval",
-          // The PAGE. Its JSON polling endpoint `/admin/p4k-import/jobs` is in NOT_PAGES, where the
-          // first sweep put it by reporting a route with no footer at all.
           "/admin/p4k-import",
           "/impressum",
-          // The third-party licence notice (REQ-UI-021): a long public page with the app shell.
           "/licenses",
-          // The Android App Link's fallback page (REQ-SEC-038), reached when the link did not
-          // resolve to the app. A real page with the app shell, and worth sweeping: the member who
-          // sees it is on a phone mid-login, which is exactly the class the touch sweep measures.
           "/app/link-help",
           "/privacy",
-          // The terms gate itself. Like `/pending-approval` it is measured with a session that has
-          // already accepted, so it redirects and skips — and, like it, it is a page again on the
-          // day it stops. It was in NONE of the three lists before they were folded into this one;
-          // the gate below found it on its first run.
           "/terms/accept",
           "/terms");
 
@@ -195,24 +172,12 @@ public final class FrontendPageRoutes {
    */
   public static final @Unmodifiable List<String> NOT_PAGES =
       List.of(
-          // A redirect, and deliberately nothing else. `/app/callback` is the Android App Link
-          // (REQ-SEC-038); the browser only reaches it when the link did not resolve to the app,
-          // and it answers 303 to `/app/link-help` so the OAuth authorization code in the query
-          // leaves the address bar instead of being rendered into a page. Sweeping it as a page
-          // would measure the page it redirects to, twice, and say nothing about this route.
           "/app/callback",
-          // HTML fragments: a view name, rendered without the app shell, swapped into a page by
-          // `krtFetch`. Indistinguishable from a page by return type, which is why neither list is
-          // derived from one.
-          // The member's erasure-request card, swapped into /profile after a raise or a withdrawal
-          // (REQ-SEC-061). A fragment, not a page: the same route also answers POST and DELETE,
-          // which the sweeps would not exercise anyway.
           "/profile/deletion-request",
           "/inventory/all/stack/entries",
           "/inventory/all/game-item-stack/entries",
           "/inventory/my/stack/entries",
           "/inventory/my/game-item-stack/entries",
-          // JSON read models behind a page: combobox searches, poll endpoints, grid data.
           "/admin/default-blueprints/search",
           "/admin/p4k-import/jobs",
           "/blueprint-overview/owners",
@@ -236,7 +201,6 @@ public final class FrontendPageRoutes {
           "/personal-inventory/uex-search",
           "/users/search",
           "/users/search-bank",
-          // The live-sync channel. A navigation to it would never finish loading.
           "/notifications/stream");
 
   /**

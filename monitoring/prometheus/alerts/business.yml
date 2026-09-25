@@ -1,10 +1,6 @@
-# Business-metric alerts (basetool_*, REQ-OBS-011). Metric names are the exact rendered names
-# from the shipped Phase-1c code (metrics/MetricNames.java in each module) — DO NOT rename a metric
-# without updating these rules in the same PR (the "monitoring moves with the change" rule).
 groups:
   - name: business-critical
     rules:
-      # The ledger broke an invariant — data corruption. Any category > 0 is critical.
       - alert: BankLedgerIntegrityViolation
         expr: basetool_bank_ledger_integrity_violations > 0
         for: 0m
@@ -14,17 +10,6 @@ groups:
           summary: "Bank ledger integrity violation: {{ $labels.category }}"
           description: "The hourly integrity sweep found {{ $value }} rows in category '{{ $labels.category }}'. A bank ledger invariant is broken — investigate before any further bank mutation."
 
-      # ADR-0142 point 5 / #1639: a login presented a subject no account carries while another
-      # account holds the same callsign. Until that release the login silently ADOPTED that account
-      # -- the caller then acted as someone else, and the case had no signal at all. Now a new
-      # PENDING registration is created instead and the admin queue marks it, so this alert is the
-      # second pair of eyes rather than the only one.
-      #
-      # Warning, not critical: nothing is broken, and a single occurrence has a benign reading (a
-      # member re-provisioned in Keycloak). What it must not do is stay invisible -- a Keycloak
-      # username is reusable after a deletion, so a repeated collision on one callsign is how a
-      # recreated account would end up claiming a departed member's identity. Threshold is
-      # deliberately low: the counter is normally flat zero.
       - alert: UserCallsignCollision
         expr: increase(basetool_user_callsign_collisions_total[1h]) > 0
         for: 5m
@@ -34,14 +19,6 @@ groups:
           summary: "Callsign collision at login: {{ $value }} in the last hour"
           description: "A login presented an unknown subject while another account holds the same callsign, so a NEW pending registration was created and nothing was inherited. Check the admin registration queue: the affected row carries the duplicate-callsign marker, and the remedy is an explicit merge, never an approval that leaves two accounts for one member. The backend log names both account ids (never the callsign itself)."
 
-      # #1825: one user's reconciliation threw during a Keycloak sync run. The batch swallows it so
-      # a single bad row cannot abort the roster -- correct, and it left the condition with no signal
-      # beyond a log line nobody watches. A user that never reconciles keeps whatever roles the local
-      # row last carried, which is access-control-relevant (REQ-OBS-011).
-      #
-      # Warning on a 1h window rather than critical: one transient failure self-heals on the next
-      # run. What must not stay invisible is a failure that repeats, because that one never self-
-      # heals -- the same row throws every time, and the account silently stops tracking Keycloak.
       - alert: UserSyncPerUserFailure
         expr: increase(basetool_user_sync_failures_total[1h]) > 0
         for: 5m
@@ -51,14 +28,6 @@ groups:
           summary: "User sync could not reconcile {{ $value }} account(s) in the last hour"
           description: "One or more users threw during the Keycloak->local reconciliation and were skipped. They keep the roles their local row last carried until a later run succeeds, and any Keycloak-side change to them has not landed. The backend log names the account id and the cause (never a handle); a repeating id is a permanent failure, not a hiccup. A duplicate Discord identity is the known cause -- check UserDiscordLinkCollision alongside this."
 
-      # #1826: a reconciliation wanted to write a Discord snowflake that a DIFFERENT app_user row
-      # already holds. The write is skipped rather than left to fail the unique constraint, because
-      # failing it took the whole per-user reconciliation down with it (see UserSyncPerUserFailure).
-      #
-      # This is a state, not an event: it stays non-zero on every run until a human consolidates the
-      # two accounts, which is the intent. Warning -- nothing is corrupted and no access is widened,
-      # but one member is split across two accounts and the Discord indicator on the surviving one
-      # stays empty until it is resolved.
       - alert: UserDiscordLinkCollision
         expr: increase(basetool_user_discord_link_collisions_total[1h]) > 0
         for: 5m
@@ -68,11 +37,6 @@ groups:
           summary: "Discord identity held by two accounts: {{ $value }} skipped link write(s) in the last hour"
           description: "One Discord identity is reachable from two app_user rows, so the link could not be written to the second. One member has two accounts -- consolidate them from the member administration (the duplicate folds into the survivor, belongings and Discord identity move, the duplicate is removed). The alert repeats every run until then. The backend log names both account ids, never the snowflake."
 
-      # REQ-ORDERS-033: an ordered-item line's blueprint no longer produces the ordered item, so the
-      # order is showing a FOREIGN recipe's materials as its demand. People collect and book against
-      # those numbers, so this is wrong-data-in-production, not a cosmetic drift. Warning rather than
-      # critical: nothing is corrupted (the write path stays consistent), but every affected order
-      # misleads until it is re-saved.
       - alert: JobOrderItemBlueprintDrift
         expr: basetool_job_order_integrity_violations > 0
         for: 15m
@@ -84,50 +48,6 @@ groups:
 
   - name: business-warning
     rules:
-      # NOTE (#1041 item 23): the backend tags basetool_scheduled_job_* with a `task` label
-      # (ScheduledJob.label()). It was formerly `job`, which COLLIDED with Prometheus's own scrape
-      # `job` label (basetool-backend) — on collision Prometheus keeps the scrape value and renames
-      # the app tag to `exported_job`, so these alerts had to match the awkward `exported_job` and
-      # one silently never fired when it matched plain `job`. TAG_JOB was renamed to `task` to
-      # sidestep the reserved name, so match on `task`. The 180d history splits at the rename (old
-      # series carry `exported_job`, new ones `task`) — a Grafana annotation marks the cutover.
-      #
-      # NEVER-SUCCEEDED SENTINEL GUARD (2026-08-10): every rule below reads the last-success gauge
-      # through `(… > 0)` rather than bare. All six compute `time() - gauge`, so a gauge value of 0
-      # means "last succeeded 1970-01-01" — an age of ~1.79e9 s, above EVERY threshold in this file.
-      # TaskMetrics registered the gauge with a 0 sentinel when a run STARTED and only wrote the real
-      # timestamp when it finished, and the holder is per-process, so each job's first run after a
-      # backend restart published 0 for its whole duration. The prod SC-Wiki sweep runs ~10-15 min
-      # (sync-all-items), which outlasts ExternalSyncStale's `for: 10m` — so that alert fired on
-      # every restart and self-resolved when the sweep finished (the 2026-08-10 05:27→05:32 CEST
-      # pair). TaskMetrics now registers the gauge on the first SUCCESS, seeded with that timestamp,
-      # so the sentinel no longer exists; this guard is defence in depth (rules reload without a
-      # backend deploy, and it immunises the six rules against a re-introduced sentinel).
-      # The filter goes INSIDE the subtraction — `time() - (gauge > 0)` — so the guard is part of the
-      # same selector rather than a second copy of it joined back on. An `… and gauge > 0` rewrite is
-      # equivalent today (set-operator matching ignores __name__, so the name-dropped left side still
-      # matches the right), but it duplicates the selector and would need an explicit `on (task)` the
-      # moment the two sides' label sets diverge. Both shapes are covered by
-      # tests/staleness_never_succeeded_sentinel_test.yml.
-      #
-      # Role drift vs. Keycloak: the user sync last succeeded too long ago. The sync now runs once
-      # per day at 05:00 (app.keycloak.sync.cron default `0 0 5 * * *` in app.keycloak.sync.zone,
-      # moved off the pre-2026-07 1-minute cadence that fed the native-thread exhaustion incident).
-      # Normal max staleness right before the next 05:00 run is ~24h, so the 26h threshold fires ~2h
-      # after a missed daily run — a single blip past the window is worth a warning for a daily
-      # safety-net job — while never tripping on the ordinary 24h cycle. An admin-triggered "Sync
-      # now" (POST /api/v1/users/sync) refreshes the same last-success gauge, so a manual run also
-      # clears this alert.
-      # The `or absent(...)` companion (#1707, 2026-08-29): the last-success gauge is registered
-      # LAZILY, on a job's first success, and lives in the backend process — so a job that fails on
-      # EVERY run since the last restart publishes no series at all, `time() - gauge` has nothing to
-      # evaluate, and this alert stayed silent on exactly the failure it exists for. The companion is
-      # gated on backend uptime exceeding this rule's own window, AND on the job's bean existing:
-      # a bare one would fire after every deploy, since (unlike the textfile metrics behind the
-      # ops-automation alerts) this gauge does not survive a restart. Written per task, never once
-      # over an alternation — absent() is 1 only when the selector matches NOTHING, so a combined
-      # guard would stay false while one of two tasks was dead. Pinned by
-      # tests/scheduled_job_never_succeeded_test.yml.
       - alert: UserSyncStale
         expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="user_sync"} > 0)) > 93600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="user_sync"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="user_sync"} == 1))
         for: 10m
@@ -137,12 +57,6 @@ groups:
           summary: "User sync stale >26h"
           description: "The Keycloak user sync last succeeded more than 26 hours ago (daily 05:00 cadence, so the last run was missed) — local roles/accounts may drift from Keycloak. Trigger 'Sync now' on the member-management page or check the scheduler/Keycloak."
 
-      # Both catalogue syncs run on a ~24h fixedDelay, so a genuine firing means at least two
-      # consecutive runs produced no success. Triage note: a fire that RESOLVES on its own within
-      # minutes is not staleness at all — it is the never-succeeded sentinel above (check
-      # `changes(process_start_time_seconds[1h])` for a restart, and whether the fire lands one
-      # `krt.scwiki.scheduler-initial-delay` after it). A real one stays up until someone acts.
-      # Carries the never-succeeded `or absent(...)` companion — see UserSyncStale for why.
       - alert: ExternalSyncStale
         expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task=~"uex_sync|scwiki_sync"} > 0)) > 172800 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="uex_sync"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 172800 and on() (basetool_scheduled_job_enabled{task="uex_sync"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="scwiki_sync"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 172800 and on() (basetool_scheduled_job_enabled{task="scwiki_sync"} == 1))
         for: 10m
@@ -152,22 +66,6 @@ groups:
           summary: "External sync stale >48h ({{ $labels.task }})"
           description: "The {{ $labels.task }} catalogue sync last succeeded more than 48 hours ago."
 
-      # (#1041 item 2) Swallowed upstream failures. Every UEX/SC-Wiki fetch/parse error is mapped to an
-      # empty list, so the sync job still "succeeds" and last_success stays fresh — ExternalSyncStale /
-      # ScheduledJobFailureStreak never fire during a weeks-long catalogue outage. This counts the
-      # swallowed failures directly (basetool_external_fetch_errors_total{source}).
-      # baseline-tune: >3 errors in 6h is the issue's initial threshold.
-      #
-      # The healthy baseline for every source is a flat 0 — the threshold buys tolerance for a
-      # transient blip, NOT headroom for a standing per-run error count. Until 2026-08-03 the uex
-      # series sat at 2 per backend process because UexClient counted UEX's empty result set
-      # (`{"status":"ok","http_code":200,"data":null}`, returned for the two permanently empty item
-      # categories 12/69) as a fetch error. Two per run is under the threshold on its own, but the
-      # counter resets on every backend restart and increase() adds the pre-reset segment back, so
-      # two restarts inside the 6h window summed to 4 and fired this alert with no upstream fault
-      # behind it. When triaging, first check whether the errors are a per-run baseline
-      # (resets(...[6h]) vs changes(process_start_time_seconds[6h])): a fixed count repeating every
-      # run points at the client, a burst that does not track the sync cadence points at upstream.
       - alert: ExternalFetchErrors
         expr: sum by (source) (increase(basetool_external_fetch_errors_total[6h])) > 3
         for: 30m
@@ -177,13 +75,6 @@ groups:
           summary: "External fetch errors ({{ $labels.source }})"
           description: "The {{ $labels.source }} client swallowed more than 3 fetch/parse errors in 6 hours — the catalogue sync may be silently importing nothing while still recording a success. Check the upstream API and the sync logs."
 
-      # (logging audit) The Keycloak roster fetch (KeycloakService.fetchUsers) swallows any Admin-API
-      # failure into an empty list, so UserSyncService records outcome=success with 0 users and
-      # UserSyncStale / UserSyncZeroItems stay quiet — a Keycloak outage is indistinguishable from a
-      # legitimately empty roster. basetool_keycloak_sync_fetch_failures_total is the distinct signal;
-      # a stalled sync is access-control-relevant (departed users keep their local roles). The series
-      # is absent until the first failure, so this cannot fire before one occurs.
-      # baseline-tune: any failure in 6h (the sync runs daily plus manual "Sync now").
       - alert: KeycloakSyncFetchFailing
         expr: sum(increase(basetool_keycloak_sync_fetch_failures_total[6h])) > 0
         for: 30m
@@ -193,37 +84,6 @@ groups:
           summary: "Keycloak user-sync roster fetch failing"
           description: "The Keycloak Admin-API roster fetch threw and was swallowed into an empty roster in the last 6h — the user sync is recording success with zero users while local roles drift from Keycloak (departed users keep access). Check Keycloak reachability and the backend sync logs."
 
-      # (#1041 item 2) Zero-item catalogue outage. An upstream that returns empty 200s processes NO
-      # rows, yet the sweep still "succeeds" and last_success stays fresh — so ExternalSyncStale never
-      # fires and ExternalFetchErrors stays quiet (an empty 200 is not a fetch error). basetool_
-      # scheduled_job_items_total is populated from the same per-run tallies as the sync-report
-      # summary (UexItemSyncService upserts / the five SC-Wiki step counts). A 48h flatline at zero
-      # while the job keeps succeeding means the catalogue is silently importing nothing.
-      #
-      # Restart-robust guard (2026-07-17): the second leg is `increase(...executions_total{
-      # outcome="success"}[48h]) > 0`, NOT the earlier `(time() - last_success) < 172800`. The items
-      # counter is registered lazily (its 0->N birth is never scraped) and resets to 0 on every backend
-      # restart, so across restarts more frequent than the 24h sync cadence Prometheus sees a
-      # permanently-flat items series and `increase(items[48h])` reads 0 even when every run healthily
-      # upserts thousands of rows — while the startup run keeps last_success fresh, so the old
-      # last-success leg tripped and SyncZeroItems false-fired continuously (uex_sync + scwiki_sync, the
-      # 2026-07-15..17 storm; the syncs were healthy — UEX upserted ~7499 rows/run). executions_total{
-      # outcome="success"} shares the items counter's exact lazy-registration + per-restart-reset
-      # behaviour, so whenever that artifact drives increase(items) to a false 0 the executions increase
-      # is ALSO 0 and the alert is correctly suppressed; a genuine empty-200 outage on a STABLE backend
-      # leaves items flat at 0 while executions_success visibly climbs, so the alert still fires. Same
-      # robust shape as UserSyncZeroItems below. The `and on (task)` guard matches the two series solely
-      # on the job name (their __name__/instance labels differ).
-      #
-      # 304 carve-out (#1182): a HEALTHY unchanged catalogue is NOT a zero-item run. Both catalogue
-      # clients (UexClient / ScWikiClient) do conditional GETs (ETag/If-None-Match), so an unchanged
-      # catalogue returns 304 for every category/endpoint and upserts nothing; uex_sync
-      # (UexItemSyncService) and each scwiki_sync step therefore report their live row count
-      # (countLiveUexItems / countLiveScwiki*) instead of 0 when nothing was upserted but at least one
-      # fetch came back 304. Only a genuine empty-200 (no 304 at all) reads as 0 here — so this alert
-      # firing means the upstream is really serving empty item responses, not that the catalogue is
-      # simply unchanged. Check the upstream feed and the sync-report admin page.
-      # baseline-tune: 48h zero-items window is the issue's initial threshold (daily sync cadence).
       - alert: SyncZeroItems
         expr: |
           increase(basetool_scheduled_job_items_total{task=~"uex_sync|scwiki_sync"}[48h]) == 0
@@ -236,12 +96,6 @@ groups:
           summary: "Catalogue sync importing zero items ({{ $labels.task }})"
           description: "The {{ $labels.task }} sync has recorded successful runs in 48h but processed zero items — the upstream catalogue is likely returning empty responses. Check the upstream API and the sync-report admin page."
 
-      # (logging audit) A single SC-Wiki sync step (ScWikiScheduler.runStep) can throw and be swallowed
-      # so the other steps still run: the umbrella scwiki_sync job then records outcome=success with a
-      # non-zero item tally, so ScheduledJobFailureStreak / SyncZeroItems / ExternalSyncStale never
-      # fire for a persistently-failing single step. basetool_scheduled_job_step_failures_total{step}
-      # counts it (step = commodity/vehicle/item/blueprint/manufacturer, a bounded literal).
-      # baseline-tune: >=2 failures of the same step in 48h = two consecutive daily runs = persistent.
       - alert: ScWikiStepFailing
         expr: sum by (step) (increase(basetool_scheduled_job_step_failures_total{task="scwiki_sync"}[48h])) > 1
         for: 1h
@@ -251,60 +105,6 @@ groups:
           summary: "SC-Wiki sync step failing ({{ $labels.step }})"
           description: "The {{ $labels.step }} step of the daily SC-Wiki sync has failed on at least two runs in 48h while the umbrella job keeps recording success — that catalogue slice is silently importing nothing. Check the SC-Wiki upstream and the backend sync logs."
 
-      # (PR #1472, review finding 6a) The SC-Wiki tombstone sweep has stood down on every run for
-      # three days. ScWikiClient marks a page walk INCOMPLETE whenever it cannot vouch for the census
-      # — a page failed mid-walk, meta.last_page went absent while page 1 came back full, the same
-      # row arrived on two pages, the DISTINCT row count fell short of meta.total, or the feed
-      # announced more pages by the end of the walk than page 1 did — and ScWikiOrphanSweep then
-      # refuses to tombstone. That refusal is correct: sweeping a half-walked feed soft-deletes every
-      # row that was merely never fetched. But it degrades SILENTLY: `complete` false on EVERY run
-      # means orphan detection is off indefinitely while scwiki_sync keeps recording success with a
-      # healthy item tally — ExternalSyncStale, SyncZeroItems and ScWikiStepFailing all stay quiet,
-      # and the only trace is a WARN line per run.
-      #
-      # This is not hypothetical: it is what the alert caught in 2026-08. The census criterion was
-      # "merged row count == meta.total", and /api/items serves 12331 duplicate-free rows across the
-      # 62 pages it announces while its own meta.total says 12283 — so every nightly run was
-      # INCOMPLETE, the sweep never ran, and this rule fired daily on a defect in the CHECK rather
-      # than in the feed (REQ-DATA-014, ADR-0147). A surplus over meta.total is no longer a census
-      # failure; a repeated row now is.
-      #
-      # There IS now a direct metric for "the sweep stood down" —
-      # basetool_catalogue_orphan_sweep_skipped_total{sweep,reason}, added 2026-09-02 — and
-      # ScWikiOrphanSweepStandingDown below reads it. This rule is kept as written because the proxy
-      # it uses covers a wider set of walks (every kind pass, including the ones that feed no sweep)
-      # and has three days of history behind its tuning. The paragraph below described the gap that
-      # metric closed; it is left in place because the proxy's reasoning still stands.
-      #
-      # The closest faithful proxy is basetool_external_fetch_errors_total{source="scwiki"}: every branch
-      # that makes a walk incomplete increments it — once per fetch, since the FetchErrorLatch
-      # collapses the several symptoms one broken walk can show at the same time into a single
-      # increment — so a run whose census was incomplete always contributes at least one. (The
-      # converse is a superset: a failed fetch on a pass that feeds no sweep counts here too, which
-      # is the safe direction for a "your orphan detection may be off" warning.)
-      #
-      # The distinguishing feature of this mode is PERSISTENCE across runs, not volume, so the rule
-      # checks three CONSECUTIVE daily windows instead of a total: one error in each of the last
-      # three 24h windows means the daily sync came back incomplete on three runs running. A total
-      # over 72h would equally match three errors inside one bad afternoon, which is the transient
-      # ExternalFetchErrors (>3 in 6h) already covers. Both firing together is an ordinary multi-day
-      # upstream outage; this one firing alone is the silent-degradation case. The counter is
-      # registered lazily on the first error, so all three legs are absent (not zero) until one
-      # occurs and the rule cannot fire on a healthy deployment.
-      # (2026-09-22, ADR-0195) What this rule MEANS narrowed, while its expression stayed put. The
-      # sweep no longer stands down just because a kind pass could not vouch for its own census: a
-      # complete residual /api/items census vouches for the kind passes it contains, because the
-      # kind endpoints are filtered views over the very pool it enumerates. So "incomplete walk"
-      # and "sweep stood down" are now two different states and this rule only ever saw the first;
-      # ScWikiOrphanSweepStandingDown below is the one that means orphan detection stopped.
-      #
-      # The expression is deliberately unchanged: an incomplete walk is still an upstream contract
-      # problem worth knowing about, whatever the sweep then does. But it now has a KNOWN PERMANENT
-      # FLOOR — /api/vehicle-items ties on a non-unique sort key and is incomplete on every run,
-      # measured, with every client-side remedy tried and rejected in ADR-0195 — so this rule is
-      # expected to be firing continuously until upstream fixes its paginator. Retuning or routing
-      # it is a separate decision that has not been taken; do not silence it by weakening the
-      # census, which is the one thing that would hide a real drift.
       - alert: ScWikiCensusIncompleteStreak
         expr: |
           sum(increase(basetool_external_fetch_errors_total{source="scwiki"}[24h])) > 0
@@ -319,20 +119,6 @@ groups:
           summary: "SC-Wiki page walk incomplete on three consecutive days"
           description: "Every one of the last three daily SC-Wiki syncs recorded a fetch/census error, so at least one page walk was flagged INCOMPLETE. This does NOT by itself mean the scwiki_deleted sweep stood down: since ADR-0195 a complete residual /api/items census vouches for the kind passes it contains, so an incomplete kind walk can fire this alert while the sweep still runs — ScWikiOrphanSweepStandingDown is the alert that means orphan detection actually stopped. KNOWN STANDING CAUSE: /api/vehicle-items orders on a non-unique key, so rows tie across a page boundary and that walk is incomplete on every single run, with no client-side fix available (sort= is not applied to the paginated query, page[size] is capped at 200, and unioning walks at two page sizes still falls short — all re-measured 2026-09-22, see ADR-0195). Until upstream gives its paginator a unique tiebreaker this alert has a permanent floor; treat a change in WHICH endpoint fails as the signal. Grep the backend log for 'INCOMPLETE' to see which walk it was: a genuinely broken upstream also trips ExternalFetchErrors, whereas this alert alone points at a pagination-contract drift (rows repeating across pages, the distinct rows falling short of meta.total, meta.last_page renamed, or the announced page count growing mid-walk). A SURPLUS over meta.total is deliberately not a census failure (ADR-0147), so it is never what is firing this."
 
-      # (2026-09-02 log triage) The direct reading of the same failure. Where
-      # ScWikiCensusIncompleteStreak infers a standing-down sweep from fetch errors, this counts the
-      # stand-down itself, at the branch that performs it.
-      #
-      # The reason filter is the whole rule. A stand-down is NOT by itself a fault: an all-304 run is
-      # a fully-cached healthy night and stands the sweep down too, which is why the counter carries
-      # `reason` and why an untagged version of it would be non-zero on every healthy deployment and
-      # could not carry an alert at all. Only reason="incomplete" means a walk could not vouch for its
-      # census; reason="no_rows" is the total-outage shape, already covered by SyncZeroItems and
-      # ExternalSyncStale. The counter is registered lazily per reason, so on a healthy deployment
-      # this series is ABSENT rather than zero and the rule cannot false-fire.
-      #
-      # baseline-tune: three incomplete runs inside 72h. The sync runs daily, so that is "three runs
-      # in a row" without depending on the scrape landing inside any particular window.
       - alert: ScWikiOrphanSweepStandingDown
         expr: sum(increase(basetool_catalogue_orphan_sweep_skipped_total{reason="incomplete"}[72h])) >= 3
         for: 1h
@@ -342,20 +128,6 @@ groups:
           summary: "SC-Wiki orphan sweep has stood down on three incomplete runs in 72h"
           description: "The cross-kind scwiki_deleted sweep refused to run on at least three syncs in 72h because the census could not be vouched for. The refusal is correct — sweeping a half-walked feed would soft-delete every row that was merely never fetched — but rows the Wiki has actually dropped are not being tombstoned while the sync keeps reporting success. Since ADR-0195 an incomplete KIND pass alone no longer causes this: it fires only when the residual /api/items pass could not vouch for its own census, or when a kind pass was served a row that residual census does not contain (logged as 'the kind endpoints are not a subset of the item pool after all'). Both are new upstream shapes rather than the long-standing /api/vehicle-items tie — so unlike ScWikiCensusIncompleteStreak, this one firing is always worth reading. Grep the backend log for 'Skipping cross-kind orphan sweep (reason=incomplete' and the census WARNs above it. reason=not_modified is a healthy fully-cached run and is deliberately not matched here."
 
-      # (#1041 item 3) All-jobs staleness. UserSyncStale/ExternalSyncStale covered only user_sync and
-      # the two catalogue syncs; the daily notification-retention purge and the hourly default-
-      # blueprint back-fill had no staleness guard. The daily rejected-registration purge
-      # (REQ-SEC-057) joined them: a retention sweep that silently stops running is exactly the
-      # failure nobody notices from the outside, because its whole job is that nothing is left over.
-      # Carries the never-succeeded `or absent(...)` companion — see UserSyncStale for why.
-      # This comment used to claim that a config-gated-off job "cannot report a false stale
-      # (deliberate, per the issue)". That stopped being true the moment the companion was added
-      # (2026-08-29): a bean @ConditionalOnProperty never created publishes no last-success gauge,
-      # which is exactly the state absent() fires on. Following .env.example's own instruction to
-      # disable a retention sweep before its first irreversible run therefore raised a PERMANENT
-      # warning from 26h of uptime onwards. The `basetool_scheduled_job_enabled` leg (2026-09-17)
-      # is what makes the claim true again: the job publishes 1 while it is configured to run, so
-      # absent-and-enabled means "never ran" and absent-and-not-enabled means "switched off".
       - alert: ScheduledJobStale
         expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task=~"notification_retention|default_blueprint_provisioning|rejected_registration_retention|audit_retention"} > 0)) > 93600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="notification_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="notification_retention"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="default_blueprint_provisioning"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="default_blueprint_provisioning"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="rejected_registration_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="rejected_registration_retention"} == 1)) or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="audit_retention"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 93600 and on() (basetool_scheduled_job_enabled{task="audit_retention"} == 1))
         for: 10m
@@ -365,12 +137,6 @@ groups:
           summary: "Scheduled job stale >26h ({{ $labels.task }})"
           description: "The {{ $labels.task }} job last succeeded more than 26 hours ago — it may have stopped being scheduled."
 
-      # (#1041 item 3) The worst false silence in the stack: if the hourly bank ledger-integrity sweep
-      # stops running, basetool_bank_ledger_integrity_violations FREEZES at its last value and
-      # BankLedgerIntegrityViolation (critical) can never fire — a broken bank invariant would go
-      # undetected. Tighter 6h window (the sweep is hourly) and critical, matching the severity of the
-      # invariant it guards.
-      # Carries the never-succeeded `or absent(...)` companion — see UserSyncStale for why.
       - alert: BankLedgerIntegritySweepStale
         expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="bank_ledger_integrity"} > 0)) > 21600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="bank_ledger_integrity"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 21600 and on() (basetool_scheduled_job_enabled{task="bank_ledger_integrity"} == 1))
         for: 10m
@@ -380,10 +146,6 @@ groups:
           summary: "Bank ledger-integrity sweep stale >6h"
           description: "The hourly bank ledger-integrity sweep last succeeded more than 6 hours ago. While it is stale the violations gauge is frozen and BankLedgerIntegrityViolation cannot fire — the data-corruption detector is blind. Restore the sweep before trusting a 'no violations' reading."
 
-      # Same false-silence trap as the bank sweep (REQ-ORDERS-033): a stale job-order integrity sweep
-      # freezes basetool_job_order_integrity_violations, so JobOrderItemBlueprintDrift can never fire
-      # and a "0 drifted lines" reading means nothing. Warning, matching the alert it guards.
-      # Carries the never-succeeded `or absent(...)` companion — see UserSyncStale for why.
       - alert: JobOrderIntegritySweepStale
         expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="job_order_integrity"} > 0)) > 21600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="job_order_integrity"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 21600 and on() (basetool_scheduled_job_enabled{task="job_order_integrity"} == 1))
         for: 10m
@@ -393,10 +155,6 @@ groups:
           summary: "Job-order integrity sweep stale >6h"
           description: "The hourly job-order integrity sweep last succeeded more than 6 hours ago. While it is stale the violations gauge is frozen and JobOrderItemBlueprintDrift cannot fire — a blueprint re-point would go undetected. Restore the sweep before trusting a 'no drift' reading."
 
-      # (#1041 item 3) BusinessMetricsCollector.refresh() (every 60s) feeds every approval/work-queue
-      # depth gauge. If it wedges, the gauges FREEZE and the *ApprovalOverdue alerts silently consume
-      # stale numbers. A last-success age > 10 min means ~10 missed samples — the sampler is stuck.
-      # Carries the never-succeeded `or absent(...)` companion — see UserSyncStale for why.
       - alert: BusinessMetricsStale
         expr: (time() - (basetool_scheduled_job_last_success_timestamp_seconds{task="business_metrics"} > 0)) > 600 or (absent(basetool_scheduled_job_last_success_timestamp_seconds{task="business_metrics"}) and on() (time() - max(process_start_time_seconds{job="basetool-backend"})) > 600 and on() (basetool_scheduled_job_enabled{task="business_metrics"} == 1))
         for: 5m
@@ -406,13 +164,6 @@ groups:
           summary: "Business-metrics sampler stale >10min"
           description: "BusinessMetricsCollector.refresh() has not completed successfully in over 10 minutes — the approval/work-queue depth gauges are frozen and the queue-overdue alerts may be evaluating stale values. Check the backend logs for the sampler's failure."
 
-      # (#1041 item 3) Success-with-zero-work detector. A run that returns successfully but synced zero
-      # users (Keycloak returned an empty roster) leaves last_success fresh, so UserSyncStale never
-      # fires. Zero items while successful runs happened is the tell. The window is [26h] because the
-      # sync now runs once per day at 05:00 (app.keycloak.sync.cron): a shorter window would usually
-      # contain zero runs, so the `executions > 0` precondition would rarely hold and the detector
-      # would miss the empty-roster case. [26h] reliably spans exactly one daily run plus margin. The
-      # `and on (task)` matches the two series on the job name only.
       - alert: UserSyncZeroItems
         expr: |
           increase(basetool_scheduled_job_items_total{task="user_sync"}[26h]) == 0
@@ -434,7 +185,6 @@ groups:
           summary: "Scheduled job failing repeatedly ({{ $labels.task }})"
           description: "Job '{{ $labels.task }}' recorded {{ $value }} failed runs in the last hour."
 
-      # Historical optimistic-locking regression indicator (the project's canonical 409 signal).
       - alert: OptimisticLockConflictSpike
         expr: rate(basetool_http_error_total{code="OPTIMISTIC_LOCK"}[5m]) > 0.1
         for: 10m
@@ -444,9 +194,6 @@ groups:
           summary: "409 optimistic-lock conflict spike"
           description: "The backend is returning 409 optimistic-lock conflicts at an elevated rate — a likely locking/version-propagation regression."
 
-      # (#1041 item 6) SERVICE_UNAVAILABLE is incremented exactly when the backend/ingest re-maps an
-      # unreachable Keycloak JWKS to a retryable 503 (REQ-SEC-024) — the documented root cause of the
-      # past Http5xxRateHigh incident. Detects it minutes earlier and pre-diagnosed.
       - alert: IdentityProviderUnavailable
         expr: sum by (application) (rate(basetool_http_error_total{code="SERVICE_UNAVAILABLE"}[5m])) > 0.1
         for: 5m
@@ -456,17 +203,6 @@ groups:
           summary: "Identity provider unavailable (503 spike, {{ $labels.application }})"
           description: "{{ $labels.application }} is re-mapping unreachable-Keycloak-JWKS failures to 503 at an elevated rate — the root cause of the past Http5xxRateHigh incident. Check Keycloak reachability / DNS before 5xx surfaces to users."
 
-      # (#1041 item 6) Authorization-probing signal: 401 (UNAUTHENTICATED) is charted, 403 was not.
-      # baseline-tune: 0.2/s is an initial guess; 403s occur normally, so tune against the baseline
-      # week. One known-benign source, which may not be absorbed by raising the threshold:
-      #   - Mission-surface refusals for a caller outside the owning scope (the canSeeMission /
-      #     canAccessParticipant checks, REQ-SEC-018). NOTE this is NOT "guest field redaction", which
-      #     the earlier version of this comment claimed: redaction answers 200 with fields stripped
-      #     and never produces a 403 at all (corrected 2026-09-02).
-      # The nightly edge-deny probe (.github/workflows/edge-deny-probe.yml) is NOT a source: it calls
-      # anonymously, and since ADR-0159 every anonymous refusal it asserts is a 401
-      # (code="UNAUTHENTICATED"), never an ACCESS_DENIED 403. It used to assert 403 on four
-      # method-seam paths; that stopped with ADR-0159 (corrected 2026-09-22).
       - alert: AccessDeniedSpike
         expr: sum by (application) (rate(basetool_http_error_total{code="ACCESS_DENIED"}[5m])) > 0.2
         for: 10m
@@ -476,13 +212,6 @@ groups:
           summary: "403 access-denied spike ({{ $labels.application }})"
           description: "{{ $labels.application }} is returning 403 access-denied at an elevated rate — possible authorization probing or a broken permission gate after a deploy."
 
-      # (logging audit) The REQ-SEC-017 pending-approval gate 403s every /api/** write from a user who
-      # carries only ROLE_PENDING_APPROVAL. It writes the 403 at the servlet-filter level, bypassing
-      # GlobalExceptionHandler, so it now increments basetool_http_error_total{code="PENDING_APPROVAL"}
-      # directly (like IdentityProviderUnavailableFilter). A spike means a converter / approval-sync
-      # regression left legitimate users with only the pending marker and is mass-403ing them — the
-      # WARN log was the only prior signal (LogbackErrorSpike is ERROR-only, so it would not catch it).
-      # baseline-tune: 0.2/s mirrors AccessDeniedSpike; a genuinely-pending user hits this rarely.
       - alert: PendingApprovalBlockSpike
         expr: sum by (application) (rate(basetool_http_error_total{code="PENDING_APPROVAL"}[5m])) > 0.2
         for: 10m
@@ -492,26 +221,6 @@ groups:
           summary: "Pending-approval 403 spike ({{ $labels.application }})"
           description: "{{ $labels.application }} is 403-blocking pending-approval users at an elevated rate — likely an authorities-converter or approval-sync regression leaving legitimate users with only ROLE_PENDING_APPROVAL, not just the occasional genuinely-pending account."
 
-      # (REQ-SEC-053) The sibling of the alert above, on the state ADR-0159 introduced: an approved
-      # account whose realm roles map to no application role is refused 403 NO_ROLE by the same
-      # filter, and the same counter records it.
-      #
-      # This one carries more weight than its twin. A pending account is a person waiting; a
-      # role-less one is a person who has ALREADY been approved and is being turned away — and the
-      # way that happens at scale is the roster sync, which reads the realm's roles nightly. A run
-      # that resolved nothing used to demote everyone onto the authority-less GUEST role, silently;
-      # now it locks them out, loudly, and this is the line that says so. The sync itself refuses to
-      # write such a run, so a spike here means something else: a realm role renamed, a member
-      # stripped by hand, or an integration sending tokens from the wrong realm.
-      # baseline-tune: same 0.2/s as its twin — a genuinely role-less account is rare, and a real
-      # one produces a handful of 403s while its owner reads the page and gives up.
-      # Counted in SUBJECTS, not requests. The request rate this used to read
-      # (rate(basetool_http_error_total{code="NO_ROLE"})) answers a distinct-subject question and
-      # fails in both directions: one member's tab polling in the background sustains it on its
-      # own, while a realm-side role rename at 03:00 -- the event this alert exists for -- locks
-      # the whole membership out at a moment when nobody is making requests, so the rate stays
-      # near zero until morning. max(), never sum(): the gauge is per process, and a subject
-      # refused on two instances would otherwise count twice.
       - alert: NoRoleBlockSpike
         expr: max by (application) (basetool_norole_refused_subjects) > 3
         for: 10m
@@ -530,14 +239,6 @@ groups:
           summary: "Rate-limit rejection spike ({{ $labels.application }})"
           description: "{{ $labels.application }} is rejecting requests via the rate limiter at an elevated rate."
 
-      # Registration approvals (Discord) and bank booking requests waiting too long.
-      #
-      # Triage note (REQ-SEC-034, ADR-0140): an admin can reopen a rejected registration back into
-      # this queue. The gauge measures from the registration's CREATION time, so a reopened
-      # months-old rejection reports that full age immediately rather than "just queued". That is
-      # deliberate -- reopen-then-decide within minutes never survives the 10m `for`, and a reopened
-      # row left sitting IS overdue -- but do not read a sudden multi-week age as a stuck queue
-      # without checking user_approval_event for a recent REOPENED row.
       - alert: RegistrationApprovalOverdue
         expr: basetool_registration_pending_oldest_age_seconds > 172800
         for: 10m
@@ -547,16 +248,6 @@ groups:
           summary: "Oldest pending registration >48h"
           description: "A user registration has been awaiting approval for more than 48 hours."
 
-      # Members' Art. 17 erasure requests waiting for an admin decision (REQ-SEC-061, ADR-0181).
-      #
-      # The one queue alert in this file whose threshold comes from a STATUTE rather than from an
-      # operational preference: Art. 12(3) GDPR gives the controller one month to respond to a
-      # data-subject request. 14 days is set well inside that, so an admin still has two weeks to
-      # weigh the request -- in particular the "also erase my audit and bank history" wish, which is
-      # a judgement about competing interests and not a click.
-      #
-      # Empty queues report 0 seconds (BusinessMetricsCollector.ageSeconds), so there is no absent()
-      # ambiguity: a value over threshold means a real request has been waiting that long.
       - alert: DeletionRequestOverdue
         expr: basetool_deletion_request_pending_oldest_age_seconds > 1209600
         for: 10m
@@ -569,21 +260,6 @@ groups:
             decided it. Art. 12(3) allows one month to respond. Decide it in Administration ->
             Loeschantraege; refusing requires a recorded reason, which the member is then told.
 
-      # Half-finished account deletions (REQ-SEC-059, ADR-0182).
-      #
-      # Deleting a member is two acts: remove the Keycloak account, then delete the local row. The
-      # member list only offers the second once the roster sync has flipped in_keycloak = false, so
-      # a forgotten click leaves the e-mail address, handle, Discord snowflake, guild nickname and
-      # profile description of somebody who has already left, indefinitely, with nothing watching.
-      #
-      # 7 days, not 48h: the wait is legitimate for as long as an admin is mid-task and the roster
-      # sync is nightly, so a same-week deletion must not page anybody. This is a hygiene signal,
-      # not an incident -- the data is not exposed, it is merely retained past its basis.
-      #
-      # Age, not count: a count above zero for 7 days would also fire when a stream of accounts was
-      # each cleared within a day, because the count never reaches zero in between. The age comes
-      # from app_user.keycloak_absent_since (V241); rows predating that migration were backfilled
-      # with the deploy time, so shortly after deploy this alert reports a LOWER BOUND.
       - alert: UserDeletionUnfinished
         expr: basetool_users_pending_deletion_oldest_age_seconds > 604800
         for: 30m
@@ -597,18 +273,6 @@ groups:
             Administration -> Mitglieder (the delete action appears for accounts the sync no longer
             finds in Keycloak), or reinstate the Keycloak account if the removal was a mistake.
 
-      # (2026-09-17) A brand-new account that is ACTIVE on arrival. The REQ-SEC-017 approval gate
-      # carves ADMIN-realm-role holders out for bootstrap safety -- the first admin must never be
-      # lockable out -- which makes it the one way a row gains full authority with no admin decision
-      # behind it, and it left no trace at all. Normally zero: an admin account is created once.
-      #
-      # A firing is the bootstrap, a re-provisioning, or somebody who was granted the ADMIN realm
-      # role in Keycloak and then logged in. It is also the tail of a failed erasure: the recreated
-      # row of an ADMIN-realm-role holder is ACTIVE immediately rather than a refusable PENDING
-      # registration, which is why AccountErasureKeycloakDeleteFailed exists below.
-      #
-      # Untagged on purpose -- the callsign would be both unbounded and PII (REQ-OBS-004). Who it
-      # was is in the ROLE audit trail, by actor and by time.
       - alert: AdminAccountAutoActivated
         expr: sum(increase(basetool_admin_registration_auto_activated_total[24h])) > 0
         for: 10m
@@ -623,23 +287,6 @@ groups:
             granted the ADMIN realm role in Keycloak, and check Administration -> Protokoll (Rollen
             tab) for the account's arrival.
 
-      # (2026-09-17) The opposite direction of UserDeletionUnfinished, and the one nothing watched.
-      # An erasure commits its local half first and deletes the Keycloak user last (REQ-SEC-026,
-      # ADR-0111). When that last step throws, the catch block logged a warning and returned -- and
-      # nothing else could see it: the account has no local row left, so it cannot appear in
-      # basetool_users_pending_deletion_count, which counts a local row whose Keycloak account has
-      # gone.
-      #
-      # Why it matters: the surviving Keycloak account can still log in. The reconciliation then
-      # inserts a fresh row -- PENDING and refusable for an ordinary member, but ACTIVE for anyone
-      # holding the ADMIN realm role, because the approval gate carves admins out for bootstrap
-      # safety (UserRegistrationService#stampNewPendingRegistration). So a member who asked to be
-      # erased can come back with full admin authority and no approval.
-      #
-      # Any occurrence, and a long window: this is a manual remedy in the Keycloak console, so the
-      # alert must still be up when somebody reads it. The series is absent until the first failure,
-      # so it cannot fire before one happens. The matching audit row is
-      # ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED, which carries the account id the console needs.
       - alert: AccountErasureKeycloakDeleteFailed
         expr: sum(increase(basetool_account_deletion_keycloak_failures_total[24h])) > 0
         for: 10m
@@ -664,13 +311,6 @@ groups:
           summary: "Oldest pending bank booking request >48h"
           description: "A bank booking request has been awaiting approval for more than 48 hours."
 
-      # (#1041 item 15) Stuck work-queue detection. The oldest-age gauges for the JobOrder / Operation
-      # / RefineryOrder / P4K-import queues existed but drove no alert — only registration + bank did.
-      # Empty queues report 0 seconds (BusinessMetricsCollector.ageSeconds), so there is no absent()
-      # ambiguity: a value over threshold means a real item has been waiting that long.
-      #
-      # P4K imports run async and should finish in minutes; a pending import older than 6h means the
-      # worker is wedged (or died without the startup reconcile flipping it).
       - alert: P4kImportStuck
         expr: basetool_p4k_import_job_pending_oldest_age_seconds > 21600
         for: 10m
@@ -680,19 +320,6 @@ groups:
           summary: "Oldest pending P4K import >6h"
           description: "A P4K catalog import has been PENDING for more than 6 hours — imports normally finish in minutes, so the async worker is likely wedged. Check the backend logs and re-run the import."
 
-      # Human work queues (JobOrder OPEN, Operation PLANNED, RefineryOrder OPEN) move on human time,
-      # so the threshold is a "someone forgot this exists" floor, not an SLA. baseline-tune: raise/lower
-      # once the real queue-age distribution is known for the active org. JobOrder is tuned to 180d for
-      # the current org cadence (long-running orders are normal).
-      #
-      # Refinery/Operation moved 30d -> 90d on 2026-08-29, the first time the queue was actually
-      # measured (#1707): the oldest open refinery order stood at 29.65d against the 30d floor, i.e.
-      # the alert was hours from firing on a queue of five orders (1 OPEN, 4 IN_PROGRESS) that nobody
-      # had called abandoned. A floor a live queue reaches in normal operation is not a floor. 90d
-      # keeps the "someone forgot this exists" intent while clearing the observed working range; it is
-      # still a baseline, and the same measurement is the way to revisit it. OperationStale is moved
-      # with it deliberately: it shares the queue's cadence, it had no open operations at all when
-      # measured, and leaving the two thresholds to diverge on no evidence would be the worse default.
       - alert: JobOrderStale
         expr: basetool_job_order_open_oldest_age_seconds > 15552000
         for: 1h
@@ -720,10 +347,6 @@ groups:
           summary: "Oldest planned operation >90d"
           description: "An operation has been PLANNED for more than 90 days — likely abandoned. Execute, reschedule or cancel it (threshold is a baseline; tune to the org's cadence)."
 
-      # (#1041 item 15) P4K import terminal failures. The pending-queue gauge drains back to 0 after a
-      # failed run, so a reliably-failing import looks like a healthy empty queue. This counter is
-      # bumped at every terminal transition, so any FAILED outcome (worker error or restart orphan)
-      # over 24h surfaces here regardless of the current queue depth.
       - alert: P4kImportFailed
         expr: sum(increase(basetool_p4k_import_jobs_total{outcome="failed"}[24h])) > 0
         for: 5m
@@ -733,10 +356,6 @@ groups:
           summary: "P4K import failure in the last 24h"
           description: "At least one P4K catalog import reached FAILED in the last 24 hours. A repeatedly-failing import leaves an empty-looking pending queue; check the job list and backend logs for the error."
 
-      # (#1041 item 16) SMTP mail delivery health. SmtpMailService swallows MailException (log only)
-      # and drops mail behind three config gates, so a broken relay or an env-var regression stops
-      # admins hearing about pending registrations — today visible only via the LogbackErrorSpike
-      # heuristic. basetool_mail_total{outcome} makes each terminal outcome explicit.
       - alert: MailDeliveryFailing
         expr: sum(increase(basetool_mail_total{outcome="failed"}[1h])) > 2
         for: 10m
@@ -746,22 +365,6 @@ groups:
           summary: "SMTP mail delivery failing (>2/h)"
           description: "More than 2 outgoing mails failed to send in the last hour. Check the SMTP relay and the backend logs; registration / approval notifications may be silently lost."
 
-      # A dropped_* outcome means mail was swallowed by one of SmtpMailService's three config gates.
-      # by(outcome) so the firing alert names the specific gate.
-      #
-      # dropped_disabled is DELIBERATELY EXCLUDED (2026-07-25). This rule originally assumed "mail is
-      # configured on the monitored deployment, so ANY drop is drift" — that premise is false for prod:
-      # `APP_MAIL_ENABLED=false` is the INTENDED steady state there, because re-enabling transactional
-      # mail requires a matching e-mail section in the privacy policy first (the mail/privacy
-      # coupling). So every prod send took the kill-switch branch and the rule paged every 4h about a
-      # policy decision, not a regression — a pure false positive that trained the on-call to ignore the
-      # mail alerts entirely. The two REMAINING outcomes are still genuine drift and stay in scope: a
-      # blank `spring.mail.host` (dropped_no_host) or a missing JavaMailSender bean (dropped_no_sender)
-      # both mean mail was TURNED ON but is silently going nowhere. Because SmtpMailService checks the
-      # gates in the order enabled -> host -> sender, those two are unreachable while the kill-switch is
-      # off, so this rule is correctly silent today and starts protecting the moment mail is enabled.
-      # If the kill-switch is ever flipped off UNINTENTIONALLY, RegistrationApprovalOverdue still
-      # catches the user-visible consequence (nobody acts on pending registrations).
       - alert: MailDroppedConfigDrift
         expr: sum by (outcome) (increase(basetool_mail_total{outcome=~"dropped_no_host|dropped_no_sender"}[1h])) > 0
         for: 10m
@@ -771,50 +374,6 @@ groups:
           summary: "Mail dropped by a config gate ({{ $labels.outcome }})"
           description: "Outgoing mail was dropped before delivery ({{ $labels.outcome }}) — mail is enabled on this deployment but misconfigured (blank spring.mail.host, or no JavaMailSender bean), so registration / approval notifications are being lost. The deliberate app.mail.enabled=false kill-switch (dropped_disabled) is out of scope for this alert."
 
-      # (#1041 item 17) Dead notification push channel. The backend SSE gauge reads zero while real
-      # users are demonstrably browsing — nobody's stream reaches the backend, so everyone silently
-      # fell back to the poll. `and on()` broadcasts the cross-target correlation (backend gauge vs
-      # frontend request rate, which live on different scrape jobs).
-      #
-      # The "users are online" guard MUST be live request traffic, NOT `basetool_active_sessions`
-      # (amended 2026-07-26). That gauge counts Spring Session entries in Redis, whose authenticated
-      # TTL is 720h (`app.session.authenticated-timeout`, REQ-SEC-025) — on prod it sits at ~365
-      # against ~30 real principals and NEVER dips, so `> 3` was true 24/7 and the rule degenerated
-      # to a bare `basetool_sse_connections == 0 for 30m`. That fires every single night: measured
-      # 2026-07-26, SSE fell 25 -> 0 at 00:45Z when the squadron went to bed and returned at 06:30Z,
-      # while active_sessions held flat at 362-370 throughout — two firing/resolved mail pairs for a
-      # site that was simply idle. A session that has not been touched for three weeks is not a user
-      # who is online.
-      #
-      # The `uri` exclusions strip the infrastructure floor that never sleeps: `/` carries a constant
-      # ~0.133 req/s of blackbox probes (https://profit-base.online, 30s interval) plus NPM health,
-      # `REDIRECTION` is dominated by those probes' 302 to the login, `NOT_FOUND` is background
-      # scanner noise, and `/actuator*` is the scrape/healthcheck surface. What remains is human page
-      # traffic: measured 0.04-0.18 req/s while people are on the site and exactly 0.0 across the
-      # 02:00-06:00Z dead window, with only ~0.002 req/s of stragglers at the shoulders — so the
-      # 0.01 req/s floor (~9 requests per 15m window) separates the two states cleanly. Note the
-      # failure direction is safe: if the frontend job disappears entirely the guard goes absent and
-      # this alert stays silent, leaving a full outage to TargetDown / blackbox, which own it.
-      #
-      # EVERY target of the `blackbox-public-surface` AND `blackbox-app-link` jobs has to appear
-      # here, and the list is only correct against the metric's `uri` LABEL rather than the probed
-      # path. Those jobs probe ten URLs every 30s = 0.033 req/s each, so any single one of them
-      # left in clears the 0.01 floor on its own and pages during the dead window — which is the
-      # 2026-07-26 failure verbatim.
-      #   - `/impressum`, `/privacy`, `/terms`, `/licenses`, `/manifest.webmanifest` and `/` are
-      #     controller routes and are tagged with their own path.
-      #   - `/.well-known/assetlinks.json` is a @RestController (AssetLinksController) and likewise.
-      #   - `/app/link-help` and `/app/callback` are AppLinkController routes (REQ-SEC-038) and
-      #     likewise. The callback answers 303, and a matched handler pattern wins over the
-      #     `REDIRECTION` special case in the `uri` tag — so it is tagged `/app/callback`, not
-      #     `REDIRECTION`. Both spellings are excluded here, so the guard holds either way rather
-      #     than resting on that being read correctly.
-      #   - `/robots.txt` is a FILE under `static/`, served by the resource handler mapped at
-      #     `/**`, so it is tagged `/**` and excluding the literal path would not have matched it.
-      #     `/**` is therefore excluded, which also drops the CSS/JS/font requests that accompany a
-      #     page load. That costs nothing here: a human session is counted through its page routes
-      #     and its polling endpoints (`/notifications/unread-count` alone is steady per viewer),
-      #     and an asset request without a page request behind it is a probe or a crawler.
       - alert: SsePushChannelDead
         expr: >-
           (basetool_sse_connections == 0)
@@ -828,13 +387,6 @@ groups:
           summary: "Notification SSE push channel dead while users are online"
           description: "The backend has zero live SSE connections for 30 minutes while the frontend is still serving real user page traffic — the notification push channel is down and clients fell back to polling. Check reverse-proxy SSE buffering and the /notifications/stream relay."
 
-      # (#1127) SSE relay pool near saturation — early warning for the silently-dropped-viewer
-      # failure. The frontend->backend notification relay runs on a dedicated 1000-connection pool
-      # (frontend-sse-pool in WebClientConfig); each live viewer holds one slot for as long as their
-      # page is open, and past the 1000th concurrent viewer a new relay blocks on pendingAcquireTimeout
-      # and then silently drops that user's live push. The basetool_notification_relay_connections
-      # gauge counts the open relays held on this instance; >0.8 of the 1000 ceiling for 10m warns the
-      # pool is about to start dropping viewers. Mirrors BulkheadNearSaturation (apps.yml).
       - alert: SseRelayPoolNearSaturation
         expr: basetool_notification_relay_connections > 800
         for: 10m
@@ -844,15 +396,6 @@ groups:
           summary: "Notification SSE relay pool near saturation"
           description: "The frontend has held more than 800 of its 1000 SSE relay slots for 10 minutes — past 1000 the next live viewer's push is silently dropped. Check the concurrent viewer count and per-user stream multiplication; consider raising frontend-sse-pool maxConnections or capping streams per user."
 
-      # (REQ-SEC-025) Runaway session store. basetool_active_sessions counts live Spring
-      # Session sessions in Redis. Un-authenticated requests mint throwaway sessions (a CSRF-token
-      # render on a permit-all page, pre-login OAuth2 state); before the two-tier-TTL fix these
-      # inherited the 30-day authenticated window and accreted to >16000 orphan CSRF-only sessions
-      # against ~30 real principals, heading for the Redis `maxmemory noeviction` wall where login /
-      # token-refresh writes start failing. Post-fix the anonymous window is short, so steady state is
-      # a few hundred (concurrent logged-in users x devices, capped at maximumSessions=10, plus a
-      # small anonymous float). >2000 for 1h therefore means the anonymous-session TTL split regressed
-      # (or a genuine surge) — with days of lead time before the Redis ceiling.
       - alert: ActiveSessionsRunaway
         expr: basetool_active_sessions > 2000
         for: 1h
@@ -862,31 +405,6 @@ groups:
           summary: "Frontend session store growing unbounded (>2000 active sessions)"
           description: "basetool_active_sessions has held above 2000 for 1h. Expected steady state is a few hundred; a sustained climb means anonymous/orphan sessions are accreting again (REQ-SEC-025 two-tier TTL regressed) and Redis is heading for its maxmemory noeviction ceiling. Check the session store size (redis SCAN 'basetool:session:sessions:*') and the created-vs-login ratio."
 
-      # (2026-09-02 log triage; re-tuned 2026-09-03 for REQ-SEC-050) Unreadable session values.
-      # On 2026-09-02 one session value in Redis that could not be deserialized answered HTTP 500 on
-      # EVERY request carrying a session cookie — everything behind the login, for everyone.
-      # FaultTolerantSessionSerializer made that survivable (the value reads as absent) and in doing
-      # so made it INVISIBLE: the three hours after the fix deployed carry 496 identical WARN lines
-      # and no number anywhere.
-      #
-      # WHAT THIS MEANS SINCE ADR-0157: a dropped value is now REMOVED from the session on the
-      # request that found it (SessionAttributeRepairFilter), so each poisoned session contributes
-      # exactly ONE drop and then stops. The counter is therefore a step, not a plateau, and the
-      # reading is simple:
-      #   - a burst that decays inside the 15m window = a poisoning that has been repaired. Expected
-      #     on the deploy that first repairs a backlog, and absorbed by the 30m `for` below.
-      #   - a rate that STAYS up = something is still WRITING an unreadable value every request. That
-      #     is the only case worth waking someone for, and it is what actually happened twice on
-      #     2026-09-03: first a Tomcat record with no @class (ADR-0154), then the same values never
-      #     being cleared because nothing rewrote them (ADR-0157).
-      #
-      # Before ADR-0157 a handful of long-lived poisoned sessions being polled produced a permanent
-      # few per minute, which is exactly how the second 2026-09-03 firing looked — that case no
-      # longer exists, so a sustained rate no longer has a benign explanation.
-      #
-      # baseline-tune: >20 in 15m held for 30m, unchanged. The storm that prompted this was
-      # ~2.75/min sustained, which this matches; a single repaired session cannot reach it, and a
-      # backlog drain cannot hold it for 30 minutes.
       - alert: SessionValueDropsSustained
         expr: sum(increase(basetool_session_value_dropped_total[15m])) > 20
         for: 30m
@@ -896,35 +414,6 @@ groups:
           summary: "Frontend is dropping unreadable session values ({{ $value | printf \"%.0f\" }} per 15m)"
           description: "Session values in Redis cannot be deserialized and are being dropped, so those attributes read as not set. Find the WARN line from SessionAttributeDiagnosticMapper in the frontend log: it names the attribute, the cause and the unresolved type id. typeId=absent means a FINAL-typed value (a record, a List.of/Map.of) was written into a session and can never be read back; a class name means that class was renamed or removed since the session was written; cause=IllegalArgumentException means a top-level @class no longer resolves. Since ADR-0157 the value is REMOVED from the session on the request that dropped it, so each poisoned session drops exactly once: a burst that decays is a backlog being repaired and is expected on a deploy, while a rate that stays up for 30m means something is still WRITING an unreadable value every request — check that the frontend startup line \"Session serializer forces an @class type id for: [...]\" lists what you expect, and that no code path puts a final type into a session (REQ-SEC-049, REQ-SEC-050)."
 
-      # (2026-09-16 log triage, REQ-SEC-063 / ADR-0186) The sibling of the alert above, on the other
-      # way a session read can fail: the hash EXISTS in Redis and is missing one of the three fields
-      # Spring Session requires, so RedisSessionMapper refuses it. Until 2026-09-16 that threw
-      # IllegalStateException straight out of SessionRepositoryFilter and answered HTTP 500 — on
-      # EVERY request carrying that cookie, for up to the 720-hour authenticated window, because
-      # nothing on the read path catches it and nothing clears the cookie. The member is locked out
-      # of the whole application until they delete it by hand.
-      #
-      # That fault ran for months unseen. 286 of those 500s landed on 2026-09-14 and 18 more on
-      # 2026-09-16, and nothing fired: LogbackErrorSpike needs 0.2/s for 10m and the worst hour of it
-      # reached 0.045/s. So this alert is not a nicety — it is the entire reason the read is now
-      # allowed to degrade quietly to "signed out".
-      #
-      # HOW TO READ IT. The producer is a delta write: RedisSession#saveDelta HSETs the changed
-      # fields only, and creationTime is in that delta solely if(isNew), so a request that commits
-      # after its hash has gone re-creates the key holding lastAccessedTime alone and puts the full
-      # TTL back on it. One lost hash therefore produces exactly ONE unmappable read and then the
-      # member gets a fresh session, so this counter is a step per affected browser, never a
-      # plateau.
-      #   - a burst after a Redis restart, an AOF truncation or a session purge run against live
-      #     traffic = expected; those are the events that lose hashes.
-      #   - a rate that climbs with no such event = hashes are being lost in volume, and Redis is
-      #     where to look, not the frontend.
-      #   - missing_key covering the whole population at once = the wire format broke and every
-      #     member is being signed out. That is the case this alert must not miss.
-      #
-      # baseline-tune: >20 in 15m held for 30m, mirroring SessionValueDropsSustained. The 2026-09-14
-      # burst was 90 and then 163 within an hour, so a real event clears it comfortably, while the
-      # handful of scattered singles seen on ordinary days (8-10 per day at most) cannot.
       - alert: SessionUnmappableSustained
         expr: sum(increase(basetool_session_unmappable_total[15m])) > 20
         for: 30m
@@ -934,18 +423,6 @@ groups:
           summary: "Frontend cannot map session hashes ({{ $value | printf \"%.0f\" }} per 15m)"
           description: "Session hashes in Redis exist but are missing a required field, so those requests are served as if they carried no session and the members are signed out. Find the WARN line from SessionAttributeDiagnosticMapper in the frontend log: it names which required field was absent. This is normally a hash that was lost and then half re-created by a delta write, so check Redis first — a restart, an AOF truncation or a session purge run against live traffic all produce it, and the burst should decay on its own once the affected browsers get fresh sessions. A rate that keeps climbing with no such event means session hashes are being lost in volume; a rate that covers the whole active population at once means the session wire format broke and everybody is being signed out (REQ-SEC-063). Before ADR-0186 this state answered HTTP 500 on every request from that browser for up to 30 days instead."
 
-      # (REQ-SEC-067 / ADR-0206) A session value named a class outside SessionTypeAllowList. Two
-      # meanings, told apart by the `mode` label:
-      #   - mode="report" (what a deploy ships): the value was READ anyway, so nobody noticed
-      #     anything — but switching APP_SESSION_TYPE_ALLOW_LIST to `enforce` would drop it. This is
-      #     the gate for that switch: the owner enforces only after this has stayed silent.
-      #   - mode="enforce": the value was REFUSED and that one attribute dropped (it is also counted
-      #     on basetool_session_value_dropped_total, so a sustained stream trips
-      #     SessionValueDropsSustained as well). Either the list lacks a class the application
-      #     legitimately stores, or something other than this frontend wrote into the session store.
-      # No `for` and a one-hour window, deliberately: under `report` Jackson caches the deserializer
-      # it resolved, so the counter rises ONCE per class and slot per frontend lifetime. A single
-      # increment is the whole signal, and a rule that waited for a rate would never see it.
       - alert: SessionTypeOutsideAllowList
         expr: sum by (mode) (increase(basetool_session_type_refused_total[1h])) > 0
         labels:
@@ -954,17 +431,6 @@ groups:
           summary: "A session value names a class outside the session type allow-list (mode={{ $labels.mode }})"
           description: "The frontend read a session value whose @class type id is not on SessionTypeAllowList. Find the WARN line from SessionTypeAllowList in the frontend log: it names the class once per frontend lifetime. mode=report means the value was read as before and nothing broke, but APP_SESSION_TYPE_ALLOW_LIST=enforce would drop it: if the class is legitimately stored in the session (a new form or DTO outside frontend.model, a new Spring or container type) add it to the list and do not enforce until this has stayed silent; if it is not, something other than this frontend wrote into Redis. mode=enforce means the value was refused and that attribute reads as not set, which is correct for a foreign class and a defect for a legitimate one (REQ-SEC-067)."
 
-      # (2026-09-02 log triage) Cross-instance Redis fan-out not subscribed. Until this release, a
-      # Redis unreachable during context refresh threw out of SmartLifecycle#start() and aborted the
-      # refresh — the backend crash-looped, which needed no metric to notice. That is now survivable
-      # (ResilientRedisMessageListenerContainer retries in the background), and the failure it leaves
-      # behind is silent: peers' changes simply never arrive, on a backend that is up, healthy and
-      # serving. This gauge is the only thing that can tell the two apart.
-      #
-      # Bound to isListening(), not isRunning(): the latter reports the `started` flag, which upstream
-      # sets BEFORE the subscription can fail. Absent on a deployment with the fan-out switched off,
-      # so `== 0` cannot fire there. Ten minutes is well past the 5s retry cadence plus any ordinary
-      # container recreate.
       - alert: RedisFanoutUnsubscribed
         expr: basetool_redis_fanout_subscribed == 0
         for: 10m
@@ -974,25 +440,6 @@ groups:
           summary: "Redis {{ $labels.fanout }} fan-out has not been subscribed for 10m"
           description: "The {{ $labels.fanout }} pub/sub container on the backend is not listening, so cross-instance delivery for that channel is dead: a peer replica's change never reaches this instance. The container retries every 5s, so 10 minutes means Redis is genuinely unreachable from the backend rather than merely restarting — check the redis container and the net-redis-backend network. The backend deliberately stays up and serving while this is true (ADR-0084, ADR-0143), so nothing else will page."
 
-      # (PR #1472) Concurrent-session evictions. Spring Security expires a principal's OLDEST session
-      # once maximumSessions (10, SecurityConfig.MAX_CONCURRENT_SESSIONS) is exceeded, and until
-      # SessionEvictionLoggingStrategy was wired that left no usable trace: Spring's own account of it
-      # is DEBUG on org.springframework.security, which the app pins to INFO, and
-      # ActiveSessionsRunaway above is blind to it because expireNow() only MARKS the session — the
-      # registry entry and the Redis key both survive, so basetool_active_sessions does not so much as
-      # dip. The visible end of the chain was a member's unexplained logout and nothing else.
-      #
-      # Eviction is rare BY CONSTRUCTION: a real user has to hold ten live sessions before the
-      # eleventh login evicts anything, and then hovers at the cap producing at most one eviction per
-      # further login. So this is not tuned against a busy baseline — it is tuned to separate that
-      # from the failure mode the counter was written for, which looks identical from the outside: a
-      # session registry that stopped reaping stale Redis entries, so the cap fills with DEAD sessions
-      # and every fresh login evicts a LIVE one. That mode is not a burst but a floor that never
-      # returns to zero, so the rule is a sustained rate — the `for` clause, not the count, is what
-      # carries it. When it fires alongside ActiveSessionsRunaway the registry is leaking on both
-      # ends; on its own it means the registry is stale rather than merely large.
-      # baseline-tune: >3 evictions in 1h, held 30m (a member cycling devices produces one or two and
-      # stops).
       - alert: SessionEvictionSpike
         expr: sum(increase(basetool_session_evicted_total[1h])) > 3
         for: 30m
@@ -1002,35 +449,6 @@ groups:
           summary: "Concurrent-session evictions sustained (session registry may be stale)"
           description: "The frontend has evicted more than 3 sessions per hour for 30 minutes because the per-principal concurrent-session cap (10) was full. Members are being logged out with 'This session has been expired'. A sustained stream means the session registry is holding dead Redis sessions against the cap rather than users genuinely cycling more than ten devices — check the registry against the live Redis keys (SCAN 'basetool:session:sessions:*') and correlate with ActiveSessionsRunaway; the backend log line names the cap and the victim's userId (sub)."
 
-      # (#1041 item 18) Frontend login broken. This alert exists to catch the ONE break mode no other
-      # signal sees: the code-to-token / JWKS / bad-IdP-response failure that hits AFTER the user has
-      # already authenticated at Keycloak, so Keycloak emits no login_error user event and
-      # KeycloakLoginErrorSpike's regex misses it. That failure class maps to reason="provider_error"
-      # in LoginFailureMetricsHandler — so the failure side is scoped to that bucket.
-      #
-      # It is deliberately NOT scoped to all failures. The earlier `failure > 0 unless success > 0`
-      # false-fired (2026-07-12): members hold 30-day "stay logged in" sessions, so genuinely fresh
-      # successful logins are sparse — frequently ZERO per 15m window, especially off-hours — while a
-      # single benign failure is trivial to produce. Unauthenticated bots/scanners hitting the OAuth
-      # callback /login/oauth2/code/keycloak (BotProtectionFilter does NOT shield it) raise
-      # reason="invalid_request" (a bare/partial callback is not a valid authorization response, so
-      # OAuth2LoginAuthenticationFilter rejects it BEFORE any token exchange), and abandoned /
-      # expired-state / back-button logins raise the state codes — LoginFailureMetricsHandler folds
-      # ALL of these into the benign reason="invalid_state" bucket (2026-07-15 fix), so none of this
-      # noise reaches provider_error. Before that fix invalid_request leaked into provider_error and
-      # off-peak scanner traffic tripped this alert with nothing broken. So "provider_error failures
-      # with zero successes" is now the token-exchange break mode only. A genuine all-users
-      # state/session-loss break (SameSite or cookie-domain regression, Redis unreachable, broken
-      # session deserialisation) shows as invalid_state, corroborated by the frontend `redis`
-      # readiness indicator / TargetDown / deploy-time e2e — folding it in here is exactly what made
-      # this alert noisy.
-      #
-      # >= 3 over 15m + for:10m: a real code-to-token/JWKS break fails EVERY attempt so provider_error
-      # climbs fast and stays, while a lone transient token-endpoint blip (one flaky exchange, a brief
-      # Keycloak restart) stays under the floor or does not sustain 10m. The `unless success > 0` guard
-      # remains: any fresh success in the window proves login is not broken for everyone (a genuine
-      # total break yields zero successes), so `unless` (not `and ... == 0`) still trips on the absent
-      # success series instead of evaluating to no-data.
       - alert: FrontendLoginBroken
         expr: sum(increase(basetool_login_total{outcome="failure", reason="provider_error"}[15m])) >= 3 unless sum(increase(basetool_login_total{outcome="success"}[15m])) > 0
         for: 10m
@@ -1040,9 +458,6 @@ groups:
           summary: "Frontend logins failing at the token exchange with zero successes"
           description: "The frontend recorded repeated OAuth2 provider errors (failed code-to-token exchange, JWKS or bad IdP response) and no successful logins in the last 15 minutes — login is likely broken for everyone at the token-exchange step. Check the frontend logs, Keycloak reachability from the frontend (issuer-uri / JWKS endpoint) and the OIDC client config. State/session-loss breaks surface as invalid_state and via the frontend redis readiness indicator instead."
 
-      # (#1041 item 18) CSRF rejection spike. krtFetch's silent single-retry self-heal masks a
-      # systematic CSRF-wiring regression as intermittent failed writes; the counter makes the rate
-      # visible. A sustained rate is a wiring regression, not the occasional stale token.
       - alert: CsrfRejectionSpike
         expr: sum(rate(basetool_csrf_rejections_total[5m])) > 0.1
         for: 15m
@@ -1052,29 +467,6 @@ groups:
           summary: "Elevated CSRF-token rejection rate"
           description: "The frontend has been rejecting CSRF tokens at more than 0.1/s for 15 minutes — likely a systematic CSRF-wiring regression rather than occasional stale tokens (which krtFetch self-heals). Check recent security/template changes and the /csrf endpoint."
 
-      # (PR #1472) Browser-side failures reported by the client error beacon (krt-client-error.js ->
-      # ClientErrorReportController). A JS exception that kills a krtFetch handler produces NO
-      # request, so it leaves no access-log line, no http_server_requests sample and no 5xx — "the
-      # button did nothing" was a user report and nothing else. The controller logs at DEBUG on
-      # purpose (any authenticated tab can trigger the endpoint at frame rate, so INFO/WARN would be
-      # a self-inflicted log flood, REQ-OBS-001), which makes basetool_client_error_total the only
-      # always-on signal — and this rule is what makes it one that is actually watched.
-      #
-      # Why a step change rather than an absolute ceiling: a handful of client errors is permanent
-      # background — old browsers, extensions injecting into the page, a resource_error from a tab
-      # left open across a deploy that still references the previous asset build. A fixed ceiling
-      # either sits above that floor, and then misses a broken surface only a few members use, or
-      # below it, and then fires forever. What is diagnostic is the SHAPE: a deploy that breaks the
-      # client half of a live-update surface makes one `kind` jump within the hour and stay up.
-      #
-      # The baseline is the SAME series over 24h, deliberately not `offset 1d`: the counter is
-      # registered lazily on the first report, so an offset comparison has an absent-baseline hole
-      # (no series a day ago -> no right-hand side -> the rule silently never fires), whereas the
-      # trailing window exists whenever the 1h window does. The spike hour is part of its own
-      # denominator, which caps the achievable ratio at 24 and keeps the trigger honest. Per `kind`
-      # (five bounded literals: FE-SEC-04 added csp_violation, 2026-09-23 i18n_missing) so one class
-      # stepping up is not diluted by the others.
-      # baseline-tune: >20 reports/h of one kind AND >3x that kind's own daily average, held 30m.
       - alert: ClientErrorSpike
         expr: |
           sum by (kind) (increase(basetool_client_error_total[1h])) > 20
@@ -1087,11 +479,6 @@ groups:
           summary: "Browser client errors stepped up ({{ $labels.kind }})"
           description: "The frontend's client-error beacon has reported {{ $labels.kind }} failures well above their own daily baseline for 30 minutes — the browser half of a page is throwing, which produces no server-side error of any kind. Check what shipped in the last frontend deploy; a script_error / unhandled_rejection step means a krtFetch handler is dying (live update silently stops working on that surface), a resource_error step means an asset the templates still reference is 404ing, a csp_violation step means a template or script now does something the Content-Security-Policy blocks (an inline script or style without the nonce, a new third-party host) and that part of the page silently does not work, an i18n_missing step means a page stopped providing a localized string a script reads (the UI now shows the key name). Raise ClientErrorReportController to DEBUG via /actuator/loggers to get the message and script URL for the duration of the investigation."
 
-      # (#1041 item 19) Discord SPI precheck abuse. The endpoint sits outside /api/**, the rate
-      # limiter AND the http_error funnel, so secret-guessing was previously log-only. A sustained
-      # unauthorized rate is a brute-force attempt against the shared secret.
-      # baseline-tune: the SPI is called only during first-broker-login, so any steady 401 stream is
-      # already suspect; 0.1/s is a conservative starting threshold.
       - alert: DiscordPrecheckUnauthorizedSpike
         expr: sum(rate(basetool_discord_precheck_total{outcome="unauthorized"}[5m])) > 0.1
         for: 10m
@@ -1101,9 +488,6 @@ groups:
           summary: "Discord precheck unauthorized-rate elevated"
           description: "The Discord account-existence precheck has been returning 401 at more than 0.1/s for 10 minutes — likely someone guessing the X-KRT-SPI-Secret. Verify the SPI's configured secret matches the backend and check for abuse."
 
-      # On prod the shared secret IS configured, so a `disabled` (503, blank-secret) outcome means
-      # the secret regressed to blank after a rotation — the SPI then fails open and every Discord
-      # login skips the duplicate-account precheck.
       - alert: DiscordPrecheckDisabledOnProd
         expr: sum(increase(basetool_discord_precheck_total{outcome="disabled"}[1h])) > 0
         for: 15m
@@ -1113,10 +497,6 @@ groups:
           summary: "Discord precheck disabled (blank secret) on prod"
           description: "The Discord account-existence precheck answered 503 (no shared secret configured) on a deployment where it should be enabled — a config-drift regression after a secret rotation. The SPI is now failing open; restore the X-KRT-SPI-Secret."
 
-      # (#1041 item 19) Rate-limit rejection ratio. The rejections counter alone only fires AFTER
-      # 429s begin; requests_total gives the denominator so a rising ratio surfaces the pressure
-      # earlier. Per (application, bucket) so a single abusive bucket is not diluted by healthy ones.
-      # baseline-tune: 1% sustained is the issue's initial threshold.
       - alert: RateLimitRejectionRatioHigh
         expr: (sum by (application, bucket) (rate(basetool_ratelimit_rejections_total[10m])) / sum by (application, bucket) (rate(basetool_ratelimit_requests_total[10m]))) > 0.01
         for: 15m
@@ -1126,27 +506,9 @@ groups:
           summary: "Rate-limit rejection ratio >1% ({{ $labels.application }}/{{ $labels.bucket }})"
           description: "More than 1% of rate-limit evaluations on {{ $labels.application }} bucket {{ $labels.bucket }} have been rejected for 15 minutes — sustained pressure or abuse against that budget. Check the source and whether the limit needs tuning."
 
-      # Audit silence: backend up but zero audited mutations recorded across a 5-DAY window — a
-      # REQ-AUDIT-001 signal that audit logging may be broken. 5d (not hours) so ordinary quiet periods
-      # (weekends, maintenance windows) never trip it; only a genuine multi-day silence does. Resolves
-      # on the first audited action and stays quiet as long as one lands within any 5-day window.
       - alert: AuditSilenceAnomaly
         expr: (sum(increase(basetool_audit_events_total[5d])) == 0) and on() (up{job="basetool-backend"} == 1)
         for: 30m
-        # `for:` delays a FIRE and never a RESOLVE, and that asymmetry cost two mails every night.
-        # `scripts/backup.sh` stops frontend, backend and ingest at 04:15 host-local for the
-        # `pg_dump` (REQ-OPS-009), so `up{job="basetool-backend"}` reads 0 for about a minute and the
-        # `and on()` conjunction empties. The alert resolved instantly, mailed RESOLVED, re-entered
-        # `pending` the moment the writers came back, and mailed FIRING again exactly `for:` later —
-        # measured on 2026-09-11 as RESOLVED 04:17:25 and FIRING 05:17:24. That pair repeats for as
-        # long as the underlying silence lasts and NO Alertmanager `repeat_interval` suppresses it,
-        # because neither mail is a repeat.
-        #
-        # `keep_firing_for` is the right lever rather than widening the guard. Relaxing the guard
-        # itself (`max_over_time(up[15m]) == 1`) would also let the alert NEWLY FIRE during a real
-        # outage, which is the one thing the guard exists to prevent. This leaves the firing
-        # condition untouched and only holds the firing state across a gap shorter than 15m, so a
-        # genuine outage still resolves the alert — just 15 minutes later.
         keep_firing_for: 15m
         labels:
           severity: warning
@@ -1154,14 +516,9 @@ groups:
           summary: "No audit events recorded in 5d while backend is up"
           description: "The backend has been up but recorded zero audit events for 5 days — possible audit-logging regression (REQ-AUDIT-001)."
 
-      # (#1041 item 10) Bank audit silence. The bank — the most sensitive audited area — keeps its own
-      # bank_audit_event table (deliberately excluded from AuditDomain), so AuditSilenceAnomaly above
-      # is blind to it. Same 60-day-silence-while-up shape on the dedicated bank counter (counts only,
-      # no amounts). Resolves on the first bank audit event within any 60-day window.
       - alert: BankAuditSilenceAnomaly
         expr: (sum(increase(basetool_bank_audit_events_total[60d])) == 0) and on() (up{job="basetool-backend"} == 1)
         for: 30m
-        # Same nightly-quiesce flap as AuditSilenceAnomaly above, same lever — see the comment there.
         keep_firing_for: 15m
         labels:
           severity: warning
@@ -1169,40 +526,9 @@ groups:
           summary: "No bank audit events recorded in 60d while backend is up"
           description: "The backend has been up but recorded zero bank audit events for 60 days — possible bank audit-logging regression (REQ-AUDIT-001). Every bank mutation must write a bank_audit_event row."
 
-      # (#1041 item 10) Per-domain audit silence. AuditSilenceAnomaly sums across all domains, so one
-      # domain losing its audit wiring in a refactor (the exact REQ-AUDIT-001 failure mode) is masked
-      # as long as any other domain stays active. This fires per domain.
-      #
-      # EXCLUSIONS — the domains whose silence carries no signal, and which therefore never notify at
-      # any horizon: PROMOTION, PERSONAL_INVENTORY, MARKET (the Materialbörse is a young, bursty trade
-      # board) and, since 2026-08-16, ROLE. ROLE covers role/membership admin, Kommando groups and
-      # user deletion — admin actions, not daily traffic — so a fortnight without one is an ordinary
-      # quiet period. It sat in the alerted set until then and fired continuously through every such
-      # period: the condition is a LEVEL, not an event, so once true it re-notified on the
-      # Alertmanager repeat_interval (four-hourly at the time; the mail cadence has since moved to
-      # one notification per event) until somebody finally changed a role. Silence in
-      # all four is reviewed on the 07 dashboard's per-domain tables (14d and 60d) instead of paged —
-      # a deliberate trade of coverage for signal, decided by @greluc.
-      #
-      # Everything NOT named above is alerted, so a newly added AuditDomain is covered by default and
-      # exempting it has to be a deliberate edit here rather than an omission. A domain that never
-      # emitted has no series and cannot fire; only one that WAS active and went silent 14d does.
-      #
-      # TRIAGE (#1707, 2026-08-29): this alert SELF-CLEARS on a deploy, and a cleared one is not
-      # evidence that anything was fixed. The counter is per-process, so a deploy resets it; once the
-      # pre-deploy samples age out of the 14d window the domain has no series at all, and a rule that
-      # needs `sum by (domain)` to produce a group goes quiet while the silence it reports continues.
-      # `or vector(0)` cannot patch this — vector(0) carries no `domain` label — so closing it means
-      # pinning the expected domain set in the rule, which is exactly the upkeep the covered-by-default
-      # design above exists to avoid. Deliberately left as-is (@greluc, 2026-08-29); the 07 dashboard's
-      # per-domain 14d/60d tables are the authoritative view when this alert disappears.
-      # baseline-tune: the 14d window suits an active org; a very quiet squadron may need it widened.
       - alert: AuditDomainSilenceAnomaly
         expr: (sum by (domain) (increase(basetool_audit_events_total{domain!~"ROLE|PROMOTION|PERSONAL_INVENTORY|MARKET"}[14d])) == 0) and on() (up{job="basetool-backend"} == 1)
         for: 1h
-        # Same nightly-quiesce flap as AuditSilenceAnomaly above, same lever — see the comment there.
-        # This is the alert the 2026-09-11 mails came from: `for: 1h` makes the re-fire land a full
-        # hour after the RESOLVED, which reads like a second, unrelated incident.
         keep_firing_for: 15m
         labels:
           severity: warning
@@ -1210,7 +536,6 @@ groups:
           summary: "Audit domain silent 14d ({{ $labels.domain }})"
           description: "The {{ $labels.domain }} audit domain recorded zero events in 14 days while the backend is up — this domain may have lost its audit wiring (REQ-AUDIT-001) even though other domains are still active."
 
-      # Frontend → backend call failures (bounded reason/method), sustained.
       - alert: BackendCallFailureSustained
         expr: sum(rate(basetool_backend_client_errors_total[5m])) > 0.5
         for: 10m
@@ -1220,13 +545,6 @@ groups:
           summary: "Sustained frontend→backend call failures"
           description: "The frontend's backend-call failure rate has been elevated for 10 minutes ({{ $value }}/s)."
 
-      # (#1041 item 1) Ingest handoff relay health. The ingest gateway relays a desktop extractor's
-      # payload (a refinery extract) to the backend and stages the returned draft for a one-time
-      # browser pickup (IngestService, REQ-INGEST-001); a dead relay means members' extractor imports
-      # silently fail to arrive. (Corrected 2026-09-22: this comment used to describe a "WoltLab"
-      # account sync, which does not exist -- the user sync is Keycloak -> backend.)
-      # The metrics (basetool_ingest_handoff_total/_errors_total) already ship from the ingest module.
-      # baseline-tune: 0.05/s error rate is the issue's initial threshold.
       - alert: IngestHandoffErrors
         expr: sum by (reason) (rate(basetool_ingest_handoff_errors_total[10m])) > 0.05
         for: 10m
@@ -1245,12 +563,6 @@ groups:
           summary: "Ingest cannot reach the backend (handoffs failing)"
           description: "The ingest gateway could not reach the backend to relay handoffs in the last 5 minutes — staged identity data is not being applied. Check backend health and the ingest→backend path."
 
-      # The Redis handoff staging (REQ-INGEST-003) is the gateway's only data store. When it is
-      # unreachable the backend relay has already SUCCEEDED and only the browser pickup cannot be
-      # parked, so the caller gets a retryable 503 — a very different operator action from
-      # IngestBackendUnavailable, which is why this reason has its own alert instead of relying on
-      # the by-reason IngestHandoffErrors threshold. Any sustained rate here means every ingest is
-      # failing at the last step: check the redis container and the gateway's REDIS_* config.
       - alert: IngestStagingUnavailable
         expr: rate(basetool_ingest_handoff_errors_total{reason="staging_unavailable"}[5m]) > 0
         for: 10m
@@ -1260,11 +572,6 @@ groups:
           summary: "Ingest cannot stage handoffs (Redis unreachable)"
           description: "The ingest gateway relayed the import to the backend but could not stage the draft in Redis for browser pickup — every send ends in a 503 and no pre-filled form opens. Check the redis container and the ingest Redis configuration."
 
-      # (logging audit) The oversized-body DoS guard (PayloadSizeLimitFilter, INGEST-DOS-1) rejects a
-      # too-large /v1 body with 413. It was previously silent — no log, no metric — unlike the sibling
-      # bot / rate-limit filters, so a flood of oversized-body probes against the only internet-facing
-      # surface was undetectable. basetool_ingest_payload_rejected_total counts each reject.
-      # baseline-tune: >0.2/s sustained is a probing/DoS pattern (a real oversized upload is rare).
       - alert: IngestPayloadRejectedSpike
         expr: rate(basetool_ingest_payload_rejected_total[5m]) > 0.2
         for: 10m
@@ -1274,22 +581,6 @@ groups:
           summary: "Ingest oversized-payload rejections spiking"
           description: "The ingest gateway is refusing oversized /v1 request bodies (413) at an elevated rate — likely an oversized-body probing / DoS attempt against the public ingest surface, or a misconfigured client. Check the NPM edge and the fail2ban jails."
 
-      # (REQ-INGEST-011) The client-identity gate refused a caller whose CLIENT SOFTWARE is not
-      # approved for the ingest path — the interface is restricted to clients the basetool developer
-      # has explicitly approved (a Keycloak client registration plus an allowlist entry). Reaching
-      # this point required a VALID realm token, so unlike the pre-auth bot / rate-limit rejects it
-      # cannot be produced by an anonymous scanner and every occurrence is worth a look.
-      #
-      # The reason separates the two very different causes, which is why it is kept as a label:
-      #   unknown_client / bad_provenance -> a foreign tool is calling the ingress
-      #   missing_azp / missing_scope     -> a Keycloak mapper or scope assignment regressed, i.e.
-      #                                      SELF-INFLICTED, and the legitimate extractor is being
-      #                                      locked out right now
-      # It also fires while `audit-only` is set (the gate counts what it WOULD have rejected), which
-      # is exactly how the operator measures the blast radius before enforcing.
-      #
-      # Threshold: any sustained occurrence. This is deliberately not baseline-tuned away — a single
-      # foreign client calling once a minute is the signal, not noise.
       - alert: IngestUnknownClient
         expr: sum by (reason) (rate(basetool_ingest_client_rejected_total[10m])) > 0
         for: 10m
@@ -1299,23 +590,6 @@ groups:
           summary: "Ingest client-identity gate rejecting callers ({{ $labels.reason }})"
           description: "The ingest gateway refused a caller under reason '{{ $labels.reason }}'. unknown_client/bad_provenance means an unapproved tool is calling the restricted ingest interface; missing_azp/missing_scope means a Keycloak mapper or scope assignment regressed and the official extractor may be locked out. Check the gateway log for the matching WARN and the allowlist in APP_INGEST_CLIENT_IDENTITY_ALLOWED_CLIENT_IDS."
 
-      # (ING-SEC-03, REQ-INGEST-011) The ingest gateway's JWT audience check is OFF.
-      #
-      # Every client gate of the gateway is switched on by the environment alone, and the audience is
-      # the one an operator must set by hand, LAST, after the audit-only pass of the client-identity
-      # gate (docs/INGEST_KEYCLOAK_SETUP.md step 7a). Until 2026-09-22 nothing but reading the host's
-      # environment said whether it had been: on 2026-08-28 it held the backend's value, i.e.
-      # effectively off, and nobody could see it. basetool_ingest_gate_enforcing{gate="audience"} is
-      # 1 once IRI_INGEST_EXPECTED_AUDIENCES carries a value, 0 otherwise.
-      #
-      # Why no environment or profile matcher: this Prometheus scrapes the production stack only
-      # (external_labels monitor=basetool-prod; dev, test and e2e run no monitoring plane), so the
-      # series it sees is by construction the production gateway's. The rule is scoped to the ingest
-      # application label so a future second gateway would be judged on its own.
-      #
-      # Expected to fire from the first deploy of the gauge until the operator completes step 7a;
-      # that is the point — it turns an unverified assumption into a standing, visible task. `for:`
-      # spans a restart, during which the gauge is absent and the rule is silent anyway.
       - alert: IngestAudienceGateOff
         expr: max by (application) (basetool_ingest_gate_enforcing{gate="audience", application="basetool-ingest"}) == 0
         for: 30m
@@ -1325,23 +599,6 @@ groups:
           summary: "Ingest gateway runs without its JWT audience check"
           description: "basetool_ingest_gate_enforcing{gate=\"audience\"} is 0: the ingest gateway accepts any valid realm token at the decoder, including frontend session tokens. Set IRI_INGEST_EXPECTED_AUDIENCES=basetool-ingest (never the backend's audience) once a live extractor token carries aud=basetool-ingest, after the client-identity gate has left audit-only — docs/INGEST_KEYCLOAK_SETUP.md step 7a — then re-render env.d and restart ingest."
 
-      # A8 / REQ-OBS-018: a client nobody registered here is driving the backend API.
-      #
-      # The backend counterpart of IngestUnknownClient above, and deliberately weaker: the ingest
-      # gateway REFUSES an unlisted client, this one only counts it. The backend serves whichever
-      # first-party clients the realm carries, and 403ing an unrecognised azp would lock out a
-      # client the day it is registered in Keycloak and before it reaches a properties file. So the
-      # allowlist bounds the label and this rule is what turns "counted" into "noticed".
-      #
-      # Reading it: client_id="other" means a token minted for some OTHER realm client called
-      # /api/**. That is not automatically an attack — a new first-party client that nobody added
-      # to app.monitoring.api-clients.known-client-ids reads identically — but both cases want the
-      # same first move: find out which client, from the Keycloak event log or the vhost access log,
-      # and then either register it or revoke it.
-      #
-      # Threshold: any sustained occurrence, like its ingest sibling. A foreign client calling once
-      # a minute is the signal, not the noise. It counts requests the downstream gates went on to
-      # refuse, on purpose — a client must not be able to hide behind its own 403s and 429s.
       - alert: ApiUnknownClient
         expr: sum (rate(basetool_api_client_requests_total{client_id="other"}[10m])) > 0
         for: 10m
@@ -1351,56 +608,6 @@ groups:
           summary: "Unregistered client software is calling the backend API"
           description: "A token whose azp names no known client drove /api/** for 10 minutes. Either a first-party client was added to the realm without being added to app.monitoring.api-clients.known-client-ids, or something nobody approved is using the API. Identify it from the Keycloak client sessions and the api vhost access log; the label is deliberately bounded to 'other' and will never name it."
 
-      # STAGED (REQ-OBS-014) — do NOT uncomment before the verification in
-      # docs/archive/MONITORING_ROLLOUT_RUNBOOK.md, Appendix C.
-      #
-      # client_id="none" means an authenticated caller whose token carries no azp claim at all.
-      # Unlike "other" that is not a foreign client but a Keycloak mapper regression, and it blinds
-      # the attribution for every client at once — worth alerting on precisely because nothing else
-      # would notice. It ships disabled because the opposite failure is worse: if some legitimate
-      # flow in this realm mints tokens without azp, the rule fires the day it merges and keeps
-      # firing, and a permanently-firing rule is how an operator learns to ignore a channel. Enable
-      # it once a week of production data shows the series flat at zero.
-      # - alert: ApiClientAttributionBlind
-      #   expr: sum (rate(basetool_api_client_requests_total{client_id="none"}[10m])) > 0
-      #   for: 15m
-      #   labels:
-      #     severity: warning
-      #   annotations:
-      #     summary: "API requests arrive without a client identity (azp missing)"
-      #     description: "Authenticated /api/** requests carry no azp claim, so basetool_api_client_requests_total can no longer attribute traffic to a client and ApiUnknownClient is blind. This is a realm-side regression (a removed/renamed protocol mapper on the client's dedicated scope), not a caller problem."
-
-      # Terms-of-Use consent rollout stalled (REQ-SEC-028). After a wording change every member is
-      # blocked until they accept, so the gate refusing callers is EXPECTED for a while — what is
-      # not expected is refusals continuing while nobody gets through, which is what a broken
-      # consent path looks like from the outside.
-      #
-      # Deliberately a conjunction. A flat basetool_terms_accepted_users alone proves nothing (it is
-      # flat all night because nobody is online), and refusals alone are the feature working. Only
-      # "people are hitting the gate AND none of them is getting past it" is a defect.
-      #
-      # `or vector(0)` is load-bearing: basetool_terms_acceptances_total does not exist as a series
-      # until the first acceptance ever recorded, and an absent series makes the `and` yield nothing
-      # — the alert could never fire in exactly the situation it is meant to catch (nobody has
-      # managed to accept). See the increase()-cannot-fire trap.
-      # Reads SUBJECTS, not requests. The refusal RATE cannot separate "the membership is locked
-      # out" from "one client is retrying": 0.01/s is one refusal per 100 s, while a single consent
-      # page render costs ~3, so any automated caller sustains the old threshold indefinitely. That
-      # is how this fired twice overnight on 2026-08-03 with nobody awake — one browser tab whose
-      # EventSource had been redirected into a reconnect loop (fixed separately). A looping tab, a
-      # member reading the terms slowly, and a straggler whose extractor keeps retrying are each ONE
-      # subject and can no longer fire it.
-      #
-      # max(), never sum(): the gauge is per process, so a subject refused on two instances would
-      # otherwise count twice. >= 3 distinct people locked out simultaneously is the shape of a
-      # broken consent path; for: 1h beats a deliberate read of a legal document, which the old 30m
-      # did not. Known and accepted fail-quiet: a backend restart inside the 2h window makes
-      # increase() extrapolate a phantom acceptance and suppresses the alert until it clears.
-
-      # The gateway calls the backend under its own identity since ADR-0129, so this
-      # client-credentials grant sits on the critical path of EVERY ingest upload. If it fails,
-      # nobody can send, and the failure is in a hop no client can see or report — the extractor
-      # only ever shows the gateway's 5xx. Any sustained failure is therefore worth waking up for.
       - alert: IngestServiceAccountTokenFailing
         expr: >-
           sum(rate(basetool_ingest_service_account_token_total{outcome="failed"}[10m])) > 0
@@ -1411,9 +618,6 @@ groups:
           summary: "Ingest gateway cannot obtain its own backend token"
           description: "The ingest gateway's client-credentials grant against Keycloak has been failing for 10 minutes. Every upload from the desktop extractor is refused for as long as this lasts, and the extractor cannot tell the user why. Check the gateway's app.ingest.service-account.* configuration, the client secret, and whether Keycloak is reachable from the gateway."
 
-      # An impersonation attempt, or a misconfigured gateway client id - and the two are worth
-      # telling apart quickly. The on-behalf-of header is the only way any caller can act as
-      # somebody else in this application, so a non-zero rate is never routine.
       - alert: OnBehalfOfRefusedSpike
         expr: >-
           sum(rate(basetool_on_behalf_of_refused_total{reason="not_a_gateway"}[15m])) > 0
@@ -1424,16 +628,6 @@ groups:
           summary: "Something other than the ingest gateway is sending an on-behalf-of header"
           description: "The backend refused an X-Ingest-On-Behalf-Of header from a caller whose azp is not on the gateway allowlist, repeatedly. Either app.security.ingest-gateway.client-ids does not match the gateway's actual client id - in which case ingest uploads are also failing - or somebody is probing for an impersonation primitive. Check the gateway's own token first, then the access log for the source."
 
-      # A named subject does not expire the way a token does. That asymmetry is the whole reason
-      # the liveness bound exists (ADR-0129), and this is the counter that says it is holding.
-      # Two very different causes land here, and the runbook step is to tell them apart:
-      #   - an offboarded member whose extractor is still installed and still sending, which is
-      #     benign but should end with uninstalling it; and
-      #   - a caller walking UUIDs to find out which subjects exist, which is not. The refusal is
-      #     byte-identical for both by design, so this metric is the ONLY place they differ.
-      # No `for:` clause as low as the others: a single refusal is meaningful here, but a
-      # decommissioned laptop retrying on a schedule would flap a 0-tolerance rule, so this asks
-      # for a sustained rate instead.
       - alert: ActingMemberNotLiveRefused
         expr: >-
           sum(rate(basetool_on_behalf_of_refused_total{reason="member_not_live"}[15m])) > 0
@@ -1444,14 +638,6 @@ groups:
           summary: "Ingest gateway is naming a member the backend will not act for"
           description: "The backend has been refusing on-behalf-of requests for a member that is either unknown locally or that the last Keycloak roster sync no longer found. Most likely an offboarded member whose desktop extractor is still running - find them via the correlationId in the backend log and have it uninstalled. If the refused subjects VARY, this is somebody enumerating user ids instead, and the source belongs in the access log."
 
-      # Two causes, and the rate tells them apart. The header ships in the extractor and is
-      # documented, so an unauthenticated caller CAN send it - a probe, or a client whose token
-      # expired mid-upload. That is ambient and single-shot. A sustained rate means the filter
-      # cannot see a caller that should be there, i.e. the chain was reordered ahead of it, which
-      # is the class of bug ADR-0129 was written after.
-      # NOT a >0-over-an-hour rule: this reason was briefly reachable from ANY path, and that
-      # version fired for a full hour off one internet probe. The endpoint bound now runs first, so
-      # only the two ingest endpoints can produce it, and a sustained rate is meaningful.
       - alert: OnBehalfOfWithoutAuthenticatedCaller
         expr: >-
           sum(rate(basetool_on_behalf_of_refused_total{reason="no_authenticated_caller"}[15m])) > 0
@@ -1473,8 +659,6 @@ groups:
           summary: "Terms-of-Use consent gate locking out several members, none getting through"
           description: "At least three distinct members have been refused by the consent gate for an hour while not a single acceptance was recorded in the last two hours. Expected right after a terms change only if nobody has logged in; otherwise the consent path is broken and those members are locked out of the tool AND the desktop extractor. Check /admin/terms for who is outstanding, and the frontend log for failures on POST /terms/accept."
 
-      # Backend oversized-JSON-body rejections (RequestBodySizeLimitFilter) on the capped import
-      # endpoints (refinery import-extract). baseline-tune: >0.2/s sustained is a probing/DoS pattern.
       - alert: RequestBodyRejectedSpike
         expr: rate(basetool_request_body_rejected_total[5m]) > 0.2
         for: 10m
@@ -1484,7 +668,6 @@ groups:
           summary: "Backend oversized request-body rejections spiking"
           description: "The backend is refusing oversized non-multipart JSON request bodies (413) on a capped import path at an elevated rate — likely a memory-DoS probing attempt against the refinery import-extract endpoint, or a misconfigured client bypassing the frontend proxy cap."
 
-      # Keycloak login errors / Discord IdP broker error spike (primary login path).
       - alert: KeycloakLoginErrorSpike
         expr: rate(keycloak_user_events_total{event=~"login_error|identity_provider_login_error"}[5m]) > 0.2
         for: 10m
@@ -1494,22 +677,6 @@ groups:
           summary: "Keycloak login-error spike"
           description: "Keycloak is emitting login_error / IdP-error events at an elevated rate."
 
-      # (#1041 item 6) KeycloakLoginErrorSpike reads keycloak_user_events_total; if Keycloak's event
-      # metrics subsystem stops exporting while Keycloak itself is up, that alert goes silent (not
-      # firing) with no other signal. This catches the absence directly.
-      #
-      # The absence alone does NOT mean misconfigured, and reading it that way is what made this
-      # alert fire after every deploy (three times on 2026-09-14). `keycloak_user_events_total` is
-      # a TAGGED Micrometer counter: it does not exist until the first matching event, and a
-      # Keycloak restart empties the registry. So a freshly restarted Keycloak that nobody has
-      # signed in to yet looks exactly like one whose event listener is switched off.
-      #
-      # Waiting longer does not separate them either — a quiet night can pass without a single
-      # login. What separates them is OPPORTUNITY: if the token/auth endpoints have actually been
-      # exercised and the counter is still missing, the subsystem really is not recording. That is
-      # the third clause. `(/auth)?` because the public surface moved under /auth with ADR-0166
-      # while the management surface stayed at the root, and Keycloak's own uri label carries the
-      # resolved route.
       - alert: KeycloakEventMetricsAbsent
         expr: >-
           absent(keycloak_user_events_total)
@@ -1525,23 +692,6 @@ groups:
           summary: "Keycloak user-event metrics absent while Keycloak is up"
           description: "keycloak_user_events_total is not being exported while the Keycloak scrape is up — KeycloakLoginErrorSpike is blind. Check the Keycloak metrics/event listener config."
 
-      # (#1102, REQ-FE-015 / ADR-0094) Redis fan-out for cross-replica live delivery is erroring.
-      # Both the live-sync changed-relay (basetool_livesync_redis_errors_total, frontend) and the
-      # notification SSE fan-out (basetool_sse_redis_errors_total, backend) publish each locally-relayed
-      # signal onto a Redis pub/sub channel so peer replicas relay it to their own rooms. The publish is
-      # fire-and-forget AFTER the local relay, so a publish error does NOT drop same-replica delivery —
-      # it silently degrades to single-instance: a viewer on replica A stops seeing changes/notifications
-      # made on replica B, with no user-facing error and no 5xx. Only fires where the fan-out is enabled
-      # (prod): a disabled fan-out issues no publishes and therefore no errors, so this never trips in
-      # single-instance dev. Sustained publish errors mean the Redis channel is unreachable from a
-      # replica (Redis down, ACL/network drift) — check Redis and the basetool:livesync:changed /
-      # basetool:notify:published channels (the default user needs `&*` for PUBLISH/SUBSCRIBE).
-      # The op="publish" selector is deliberate and load-bearing: since #1237/ADR-0126 the frontend
-      # also gossips editor-presence snapshots on a THIRD channel (basetool:livesync:presence),
-      # whose failures count under op="presence_publish"/"presence_consume". Those stay OUT of this
-      # expression on purpose — a lost changed frame leaves a peer acting on stale data, a lost
-      # presence gossip costs a cosmetic dot. Presence errors are visible on the `07` Redis fan-out
-      # panel instead. If presence ever stops being cosmetic, widen the selector here, not the tag.
       - alert: LiveSyncRedisFanoutBroken
         expr: sum(rate(basetool_livesync_redis_errors_total{op="publish"}[5m])) > 0 or sum(rate(basetool_sse_redis_errors_total{op="publish"}[5m])) > 0
         for: 10m
@@ -1551,24 +701,6 @@ groups:
           summary: "Redis live-sync/notification fan-out publish errors (cross-replica delivery degraded)"
           description: "The live-sync and/or notification Redis fan-out has failed to publish for 10 minutes — cross-replica live delivery is silently degraded to single-instance (a viewer on one replica stops seeing another replica's changes/notifications; same-replica delivery still works, no user-facing error). Check Redis reachability from the app replicas and the basetool:livesync:changed / basetool:notify:published pub/sub channels (default-user ACL `&*`)."
 
-      # (ADR-0143, REQ-FE-019, REQ-OBS-011) The app live-sync bridge stopped bridging.
-      #
-      # This is the one failure the bridge cannot show any other way. Both halves keep working
-      # alone: the frontend relays browser-to-browser, the backend relays app-to-app, every health
-      # check is green, no request fails — and a browser edit simply never reaches a phone while a
-      # phone's write never reaches a browser. Nobody reports it, because from either side it looks
-      # like the other side did not change anything.
-      #
-      # The causes are all configuration, which is why it is worth a rule rather than a dashboard:
-      # app.live-sync.redis-fanout.enabled left off in prod, the channel overridden to something
-      # the frontend does not use, or the backend's Redis ACL missing PUBLISH/SUBSCRIBE (`&*`).
-      #
-      # Three conjuncts, each load-bearing. There must be something to bridge (the frontend is
-      # actually publishing), someone to bridge it to (an app stream is open — otherwise a quiet
-      # night would fire this every time), and nothing arriving. The `or vector(0)` on the last one
-      # is not decoration: Micrometer creates a counter lazily on first increment, so a backend
-      # that has consumed nothing *ever* exposes no series at all, the comparison drops out of the
-      # vector, and the rule would be silent in exactly the total-failure case it exists for.
       - alert: AppLiveSyncBridgeSilent
         expr: |
           (sum(rate(basetool_livesync_redis_published_total{job="basetool-frontend"}[30m])) > 0)
@@ -1583,26 +715,6 @@ groups:
           summary: "App live-sync bridge silent (web changes are not reaching the app)"
           description: "The web frontend has been publishing live-sync changed frames for 30 minutes and the backend has consumed none, while app live-sync streams are open — so a browser edit never reaches the app and an app write never reaches a browser, with no error on either side. Check app.live-sync.redis-fanout.enabled on the backend (must be true in prod), that its channel is the frontend's basetool:livesync:changed and not a channel of its own, and the Redis default-user ACL (`&*` for PUBLISH/SUBSCRIBE)."
 
-      # (#1238, REQ-OBS-011) Live-sync relay drops. Every drop branch of the relay means a peer did
-      # NOT get an update it should have had: a throttled or topic-throttled `changed` frame, a write
-      # to a broken socket, a subscribe refused at the per-session topic cap, or a subscribe that
-      # failed OPEN because the authorization executor was saturated. All of them leave a viewer
-      # silently stale — no error client-side, no 5xx, nothing else to see it by.
-      #
-      # THRESHOLD IS MEASURED, NOT GUESSED. #1102 deferred this alert until a production baseline
-      # existed; the baseline was read on 2026-08-03 over the preceding 21 days and is *exactly
-      # zero*: `basetool_presence_relay_dropped_total` had not a single series in prod — Micrometer
-      # creates a counter lazily on first increment, so an empty vector means no drop branch has ever
-      # been taken, on any of the nine topic classes. Relay volume over the same window was small
-      # (mission 1175 `changed` frames, then 53/53/12/10/7/2 for inventory_all, materialboard,
-      # order_detail, bank_staff, orgunit_bank and bank_account; orders_queue 0), so the token
-      # buckets (burst 24, refill 1/s) are nowhere near being exercised. Against a three-week zero,
-      # >3 drops in an hour is a strong anomaly signal and still leaves headroom for the one drop
-      # class that CAN occur benignly: `send_failed` races when a socket closes between the
-      # `isOpen()` pre-check and the write. A one-off race can never reach 4/h, so it stays silent.
-      #
-      # `section_filtered` is deliberately excluded here — it is a code-skew defect, not a capacity
-      # signal, and needs the far lower threshold of LiveSyncSectionKeySkew below.
       - alert: LiveSyncRelayDropsSustained
         expr: sum by (topic_class, reason) (increase(basetool_presence_relay_dropped_total{reason!="section_filtered"}[1h])) > 3
         for: 15m
@@ -1612,33 +724,6 @@ groups:
           summary: "Live-sync relay dropping frames on {{ $labels.topic_class }} ({{ $labels.reason }})"
           description: "The live-sync relay dropped more than 3 frames in an hour on topic class {{ $labels.topic_class }} for reason {{ $labels.reason }}, sustained for 15m — peers on that surface are silently missing updates. Prod baseline for this counter is zero over 21d, so any sustained stream is anomalous. `throttled`/`topic_throttled`: a client or a room is exceeding its token bucket (misbehaving client, or a genuinely hot room needing a wider bound). `send_failed`: sockets breaking mid-write — check the reverse proxy's WebSocket timeouts. `topic_cap`: a client subscribing past its per-session topic cap (client bug). `authorize_saturated`: the subscribe-authorization executor is saturated and subscribes are failing OPEN — a subscribe was admitted without an authorization check, so treat it as security-relevant and check backend latency."
 
-      # (#1238, REQ-FE-010 / REQ-OBS-011) A section key is being broadcast that the relay's
-      # accept-list does not know, so the relay silently forwards nothing for it and every peer's
-      # matching panel stays stale — with no error on either side. This is THE REQ-FE-010 defect
-      # class, the one that shipped when `objectives`/`frequencies` were added to the mission write
-      # seam but not to the receiver and relay maps, and `section_filtered` is what finally makes it
-      # observable: the counter is bumped once per frame that lost at least one key to the whitelist.
-      #
-      # This replaces the `changed`-flatline alert #1238 originally proposed, which is NOT soundly
-      # constructible: `relayLocal` skips the originating session, so a room with one viewer relays
-      # zero `changed` frames however hard that viewer edits — a flatline is the normal state of an
-      # unoccupied surface. The guard the issue assumed ("while `snapshot` frames keep flowing")
-      # exists only for topic_class=mission, because every snapshot path is gated on
-      # presenceEnabled(), true for MISSION alone. Measured peak CONCURRENT subscriptions per class
-      # over the 21d to 2026-08-03 were mission 15, bank_staff 6, order_detail 4, {inventory_all,
-      # materialboard, orders_queue, orgunit_bank} 3, bank_account 2 and operation 1 — co-presence
-      # never once occurred on `operation`. So a flatline rule would be silent where it could fire
-      # and false where it could not. This rule detects the same defect POSITIVELY instead, needing
-      # no occupancy assumption at all. The new basetool_livesync_peer_rooms{topic_class} gauge is
-      # the co-presence denominator a future flatline rule would need; it is panel-only until it has
-      # its own baseline, and only `mission` looks likely to ever carry enough traffic for one.
-      #
-      # Persistence, not volume, is the discriminator: a real skew is deterministic and re-triggers
-      # on every edit of that section, so `increase[1h] > 0` held for 2h means drops kept arriving
-      # across at least two hours. A single isolated blip decays out of the 1h window and stays
-      # silent. Baseline here is also zero over 21d. Known gap: on a barely-used surface
-      # (bank_account relayed 2 frames in 21 days) a real skew may never sustain 2h — the dashboard
-      # panel remains the backstop there.
       - alert: LiveSyncSectionKeySkew
         expr: sum by (topic_class) (increase(basetool_presence_relay_dropped_total{reason="section_filtered"}[1h])) > 0
         for: 2h
@@ -1648,13 +733,6 @@ groups:
           summary: "Live-sync section-key skew on {{ $labels.topic_class }} (peers going stale)"
           description: "The live-sync relay has been filtering unknown section keys out of `changed` frames on topic class {{ $labels.topic_class }} for over 2 hours — a broadcast key is missing from the relay's accept-list, so peers' matching panels stay stale with no visible error (the REQ-FE-010 defect class). A section key must exist at all three mirror points at once: the acting page's seam map, LiveSyncTopicClass.allowedSections, and the receiving client's apply map. Check what the last frontend deploy changed on that surface and raise LiveSyncWebSocketHandler to DEBUG to see the rejected key (logged sanitised, never a metric tag)."
 
-      # (BE-PERF-13, ADR-0143 amendment, REQ-OBS-011) The backend's app live-sync streams are written
-      # off the publishing thread through a bounded per-stream queue (64 frames); a frame offered to
-      # a full queue is dropped and counted, never buffered. A queue only fills when a subscriber has
-      # stopped reading for several seconds while its room is busy, so the steady state is zero and
-      # an occasional single drop (one stalled phone on a flood) is not worth a page. More than 3 in
-      # an hour, sustained, means app members are systematically missing `changed` frames — the same
-      # threshold shape as LiveSyncRelayDropsSustained, its web-side twin.
       - alert: AppLiveSyncFramesDropped
         expr: sum by (event) (increase(basetool_livesync_frames_dropped_total{job="basetool-backend"}[1h])) > 3
         for: 15m

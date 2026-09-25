@@ -92,9 +92,6 @@ class ConcurrencyTest {
 
   @AfterEach
   void cleanupSeedRow() {
-    // Without an outer @Transactional the seed mission survives the test;
-    // remove it so adjacent tests that snapshot the table can rely on a
-    // clean baseline.
     if (seedMissionId != null) {
       missionRepository.deleteById(seedMissionId);
       seedMissionId = null;
@@ -127,15 +124,6 @@ class ConcurrencyTest {
             pool.submit(
                 () -> {
                   try {
-                    // Since #1114 every mutable Mission scalar is @OptimisticLock(excluded=true),
-                    // so a
-                    // bare save after mutating one scalar no longer bumps the row @Version (that is
-                    // what stops a core edit from 409-ing a concurrent schedule edit). The
-                    // row-level
-                    // "exactly one wins" guarantee now lives on the legacy full-replace path
-                    // (updateMission), which force-increments @Version via
-                    // OPTIMISTIC_FORCE_INCREMENT
-                    // — this test exercises that path.
                     Long staleVersion = missionRepository.findById(id).orElseThrow().getVersion();
                     ready.countDown();
                     if (!go.await(START_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {

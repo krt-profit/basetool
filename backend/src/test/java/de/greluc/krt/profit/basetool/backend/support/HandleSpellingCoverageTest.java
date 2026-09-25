@@ -62,7 +62,6 @@ class HandleSpellingCoverageTest {
         .collect(Collectors.toSet());
   }
 
-  // covers REQ-SEC-062 - a spelling the search does not reach would be a name nobody can find
   @Test
   void everySpellingIsAColumnThePersonSearchMatchesOn() {
     assertThat(searchedColumns())
@@ -73,7 +72,6 @@ class HandleSpellingCoverageTest {
         .containsAll(HandleSpellings.COLUMNS);
   }
 
-  // covers REQ-SEC-058 - and the addition direction: a new name column cannot stay off the list
   @Test
   void everySearchedMemberColumnIsEitherASpellingOrDeclaredNotToBeOne() {
     Set<String> accounted =
@@ -90,7 +88,6 @@ class HandleSpellingCoverageTest {
         .allSatisfy(column -> assertThat(accounted).contains(column));
   }
 
-  // covers REQ-SEC-062 - a declared non-spelling must be a column that is really searched
   @Test
   void everyDeclaredNonSpellingIsRealAndStatesAReason() {
     assertThat(HandleSpellings.NOT_A_SPELLING)
@@ -107,7 +104,6 @@ class HandleSpellingCoverageTest {
             });
   }
 
-  // covers REQ-SEC-062 - no column may be a spelling and a non-spelling at once
   @Test
   void noColumnIsBothASpellingAndNotOne() {
     assertThat(HandleSpellings.COLUMNS)

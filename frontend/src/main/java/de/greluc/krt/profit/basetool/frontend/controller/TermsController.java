@@ -79,9 +79,6 @@ public class TermsController {
   @NotNull
   @GetMapping("/terms")
   public String showTerms(Model model) {
-    // The only bearer-less backend call the frontend makes (REQ-SEC-052). Named rather than
-    // expressed as a flag: a boolean parameter meaning "send this without an identity" was what
-    // forty other call sites used to pass, and each of them was a decision nobody made on purpose.
     try {
       model.addAttribute("terms", backendApiClient.getTermsDocumentAnonymously());
     } catch (BackendServiceException e) {

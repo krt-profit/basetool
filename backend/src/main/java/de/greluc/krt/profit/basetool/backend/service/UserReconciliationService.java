@@ -142,35 +142,14 @@ public class UserReconciliationService {
     final UUID finalUserId = userService.getUserIdFromJwt(jwt);
     String username = jwt.getClaimAsString("preferred_username");
 
-    // A Discord federated login is recognised ONLY by the Keycloak subject / discord_user_id link,
-    // never by username (REQ-SEC-017 / REQ-DATA-006). That used to need an explicit carve-out here,
-    // because the name-matching fallback below would otherwise have linked a brokered -- i.e.
-    // attacker-influenced -- Discord username onto a pre-existing, possibly privileged, already
-    // ACTIVE row, bypassing the PENDING gate. The fallback is gone (#1639), so the rule the
-    // carve-out enforced now holds for every login path by construction rather than by exception.
     final String discordUserId = jwt.getClaimAsString("discord_user_id");
     final boolean viaDiscord = discordUserId != null && !discordUserId.isBlank();
 
     Optional<User> existingUser = userRepository.findById(finalUserId);
     if (existingUser.isEmpty() && username != null) {
-      // A token whose subject matches no row NEVER adopts one found by name (ADR-0142 point 5,
-      // #1639). Until this release it did, and the consequences were both silent: from that login
-      // on, app_user.id was not the caller's subject for that one row -- the invariant 39 foreign
-      // keys, the frontend's own comparisons, /users/me and the audit trail all rest on -- and a
-      // Keycloak username, which is neither immutable nor unique after a deletion, decided which
-      // account a token acted as. A recreated account with a previous member's callsign inherited
-      // their inventory, their bank grants and their notifications.
-      //
-      // The caller is provisioned as a brand-new registration below instead. That lands PENDING
-      // and notifies every admin (REQ-SEC-017, REQ-NOTIF-012), so the collision surfaces as a
-      // decision rather than as an inheritance. It is still worth a log line -- this is exactly
-      // the case the fallback used to hide.
       List<UUID> sameCallsign = userRepository.findIdsByUsername(username);
       if (!sameCallsign.isEmpty()) {
         meterRegistry.counter(MetricNames.USER_CALLSIGN_COLLISIONS).increment();
-        // REQ-OBS-004: never log names/handles. preferred_username can be a real callsign that the
-        // PiiMasker cannot scrub (it only matches JWTs, e-mails and token keywords), so log the
-        // row ids and omit the value.
         log.warn(
             "Callsign collision: subject {} is unknown, but {} existing account(s) hold the same"
                 + " preferred_username (value omitted, PII), e.g. {}. Provisioning a NEW pending"
@@ -181,8 +160,6 @@ public class UserReconciliationService {
       }
     }
 
-    // A truly new user (no row by id and none by username) is provisioned for the first time; the
-    // post-save event grants their default blueprints after commit (REQ-INV-016).
     final boolean created = existingUser.isEmpty();
 
     User user =
@@ -195,9 +172,6 @@ public class UserReconciliationService {
 
     boolean changed = false;
 
-    // A token exists only for an enabled account, so a successful authentication is itself proof of
-    // the flag the roster sync mirrors — which makes re-activation take effect at the member's next
-    // login rather than waiting for the next sync pass.
     if (!user.isEnabledInKeycloak()) {
       user.setEnabledInKeycloak(true);
       changed = true;
@@ -208,41 +182,17 @@ public class UserReconciliationService {
       changed = true;
     }
 
-    // Privacy / data minimisation: given_name / family_name are intentionally NOT read or stored
-    // anymore (the columns were dropped from the entity). Only username, email and roles are
-    // mirrored locally.
     String email = jwt.getClaimAsString("email");
     if (!Objects.equals(user.getEmail(), email)) {
       user.setEmail(email);
       changed = true;
     }
 
-    // Sync Roles.
-    //
-    // The token's claim is authoritative for MOST clients and for none of them unconditionally.
-    // A client provisioned with `fullScopeAllowed: false` and a narrowed scope mints a token that
-    // describes a deliberately smaller member than the real one: the mobile client's scope names
-    // five of the realm's eight roles (REQ-SEC-035). Because this write REPLACES the stored set
-    // rather than merging into it, persisting such a claim lets whichever client a member happened
-    // to use last decide what the database says they are. The case that actually bit, before the
-    // scope gained `Admin` on 2026-09-02: an administrator who opened the app had `Admin` removed
-    // from their row, and every consumer that reads roles outside a request
-    // (scheduled tasks, notification targeting, roster views) would see the narrower set until
-    // their next web request put it back.
-    //
-    // So for a partial-scope client the stored set is left ALONE and the token's roles are used for
-    // this request only. The stored set stays maintained by the clients whose claim is complete and
-    // by the daily Admin-API pass (`syncUser(KeycloakUserDto)`), which reads the realm directly and
-    // is unaffected by any client's scope -- so the row still converges even for a member who only
-    // ever uses the app. REQ-SEC-036.
     Set<String> keycloakRoles = extractRolesFromJwt(jwt);
     Set<Role> localRoles = mapRoles(keycloakRoles);
     final boolean roleClaimIsPartial =
         partialRoleScopeProperties.isPartialRoleScopeClient(jwt.getClaimAsString("azp"));
 
-    // A brand-new row is an exception in the safe direction: there is no stored set to protect, and
-    // the alternative is persisting a member with no roles at all. The next complete-claim login or
-    // Admin-API pass widens it.
     final boolean mayPersistRoles = !roleClaimIsPartial || created;
 
     if (mayPersistRoles) {
@@ -251,7 +201,6 @@ public class UserReconciliationService {
         changed = true;
       }
     } else if (!user.getRoles().equals(localRoles)) {
-      // REQ-OBS-004: the id, never the username -- preferred_username can be a real callsign.
       log.debug(
           "Role claim from partial-scope client not persisted for user {} (stored {} roles, token"
               + " carried {})",
@@ -260,39 +209,16 @@ public class UserReconciliationService {
           localRoles.size());
     }
 
-    // Persist the Discord account link (auto-link, REQ-DATA-006) from the IdP-mapped token claim.
-    // discordUserId / viaDiscord were resolved up-front (see the subject-only lookup above).
     if (viaDiscord && applyDiscordLink(user, discordUserId)) {
       changed = true;
     }
 
-    // Persist the per-guild Discord server nickname (REQ-DATA-018) from the optional IdP-mapped
-    // claim. Display-only — shown to admins in the registration-approval queue so a decision can be
-    // tied to a recognisable in-server identity. Captured best-effort, so it may be absent (no
-    // nickname set, non-Discord login, or capture mappers not configured); refreshes on every
-    // login.
     String guildNickname = normalizeGuildNickname(jwt.getClaimAsString("discord_guild_nickname"));
     if (!Objects.equals(user.getDiscordGuildNickname(), guildNickname)) {
       user.setDiscordGuildNickname(guildNickname);
       changed = true;
     }
 
-    // Approval lifecycle (epic #720, Track 1 / REQ-SEC-017 — fail-safe default). EVERY brand-new
-    // non-admin registration lands PENDING and receives no authorities until an admin approves,
-    // regardless of whether the login arrived via Discord or credentials. The PENDING stamping is
-    // delegated to the shared UserRegistrationService#stampNewPendingRegistration so this JWT path
-    // and the scheduled Admin-API path evaluate the approval gate identically — deliberately
-    // decoupled from Discord detection: the PENDING decision must NOT depend on the optional
-    // discord_user_id claim/mapper, otherwise a misconfigured Keycloak (attribute/protocol mapper
-    // absent) would let a federated login inherit the ACTIVE entity-default and silently skip
-    // approval. Keycloak ADMIN-realm-role holders are auto-ACTIVE (bootstrap safety — the first
-    // admin can never be locked out), and the carve-out below also promotes an existing PENDING
-    // admin to ACTIVE (specific to this interactive path). The admin notification (REQ-NOTIF-012)
-    // fires for EVERY such new PENDING registration, keyed off the PENDING transition itself and
-    // NOT off the discord_user_id claim: a missing claim mapper must never silence an approval
-    // notification any more than it may skip the gate. A credential registration therefore notifies
-    // too — at first login there is no reliable Discord signal without the claim, and the event
-    // carries no Discord id/PII anyway (only id + username).
     boolean isAdmin = localRoles.stream().anyMatch(r -> Roles.ADMIN.equalsIgnoreCase(r.getCode()));
     boolean newPendingRegistration =
         userRegistrationService.stampNewPendingRegistration(user, created, localRoles);
@@ -304,27 +230,15 @@ public class UserReconciliationService {
       changed = true;
     }
     if (created && isAdmin) {
-      // The bootstrap carve-out is the one way a row reaches ACTIVE with no admin decision behind
-      // it, and until this counter existed it left no trace whatsoever. It is also what makes a
-      // failed Keycloak delete during an erasure dangerous rather than untidy: the recreated row
-      // of an ADMIN-realm-role holder is ACTIVE immediately, not a refusable PENDING registration
-      // (REQ-SEC-061, and the corrected note in security-and-access.md).
       meterRegistry.counter(MetricNames.ADMIN_REGISTRATION_AUTO_ACTIVATED).increment();
     }
 
     if (changed || user.isNew()) {
       User saved = userRepository.save(user);
       if (created) {
-        // Grant the default blueprints in THIS transaction so a brand-new user has them committed
-        // before the request returns (REQ-INV-016). The grant is an idempotent bulk INSERT … ON
-        // CONFLICT touching only personal_blueprint (never the app_user row), so it neither bumps
-        // the user's @Version nor collides with the converter's retry. The id is the Keycloak sub,
-        // set before the first save.
         defaultBlueprintProvisioningService.grantDefaultsToUser(user.getId());
       }
       if (newPendingRegistration) {
-        // After-commit listener notifies every admin of the new pending registration
-        // (REQ-NOTIF-012); the event carries no Discord id/PII (only user id + username).
         eventPublisher.publishEvent(
             new DiscordRegistrationPendingEvent(saved.getId(), saved.getUsername()));
       }
@@ -361,17 +275,10 @@ public class UserReconciliationService {
 
     if (!user.isInKeycloak()) {
       user.setInKeycloak(true);
-      // Clear the absence stamp with the flag it belongs to (REQ-SEC-059). An account that comes
-      // back is no longer waiting for deletion, and leaving the instant behind would keep it in the
-      // orphan-age gauge forever — a permanently firing alert for an account that is present.
       user.setKeycloakAbsentSince(null);
       changed = true;
     }
 
-    // The Admin API has always returned this; it used to be dropped on the floor. Persisted since
-    // V230 because a named subject does not expire the way a token does (ADR-0129): without it,
-    // deactivating a member in Keycloak left their extractor sending indefinitely. A null `enabled`
-    // is read as TRUE — an absent field must not lock out a member base.
     boolean enabled = !Boolean.FALSE.equals(dto.enabled());
     if (user.isEnabledInKeycloak() != enabled) {
       user.setEnabledInKeycloak(enabled);
@@ -383,28 +290,14 @@ public class UserReconciliationService {
       changed = true;
     }
 
-    // Privacy / data minimisation: first / last name are intentionally not mirrored (see
-    // syncUser(Jwt)).
     if (!Objects.equals(user.getEmail(), dto.email())) {
       user.setEmail(dto.email());
       changed = true;
     }
 
-    // Sync Roles. The mapping is tracked (not just applied) on this path: a realm-side role rename
-    // makes every holder's names stop matching, which strips them all overnight — a privilege
-    // change with no signal anywhere, because the fetch itself succeeded and the item count stayed
-    // the same. Since REQ-SEC-053 that is a lockout rather than a demotion, which raises the stakes
-    // on the tally rather than changing how it works. The tallies feed the per-run aggregate
-    // written by logRoleSyncSummary(); the per-account line stays at DEBUG and carries the sub
-    // UUID only.
     RoleMapping mapping = mapRolesTracked(dto.roles());
     droppedRoleNames.addAndGet(mapping.droppedNames());
     Set<Role> localRoles = mapping.roles();
-    // The role-less tally is counted OUTSIDE the delta gate on purpose. Inside it, only an account
-    // that role-less-ness happened TO on this run is counted, and an account that was already
-    // role-less contributes nothing - so the population V239 creates in one stroke (every ex-GUEST
-    // holder) is invisible on the first run and on every run after it, which is precisely the
-    // population the WARN exists to surface. It is a census, not a delta.
     if (mapping.roleLess()) {
       roleLessAccounts.incrementAndGet();
     }
@@ -419,14 +312,6 @@ public class UserReconciliationService {
           mapping.droppedNames());
     }
 
-    // Persist the Discord account link discovered out-of-band via the Keycloak Admin API
-    // (/federated-identity, see KeycloakService#fetchDiscordFederatedId). This is what surfaces the
-    // link for accounts that linked Discord AFTER creation — the import-time token claim only
-    // covers
-    // accounts that registered via Discord (REQ-DATA-006). Like syncUser(Jwt) this only SETS the
-    // link, never clears it: the federated-identity fetch is best-effort and returns null on any
-    // failure, so clearing on a null would wrongly wipe a real link on a transient Admin-API
-    // hiccup.
     String discordUserId = dto.discordUserId();
     if (discordUserId != null
         && !discordUserId.isBlank()
@@ -434,36 +319,21 @@ public class UserReconciliationService {
       changed = true;
     }
 
-    // Fail-safe approval default (REQ-SEC-017), mirroring syncUser(Jwt): a brand-new non-admin user
-    // first discovered by the scheduled reconciliation lands PENDING via the shared
-    // UserRegistrationService#stampNewPendingRegistration, so the scheduler can never pre-create an
-    // ACTIVE row that a later interactive login would inherit (created == false) and thereby skip
-    // the approval gate. Admins stay ACTIVE (entity default, bootstrap safety). Only brand-new rows
-    // are touched — an existing user's approval state is never changed here.
     boolean newPendingRegistration =
         userRegistrationService.stampNewPendingRegistration(user, created, localRoles);
     if (newPendingRegistration) {
       changed = true;
     } else if (created
         && localRoles.stream().anyMatch(r -> Roles.ADMIN.equalsIgnoreCase(r.getCode()))) {
-      // Same signal as the interactive path: a brand-new row that is ACTIVE on arrival because of
-      // the REQ-SEC-017 bootstrap carve-out. Counted on whichever path inserts the row, so the two
-      // cannot double-count -- `created` is true exactly once per account.
       meterRegistry.counter(MetricNames.ADMIN_REGISTRATION_AUTO_ACTIVATED).increment();
     }
 
     if (changed || user.isNew()) {
       userRepository.save(user);
       if (created) {
-        // Grant the default blueprints synchronously on first creation (REQ-INV-016); idempotent.
         defaultBlueprintProvisioningService.grantDefaultsToUser(user.getId());
       }
       if (newPendingRegistration) {
-        // A registration first materialised by the scheduled reconciler (rather than by the
-        // interactive login) must still notify the admins (REQ-NOTIF-012). Gating on `created`
-        // keeps it exactly-once across both paths: whichever path inserts the row has created ==
-        // true and publishes; every later call in either path sees created == false and stays
-        // silent, so no persisted "announced" flag is needed. The event carries no Discord id/PII.
         eventPublisher.publishEvent(
             new DiscordRegistrationPendingEvent(user.getId(), user.getUsername()));
       }
@@ -537,10 +407,6 @@ public class UserReconciliationService {
     if (currentIds.isEmpty()) {
       return 0;
     }
-    // The instant is recorded so the orphan-age guard of REQ-SEC-059 can say how long an account
-    // has been waiting for the second half of its deletion. The update's `inKeycloak = true`
-    // predicate keeps this a FIRST-observation stamp: a row already flagged is not rewritten, so
-    // the value does not creep forward with every nightly run.
     return userRepository.markMissingUsers(currentIds, Instant.now());
   }
 
@@ -681,11 +547,6 @@ public class UserReconciliationService {
       }
     }
 
-    // REQ-SEC-053: nothing is substituted for an empty result any more. It used to be handed the
-    // authority-less `Guest` role, which read as "mapped" while meaning "not mapped" — and, with
-    // the anonymous surface still open, quietly granted the guest read surface to an account whose
-    // realm roles the sync had failed to resolve. An empty set is now the honest answer, and
-    // `assembleFor` turns it into a refusal.
     return new RoleMapping(localRoles, localRoles.isEmpty(), dropped);
   }
 
@@ -767,7 +628,6 @@ public class UserReconciliationService {
     if (realmAccess != null && realmAccess.containsKey("roles")) {
       roles.addAll((List<String>) realmAccess.get("roles"));
     }
-    // Also check resource_access if needed, but realm_access is standard for realm roles
     return roles;
   }
 }

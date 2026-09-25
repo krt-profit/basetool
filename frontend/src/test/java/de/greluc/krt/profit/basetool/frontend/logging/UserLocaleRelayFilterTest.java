@@ -50,27 +50,21 @@ class UserLocaleRelayFilterTest {
 
   @Test
   void relayUserLocale_addsAcceptLanguageFromLocaleContext() {
-    // Given — the servlet layer resolved the user's UI language to German
     LocaleContextHolder.setLocale(Locale.GERMAN);
     AtomicReference<ClientRequest> sent = new AtomicReference<>();
 
-    // When
     filter.relayUserLocale().filter(request(), capture(sent)).block();
 
-    // Then
     assertThat(sent.get().headers().getFirst(HttpHeaders.ACCEPT_LANGUAGE)).isEqualTo("de");
   }
 
   @Test
   void relayUserLocale_omitsHeaderWithoutBoundLocaleContext() {
-    // Given — no locale context (background task / scheduled job)
     LocaleContextHolder.resetLocaleContext();
     AtomicReference<ClientRequest> sent = new AtomicReference<>();
 
-    // When
     filter.relayUserLocale().filter(request(), capture(sent)).block();
 
-    // Then — the backend falls through to its default-locale behaviour
     assertThat(sent.get().headers().getFirst(HttpHeaders.ACCEPT_LANGUAGE)).isNull();
   }
 

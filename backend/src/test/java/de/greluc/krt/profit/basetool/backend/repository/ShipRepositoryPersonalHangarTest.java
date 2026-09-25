@@ -69,9 +69,6 @@ class ShipRepositoryPersonalHangarTest {
     owner = newUser("owner-773");
     otherOwner = newUser("other-773");
 
-    // Two manufacturers, alphabetical: "Aegis-773" < "Drake-773". Names are suffixed so they never
-    // collide with the seeded UEX catalog (Manufacturer.name is UNIQUE) yet still let the search
-    // tests match by a stable substring.
     Manufacturer aegis = newManufacturer("Aegis-773", "AE773");
     Manufacturer drake = newManufacturer("Drake-773", "DR773");
 
@@ -85,18 +82,15 @@ class ShipRepositoryPersonalHangarTest {
 
   @Test
   void findByOwnerIdFiltered_ordersByTheFullMultiKeyComparator() {
-    // Ships are saved in a deliberately scrambled order; the query must return them in the rich
-    // comparator order: manufacturer, type, insurance tier (LTI < numeric < unset), amount desc,
-    // location, fitted-first, name, id. Each adjacent pair below isolates exactly one key.
-    saveShip("s-D", avenger, "120", false, area18); // numeric tier, amount 120
-    saveShip("s-H", cutlass, "LTI", false, area18); // Drake manufacturer -> last group
-    saveShip("s-A2", avenger, "LTI", true, area18); // name tiebreaker vs s-A
-    saveShip("s-F", avenger, "0", false, area18); // unset tier -> last in its type group
-    saveShip("s-B", avenger, "LTI", true, orison); // Orison > Area18 -> after the Area18 LTI ships
-    saveShip("s-A", avenger, "LTI", true, area18); // earliest: LTI, Area18, fitted, name s-A
-    saveShip("s-E", avenger, "30", false, area18); // numeric tier, amount 30 (after 120)
-    saveShip("s-C", avenger, "LTI", false, area18); // Area18 LTI but unfitted -> after fitted ones
-    saveShip("s-G", gladius, "LTI", false, area18); // Gladius type -> after every Avenger row
+    saveShip("s-D", avenger, "120", false, area18);
+    saveShip("s-H", cutlass, "LTI", false, area18);
+    saveShip("s-A2", avenger, "LTI", true, area18);
+    saveShip("s-F", avenger, "0", false, area18);
+    saveShip("s-B", avenger, "LTI", true, orison);
+    saveShip("s-A", avenger, "LTI", true, area18);
+    saveShip("s-E", avenger, "30", false, area18);
+    saveShip("s-C", avenger, "LTI", false, area18);
+    saveShip("s-G", gladius, "LTI", false, area18);
 
     Page<Ship> page =
         shipRepository.findByOwnerIdFiltered(owner.getId(), null, PageRequest.of(0, 50));
@@ -111,7 +105,6 @@ class ShipRepositoryPersonalHangarTest {
     saveShip("s-G", gladius, "LTI", false, area18);
     saveShip("s-H", cutlass, "LTI", false, area18);
 
-    // Ship-type name match (case-insensitive).
     assertThat(
             shipRepository
                 .findByOwnerIdFiltered(owner.getId(), "cutlass-773", PageRequest.of(0, 50))
@@ -120,7 +113,6 @@ class ShipRepositoryPersonalHangarTest {
                 .map(Ship::getName))
         .containsExactly("s-H");
 
-    // Manufacturer name match — "Aegis-773" owns both Avenger and Gladius, ordered by type.
     assertThat(
             shipRepository
                 .findByOwnerIdFiltered(owner.getId(), "AEGIS-773", PageRequest.of(0, 50))
@@ -129,7 +121,6 @@ class ShipRepositoryPersonalHangarTest {
                 .map(Ship::getName))
         .containsExactly("s-A", "s-G");
 
-    // A null term means "no filter" — every ship comes back.
     assertThat(shipRepository.findByOwnerIdFiltered(owner.getId(), null, PageRequest.of(0, 50)))
         .hasSize(3);
   }
@@ -173,8 +164,6 @@ class ShipRepositoryPersonalHangarTest {
                 .map(Ship::getName))
         .containsExactly("theirs");
   }
-
-  // ---- fixtures ----
 
   private User newUser(String username) {
     User u = new User();

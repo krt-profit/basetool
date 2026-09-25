@@ -39,9 +39,7 @@ public final class ClientIpContext {
 
   private static final ThreadLocal<String> HOLDER = new ThreadLocal<>();
 
-  private ClientIpContext() {
-    // utility
-  }
+  private ClientIpContext() {}
 
   /**
    * Stores the given client IP for the calling thread; a {@code null}/blank value clears the slot.

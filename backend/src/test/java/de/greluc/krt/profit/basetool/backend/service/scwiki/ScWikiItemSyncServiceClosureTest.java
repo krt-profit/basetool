@@ -116,8 +116,6 @@ class ScWikiItemSyncServiceClosureTest {
     int written = service.syncItems();
 
     verifyNoInteractions(scWikiClient, gameItemRepository, blueprintRepository);
-    // A dark sync writes no rows → 0 items, so scwiki_sync's tally reflects only enabled steps
-    // (#1041 item 2, SyncZeroItems).
     assertEquals(0, written, "a disabled item sync must report zero written rows");
   }
 
@@ -131,7 +129,6 @@ class ScWikiItemSyncServiceClosureTest {
 
     service.syncItems();
 
-    // Closure mode hits GET /api/items/{uuid} exactly for the two scoped uuids — never a list walk.
     verify(scWikiClient).fetchOne(eq("/api/items/" + a), eq(ScWikiItemDto.class), any());
     verify(scWikiClient).fetchOne(eq("/api/items/" + b), eq(ScWikiItemDto.class), any());
     verify(scWikiClient, never()).fetchAllPagesResult(any(), any(), any());
@@ -179,8 +176,6 @@ class ScWikiItemSyncServiceClosureTest {
 
     int written = service.syncItems();
 
-    // One existing row filled → one written row, the count fed to scwiki_sync's item tally (#1041
-    // item 2).
     assertEquals(1, written, "filling one existing row must report one written row");
     ArgumentCaptor<GameItem> saved = ArgumentCaptor.forClass(GameItem.class);
     verify(gameItemRepository).save(saved.capture());
@@ -189,14 +184,12 @@ class ScWikiItemSyncServiceClosureTest {
     assertEquals("venture-helmet-white-2", result.getScwikiSlug());
     assertEquals("FPS.Armor.Helmet", result.getClassification());
     assertEquals(2.5, result.getMass());
-    // width -> x, height -> y, length -> z; the Wiki serves the box under those names, never x/y/z.
     assertEquals(0.3, result.getDimensionX());
     assertEquals(0.4, result.getDimensionY());
     assertEquals(0.35, result.getDimensionZ());
     assertEquals("An explorer helmet.", result.getDescriptionEn());
     assertEquals("Ein Forscherhelm.", result.getDescriptionDe());
     assertEquals(1, result.getSizeClass());
-    // UEX-canonical fields untouched.
     assertEquals("Venture Helmet", result.getName());
     assertEquals(GameItemKind.ARMOR, result.getKind());
   }
@@ -271,10 +264,6 @@ class ScWikiItemSyncServiceClosureTest {
 
   @Test
   void syncItems_closure_isolatesPerItem_oneDeadlockDoesNotAbortTheRest() {
-    // Regression for the production deadlock cascade: the closure loop used to run in ONE
-    // transaction, so a deadlock on any row aborted the tx and every later item failed with
-    // "current transaction is aborted" (25P02). With per-item REQUIRES_NEW isolation, only the
-    // deadlocked item rolls back and the rest still persist.
     UUID deadlocked = UUID.randomUUID();
     UUID firstGood = UUID.randomUUID();
     UUID secondGood = UUID.randomUUID();
@@ -301,7 +290,6 @@ class ScWikiItemSyncServiceClosureTest {
 
     service.syncItems();
 
-    // Every item is attempted (the loop never aborts) and the two healthy rows still persist.
     verify(gameItemRepository, times(3)).save(any(GameItem.class));
     verify(gameItemRepository).save(argThat(g -> firstGood.equals(g.getExternalUuid())));
     verify(gameItemRepository).save(argThat(g -> secondGood.equals(g.getExternalUuid())));
@@ -309,9 +297,6 @@ class ScWikiItemSyncServiceClosureTest {
 
   @Test
   void syncItems_closure_defersOnOptimisticLock_oneCollisionDoesNotAbortTheRest() {
-    // A concurrent sync (e.g. the parallel UEX game_item sync) can bump a row's @Version between
-    // this REQUIRES_NEW transaction's read and commit. That collision is expected and benign: the
-    // colliding item is deferred (WARN, not ERROR) and the rest of the batch still persists.
     UUID collided = UUID.randomUUID();
     UUID firstGood = UUID.randomUUID();
     UUID secondGood = UUID.randomUUID();
@@ -337,7 +322,6 @@ class ScWikiItemSyncServiceClosureTest {
 
     service.syncItems();
 
-    // Every item is attempted (the loop never aborts) and the two healthy rows still persist.
     verify(gameItemRepository, times(3)).save(any(GameItem.class));
     verify(gameItemRepository).save(argThat(g -> firstGood.equals(g.getExternalUuid())));
     verify(gameItemRepository).save(argThat(g -> secondGood.equals(g.getExternalUuid())));
@@ -354,8 +338,6 @@ class ScWikiItemSyncServiceClosureTest {
 
     service.syncItems();
 
-    // The Wiki fetch completes before the per-item write transaction opens, so no game_item lock is
-    // ever held across the HTTP round-trip.
     InOrder ordered = inOrder(scWikiClient, gameItemRepository);
     ordered.verify(scWikiClient).fetchOne(eq("/api/items/" + uuid), eq(ScWikiItemDto.class), any());
     ordered.verify(gameItemRepository).save(any(GameItem.class));

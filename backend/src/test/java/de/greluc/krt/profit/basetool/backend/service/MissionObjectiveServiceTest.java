@@ -88,8 +88,6 @@ class MissionObjectiveServiceTest {
                 goal(goal2Id, "Keine Eskalation", MissionObjectiveKind.NON_GOAL, 1))));
 
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
-    // Since #1147 enforceSectionVersion runs the DB-enforced conditional bump; default it to "1 row
-    // affected" (version matched) so happy paths pass. The stale-version test overrides it to 0.
     lenient()
         .when(missionRepository.bumpObjectivesVersionIfMatches(eq(missionId), anyLong()))
         .thenReturn(1);
@@ -113,17 +111,15 @@ class MissionObjectiveServiceTest {
 
   @Test
   void addObjective_appendsAtEnd_bumpsVersion_andRecordsAudit() {
-    // When
     Mission result =
         timelineService.addObjective(
             missionId, "  Schutz der Crew  ", MissionObjectiveKind.SECONDARY, 3L);
 
-    // Then
     assertEquals(3, result.getObjectives().size());
     MissionObjective added = orderedObjectives().get(2);
-    assertEquals("Schutz der Crew", added.getTitle()); // trimmed
+    assertEquals("Schutz der Crew", added.getTitle());
     assertEquals(MissionObjectiveKind.SECONDARY, added.getKind());
-    assertEquals(2, added.getOrderIndex()); // appended after the two existing goals
+    assertEquals(2, added.getOrderIndex());
     assertEquals(4L, result.getObjectivesVersion());
     verify(missionObjectiveRepository).save(any(MissionObjective.class));
     verify(auditService)
@@ -151,7 +147,7 @@ class MissionObjectiveServiceTest {
 
     MissionObjective edited = orderedObjectives().get(0);
     assertEquals("Erz vollständig sichern", edited.getTitle());
-    assertEquals(MissionObjectiveKind.SECONDARY, edited.getKind()); // reclassified
+    assertEquals(MissionObjectiveKind.SECONDARY, edited.getKind());
     assertEquals(4L, result.getObjectivesVersion());
     verify(auditService)
         .record(
@@ -169,13 +165,12 @@ class MissionObjectiveServiceTest {
 
   @Test
   void deleteObjective_removesAndRepacksOrderIndex_andRecordsAudit() {
-    // When the first goal is removed, the remaining goal must re-pack to orderIndex 0.
     Mission result = timelineService.deleteObjective(missionId, goal1Id, 3L);
 
     assertEquals(1, result.getObjectives().size());
     MissionObjective remaining = orderedObjectives().get(0);
     assertEquals(goal2Id, remaining.getId());
-    assertEquals(0, remaining.getOrderIndex()); // re-packed from 1 -> 0
+    assertEquals(0, remaining.getOrderIndex());
     assertEquals(4L, result.getObjectivesVersion());
     verify(auditService)
         .record(
@@ -190,7 +185,6 @@ class MissionObjectiveServiceTest {
     assertEquals(goal2Id, ordered.get(0).getId());
     assertEquals(goal1Id, ordered.get(1).getId());
     assertEquals(4L, result.getObjectivesVersion());
-    // Exactly one reorder event, carrying only a count (never a title).
     ArgumentCaptor<CharSequence> details = ArgumentCaptor.forClass(CharSequence.class);
     verify(auditService)
         .record(
@@ -211,8 +205,6 @@ class MissionObjectiveServiceTest {
 
   @Test
   void objectiveMutations_neverLeakTheGoalTitleIntoTheAuditDetails() {
-    // The title is user free text — REQ-AUDIT-001 forbids it (and any PII) in the details payload.
-    // The kind enum is a non-personal classification and IS allowed.
     timelineService.addObjective(
         missionId, "TOP-SECRET RALLY POINT", MissionObjectiveKind.PRIMARY, 3L);
 
@@ -225,9 +217,9 @@ class MissionObjectiveServiceTest {
             label.capture(),
             isNull(),
             details.capture());
-    assertEquals(mission.getName(), label.getValue()); // subject label is the mission name snapshot
-    assertTrue(details.getValue().toString().contains("PRIMARY")); // kind is allowed
-    assertTrue(!details.getValue().toString().contains("TOP-SECRET")); // title must not leak
+    assertEquals(mission.getName(), label.getValue());
+    assertTrue(details.getValue().toString().contains("PRIMARY"));
+    assertTrue(!details.getValue().toString().contains("TOP-SECRET"));
     assertTrue(!details.getValue().toString().contains("RALLY"));
   }
 }

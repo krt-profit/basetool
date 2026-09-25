@@ -218,8 +218,6 @@ public class LiveSyncStreamService {
       throw new IllegalArgumentException("A live-sync stream needs at least one accepted topic");
     }
     Subscription subscription = new Subscription(sub, canonicalTopics(topics), newEmitter());
-    // Queued before the stream joins a room, so it is always the first frame the drain writes —
-    // a changed frame delivered concurrently can only queue behind it.
     send(subscription, MetricNames.LIVESYNC_EVENT_SUBSCRIBED, subscribedPayload(subscription));
     List<Subscription> evicted = new ArrayList<>();
     bySub.compute(
@@ -348,7 +346,6 @@ public class LiveSyncStreamService {
     try {
       deliveryExecutor.execute(() -> drain(subscription));
     } catch (RejectedExecutionException e) {
-      // Only after shutdown: the stream is going away with the context, so give up on it.
       subscription.draining().set(false);
       log.debug("Live-sync delivery executor refused a drain; retiring the stream", e);
       retire(subscription, false);

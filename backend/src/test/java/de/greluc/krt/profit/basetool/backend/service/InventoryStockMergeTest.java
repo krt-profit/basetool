@@ -153,9 +153,6 @@ class InventoryStockMergeTest {
     assertEquals(10.0, survivor.getAmount(), 1e-9, "amounts of all folded rows are summed");
     assertEquals("note-a\nnote-b", survivor.getNote(), "distinct notes are concatenated in order");
 
-    // The victims' job-order slices union into the survivor: victim2 targets the same order, so
-    // its amount sums into the survivor's slice and the delivered marker is OR-combined (delivered
-    // because victim2's part was), rather than the survivor being reset to a scalar not-delivered.
     assertEquals(1, survivor.getJobOrderAllocations().size(), "same-order slices fold into one");
     InventoryJobOrderAllocation slice = survivor.getJobOrderAllocations().get(0);
     assertSame(order, slice.getJobOrder(), "the surviving slice keeps the shared job order");
@@ -265,10 +262,8 @@ class InventoryStockMergeTest {
     return item;
   }
 
-  // covers REQ-INV-029 (item rows always auto-merge, keyed through the 7-arg NULL-branch query)
   @Test
   void gameItemRow_alwaysAutoMerges_viaSevenArgumentNullBranchQuery() {
-    // Given a fresh item row and one matching sibling behind the catalog-discriminated merge key
     GameItem gameItem = new GameItem();
     gameItem.setId(UUID.randomUUID());
     gameItem.setName("Quantum Drive");
@@ -281,13 +276,8 @@ class InventoryStockMergeTest {
         .thenReturn(List.of(survivor, victim));
     when(inventoryItemRepository.saveAndFlush(survivor)).thenReturn(survivor);
 
-    // When — the client merge flag is false: irrelevant for item rows, which follow the PIECE
-    // auto-merge rule
     InventoryItem result = service.mergeStockIfRequested(survivor, false);
 
-    // Then — the group is loaded through the full seven-argument query with the NULL material AND
-    // NULL quality branches (the pre-fix plain equalities matched nothing for item rows, silently
-    // degenerating their merge to a permanent no-op), and the sibling folds into the survivor.
     assertSame(survivor, result);
     assertEquals(5.0, survivor.getAmount(), 1e-9, "item amounts of all folded rows are summed");
     ArgumentCaptor<UUID> materialKey = ArgumentCaptor.forClass(UUID.class);
@@ -311,9 +301,6 @@ class InventoryStockMergeTest {
 
   @Test
   void nullMaterial_withOptIn_isNoOp() {
-    // A row without a material cannot merge (the merge key requires material) and must not NPE on
-    // material.getId() even with the SCU per-action opt-in set — pins the null-material early
-    // return.
     InventoryItem row = row(UUID.randomUUID(), QuantityType.SCU, 5.0, "n");
     row.setMaterial(null);
 

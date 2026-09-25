@@ -1,26 +1,8 @@
-# Local manual-browser override (NOT for CI / e2e — that harness remaps host.docker.internal
-# inside its automated browser instead).
-#
-# The OIDC issuer is http://host.docker.internal:18080/auth/realms/iri. On Docker Desktop the host
-# resolves host.docker.internal to the host's LAN IP (e.g. 10.1.0.30), but the base compose
-# publishes Keycloak only on 127.0.0.1:18080 — so the host browser's redirect to the issuer is
-# refused. Re-publishing on all interfaces makes host.docker.internal:18080 reach Keycloak from
-# the host browser while keeping localhost:18080 working too.
-#
-# Append this file LAST so its port mapping wins:
-#   docker compose --env-file .env.test `
-#     -f docker-compose.yml -f docker-compose.test.yml `
-#     -f docker-compose.build.yml -f docker-compose.e2e.yml -f docker-compose.localtest.yml `
-#     --profile dev up -d
 services:
   keycloak-dev:
     ports: !override
       - "0.0.0.0:18080:18080"
 
-  # Disable the background catalogue syncs for manual testing. The dev profile runs the UEX
-  # commodity-price sync, whose clearStalePrices sweep NULLs every price UEX does not return —
-  # which wipes any hand-seeded demo matrix within a sync cycle. Turning the schedulers off keeps
-  # a seeded dataset (build/seed-matrix-demo.sql) stable. Remove these to exercise the real syncs.
   backend-dev:
     environment:
       KRT_UEX_SCHEDULER_ENABLED: "false"

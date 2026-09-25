@@ -58,8 +58,6 @@ public class InventoryItemCatalogService {
   @NotNull
   public Page<InventoryGameItemReferenceDto> findBookableItems(
       String search, @NotNull Pageable pageable) {
-    // Empty string (not null) for "no filter": a null bind into the query's LOWER(CONCAT(...))
-    // makes PostgreSQL infer bytea and fail; "" matches every row via the %% pattern.
     String q = search != null && !search.isBlank() ? search.strip() : "";
     return blueprintRepository
         .findItemsWithActiveBlueprint(q, pageable)

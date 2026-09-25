@@ -155,7 +155,6 @@ class DtoMirrorConsistencyTest {
     assertTrue(paired > 0, "No paired DTOs found - directory layout or detection logic broke.");
 
     if (!softWarnings.isEmpty()) {
-      // Loud but non-fatal: a frontend-only field is dead-code-ish but never produces a 500.
       System.out.println("DTO mirror soft warnings (frontend-only fields):");
       softWarnings.forEach(w -> System.out.println("  " + w));
     }
@@ -191,9 +190,7 @@ class DtoMirrorConsistencyTest {
       switch (c) {
         case '(' -> depth++;
         case ')' -> depth--;
-        default -> {
-          // no-op
-        }
+        default -> {}
       }
       headerEnd++;
     }

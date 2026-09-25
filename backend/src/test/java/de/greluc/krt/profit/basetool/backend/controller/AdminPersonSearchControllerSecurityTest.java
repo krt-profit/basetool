@@ -125,7 +125,6 @@ class AdminPersonSearchControllerSecurityTest {
         .andExpect(status().isOk());
   }
 
-  // covers REQ-SEC-060 — a served search is handed to the service that records it
   @Test
   void personSearch_isHandedToTheAuditingSeam() throws Exception {
     PersonSearchService.PersonSearchResult result =
@@ -142,12 +141,6 @@ class AdminPersonSearchControllerSecurityTest {
                         .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
         .andExpect(status().isOk());
 
-    // The controller's whole audit responsibility is this delegation. It cannot write the row
-    // itself: AuditService.record is MANDATORY-propagated and a handler has no transaction, so a
-    // direct call 500s the endpoint (ArchitectureTest#controllerLayerMustNotWriteAuditRowsDirectly
-    // forbids it). The payload's shape — length yes, term never — is asserted where it is now
-    // built, in PersonSearchServiceAuditTest, and end-to-end against a real AuditService in
-    // DataSubjectRightsAuditIntegrationTest.
     verify(personSearchService).recordSearch(eq("SomeVeryDistinctiveHandle"), eq(result));
   }
 }

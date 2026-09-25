@@ -112,7 +112,6 @@ class BackendRoleSyncFilterTest {
     chain = mock(FilterChain.class);
     session = mock(HttpSession.class);
     when(request.getSession(false)).thenReturn(session);
-    // Every request now runs through the static-asset short-circuit, so the path must be readable.
     when(request.getContextPath()).thenReturn("");
     when(request.getRequestURI()).thenReturn("/dashboard");
     when(session.getAttribute(ROLES_SYNCED_AT_FLAG)).thenReturn(null);
@@ -132,35 +131,27 @@ class BackendRoleSyncFilterTest {
 
   @Test
   void doFilterInternal_whenUsersMeReturnsNull_doesNotMarkSessionSynced() throws Exception {
-    // Given — Resilience4j fallback hands back null (backend unavailable)
     when(backendApiClient.get(USERS_ME, UserDto.class)).thenReturn(null);
 
-    // When
     filter.doFilterInternal(request, response, chain);
 
-    // Then — flag stays unset so the next request retries; chain still proceeds
     verify(session, never()).setAttribute(eq(ROLES_SYNCED_AT_FLAG), any());
     verify(chain).doFilter(request, response);
   }
 
   @Test
   void doFilterInternal_whenUsersMeThrows_doesNotMarkSessionSynced() throws Exception {
-    // Given — the backend call blows up
     when(backendApiClient.get(USERS_ME, UserDto.class))
         .thenThrow(new RuntimeException("backend down"));
 
-    // When
     filter.doFilterInternal(request, response, chain);
 
-    // Then
     verify(session, never()).setAttribute(eq(ROLES_SYNCED_AT_FLAG), any());
     verify(chain).doFilter(request, response);
   }
 
   @Test
   void doFilterInternal_whenUsersMeSucceeds_marksSessionSynced() throws Exception {
-    // Given — a valid user whose roles are already present on the token (modified=false path, so no
-    // SecurityContext rewrite is exercised) — the read still counts as a successful sync.
     UserDto user =
         new UserDto(
             UUID.randomUUID(),
@@ -183,21 +174,14 @@ class BackendRoleSyncFilterTest {
             false);
     when(backendApiClient.get(USERS_ME, UserDto.class)).thenReturn(user);
 
-    // When
     filter.doFilterInternal(request, response, chain);
 
-    // Then — successful read stamps the session with the sync time
     verify(session).setAttribute(eq(ROLES_SYNCED_AT_FLAG), any(Long.class));
     verify(chain).doFilter(request, response);
   }
 
   @Test
   void doFilterInternal_whenBackendServiceException_logsAtDebugNotError() throws Exception {
-    // REQ-OBS-001: a relayed BackendServiceException was already logged once at the
-    // BackendApiClient
-    // boundary. syncRoles re-runs on every request until it succeeds, so re-logging it at ERROR
-    // here
-    // would turn one backend outage into a per-request ERROR storm and trip LogbackErrorSpike.
     Logger logger = (Logger) LoggerFactory.getLogger(BackendRoleSyncFilter.class);
     Level original = logger.getLevel();
     logger.setLevel(Level.DEBUG);
@@ -226,18 +210,13 @@ class BackendRoleSyncFilterTest {
 
   @Test
   void pendingApproval_nonExemptPath_redirectsToWaitingPage() throws Exception {
-    // Given — the backend reports a PENDING registration and the request targets a guarded page
     when(request.getContextPath()).thenReturn("");
     when(request.getRequestURI()).thenReturn("/dashboard");
     when(backendApiClient.get(REGISTRATION_STATUS, RegistrationStatusDto.class))
         .thenReturn(new RegistrationStatusDto("PENDING"));
 
-    // When
     filter.doFilterInternal(request, response, chain);
 
-    // Then — routed to the waiting page and the chain is short-circuited (never the guest surface,
-    // never the #720 403 storm), and the resolved status is cached with its read time so the
-    // re-check interval can expire it
     verify(response).sendRedirect("/pending-approval");
     verify(chain, never()).doFilter(request, response);
     verify(session).setAttribute(APPROVAL_STATE_FLAG, "PENDING");
@@ -246,85 +225,62 @@ class BackendRoleSyncFilterTest {
 
   @Test
   void pendingApproval_statusPollPath_proceeds() throws Exception {
-    // Given — the waiting page's own status poll must reach its handler, not be answered with a
-    // redirect to the HTML page it is polling from
     when(request.getRequestURI()).thenReturn("/pending-approval/status");
     when(backendApiClient.get(REGISTRATION_STATUS, RegistrationStatusDto.class))
         .thenReturn(new RegistrationStatusDto("PENDING"));
 
-    // When
     filter.doFilterInternal(request, response, chain);
 
-    // Then
     verify(chain).doFilter(request, response);
     verify(response, never()).sendRedirect(anyString());
   }
 
   @Test
   void pendingApproval_exemptPath_proceeds() throws Exception {
-    // Given — a PENDING user hitting an exempt path (/logout) must be able to leave, not be trapped
     when(request.getContextPath()).thenReturn("");
     when(request.getRequestURI()).thenReturn("/logout");
     when(backendApiClient.get(REGISTRATION_STATUS, RegistrationStatusDto.class))
         .thenReturn(new RegistrationStatusDto("PENDING"));
 
-    // When
     filter.doFilterInternal(request, response, chain);
 
-    // Then — the chain proceeds and no redirect is issued
     verify(chain).doFilter(request, response);
     verify(response, never()).sendRedirect(anyString());
   }
 
   @Test
   void approvalStatus_whenActive_isCachedForGood_skipsRegistrationStatusFetch() throws Exception {
-    // Given — a prior request resolved ACTIVE, which is terminal (the backend only ever decides a
-    // still-PENDING registration), and roles are already synced (isolates the approval branch)
     when(session.getAttribute(APPROVAL_STATE_FLAG)).thenReturn("ACTIVE");
     when(session.getAttribute(APPROVAL_CHECKED_AT_FLAG)).thenReturn(staleStamp());
     when(session.getAttribute(ROLES_SYNCED_AT_FLAG)).thenReturn(freshStamp());
 
-    // When
     filter.doFilterInternal(request, response, chain);
 
-    // Then — never re-read, not even long after the re-check interval has passed
     verify(backendApiClient, never()).get(REGISTRATION_STATUS, RegistrationStatusDto.class);
     verify(chain).doFilter(request, response);
   }
 
   @Test
   void approvalStatus_whenPendingAndFresh_isNotRefetched() throws Exception {
-    // Given — the PENDING verdict was read moments ago; a page load must not re-hit the backend for
-    // every request inside the re-check interval
     when(session.getAttribute(APPROVAL_STATE_FLAG)).thenReturn("PENDING");
     when(session.getAttribute(APPROVAL_CHECKED_AT_FLAG)).thenReturn(freshStamp());
 
-    // When
     filter.doFilterInternal(request, response, chain);
 
-    // Then — cached verdict still routes to the waiting page, without a backend read
     verify(backendApiClient, never()).get(REGISTRATION_STATUS, RegistrationStatusDto.class);
     verify(response).sendRedirect("/pending-approval");
   }
 
   @Test
   void approvalStatus_whenPendingAndStale_picksUpApprovalWithoutRelogin() throws Exception {
-    // Given — the session still carries the PENDING verdict cached before the admin decided, but it
-    // has aged past the re-check interval and the backend now reports ACTIVE. This is the exact
-    // situation that used to strand an approved member on the waiting page until they logged out
-    // and back in: the verdict was pinned for the session's whole 720h lifetime.
     when(session.getAttribute(APPROVAL_STATE_FLAG)).thenReturn("PENDING");
     when(session.getAttribute(APPROVAL_CHECKED_AT_FLAG)).thenReturn(staleStamp());
     when(session.getAttribute(ROLES_SYNCED_AT_FLAG)).thenReturn(freshStamp());
     when(backendApiClient.get(REGISTRATION_STATUS, RegistrationStatusDto.class))
         .thenReturn(new RegistrationStatusDto("ACTIVE"));
 
-    // When
     filter.doFilterInternal(request, response, chain);
 
-    // Then — the user is let through on this very request, the new verdict is cached, and the
-    // role-sync stamp is dropped so the authorities the approval unlocks are pulled immediately
-    // instead of up to a re-sync interval later (the second forced re-login).
     verify(response, never()).sendRedirect(anyString());
     verify(session).setAttribute(APPROVAL_STATE_FLAG, "ACTIVE");
     verify(session).removeAttribute(ROLES_SYNCED_AT_FLAG);
@@ -333,46 +289,33 @@ class BackendRoleSyncFilterTest {
 
   @Test
   void roleSync_whenStampIsFresh_skipsBackendRead() throws Exception {
-    // Given — an approved session that synced its roles moments ago
     when(session.getAttribute(APPROVAL_STATE_FLAG)).thenReturn("ACTIVE");
     when(session.getAttribute(ROLES_SYNCED_AT_FLAG)).thenReturn(freshStamp());
 
-    // When
     filter.doFilterInternal(request, response, chain);
 
-    // Then — no per-request role read
     verify(backendApiClient, never()).get(USERS_ME, UserDto.class);
     verify(chain).doFilter(request, response);
   }
 
   @Test
   void roleSync_whenStampIsStale_reReadsBackendRoles() throws Exception {
-    // Given — an approved session whose synced roles have aged past the re-sync interval. Without
-    // this refresh a role/unit granted after login stayed invisible to the frontend's authority
-    // gates until the user started a new session — the second half of the double-re-login report.
     when(session.getAttribute(APPROVAL_STATE_FLAG)).thenReturn("ACTIVE");
     when(session.getAttribute(ROLES_SYNCED_AT_FLAG)).thenReturn(staleStamp());
     when(backendApiClient.get(USERS_ME, UserDto.class)).thenReturn(null);
 
-    // When
     filter.doFilterInternal(request, response, chain);
 
-    // Then — the backend roles are read again
     verify(backendApiClient).get(USERS_ME, UserDto.class);
     verify(chain).doFilter(request, response);
   }
 
   @Test
   void staticAsset_skipsFilterBodyEntirely() throws Exception {
-    // Given — a CSS request on a session that has resolved nothing yet. Both refreshes are
-    // TTL-driven now, so without this short-circuit every asset of a page load would be a candidate
-    // for a backend read.
     when(request.getRequestURI()).thenReturn("/css/styles.css");
 
-    // When
     filter.doFilterInternal(request, response, chain);
 
-    // Then — no backend traffic at all, and the asset is served
     verify(backendApiClient, never()).get(anyString(), eq(RegistrationStatusDto.class));
     verify(backendApiClient, never()).get(anyString(), eq(UserDto.class));
     verify(chain).doFilter(request, response);
@@ -390,14 +333,11 @@ class BackendRoleSyncFilterTest {
   void publicDocument_skipsFilterBodyEntirely() throws Exception {
     for (String path :
         new String[] {"/robots.txt", "/.well-known/assetlinks.json", "/manifest.webmanifest"}) {
-      // Given — a fresh public-document request on a session that has resolved nothing yet
       when(request.getRequestURI()).thenReturn(path);
 
-      // When
       filter.doFilterInternal(request, response, chain);
     }
 
-    // Then — no backend traffic at all, and every document is served
     verify(backendApiClient, never()).get(anyString(), eq(RegistrationStatusDto.class));
     verify(backendApiClient, never()).get(anyString(), eq(UserDto.class));
     verify(chain, times(3)).doFilter(request, response);
@@ -405,80 +345,58 @@ class BackendRoleSyncFilterTest {
 
   @Test
   void roleSync_dropsRoleTheBackendNoLongerGrants() throws Exception {
-    // Given — the token still carries ROLE_ADMIN from login, but the backend (whose local mirror
-    // is what its own @PreAuthorize gates read) now only reports Officer. Keeping ROLE_ADMIN would
-    // render admin UI that 403s on every click for the rest of the 720h session.
     authenticateWith("ROLE_OFFICER", "ROLE_ADMIN");
     when(backendApiClient.get(USERS_ME, UserDto.class))
         .thenReturn(userDto(Set.of("Officer"), Set.of()));
 
-    // When
     filter.doFilterInternal(request, response, chain);
 
-    // Then
     assertThat(currentAuthorities()).contains("ROLE_OFFICER").doesNotContain("ROLE_ADMIN");
   }
 
   @Test
   void roleSync_dropsPermissionItPreviouslyGranted() throws Exception {
-    // Given — a permission this filter granted on an earlier sync, which the backend no longer
-    // reports. It is revocable precisely because the session records that WE asserted it.
     authenticateWith("ROLE_OFFICER", "HANGAR_WRITE");
     when(session.getAttribute(SYNCED_AUTHORITIES_FLAG))
         .thenReturn(new ArrayList<>(List.of("ROLE_OFFICER", "HANGAR_WRITE")));
     when(backendApiClient.get(USERS_ME, UserDto.class))
         .thenReturn(userDto(Set.of("Officer"), Set.of()));
 
-    // When
     filter.doFilterInternal(request, response, chain);
 
-    // Then
     assertThat(currentAuthorities()).contains("ROLE_OFFICER").doesNotContain("HANGAR_WRITE");
   }
 
   @Test
   void roleSync_neverDropsLoginOwnedAuthorities() throws Exception {
-    // Given — OIDC_USER / SCOPE_* are granted by the login, not by this filter, and carry no
-    // prefix that would tell them apart from a permission. They must survive a sync that asserts
-    // neither, which the "only revoke what we asserted" rule guarantees structurally.
     authenticateWith("ROLE_OFFICER", "OIDC_USER", "SCOPE_openid", "SCOPE_profile");
     when(backendApiClient.get(USERS_ME, UserDto.class))
         .thenReturn(userDto(Set.of("Officer"), Set.of()));
 
-    // When
     filter.doFilterInternal(request, response, chain);
 
-    // Then
     assertThat(currentAuthorities())
         .contains("ROLE_OFFICER", "OIDC_USER", "SCOPE_openid", "SCOPE_profile");
   }
 
   @Test
   void roleSync_whenBackendReportsNoRoleList_revokesNothing() throws Exception {
-    // Given — a response that says nothing about roles must never be read as "everything is
-    // revoked"; the caller keeps what it has and the next sync decides.
     authenticateWith("ROLE_OFFICER", "ROLE_ADMIN");
     when(backendApiClient.get(USERS_ME, UserDto.class)).thenReturn(userDto(null, null));
 
-    // When
     filter.doFilterInternal(request, response, chain);
 
-    // Then
     assertThat(currentAuthorities()).contains("ROLE_OFFICER", "ROLE_ADMIN");
   }
 
   @Test
   void roleSync_grantsMembershipDerivedRoles() throws Exception {
-    // Given — the two org-unit membership flags are asserted as flat roles, alongside the catalog
-    // roles and the flattened permissions.
     authenticateWith("ROLE_OFFICER");
     when(backendApiClient.get(USERS_ME, UserDto.class))
         .thenReturn(userDto(Set.of("Officer"), Set.of("HANGAR_READ"), true, true));
 
-    // When
     filter.doFilterInternal(request, response, chain);
 
-    // Then
     assertThat(currentAuthorities())
         .contains("ROLE_OFFICER", "ROLE_LOGISTICIAN", "ROLE_MISSION_MANAGER", "HANGAR_READ");
   }
@@ -544,11 +462,6 @@ class BackendRoleSyncFilterTest {
 
   @Test
   void forgetApprovalVerdict_dropsBothVerdictAttributes() {
-    // The seam PendingApprovalPageController uses to break the redirect loop: it sends an ACTIVE
-    // caller off the waiting page, but that page is only reachable because this filter believes the
-    // caller is NOT approved — and it serves that belief from the session for a full recheck
-    // interval without a backend read. Leaving either attribute behind leaves the two disagreeing,
-    // and the browser bounces between "/" and "/pending-approval" at full speed.
     BackendRoleSyncFilter.forgetApprovalVerdict(session);
 
     verify(session).removeAttribute(APPROVAL_STATE_FLAG);
@@ -557,8 +470,6 @@ class BackendRoleSyncFilterTest {
 
   @Test
   void forgetApprovalVerdict_leavesTheRoleSyncStampAlone() {
-    // Only the approval verdict is stale; discarding the role-sync stamp too would buy an extra
-    // /api/v1/users/me read per redirect for nothing.
     BackendRoleSyncFilter.forgetApprovalVerdict(session);
 
     verify(session, never()).removeAttribute(ROLES_SYNCED_AT_FLAG);
@@ -567,67 +478,47 @@ class BackendRoleSyncFilterTest {
 
   @Test
   void forgetApprovalVerdict_withoutASession_isANoOp() {
-    // getSession(false) yields null for a session-less request; there is no verdict to forget.
     assertThatCode(() -> BackendRoleSyncFilter.forgetApprovalVerdict(null))
         .doesNotThrowAnyException();
   }
 
   @Test
   void noRole_isDiscoveredByTheRoleRead_andRoutesThatSameRequest() throws Exception {
-    // Given - an approved account holding no role. The registration status says ACTIVE (it IS
-    // approved), so the approval gate above lets it through; the refusal only surfaces one step
-    // later, when the role read comes back 403 NO_ROLE.
     Map<String, Object> attributes = statefulSession();
     when(backendApiClient.get(REGISTRATION_STATUS, RegistrationStatusDto.class))
         .thenReturn(new RegistrationStatusDto("ACTIVE"));
     when(backendApiClient.get(USERS_ME, UserDto.class)).thenThrow(noRoleRefusal());
 
-    // When
     filter.doFilterInternal(request, response, chain);
 
-    // Then - the discovering request is the one that gets routed. Serving it and routing only the
-    // next navigation would render the dashboard to a member who may see nothing on it: every
-    // fragment on that page answers 403 NO_ROLE, so the page arrives empty and the account-status
-    // copy explaining why arrives one click late.
     verify(response).sendRedirect("/pending-approval");
     verify(chain, never()).doFilter(request, response);
     assertThat(attributes).containsEntry(APPROVAL_STATE_FLAG, "NO_ROLE");
     assertThat(attributes).containsKey(APPROVAL_CHECKED_AT_FLAG);
-    // The sync did not succeed, so its stamp stays unset and the next request retries (REQ-SEC-013)
-    // - which is what lets an administrator's role grant reach the session without a re-login.
     assertThat(attributes).doesNotContainKey(ROLES_SYNCED_AT_FLAG);
   }
 
   @Test
   void noRole_onTheDiscoveringRequest_stillLetsAnExemptPathThrough() throws Exception {
-    // Given - the same discovery, but on /logout. A role-less member must be able to leave; the
-    // account-status page is a dead end, not a trap.
     statefulSession();
     when(request.getRequestURI()).thenReturn("/logout");
     when(backendApiClient.get(REGISTRATION_STATUS, RegistrationStatusDto.class))
         .thenReturn(new RegistrationStatusDto("ACTIVE"));
     when(backendApiClient.get(USERS_ME, UserDto.class)).thenThrow(noRoleRefusal());
 
-    // When
     filter.doFilterInternal(request, response, chain);
 
-    // Then
     verify(chain).doFilter(request, response);
     verify(response, never()).sendRedirect(anyString());
   }
 
   @Test
   void noRole_cachedVerdict_routesWithoutAskingTheBackendAgain() throws Exception {
-    // Given - a session that already knows, stamped just now. The verdict is cached precisely so
-    // the next navigation costs no round trip; without it every click of a role-less member would
-    // repeat the same two refusals.
     when(session.getAttribute(APPROVAL_STATE_FLAG)).thenReturn("NO_ROLE");
     when(session.getAttribute(APPROVAL_CHECKED_AT_FLAG)).thenReturn(freshStamp());
 
-    // When
     filter.doFilterInternal(request, response, chain);
 
-    // Then
     verify(response).sendRedirect("/pending-approval");
     verify(chain, never()).doFilter(request, response);
     verify(backendApiClient, never()).get(REGISTRATION_STATUS, RegistrationStatusDto.class);

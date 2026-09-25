@@ -107,25 +107,8 @@ public class JobOrderItemBlueprintOwnersService {
             jobOrderRepository.findByIdWithItemBlueprints(jobOrderId),
             () -> "Job order not found: " + jobOrderId);
 
-    // Per-order counting toggle (REQ-ORDERS-021, issue #822): when true the coverage counts
-    // cosmetic
-    // variants of an ordered item via the variant family key (the historic behaviour); when false
-    // it
-    // matches blueprints exactly, so when a specific variant is requested only owners of that exact
-    // blueprint count and the other variants of the same family are excluded. Both the required
-    // side
-    // here and the owned side below derive their key through familyResolver.matchKey(name,
-    // countWithVariants) so the two stay symmetric.
     boolean countWithVariants = order.isCountBlueprintsWithVariants();
 
-    // Required products: match key -> (ordered display name, variant-inclusive flag). Each item
-    // line's chosen-blueprint output name is reduced to its match key (variant family key when the
-    // toggle is on, exact normalized name when off), so in variant mode a base item and its
-    // cosmetic
-    // variants collapse onto one required row. Lines whose output name resolves to nothing are
-    // skipped; a MATERIAL order has no item lines. A row is variant-inclusive only when the toggle
-    // is
-    // on AND the line is not an atomic magazine (a magazine is always matched exactly).
     Map<String, RequiredFamily> requiredByFamily = new LinkedHashMap<>();
     for (JobOrderItem item : order.getItems()) {
       String outputName = item.getBlueprint() == null ? null : item.getBlueprint().getOutputName();
@@ -141,11 +124,6 @@ public class JobOrderItemBlueprintOwnersService {
       return new JobOrderItemBlueprintOwnersDto(List.of(), List.of());
     }
 
-    // Owner ids of the responsible org unit's members, unioned with the users who opted into
-    // global blueprint sharing (REQ-INV-018) so an opted-in owner is counted toward this order's
-    // coverage even when they are not a member of the responsible org unit. A null responsible
-    // (legacy pre-backfill row) contributes no members; the endpoint gate already rejects such
-    // orders, but global sharers would still be considered here.
     OrgUnit responsible = order.getResponsibleOrgUnit();
     Set<UUID> memberSubs = new LinkedHashSet<>();
     if (responsible != null) {
@@ -156,12 +134,6 @@ public class JobOrderItemBlueprintOwnersService {
     Set<UUID> ownerUserIds = new LinkedHashSet<>(memberSubs);
     ownerUserIds.addAll(userRepository.findIdsBySharingBlueprintsGlobally());
 
-    // Load the members' owned blueprints and keep the ones whose match key is required. The match
-    // key is a Java-computed reduction of the product name (no SQL form), so the match runs in
-    // memory
-    // over the members' rows. The per-owner set carries the ACTUAL owned variant names (so a lead
-    // sees which variant each member holds), and the per-key owner set drives the coverage count
-    // (distinct members owning any matching blueprint).
     Map<UUID, Set<String>> ownedNamesByOwnerId = new LinkedHashMap<>();
     Map<String, Set<UUID>> ownersByFamily = new HashMap<>();
     if (!ownerUserIds.isEmpty()) {

@@ -284,12 +284,8 @@ class MissionParticipantConcurrencyTest {
                     missionService.addParticipant(missionId, userId, null, null, null, null, null);
                     successCount.incrementAndGet();
                   } catch (DuplicateEntityException expected) {
-                    // Thread loaded the mission AFTER the winner committed and the in-memory
-                    // check at the top of addParticipant fired.
                     rejectedByInMemoryCheck.incrementAndGet();
                   } catch (DataIntegrityViolationException expected) {
-                    // Thread loaded the mission BEFORE any commit, passed the in-memory check,
-                    // raced to INSERT and hit the V96 partial unique index at commit time.
                     rejectedByDbIndex.incrementAndGet();
                   } catch (Throwable t) {
                     otherErrorCount.incrementAndGet();

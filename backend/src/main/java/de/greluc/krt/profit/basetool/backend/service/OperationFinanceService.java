@@ -135,8 +135,6 @@ public class OperationFinanceService {
         }
       }
 
-      // Refinery orders contribute their profit/loss (oreSales - expenses - otherExpenses)
-      // rather than only their costs. Legacy data with null values is treated as 0.
       for (RefineryOrder order : orders) {
         double sales = order.getOreSales() != null ? order.getOreSales() : 0d;
         double costs = order.getExpenses() != null ? order.getExpenses() : 0d;

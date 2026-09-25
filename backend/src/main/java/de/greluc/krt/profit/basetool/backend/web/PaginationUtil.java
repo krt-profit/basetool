@@ -91,7 +91,6 @@ public final class PaginationUtil {
             : Math.min(sizeParam, MAX_PAGE_SIZE);
 
     Sort sort = resolveSort(sortParam, allowedSortFields, defaultSortField);
-    // Ensure stability: always add a secondary sort by id if not already included
     if (!containsProperty(sort, "id") && allowedSortFields.contains("id")) {
       sort = sort.and(Sort.by("id"));
     }
@@ -134,7 +133,6 @@ public final class PaginationUtil {
       return Sort.by(defaultField).ascending();
     }
     List<Sort.Order> orders = new ArrayList<>();
-    // Support multiple fields separated by semicolon or repeated commas: field,asc;other,desc
     String[] parts = sortParam.split("[;]");
     for (String part : parts) {
       String[] tokens = part.split(",");

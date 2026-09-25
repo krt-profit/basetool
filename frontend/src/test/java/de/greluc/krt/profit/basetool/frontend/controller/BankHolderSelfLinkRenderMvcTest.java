@@ -83,7 +83,6 @@ class BankHolderSelfLinkRenderMvcTest {
     UUID ownHolderId = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
     UUID foreignHolderId = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
 
-    // Own holder: its userId equals the caller's sub. Foreign holder: a different userId.
     BankHolderDto own =
         new BankHolderDto(
             ownHolderId, UUID.fromString(sub), "self", true, BigDecimal.ZERO, false, 0L);
@@ -91,7 +90,6 @@ class BankHolderSelfLinkRenderMvcTest {
         new BankHolderDto(
             foreignHolderId, UUID.randomUUID(), "other", true, BigDecimal.ZERO, false, 0L);
 
-    // Default any unmatched backend read (sidebar / controller-advice lookups) to null.
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
     when(backendApiClient.get(eq("/api/v1/bank/holders"), anyTypeRef()))
         .thenReturn(List.of(own, foreign));
@@ -110,10 +108,8 @@ class BankHolderSelfLinkRenderMvcTest {
                             token ->
                                 token.subject(sub).claim("preferred_username", "self-username"))))
         .andExpect(status().isOk())
-        // The caller's own holder row is a link to its custody history.
         .andExpect(content().string(containsString("/bank/holders/" + ownHolderId)))
         .andExpect(content().string(containsString("data-testid=\"bank-holder-history-link\"")))
-        // The foreign holder row is plain text — never a link to its detail page.
         .andExpect(content().string(not(containsString("/bank/holders/" + foreignHolderId))));
   }
 }

@@ -108,10 +108,6 @@ public class ApiCacheControlFilter extends OncePerRequestFilter {
       HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
       throws ServletException, IOException {
     response.setHeader("Cache-Control", cacheControlFor(request.getRequestURI()));
-    // Accept joined Accept-Encoding when the API gained a second representation (ADR-0161 8.5):
-    // the same path now answers CBOR or JSON depending on what the caller asked for, and a cache
-    // keyed only on the URL would hand a CBOR body to a JSON client. The revalidate families are
-    // the ones this protects -- the no-store families are not stored anywhere to begin with.
     response.addHeader("Vary", "Accept");
     response.addHeader("Vary", "Accept-Encoding");
     filterChain.doFilter(request, response);

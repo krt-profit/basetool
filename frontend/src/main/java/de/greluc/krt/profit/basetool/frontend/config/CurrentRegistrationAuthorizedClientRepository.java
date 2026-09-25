@@ -86,9 +86,6 @@ public class CurrentRegistrationAuthorizedClientRepository
     if (current == null) {
       return stored;
     }
-    // The interface is generic in the return type only so a subclass of OAuth2AuthorizedClient
-    // can be stored; this application stores the plain class, which is what is rebuilt here, so
-    // the unchecked cast narrows nothing it could get wrong.
     @SuppressWarnings("unchecked")
     T rebuilt =
         (T)

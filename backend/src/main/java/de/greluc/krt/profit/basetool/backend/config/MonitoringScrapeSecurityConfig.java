@@ -89,11 +89,6 @@ public class MonitoringScrapeSecurityConfig {
   public SecurityFilterChain monitoringScrapeFilterChain(@NotNull HttpSecurity http)
       throws Exception {
     http.securityMatcher(PROMETHEUS_PATH)
-        // CSRF protection is deliberately off on this chain: it is a stateless, basic-auth-only
-        // machine endpoint with no session cookie, so there is no browser credential a forged
-        // cross-site request could ride on - the rule does not apply to this call site. A 30 s
-        // scrape interval must also not accumulate sessions or saved requests.
-        // lgtm[java/spring-disabled-csrf-protection]
         .csrf(AbstractHttpConfigurer::disable)
         .requestCache(RequestCacheConfigurer::disable)
         .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
@@ -108,17 +103,10 @@ public class MonitoringScrapeSecurityConfig {
       http.userDetailsService(new InMemoryUserDetailsManager(scrapeUser))
           .httpBasic(Customizer.withDefaults())
           .authorizeHttpRequests(auth -> auth.anyRequest().hasRole(MONITORING_ROLE));
-      // One line per boot so the chosen posture is discoverable. Log the fixed role literal, never
-      // the scrape username or password (REQ-OBS-004).
       log.info(
           "Prometheus scrape endpoint secured with HTTP basic auth (role {}).", MONITORING_ROLE);
     } else {
-      // Fail-closed: no credentials configured -> nobody reaches the metrics payload. The
-      // default Http403ForbiddenEntryPoint answers every request with 403.
       http.authorizeHttpRequests(auth -> auth.anyRequest().denyAll());
-      // Discoverable startup breadcrumb: legitimate in dev/test/e2e or a prod host without the
-      // monitoring stack, but also the signature of an accidentally-unset MONITORING_SCRAPE_* pair
-      // in prod (Grafana dashboards then go blank). The config cannot tell the two apart, so INFO.
       log.info(
           "Prometheus scrape endpoint is DENY-ALL: MONITORING_SCRAPE_USER/PASSWORD not configured"
               + " — /actuator/prometheus returns 403 to every caller.");

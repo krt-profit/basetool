@@ -103,17 +103,13 @@ class HangarPaginationE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        // Smallest page size guarantees the seeded fleet spans more than one page.
         E2eSupport.navigate(page, baseUrl + "/hangar?size=10");
 
-        // A full page caps at the requested size, and the shared pagination chrome is present.
         assertEquals(10, page.getByTestId("hangar-ship-row").count(), "page must cap at size 10");
         assertThat(page.locator(".pagination").first()).isVisible();
         assertThat(page.locator(".page-size-picker")).isVisible();
         assertThat(page.locator("#hangar-ship-filter")).isVisible();
 
-        // Page forward in place: clicking the next (page=1) link re-swaps #hangar-results via a
-        // fragment fetch — the page must not reload, and the address bar must reflect page=1.
         page.evaluate("window.__krtNoReload = true;");
         page.waitForResponse(
             r -> r.url().contains("/hangar") && r.url().contains("fragment=results"),
@@ -122,15 +118,8 @@ class HangarPaginationE2eTest {
             Boolean.TRUE,
             page.evaluate("window.__krtNoReload === true"),
             "paging must not reload the page");
-        // The address bar is updated via history.replaceState inside the swap's response handler,
-        // which runs AFTER waitForResponse resolves (the fetch body still has to be read and the
-        // fragment swapped in first). Reading page.url() once here races that continuation — a
-        // window Firefox widens enough to flake — so poll for the new page marker instead. A
-        // timeout means the address bar never reflected the page click (the real regression).
         page.waitForURL(url -> url.contains("page=1"));
 
-        // Server-side search: a term that matches no ship empties the table in place (the backend
-        // re-pages the matching set, here zero), still without a navigation.
         page.evaluate("window.__krtNoReload = true;");
         page.waitForResponse(
             r -> r.url().contains("/hangar") && r.url().contains("fragment=results"),

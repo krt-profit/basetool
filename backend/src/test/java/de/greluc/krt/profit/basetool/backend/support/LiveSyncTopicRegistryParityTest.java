@@ -96,7 +96,6 @@ class LiveSyncTopicRegistryParityTest {
     for (LiveSyncTopicClass backendClass : LiveSyncTopicClass.values()) {
       FrontendClass peer = frontend.get(key(backendClass.prefix(), backendClass.perResource()));
       if (peer == null) {
-        // Reported by the sibling test; not worth failing twice for one cause.
         continue;
       }
       assertThat(peer.sections())
@@ -113,8 +112,6 @@ class LiveSyncTopicRegistryParityTest {
   @DisplayName("the frontend's staff-only rooms stay out of the backend registry")
   void staffOnlyRoomsAreNotBridged() throws IOException {
     Map<String, FrontendClass> frontend = parseFrontendRegistry();
-    // Guards the omission rather than the presence: the admin area is web-only permanently (app
-    // plan Q7), so these must never drift in by someone "completing" the registry.
     assertThat(frontend).containsKey(key("bank", false));
 
     Set<String> backendKeys = new LinkedHashSet<>();

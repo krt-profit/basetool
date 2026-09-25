@@ -256,26 +256,11 @@ public class UserDeletionService {
             .orElseThrow(() -> new NoSuchElementException("User not found"));
 
     if (user.isInKeycloak()) {
-      // An admin's request against an account that still exists — a 400 with a localized detail,
-      // not a raw IllegalStateException, which is answered as a 500 (APPSEC-06).
       throw new BadRequestException(ERROR_STILL_IN_KEYCLOAK);
     }
-    // The stored flag is only a cached mirror of Keycloak, maintained by the sync. A single
-    // swallowed sync error leaves it stale at false, which used to be enough for an admin to
-    // irreversibly hard-delete an ACTIVE member — and since this method purges rather than
-    // reassigns, that now destroys their Lager, hangar and personal data outright. So re-verify
-    // against Keycloak itself. Fail-closed by construction: userExists only reports absence on a
-    // clean 404 and otherwise propagates, so an unreachable Keycloak aborts the deletion instead of
-    // letting it proceed on a stale flag.
-    //
-    // Waived only for a caller that removes the Keycloak user as part of the same operation, where
-    // the probe would be asking about a user the caller is itself disposing of (see the overload's
-    // Javadoc and #1827).
     if (presenceCheck == KeycloakPresenceCheck.ENFORCED
         && keycloakService.userExists(userId)
         && !isConfiguredGatewayServiceAccount(userId)) {
-      // Same answer as the stored-flag guard above: the caller cannot tell the two apart and
-      // need not. The stale flag is the sync's business, logged there.
       throw new BadRequestException(ERROR_STILL_IN_KEYCLOAK);
     }
 
@@ -296,45 +281,17 @@ public class UserDeletionService {
                             () ->
                                 new IllegalStateException("No admin user found to reassign data")));
 
-    // ---- Account-owned data: purged with the account (REQ-DATA-008) ----
-    // Every delete below is set-based on purpose. Loading any of these rows as managed entities
-    // would leave them pointing at the User removed further down and abort the flush with
-    // TransientPropertyValueException — see the projection note on the responsible-holder snapshot.
-    // The warehouse delete also takes the job-order and mission allocations with it (both FKs are
-    // ON DELETE CASCADE, V217) and any open Materialbörse offer (V210); the handover history
-    // survives with its inventory link nulled (V58, ON DELETE SET NULL).
     int inventoryDeleted = inventoryItemRepository.deleteByUserId(userId);
     int shipsDeleted = shipRepository.deleteByOwnerId(userId);
 
-    // The five identity columns that used to carry no foreign key to app_user. Since V235 each
-    // declares ON DELETE CASCADE (REQ-DATA-008, ADR-0142), so the database would remove these rows
-    // on its own -- these statements are NOT dead code, they are what the summary audit event
-    // below counts: Postgres reports no row count for a cascade, and dropping them would leave
-    // PERSONAL_DATA_PURGED_ON_USER_DELETION with nothing to record. The constraint is the
-    // guarantee, the statement is the number. Deleting explicitly first also keeps the rows out of
-    // the cascade entirely, so the ordering below stays the only thing that has to be right.
-    //
-    // What the constraint buys: a future delete path that forgets one of the five can no longer
-    // leak rows that outlive the account, stay undiscoverable because every lookup is keyed by a
-    // departed member, and are re-adopted should the same Keycloak subject return. The rule
-    // selectors were the worst of them -- left in place they keep minting NEW notifications for a
-    // recipient that no longer exists.
     int personalInventoryDeleted = personalInventoryItemRepository.deleteByOwnerUserId(userId);
     int blueprintsDeleted = personalBlueprintRepository.deleteAllByOwnerUserId(userId);
     int notificationsDeleted = notificationRepository.deleteAllForRecipient(userId);
     int ruleSelectorsDeleted = notificationRuleRepository.deleteSelectorsByUserId(userId);
     int evaluationsDeleted = memberEvaluationRepository.deleteAllByUserId(userId);
 
-    // ---- Shared / historical aggregates: these survive, only their ownership moves ----
-    // Refinery orders and missions are not account data: they feed operation finances and the
-    // mission history that must stay readable after the member leaves. Reassigning (rather than
-    // deleting) them keeps those records whole.
     missionRepository.updateOwner(user, admin);
 
-    // System/cascade audit: summary events only (set-based statements expose no per-row ids); the
-    // deleted user is the target, the acting admin is the actor. Recorded only when rows were
-    // actually affected and carrying the row count, mirroring InventoryOrgUnitReconciler's >0
-    // guard.
     if (inventoryDeleted > 0 || shipsDeleted > 0) {
       auditService.record(
           AuditEventType.INVENTORY_PURGED_ON_USER_DELETION,
@@ -375,50 +332,22 @@ public class UserDeletionService {
               .with("fromUser", userId)
               .with("toAdmin", admin.getId()));
     }
-    // The mission_ownership companion (1:1 with mission, owner_id FK has no ON DELETE clause) must
-    // be reassigned in lock-step with mission.owner above; otherwise its dangling owner_id FK-fails
-    // (23503) on the final delete, because the parent mission survives so its mission_id cascade
-    // never clears the row.
     missionOwnershipRepository.updateOwner(user, admin);
 
-    // Remove ManyToMany and nullable references
     missionRepository.removeManager(userId);
     jobOrderRepository.removeAssignee(userId);
     missionParticipantRepository.unlinkUser(userId);
-    // material_claim.claimed_by_user_id (V131) is an audit-only FK with no ON DELETE clause; null
-    // it
-    // so an ex-logistician who ever filed a claim does not FK-fail (23503) on the delete below.
     materialClaimRepository.unlinkClaimedByUser(userId);
 
-    // Discord-approval audit cleanup (epic #720 / REQ-SEC-017, V173). These three references into
-    // app_user declare no ON DELETE clause (Postgres NO ACTION), so without explicit cleanup a
-    // decided-on or deciding account cannot be hard-deleted. This is the reported regression: an
-    // approved, since-removed Discord registration could not be deleted because of FK
-    // user_approval_event_user_id_fkey (409). The subject's own audit rows are deleted (user_id is
-    // NOT NULL, so they cannot be orphaned); rows the deleted account decided keep the audit but
-    // lose their now-gone decider link; and the denormalised app_user.approved_by_id back-pointer
-    // on other users is nulled. The approval audit of OTHER users survives. Must run before the
-    // app_user delete below so the FK is satisfied at flush.
     userApprovalEventRepository.deleteByUserId(userId);
     userApprovalEventRepository.clearDecidedBy(userId);
     userRepository.clearApprovedBy(userId);
 
-    // Snapshot the responsible holders of every account tied to the user's org units BEFORE the
-    // delete: a leader (Staffelleiter / SK-Lead / Bereichsleiter / OL member) being deleted changes
-    // the derived Kontoverantwortliche/r of the affected account(s) (REQ-BANK-034, ADR-0070). The
-    // org-unit membership rows go via the DB ON DELETE CASCADE, so the delete is flushed before the
-    // re-diff so the recompute observes the post-cascade state.
     final Map<UUID, Set<UUID>> responsibleBefore =
         orgUnitBankResponsibilityServiceProvider
             .getObject()
             .snapshotResponsibleHoldersForUser(userId);
 
-    // The marker event for the whole operation (REQ-AUDIT-001): the deletion mutates several
-    // audited areas at once, and without it the per-area purge events above would have no common
-    // anchor explaining why an admin suddenly emptied someone's Lager. Recorded BEFORE the delete
-    // so the acting admin and the target are still resolvable, and unconditionally — unlike the
-    // per-area events there is always exactly one deletion to record. The payload holds ids and
-    // counts only; the handle snapshot AuditService takes is the sole place a name may appear.
     auditService.record(
         AuditEventType.USER_DELETED,
         null,
@@ -433,7 +362,6 @@ public class UserDeletionService {
             .with("evaluations", evaluationsDeleted)
             .with("refineryOrdersReassignedTo", admin.getId()));
 
-    // Delete the user
     userRepository.delete(user);
     userRepository.flush();
     orgUnitBankResponsibilityServiceProvider
@@ -487,9 +415,6 @@ public class UserDeletionService {
     try {
       username = keycloakService.usernameOf(userId);
     } catch (RestClientException unreachable) {
-      // Cannot establish it, so do not claim it. The guard then refuses with its ordinary message
-      // instead of this method's failure escaping as an unexpected 500 — which is exactly what the
-      // first cut did when the clients endpoint answered 403.
       log.warn("Could not determine whether the row is a gateway service account; refusing");
       return false;
     }
@@ -501,8 +426,6 @@ public class UserDeletionService {
                         .anyMatch(clientId -> name.equals(SERVICE_ACCOUNT_PREFIX + clientId)))
             .isPresent();
     if (isMachine) {
-      // WARN, not DEBUG: deleting a row the application swears it never creates is worth a line in
-      // the log, and this path should fire once per environment and then never again.
       log.warn(
           "Deleting the stray app_user row of a configured ingest gateway's service account; "
               + "the stale in_keycloak flag is expected here because an unfiltered user listing "

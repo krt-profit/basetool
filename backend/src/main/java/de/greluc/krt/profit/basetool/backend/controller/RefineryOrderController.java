@@ -229,7 +229,6 @@ public class RefineryOrderController {
         targetUserId = existing.getOwner().getId();
       }
     } else {
-      // Normal user: must be the owner
       if (existing.getOwner() == null || !existing.getOwner().getId().equals(callerId)) {
         throw new AccessDeniedException("Access denied: You do not own this refinery order");
       }
@@ -267,8 +266,6 @@ public class RefineryOrderController {
     refineryOrderService.storeRefineryOrder(
         userService.getUserIdFromJwt(jwt), id, dto, authHelperService.isLogisticianOrAbove());
   }
-
-  // Admin/Officer endpoints
 
   /**
    * Squadron-wide refinery-order list. Open to all authenticated callers (read-only).

@@ -94,24 +94,17 @@ public final class PersonSearchTargets {
    */
   public static final List<Target> TARGETS =
       List.of(
-          // --- the member record itself -------------------------------------------------
           new Target("MEMBER", "app_user", "username", "id", LINK_MEMBER),
           new Target("MEMBER", "app_user", "display_name", "id", LINK_MEMBER),
           new Target("MEMBER", "app_user", "discord_guild_nickname", "id", LINK_MEMBER),
           new Target("MEMBER", "app_user", "description", "id", LINK_MEMBER),
           new Target("MEMBER", "app_user", "email", "id", LINK_MEMBER),
-          // The admin's written assessment of an applicant. The sharpest free-text field in the
-          // schema, and the reason REQ-SEC-057 bounds its retention.
           new Target("REGISTRATION", "user_approval_event", "reason", "id", null),
           new Target("DELETION_REQUEST", "deletion_request", "decision_note", "id", null),
-
-          // --- Einsätze -----------------------------------------------------------------
           new Target("MISSION", "mission", "name", "id", LINK_MISSION),
           new Target("MISSION", "mission", "description", "id", LINK_MISSION),
           new Target("MISSION", "mission", "meeting_point", "id", LINK_MISSION),
-          // An external party lead, named by hand because they have no account.
           new Target("MISSION", "mission", "party_lead_guest_name", "id", LINK_MISSION),
-          // The canonical case this whole feature exists for: an external participant.
           new Target("MISSION", "mission_participant", "guest_name", "mission_id", LINK_MISSION),
           new Target("MISSION", "mission_participant", "comment", "mission_id", LINK_MISSION),
           new Target("MISSION", "mission_objective", "title", "mission_id", LINK_MISSION),
@@ -121,18 +114,11 @@ public final class PersonSearchTargets {
           new Target("MISSION", "mission_unit", "note", "mission_id", LINK_MISSION),
           new Target("MISSION", "mission_frequency", "name", "mission_id", LINK_MISSION),
           new Target("MISSION", "mission_finance_entry", "note", "mission_id", LINK_MISSION),
-
-          // --- Operationen --------------------------------------------------------------
           new Target("OPERATION", "operation", "name", "id", LINK_OPERATION),
           new Target("OPERATION", "operation", "description", "id", LINK_OPERATION),
-
-          // --- Aufträge -----------------------------------------------------------------
           new Target("JOB_ORDER", "job_order", "comment", "id", LINK_JOB_ORDER),
-          // The requesting member's handle, typed rather than referenced.
           new Target("JOB_ORDER", "job_order", "handle", "id", LINK_JOB_ORDER),
           new Target("JOB_ORDER", "job_order_assignees", "note", "job_order_id", LINK_JOB_ORDER),
-          // Handover recipients: a handle with no user id beside it, which is why an erasure has to
-          // match them by text (REQ-SEC-062).
           new Target(
               "JOB_ORDER",
               "job_order_handover",
@@ -151,21 +137,13 @@ public final class PersonSearchTargets {
               "recipient_handle",
               "job_order_id",
               LINK_JOB_ORDER),
-
-          // --- Lager / Mein Inventar / Blueprints ---------------------------------------
           new Target("INVENTORY", "inventory_item", "note", "id", LINK_INVENTORY),
           new Target("PERSONAL_INVENTORY", "personal_inventory_item", "name", "id", null),
           new Target("PERSONAL_INVENTORY", "personal_inventory_item", "note", "id", null),
           new Target("PERSONAL_INVENTORY", "personal_blueprint", "note", "id", null),
-
-          // --- Hangar -------------------------------------------------------------------
           new Target("HANGAR", "ship", "name", "id", null),
-
-          // --- Materialbörse ------------------------------------------------------------
           new Target("MARKET", "material_exchange_offer", "remark", "id", LINK_MARKET),
           new Target("MARKET", "material_exchange_request", "remark", "id", LINK_MARKET),
-
-          // --- Bank ---------------------------------------------------------------------
           new Target("BANK", "bank_account", "name", "id", LINK_BANK),
           new Target("BANK", "bank_holder", "handle", "id", LINK_BANK),
           new Target("BANK", "bank_transaction", "justification", "id", LINK_BANK),
@@ -181,9 +159,6 @@ public final class PersonSearchTargets {
           new Target("BANK", "bank_booking_request", "counterparty_handle", "id", LINK_BANK),
           new Target(
               "BANK", "bank_booking_request", "owner_approval_granted_by_handle", "id", LINK_BANK),
-
-          // --- Organisation -------------------------------------------------------------
-          // An org-chart placeholder for somebody without an account yet.
           new Target("ORG", "org_chart_position", "name", "id", LINK_ORG),
           new Target("ORG", "org_chart_position", "display_name", "id", LINK_ORG),
           new Target("ORG", "org_unit", "grand_admiral_display_name", "id", LINK_ORG),
@@ -191,8 +166,6 @@ public final class PersonSearchTargets {
           new Target("ORG", "org_unit", "shorthand", "id", LINK_ORG),
           new Target("ORG", "org_unit", "description", "id", LINK_ORG),
           new Target("ORG", "kommando_group", "name", "id", LINK_ORG),
-
-          // --- Admin-authored reference text --------------------------------------------
           new Target("ANNOUNCEMENT", "announcement", "content", "id", null),
           new Target("LOCATION", "location", "name", "id", null),
           new Target("LOCATION", "location", "description", "id", null),
@@ -207,26 +180,9 @@ public final class PersonSearchTargets {
           new Target("PROMOTION", "promotion_level_content", "description", "id", null),
           new Target("PROMOTION", "rank_requirement", "description", "id", null),
           new Target("NOTIFICATION", "notification_rule", "description", "id", null),
-
-          // --- the trails ---------------------------------------------------------------
-          // Last, deliberately: a hit here is a record ABOUT an action, not a field somebody typed
-          // a name into. It is also the only place an erasure cannot reach by id once the account
-          // is gone (REQ-SEC-062).
           new Target("AUDIT", "audit_event", "actor_handle", "id", LINK_AUDIT),
           new Target("AUDIT", "audit_event", "subject_label", "id", LINK_AUDIT),
           new Target("AUDIT", "bank_audit_event", "actor_handle", "id", LINK_AUDIT),
-          // Both details payloads, and they were exempt until review. The exemption read "carries
-          // ids and counts, never user free text (REQ-AUDIT-001)", which is what the rule says and
-          // not what the code does: `details` is a bare CharSequence on AuditService#record and
-          // BankAuditService#record, so nothing routes a caller through the AuditDetails builder.
-          // BankHolderService records HOLDER_REGISTERED with the holder's handle AS the payload,
-          // and BankLedgerService writes "+<amount> aUEC @<handle>" on every booking. A search
-          // that skipped these would report "no further mentions" for a name that is in them, and
-          // the whole point of this registry is that such an answer cannot be wrong quietly.
-          //
-          // The cost is a hit that sometimes duplicates its own parent row's hit, which is the
-          // reason the exemption gave for skipping them. A duplicate line in an admin's result
-          // list is not comparable to a missed occurrence in an Art. 16 rectification.
           new Target("AUDIT", "audit_event", "details", "id", LINK_AUDIT),
           new Target("AUDIT", "bank_audit_event", "details", "id", LINK_AUDIT));
 
@@ -249,40 +205,13 @@ public final class PersonSearchTargets {
    */
   public static final Set<String> EXEMPT_COLUMNS =
       Set.of(
-          // --- technical payloads, stated explicitly ------------------------------------
-          // NOTE: audit_event.details and bank_audit_event.details used to be exempt here, on the
-          // reason that they carry ids and counts and never user free text. They do carry names -
-          // see the two targets above - so they are searched now. Do not re-exempt them without
-          // first making the writers honour REQ-AUDIT-001.
-          //
-          // The originating-client label: a bounded vocabulary, never a name (REQ-AUDIT-005).
           "audit_event.client_id",
           "bank_audit_event.client_id",
-          // Render parameters for one notification, machine-written from a bounded template.
-          //
-          // It does hold a handle - AccountDeletionRequestedEvent writes {"handle":"<name>"} into
-          // one row per administrator - and that is why the exemption is about reachability and
-          // not about absence: a notification belongs to one recipient, renders through a bounded
-          // template, and is swept within 180 days (REQ-NOTIF-009). Searching it would return one
-          // hit per admin inbox for the same event.
-          //
-          // A granted Art. 17 request used to rewrite the name inside this payload. That
-          // statement was removed on 2026-09-17 -- it was a substring REPLACE over every row of
-          // the table driven by the member's own self-service display name, so a short or common
-          // one rewrote unrelated rows irreversibly (ADR-0183).
-          //
-          // The notification is superseded instead, which is better than rewriting it: the three
-          // terminal transitions of a deletion request now resolve the pending notification, so
-          // the row carrying the name is gone the moment the request is withdrawn, declined or
-          // carried out rather than surviving until the 180-day unread sweep.
           "notification.params",
           "notification.entity_type",
-          // P4K import diagnostics and the uploaded file's own name.
           "p4k_import_job.error_message",
           "p4k_import_job.result_json",
           "p4k_import_job.source_filename",
-
-          // --- identifiers, codes and enum-like values ----------------------------------
           "app_user.discord_user_id",
           "bank_account.account_no",
           "bank_account.area_name",
@@ -319,10 +248,6 @@ public final class PersonSearchTargets {
           "job_type.name",
           "job_type.description",
           "job_type.archetype",
-
-          // --- @Enumerated(STRING) columns: an application enum, never a name ------------
-          // Stored as varchar by JPA, so information_schema reports them as text. Each is a
-          // bounded value set the code switches on; a person's name cannot appear in one.
           "app_user.approval_status",
           "app_user.default_payout_preference",
           "audit_event.domain",
@@ -369,18 +294,9 @@ public final class PersonSearchTargets {
           "refinery_order.status",
           "role_permissions.permission",
           "user_approval_event.decision",
-
-          // --- the role catalogue -------------------------------------------------------
-          // Eight seeded rows describing roles, not people (DataInitializer). A member handle in
-          // one would mean somebody had renamed a role after a person.
           "role.code",
           "role.name",
           "role.description",
-
-          // --- authorship stamps that hold an id, not a name ----------------------------
-          // These carry a Keycloak subject id or the literal "system". The two alias tables are
-          // the exception and ARE searched: MaterialExternalAliasService writes the principal
-          // NAME there, which can be a handle.
           "default_blueprint.created_by",
           "frequency_type.created_by",
           "frequency_type.updated_by",
@@ -390,10 +306,6 @@ public final class PersonSearchTargets {
           "mission_objective.updated_by",
           "mission_step.created_by",
           "mission_step.updated_by",
-
-          // --- external-sync diagnostics ------------------------------------------------
-          // Written by the UEX / SC-wiki sync jobs about catalogue rows, and reported on the
-          // admin sync-report page. They name items and manufacturers, not members.
           "external_sync_report.aggregate",
           "external_sync_report.detail",
           "external_sync_report.event_type",
@@ -401,11 +313,6 @@ public final class PersonSearchTargets {
           "external_sync_report.source_system",
           "material_external_alias.source_system",
           "blueprint_external_alias.source_system",
-
-          // --- blueprint catalogue detail rows ------------------------------------------
-          // Recipe structure synced from the SC wiki: ingredient names, property keys, group
-          // labels and comparison directions. The parent tables are in EXEMPT_TABLES; these are
-          // their child tables, listed individually because their names do not share a prefix.
           "blueprint_dismantle_return.wiki_name_snapshot",
           "blueprint_ingredient.kind",
           "blueprint_ingredient.wiki_name_snapshot",

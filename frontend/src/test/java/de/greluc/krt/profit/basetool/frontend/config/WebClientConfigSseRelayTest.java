@@ -79,8 +79,6 @@ class WebClientConfigSseRelayTest {
     when(locale.relayUserLocale()).thenReturn(passthrough);
 
     Environment environment = mock(Environment.class);
-    // "test" profile => connector(true) pins InsecureTrustManagerFactory and never reads
-    // SslBundles.
     when(environment.getActiveProfiles()).thenReturn(new String[] {"test"});
 
     WebClientConfig config =

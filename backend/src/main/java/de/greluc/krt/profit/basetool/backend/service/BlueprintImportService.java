@@ -119,15 +119,11 @@ public class BlueprintImportService {
 
     Map<String, ResolvedProduct> productByKey = productIndex();
     List<ResolvedProduct> allProducts = new ArrayList<>(productByKey.values());
-    // The structural tag index is only consulted for entries carrying a tag (scmdb.net). Build it
-    // lazily so the watcher / extractor / bare-array imports — which never carry a tag — pay no
-    // extra active-blueprint scan, exactly as before this source was added.
     Map<String, String> tagIndex =
         parsed.stream().anyMatch(e -> e.tag() != null)
             ? blueprintProductService.scwikiKeyToProductKeyIndex()
             : Map.of();
 
-    // First pass: resolve each name (without the owned check) and collect resolved keys.
     List<Resolution> resolutions = new ArrayList<>(parsed.size());
     Set<String> resolvedKeys = new HashSet<>();
     for (BlueprintExportParser.ParsedEntry entry : parsed) {
@@ -138,7 +134,6 @@ public class BlueprintImportService {
       }
     }
 
-    // Second pass: a single bulk lookup decides which resolved products are already owned.
     Set<String> ownedKeys = ownedKeys(ownerUserId, resolvedKeys);
 
     List<BlueprintImportEntryDto> entries = new ArrayList<>(resolutions.size());
@@ -159,9 +154,7 @@ public class BlueprintImportService {
         case SUGGESTED -> suggested++;
         case UNMATCHED -> unmatched++;
         case ALREADY_OWNED -> alreadyOwned++;
-        default -> {
-          /* exhaustive */
-        }
+        default -> {}
       }
       entries.add(
           new BlueprintImportEntryDto(
@@ -239,11 +232,6 @@ public class BlueprintImportService {
 
       PersonalBlueprint existing = ownedByKey.get(product.productKey());
       if (existing != null) {
-        // Re-import of an already-owned blueprint: never insert a duplicate (also guarded by the
-        // (owner_user_id, product_key) unique constraint); only pull the acquisition time earlier
-        // when
-        // this import carries an earlier timestamp. Mutating the managed entity relies on
-        // dirty-checking — no save()/flush() — per the CLAUDE.md concurrency rules.
         if (isEarlierAcquiredAt(resolution.acquiredAt(), existing.getAcquiredAt())) {
           existing.setAcquiredAt(resolution.acquiredAt());
           acquiredAtUpdated++;

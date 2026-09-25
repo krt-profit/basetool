@@ -55,23 +55,18 @@ class IngestPathScopeTest {
 
   @Test
   void matchesAPercentEncodedIngestPath() {
-    // %76 = 'v'. Spring MVC decodes this back to /v1/... and dispatches it, so the protective
-    // filters must see it as in scope.
     assertThat(IngestPathScope.isIngestRequest(request("/%761/refinery-extract"))).isTrue();
     assertThat(IngestPathScope.isIngestRequest(request("/v%31/refinery-extract"))).isTrue();
   }
 
   @Test
   void doesNotMatchTheUnauthenticatedOperationalEndpoints() {
-    // Gating these would break the container healthcheck and the Prometheus scrape.
     assertThat(IngestPathScope.isIngestRequest(request("/actuator/health"))).isFalse();
     assertThat(IngestPathScope.isIngestRequest(request("/v3/api-docs"))).isFalse();
   }
 
   @Test
   void doesNotMatchAPathThatMerelyStartsWithTheScopeLiteral() {
-    // /v1x is a different first segment, not a sub-path of /v1 — the segment-wise match keeps them
-    // apart where a naive string prefix would not.
     assertThat(IngestPathScope.isIngestRequest(request("/v1x/refinery-extract"))).isFalse();
   }
 }

@@ -67,12 +67,8 @@ class NotificationRedisConfigContextTest {
             NotificationFanoutProperties.class,
             () -> new NotificationFanoutProperties(true, "basetool:notify:published"))
         .withBean(RedisConnectionFactory.class, () -> mock(RedisConnectionFactory.class))
-        // Decoy executors: the real backend context holds five async ThreadPoolTaskExecutor beans,
-        // so the container's executor inject is ambiguous by type — the exact multi-bean situation.
         .withBean("uexExecutor", ThreadPoolTaskExecutor.class, ThreadPoolTaskExecutor::new)
         .withBean("mailExecutor", ThreadPoolTaskExecutor.class, ThreadPoolTaskExecutor::new)
-        // Keep the container from opening a real Redis subscription at lifecycle start against the
-        // mock connection factory — the bean wiring, not the connection, is what this guards.
         .withBean(
             "noAutoStart", BeanPostProcessor.class, NotificationRedisConfigContextTest::noAutoStart)
         .withUserConfiguration(NotificationRedisConfig.class)

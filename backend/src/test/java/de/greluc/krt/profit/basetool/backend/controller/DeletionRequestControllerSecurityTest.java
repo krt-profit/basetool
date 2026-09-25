@@ -75,7 +75,6 @@ class DeletionRequestControllerSecurityTest {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   }
 
-  // covers REQ-SEC-061 — an ordinary member may read their own request
   @Test
   void myRequest_member_isAllowed() throws Exception {
     mockMvc
@@ -93,7 +92,6 @@ class DeletionRequestControllerSecurityTest {
     mockMvc.perform(get("/api/v1/users/me/deletion-request")).andExpect(status().isUnauthorized());
   }
 
-  // covers REQ-SEC-061 — the admin queue is closed to a member, an officer and bank staff alike
   @Test
   void adminQueue_member_isForbidden() throws Exception {
     mockMvc
@@ -135,8 +133,6 @@ class DeletionRequestControllerSecurityTest {
         .andExpect(status().isOk());
   }
 
-  // covers REQ-SEC-061 — the irreversible action is unreachable without ADMIN, and the refusal
-  // happens at the gate rather than in the service
   @Test
   void execute_officer_isForbiddenAndNeverReachesTheService() throws Exception {
     mockMvc

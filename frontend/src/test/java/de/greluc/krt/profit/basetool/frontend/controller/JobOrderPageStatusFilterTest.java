@@ -68,9 +68,6 @@ class JobOrderPageStatusFilterTest {
   @BeforeEach
   void setup() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-    // The default @WithMockUser is a non-admin, so the orders view's profit gate would otherwise
-    // redirect to /orders/create. Stub the capability as a profit-eligible viewer so these tests
-    // exercise the list path.
     when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
         .thenReturn(LayoutResponses.capabilities(true, true, true));
   }

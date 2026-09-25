@@ -127,8 +127,7 @@ class OAuth2ScopeRequestParamLeakTest {
     OAuth2AuthorizedClientProvider capturing =
         context -> {
           captured.set(context);
-          return null; // null = "still valid, no reauth needed"; manager returns the existing
-          // client
+          return null;
         };
 
     DefaultOAuth2AuthorizedClientManager manager =

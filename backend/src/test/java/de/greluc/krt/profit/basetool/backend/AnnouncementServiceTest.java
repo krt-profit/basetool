@@ -60,7 +60,7 @@ class AnnouncementServiceTest {
 
   @Test
   void getAdminAnnouncement_ShouldReturnActiveOverEmpty() {
-    Announcement emptyZombie = new Announcement(); // content null, updatedAt null
+    Announcement emptyZombie = new Announcement();
 
     Announcement active = new Announcement();
     active.setContent("Active Info");

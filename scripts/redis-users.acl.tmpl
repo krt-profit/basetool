@@ -1,41 +1,6 @@
-# Profit Basetool - the Redis ACL, one user per service (REQ-SEC-068, ADR-0207).
-#
-# THE RULES ONLY. No secret is in this file: every password is a {{hash:NAME}} placeholder that
-# scripts/render-redis-acl.py replaces with the SHA-256 of NAME's value in the host .env, written in
-# Redis's `#<hex>` form, so the rendered /var/iri/redis/users.acl carries hashes and never a
-# password. The same template is rendered by the Java tests (RedisAclTemplate in test-support), so
-# a rule that is changed here is the rule the Testcontainers suites and the E2E stack run against.
-#
-# Syntax the renderer understands, and nothing else:
-#   {{hash:NAME}}   '#' + sha256(value of NAME); NAME must be set and non-empty, or the render refuses
-#   {{state:NAME}}  `on` or `off` from NAME; `on` when NAME is unset; any other value refuses
-# A line starting with '#' is a comment and is not copied into the output.
-#
-# Order matters inside a rule: they apply left to right, so `-@all` first, then what is granted,
-# then `-@dangerous` to take the dangerous members of a granted category back out.
-#
-# default -- what an unauthenticated client and a password-only `AUTH <pw>` land on. `on` until the
-#            rollout moves the applications to their own users, then REDIS_DEFAULT_USER=off. It
-#            MUST stay in this file in both states: an ACL file without a `default` line makes
-#            Redis reset `default` to `nopass ~* &* +@all` (the 2026-07-10 incident).
 user default {{state:REDIS_DEFAULT_USER}} {{hash:REDIS_PASSWORD}} ~* &* +@all sanitize-payload
-# admin -- the operator's user for ACL LOAD and inspection, with the same REDIS_PASSWORD. It lives
-#          in the redis container's environment only (env.d/redis.env), never in an application's.
 user admin on {{hash:REDIS_PASSWORD}} ~* &* +@all sanitize-payload
-# monitoring -- redis_exporter. Introspection commands, no key access. SCAN and RANDOMKEY are not
-#               key-checked, so +@read alone would hand this user every key NAME, and a session
-#               key's name is a session id; they are taken back out explicitly.
 user monitoring on {{hash:REDIS_EXPORTER_PASSWORD}} resetkeys resetchannels -@all +@connection +@read +client +config|get +info +latency +slowlog +memory +cluster|info +cluster|slots +cluster|nodes +xinfo +pfcount -keys -scan -randomkey sanitize-payload
-# basetool-frontend -- Spring Session (the basetool:session namespace, its created-event channel and
-#                      the two keyspace-event channels it subscribes to), the live-sync fan-out
-#                      channels, and the ingest handoff keys it consumes with GETDEL. SCAN is its own
-#                      (SessionMetricsConfig counts sessions). CONFIG is not: the server carries
-#                      --notify-keyspace-events itself. PSUBSCRIBE patterns are matched LITERALLY
-#                      against &-patterns, which is why the created-event pattern is spelled out.
 user basetool-frontend on {{hash:REDIS_FRONTEND_PASSWORD}} resetkeys ~basetool:session:* ~ingest:handoff:* resetchannels &basetool:session:* &basetool:session:event:0:created:* &__keyevent@0__:del &__keyevent@0__:expired &basetool:livesync:changed &basetool:livesync:presence -@all +@connection +@read +@write +@keyspace +@hash +@set +@sortedset +@string +@pubsub +@transaction -@dangerous +info sanitize-payload
-# basetool-backend -- the notification and live-sync fan-outs: publish and subscribe on two
-#                     channels, no key at all, and INFO for the health indicator.
 user basetool-backend on {{hash:REDIS_BACKEND_PASSWORD}} resetkeys resetchannels &basetool:livesync:changed &basetool:notify:published -@all +@connection -@dangerous +info +publish +subscribe +unsubscribe sanitize-payload
-# basetool-ingest -- stages one handoff under ingest:handoff:<sub>:<id> and keeps a per-subject
-#                    index list under ingest:handoff-index:<sub>. No channel, no SCAN.
 user basetool-ingest on {{hash:REDIS_INGEST_PASSWORD}} resetkeys ~ingest:* resetchannels -@all +@connection -@dangerous +info +set +setex +psetex +rpush +lpop +expire +pexpire +del +unlink sanitize-payload

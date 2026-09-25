@@ -197,10 +197,7 @@ public class BankApprovalLimitService {
                     limit.getGranteeUserId(),
                     names.getOrDefault(limit.getGranteeUserId(), ""),
                     limit.getLimitAmount()));
-        default -> {
-          // All BankAccountViewGranteeKind values are handled above; the default is unreachable and
-          // present only to satisfy the MissingSwitchDefault check on the switch statement.
-        }
+        default -> {}
       }
     }
     return new BankApprovalLimitsDto(

@@ -86,8 +86,6 @@ class AssetLinksControllerTest {
   @Test
   @DisplayName("is served anonymously, as JSON, with no redirect")
   void servedAnonymouslyAsJson() throws Exception {
-    // All three matter to Android and none of them held before this endpoint existed: an
-    // unauthenticated GET answered 302 into the OAuth entry point.
     mvc()
         .perform(get("/.well-known/assetlinks.json"))
         .andExpect(status().isOk())
@@ -109,9 +107,6 @@ class AssetLinksControllerTest {
   @Test
   @DisplayName("publishes the digests as a list, so a key rotation can name two at once")
   void fingerprintsAreAList() throws Exception {
-    // A rotation must publish the new digest while the old key is still installed everywhere. If
-    // this ever became a bare string, that overlap would be impossible and one population would
-    // break for the length of the rollout.
     mvc()
         .perform(get("/.well-known/assetlinks.json"))
         .andExpect(jsonPath("$[0].target.sha256_cert_fingerprints").isArray())

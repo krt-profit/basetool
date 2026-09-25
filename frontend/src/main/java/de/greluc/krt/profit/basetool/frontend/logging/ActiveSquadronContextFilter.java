@@ -129,7 +129,6 @@ public class ActiveSquadronContextFilter extends OncePerRequestFilter implements
     }
     String orgUnitId = active == null ? NO_ACTIVE_ORG_UNIT : active.toString();
     MDC.put(ORG_UNIT_ID_MDC_KEY, orgUnitId);
-    // Stashed for a later async dispatch of this same request, which runs on another thread.
     request.setAttribute(ORG_UNIT_ID_ATTRIBUTE, orgUnitId);
     try {
       chain.doFilter(request, response);

@@ -104,19 +104,14 @@ public class RefineryOrderWriteController {
     try {
       return java.time.Instant.parse(input);
     } catch (Exception ignored) {
-      /* not an instant */
     }
     try {
       return java.time.OffsetDateTime.parse(input).toInstant();
     } catch (Exception ignored) {
-      /* not offset date time */
     }
     if (input.length() == 10) {
-      // Date only -> start of day in UTC
       return java.time.LocalDate.parse(input).atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
     }
-    // LocalDateTime without zone -> defensively interpret as UTC to avoid a double
-    // DST conversion. Correct inputs always carry 'Z' or an offset.
     return java.time.LocalDateTime.parse(input).toInstant(java.time.ZoneOffset.UTC);
   }
 
@@ -311,7 +306,6 @@ public class RefineryOrderWriteController {
       RefineryOrderStoreDto dto = buildStoreDto(form);
       backendApiClient.post("/api/v1/refinery-orders/" + id + "/store", dto, Void.class);
       liveSyncLocalBus.publish("refinery", REFINERY_QUEUE_SECTION);
-      // Storing the refined output writes inventory rows, so an open Lager must refresh too.
       liveSyncLocalBus.publish("inventory", INVENTORY_STOCK_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "success.refineryorder.store");
     } catch (BackendServiceException e) {
@@ -543,7 +537,6 @@ public class RefineryOrderWriteController {
       backendApiClient.post(
           "/api/v1/refinery-orders/" + id + "/store", buildStoreDto(form), Void.class);
       liveSyncLocalBus.publish("refinery", REFINERY_QUEUE_SECTION);
-      // Storing the refined output writes inventory rows, so an open Lager must refresh too.
       liveSyncLocalBus.publish("inventory", INVENTORY_STOCK_SECTION);
       return org.springframework.http.ResponseEntity.ok(
           java.util.Map.of("targetUrl", "/refinery-orders"));

@@ -87,7 +87,6 @@ public class OrgChartReadService {
     final List<OrgChartPosition> areaPositions =
         positionRepository.findAllByOrgUnitIsNullOrderBySortIndexAscCreatedAtAsc();
 
-    // Positions for every org-unit-bound tier: profit-eligible Staffeln/SKs + Bereiche + the OL.
     Set<UUID> chartedUnitIds = new HashSet<>();
     units.forEach(u -> chartedUnitIds.add(u.getId()));
     chartedUnitIds.addAll(bereichIds);
@@ -102,12 +101,6 @@ public class OrgChartReadService {
     Map<UUID, List<OrgChartPosition>> positionsByUnit =
         unitPositions.stream().collect(Collectors.groupingBy(p -> p.getOrgUnit().getId()));
 
-    // OL tier at the very top (null when no OL exists, so the chart omits the tier). The Grand
-    // Admiral (REQ-ORG-021) is surfaced above the rest of the OL. It is held by EITHER an account
-    // (an OL member split out of the member list — keeps the OL_MEMBER rank, so rights are
-    // unaffected) OR a free-text name for a member without an account (a synthesized node that
-    // grants
-    // nothing, like every other free-text holder) — the two are mutually exclusive.
     OlChartDto olTier = null;
     if (ol != null) {
       List<OrgChartNodeDto> olMembers =
@@ -136,16 +129,12 @@ public class OrgChartReadService {
       olTier = new OlChartDto(ol.getId(), ol.getName(), ol.getShorthand(), grandAdmiral, members);
     }
 
-    // One tier per Bereich: its Bereichsleitung sub-tree + the Staffeln/SKs wired under it.
     List<BereichChartDto> bereichDtos =
         bereiche.stream()
             .sorted(Comparator.comparing(OrgUnit::getName, String.CASE_INSENSITIVE_ORDER))
             .map(b -> buildBereich(b, units, positionsByUnit))
             .toList();
 
-    // Ungrouped/legacy tier: active Staffeln/SKs NOT wired under a (charted) Bereich. Until
-    // an admin creates Bereiche and assigns parents this holds every unit, so the chart degrades to
-    // the pre-#692 single-tree view.
     List<SquadronChartDto> ungroupedSquadrons =
         units.stream()
             .filter(u -> u.getKind() == OrgUnitKind.SQUADRON)

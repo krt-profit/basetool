@@ -93,10 +93,6 @@ class AdminSyncReportsPageControllerTest {
 
   @Test
   void deleteOld_canonicalisesTheSourceTabBeforeRelayingIt() {
-    // The redirect always upper-cased and trimmed the tab while the relayed backend query took the
-    // raw string, so "  scwiki  " landed on the SC Wiki tab but sent an unrecognised source — which
-    // the backend reads as "no filter" and purges BOTH catalogues. One canonical value now feeds
-    // both.
     BackendApiClient client = mock(BackendApiClient.class);
     when(client.delete(any(String.class), eq(SyncReportPurgeResultDto.class)))
         .thenReturn(new SyncReportPurgeResultDto(3));
@@ -113,8 +109,6 @@ class AdminSyncReportsPageControllerTest {
 
   @Test
   void deleteOld_unknownSourceNeverReachesTheRelayedUri() {
-    // A crafted tab must not be able to append a second query parameter to the purge request. It is
-    // not in the allowlist, so it collapses to the combined purge and the URI carries no `source`.
     BackendApiClient client = mock(BackendApiClient.class);
     when(client.delete(any(String.class), eq(SyncReportPurgeResultDto.class)))
         .thenReturn(new SyncReportPurgeResultDto(0));

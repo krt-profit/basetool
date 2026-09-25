@@ -134,9 +134,6 @@ class RestClientConfigTest {
 
   @Test
   void withHostnameVerificationTheRelayRefusesAPinnedButMisnamedCertificate() throws Exception {
-    // REQ-SEC-070 / ING-SEC-04: once one internal CA signs every service the pinned anchor
-    // vouches for all of them, so the name has to be checked. Same pinned chain as the default
-    // case above, verification on: refused.
     try (MockWebServer backend = httpsServer(BACKEND_CERT)) {
       RestClient client =
           config(
@@ -153,7 +150,6 @@ class RestClientConfigTest {
 
   @Test
   void withHostnameVerificationTheRelayAcceptsAPinnedCorrectlyNamedCertificate() throws Exception {
-    // ...and the matching name is accepted, so the refusal above was the name and nothing else.
     try (MockWebServer backend = httpsServer(LOCALHOST_CERT)) {
       RestClient client =
           config(
@@ -197,8 +193,6 @@ class RestClientConfigTest {
 
   @Test
   void withoutABundleTheRelayFallsBackToTheJvmTrustStore() throws Exception {
-    // A publicly-trusted / corporate-CA backend cert needs no pin. A self-signed one is therefore
-    // refused here — the fallback is the JVM's anchors, not "trust anything".
     try (MockWebServer backend = httpsServer(LOCALHOST_CERT)) {
       RestClient client =
           config(httpsUrl(backend), new String[] {"prod"}, new DefaultSslBundleRegistry())
@@ -226,7 +220,6 @@ class RestClientConfigTest {
 
   @Test
   void theKeycloakClientVerifiesTheHostnameEvenForAPinnedCertificate() throws Exception {
-    // Pinned chain, wrong name: refused, because the token endpoint keeps hostname verification.
     try (MockWebServer keycloak = httpsServer(BACKEND_CERT)) {
       RestClient client =
           config(
@@ -239,8 +232,6 @@ class RestClientConfigTest {
       assertThatThrownBy(() -> client.get().uri(httpsUrl(keycloak)).retrieve().body(String.class))
           .isInstanceOf(ResourceAccessException.class);
     }
-    // Pinned chain, matching name: accepted — so the refusal above was the hostname and nothing
-    // else.
     try (MockWebServer keycloak = httpsServer(LOCALHOST_CERT)) {
       RestClient client =
           config(
@@ -327,7 +318,6 @@ class RestClientConfigTest {
       RecordedRequest recorded = backend.takeRequest(5, TimeUnit.SECONDS);
       assertThat(recorded).isNotNull();
       assertThat(recorded.getPath()).isEqualTo("/api/v1/ping");
-      // Pinned to HTTP/1.1, as the replaced Reactor Netty client spoke: no h2c upgrade offer.
       assertThat(recorded.getRequestLine()).endsWith("HTTP/1.1");
       assertThat(recorded.getHeader("Upgrade")).isNull();
     }

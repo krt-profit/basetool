@@ -48,7 +48,6 @@
         </div>
 
         <th:block th:unless="${#lists.isEmpty(eligibilities)}">
-            <!--/* Toolbar: filter "nur offene Voraussetzungen" */-->
             <div class="me-toolbar">
                 <label class="me-filter-chip">
                     <input type="checkbox" id="me-filter-open" data-trigger="me-filter-open" />
@@ -81,7 +80,6 @@
                     </div>
                 </div>
 
-                <!--/* Progress bar (M2): aggregate achievedCount / requiredCount across all checks */-->
                 <th:block th:if="${!#lists.isEmpty(elig.checks)}">
                     <div class="eligibility-progress-label">
                         <span th:text="#{promotion.my.eligibility.progress.label}">Fortschritt</span>:
@@ -118,11 +116,6 @@
                                         <span th:case="*">-</span>
                                     </span>
                                 </td>
-                                <!--/*
-                                    M1: "Deine Stufe" — server-rendered from evaluationByCategoryId so
-                                    requirement and actual value sit side-by-side. Falls back to a "—"
-                                    badge when the user has no evaluation in that category.
-                                */-->
                                 <td>
                                     <th:block th:with="myEval=${chk.categoryId != null ? evaluationByCategoryId[chk.categoryId.toString()] : null}">
                                         <span th:if="${myEval != null and myEval.assignedLevel != null}"
@@ -170,13 +163,6 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <!--/*
-                            Each row carries a weak-flag computed server-side: if the user's assigned
-                            level (by ordinal) is below the highest required level for that category
-                            across any rank requirement, the row is marked as weak and the badge gets
-                            an orange tint. requiredLevelByCategory may be null/empty for categories
-                            with no rules.
-                        */-->
                         <tr th:each="category : ${topicCategoryMap[topic.id.toString()]}"
                             th:with="myEval=${evaluationByCategoryId[category.id.toString()]},
                                      reqLevel=${requiredLevelByCategory[category.id.toString()]},

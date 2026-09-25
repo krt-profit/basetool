@@ -79,7 +79,6 @@ public class DiscordAccountExistenceService {
     boolean byEmail = lowerEmail != null && userRepository.existsByLowerEmail(lowerEmail);
 
     boolean exists = byName || byEmail;
-    // REQ-OBS: log only the coarse decision, never the candidate names/e-mail.
     log.debug("Discord account-existence precheck decided exists={}.", exists);
     return exists;
   }

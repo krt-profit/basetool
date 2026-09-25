@@ -100,7 +100,6 @@ class MissionDesignFixesCheckE2eTest {
 
       E2eSupport.login(page, baseUrl, "test-admin", "test-admin-pw");
 
-      // 1) Übersicht: no jump cards left.
       E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=ueb");
       page.waitForLoadState();
       page.waitForTimeout(400);
@@ -112,7 +111,6 @@ class MissionDesignFixesCheckE2eTest {
               .setFullPage(true)
               .setPath(Paths.get("build", "e2e", "fix-ueb.png")));
 
-      // 2) Crew board: legend + drop-hint must render light/regular, not thin gray-2.
       E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=crew");
       page.waitForLoadState();
       page.waitForTimeout(400);
@@ -129,7 +127,6 @@ class MissionDesignFixesCheckE2eTest {
               .setFullPage(true)
               .setPath(Paths.get("build", "e2e", "fix-crew.png")));
 
-      // 3+4) Finance: payout table fits without horizontal scroll; details carry a panel surface.
       E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=fin");
       page.waitForLoadState();
       page.waitForTimeout(400);
@@ -137,8 +134,6 @@ class MissionDesignFixesCheckE2eTest {
           page.evaluate(
               "() => { const w ="
                   + " document.querySelector('.payout-table')?.closest('.table-responsive');"
-                  // The demo mission has no refinery orders, so the details element may not
-                  // render — verify the selector via a synthetic element in that case.
                   + " let d = document.querySelector('#pane-fin details.hud-details');"
                   + " let synthetic = false;"
                   + " if (!d) { d = document.createElement('details'); d.className = 'hud-details';"
@@ -153,7 +148,6 @@ class MissionDesignFixesCheckE2eTest {
               .setFullPage(true)
               .setPath(Paths.get("build", "e2e", "fix-fin.png")));
 
-      // 5) Verwaltung: both "Jetzt" buttons fully visible inside their pane.
       E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=verw");
       page.waitForLoadState();
       page.waitForTimeout(400);

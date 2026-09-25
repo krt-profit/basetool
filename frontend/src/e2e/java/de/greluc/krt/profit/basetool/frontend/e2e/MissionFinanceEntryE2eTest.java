@@ -124,28 +124,16 @@ class MissionFinanceEntryE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        // Open the seeded mission's detail page on the finance tab (?tab=fin deeplink —
-        // the "Neuer Eintrag" button lives inside the Finanzen tab pane) and the modal.
         E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=fin");
         page.waitForLoadState();
         page.locator("button[data-trigger='open-modal-display'][data-modal-id='finance-modal']")
             .click();
 
-        // Fill an income entry. The participant picker is a searchable combobox; its empty-value
-        // placeholder is not a list option, so the first option is the first real (seeded guest)
-        // participant — the equivalent of the former selectOption().setIndex(1). The type is a
-        // segment control mirroring into the hidden type input; INCOME is the default, the explicit
-        // click guards against a changed default.
         Locator modal = page.locator("#finance-modal");
         E2eSupport.selectComboboxFirstOption(modal.locator(".krt-combobox__input"));
         modal.locator(".seg button[data-type-value='INCOME']").click();
         modal.locator("input[name='amount']").fill(FINANCE_AMOUNT);
 
-        // Submit in place (#574): the finance add now swaps the Finanzen pane via AJAX — there is
-        // no
-        // Post/Redirect/Get navigation to await. Mark the window so we can prove no full reload
-        // happened, click submit, then web-first-wait for the new entry's edit button to appear in
-        // the re-rendered pane (which also proves the entry was persisted).
         page.evaluate("window.__krtNoReload = true;");
         modal.locator("button[type='submit']").click();
         assertThat(
@@ -157,10 +145,6 @@ class MissionFinanceEntryE2eTest {
             page.evaluate("window.__krtNoReload === true"),
             "finance add must swap in place — no full-page reload cleared the window marker");
 
-        // Reopen the detail page. Before the th:with fix this 500'd: the populated finance loop
-        // called @moneyFormat inside the restricted th:data-amount attribute and threw a
-        // TemplateProcessingException. It must now render 200 with the finance edit button
-        // carrying the rounded amount as a plain data-amount value.
         Response reopened =
             E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=fin");
         assertEquals(

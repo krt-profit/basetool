@@ -69,8 +69,6 @@ class LeitungPageControllerTest {
 
     assertEquals("organisation/leitung", result);
     assertSame(view, model.getAttribute("leitung"));
-    // #1193: the appointment pickers search the roster server-side on demand, so the full page
-    // render no longer preloads the user lookup or sets the allUsers attribute.
     assertNull(model.getAttribute("allUsers"));
     verify(backend, never()).get(eq("/api/v1/users/lookup"), anyTypeRef());
   }

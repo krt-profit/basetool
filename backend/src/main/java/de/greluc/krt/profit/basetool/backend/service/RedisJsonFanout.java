@@ -135,7 +135,6 @@ final class RedisJsonFanout {
       JsonNode root = jsonMapper.readTree(new String(message.getBody(), StandardCharsets.UTF_8));
       JsonNode origin = root.get("origin");
       if (origin != null && origin.isString() && instanceId.equals(origin.asString())) {
-        // Our own publication looped back — the local delivery already happened. Skip.
         return;
       }
       handler.accept(root);

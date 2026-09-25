@@ -69,10 +69,6 @@ public class SquadronAdminProxyController {
   public ResponseEntity<Void> setPromotionEnabled(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
     backendApiClient.patch("/api/v1/squadrons/" + id + "/promotion-enabled", body, Void.class);
-    // The flag lives on the cached SquadronDto that OrgUnitContextAdvice reads on every render, so
-    // a toggle must evict the SQUADRON (and ORG_UNIT) caches or the sidebar/title gate stays stale
-    // up to the TTL (REQ-DATA-007 — squadron-catalogue cacheability is gated on every admin
-    // mutation evicting).
     backendApiClient.evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);
     return ResponseEntity.noContent().build();
   }
@@ -91,9 +87,6 @@ public class SquadronAdminProxyController {
   public ResponseEntity<Void> setProfitEligible(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
     backendApiClient.patch("/api/v1/squadrons/" + id + "/profit-eligible", body, Void.class);
-    // Same reason as setPromotionEnabled: isProfitEligible is part of the cached SquadronDto, so
-    // evict the SQUADRON (and ORG_UNIT) caches on the toggle to keep the cached catalogue truthful
-    // (REQ-DATA-007).
     backendApiClient.evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);
     return ResponseEntity.noContent().build();
   }

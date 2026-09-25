@@ -129,9 +129,6 @@ public class DefaultBlueprintBootstrap implements CommandLineRunner {
         entity.setOutputItem(gameItemRepository.getReferenceById(product.outputItemId()));
       }
     } else {
-      // The catalog does not (yet) carry this product under a matching name. Seed a degraded row
-      // (key = normalized name, no output item) so the default is still granted; an admin can
-      // remove it and re-add the correct catalog product through the picker.
       log.warn(
           "Default blueprint '{}' did not resolve against the blueprint catalog; seeding degraded"
               + " row (key='{}').",

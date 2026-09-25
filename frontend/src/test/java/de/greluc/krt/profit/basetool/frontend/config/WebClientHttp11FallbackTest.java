@@ -104,8 +104,6 @@ class WebClientHttp11FallbackTest {
 
     assertThat(body).isEqualTo("ok");
 
-    // The server here is the same HTTP/2-capable one the other class uses, so a failure means the
-    // property was ignored rather than that the peer could not speak it.
     assertThat(negotiated.get()).isNotEqualTo("h2");
   }
 }

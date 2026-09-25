@@ -73,18 +73,10 @@ public class BlueprintVariantAliasOverrides {
   public BlueprintVariantAliasOverrides() {
     Map<String, String> map = new LinkedHashMap<>();
 
-    // ── Base-name spelling drift ──
-    // The Pulse laser pistol's cosmetic variants are inconsistently spelled on the SC Wiki: some
-    // liveries drop the "Laser" base token ("Pulse \"Blacklist\" Pistol" -> "pulse pistol") while
-    // the base and the manufacturer-livery skins keep it ("pulse laser pistol"). Same craftable
-    // family; collapse the truncated spelling onto the full one.
     register(map, "pulse pistol", "pulse laser pistol");
 
-    // ── Unquoted sub-models confirmed to share their base line's craftability ──
-    // Salvo Frag Pistol signature editions: inline personal names, not quoted skins.
     register(map, "salvo esteban frag pistol", "salvo frag pistol");
     register(map, "salvo saeed frag pistol", "salvo frag pistol");
-    // Arclight pistol revision designation ("Model II"), either word order seen in the wild.
     register(map, "model ii arclight", "arclight pistol");
     register(map, "arclight model ii", "arclight pistol");
 

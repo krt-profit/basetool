@@ -139,7 +139,6 @@ public class BackendServiceException extends RuntimeException {
           return pd.getTitle();
         }
       } catch (Exception ignored) {
-        // ProblemDetail body not present or unparseable — fall through to default message
       }
     }
     return String.valueOf(getMessage());
@@ -162,7 +161,6 @@ public class BackendServiceException extends RuntimeException {
           return type;
         }
       } catch (Exception ignored) {
-        // ProblemDetail body not present or unparseable — return null
       }
     }
     return null;
@@ -204,14 +202,9 @@ public class BackendServiceException extends RuntimeException {
           }
         }
       } catch (Exception ignored) {
-        // Leave defaults; the handler will fall back to a generic message.
       }
     }
 
-    // deriveCodeFromStatus is @NotNull and Jackson's asText(default) never returns null,
-    // so code is guaranteed non-null here. The previous "code != null" defensive guard
-    // mis-signalled to SpotBugs that the author believed a null code was reachable, which
-    // conflicted with the @NotNull problemCode parameter on the constructor below.
     String message = "Backend returned " + status + " [" + code + "]";
     return new BackendServiceException(
         message, cause, status, code, correlationId, fieldErrors, detail);

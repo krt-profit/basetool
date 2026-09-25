@@ -255,17 +255,7 @@ public class RedisSessionConfig {
   public RedisSerializer<Object> springSessionDefaultRedisSerializer(
       ObjectProvider<MeterRegistry> meterRegistry) {
     SessionTypeAllowList.Mode mode = SessionTypeAllowList.Mode.parse(typeAllowListValue);
-    // One line, because a mode that is not the one the operator meant is otherwise invisible:
-    // REPORT
-    // and OFF read identically, and ENFORCE differs only once something outside the list turns up.
     log.info("Session type allow-list mode: {}", mode);
-    // Wrapped, because the read path has no error handling of its own: a value that cannot be
-    // deserialized leaves RedisIndexedSessionRepository uncaught and becomes an HTTP 500 on every
-    // request carrying a session cookie. That is the 2026-09-02 outage. The wrapper turns an
-    // unreadable ATTRIBUTE into "not set", i.e. a signed-out member; it cannot mask a bad write,
-    // and it cannot hide the required timestamps, which are final types and never fail. See
-    // FaultTolerantSessionSerializer for why that is both safe and sufficient. An attribute the
-    // allow-list refuses under ENFORCE takes exactly that path.
     return new FaultTolerantSessionSerializer(
         new GenericJacksonJsonRedisSerializer(
             buildSessionJsonMapper(
@@ -350,11 +340,6 @@ public class RedisSessionConfig {
         forced.add(className);
       }
     }
-    // Logged at INFO, and the absent case at WARN, because the whole mechanism degrades SILENTLY:
-    // an unresolved name simply means no mix-in, the values go back to being written without an
-    // @class, and the only symptom is SessionValueDropsSustained firing against an application
-    // whose code looks correct. On 2026-09-03 that cost a full investigation to rule out, with
-    // nothing in the production log either way. One line at startup answers it by grep.
     log.info("Session serializer forces an @class type id for: {}", forced);
     if (!absent.isEmpty()) {
       log.warn(
@@ -390,7 +375,6 @@ public class RedisSessionConfig {
   @Nullable
   private static Class<?> resolveIfPresent(@NotNull String className, ClassLoader loader) {
     try {
-      // Not initialised: a mix-in registration needs the Class object, never the class's state.
       return Class.forName(className, false, loader);
     } catch (ClassNotFoundException | LinkageError ex) {
       log.debug(

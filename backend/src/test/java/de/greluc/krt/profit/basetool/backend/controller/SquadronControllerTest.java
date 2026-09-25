@@ -97,7 +97,6 @@ class SquadronControllerTest {
 
   @Test
   void getAll_wrapsServicePageIntoPageResponseAndMapsContent() {
-    // Given
     Squadron entity = new Squadron();
     SquadronDto dto =
         new SquadronDto(UUID.randomUUID(), "Alpha", "ALP", "Test", true, true, false, 1L);
@@ -105,10 +104,8 @@ class SquadronControllerTest {
     when(service.getAllSquadrons(any(Pageable.class), eq(false))).thenReturn(servicePage);
     when(mapper.toDto(entity)).thenReturn(dto);
 
-    // When
     PageResponse<SquadronDto> resp = controller.getAllSquadrons(0, 20, null, false);
 
-    // Then
     assertEquals(1, resp.totalElements());
     assertEquals(1, resp.content().size());
     assertSame(dto, resp.content().getFirst());
@@ -119,13 +116,9 @@ class SquadronControllerTest {
     when(service.getAllSquadrons(any(Pageable.class), eq(true)))
         .thenReturn(new PageImpl<>(List.of()));
 
-    // M-6: includeInactive=true now requires ROLE_ADMIN. Authenticate as an admin so the
-    // delegation-contract test still exercises the pass-through to the service.
     RoleGateFixture.authenticateAs("ROLE_ADMIN");
     controller.getAllSquadrons(null, null, null, true);
 
-    // The boolean flag controls whether inactive squadrons appear in the result;
-    // mis-routing it would silently hide deleted-but-still-required entries.
     verify(service).getAllSquadrons(any(Pageable.class), eq(true));
   }
 
@@ -162,8 +155,6 @@ class SquadronControllerTest {
 
   @Test
   void update_passesIdAndDtoDirectlyToService() {
-    // Given — note: SquadronController.updateSquadron forwards the DTO
-    // (not a mapped entity) to the service. Documents the actual contract.
     UUID id = UUID.randomUUID();
     SquadronDto request = new SquadronDto(id, "Renamed", "REN", "Test", true, true, false, 4L);
     Squadron persisted = new Squadron();

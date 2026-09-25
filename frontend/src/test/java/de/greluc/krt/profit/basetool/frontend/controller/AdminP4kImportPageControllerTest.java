@@ -72,7 +72,6 @@ class AdminP4kImportPageControllerTest {
     try {
       server.shutdown();
     } catch (Exception ignored) {
-      // already shut down
     }
   }
 
@@ -183,8 +182,6 @@ class AdminP4kImportPageControllerTest {
     assertEquals("POST", req.getMethod());
     assertEquals("/api/v1/admin/import/p4k/jobs/" + id + "/apply?seedNew=true", req.getPath());
 
-    // An apply rewrites the master-data catalogues the frontend caches, so the affected domains are
-    // evicted at apply-enqueue time (F6).
     verify(backendApiClient)
         .evict(
             CacheDomain.MATERIAL,

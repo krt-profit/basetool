@@ -183,12 +183,8 @@ class RefineryOrderDetailFragmentMvcTest {
 
     String html = render(orderId, userId, "");
 
-    // The stable swap containers the seam map targets must exist on the full page, otherwise every
-    // section refresh silently resolves to "container absent" and does nothing.
     assertThat(html).as("order swap container").contains("id=\"refinery-order-results\"");
     assertThat(html).as("store swap container").contains("id=\"refinery-store-results\"");
-    // The error fragment lives inside a <template>, so it ships in the markup but the browser never
-    // paints it. A bare <p> here would show as a stray red error line on every normal page load.
     assertThat(html).contains("<template id=\"refinery-fragment-error-tpl\">");
     int templateStart = html.indexOf("<template id=\"refinery-fragment-error-tpl\">");
     int templateEnd = html.indexOf("</template>", templateStart);
@@ -206,13 +202,9 @@ class RefineryOrderDetailFragmentMvcTest {
     String html = render(orderId, userId, "?fragment=order");
 
     assertThat(html).as("main edit form").contains("id=\"refineryOrderMainForm\"");
-    // Section-sized: no page shell, and none of the store dialog (its own fragment covers that).
     assertThat(html).as("no page shell").doesNotContain("<!DOCTYPE");
     assertThat(html).as("store dialog is a separate section").doesNotContain("id=\"storeForm\"");
-    // The fragment must not re-emit its own container, which krtFetch.swap would nest inside
-    // itself.
     assertThat(html).as("no re-nested container").doesNotContain("id=\"refinery-order-results\"");
-    // Fragment-gating: the active-job-order lookup backs only the store dialog's Auftrag picker.
     verify(backendApiClient, never()).get(eq("/api/v1/orders/lookup"), anyTypeRef());
   }
 
@@ -228,8 +220,6 @@ class RefineryOrderDetailFragmentMvcTest {
     assertThat(html).as("no page shell").doesNotContain("<!DOCTYPE");
     assertThat(html).as("main form is a separate section").doesNotContain("refineryOrderMainForm");
     assertThat(html).as("no re-nested container").doesNotContain("id=\"refinery-store-results\"");
-    // Fragment-gating: the missions catalog is a size=1000 uncached read used only by the `order`
-    // section's Einsatz picker, so a store refresh must not pay for it.
     verify(backendApiClient, never()).get(contains("/api/v1/missions"), anyTypeRef());
   }
 
@@ -243,7 +233,6 @@ class RefineryOrderDetailFragmentMvcTest {
 
     assertThat(html).contains(SECTION_ERROR_TEXT);
     assertThat(html).as("no page shell").doesNotContain("<!DOCTYPE");
-    // Rendered bare, without the <template> wrapper it is parked in on the full page.
     assertThat(html).doesNotContain("<template");
   }
 
@@ -251,8 +240,6 @@ class RefineryOrderDetailFragmentMvcTest {
   void fragmentLoadFailure_degradesToTheSectionError_neverARedirect() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    // A backend hiccup on a peer-driven refresh must not answer with a redirect: krtFetch.swap
-    // bails on res.redirected and leaves the section silently stale.
     when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), eq(RefineryOrderDto.class)))
         .thenThrow(
             new BackendServiceException(

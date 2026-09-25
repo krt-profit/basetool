@@ -1,15 +1,4 @@
 ---
-# basetool_host -- prepare a Rocky Linux 10 host to run the Basetool stack under rootless Podman.
-#
-# ADR-0188. This role PROVISIONS; it does not deploy. It installs packages, creates the service
-# user and its subuid range, lays out and owns the directories, sets SELinux contexts and writes
-# containers.conf. It never ships the stack's unit files, never pulls an image, and is never
-# scheduled -- REQ-OPS-001's pull-only delivery is untouched by it. It runs in full only against a
-# host that is not serving yet; on a serving host only for a deliberate host change, tag-limited
-# and owner-approved, --check --diff first (ansible/README.md, ADR-0188).
-#
-# The reasoning behind every step is in docs/archive/PODMAN_HOST_BOOTSTRAP.md. This file is the what; that
-# document is the why, and it is not duplicated here on purpose.
 
 - name: Preflight -- the host is what this role assumes
   ansible.builtin.import_tasks: 00-preflight.yml
@@ -44,18 +33,11 @@
   when: basetool_host_manage_selinux | bool
   tags: [selinux]
 
-# AFTER the labels, deliberately. This file STARTS a timer whose unit executes a script out of
-# /var/iri/code/scripts, and until 40-selinux.yml has relabelled that directory to bin_t systemd
-# refuses to exec it (203/EXEC). Ordered before the labels the first tick of a fresh host always
-# fails; it recovers on the next one, but a provisioning run that leaves a failed unit behind
-# teaches an operator to ignore failed units.
 - name: The monitoring that is not a container
   ansible.builtin.import_tasks: 27-observability.yml
   when: basetool_host_manage_observability | default(true) | bool
   tags: [observability, monitoring]
 
-# Also after the labels, for the same 203/EXEC reason: dnf-automatic's ExecStopPost= and the boot
-# refresh both exec a script out of /var/iri/code/scripts.
 - name: Unattended security updates, and whether they are happening
   ansible.builtin.import_tasks: 45-updates.yml
   when: basetool_host_manage_updates | default(true) | bool

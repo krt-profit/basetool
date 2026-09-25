@@ -108,7 +108,6 @@ class AdminMissionDataCrudE2eTest {
         page.waitForLoadState();
         page.evaluate("() => { window.__krtNoReload = true; }");
 
-        // CREATE
         page.locator("#add-squadron-btn").click();
         Locator name = page.locator("#sq-name");
         assertThat(name).isVisible();
@@ -124,7 +123,6 @@ class AdminMissionDataCrudE2eTest {
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(15_000));
         assertThat(page.locator(".notification-toast.error-toast")).hasCount(0);
 
-        // DELETE — open the confirm modal from the created row, then confirm.
         squadronRow(page).locator(".delete-btn").first().click();
         assertThat(page.locator("#delete-confirm-modal")).isVisible();
         page.waitForResponse(
@@ -146,8 +144,6 @@ class AdminMissionDataCrudE2eTest {
       }
     }
   }
-
-  // ---------------------------------------------------------------------- helpers --
 
   /**
    * Opens a new authenticated browser context with HTTPS errors ignored (the stack uses a

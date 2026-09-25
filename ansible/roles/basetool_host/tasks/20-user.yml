@@ -1,8 +1,4 @@
 ---
-# The group FIRST, and explicitly. `ansible.builtin.user` with `group:` does not create the
-# group -- it expects it to exist and fails with a bare "Group iri does not exist". Only a real
-# run finds that: in --check the user module never reaches the system call that would complain,
-# so the dry run reported success for a task that could not work.
 - name: Create the service group
   ansible.builtin.group:
     name: "{{ basetool_host_service_group }}"
@@ -14,12 +10,8 @@
     name: "{{ basetool_host_service_user }}"
     group: "{{ basetool_host_service_group }}"
     system: true
-    # A home, unlike the Docker bootstrap's --no-create-home: rootless Podman keeps its entire
-    # state under $HOME -- the image store, the per-user configuration, and the generated units.
-    # Here the home IS the deployment.
     create_home: true
     shell: /sbin/nologin
-    # No supplementary groups. There is no docker group to be in, which is the point.
     state: present
   register: basetool_host_user
 
@@ -43,23 +35,11 @@
     group: root
     mode: "0644"
 
-# Without lingering the user's systemd instance exists only while somebody is logged in: the
-# containers stop the moment the last session closes, and they never start at boot at all.
-#
-# Enabling it also STARTS every unit already sitting in ~/.config/containers/systemd, because
-# the generated units carry [Install] WantedBy=default.target. That is harmless here -- the
-# role provisions a host that has no units yet, and deploy.sh delivers them afterwards -- but
-# it is the reason this task must never be reordered after unit delivery, and the reason a
-# hand bootstrap enables lingering last. Measured on the testing VM, 2026-09-16.
 - name: Enable lingering so the user manager runs without a session
   ansible.builtin.command: "loginctl enable-linger {{ basetool_host_service_user }}"
   args:
     creates: "/var/lib/systemd/linger/{{ basetool_host_service_user }}"
 
-# In --check the user was never created, so it has no uid to look up and there is no runtime
-# directory to confirm. That is not a gap in the dry run, it is what a dry run means -- and reading
-# `basetool_host_user.uid` there fails with a bare "'dict object' has no attribute 'uid'", which says
-# nothing about why.
 - name: Confirm the user manager's runtime directory exists
   when: not ansible_check_mode
   ansible.builtin.stat:

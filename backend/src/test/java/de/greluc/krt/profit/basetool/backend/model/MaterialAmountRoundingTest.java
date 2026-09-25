@@ -24,7 +24,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 import org.junit.jupiter.api.Test;
 
-// covers REQ-INV-003 (SCU-scale storage) - see docs/specs/inv-material-quantities.md
 /**
  * Verifies the {@code @PrePersist}/{@code @PreUpdate} rounding hooks on the material-amount
  * entities normalise SCU amounts to three decimals using commercial rounding ({@code HALF_UP}), the

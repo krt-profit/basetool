@@ -80,11 +80,7 @@ class GeneratedDtoAgreementTest {
    */
   private static final Map<String, String> ALIASES =
       Map.ofEntries(
-          // The admin queue mirror of the backend's DeletionRequestDto (REQ-SEC-061): same
-          // fields, a name that says which surface reads it.
           Map.entry("AdminDeletionRequestDto", "DeletionRequestDto"),
-          // The person-search response is a nested record on the service, so springdoc names
-          // it without the Dto suffix (REQ-SEC-060).
           Map.entry("PersonSearchResultDto", "PersonSearchResult"),
           Map.entry("DefaultBlueprintDto", "DefaultBlueprintResponse"),
           Map.entry("MaterialCreateAjaxRequest", "MaterialCreateDto"),
@@ -113,28 +109,16 @@ class GeneratedDtoAgreementTest {
    */
   private static final Set<String> FRONTEND_ONLY =
       Set.of(
-          // View models assembled in the frontend from one or more backend responses.
           "AuditRowView",
           "MatrixGridDto",
           "NotificationViewDto",
           "NotificationPageSliceDto",
           "StagedHandoff",
-          // The generic page envelope. The backend's spec has no generic: springdoc expands it into
-          // one concrete PageResponseXxx schema per payload type, so there is nothing to compare a
-          // single generic record against.
           "PageResponse",
-          // Form-backing objects the templates bind to. They carry Jakarta validation, exist for
-          // Thymeleaf, and are mapped to a backend request before they are sent -- so the generator
-          // has nothing to say about them and a generated replacement would be wrong rather than
-          // merely different.
           "BereichCreateRequest",
           "MaterialUpdateAjaxRequest",
           "MissionActualTimeUpdateRequest",
           "OrganisationsleitungCreateRequest",
-          // The browser-to-frontend contract of the in-place default-blueprint add (REQ-INV-017):
-          // the page sends every staged key in one request, the frontend fans it out to one
-          // backend add per key and folds the outcomes into one answer. The backend has neither
-          // shape — it takes DefaultBlueprintCreateRequest and returns DefaultBlueprintResponse.
           "DefaultBlueprintAddSelectionRequest",
           "DefaultBlueprintAddResultDto");
 
@@ -215,24 +199,15 @@ class GeneratedDtoAgreementTest {
   @Test
   @DisplayName("the two exception lists still describe something, and cannot quietly grow")
   void theExceptionListsHaveAFloorAndACeiling() {
-    // Without this, "make the guard pass" has an easy wrong answer: move the failing name into
-    // FRONTEND_ONLY. The ceiling is what makes that a visible decision rather than a one-line diff
-    // nobody reads, and the KNOWN_DRIFT floor keeps the two open findings from being quietly
-    // dropped instead of resolved.
     assertThat(FRONTEND_ONLY)
         .as(
             "frontend-only types. A genuine new view model raises this AND gets a reason beside its"
                 + " name; a backend type that stopped existing does NOT belong here")
-        // 10 -> 12 on 2026-09-22: the in-place default-blueprint add's request and result, which
-        // exist only between the page and the frontend (see the reason beside their names).
         .hasSize(12);
     assertThat(ALIASES)
         .as(
             "mirror-to-schema aliases. A rename on either side raises this and moves the entry, and"
                 + " each one is established by an identical property set rather than by the name")
-        // 16 -> 18 on 2026-09-16: the two data-protection mirrors (REQ-SEC-058/061). Both are
-        // established the way this assertion asks for -- an identical property set, differing only
-        // in the name springdoc gave the schema.
         .hasSize(18);
     assertThat(KNOWN_DRIFT)
         .as(

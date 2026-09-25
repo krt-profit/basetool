@@ -92,8 +92,6 @@ class TermsAcceptanceQueryDataTest {
     persistAcceptance(acceptedUserId, VERSION_IN_FORCE, Instant.now().minus(1, ChronoUnit.HOURS));
     persistAcceptance(
         staleAcceptanceUserId, OLDER_VERSION, Instant.now().minus(9, ChronoUnit.DAYS));
-    // The departed user did accept — the row must still be hidden, because the exclusion is about
-    // being able to act on the person, not about whether they ever consented.
     persistAcceptance(departedUserId, VERSION_IN_FORCE, Instant.now().minus(2, ChronoUnit.DAYS));
     entityManager.flush();
   }
@@ -219,11 +217,6 @@ class TermsAcceptanceQueryDataTest {
             VERSION_IN_FORCE, "ALL", PageRequest.of(0, 50, JpaSort.unsafe("ta.acceptedAt")));
 
     assertThat(page.getTotalElements()).isEqualTo(3);
-    // Postgres treats NULL as larger than any non-null value, so ASC means NULLS LAST: the one user
-    // who accepted the version in force leads, and everyone still owing consent trails. Worth
-    // pinning because it is the opposite of what the admin overview wants by default — the useful
-    // default sort is the pending users first — so a later NULLS FIRST or DESC switch has to be a
-    // visible decision rather than a silent reordering of the worklist.
     assertThat(page.getContent().getFirst().userId()).isEqualTo(acceptedUserId);
     assertThat(page.getContent().get(1).acceptedAt()).isNull();
   }

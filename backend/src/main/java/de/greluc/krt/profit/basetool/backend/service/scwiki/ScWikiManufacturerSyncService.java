@@ -113,10 +113,6 @@ public class ScWikiManufacturerSyncService {
             new ParameterizedTypeReference<ScWikiResponseDto<ScWikiManufacturerDto>>() {},
             "manufacturers");
     if (result.notModified()) {
-      // Catalogue unchanged since the last sync (ETag 304): nothing to reconcile, but this is a
-      // healthy run — report the live reconciled-manufacturer count so an all-304 run is not read
-      // as a zero-item outage (#1182). A genuine empty-200 falls through to isEmpty() and reports
-      // 0.
       long live = manufacturerRepository.countLiveScwikiManufacturers();
       log.info(
           "SC Wiki manufacturer catalogue unchanged since last sync (304) — reporting {} live"
@@ -163,8 +159,6 @@ public class ScWikiManufacturerSyncService {
           continue;
         }
 
-        // Captured before setScwikiUuid() below mutates getScwikiUuid(); final so the
-        // declaration-to-use distance check tolerates the gap.
         final boolean firstLink = existingLink == null;
         seen.add(dto.uuid());
         match.setScwikiUuid(dto.uuid());

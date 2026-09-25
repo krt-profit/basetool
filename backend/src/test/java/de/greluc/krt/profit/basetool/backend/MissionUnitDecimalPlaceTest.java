@@ -102,14 +102,12 @@ class MissionUnitDecimalPlaceTest {
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
 
-    // The ship owner must be a registered participant before the ship can be pinned to a unit.
     missionService.addParticipant(
         mission.getId(), officerUser.getId(), null, null, null, null, null);
   }
 
   @Test
   void testAddUnitWithThreeDecimalPlaces_ShouldRoundUp() throws Exception {
-    // Input: 100.126 -> Should round to 100.13
     String requestJson =
         "{\"name\": \"Test Unit\", \"shipTypeId\": \""
             + shipType.getId()
@@ -137,7 +135,6 @@ class MissionUnitDecimalPlaceTest {
 
   @Test
   void testAddUnitWithThreeDecimalPlaces_ShouldRoundDown() throws Exception {
-    // Input: 100.123 -> Should round to 100.12
     String requestJson =
         "{\"name\": \"Test Unit\", \"shipTypeId\": \""
             + shipType.getId()

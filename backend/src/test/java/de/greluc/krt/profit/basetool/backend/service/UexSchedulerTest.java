@@ -63,25 +63,18 @@ class UexSchedulerTest {
   @Mock private UexItemPriceSyncService uexItemPriceSyncService;
   @Mock private MasterDataCacheEvictionService masterDataCacheEvictionService;
 
-  // A real coordinator (spied so it can be told the gate is busy) — its default behaviour runs the
-  // sweep synchronously, so the existing ordering/verify tests below exercise the real steps.
   @Spy private SyncCoordinator syncCoordinator = new SyncCoordinator(3_600_000);
 
-  // A real registry (held so tests can read the item counter) behind a real, spied TaskMetrics.
-  // Declared before taskMetrics so field initialisation order hands it the same instance.
   private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
 
-  // A real TaskMetrics (spied) so the instrumentation wrapper genuinely runs the sweep body.
   @Spy private TaskMetrics taskMetrics = new TaskMetrics(meterRegistry);
 
   @InjectMocks private UexScheduler scheduler;
 
   @Test
   void scheduleTask_invokesEverySyncServiceOnce() {
-    // When
     scheduler.scheduleCommodityPriceUpdate();
 
-    // Then — every method called exactly once
     verify(uexUniverseSyncService).syncFactions();
     verify(uexUniverseSyncService).syncJurisdictions();
     verify(uexUniverseSyncService).syncPlanets();
@@ -105,8 +98,6 @@ class UexSchedulerTest {
     verify(uexRefinerySyncService).syncRefiningMethods();
     verify(uexRefinerySyncService).syncRefineryYields();
 
-    // Derived refinery flags, recomputed once per sweep from the sweep's finally
-    // (REQ-REFINERY-020).
     verify(uexUniverseSyncService).reconcileRefineryTerminalFlags();
 
     verifyNoMoreInteractions(
@@ -123,12 +114,8 @@ class UexSchedulerTest {
 
   @Test
   void scheduleTask_invokesUniverseSyncsBeforeStarSystemsAndCommodities() {
-    // When
     scheduler.scheduleCommodityPriceUpdate();
 
-    // Then — the documented order is preserved. We assert the boundary
-    // transitions only (otherwise the test becomes brittle): universe
-    // basics first, then catalogue syncs, then refinery syncs.
     InOrder order =
         inOrder(
             uexUniverseSyncService,
@@ -141,12 +128,8 @@ class UexSchedulerTest {
             uexItemPriceSyncService,
             uexRefinerySyncService);
 
-    // Phase 0: terminals lead the sweep (REQ-REFINERY-020) — they carry no FK into the rest of the
-    // topology, and hoisting them ahead of every step that can abort the tick is what keeps
-    // terminal.type (the refinery picker's only source) from going a full 24h unpopulated.
     order.verify(uexUniverseSyncService).syncTerminals();
 
-    // Phase 1: universe basics in declared order
     order.verify(uexUniverseSyncService).syncFactions();
     order.verify(uexUniverseSyncService).syncJurisdictions();
     order.verify(uexUniverseSyncService).syncPlanets();
@@ -157,33 +140,25 @@ class UexSchedulerTest {
     order.verify(uexUniverseSyncService).syncPois();
     order.verify(uexUniverseSyncService).syncSpaceStations();
 
-    // Phase 2: catalogue
     order.verify(uexStarSystemService).fetchAndProcessStarSystems();
     order.verify(uexCommodityService).fetchAndProcessCommoditiesPrices();
     order.verify(uexManufacturerService).syncManufacturers();
     order.verify(uexVehicleService).syncVehicles();
 
-    // Phase 2.5 (R2): category ref + item walk — categories before items, both after
-    // manufacturers + vehicles so the item upsert can resolve manufacturer + linked_ship_type FKs.
     order.verify(uexCategoryRefService).syncCategories();
     order.verify(uexItemSyncService).syncItems();
     order.verify(uexItemPriceSyncService).syncItemPrices();
 
-    // Phase 3: refineries last (depend on materials)
     order.verify(uexRefinerySyncService).syncRefiningMethods();
     order.verify(uexRefinerySyncService).syncRefineryYields();
   }
 
   @Test
   void scheduleTask_recordsItemCatalogueUpsertCount() {
-    // Given — the item sync reports the number of game_item rows it upserted this run.
     when(uexItemSyncService.syncItems()).thenReturn(4242);
 
-    // When
     scheduler.scheduleCommodityPriceUpdate();
 
-    // Then — that upsert tally becomes basetool_scheduled_job_items_total{job=uex_sync} (#1041 item
-    // 2), the representative "rows processed" signal the SyncZeroItems alert watches.
     assertEquals(
         4242,
         meterRegistry
@@ -196,14 +171,10 @@ class UexSchedulerTest {
 
   @Test
   void scheduleTask_recordsNoItemCount_whenTheSweepFails() {
-    // Given — an early step throws, aborting the sweep before the item count is known.
     doThrow(new RuntimeException("UEX 500")).when(uexUniverseSyncService).syncFactions();
 
-    // When
     scheduler.scheduleCommodityPriceUpdate();
 
-    // Then — a failed run records a failure, NOT a zero item count: the items series stays absent,
-    // so SyncZeroItems (which needs a fresh success) cannot false-fire on an outright sync failure.
     assertNull(
         meterRegistry
             .find(MetricNames.SCHEDULED_JOB_ITEMS)
@@ -214,115 +185,74 @@ class UexSchedulerTest {
 
   @Test
   void scheduleTask_swallowsExceptionFromInnerService() {
-    // Given
     doThrow(new RuntimeException("UEX 500")).when(uexUniverseSyncService).syncFactions();
 
-    // When / Then — the scheduled task must not propagate; otherwise the
-    // @Scheduled wrapper would suppress all subsequent invocations.
     scheduler.scheduleCommodityPriceUpdate();
 
-    // The first failing service is invoked but subsequent ones are NOT —
-    // the try/catch wraps the whole block, so a hard failure in step 1
-    // aborts the tick (documented behaviour). That is the contract we
-    // want: fail loud in the logs, but never propagate.
     verify(uexUniverseSyncService).syncFactions();
     verify(uexUniverseSyncService, never()).syncPlanets();
   }
 
   @Test
   void scheduleTask_continuesAfterPartialFailureInOneServiceMethod() {
-    // Given — only the first call throws
     doThrow(new RuntimeException("transient")).when(uexUniverseSyncService).syncFactions();
 
-    // When / Then — no exception escapes
     scheduler.scheduleCommodityPriceUpdate();
 
-    // The contract: try/catch is around the whole orchestration so the
-    // next sync calls are skipped (best-effort). Refactoring this to
-    // per-service try/catch would be a behaviour change and break this
-    // expectation — the test then makes that change visible.
     verify(uexRefinerySyncService, never()).syncRefiningMethods();
   }
 
   @Test
   void scheduleTask_evictsUexSyncedMasterDataAfterSweep() {
-    // When the sweep runs to completion
     scheduler.scheduleCommodityPriceUpdate();
 
-    // Then the caches the UEX writes can make stale are evicted once (CACHE-SYNC-EVICT-001) so a
-    // freshly-synced catalogue is visible on the next read instead of lagging the 30-min TTL.
     verify(masterDataCacheEvictionService).evictUexSyncedMasterData();
   }
 
   @Test
   void scheduleTask_evictsMasterDataEvenWhenAStepFails() {
-    // Given a mid-sweep step aborts the remaining steps
     doThrow(new RuntimeException("UEX 500")).when(uexUniverseSyncService).syncFactions();
 
-    // When
     scheduler.scheduleCommodityPriceUpdate();
 
-    // Then the finally still evicts, so any step that DID commit is reconciled rather than stranded
-    // until the TTL.
     verify(masterDataCacheEvictionService).evictUexSyncedMasterData();
   }
 
-  // covers REQ-REFINERY-020 — terminals must be fetched before anything that can abort the tick,
-  // because terminal.type is the sole source the refinery picker derives from and the sweep only
-  // repeats every 24h.
   @Test
   void scheduleTask_syncsTerminalsEvenWhenTheRestOfTheTopologyFails() {
-    // Given the first of the topology steps that used to precede terminals blows up
     doThrow(new RuntimeException("UEX 500")).when(uexUniverseSyncService).syncFactions();
 
-    // When
     scheduler.scheduleCommodityPriceUpdate();
 
-    // Then terminals were already fetched — previously this abort left terminal.type NULL, every
-    // has_refinery_terminal false and the refinery-order picker empty until the next daily tick.
     verify(uexUniverseSyncService).syncTerminals();
   }
 
-  // covers REQ-REFINERY-020 — the derived flags survive an aborted sweep.
   @Test
   void scheduleTask_reconcilesRefineryFlagsEvenWhenALaterStepFails() {
-    // Given a step downstream of the committed terminals aborts the sweep
     doThrow(new RuntimeException("UEX 500")).when(uexVehicleService).syncVehicles();
 
-    // When
     scheduler.scheduleCommodityPriceUpdate();
 
-    // Then the finally still derives has_refinery_terminal from the terminals that DID commit,
-    // rather than stranding the refinery feature until the next daily tick.
     verify(uexUniverseSyncService).reconcileRefineryTerminalFlags();
   }
 
-  // A failing reconciliation must not replace the sweep's own exception nor skip the eviction that
-  // shares its finally block.
   @Test
   void scheduleTask_stillEvictsMasterData_whenReconciliationItselfFails() {
-    // Given the reconciliation in the finally throws
     doThrow(new RuntimeException("reconcile boom"))
         .when(uexUniverseSyncService)
         .reconcileRefineryTerminalFlags();
 
-    // When
     scheduler.scheduleCommodityPriceUpdate();
 
-    // Then the eviction after it still runs
     verify(masterDataCacheEvictionService).evictUexSyncedMasterData();
   }
 
   @Test
   void scheduleTask_skipsEntireSweep_whenAnotherSyncIsAlreadyRunning() {
-    // Given the shared gate denies entry (a UEX or SC Wiki sync is already in flight)
     doReturn(false).when(syncCoordinator).runExclusively(eq("UEX"), any());
 
-    // When
     scheduler.scheduleCommodityPriceUpdate();
 
-    // Then no sync step runs — the tick is dropped, never started concurrently — and, since the
-    // sweep body never executes, the master-data caches are not evicted either.
     verifyNoInteractions(
         uexUniverseSyncService,
         uexStarSystemService,

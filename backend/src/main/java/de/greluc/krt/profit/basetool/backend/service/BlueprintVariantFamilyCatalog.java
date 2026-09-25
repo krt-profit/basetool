@@ -85,8 +85,6 @@ public class BlueprintVariantFamilyCatalog {
       }
       index.computeIfAbsent(familyKey, k -> new HashSet<>()).add(productKey);
     }
-    // Deep-freeze before caching: the cached reference is shared across requests and must not be
-    // mutated by any consumer.
     Map<String, Set<String>> frozen = new HashMap<>(index.size());
     index.forEach((family, keys) -> frozen.put(family, Set.copyOf(keys)));
     return Map.copyOf(frozen);

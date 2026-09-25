@@ -55,9 +55,7 @@ public final class MaterialNameCanonicalizer {
   /** Matches any run of non-alphanumeric characters, used to fold names to a canonical core. */
   private static final Pattern NON_ALNUM = Pattern.compile("[^a-z0-9]+");
 
-  private MaterialNameCanonicalizer() {
-    // static utility, never instantiated
-  }
+  private MaterialNameCanonicalizer() {}
 
   /**
    * Computes a commodity's canonical core with all word boundaries removed: {@code "Raw Silicon"},

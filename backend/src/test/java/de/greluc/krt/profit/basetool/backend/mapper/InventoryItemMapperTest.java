@@ -58,19 +58,14 @@ class InventoryItemMapperTest {
 
   @BeforeEach
   void setUp() {
-    // The generated InventoryItemMapperImpl receives the mappers it uses through its constructor
-    // (CentralMapperConfig: injectionStrategy = CONSTRUCTOR), so the test builds it the same way.
     mapper =
         new InventoryItemMapperImpl(
             Mappers.getMapper(UserMapper.class), Mappers.getMapper(SquadronMapper.class));
-    // The caller-aware seam behind canEdit (REQ-SEC-047). Answering true here keeps these tests
-    // about the field mapping; the authorisation rule itself is covered where it lives.
     ReflectionTestUtils.setField(mapper, "stockAccess", ALWAYS_ALLOWED);
   }
 
   @Test
   void toDto_shouldMapJobOrderAndMissionAsFlattenedIds() {
-    // Given
     UUID itemId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
@@ -110,17 +105,11 @@ class InventoryItemMapperTest {
     item.setPersonal(false);
     item.setNote("Strict QC");
     item.setVersion(7L);
-    // Variante C (REQ-INV-027): earmarks live on the allocation collections, not the
-    // dropped scalar jobOrder/mission/delivered columns. A single job-order slice carries
-    // the delivered flag; the mapper projects each dimension into the jobOrderAllocations /
-    // missionAllocations chip lists asserted below.
     InventoryAllocations.addJobOrder(item, jobOrder, item.getAmount(), true);
     InventoryAllocations.addMission(item, mission, item.getAmount());
 
-    // When
     InventoryItemDto dto = mapper.toDto(item);
 
-    // Then
     assertNotNull(dto);
     assertEquals(itemId, dto.id());
     assertEquals(800, dto.quality());
@@ -129,7 +118,6 @@ class InventoryItemMapperTest {
     assertEquals("Strict QC", dto.note());
     assertEquals(7L, dto.version());
 
-    // Variante-C allocation chips (one slice per dimension)
     assertEquals(1, dto.jobOrderAllocations().size());
     assertEquals(jobOrderId, dto.jobOrderAllocations().get(0).jobOrderId());
     assertEquals(42, dto.jobOrderAllocations().get(0).jobOrderDisplayId());
@@ -137,7 +125,6 @@ class InventoryItemMapperTest {
     assertEquals(missionId, dto.missionAllocations().get(0).missionId());
     assertEquals("Op Sunfire", dto.missionAllocations().get(0).missionName());
 
-    // Nested reference DTOs
     assertNotNull(dto.user());
     assertEquals(userId, dto.user().id());
     assertEquals("logist", dto.user().username());
@@ -154,7 +141,6 @@ class InventoryItemMapperTest {
 
   @Test
   void toDto_withoutJobOrderOrMission_shouldKeepEmptyAllocations() {
-    // Given an item that is unattached to a job order or mission
     User user = new User();
     user.setId(UUID.randomUUID());
     Material material = new Material();
@@ -170,13 +156,9 @@ class InventoryItemMapperTest {
     item.setQuality(500);
     item.setAmount(1.0);
     item.setPersonal(true);
-    // No allocations added: a fresh entry's job-order / mission slice collections are
-    // empty, so the mapper produces empty jobOrderAllocations / missionAllocations lists.
 
-    // When
     InventoryItemDto dto = mapper.toDto(item);
 
-    // Then
     assertTrue(dto.jobOrderAllocations().isEmpty());
     assertTrue(dto.missionAllocations().isEmpty());
     assertTrue(dto.personal());
@@ -184,17 +166,14 @@ class InventoryItemMapperTest {
 
   @Test
   void locationToDto_shouldExposeFullSurface() {
-    // Given
     Location loc = new Location();
     loc.setId(UUID.randomUUID());
     loc.setName("New Babbage");
     loc.setHidden(false);
     loc.setVersion(2L);
 
-    // When
     LocationDto dto = mapper.locationToDto(loc);
 
-    // Then
     assertNotNull(dto);
     assertEquals(loc.getId(), dto.id());
     assertEquals("New Babbage", dto.name());

@@ -97,8 +97,6 @@ public class BlueprintOutputNameOverrides {
   public BlueprintOutputNameOverrides(@NotNull BlueprintNameNormalizer normalizer) {
     this.normalizer = normalizer;
     Map<String, Correction> corrections = new LinkedHashMap<>();
-    // CIG mislabels: the "arms" recipe resolves to "Antium Helmet Jet", the "helmet" recipe to
-    // "Antium Core Jet". Use the in-game (log/notification) names, not UEX's "Antium Armor …".
     register(
         corrections,
         "BP_CRAFT_qrt_specialist_heavy_arms_01_01_13",

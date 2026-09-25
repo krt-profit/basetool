@@ -57,17 +57,12 @@ class JobOrderHandoverReportProxyControllerTest {
 
   @InjectMocks private JobOrderHandoverReportProxyController controller;
 
-  // -------------------------------------------------------------------------
-  // GET /{jobOrderId}/handovers/{handoverId}/report
-  // -------------------------------------------------------------------------
-
   @Test
   @SuppressWarnings({"unchecked", "rawtypes"})
   void downloadHandoverReport_shouldReturnPdfBytes_whenBackendRespondsOk() {
-    // Given
     UUID jobOrderId = UUID.randomUUID();
     UUID handoverId = UUID.randomUUID();
-    byte[] fakePdf = new byte[] {0x25, 0x50, 0x44, 0x46}; // %PDF magic bytes
+    byte[] fakePdf = new byte[] {0x25, 0x50, 0x44, 0x46};
 
     doReturn(requestHeadersUriSpec).when(webClient).get();
     doReturn(requestHeadersSpec).when(requestHeadersUriSpec).uri(anyString());
@@ -75,11 +70,9 @@ class JobOrderHandoverReportProxyControllerTest {
     doReturn(responseSpec).when(requestHeadersSpec).retrieve();
     doReturn(Mono.just(fakePdf)).when(responseSpec).bodyToMono(byte[].class);
 
-    // When
     ResponseEntity<byte[]> response =
         controller.downloadHandoverReport(jobOrderId, handoverId, null);
 
-    // Then
     assertEquals(HttpStatus.OK, response.getStatusCode());
     assertNotNull(response.getBody());
     assertArrayEquals(fakePdf, response.getBody());
@@ -93,7 +86,6 @@ class JobOrderHandoverReportProxyControllerTest {
   @Test
   @SuppressWarnings({"unchecked", "rawtypes"})
   void downloadHandoverReport_shouldThrowResponseStatusException_whenBackendReturns404() {
-    // Given
     UUID jobOrderId = UUID.randomUUID();
     UUID handoverId = UUID.randomUUID();
 
@@ -105,7 +97,6 @@ class JobOrderHandoverReportProxyControllerTest {
         .when(responseSpec)
         .bodyToMono(byte[].class);
 
-    // When & Then
     ResponseStatusException ex =
         assertThrows(
             ResponseStatusException.class,
@@ -113,14 +104,9 @@ class JobOrderHandoverReportProxyControllerTest {
     assertEquals(404, ex.getStatusCode().value());
   }
 
-  // -------------------------------------------------------------------------
-  // POST /{jobOrderId}/handovers/report/preview
-  // -------------------------------------------------------------------------
-
   @Test
   @SuppressWarnings({"unchecked", "rawtypes"})
   void previewHandoverReport_shouldReturnPdfBytes_whenBackendRespondsOk() {
-    // Given
     UUID jobOrderId = UUID.randomUUID();
     byte[] fakePdf = new byte[] {0x25, 0x50, 0x44, 0x46};
     Map<String, Object> payload = Map.of("jobOrderNumber", "#42", "recipientHandle", "Pilot");
@@ -132,10 +118,8 @@ class JobOrderHandoverReportProxyControllerTest {
     doReturn(responseSpec).when(requestHeadersSpec).retrieve();
     doReturn(Mono.just(fakePdf)).when(responseSpec).bodyToMono(byte[].class);
 
-    // When
     ResponseEntity<byte[]> response = controller.previewHandoverReport(jobOrderId, payload);
 
-    // Then
     assertEquals(HttpStatus.OK, response.getStatusCode());
     assertNotNull(response.getBody());
     assertArrayEquals(fakePdf, response.getBody());
@@ -149,7 +133,6 @@ class JobOrderHandoverReportProxyControllerTest {
   @Test
   @SuppressWarnings({"unchecked", "rawtypes"})
   void previewHandoverReport_shouldThrowResponseStatusException_whenBackendReturns400() {
-    // Given
     UUID jobOrderId = UUID.randomUUID();
     Map<String, Object> payload = Map.of();
 
@@ -162,7 +145,6 @@ class JobOrderHandoverReportProxyControllerTest {
         .when(responseSpec)
         .bodyToMono(byte[].class);
 
-    // When & Then
     ResponseStatusException ex =
         assertThrows(
             ResponseStatusException.class,

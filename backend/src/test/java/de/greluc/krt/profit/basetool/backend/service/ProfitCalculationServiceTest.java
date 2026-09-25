@@ -57,7 +57,6 @@ class ProfitCalculationServiceTest {
 
   @Test
   void shouldCalculateProfitAndSortByMaterialName() {
-    // Given
     UUID shipId = UUID.randomUUID();
     ShipType ship = new ShipType();
     ship.setId(shipId);
@@ -101,22 +100,15 @@ class ProfitCalculationServiceTest {
     when(shipTypeRepository.findById(shipId)).thenReturn(Optional.of(ship));
     when(materialPriceRepository.findAllAutoLoadPrices()).thenReturn(List.of(p1, p2, p3));
 
-    // When
     List<ProfitCalculationDto> result = profitCalculationService.calculateProfit(shipId, null);
 
-    // Then
     assertNotNull(result);
     assertEquals(3, result.size());
 
-    // Sollte alphabetisch sortiert sein: Agricium, Laranite, Zeyneh
     assertEquals("Agricium", result.get(0).materialName());
     assertEquals("Laranite", result.get(1).materialName());
     assertEquals("Zeyneh", result.get(2).materialName());
   }
-
-  // ----------------------------------------------------------------
-  // ShipType lookup
-  // ----------------------------------------------------------------
 
   @Test
   void shouldThrowIllegalArgument_whenShipTypeDoesNotExist() {
@@ -131,8 +123,6 @@ class ProfitCalculationServiceTest {
 
   @Test
   void shouldUseZeroScu_whenShipScuIsNull() {
-    // Defensive: ship without an SCU field set (e.g. small fighter) -> full-load
-    // economics collapse to zero, but the calculation must NOT NPE.
     UUID shipId = UUID.randomUUID();
     ShipType ship = newShip(shipId, "Aurora", null);
 
@@ -146,16 +136,10 @@ class ProfitCalculationServiceTest {
     List<ProfitCalculationDto> result = profitCalculationService.calculateProfit(shipId, null);
 
     assertEquals(1, result.size());
-    // fullLoadCost = 10 * 0 = 0; maxProfitFullLoad = 10 * 0 = 0
     assertEquals(0, BigDecimal.ZERO.compareTo(result.get(0).fullLoadCost()));
     assertEquals(0, BigDecimal.ZERO.compareTo(result.get(0).maxProfitFullLoad()));
-    // Per-SCU economics must still be correct.
     assertEquals(0, BigDecimal.valueOf(10).compareTo(result.get(0).profitPerScu()));
   }
-
-  // ----------------------------------------------------------------
-  // Star-system scoping
-  // ----------------------------------------------------------------
 
   @Test
   void emptyStarSystemList_shouldHitGlobalQuery() {
@@ -184,10 +168,6 @@ class ProfitCalculationServiceTest {
     verify(materialPriceRepository, never()).findAllAutoLoadPrices();
   }
 
-  // ----------------------------------------------------------------
-  // Hull C filter — only terminals with hasLoadingDock=true survive
-  // ----------------------------------------------------------------
-
   @Test
   void hullC_keepsOnlyTerminalsWithLoadingDock() {
     UUID shipId = UUID.randomUUID();
@@ -195,9 +175,8 @@ class ProfitCalculationServiceTest {
 
     Material material = newMaterial("Quantanium");
     MaterialPrice atDock = newPrice(material, newTerminal(true), 10, 20);
-    MaterialPrice atOutpost =
-        newPrice(material, newTerminal(false), 5, 25); // better margin but no dock
-    MaterialPrice atUnknown = newPrice(material, newTerminal(null), 3, 30); // null hasLoadingDock
+    MaterialPrice atOutpost = newPrice(material, newTerminal(false), 5, 25);
+    MaterialPrice atUnknown = newPrice(material, newTerminal(null), 3, 30);
 
     when(shipTypeRepository.findById(shipId)).thenReturn(Optional.of(hullC));
     when(materialPriceRepository.findAllAutoLoadPrices())
@@ -205,8 +184,6 @@ class ProfitCalculationServiceTest {
 
     List<ProfitCalculationDto> result = profitCalculationService.calculateProfit(shipId, null);
 
-    // Only the dock-equipped terminal contributes:
-    // minBuy=10 (not 3 or 5), maxSell=20 (not 25 or 30).
     assertEquals(1, result.size());
     assertEquals(0, BigDecimal.valueOf(10).compareTo(result.get(0).minBuyPrice()));
     assertEquals(0, BigDecimal.valueOf(20).compareTo(result.get(0).maxSellPrice()));
@@ -214,8 +191,6 @@ class ProfitCalculationServiceTest {
 
   @Test
   void caseInsensitiveHullCMatch() {
-    // The Hull C name check uses toLowerCase().contains("hull c") — make sure
-    // mixed-case names still trigger the filter.
     UUID shipId = UUID.randomUUID();
     ShipType hullC = newShip(shipId, "RSI HULL c MERCHANT", 4608);
 
@@ -237,7 +212,6 @@ class ProfitCalculationServiceTest {
 
   @Test
   void shipWithNullName_doesNotTriggerHullCFilter() {
-    // Defensive: if name is null, the Hull C check must NOT NPE on null.toLowerCase().
     UUID shipId = UUID.randomUUID();
     ShipType ship = newShip(shipId, null, 50);
 
@@ -249,17 +223,11 @@ class ProfitCalculationServiceTest {
 
     List<ProfitCalculationDto> result = profitCalculationService.calculateProfit(shipId, null);
 
-    // Outpost (no loading dock) still counts because the ship isn't a Hull C.
     assertEquals(1, result.size());
   }
 
-  // ----------------------------------------------------------------
-  // Price-zero / price-null filtering
-  // ----------------------------------------------------------------
-
   @Test
   void priceWithNullBuy_isSkipped() {
-    // No buy price -> minBuy resolves to null -> material is filtered out entirely.
     UUID shipId = UUID.randomUUID();
     ShipType ship = newShip(shipId, "Cutlass", 46);
 
@@ -337,8 +305,6 @@ class ProfitCalculationServiceTest {
 
   @Test
   void mixedTerminalsForOneMaterial_useMinBuyAndMaxSell() {
-    // Three terminals for the same material with different prices —
-    // the calculation must take min(buy) and max(sell) across terminals.
     UUID shipId = UUID.randomUUID();
     ShipType ship = newShip(shipId, "Cutlass", 100);
 
@@ -364,7 +330,6 @@ class ProfitCalculationServiceTest {
         0,
         BigDecimal.valueOf(30).compareTo(row.maxSellPrice()),
         "maxSell must be 30 (the most expensive of 12/15/30)");
-    // profitPerScu = 30 - 5 = 25; fullLoadCost = 5 * 100 = 500; maxProfit = 25 * 100 = 2500.
     assertEquals(0, BigDecimal.valueOf(25).compareTo(row.profitPerScu()));
     assertEquals(0, BigDecimal.valueOf(500).compareTo(row.fullLoadCost()));
     assertEquals(0, BigDecimal.valueOf(2500).compareTo(row.maxProfitFullLoad()));
@@ -372,7 +337,6 @@ class ProfitCalculationServiceTest {
 
   @Test
   void marginPercent_isComputedAsBuyPercentage() {
-    // minBuy=10, maxSell=30 -> margin = (30-10)/10 * 100 = 200.0000%
     UUID shipId = UUID.randomUUID();
     ShipType ship = newShip(shipId, "Cutlass", 1);
 
@@ -385,7 +349,6 @@ class ProfitCalculationServiceTest {
     List<ProfitCalculationDto> result = profitCalculationService.calculateProfit(shipId, null);
 
     BigDecimal margin = result.get(0).marginPercent();
-    // 200.0000 with scale 4 (multiply by 100 first, then divide-with-scale-4 keeps the 4 decimals).
     assertEquals(
         0,
         new BigDecimal("200.0000").compareTo(margin),
@@ -394,11 +357,6 @@ class ProfitCalculationServiceTest {
 
   @Test
   void smallMargin_isRoundedHalfUpAtFourDecimals() {
-    // The implementation does: profitPerScu.multiply(100).divide(minBuy, 4, HALF_UP).
-    // For profit=1, minBuy=3: 100.divide(3, 4, HALF_UP) = 33.3333. The multiply-first
-    // ordering preserves four meaningful fractional digits in the percent value, so we
-    // get 33.3333% (and not the precision-collapsed 33.3300% that divide-then-multiply
-    // would yield).
     UUID shipId = UUID.randomUUID();
     ShipType ship = newShip(shipId, "Cutlass", 1);
 
@@ -417,17 +375,8 @@ class ProfitCalculationServiceTest {
         "margin must be 33.3333% — multiply-before-divide preserves 4 fractional digits");
   }
 
-  // ----------------------------------------------------------------
-  // Loss-making material — both sides positive but maxSell < minBuy
-  // ----------------------------------------------------------------
-
   @Test
   void negativeMargin_materialIsStillIncludedWithNegativeProfit() {
-    // A material whose cheapest buy (30) is dearer than its best sell (20). Both
-    // sides are individually positive, so it passes the both-sides-positive filter
-    // and MUST be kept — the profit page shows loss rows so a trader sees them.
-    // profitPerScu = 20 - 30 = -10; margin = -10 * 100 / 30 = -33.3333%;
-    // maxProfitFullLoad = -10 * 100 = -1000.
     UUID shipId = UUID.randomUUID();
     ShipType ship = newShip(shipId, "Cutlass", 100);
 
@@ -458,10 +407,6 @@ class ProfitCalculationServiceTest {
         row.maxProfitFullLoad().compareTo(BigDecimal.ZERO) < 0,
         "a loss ship-load must surface as a negative full-load profit");
   }
-
-  // ----------------------------------------------------------------
-  // helpers
-  // ----------------------------------------------------------------
 
   private static ShipType newShip(UUID id, String name, Integer scu) {
     ShipType s = new ShipType();

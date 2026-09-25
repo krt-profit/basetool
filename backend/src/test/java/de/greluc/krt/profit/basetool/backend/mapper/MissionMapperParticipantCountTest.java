@@ -34,23 +34,19 @@ import org.junit.jupiter.api.Test;
  */
 class MissionMapperParticipantCountTest {
 
-  // None of the mappers MissionMapper uses is reached by these mappings.
   private final MissionMapper mapper = new MissionMapperImpl(null, null, null, null);
 
   @Test
   void shouldReturnZeroCounts_WhenNoParticipants() {
-    // Given
     Mission mission = new Mission();
     mission.setParticipants(new HashSet<>());
 
-    // When / Then
     assertEquals(0, mapper.resolveCheckedInParticipants(mission));
     assertEquals(0, mapper.resolveRegisteredParticipants(mission));
   }
 
   @Test
   void shouldCountAllRegisteredButNoneCheckedIn_WhenNobodyCheckedIn() {
-    // Given
     Mission mission = new Mission();
     Set<MissionParticipant> participants = new HashSet<>();
     participants.add(buildParticipant(null));
@@ -58,28 +54,24 @@ class MissionMapperParticipantCountTest {
     participants.add(buildParticipant(null));
     mission.setParticipants(participants);
 
-    // When / Then
     assertEquals(0, mapper.resolveCheckedInParticipants(mission));
     assertEquals(3, mapper.resolveRegisteredParticipants(mission));
   }
 
   @Test
   void shouldCountAllAsCheckedIn_WhenEveryoneCheckedIn() {
-    // Given
     Mission mission = new Mission();
     Set<MissionParticipant> participants = new HashSet<>();
     participants.add(buildParticipant(Instant.now()));
     participants.add(buildParticipant(Instant.now()));
     mission.setParticipants(participants);
 
-    // When / Then
     assertEquals(2, mapper.resolveCheckedInParticipants(mission));
     assertEquals(2, mapper.resolveRegisteredParticipants(mission));
   }
 
   @Test
   void shouldCountMixed_WhenSomeCheckedIn() {
-    // Given
     Mission mission = new Mission();
     Set<MissionParticipant> participants = new HashSet<>();
     participants.add(buildParticipant(Instant.now()));
@@ -88,7 +80,6 @@ class MissionMapperParticipantCountTest {
     participants.add(buildParticipant(null));
     mission.setParticipants(participants);
 
-    // When / Then
     assertEquals(2, mapper.resolveCheckedInParticipants(mission));
     assertEquals(4, mapper.resolveRegisteredParticipants(mission));
   }

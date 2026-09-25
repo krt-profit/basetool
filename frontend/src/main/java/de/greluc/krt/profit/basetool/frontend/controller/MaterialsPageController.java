@@ -151,9 +151,6 @@ public class MaterialsPageController {
         return sysCmp;
       }
 
-      // Planet-less terminals (jump points / Lagrange) sink to the end of their star system so
-      // the planet-tinted block stays contiguous. Within the planet-less tail the existing
-      // group/name ordering still applies.
       boolean thisHasPlanet = this.planetName != null && !this.planetName.isBlank();
       boolean otherHasPlanet = o.planetName != null && !o.planetName.isBlank();
       if (thisHasPlanet != otherHasPlanet) {
@@ -237,8 +234,6 @@ public class MaterialsPageController {
                 : "Unsortiert";
         materialsByKind.computeIfAbsent(kind, k -> new ArrayList<>()).add(mat);
       }
-      // Sort items within each kind alphabetically by name (already sorted from API, but just to be
-      // sure)
       materialsByKind
           .values()
           .forEach(
@@ -385,8 +380,6 @@ public class MaterialsPageController {
   private List<MaterialMatrixItemDto> fetchFilteredMatrixItems(
       List<String> materials, List<String> systems, boolean loadingDock, boolean autoLoad) {
     try {
-      // Uncached, so it misses the single-flight that keeps the unfiltered matrix to one concurrent
-      // buffer; bound how many matrix-sized filtered payloads buffer at once (WebClientConfig).
       filteredMatrixFetchGuard.acquire();
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();

@@ -122,9 +122,6 @@ public class DiscordMembershipChecker {
         response =
             httpClient.send(buildRequest(url, accessToken), HttpResponse.BodyHandlers.ofString());
       } catch (IOException e) {
-        // Timeout / connection reset / DNS failure / truncated read — fail closed. This is the
-        // single most likely cause of a "nobody can log in" report, so it must not be silent: the
-        // authenticator downstream only ever sees DENIED_ERROR and cannot say what went wrong.
         log.warnf(
             e,
             "Discord membership check failed to reach the API (%s); denying.",
@@ -144,14 +141,11 @@ public class DiscordMembershipChecker {
               ? new MemberLookup(Result.ALLOWED, body)
               : MemberLookup.denied(Result.DENIED_NOT_MEMBER);
         } catch (IOException e) {
-          // Malformed / unparseable body — fail closed. Distinct from a transport failure: this one
-          // means Discord answered 200 with something we could not read, i.e. a contract change.
           log.warnf(e, "Discord returned an unreadable member payload; denying.");
           return MemberLookup.denied(Result.DENIED_ERROR);
         }
       }
       if (status == 404) {
-        // Clean "not a member of the guild".
         return MemberLookup.denied(Result.DENIED_NOT_MEMBER);
       }
       if (status == 429 && attempt < max429Retries) {
@@ -159,10 +153,6 @@ public class DiscordMembershipChecker {
         waitForRetry(response);
         continue;
       }
-      // 5xx / 401 / 403 / 429-after-retries / anything unexpected — fail closed. The status is the
-      // whole diagnosis: 401 means the brokered token is bad, 403 a missing scope, 429 that we are
-      // being rate-limited, 5xx a Discord outage. Never log the token or the URL (it carries the
-      // guild id).
       log.warnf(
           "Discord membership check denied on HTTP %d after %d retry attempt(s).", status, attempt);
       return MemberLookup.denied(Result.DENIED_ERROR);
@@ -240,7 +230,6 @@ public class DiscordMembershipChecker {
     try {
       return (long) (Double.parseDouble(headerValue.trim()) * 1000);
     } catch (NumberFormatException e) {
-      // A non-numeric Retry-After (HTTP-date form) — fall back to a small fixed wait.
       log.debugf("Non-numeric Discord Retry-After header; using the default backoff.");
       return 200L;
     }

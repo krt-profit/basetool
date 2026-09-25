@@ -105,8 +105,6 @@ public class TerminalController {
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public TerminalDto updateTerminal(
       @PathVariable @NotNull UUID id, @RequestBody @Valid @NotNull TerminalDto terminalDto) {
-    // Here we just allow toggling visibility according to the requirement,
-    // but we mimic a normal PUT. In the Admin view, we only change 'hidden'.
     return terminalMapper.toDto(terminalService.updateTerminalVisibility(id, terminalDto.hidden()));
   }
 

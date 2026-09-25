@@ -105,9 +105,6 @@ class WebClientHttp2NegotiationTest {
             .protocol(HttpProtocol.H2, HttpProtocol.HTTP11)
             .secure(
                 spec ->
-                    // Cast to the generic spec on purpose: Http2SslContextSpec implements both
-                    // interfaces and Java picks the more specific -- and deprecated -- overload
-                    // without it, failing the -Werror build on a call that is otherwise correct.
                     spec.sslContext(
                         (reactor.netty.tcp.SslProvider.GenericSslContextSpec<?>)
                             Http2SslContextSpec.forServer(TestTls.serverKeyManagerFactory())))
@@ -119,11 +116,6 @@ class WebClientHttp2NegotiationTest {
                             WebClientTestSupport.applicationProtocol(connection.channel()));
                         peers.add(connection.channel().remoteAddress());
                       });
-                  // `/slow` holds the response open long enough that calls fired together are
-                  // genuinely in flight together. Without it a fast local server answers each call
-                  // before the next is issued, the pool never needs a second connection, and the
-                  // stream cap the concurrency case exists to pin is never reached -- so the case
-                  // would pass at any setting, which is worse than not having it.
                   Mono<String> body = Mono.just("ok");
                   if (SLOW_PATH.equals(request.path()) || request.uri().endsWith(SLOW_PATH)) {
                     body = body.delayElement(HOLD);
@@ -145,8 +137,6 @@ class WebClientHttp2NegotiationTest {
   void requestClientNegotiatesHttp2() {
     assertThat(get(liveSyncAuthWebClient)).isEqualTo("ok");
 
-    // "h2" is the ALPN identifier, and the server is the honest place to read it: it reports what
-    // was agreed, not what the client hoped to offer.
     assertThat(negotiated.get()).isEqualTo("h2");
   }
 
@@ -155,30 +145,12 @@ class WebClientHttp2NegotiationTest {
   void streamingClientStaysOnHttp11() {
     assertThat(get(sseWebClient)).isEqualTo("ok");
 
-    // Asserted as "not h2" rather than as an exact string: a client that offers no ALPN extension
-    // at all leaves the JDK engine reporting an empty protocol on some providers and null on
-    // others, and pinning which one would make this a test of the TLS stack instead of the
-    // decision. What matters is that a thousand long-lived viewer streams are not multiplexed onto
-    // a handful of connections behind one flow-control window.
     assertThat(negotiated.get()).isNotEqualTo("h2");
   }
 
   @Test
   @DisplayName("forty concurrent calls ride a handful of connections, not forty")
   void concurrentCallsAreMultiplexed() {
-    // The saving itself, and BOTH of its halves, pinned by one number.
-    //
-    // Under HTTP/1.1 each in-flight call holds one pooled connection, which is why `frontend-pool`
-    // was raised to 100 and aligned with the bulkhead. Under HTTP/2 forty overlapping calls at
-    // `app.http.max-concurrent-streams` = 20 need exactly ceil(40 / 20) = 2 connections, and the
-    // window below is that arithmetic plus room for one straggler.
-    //
-    // A one-sided "few enough" bound would have been satisfied by both failure modes this change
-    // exists to prevent:
-    //   * drop strictConnectionReuse -> 40 sockets, one stream each. Caught by the upper bound.
-    //   * raise maxConcurrentStreams past 40 -> ONE socket carrying all forty, of which Tomcat
-    //     11.0.25 executes twenty and queues the rest, invisibly. Caught by the LOWER bound, which
-    //     is the half a "<= 8" assertion could never make.
     fire(liveSyncAuthWebClient);
 
     assertThat(negotiated.get()).isEqualTo("h2");
@@ -190,11 +162,6 @@ class WebClientHttp2NegotiationTest {
   @Test
   @DisplayName("the same load on HTTP/1.1 needs a socket per call, which is the cost being removed")
   void theHttp11PathStillNeedsAConnectionPerCall() {
-    // The control, on the same slow route and the same forty calls. Without it the window above is
-    // a number with nothing to compare it to, and a regression that quietly dropped back to
-    // HTTP/1.1 would still satisfy it on a fast enough machine, because sequential reuse also keeps
-    // the socket count low. The SSE client is the same connector code with http2 = false, so this
-    // measures the protocol and not a second configuration.
     fire(sseWebClient);
 
     assertThat(negotiated.get()).isNotEqualTo("h2");

@@ -49,9 +49,7 @@ public final class TermsGateHandoff {
    */
   private static final String REQUEST_ATTRIBUTE = "krt.terms.gate.websocket";
 
-  private TermsGateHandoff() {
-    // utility holder
-  }
+  private TermsGateHandoff() {}
 
   /**
    * Marks a WebSocket handshake as belonging to a user without valid consent, recording where that

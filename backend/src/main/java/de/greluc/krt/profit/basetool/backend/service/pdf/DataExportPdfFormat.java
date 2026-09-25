@@ -110,14 +110,11 @@ public final class DataExportPdfFormat {
           meta, label.apply("pdf.export.meta.totalRows"), String.valueOf(export.totalRows()));
       krt.document().add(meta);
 
-      // Why this document is a summary, said in the document. A reader must not have to guess
-      // whether the short list means "that is all there is".
       KrtPdfSupport.addNote(krt, label.apply("pdf.export.note.summary"));
       if (export.thirdPartyHandlesRemoved()) {
         KrtPdfSupport.addNote(krt, label.apply("pdf.export.note.thirdParty"));
       }
 
-      // --- the inventory: one line per section, with its count and legal basis ------------
       KrtPdfSupport.addSectionHeader(krt, label.apply("pdf.export.inventory"));
       PdfPTable inventory = new PdfPTable(3);
       inventory.setWidthPercentage(100);
@@ -144,7 +141,6 @@ public final class DataExportPdfFormat {
       }
       krt.document().add(inventory);
 
-      // --- the short sections, in full -----------------------------------------------------
       for (ExportSection section : export.sections()) {
         if (!VERBATIM_SECTIONS.contains(section.key()) || section.rows().isEmpty()) {
           continue;
@@ -155,11 +151,6 @@ public final class DataExportPdfFormat {
         table.setWidths(new float[] {1.4f, 3f});
         KrtPdfSupport.addTableHeader(table, label.apply("pdf.export.col.field"));
         KrtPdfSupport.addTableHeader(table, label.apply("pdf.export.col.value"));
-        // The field name is a bundle label, not the projection's alias. It used to be the alias, so
-        // a member exercising their right of access read `discord_guild_nickname` and
-        // `share_blueprints_globally` -- untranslated user-visible text in a document that answers
-        // a legal request, and unintelligible to the person it is addressed to.
-        // DataExportPdfFieldLabelCoverageTest fails when a projection yields a column with no key.
         boolean rowAlt = false;
         for (Map<String, Object> row : section.rows()) {
           for (Map.Entry<String, Object> cell : row.entrySet()) {

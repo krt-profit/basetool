@@ -116,34 +116,24 @@ class MaterialboardReleaseModalOpensE2eTest {
       try {
         E2eSupport.navigate(page, baseUrl + "/materialboerse");
         page.waitForLoadState();
-        // Both deferred scripts must have wired up: the board's delegated click handler and the
-        // shared release modal's window.krtMaterialRelease. waitForLoadState() already guarantees
-        // deferred scripts ran, but assert the seam explicitly so a click can never land early.
         page.waitForFunction("() => typeof window.krtMaterialRelease === 'object'");
 
-        // Closed on load: the .krt-modal-overlay global default is display:none.
         assertThat(page.locator("#mb-modal"))
             .isHidden(new LocatorAssertions.IsHiddenOptions().setTimeout(10_000));
 
         page.locator("[data-mb-open-release]").first().click();
 
-        // The regression discriminator: the modal must be genuinely visible, not just un-hidden.
         assertThat(page.locator("#mb-modal"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
-        // "new" mode reveals the material picker so the user can choose a releasable posten.
         assertThat(page.locator("#mb-modal [data-mb-picker]"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
 
-        // The picker DROPDOWN stays closed on open: the modal auto-focuses the input, and a
-        // programmatic focus must not pop the list (pre-fix it force-opened, covering the fields).
         assertThat(page.locator("#mb-modal [data-mb-picker-list]"))
             .isHidden(new LocatorAssertions.IsHiddenOptions().setTimeout(10_000));
-        // Clicking into the picker input opens it (an empty actor still shows the notice row).
         page.locator("#mb-modal [data-mb-picker-input]").click();
         assertThat(page.locator("#mb-modal [data-mb-picker-list]"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
 
-        // Dismiss via the header close button and confirm it hides again (display toggles back).
         page.locator("#mb-modal [data-mb-modal-close]").first().click();
         assertThat(page.locator("#mb-modal"))
             .isHidden(new LocatorAssertions.IsHiddenOptions().setTimeout(10_000));

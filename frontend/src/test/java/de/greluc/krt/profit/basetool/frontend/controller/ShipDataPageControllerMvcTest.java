@@ -124,9 +124,6 @@ class ShipDataPageControllerMvcTest {
         .andExpect(content().string(containsString("value=\"Avenger Titan\"")))
         .andExpect(content().string(containsString("value=\"Aegis Dynamics\"")))
         .andExpect(content().string(containsString("src=\"/js/ship-data.js\"")))
-        // covers the .form-group checkbox regression class (PR #1405): the page-scoped rule must
-        // carry the :where() exclusion so it can never capture a checkbox/radio and stretch it into
-        // a full-width padded bar (it ties the global KRT square rule and renders after it).
         .andExpect(
             PageStylesheets.content(
                 containsString(

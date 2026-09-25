@@ -221,11 +221,6 @@ public class KeycloakService {
       List<KeycloakUserDto> result = new ArrayList<>(roster.size());
       for (KeycloakUserDto u : roster) {
         Set<String> roles = rolesByUser.getOrDefault(u.id(), Collections.emptySet());
-        // Incremental Discord back-fill: skip the per-user federated-identity read for accounts
-        // that already carry a local link. syncUser treats the resulting null as "leave the
-        // existing link alone", so skipping is safe and cannot wipe a real link. A relink to a
-        // different Discord account is still caught at the linker's next login (the JWT claim
-        // path), which is why the daily sync only needs to cover accounts with no local link yet.
         String discordUserId =
             (u.id() != null && !knownDiscordLinkedIds.contains(u.id()))
                 ? fetchDiscordFederatedId(u.id(), token)
@@ -238,10 +233,6 @@ public class KeycloakService {
 
     } catch (Exception e) {
       logFetchFailure(e);
-      // REQ-OBS-011: the swallow returns an empty roster and the sync still records success, so
-      // without this counter a Keycloak Admin-API outage is indistinguishable from a legitimately
-      // empty roster (departed users would keep their local roles). KeycloakSyncFetchFailing
-      // alerts.
       meterRegistry.counter(MetricNames.KEYCLOAK_SYNC_FETCH_FAILURES).increment();
       return Collections.emptyList();
     }
@@ -385,15 +376,8 @@ public class KeycloakService {
       }
     }
 
-    // REQ-SEC-053: everything the realm's default-role composite grants, credited to every one of
-    // its members. Without this a member who holds KRT Member only through `default-roles-iri`
-    // comes back with no roles at all.
     accumulateRoleMembers(
         defaultRoleName(), fetchDefaultRoleGrants(token, canonicalByLower), token, byUser);
-    // Which of the app's roles the realm actually still knows is the input every downstream role
-    // decision rests on, and it used to be invisible: a renamed realm role simply stops matching
-    // here, the run still "succeeds", and every holder is quietly left with no role at all.
-    // Counts only (role names are structural, but the numbers are what a dashboard needs).
     log.info(
         "Keycloak role index: {} of {} mappable app roles matched a realm role ({} realm roles"
             + " listed), {} users carry at least one.",
@@ -401,30 +385,6 @@ public class KeycloakService {
         canonicalByLower.size(),
         realmRoleNames.size(),
         byUser.size());
-    // Not a per-role "missing from the realm" warning: the local catalog may contain local-only
-    // roles, so an unmatched app role is NOT by itself an anomaly and warning per role would fire
-    // on every single run. The degenerate case — the realm matching NONE of the app's roles — is
-    // unambiguous, and since REQ-SEC-053 it is no longer merely worth warning about: writing that
-    // run would strip every account of every role and refuse the entire organisation with NO_ROLE
-    // at once. It is a realm-side rename or a broken query, never a legitimate state, so the run
-    // is ABORTED here and skipped by fetchUsers' top-level catch.
-    //
-    // Deliberately narrow. A single account resolving to no role IS legitimate and is written
-    // through; only the whole-index failure is treated as "the realm did not answer the question",
-    // which is what it is.
-    //
-    // It is NOT, however, how a member is offboarded, and this comment used to claim it was
-    // ("removing someone's roles in Keycloak still removes their access"). That was wrong.
-    // `default-roles-<realm>` is assigned to every account Keycloak creates and is not removed
-    // when an admin clears the user's other role mappings, so the composite fold-in below credits
-    // `KRT Member` back on the next run. **Offboarding is disabling or deleting the account in
-    // Keycloak**, confirmed by the owner on 2026-09-07, and the enforcement is Keycloak's own:
-    // neither account is issued a token, so no request reaches this application at all. The local
-    // row mirrors both facts anyway — `in_keycloak` for presence, `enabled_in_keycloak` for the
-    // `enabled` flag (V230) — because the ingest gateway's acting-member path (ADR-0129) installs
-    // an authentication with no token to refuse, and its liveness guard is the only reader of
-    // either. An account that reaches this code with no role is one whose realm never granted it
-    // anything, not one somebody meant to remove.
     if (matched == 0) {
       throw new IllegalStateException(
           "Keycloak role index: none of the "
@@ -552,9 +512,6 @@ public class KeycloakService {
       }
     }
     if (!granted.isEmpty()) {
-      // Counts and role names only — both are structural, neither is PII. Worth INFO: this is the
-      // grant that is invisible in every per-user and per-role view, so a reader diagnosing "why
-      // does this member have KRT Member" has nothing else to go on.
       log.info(
           "Keycloak role index: the default-role composite '{}' grants {} mappable app role(s): {}",
           defaultRoleName(),
@@ -633,15 +590,9 @@ public class KeycloakService {
                 .retrieve()
                 .body(new ParameterizedTypeReference<List<Map<String, Object>>>() {});
       } catch (HttpClientErrorException.NotFound notFound) {
-        // Benign TOCTOU: the role disappeared after the realm-role listing named it. No members to
-        // contribute — skip this one role WITHOUT aborting the run (log the role name only, no
-        // PII).
         log.debug("Realm role '{}' not found while reading members; skipping.", queryRoleName);
         return;
       }
-      // Any OTHER failure is intentionally uncaught: it propagates to fetchUsers()'s top-level
-      // catch
-      // so the run is skipped rather than persisting a degraded, role-stripped set (see Javadoc).
       if (page == null || page.isEmpty()) {
         break;
       }
@@ -652,8 +603,6 @@ public class KeycloakService {
                 .computeIfAbsent(UUID.fromString(idText), k -> new HashSet<>())
                 .addAll(storedRoleNames);
           } catch (IllegalArgumentException ignored) {
-            // A non-UUID member id is a Keycloak configuration deviation; skip it rather than
-            // aborting the whole role page (matches the fail-closed id handling elsewhere).
           }
         }
       }
@@ -718,9 +667,6 @@ public class KeycloakService {
     try {
       return fetchDiscordLink(keycloakUserId, getAccessToken());
     } catch (HttpClientErrorException.NotFound userGone) {
-      // The Keycloak user is gone (e.g. an earlier partial link already deleted the throwaway
-      // registration user). No federated identity to read — report "no link" so the caller can fall
-      // back to the local discord_user_id and recover. Log the id only (not PII).
       log.debug(
           "Keycloak user {} not found on discord-link read; treating as no link", keycloakUserId);
       return Optional.empty();
@@ -770,7 +716,6 @@ public class KeycloakService {
       String existing =
           fetchDiscordLink(keycloakUserId, token).map(DiscordLink::userId).orElse(null);
       if (discordSnowflake.equals(existing)) {
-        // Retry of this same link — the identity is already attached. Idempotent success.
         return;
       }
       throw new ExternalServiceException(
@@ -847,7 +792,6 @@ public class KeycloakService {
           .toBodilessEntity();
       return true;
     } catch (HttpClientErrorException.NotFound absent) {
-      // The only outcome that may be read as "gone". Log the id only (it is not PII).
       log.debug("Keycloak user {} confirmed absent", keycloakUserId);
       return false;
     }
@@ -914,7 +858,6 @@ public class KeycloakService {
           .retrieve()
           .toBodilessEntity();
     } catch (HttpClientErrorException.NotFound notFound) {
-      // Already absent — idempotent success. Log the id only (it is not PII).
       log.debug("Keycloak user {} already absent on delete", keycloakUserId);
     }
   }

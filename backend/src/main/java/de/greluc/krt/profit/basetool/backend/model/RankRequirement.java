@@ -57,9 +57,6 @@ import lombok.ToString;
 @Builder
 public class RankRequirement extends AbstractEntity<UUID> {
 
-  // {@code onMethod_ = @__(@Override)} tells Lombok to attach a real {@code @Override} to the
-  // generated {@code getId()} so CodeQL recognises this method as the {@code Persistable.getId()}
-  // implementation.
   @Getter(onMethod_ = @__(@Override))
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
@@ -84,15 +81,11 @@ public class RankRequirement extends AbstractEntity<UUID> {
   @JoinColumn(name = "owning_squadron_id", nullable = false)
   private Squadron owningSquadron;
 
-  // Excluded from {@code @ToString} because the LAZY association would either trigger a
-  // LazyInitializationException outside a Hibernate session or recurse back through
-  // topic.categories.
   @ToString.Exclude
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "topic_id")
   private PromotionTopic topic;
 
-  // Excluded from {@code @ToString} for the same lazy/recursion reasons as {@link #topic}.
   @ToString.Exclude
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "category_id")

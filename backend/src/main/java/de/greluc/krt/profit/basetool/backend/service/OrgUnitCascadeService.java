@@ -153,18 +153,13 @@ public class OrgUnitCascadeService {
   @NotNull
   public Set<UUID> cascadedOfficerReach(@NotNull Collection<OrgUnitMembership> memberships) {
     if (memberships.isEmpty()) {
-      // No memberships → empty reach with no DB read; nothing worth caching.
       return new LinkedHashSet<>();
     }
     Map<Set<OrgUnitMembershipId>, Set<UUID>> memo =
         RequestMemo.getIfBound(CACHE_KEY_CASCADED_REACH, HashMap::new);
     if (memo == null) {
-      // No HTTP request bound (unit tests, scheduled jobs): compute directly — identical result.
       return computeCascadedOfficerReach(memberships);
     }
-    // Same principal within the same request → reuse the materialised reach, skipping the
-    // findAllOrgUnitIds() / findChildOrgUnitIds() round-trips the converter already paid. A
-    // defensive copy is returned so a caller can never corrupt the cached set.
     Set<UUID> reach =
         memo.computeIfAbsent(
             membershipKey(memberships), key -> computeCascadedOfficerReach(memberships));
@@ -186,13 +181,10 @@ public class OrgUnitCascadeService {
       @NotNull Collection<OrgUnitMembership> memberships) {
     boolean olReach = memberships.stream().anyMatch(m -> m.getRole() == MembershipRole.OL_MEMBER);
     if (olReach) {
-      // OL reach is the literal union of every org unit — materialised, never an admin-all marker.
       return new LinkedHashSet<>(orgUnitRepository.findAllOrgUnitIds());
     }
     Set<UUID> reach = new LinkedHashSet<>();
     for (OrgUnitMembership m : memberships) {
-      // Only the three area ranks cascade (Bereich → its Staffeln/SKs). Squadron ranks and SK_LEAD
-      // confer own-unit reach only (REQ-ROLE-002) and fall through here.
       if (m.getRole().isAreaRank()) {
         UUID bereichId = m.getId().getOrgUnitId();
         reach.add(bereichId);

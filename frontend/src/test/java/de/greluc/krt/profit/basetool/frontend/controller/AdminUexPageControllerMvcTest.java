@@ -96,11 +96,6 @@ class AdminUexPageControllerMvcTest {
         false);
   }
 
-  // covers the .form-group checkbox regression class (PR #1405) — the page-scoped .form-group
-  // input rule ties the global KRT square-checkbox rule at (0,1,1) and, rendering after
-  // styles.css, would win and stretch any .form-group checkbox/radio into a full-width padded
-  // bar. Pins the :where() exclusion so the page rule can never capture checkbox/radio inputs.
-  // The GET handler degrades to the error banner on unstubbed fetches, still rendering the head.
   @Test
   @WithMockUser(roles = "ADMIN")
   void listData_ShouldExcludeCheckboxesFromFormGroupInputRule() throws Exception {
@@ -113,8 +108,6 @@ class AdminUexPageControllerMvcTest {
                     ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
   }
 
-  // covers #582 — the terminal toggle-visibility twin (X-Requested-With) flips the hidden flag off
-  // a freshly-read record and returns 200; the button is re-rendered client-side.
   @Test
   @WithMockUser(roles = "ADMIN")
   void toggleTerminalVisibilityAjax_withHeader_returns200() throws Exception {
@@ -132,9 +125,6 @@ class AdminUexPageControllerMvcTest {
         .andExpect(status().isOk());
   }
 
-  // covers #582 — the loading-dock override twin (X-Requested-With + action=yes) PATCHes the pin
-  // and
-  // returns 200.
   @Test
   @WithMockUser(roles = "ADMIN")
   void loadingDockOverrideAjax_withHeaderYes_returns200() throws Exception {
@@ -150,7 +140,6 @@ class AdminUexPageControllerMvcTest {
         .andExpect(status().isOk());
   }
 
-  // covers #582 — the action whitelist: a bogus action is rejected with 400.
   @Test
   @WithMockUser(roles = "ADMIN")
   void loadingDockOverrideAjax_withHeaderBogusAction_returns400() throws Exception {
@@ -165,8 +154,6 @@ class AdminUexPageControllerMvcTest {
         .andExpect(status().isBadRequest());
   }
 
-  // covers #582 — header routing: the same loading-dock URL WITHOUT the header still hits the
-  // classic form handler and redirects (no-JS fallback preserved).
   @Test
   @WithMockUser(roles = "ADMIN")
   void loadingDockOverride_withoutHeader_redirects() throws Exception {

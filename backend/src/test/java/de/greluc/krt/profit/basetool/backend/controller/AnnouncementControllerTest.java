@@ -51,8 +51,6 @@ class AnnouncementControllerTest {
 
   @InjectMocks private AnnouncementController controller;
 
-  // ── getPublicAnnouncement ───────────────────────────────────────────────
-
   @Test
   void getPublicAnnouncement_whenServiceHasOne_returns200WithMappedBody() {
     Announcement entity = new Announcement();
@@ -69,9 +67,6 @@ class AnnouncementControllerTest {
 
   @Test
   void getPublicAnnouncement_whenNoneExists_returns204WithEmptyBody() {
-    // Given — service returns Optional.empty, controller must NOT return
-    // a fake DTO; the 204 contract is documented in the frontend
-    // ErrorHandler (it specifically suppresses logging on 204).
     when(service.getPublicAnnouncement()).thenReturn(Optional.empty());
 
     ResponseEntity<AnnouncementDto> result = controller.getPublicAnnouncement();
@@ -80,12 +75,8 @@ class AnnouncementControllerTest {
     assertNull(result.getBody(), "204 No Content must not carry a JSON payload");
   }
 
-  // ── getAdminAnnouncement ────────────────────────────────────────────────
-
   @Test
   void getAdminAnnouncement_returnsMappedDto() {
-    // The admin endpoint always returns a DTO (the service creates the
-    // singleton row if missing) — no 204 branch here.
     Announcement entity = new Announcement();
     AnnouncementDto dto = new AnnouncementDto(UUID.randomUUID(), "", Instant.now(), 1L);
     when(service.getAdminAnnouncement()).thenReturn(entity);
@@ -95,8 +86,6 @@ class AnnouncementControllerTest {
 
     assertSame(dto, result);
   }
-
-  // ── updateAnnouncement ──────────────────────────────────────────────────
 
   @Test
   void updateAnnouncement_forwardsContentAndVersionToService() {
@@ -115,8 +104,6 @@ class AnnouncementControllerTest {
     assertSame(dto, result);
     verify(service).updateAnnouncement("New content", 3L);
   }
-
-  // ── deleteAnnouncement ──────────────────────────────────────────────────
 
   @Test
   void deleteAnnouncement_delegatesToService() {

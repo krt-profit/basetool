@@ -51,7 +51,6 @@ class FrontendPropertiesValidationTest {
     contextRunner
         .withPropertyValues(
             "app.backend-url=",
-            // provide valid http timeouts to avoid unrelated failures
             "app.http.connect-timeout=3s",
             "app.http.response-timeout=5s",
             "app.http.read-timeout=5s",

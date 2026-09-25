@@ -170,18 +170,15 @@ class BackendImportClientTest {
 
   @Test
   void shouldCallTheBackendAsTheGatewayNamingTheCaller() throws Exception {
-    // Given
     backend.enqueue(
         new MockResponse()
             .setResponseCode(200)
             .addHeader("Content-Type", "application/json")
             .setBody("{\"goodsMatched\":1}"));
 
-    // When
     MDC.put("correlationId", "cid-9");
     String body = client.forwardRefineryExtract("caller-sub", "de", sampleExtract());
 
-    // Then
     assertThat(body).isEqualTo("{\"goodsMatched\":1}");
     RecordedRequest request = backend.takeRequest();
     assertThat(request.getMethod()).isEqualTo("POST");
@@ -195,19 +192,14 @@ class BackendImportClientTest {
 
   @Test
   void shouldOmitTheOptionalRelayHeadersWhenTheyAreAbsentOrBlank() throws Exception {
-    // Given: a missing Accept-Language and an unset MDC correlation id both have to end up as
-    // "header not set" rather than as an empty header the backend would then have to defend
-    // against.
     backend.enqueue(
         new MockResponse()
             .setResponseCode(200)
             .addHeader("Content-Type", "application/json")
             .setBody("{}"));
 
-    // When
     client.forwardRefineryExtract("caller-sub", "   ", sampleExtract());
 
-    // Then
     RecordedRequest request = backend.takeRequest();
     assertThat(request.getHeader("Authorization")).isEqualTo("Bearer gateway-token");
     assertThat(request.getHeader(BackendImportClient.ON_BEHALF_OF_HEADER)).isEqualTo("caller-sub");
@@ -217,18 +209,15 @@ class BackendImportClientTest {
 
   @Test
   void shouldRelayTheCorrelationIdOnTheBlueprintPathToo() throws Exception {
-    // Given
     backend.enqueue(
         new MockResponse()
             .setResponseCode(200)
             .addHeader("Content-Type", "application/json")
             .setBody("{}"));
 
-    // When
     MDC.put("correlationId", "cid-3");
     client.forwardBlueprintPreview("caller-sub", "en", "{}".getBytes(StandardCharsets.UTF_8));
 
-    // Then
     RecordedRequest request = backend.takeRequest();
     assertThat(request.getHeader("Accept-Language")).isEqualTo("en");
     assertThat(request.getHeader("X-Correlation-Id")).isEqualTo("cid-3");
@@ -236,11 +225,6 @@ class BackendImportClientTest {
 
   @Test
   void shouldTakeTheCorrelationIdFromTheMdcRatherThanFromTheInboundHeader() throws Exception {
-    // Given: the security fix. CorrelationIdFilter validates the inbound header and, when it fails,
-    // puts a freshly minted id in the MDC — the relay must carry THAT one. Forwarding the raw
-    // header
-    // instead let unvalidated internet input be copied onto the internal backend call, and it split
-    // one request across two different correlation ids in the two modules' logs (REQ-OBS-002).
     backend.enqueue(
         new MockResponse()
             .setResponseCode(200)
@@ -248,28 +232,22 @@ class BackendImportClientTest {
             .setBody("{}"));
     MDC.put("correlationId", "sanitised-id");
 
-    // When
     client.forwardRefineryExtract("caller-sub", "de", sampleExtract());
 
-    // Then: exactly the MDC value, and only one such header on the wire.
     RecordedRequest request = backend.takeRequest();
     assertThat(request.getHeaders().values("X-Correlation-Id")).containsExactly("sanitised-id");
   }
 
   @Test
   void shouldDropAnAcceptLanguageThatIsNotAPlainLanguageRange() throws Exception {
-    // Given: a CRLF-bearing locale is the header-injection shape. It must never reach the outbound
-    // request — not even to be rejected by the transport, which would surface as an opaque 500.
     backend.enqueue(
         new MockResponse()
             .setResponseCode(200)
             .addHeader("Content-Type", "application/json")
             .setBody("{}"));
 
-    // When
     client.forwardRefineryExtract("caller-sub", "de\r\nX-Injected: evil", sampleExtract());
 
-    // Then: the locale is dropped entirely and no smuggled header exists.
     RecordedRequest request = backend.takeRequest();
     assertThat(request.getHeader("Accept-Language")).isNull();
     assertThat(request.getHeader("X-Injected")).isNull();
@@ -277,43 +255,34 @@ class BackendImportClientTest {
 
   @Test
   void shouldDropAnOverlongAcceptLanguage() throws Exception {
-    // Given: a real Accept-Language is a handful of ranges; a 500-character one is not content
-    // negotiation, so it is dropped rather than copied onto the internal call.
     backend.enqueue(
         new MockResponse()
             .setResponseCode(200)
             .addHeader("Content-Type", "application/json")
             .setBody("{}"));
 
-    // When
     client.forwardRefineryExtract("caller-sub", "de,".repeat(200), sampleExtract());
 
-    // Then
     RecordedRequest request = backend.takeRequest();
     assertThat(request.getHeader("Accept-Language")).isNull();
   }
 
   @Test
   void shouldKeepAWellFormedWeightedAcceptLanguage() throws Exception {
-    // Given: the guard must not be so strict that it breaks real content negotiation — a q-weighted
-    // multi-range header is exactly what a browser-adjacent client sends.
     backend.enqueue(
         new MockResponse()
             .setResponseCode(200)
             .addHeader("Content-Type", "application/json")
             .setBody("{}"));
 
-    // When
     client.forwardRefineryExtract("caller-sub", "de-DE,de;q=0.9,en;q=0.8,*;q=0.5", sampleExtract());
 
-    // Then
     RecordedRequest request = backend.takeRequest();
     assertThat(request.getHeader("Accept-Language")).isEqualTo("de-DE,de;q=0.9,en;q=0.8,*;q=0.5");
   }
 
   @Test
   void shouldForwardBlueprintPreviewAsMultipart() throws Exception {
-    // Given
     backend.enqueue(
         new MockResponse()
             .setResponseCode(200)
@@ -321,10 +290,8 @@ class BackendImportClientTest {
             .setBody("{\"total\":3}"));
     byte[] json = "{\"blueprints\":[]}".getBytes(StandardCharsets.UTF_8);
 
-    // When
     String body = client.forwardBlueprintPreview("caller-sub", null, json);
 
-    // Then
     assertThat(body).isEqualTo("{\"total\":3}");
     RecordedRequest request = backend.takeRequest();
     assertThat(request.getMethod()).isEqualTo("POST");

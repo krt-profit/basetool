@@ -1,16 +1,3 @@
-# promtool unit test for the TargetDown /probe-scoping (REQ-OBS-008/-012, 2026-07-12 false-critical fix).
-#
-# Proves the scoped expr `up{job!~"blackbox-(http|edge|force|members|public|hsts|internal|dns|app).*"} == 0`:
-#   - does NOT fire TargetDown for any of the blackbox /probe jobs whose scrape timed out (up==0 is a
-#     scrape-timeout artifact there, not a target-down signal — see the alert comment);
-#   - STILL fires for the blackbox-exporter self-scrape (the exporter's own /metrics liveness) and for
-#     every non-probe scrape job (app scrapes, infra exporters, monitoring-plane self health).
-#
-# Run locally (no promtool installed on the host — use an ephemeral container, see
-# monitoring/README.md monitoring-config lint recipe):
-#   docker run --rm -v "$PWD/monitoring/prometheus:/work" -w /work \
-#     prom/prometheus:v3.14.0 promtool test rules tests/targetdown_probe_scope_test.yml
-
 rule_files:
   - ../alerts/infrastructure.yml
 
@@ -20,9 +7,6 @@ tests:
   - name: TargetDown excludes blackbox /probe jobs, keeps exporter + real scrapes
     interval: 30s
     input_series:
-      # --- blackbox /probe jobs, all scrape-timed-out (up==0): MUST NOT page TargetDown ---
-      # Every prefix in the alternation gets at least one series. A job whose prefix is missing from
-      # the regex is SELECTED and pages critical, which is what this test exists to catch.
       - series: 'up{job="blackbox-http", instance="https://profit-base.online"}'
         values: "0x10"
       - series: 'up{job="blackbox-http-auth", instance="https://ingest.profit-base.online"}'
@@ -51,7 +35,6 @@ tests:
         values: "0x10"
       - series: 'up{job="blackbox-dns-aaaa", instance="1.1.1.1"}'
         values: "0x10"
-      # --- kept in scope (up==0 here IS a real down signal): MUST page TargetDown ---
       - series: 'up{job="blackbox-exporter", instance="blackbox-exporter:9115"}'
         values: "0x10"
       - series: 'up{job="basetool-backend", instance="backend:11261", application="basetool-backend"}'

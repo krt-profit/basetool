@@ -146,9 +146,6 @@ class JobOrderHandoverMixedFlowIntegrationTest {
           inv1.setMaterial(aslarite);
           inv1.setQuality(800);
           inv1.setAmount(1.835);
-          // Variante C (REQ-INV-027): earmark the whole row to the order via a job-order slice
-          // (the former scalar setJobOrder). Full-amount earmark, undelivered; the handover shrinks
-          // the slice in lock-step with the entry amount, so R5 (Σ slice ≤ amount) always holds.
           InventoryAllocations.addJobOrder(inv1, jobOrder, inv1.getAmount(), false);
           inv1 = inventoryItemRepository.save(inv1);
 
@@ -163,9 +160,6 @@ class JobOrderHandoverMixedFlowIntegrationTest {
           inv2.setMaterial(ouratite);
           inv2.setQuality(900);
           inv2.setAmount(5.730999999999999);
-          // Variante C (REQ-INV-027): earmark the whole row to the order via a job-order slice
-          // (the former scalar setJobOrder). Full-amount earmark, undelivered; the two handovers
-          // shrink the slice in lock-step with the entry amount, so R5 (Σ slice ≤ amount) holds.
           InventoryAllocations.addJobOrder(inv2, jobOrder, inv2.getAmount(), false);
           inv2 = inventoryItemRepository.save(inv2);
 
@@ -180,7 +174,6 @@ class JobOrderHandoverMixedFlowIntegrationTest {
   void mixedFullAndPartialHandover_keepsOrderOpen_thenSecondHandoverCompletesIt() {
     Fixture f = prepareFixture();
 
-    // Step 1: deliver Aslarite fully (1.8) + Ouratite partially (2.0 of 5.7 required)
     JobOrderHandoverCreateDto firstDto =
         new JobOrderHandoverCreateDto(
             Instant.now(),
@@ -203,10 +196,8 @@ class JobOrderHandoverMixedFlowIntegrationTest {
               Material ouratiteFromMaterials = null;
               for (JobOrderMaterial m : reloaded.getMaterials()) {
                 if (m.getAmount() <= 0.0001) {
-                  // Aslarite — fully fulfilled
                   continue;
                 }
-                // Ouratite — must still have ~3.7 open
                 assertEquals(
                     3.7,
                     m.getAmount(),
@@ -215,9 +206,7 @@ class JobOrderHandoverMixedFlowIntegrationTest {
                 ouratiteFromMaterials = m.getMaterial();
               }
 
-              // Inventory must reflect both deductions
               InventoryItem inv1 = inventoryItemRepository.findById(f.invItem1Id()).orElse(null);
-              // Aslarite inventory remaining 0.035 — kept (not deleted) because > 0.0001
               assertTrue(inv1 != null, "Aslarite inventory row must still exist (remaining 0.035)");
               assertEquals(0.035, inv1.getAmount(), 0.0001);
 
@@ -228,7 +217,6 @@ class JobOrderHandoverMixedFlowIntegrationTest {
             });
     assertTrue(ouratiteRef != null, "Ouratite material must still be open after partial handover");
 
-    // Step 2: deliver the remaining 3.7 of Ouratite — must complete the order
     JobOrderHandoverCreateDto secondDto =
         new JobOrderHandoverCreateDto(
             Instant.now(),

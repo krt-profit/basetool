@@ -113,9 +113,6 @@ public class WebClientLoggingFilter {
     if (status >= 500) {
       log.warn("Backend call {} {}{} -> {} in {} ms", method, host, path, status, durationMs);
     } else if (durationMs >= loggingProperties.slowBackendCallThresholdMs()) {
-      // A non-5xx response that merely took a while is still a success — surface the latency at
-      // INFO with an explicit marker instead of crying wolf at WARN (issue #1204). Backend-call
-      // slowness is alerted on through the http.client.requests p95 histogram, not this line.
       log.info(
           "Slow backend call {} {}{} -> {} in {} ms (threshold {} ms)",
           method,
@@ -136,11 +133,6 @@ public class WebClientLoggingFilter {
       @NotNull Throwable err,
       long startNanos) {
     long durationMs = (System.nanoTime() - startNanos) / 1_000_000L;
-    // A CallNotPermittedException here is the circuit breaker short-circuiting the call (0 ms, no
-    // backend hit) — an expected, self-healing state that repeats for every call for the whole open
-    // window, not a backend failure. Log it at DEBUG so a routine backend restart/deploy does not
-    // flood WARN with "Backend call … failed" lines (issue #1203). Genuine transport failures
-    // (timeout, connection reset) still log at WARN — they are the signal the backend is down.
     if (err instanceof CallNotPermittedException) {
       log.debug(
           "Backend call {} {}{} short-circuited after {} ms (circuit breaker open)",

@@ -97,7 +97,6 @@ class JobOrderPageControllerNoReloadMvcTest {
   @BeforeEach
   void setup() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-    // Profit-eligible viewer so the order-detail gate does not redirect to /orders/create.
     when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
         .thenReturn(LayoutResponses.capabilities(true, true, true));
   }
@@ -170,9 +169,6 @@ class JobOrderPageControllerNoReloadMvcTest {
             eq(JobOrderDto.class)))
         .thenThrow(new BackendServiceException("conflict", null, 409));
 
-    // propagateBackendError must answer application/problem+json (not a bare status) so krtFetch
-    // can
-    // read the RFC 7807 code and drive its conflict UX.
     mockMvc
         .perform(put("/orders/" + orderId + "/priority/ajax").param("priority", "3").with(csrf()))
         .andExpect(status().isConflict())
@@ -191,9 +187,6 @@ class JobOrderPageControllerNoReloadMvcTest {
     verify(backendApiClient, never()).put(any(String.class), any(), eq(JobOrderDto.class));
   }
 
-  // REQ-ORDERS-021 / #822: the variant-counting toggle proxy relays to the backend PATCH and
-  // returns
-  // the persisted order so the order-detail JS can patch the @Version and re-render the panel.
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void blueprintVariantCounting_AsLogistician_RelaysAndReturnsOrder() throws Exception {
@@ -241,8 +234,6 @@ class JobOrderPageControllerNoReloadMvcTest {
   void unlinkInventoryItemAjax_AsLogistician_RelaysAndReturnsRefreshedOrder() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID invId = UUID.randomUUID();
-    // After the detach the endpoint re-fetches the order so the bumped @Version flows to the
-    // client.
     when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
         .thenReturn(materialOrder(orderId, 9L));
 
@@ -299,7 +290,6 @@ class JobOrderPageControllerNoReloadMvcTest {
   @WithMockUser(roles = {"ADMIN"})
   void deleteOrderAjax_WhenBackendRejects_PropagatesProblemJson() throws Exception {
     UUID orderId = UUID.randomUUID();
-    // e.g. the order still has linked inventory → the page stays put with a toast, not a redirect.
     doThrow(new BackendServiceException("in use", null, 409))
         .when(backendApiClient)
         .delete(eq("/api/v1/orders/" + orderId), eq(Void.class));
@@ -446,22 +436,11 @@ class JobOrderPageControllerNoReloadMvcTest {
         + "\",\"amount\":10.0,\"version\":3}]}";
   }
 
-  // ------------------------------------------------------------------------
-  // bookProductionAjax — POST /orders/{id}/items/{itemId}/production (REQ-ORDERS-025 Herstellung).
-  // Relays the production booking to the backend, then re-fetches the order so the detail page can
-  // swap the items / aggregated / header / kpi / item-handovers sections in place (the Herstellung
-  // surface lives in the items section). A backend 409 (OPTIMISTIC_LOCK) or 422
-  // (PRODUCTION_ALLOCATION) must be propagated verbatim via propagateBackendError — not swallowed
-  // into a 500 — so krtFetch can distinguish a reload-and-retry from an inline hint.
-  // ------------------------------------------------------------------------
-
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void bookProductionAjax_AsLogistician_RelaysAndReturnsRefreshedOrder() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID itemId = UUID.randomUUID();
-    // After the booking the endpoint re-fetches the order so the bumped manufactured amounts + the
-    // fresh @Version flow to the client.
     when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
         .thenReturn(materialOrder(orderId, 7L));
 
@@ -484,10 +463,6 @@ class JobOrderPageControllerNoReloadMvcTest {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void bookProductionAjax_WhenBackendConflicts_PropagatesProblemJson() throws Exception {
-    // A concurrent line edit bumped the version → the backend answers 409 OPTIMISTIC_LOCK.
-    // propagateBackendError must re-emit application/problem+json (not swallow it into a 500) so
-    // the
-    // Herstellung modal can offer a reload instead of a generic toast.
     UUID orderId = UUID.randomUUID();
     UUID itemId = UUID.randomUUID();
     when(backendApiClient.post(
@@ -511,8 +486,6 @@ class JobOrderPageControllerNoReloadMvcTest {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void createOrderAjax_ValidMaterial_ReturnsNavigationTarget() throws Exception {
-    // Routed by X-Requested-With; returns the post-create navigation target as JSON (the page
-    // navigates itself) instead of a server redirect.
     mockMvc
         .perform(
             post("/orders/create")
@@ -564,18 +537,9 @@ class JobOrderPageControllerNoReloadMvcTest {
     verify(backendApiClient).post(eq("/api/v1/orders/items"), any(), eq(JobOrderDto.class));
   }
 
-  // ------------------------------------------------------------------------
-  // updateStatus — POST /orders/{id}/status (state-machine transition relay to the backend PUT).
-  // Untested before: no success relay, no illegal-transition 400 passthrough, no auth-gate. The
-  // endpoint is an audited (Auftraege) state-mutating activity, so a mis-pointed relay or a
-  // 400/409 swallowed into a 500 must be caught here.
-  // ------------------------------------------------------------------------
-
   @Test
   @WithMockUser(roles = {"KRT_MEMBER"})
   void updateStatus_AsAuthenticated_RelaysAndReturnsOrder() throws Exception {
-    // The gate is isAuthenticated() — deliberately NOT LOGISTICIAN — so a plain member drives the
-    // transition; the backend enforces the fine per-order edit scope.
     UUID orderId = UUID.randomUUID();
     when(backendApiClient.put(
             eq("/api/v1/orders/" + orderId + "/status"), any(), eq(JobOrderDto.class)))
@@ -598,10 +562,6 @@ class JobOrderPageControllerNoReloadMvcTest {
   @WithMockUser(roles = {"KRT_MEMBER"})
   void updateStatus_WhenBackendRejectsIllegalTransition_Propagates400ProblemJson()
       throws Exception {
-    // The backend state machine rejects an illegal transition (e.g. COMPLETED -> OPEN) with a 400.
-    // propagateBackendError must re-emit it as application/problem+json (not swallow it into a 500
-    // via the generic catch) so the detail-page JS shows the state-machine message, not a generic
-    // toast.
     UUID orderId = UUID.randomUUID();
     when(backendApiClient.put(
             eq("/api/v1/orders/" + orderId + "/status"), any(), eq(JobOrderDto.class)))
@@ -620,9 +580,6 @@ class JobOrderPageControllerNoReloadMvcTest {
   @Test
   @WithAnonymousUser
   void updateStatus_AsAnonymous_IsRedirectedWithoutCallingBackend() throws Exception {
-    // /orders/** is permitAll at the URL layer, but the isAuthenticated() method gate still denies
-    // an anonymous principal: GlobalExceptionHandler maps the AuthorizationDeniedException to 403
-    // (not the SSO entry point), and the backend is never touched.
     UUID orderId = UUID.randomUUID();
 
     mockMvc
@@ -631,29 +588,15 @@ class JobOrderPageControllerNoReloadMvcTest {
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"status\":\"IN_PROGRESS\",\"version\":1}"))
-        // REQ-SEC-052: refused at the entry point now, not at the method gate. This request
-        // carries no Accept header that marks it as a background call, so the entry point treats
-        // it as a navigation and redirects to the login rather than answering 401. Either way the
-        // backend is never called, which is what the verify below has always been about.
         .andExpect(status().is3xxRedirection());
 
     verify(backendApiClient, never())
         .put(eq("/api/v1/orders/" + orderId + "/status"), any(), eq(JobOrderDto.class));
   }
 
-  // ------------------------------------------------------------------------
-  // updateOrderAsRequesterAjax — POST /orders/{id}/requested-update (JSON twin, REQ-ORDERS-023).
-  // The requester-side material edit relays to PUT /api/v1/orders/{id}/requested and deliberately
-  // carries NO hasRole('LOGISTICIAN') — the backend requester gate is the authorization. Only
-  // comment + materials + version reach the backend (org unit / handle / status are dropped).
-  // ------------------------------------------------------------------------
-
   @Test
   @WithMockUser(roles = {"KRT_MEMBER"})
   void updateOrderAsRequesterAjax_RelaysToRequestedEndpointAndReturnsOrder() throws Exception {
-    // A plain member (no LOGISTICIAN) must pass — the requester path relays to /requested and only
-    // comment + materials + version cross the seam. The body carries a requestingOrgUnitId + handle
-    // to prove they are stripped (regression (b): a field leak would send them through).
     UUID orderId = UUID.randomUUID();
     when(backendApiClient.put(
             eq("/api/v1/orders/" + orderId + "/requested"), any(), eq(JobOrderDto.class)))
@@ -684,7 +627,6 @@ class JobOrderPageControllerNoReloadMvcTest {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER"})
   void updateOrderAsRequesterAjax_EmptyMaterials_Returns400WithoutBackendCall() throws Exception {
-    // The empty-materials short-circuit answers 400 before any backend relay.
     UUID orderId = UUID.randomUUID();
 
     mockMvc
@@ -702,9 +644,6 @@ class JobOrderPageControllerNoReloadMvcTest {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER"})
   void updateOrderAsRequesterAjax_FrozenAfterDelivery_Propagates400ProblemJson() throws Exception {
-    // The backend freezes a material after it has been (partly) delivered and rejects a requester
-    // edit that touches it with a 400. propagateBackendError must re-emit problem+json so the
-    // requester sees an actionable message instead of a generic 500.
     UUID orderId = UUID.randomUUID();
     when(backendApiClient.put(
             eq("/api/v1/orders/" + orderId + "/requested"), any(), eq(JobOrderDto.class)))
@@ -722,10 +661,6 @@ class JobOrderPageControllerNoReloadMvcTest {
 
   @Test
   void viewOrderDetail_AssigneesFragment_RendersTheAssigneesSection() throws Exception {
-    // The order:{id} live-sync receiver refreshes the `assignees` section via GET
-    // /orders/{id}?fragment=assignees (REQ-FE-015). The fragment switch must map it to the
-    // assigneesSection fragment (HTTP 200, section-sized, no page chrome), not fall through to the
-    // whole page — the new case added alongside the ORDER topic class.
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
@@ -749,10 +684,6 @@ class JobOrderPageControllerNoReloadMvcTest {
   void viewOrderDetail_FragmentBackendError_ReturnsNonRedirectErrorFragment() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    // The backend read fails mid section-swap (circuit-breaker open / timeout / 5xx). The fragment
-    // path must answer with a section-sized error fragment (HTTP 200), never the classic
-    // redirect:/orders — krtFetch.swap would otherwise follow the 302 into the small results
-    // container (#575, mirrors the #574 fix).
     when(backendApiClient.get(eq("/api/v1/orders/" + orderId), eq(JobOrderDto.class)))
         .thenThrow(new RuntimeException("backend unavailable"));
 

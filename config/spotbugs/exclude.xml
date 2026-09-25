@@ -1,55 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-  SpotBugs filter file.
-
-  Scope so far: JPA entity collection exposure.
-
-  ============================================================================
-  EI_EXPOSE_REP / EI_EXPOSE_REP2 on `de.greluc.krt.profit.basetool.backend.model.*`
-  ============================================================================
-
-  Every JPA entity in this package exposes its `@OneToMany` / `@ManyToMany`
-  collections via Lombok `@Getter` (and accepts them back via `@Setter`).
-  SpotBugs and the `github-code-quality[bot]` running on PRs flag every such
-  getter as "Exposing internal representation" — they keep counting because
-  service code legitimately mutates the returned collections (the canonical
-  `entity.getCollection().clear()` / `.add(x)` / `.remove(x)` / `.forEach(...)`
-  pattern Hibernate manages via dirty-checking).
-
-  The conventional SpotBugs fix is `Collections.unmodifiableSet(...)` in the
-  getter plus a defensive-copy setter plus an `addXxx`/`removeXxx` helper API.
-  That mechanically silences the rule but:
-
-    1. The unmodifiable view would throw `UnsupportedOperationException` at
-       every existing service call site — 12+ sites across `MissionService`,
-       `JobOrderService`, `OperationService` would need refactoring to the
-       new helper API.
-    2. The `addXxx`/`removeXxx` helpers ultimately wrap the same `set.add()`
-       call — the wrapper just hides the mutation behind a method name. The
-       internal collection is still mutable; SpotBugs is happy because it
-       can't see "through" the helper, but the real-world security posture
-       is identical.
-    3. Hibernate's dirty-checking depends on the persistent collection
-       remaining the same managed instance throughout the transaction.
-       Defensive-copy setters break the persistent-collection identity and
-       can produce subtle dirty-checking misses.
-
-  Architectural counter-argument: this project enforces "DTOs only at
-  controller boundaries; never expose JPA entities at the HTTP boundary"
-  (CLAUDE.md `Architecture > API conventions`), and the invariant is
-  ArchUnit-enforced in
-  `backend/.../ArchitectureTest.java`. No untrusted caller ever holds a
-  reference to a managed entity, so the mutable collection cannot be reached
-  from outside the `@Transactional` service layer.
-
-  Per CLAUDE.md `Linting / static analysis`: a finding "may be silenced ...
-  when the rule is genuinely wrong for that specific call site, and in that
-  case leave a one-line comment explaining why." That's this whole block.
-
-  If a future entity adds a collection that IS intended to be exposed
-  immutably (e.g. a read-only audit log returned by a `/api/v1/<path>`
-  endpoint that bypasses the DTO seam), tighten this filter at that point.
--->
 <FindBugsFilter
     xmlns="https://github.com/spotbugs/filter/3.0.0"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -63,20 +12,6 @@
     </Or>
   </Match>
 
-  <!--
-    ==========================================================================
-    SPRING_CSRF_UNRESTRICTED_REQUEST_MAPPING on BasetoolErrorController
-    ==========================================================================
-
-    The error controller maps `${server.error.path:/error}` with a plain
-    `@RequestMapping` (all HTTP methods) on purpose: the servlet container
-    re-dispatches the ORIGINAL request method to the error path, so restricting
-    it to GET would drop the RFC-7807 body for a POST/PUT/DELETE that errors.
-    It is a read-only renderer — it reads the `jakarta.servlet.error.*`
-    attributes and returns a problem+json body, mutating no state — so the
-    CSRF-unrestricted-mapping detector is a false positive here (Spring Boot's
-    own BasicErrorController, which this replaces, has the identical shape).
-  -->
   <Match>
     <Class name="de.greluc.krt.profit.basetool.backend.controller.BasetoolErrorController"/>
     <Bug pattern="SPRING_CSRF_UNRESTRICTED_REQUEST_MAPPING"/>

@@ -236,13 +236,6 @@ public class RequestScopeResolver {
           .map(id -> new ScopePredicate(false, id, Set.of()))
           .orElseGet(() -> new ScopePredicate(true, null, Set.of()));
     }
-    // R5.e: non-admin path. Read the same active-OrgUnit header the admin switcher uses — once
-    // the frontend's R5.e switcher widening lets non-admins pick from their memberships, the
-    // header carries that selection. The pin is only honoured when it points to a unit the caller
-    // can actually reach — their direct memberships unioned with the epic #692 / REQ-ORG-015
-    // cascade, so a Bereichsleitung/OL may pin to a descendant unit but never to a foreign one.
-    // This is the defence against a spoofed header from a curl call; a pin outside that reach
-    // silently collapses to the reach-union read so the user never sees data they did not opt into.
     Set<UUID> memberOrgUnitIds = currentMemberOrgUnitIds();
     Optional<UUID> pinned = readActiveSquadronFromHeader();
     if (pinned.isPresent() && memberOrgUnitIds.contains(pinned.get())) {
@@ -278,8 +271,6 @@ public class RequestScopeResolver {
   @NotNull
   public ScopePredicate currentUnitOverviewScope() {
     ScopePredicate base = currentScopePredicate();
-    // Only upgrade a non-admin OL member who has not pinned a single unit; everyone else (admins,
-    // plain/BL members, and any pinned caller) keeps the base scope unchanged.
     if (!base.adminAllScope()
         && base.activeOrgUnitId() == null
         && !authHelper.isAdmin()
@@ -404,10 +395,6 @@ public class RequestScopeResolver {
    */
   @NotNull
   public Set<UUID> currentMemberOrgUnitIds() {
-    // Reuse the request-memoised membership rows (REQ-DATA-003): the blueprint-overview gate
-    // and the oversight scopes now share one membership read. currentCallerMemberships() is
-    // empty for anonymous callers and expandWithDescendants of an empty input is the empty
-    // set, so both the anonymous and member paths behave exactly as before.
     return RequestMemo.get(
         request,
         CACHE_KEY_MEMBER_ORG_UNIT_IDS,
@@ -595,8 +582,6 @@ public class RequestScopeResolver {
     Set<UUID> oversightOrgUnitIds = new LinkedHashSet<>();
     List<OrgUnitMembership> memberships = currentCallerMemberships();
     if (authHelper.hasReachableRole(Roles.authority(Roles.OFFICER))) {
-      // REQ-ORG-017: an officer oversees ALL of their own Staffeln (up to two), not just the
-      // name-sorted primary — add every SQUADRON membership rather than the single active one.
       for (OrgUnitMembership m : memberships) {
         if (m.getKind() == OrgUnitKind.SQUADRON) {
           oversightOrgUnitIds.add(m.getId().getOrgUnitId());
@@ -604,16 +589,10 @@ public class RequestScopeResolver {
       }
     }
     for (OrgUnitMembership m : memberships) {
-      // SK leads oversee their own SK; from epic #800 (REQ-ROLE-002) the four squadron ranks
-      // oversee their own squadron the same way (officer-equivalent, own-unit only, no cascade).
       if (m.getRole() == MembershipRole.SK_LEAD || m.getRole().isSquadronRank()) {
         oversightOrgUnitIds.add(m.getId().getOrgUnitId());
       }
     }
-    // Epic #692 Phase 6 (REQ-ORG-015/-019): a Bereichsleitung member oversees their Bereich + its
-    // Staffeln/SKs, an OL member every org unit — the cascading, officer-equivalent reach (never
-    // admin). cascadedOfficerReach also contributes the Bereich/OL seat itself, so the caller's own
-    // AREA/CARTEL account is in scope.
     oversightOrgUnitIds.addAll(orgUnitCascadeService.cascadedOfficerReach(memberships));
     Optional<UUID> pinned = readActiveSquadronFromHeader();
     if (pinned.isPresent() && oversightOrgUnitIds.contains(pinned.get())) {
@@ -656,9 +635,6 @@ public class RequestScopeResolver {
     Set<UUID> ownLevelOrgUnitIds = new LinkedHashSet<>();
     List<OrgUnitMembership> memberships = currentCallerMemberships();
     if (authHelper.hasReachableRole(Roles.authority(Roles.OFFICER))) {
-      // REQ-ORG-017: an officer's own-level scope is ALL of their Staffeln (up to two), not just
-      // the
-      // name-sorted primary.
       for (OrgUnitMembership m : memberships) {
         if (m.getKind() == OrgUnitKind.SQUADRON) {
           ownLevelOrgUnitIds.add(m.getId().getOrgUnitId());
@@ -838,12 +814,6 @@ public class RequestScopeResolver {
    */
   @NotNull
   private Optional<Squadron> loadCurrentSquadron() {
-    // Polymorphic load + unproxy instead of a Squadron-typed findById (the R2.d repository swap
-    // announced on currentOrgUnit()): the effective Staffel id is frequently already present in the
-    // caller's persistence context as a base-typed OrgUnit proxy (e.g. an aggregate's owning unit),
-    // and a subclass-typed load would force Hibernate to narrow that proxy (HHH000179, breaks ==).
-    // The instanceof filter replaces the SQL discriminator filter 1:1 — a non-Staffel id still
-    // resolves to empty.
     return currentSquadronId()
         .flatMap(orgUnitRepository::findById)
         .map(ou -> Hibernate.unproxy(ou, OrgUnit.class))
@@ -862,9 +832,6 @@ public class RequestScopeResolver {
    */
   @NotNull
   public Optional<OrgUnit> currentOrgUnit() {
-    // Cast through Optional<Squadron> for now — Squadron is the only OrgUnit subtype that can
-    // currently be the active context. R2.d will replace this with a polymorphic OrgUnitRepository
-    // lookup once Squadron + SpecialCommand are both selectable in the admin switcher.
     return currentSquadron().map(s -> (OrgUnit) s);
   }
 
@@ -985,16 +952,6 @@ public class RequestScopeResolver {
    */
   @NotNull
   private Optional<UUID> resolvePersistentSquadronFromUser() {
-    // REQ-ORG-017: the user's Staffel lives in org_unit_membership (kind=SQUADRON), and a user may
-    // now hold up to TWO Staffeln (the V98 uq_org_unit_membership_one_squadron index was relaxed to
-    // <=2 in V164). This single-valued accessor resolves the caller's ACTIVE Staffel: honour an
-    // X-Active-Org-Unit-Id pin that points at one of the caller's own Staffel memberships
-    // (mirroring
-    // the non-admin pin handling in currentScopePredicate()); otherwise fall back to a
-    // DETERMINISTIC
-    // name-sorted primary (matching UserMapper.resolveSquadron / UserDto.squadron) rather than an
-    // arbitrary first row, so the auto-stamp and single-value surfaces agree with the displayed
-    // primary Staffel.
     return authHelper
         .currentUserId()
         .flatMap(
@@ -1010,10 +967,6 @@ public class RequestScopeResolver {
                   && rows.stream().anyMatch(r -> r.getId().getOrgUnitId().equals(pinned.get()))) {
                 return pinned;
               }
-              // No matching pin: the deterministic name-sorted primary. The name-sort (and the
-              // single-Staffel fast path that skips the squadron load) is owned by
-              // StaffelMembershipResolver so this fallback agrees with UserDto.squadron /
-              // OrgUnitMembershipService.findStaffelMembershipOrgUnitIds by construction.
               return staffelMembershipResolver.resolveNameSortedStaffelIds(rows).stream()
                   .findFirst();
             });

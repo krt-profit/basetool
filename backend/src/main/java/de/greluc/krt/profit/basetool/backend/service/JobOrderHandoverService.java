@@ -155,14 +155,6 @@ public class JobOrderHandoverService {
         Entities.require(jobOrderRepository.findById(jobOrderId), "JobOrder not found");
 
     if (jobOrder.getType() == JobOrderType.ITEM) {
-      // A material handover must never run against an ITEM order. An item order's linked stock IS
-      // the material to be produced, and the Herstellung step (JobOrderItemProductionService,
-      // REQ-ORDERS-025) is the single path that consumes it — a material handover here would draw
-      // the same inventory down a second time. Item orders are fulfilled via item handovers
-      // (finished units), which never touch material stock. Guarded server-side (the UI already
-      // hides the material-handover button on item orders) so a crafted request cannot
-      // double-reduce
-      // the linked inventory.
       throw new BadRequestException("Material handover is not available for item orders");
     }
 
@@ -172,14 +164,6 @@ public class JobOrderHandoverService {
     handover.setRecipientHandle(dto.recipientHandle());
     handover.setRecipientSquadron(dto.recipientSquadron());
 
-    // Audit trail: capture the executing user + their squadron snapshot at handover time.
-    // Cross-staffel workspace means the executing user may belong to a different squadron than the
-    // order's responsible one — without this stamp the audit trail does not record who actually
-    // performed the write on a foreign squadron's items. REQ-ORG-017: the executor may now hold up
-    // to two Staffeln, so the snapshot is order-aligned — the executor's Staffel that matches the
-    // order's responsible org unit, else their deterministic primary (read from
-    // org_unit_membership;
-    // the legacy User.squadron column was dropped in V101).
     UUID responsibleOrgUnitId =
         jobOrder.getResponsibleOrgUnit() != null ? jobOrder.getResponsibleOrgUnit().getId() : null;
     userService
@@ -187,11 +171,6 @@ public class JobOrderHandoverService {
         .ifPresent(
             current -> {
               handover.setExecutingUser(current);
-              // Polymorphic load + unproxy instead of a Squadron-typed findById: the executing
-              // Staffel id routinely equals the order's responsibleOrgUnit, which this transaction
-              // already holds as a base-typed OrgUnit proxy — a subclass-typed load would force
-              // Hibernate to narrow that proxy (HHH000179, breaks ==). The base-typed find reuses
-              // the persistence-context instance; unproxy yields the concrete Squadron.
               orgUnitMembershipQueryService
                   .findExecutingStaffelForOrder(current.getId(), responsibleOrgUnitId)
                   .flatMap(orgUnitRepository::findById)
@@ -201,22 +180,12 @@ public class JobOrderHandoverService {
                   .ifPresent(handover::setExecutingSquadron);
             });
 
-    // Materials whose remaining open amount drops to (effectively) zero in this handover.
-    // The corresponding inventory rows are unlinked AFTER the loop so that no
-    // {@code clearAutomatically=true} bulk update detaches the aggregate mid-iteration.
     Set<UUID> materialsToUnlink = new HashSet<>();
 
-    // Snapshot each handed-over inventory row BEFORE it is decremented/deleted; the
-    // INVENTORY_HANDED_OVER audit events are emitted after the bulk unlinks from these snapshots,
-    // never by re-reading a detached/deleted entity (bulk-clear landmine rules).
     final Integer orderDisplayId = jobOrder.getDisplayId();
     final List<HandedItem> handedItems = new ArrayList<>();
 
     for (JobOrderHandoverItemCreateDto itemDto : dto.items()) {
-      // The InventoryItem is only used as a transient lookup source for the snapshot data
-      // (material, quality) and to update / delete the source inventory row. It is intentionally
-      // NOT referenced from JobOrderHandoverItem anymore so that emptying the inventory does not
-      // break historical handover records (see CHANGELOG / V64 migration).
       InventoryItem inventoryItem =
           Entities.require(
               inventoryItemRepository.findByIdForUpdate(itemDto.inventoryItemId()),
@@ -224,42 +193,19 @@ public class JobOrderHandoverService {
 
       if (inventoryItem.getJobOrderAllocations().stream()
           .noneMatch(a -> a.getJobOrder() != null && a.getJobOrder().getId().equals(jobOrderId))) {
-        // Plan §4.4 cross-staffel pre-write guard: the handover may only mutate inventory items
-        // that are bound to the current order — since Variante C (REQ-INV-027) that binding lives
-        // in
-        // the allocation table, so the item must carry a job-order slice for this order. A mismatch
-        // means either a stale client payload or a concurrent unlink — in both cases the handover
-        // cannot proceed. A client-side condition, so a 400 with a localized detail — not a raw
-        // IllegalStateException, which GlobalExceptionHandler answers as a 500 (APPSEC-06).
         throw new BadRequestException(ERROR_ITEM_NOT_LINKED_TO_ORDER);
       }
 
       if (inventoryItem.getMaterial() == null) {
-        // Game-item stock rows (V220, REQ-INV-029) are never valid material-handover sources: a
-        // material handover fulfils a JobOrderMaterial requirement, which an item row cannot back.
-        // Structurally unreachable through the allocation gate (an item row can only be earmarked
-        // to ITEM orders, and this flow already rejects ITEM orders above), but guarded explicitly
-        // so the material dereferences below can never NPE on a crafted payload (design §4.4).
         throw new BadRequestException("Handed-over inventory entry does not hold a material");
       }
 
       if (itemDto.amount() == null || itemDto.amount() <= 0) {
-        // Defence in depth behind the DTO's @Positive (now actually cascaded via @Valid, audit
-        // M-4): a non-positive amount would pass the "more than available" check, then *increase*
-        // both the inventory stock (remaining = stock - amount) and the open requirement.
         throw new BadRequestException("Handover amount must be positive");
       }
       if (itemDto.amount() > inventoryItem.getAmount() + QUANTITY_EPSILON) {
         throw new BadRequestException("Cannot hand over more than the available amount");
       }
-      // Variante C (REQ-INV-027): the handover fulfils THIS order, so it may draw only from this
-      // order's own earmark on the entry — never from a sibling order's slice or the free rest. Cap
-      // the handed amount at the entry's job-order slice for this order (defence in depth behind
-      // the
-      // frontend, which sets the amount field's max to the same slice). Reducing only that slice
-      // then keeps R5 (Σ job-order ≤ amount) without touching any other order chip or the rest —
-      // the
-      // silent sibling over-allocation was possible only because this cap was missing.
       var orderSlice = InventoryAllocations.jobOrderSlice(inventoryItem, jobOrderId);
       double orderSliceAmount =
           orderSlice != null && orderSlice.getAmount() != null ? orderSlice.getAmount() : 0.0;
@@ -303,14 +249,6 @@ public class JobOrderHandoverService {
       if (remainingAmount <= QUANTITY_EPSILON) {
         inventoryItemRepository.delete(inventoryItem);
       } else {
-        // Variante C (REQ-INV-027): the handover fulfils this job order, so the handed stock leaves
-        // inventory AND its earmark to the order — shrink that order slice by the handed amount.
-        // The
-        // same physical SCU also leave any mission earmark, so the mission dimension is clamped by
-        // the same amount: resolve its "deduct from" plan against the PRE-decrement slices (an
-        // explicit plan from the handover modal picker, else rest-first then proportional) and
-        // apply
-        // it, keeping R5 without a 422 for a dual-tagged partial handover.
         Map<UUID, Double> missionPlan =
             AllocationReductions.resolveReductionPlan(
                 inventoryItem, itemDto.missionReductions(), itemDto.amount(), false);
@@ -320,11 +258,6 @@ public class JobOrderHandoverService {
         inventoryItemRepository.save(inventoryItem);
       }
 
-      // Mutate the managed JobOrderMaterial via dirty checking. We MUST NOT call
-      // jobOrderMaterialRepository.save(mat) here: a save() on a detached entity (which
-      // would happen if a previous iteration's bulk update detached the aggregate) silently
-      // performs a merge() and produces a second version-bump on the same row, leading to
-      // ObjectOptimisticLockingFailureException at commit time.
       jobOrder.getMaterials().stream()
           .filter(mat -> mat.getMaterial().getId().equals(inventoryItem.getMaterial().getId()))
           .findFirst()
@@ -338,30 +271,14 @@ public class JobOrderHandoverService {
               });
     }
 
-    // Persist the handover (incl. items via cascade) BEFORE issuing any bulk update that would
-    // clear the persistence context. This guarantees the handover row exists by the time the
-    // bulk UPDATEs run and avoids implicit re-merge of detached entities.
     JobOrderHandover savedHandover = jobOrderHandoverRepository.save(handover);
-    // Capture the DTO while the entity graph is still attached and fully initialised.
     final JobOrderHandoverDto resultDto = jobOrderHandoverMapper.toDto(savedHandover);
 
-    // Run the (potentially session-clearing) bulk unlinks ONCE per fulfilled material, AFTER
-    // all per-item bookkeeping is done.  Each call carries
-    // {@code @Modifying(clearAutomatically=true, flushAutomatically=true)} which flushes the
-    // pending dirty changes from the loop and then detaches the persistence context; doing
-    // this once at the end (instead of inside the loop) is what makes the multi-material
-    // completion flow safe with respect to optimistic locking.
     for (UUID materialId : materialsToUnlink) {
-      // R2 (REQ-INV-027): release the fulfilled material's allocation slices, so the leftover
-      // stock stays in the Lager as (partially) unassigned rather than keeping a phantom order
-      // link.
       inventoryItemRepository.deleteJobOrderAllocationsByJobOrderAndMaterial(
           jobOrderId, materialId);
     }
 
-    // Re-fetch the JobOrder so the completion check runs on a freshly managed aggregate
-    // with up-to-date {@code @Version}s. The previous bulk unlinks (and any auto-flush) have
-    // already detached the original {@code jobOrder} reference from the session.
     JobOrder managedJobOrder =
         Entities.require(jobOrderRepository.findById(jobOrderId), "JobOrder not found");
 
@@ -370,22 +287,10 @@ public class JobOrderHandoverService {
             .allMatch(mat -> mat.getAmount() <= QUANTITY_EPSILON);
 
     if (allFulfilled) {
-      // Use the dedicated WithinTransaction method that works on the already-managed entity
-      // to avoid the double-save / optimistic-locking conflict that would otherwise occur if
-      // {@code updateJobOrderStatus()} performed its own findById() + save() + flush() inside
-      // the running transaction (see {@code AGENTS.md} — "INTRA-TRANSACTION SERVICE CALLS").
       jobOrderService.completeJobOrderWithinTransaction(managedJobOrder);
     }
 
-    // Emit the audit events AFTER the bulk unlinks + completion, from the loop-captured snapshots
-    // (never re-reading a detached/deleted inventory entity). One INVENTORY_HANDED_OVER per item
-    // (cross-domain inventory effect) plus one JOB_ORDER_HANDOVER_CREATED. The recipientHandle is
-    // user free text and is never written to the audit details. completeJobOrderWithinTransaction
-    // already recorded JOB_ORDER_COMPLETED when the order was fulfilled, so this method does not.
     for (HandedItem h : handedItems) {
-      // Ratchet any active Materialbörse offer on a non-depleted handed-over row down to its
-      // reduced
-      // stock (REQ-MARKET-013); a depleted row was deleted and its offer cascade-removed (V210).
       if (!h.depleted()) {
         materialExchangeOfferRepository.clampOfferedAmountToStock(h.itemId(), h.remaining());
       }

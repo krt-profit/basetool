@@ -96,8 +96,6 @@ class AccessibleTextTintTest {
       stylesheets++;
       String css =
           Files.readString(sheet, StandardCharsets.UTF_8).replaceAll("(?s)/\\*.*?\\*/", " ");
-      // Innermost rule blocks: the selector is the text back to the previous brace, so a rule
-      // nested in @layer / @media still reads as its own selector.
       Matcher rule = RULE.matcher(css);
       while (rule.find()) {
         Matcher colour = CSS_TEXT_COLOUR.matcher(rule.group(2));

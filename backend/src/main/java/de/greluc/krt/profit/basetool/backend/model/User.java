@@ -213,10 +213,6 @@ public class User extends AbstractEntity<UUID> {
     return (displayName != null && !displayName.isBlank()) ? displayName : username;
   }
 
-  // @ToString.Exclude on the LAZY @ManyToMany so a logged User outside of a
-  // Hibernate session does not trigger LazyInitializationException — and so
-  // toString() does not recurse User -> Role.permissions -> ... when Role
-  // proxies are subsequently hydrated.
   @ManyToMany(fetch = FetchType.LAZY)
   @JoinTable(
       name = "user_roles",

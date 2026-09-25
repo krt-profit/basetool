@@ -49,10 +49,8 @@ class TaskMetricsTest {
 
   @Test
   void record_onSuccess_incrementsSuccessCounterTimesDurationAndAdvancesLastSuccessGauge() {
-    // Given / When
     taskMetrics.record(ScheduledJob.USER_SYNC, () -> {});
 
-    // Then — one successful execution, one duration sample, gauge advanced past 0.
     assertThat(
             registry
                 .get(MetricNames.SCHEDULED_JOB_EXECUTIONS)
@@ -82,7 +80,6 @@ class TaskMetricsTest {
 
   @Test
   void record_onFailure_countsFailureSwallowsAndPublishesNoLastSuccessGauge() {
-    // Given a body that throws / When
     assertThatCode(
             () ->
                 taskMetrics.record(
@@ -92,9 +89,6 @@ class TaskMetricsTest {
                     }))
         .doesNotThrowAnyException();
 
-    // Then — counted as a failure, never a success, and NO last-success gauge at all. A published
-    // 0 would read as "last succeeded 1970-01-01" through the alerts' time() - gauge, which is
-    // above every staleness threshold in business.yml.
     assertThat(
             registry
                 .get(MetricNames.SCHEDULED_JOB_EXECUTIONS)
@@ -180,10 +174,8 @@ class TaskMetricsTest {
 
   @Test
   void record_lazilyRegistersLastSuccessGaugeOnlyForJobsThatRan() {
-    // Given only one job has ever been recorded
     taskMetrics.record(ScheduledJob.USER_SYNC, () -> {});
 
-    // Then a never-run job has no last-success gauge at all (rather than a falsely-stale 0).
     assertThat(
             registry
                 .find(MetricNames.SCHEDULED_JOB_LAST_SUCCESS)
@@ -194,12 +186,6 @@ class TaskMetricsTest {
 
   @Test
   void record_publishesNoLastSuccessGaugeWhileTheFirstRunIsStillInFlight() {
-    // The 2026-08-10 ExternalSyncStale false positive. The gauge used to be registered at 0 when
-    // a run STARTED, so throughout a job's first run in a fresh process the scrape exposed 0 and
-    // every staleness alert saw time() - 0 ~ 1.79e9 s. The prod SC-Wiki sweep takes ~10-15 min
-    // (sync-all-items), outlasting ExternalSyncStale's `for: 10m`, so the alert fired on every
-    // backend restart and self-resolved when the sweep finished. Nothing may publish the gauge
-    // before the body returns.
     AtomicReference<Gauge> duringRun = new AtomicReference<>();
 
     taskMetrics.record(
@@ -223,7 +209,6 @@ class TaskMetricsTest {
 
   @Test
   void record_successAfterFailure_advancesGaugeAndKeepsBothOutcomeCounters() {
-    // Given a failing run then a successful run of the same job
     taskMetrics.record(
         ScheduledJob.BANK_LEDGER_INTEGRITY,
         () -> {
@@ -238,9 +223,6 @@ class TaskMetricsTest {
     AtomicInteger runs = new AtomicInteger();
     taskMetrics.record(ScheduledJob.BANK_LEDGER_INTEGRITY, runs::incrementAndGet);
 
-    // Then the body ran, the gauge was born only with the success (it did not exist after the
-    // failure — BankLedgerIntegritySweepStale is CRITICAL and a 0 would page on every restart),
-    // and both outcomes are counted.
     assertThat(runs.get()).isEqualTo(1);
     assertThat(afterFailure).isNull();
     assertThat(
@@ -348,9 +330,6 @@ class TaskMetricsTest {
 
   @Test
   void record_tagsTheRunWithItsOwnCorrelationIdAndClearsItAfterwards() {
-    // A scheduler thread carries no request, so CorrelationIdFilter never runs for it and every
-    // scheduled line used to have an empty correlationId. With eight jobs on overlapping schedules
-    // that made a nightly window unreadable — the lines interleave with nothing to group them.
     AtomicReference<String> seen = new AtomicReference<>();
 
     taskMetrics.record(ScheduledJob.USER_SYNC, () -> seen.set(MDC.get("correlationId")));
@@ -361,7 +340,6 @@ class TaskMetricsTest {
 
   @Test
   void record_givesTwoRunsOfTheSameJobDistinctIds() {
-    // Grepping the job label finds every run; the full id narrows it to one.
     AtomicReference<String> first = new AtomicReference<>();
     AtomicReference<String> second = new AtomicReference<>();
 
@@ -373,7 +351,6 @@ class TaskMetricsTest {
 
   @Test
   void record_clearsTheRunIdEvenWhenTheJobBodyThrows() {
-    // The scheduler thread is pooled, so a leaked id would mislabel the next job that runs on it.
     taskMetrics.record(
         ScheduledJob.USER_SYNC,
         () -> {
@@ -385,8 +362,6 @@ class TaskMetricsTest {
 
   @Test
   void record_keepsAnExistingRequestCorrelationIdInsteadOfOverwritingIt() {
-    // recordCountingRethrow runs inside an admin request that already owns a real correlation id;
-    // replacing it would sever the manual trigger from the HTTP call that started it.
     MDC.put("correlationId", "request-cid-1");
     try {
       AtomicReference<String> seen = new AtomicReference<>();

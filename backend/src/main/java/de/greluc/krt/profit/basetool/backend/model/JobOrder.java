@@ -51,10 +51,6 @@ import org.hibernate.annotations.Generated;
 @AllArgsConstructor
 @Builder
 @Table(name = "job_order")
-// Batch-fetch lazy proxies of this entity so a page of InventoryJobOrderAllocation /
-// InventoryMissionAllocation rows initialises its to-one references in bounded batches
-// instead of one-by-one (the allocation N+1, REQ-DATA-003). @BatchSize is invalid on a
-// @ManyToOne field in Hibernate 6, so it goes on the target entity class.
 @BatchSize(size = 100)
 public class JobOrder extends AbstractEntity<UUID> {
 

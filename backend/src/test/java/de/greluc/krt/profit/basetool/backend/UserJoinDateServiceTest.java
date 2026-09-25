@@ -46,7 +46,6 @@ class UserJoinDateServiceTest {
 
   @Test
   void shouldSetJoinDate_WhenProvided() {
-    // Given
     UUID id = UUID.randomUUID();
     User user = new User();
     user.setId(id);
@@ -57,16 +56,13 @@ class UserJoinDateServiceTest {
     when(userRepository.findById(id)).thenReturn(Optional.of(user));
     when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    // When
     User result = userService.updateUserAttributes(id, 1, null, null, null, joinDate);
 
-    // Then
     assertThat(result.getJoinDate()).isEqualTo(joinDate);
   }
 
   @Test
   void shouldClearJoinDate_WhenNullProvided() {
-    // Given
     UUID id = UUID.randomUUID();
     User user = new User();
     user.setId(id);
@@ -77,16 +73,13 @@ class UserJoinDateServiceTest {
     when(userRepository.findById(id)).thenReturn(Optional.of(user));
     when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    // When
     User result = userService.updateUserAttributes(id, 1, null, null, null, null);
 
-    // Then
     assertThat(result.getJoinDate()).isNull();
   }
 
   @Test
   void shouldUpdateJoinDate_WhenChanged() {
-    // Given
     UUID id = UUID.randomUUID();
     User user = new User();
     user.setId(id);
@@ -98,10 +91,8 @@ class UserJoinDateServiceTest {
     when(userRepository.findById(id)).thenReturn(Optional.of(user));
     when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    // When
     User result = userService.updateUserAttributes(id, 1, null, null, null, newDate);
 
-    // Then
     assertThat(result.getJoinDate()).isEqualTo(newDate);
   }
 }

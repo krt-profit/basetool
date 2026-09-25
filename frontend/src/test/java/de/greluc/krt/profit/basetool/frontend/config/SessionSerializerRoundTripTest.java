@@ -83,22 +83,16 @@ class SessionSerializerRoundTripTest {
 
   @Test
   void creationTime_isReadableAgain() {
-    // The exact field named by the production stack trace. Spring Session's RedisSessionMapper
-    // rejects the whole session when this one comes back null, which is how a serialization
-    // asymmetry turns into "you are logged out" for everybody at once.
     assertEquals(1_788_334_209_954L, roundTrip(1_788_334_209_954L));
   }
 
   @Test
   void maxInactiveInterval_isReadableAgain() {
-    // Stored as an Integer (seconds) rather than a Duration — a second final type on the same path.
     assertEquals(1800, roundTrip(1800));
   }
 
   @Test
   void aStringAttribute_isReadableAgain() {
-    // The active-org-unit pin is a plain String under `iridium.activeOrgUnitId`, and String is
-    // final too.
     assertEquals(
         "00000000-0000-0000-0000-000000000001", roundTrip("00000000-0000-0000-0000-000000000001"));
   }
@@ -123,32 +117,11 @@ class SessionSerializerRoundTripTest {
 
   @Test
   void aRecordAsAnAttributeValue_cannotBeReadBack() {
-    // The trap, measured rather than argued. A record is implicitly FINAL, so the NON_FINAL default
-    // typing writes it with no `@class` — while still writing a JSON OBJECT, which the reader then
-    // demands a type id for. It writes without complaint and is unreadable on the very next
-    // request, taking the whole session with it before FaultTolerantSessionSerializer existed.
-    //
-    // This is a CONTRACT, not a wish: nothing about a record makes it unusable in a session, only
-    // this serializer configuration does. If a future change makes the round trip succeed, this
-    // test is the one to delete — deliberately, not by accident.
-    //
-    // RedisSessionConfig's forced-type-id mix-in does NOT make it succeed, and that is the point of
-    // keeping this case beside `tomcatsWebSocketSessionBindingListener_isReadableAgain`: the mix-in
-    // is an allow-list of individually named container classes, not a change of policy for final
-    // types. If this ever starts passing, the allow-list has grown into a blanket rule and the
-    // required Long/Integer session keys are the next thing to check.
     assertThrows(Exception.class, () -> roundTrip(probeRecord()));
   }
 
   @Test
   void aBindingResultIsWrittenButCannotBeReadBack() {
-    // The root cause of the admin personal-inventory form losing its errors (fixed 2026-09-23):
-    // RedisSessionConfig's BindingResultMixin makes a BeanPropertyBindingResult WRITABLE (it hides
-    // the self-referencing model), but nothing makes it READABLE — it has no constructor Jackson
-    // can use, and neither has FieldError. A flash map carrying one was therefore written without
-    // complaint and dropped whole on the redirect's GET (REQ-SEC-063). The fix is that a
-    // BindingResult never enters the session at all (FlashAttributeTypesTest); this case pins why,
-    // so nobody "fixes" the rule away by trusting the mix-in.
     PersonalInventoryForm form = new PersonalInventoryForm();
     BeanPropertyBindingResult errors = new BeanPropertyBindingResult(form, "personalInventoryForm");
     errors.rejectValue("name", "NotBlank", "must not be blank");
@@ -161,20 +134,12 @@ class SessionSerializerRoundTripTest {
 
   @Test
   void anImmutableJdkCollectionAsAnAttributeValue_cannotBeReadBack() {
-    // The same trap wearing different clothes, and the easier one to walk into: List.of(...) and
-    // Map.of(...) are final JDK classes, so they too are written without a type id. BackendRoleSync
-    // Filter's `new ArrayList<>(backend.asserted())` is not a stylistic wrapper — it is what makes
-    // that attribute readable.
     assertThrows(Exception.class, () -> roundTrip(List.of("a", "b")));
     assertThrows(Exception.class, () -> roundTrip(Map.of("a", "b")));
   }
 
   @Test
   void aMutableCollectionCarryingTheSameRecord_isReadableAgain() {
-    // And the workaround, pinned so the rule is not over-read into "records may never touch a
-    // session". A non-final container gets its `@class`, and its contents are then written through
-    // Object-typed slots, which type-id everything inside — including a record. This is why flash
-    // attributes (a java.util.ArrayList of FlashMap) survive while a bare record does not.
     List<Object> wrapped = new ArrayList<>(List.of(probeRecord()));
 
     assertEquals(wrapped, roundTrip(wrapped));
@@ -184,18 +149,6 @@ class SessionSerializerRoundTripTest {
 
   @Test
   void tomcatsWebSocketSessionBindingListener_isReadableAgain() {
-    // The 2026-09-03 alert, pinned against the real class rather than a stand-in. Tomcat 11.0.25
-    // added this record and `WsServerContainer#registerAuthenticatedSession` writes it into the
-    // HttpSession on every authenticated WebSocket handshake — which for this application is every
-    // logged-in page, because live sync opens /ws/sync. Being a record it is implicitly final, so
-    // before RedisSessionConfig's forced-type-id mix-in it was written with no `@class` and dropped
-    // on the very next request. The rate never decayed, because a dropped value leaves the
-    // attribute unset and the next handshake writes it again: SessionValueDropsSustained fired at
-    // ~70 drops per 15 min against a healthy application.
-    //
-    // Referenced by type here, deliberately, although the production registration resolves it by
-    // name: this test is the alarm that should ring if the class is ever gone, because that is
-    // exactly when the entry in CONTAINER_WRITTEN_FINAL_SESSION_TYPES stops earning its place.
     WsHttpSessionBindingListener listener = new WsHttpSessionBindingListener("a-session-id");
 
     assertEquals(listener, roundTrip(listener));
@@ -203,10 +156,6 @@ class SessionSerializerRoundTripTest {
 
   @Test
   void theForcedTypeIdUsesTheSameAtClassPropertyAsEverythingElseInTheHash() {
-    // The mix-in must not invent a second dialect. `@class` is what the NON_FINAL default typing
-    // writes for every non-final value in the same session hash, so writing the forced id under any
-    // other property name would read back only by accident — and would diverge silently the moment
-    // Spring Session's own typing configuration moved.
     byte[] written = serializer.serialize(new WsHttpSessionBindingListener("a-session-id"));
 
     assertNotNull(written);

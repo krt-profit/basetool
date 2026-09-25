@@ -78,15 +78,12 @@ class SecurityConfigCsrfExemptionTest {
   @ParameterizedTest(name = "{0}")
   @ValueSource(
       strings = {
-        // The four the edge-deny probe caught, verbatim.
         "/api/v1/inventory/00000000-0000-4000-8000-00000000cafe/book-out",
         "/api/v1/orders/00000000-0000-4000-8000-00000000cafe/assignees/00000000-0000-4000-8000-00000000cafe",
         "/api/v1/orders/00000000-0000-4000-8000-00000000cafe/status",
         "/api/v1/org-units/bank/accounts/00000000-0000-4000-8000-00000000cafe/balance-target",
-        // The two families that were on the old list and therefore worked. They must keep working.
         "/api/v1/missions/00000000-0000-4000-8000-00000000cafe/join",
         "/api/v1/operations/00000000-0000-4000-8000-00000000cafe/payouts/paid-out",
-        // Machine-to-machine, its own shared-secret header (REQ-SEC-022).
         "/internal/discord/link",
       })
   @DisplayName("a bearer-only write is never refused for a missing CSRF token")
@@ -102,17 +99,12 @@ class SecurityConfigCsrfExemptionTest {
   @Test
   @DisplayName("the exemption is stated as the API surface, not as a list of endpoints")
   void theExemptionCoversTheWholeApi() {
-    // The regression came from a per-endpoint list that a new endpoint silently fell outside of.
-    // Naming the surface is what stops the next one repeating it, so the shape is asserted and not
-    // merely its current membership.
     assertThat(List.of(SecurityConfig.CSRF_EXEMPT_PATHS)).contains("/api/v1/**");
   }
 
   @Test
   @DisplayName("paths outside the bearer API are still protected")
   void nonApiPathsAreNotExempt() {
-    // Nothing browser-facing lives on this backend today, but the exemption must stay scoped so
-    // that adding something browser-facing does not arrive pre-exempted.
     assertThat(EXEMPT.matches(write("POST", "/actuator/shutdown"))).isFalse();
     assertThat(EXEMPT.matches(write("POST", "/login"))).isFalse();
   }

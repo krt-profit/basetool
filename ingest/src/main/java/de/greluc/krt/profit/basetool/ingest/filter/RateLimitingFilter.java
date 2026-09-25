@@ -112,25 +112,15 @@ public class RateLimitingFilter extends OncePerRequestFilter {
                     properties.ipRefillTokens(),
                     properties.refillPeriod()));
     ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
-    // Per-bucket evaluation counter (#1041 item 19) — every attempt, so rejections/requests gives
-    // the per-IP rejection ratio rather than 429-only detection. Bounded `ip` literal, not the IP.
     meterRegistry
         .counter(MetricNames.RATELIMIT_REQUESTS, MetricNames.TAG_BUCKET, MetricNames.BUCKET_IP)
         .increment();
     if (!probe.isConsumed()) {
-      // Pre-auth per-IP 429 (REQ-OBS-011). Labelled by the bounded `ip` bucket literal, never the
-      // client IP itself (PII/unbounded).
       meterRegistry
           .counter(MetricNames.RATELIMIT_REJECTIONS, MetricNames.TAG_BUCKET, MetricNames.BUCKET_IP)
           .increment();
       long retryAfterSeconds =
           Math.max(1, TimeUnit.NANOSECONDS.toSeconds(probe.getNanosToWaitForRefill()));
-      // DEBUG, not WARN: this is the pre-auth front line on the only internet-facing surface, so an
-      // attacker decides how often it fires and an INFO/WARN here would be a log-flood vector (the
-      // same reasoning as BotProtectionFilter). The bounded `bucket="ip"` counter is the prod
-      // signal; on a 429 without the SubjectRateLimiter WARN, this limiter is the one that
-      // rejected. The client IP is deliberately not logged — app logs stay PII-free (REQ-OBS-004),
-      // and the edge log carries the address.
       log.debug(
           "Per-IP ingest rate limit exceeded (capacity={} per {}, retryAfter={}s)",
           properties.ipCapacity(),

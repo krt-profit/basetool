@@ -92,9 +92,6 @@ class ScWikiOrphanSweepTest {
 
   @Test
   void incompleteFetch_refusesToSweep_andWarnsWhy() {
-    // The regression this gate exists for: a page walk that died after page 1 still hands the sync
-    // a non-empty seen-set, so the emptiness gate passes and every row on the pages that were never
-    // fetched would be tombstoned for never having been fetched.
     Set<UUID> seen = Set.of(UUID.randomUUID(), UUID.randomUUID());
     AtomicInteger sweepCalls = new AtomicInteger();
 

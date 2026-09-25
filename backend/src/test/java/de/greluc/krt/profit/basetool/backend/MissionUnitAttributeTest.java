@@ -102,7 +102,6 @@ class MissionUnitAttributeTest {
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
 
-    // The ship owner must be a registered participant before the ship can be pinned to a unit.
     missionService.addParticipant(
         mission.getId(), officerUser.getId(), null, null, null, null, null);
   }

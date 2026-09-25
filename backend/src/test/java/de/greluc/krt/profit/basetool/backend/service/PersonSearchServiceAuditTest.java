@@ -53,7 +53,6 @@ class PersonSearchServiceAuditTest {
 
   @Mock private AuditService auditService;
 
-  // covers REQ-SEC-060 — the recorded payload carries the term's length, never the term
   @Test
   void recordSearch_recordsTheLengthAndNeverTheTerm() {
     PersonSearchService service = new PersonSearchService(auditService);
@@ -67,12 +66,10 @@ class PersonSearchServiceAuditTest {
 
     String payload = details.getValue().toString();
     assertThat(payload).as("the term is somebody's name").doesNotContain(TERM);
-    // The length is the whole point: 25 characters, not the 25 characters.
     assertThat(payload).contains("termLength=" + TERM.length());
     assertThat(payload).contains("hits=2").contains("truncated=true");
   }
 
-  // covers REQ-SEC-060 — the length is of the trimmed term, as the search itself uses it
   @Test
   void recordSearch_measuresTheTrimmedTerm() {
     PersonSearchService service = new PersonSearchService(auditService);

@@ -72,15 +72,10 @@ public class LoginFailureMetricsHandler extends SimpleUrlAuthenticationFailureHa
    */
   private static final Set<String> BENIGN_AUTHORIZATION_RESPONSE_ERRORS =
       Set.of(
-          // The callback could not be correlated to a saved authorization request (state failure).
           "authorization_request_not_found",
           "invalid_state_parameter",
           "invalid_state",
-          // The callback was not a valid authorization response at all (scanner / stale bookmark).
           "invalid_request",
-          // The prompt=none silent-SSO probe found no usable Keycloak SSO session (OIDC Core
-          // 3.1.2.6). SsoReAuthenticationEntryPoint issues that probe by design, so these are
-          // self-inflicted and expected — not a provider fault.
           "login_required",
           "interaction_required",
           "consent_required",
@@ -148,8 +143,6 @@ public class LoginFailureMetricsHandler extends SimpleUrlAuthenticationFailureHa
         .increment();
     logFailure(reason, exception);
 
-    // Deliberately NOT super.onAuthenticationFailure(...): that calls the superclass's `final`
-    // saveException, which parks the exception in the HTTP session. See redirectWithoutPoisoning.
     redirectWithoutPoisoningTheSession(request, response, exception);
   }
 

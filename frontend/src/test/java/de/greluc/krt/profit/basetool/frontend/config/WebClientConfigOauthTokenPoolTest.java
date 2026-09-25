@@ -135,12 +135,10 @@ class WebClientConfigOauthTokenPoolTest {
     OAuth2AccessTokenResponse response =
         client.getTokenResponse(refreshRequest(server.url("/token").toString()));
 
-    // Response converter intact: the token JSON parsed back into the typed response.
     assertThat(response.getAccessToken().getTokenValue()).isEqualTo("new-access-token");
     assertThat(response.getRefreshToken()).isNotNull();
     assertThat(response.getRefreshToken().getTokenValue()).isEqualTo("rotated-refresh-token");
 
-    // Request converter intact: the grant went out as a form-encoded refresh_token POST.
     RecordedRequest recorded = server.takeRequest(2, TimeUnit.SECONDS);
     assertThat(recorded).isNotNull();
     assertThat(recorded.getMethod()).isEqualTo("POST");
@@ -151,14 +149,6 @@ class WebClientConfigOauthTokenPoolTest {
 
   @Test
   void refreshTokenErrorResponseIsMappedByThePreservedOAuth2ErrorHandler() {
-    // A Keycloak token error (400 + an RFC 6749 error body). Only the preserved
-    // OAuth2ErrorResponseErrorHandler — the third behaviour the setRestClient transport swap must
-    // keep — maps this to a typed OAuth2AuthorizationException carrying the `invalid_grant` code
-    // (the
-    // signal the refresh provider surfaces as client_authorization_required, REQ-SEC-012). Without
-    // that handler the RestClient raises a raw HttpClientErrorException that getTokenResponse wraps
-    // as a generic `invalid_token_response`, so asserting the parsed error code proves the handler
-    // survived the RestClient replacement.
     server.enqueue(
         new MockResponse()
             .setResponseCode(400)
@@ -178,16 +168,6 @@ class WebClientConfigOauthTokenPoolTest {
 
   @Test
   void stalledTokenEndpointFailsWithinTheClientSideBound() {
-    // ADR-0115 follow-up (2026-07-22 incident): reactor-netty's responseTimeout only arms once the
-    // request has been FULLY written, so a token exchange that stalled mid-request had no
-    // client-side bound at all and hung until the edge reaped the socket after ~60s — one lost
-    // refresh grant per attempt. The ReadTimeoutHandler/WriteTimeoutHandler pair added in
-    // oauthTokenRestClient() closes that gap. This test makes the idle-read bound observable: the
-    // fake token endpoint accepts the connection but never responds, the read timeout is 500ms and
-    // the responseTimeout a deliberately long 30s — only the ReadTimeoutHandler can fail the
-    // exchange quickly, so an elapsed time far below the responseTimeout proves the handler is
-    // wired (a regression dropping the doOnConnected handlers blocks for the full 30s and trips
-    // the elapsed assertion).
     server.enqueue(new MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE));
 
     OAuth2AccessTokenResponseClient<OAuth2RefreshTokenGrantRequest> client =

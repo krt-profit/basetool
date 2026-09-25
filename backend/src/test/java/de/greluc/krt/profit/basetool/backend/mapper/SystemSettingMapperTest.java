@@ -32,15 +32,12 @@ class SystemSettingMapperTest {
 
   @Test
   void toDto_shouldMapKeyValueAndVersion() {
-    // Given
     SystemSetting setting =
         SystemSetting.builder().id("feature.flag.combat").value("ENABLED").build();
     setting.setVersion(3L);
 
-    // When
     SystemSettingDto dto = mapper.toDto(setting);
 
-    // Then
     assertNotNull(dto);
     assertEquals("feature.flag.combat", dto.id());
     assertEquals("ENABLED", dto.value());

@@ -80,12 +80,8 @@ class PersonSearchIntegrationTest {
 
   @Test
   void findsTheMentionWhateverCaseTheAdminTypes() {
-    // Given a member whose handle also sits inside a sentence in a free-text column -- the shape
-    // the search exists for, where no foreign key leads to the mention
     seedMember(HANDLE, "Flew wing with " + HANDLE + " during the last operation.");
 
-    // When the admin types it in each of the three plausible casings
-    // Then every one of them finds the handle, and the wrong casing still finds the sentence
     assertThat(hits(HANDLE, "username")).as("typed exactly as stored").hasSize(1);
     assertThat(hits(HANDLE.toLowerCase(Locale.ROOT), "username")).as("typed lower").hasSize(1);
     assertThat(hits(HANDLE.toUpperCase(Locale.ROOT), "username")).as("typed upper").hasSize(1);
@@ -96,28 +92,18 @@ class PersonSearchIntegrationTest {
 
   @Test
   void findsTheMentionWhateverCaseTheRowHolds() {
-    // Given the same name written three different ways by three different authors, which is what
-    // free text actually looks like after a year
     seedMember(HANDLE.toLowerCase(Locale.ROOT), null);
     seedMember(HANDLE.toUpperCase(Locale.ROOT), null);
     seedMember(HANDLE, null);
 
-    // When the admin searches once
     List<PersonSearchHitDto> found = hits(HANDLE, "username");
 
-    // Then all three rows are reported. A rectification that missed two of them would leave the
-    // name in the system while the record said it was gone.
     assertThat(found).as("one hit per seeded member").hasSize(3);
     assertThat(found).allSatisfy(h -> assertThat(h.area()).isEqualTo("MEMBER"));
   }
 
-  // covers REQ-SEC-060 - the snippet has to contain the name that was searched for
   @Test
   void theSnippetIsAWindowAroundTheMatchAndNotTheValuesFirstCharacters() {
-    // The snippet used to be left(column, 200). A long note that mentions the person late -- the
-    // ordinary shape of a note -- then produced a snippet without the name in it, so the admin had
-    // to open every hit to find out whether it was the right person. On a surface whose job is to
-    // be exhaustive, that is the difference between a usable list and a list nobody finishes.
     String longPrefix = "x".repeat(400);
     seedMember(HANDLE, longPrefix + " und " + HANDLE + " waren beide dabei.");
 
@@ -129,14 +115,8 @@ class PersonSearchIntegrationTest {
         .contains(HANDLE);
   }
 
-  // covers REQ-SEC-060 - the per-column cap is reported, not swallowed
   @Test
   void aColumnThatHitsItsOwnCapIsNamed() {
-    // 75 searched columns at 25 hits each: a name occurring 40 times in ONE column produced 25
-    // hits, a union total far below the overall 300, and truncated == false. The admin read a
-    // complete-looking list and never learned 15 occurrences had been dropped -- on the surface
-    // whose whole purpose is to be exhaustive, and while the privacy record claimed in as many
-    // words that it "says so when it capped".
     for (int i = 0; i < PersonSearchService.PER_TARGET_LIMIT + 3; i++) {
       seedMember(HANDLE + "Nr" + i, null);
     }
@@ -154,7 +134,6 @@ class PersonSearchIntegrationTest {
         .isFalse();
   }
 
-  // covers REQ-SEC-060 - a column comfortably under its cap is not named
   @Test
   void aColumnUnderItsCapIsNotNamed() {
     seedMember(HANDLE, null);

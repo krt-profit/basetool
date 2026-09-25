@@ -71,9 +71,6 @@ import org.springframework.beans.factory.annotation.Autowired;
     uses = {SquadronMapper.class})
 public abstract class UserMapper {
 
-  // Field injection mirrors MissionMapper / RefineryOrderMapper — the MapStruct annotation
-  // processor generates the subclass with a default constructor, so the helper repositories must
-  // come in via field-level @Autowired.
   @Autowired protected OrgUnitMembershipRepository membershipRepository;
 
   @Autowired protected StaffelMembershipResolver staffelMembershipResolver;

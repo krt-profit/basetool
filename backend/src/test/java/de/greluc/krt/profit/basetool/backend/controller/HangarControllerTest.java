@@ -111,8 +111,6 @@ class HangarControllerTest {
         .build();
   }
 
-  // ── GET /my-ships ─────────────────────────────────────────────────────
-
   @Test
   void getMyShips_resolvesOwnerFromJwt_andWrapsPageThroughMapper() {
     Jwt jwt = jwt("alice-sub");
@@ -130,9 +128,6 @@ class HangarControllerTest {
 
     PageResponse<ShipDto> result = controller.getMyShips(jwt, 0, 20, null);
 
-    // The owner id must come from UserService.getUserIdFromJwt, NEVER a URL parameter — this is
-    // the personal-hangar data-isolation guarantee. The captured Pageable plus the JWT-derived
-    // owner id together prove the controller doesn't accept caller-supplied owners.
     ArgumentCaptor<UUID> ownerCaptor = ArgumentCaptor.forClass(UUID.class);
     verify(hangarService).getMyShipsFiltered(ownerCaptor.capture(), isNull(), any(Pageable.class));
     assertThat(ownerCaptor.getValue()).isEqualTo(ownerId);
@@ -142,9 +137,6 @@ class HangarControllerTest {
 
   @Test
   void getMyShips_forwardsSearchTermToService() {
-    // covers REQ-HANGAR-002 — the personal-hangar text filter travels from the HTTP boundary into
-    // the service untouched, so a filtered result is ordered + paginated across the whole fleet
-    // rather than the rows of a single client-fetched page.
     Jwt jwt = jwt("alice-sub");
     UUID ownerId = UUID.randomUUID();
     when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
@@ -156,8 +148,6 @@ class HangarControllerTest {
 
     verify(hangarService).getMyShipsFiltered(eq(ownerId), eq("Cutlass"), any(Pageable.class));
   }
-
-  // ── GET /ships (admin/officer wide read) ─────────────────────────────
 
   @Test
   void getAllShips_wrapsPageThroughMapper() {
@@ -175,8 +165,6 @@ class HangarControllerTest {
     assertThat(result.sort()).isNotEmpty();
     verify(hangarService).getAllShips(any(Pageable.class));
   }
-
-  // ── GET /squadron-overview (role-shaped payload) ─────────────────────
 
   static java.util.stream.Stream<String> callers() {
     return RoleGateFixture.callers();
@@ -197,12 +185,8 @@ class HangarControllerTest {
 
     controller.getSquadronOverview(0, 20, null, null);
 
-    // Plain callers see only the aggregated counts — the per-ship owner is hidden at the HTTP
-    // boundary so the service doesn't have to read SecurityContextHolder.
     verify(hangarService).getSquadronOverview(any(Pageable.class), eq(expected), isNull());
   }
-
-  // ── POST /ships ───────────────────────────────────────────────────────
 
   @Test
   void addShip_forwardsJwtDerivedOwnerToService() {
@@ -221,8 +205,6 @@ class HangarControllerTest {
     assertThat(result).isSameAs(dto);
     verify(hangarService).addShip(ownerId, request);
   }
-
-  // ── PUT /ships/{id} ───────────────────────────────────────────────────
 
   @Test
   void updateMyShip_forwardsJwtDerivedOwnerAndShipIdToService() {
@@ -243,8 +225,6 @@ class HangarControllerTest {
     verify(hangarService).updateShip(ownerId, shipId, request);
   }
 
-  // ── DELETE /ships/{id} ────────────────────────────────────────────────
-
   @Test
   void deleteMyShip_forwardsJwtDerivedOwnerAndShipIdToService() {
     Jwt jwt = jwt("alice-sub");
@@ -256,8 +236,6 @@ class HangarControllerTest {
 
     verify(hangarService).deleteShip(ownerId, shipId);
   }
-
-  // ── DELETE /ships ─────────────────────────────────────────────────────
 
   @Test
   void deleteAllMyShips_returns204_andUsesJwtDerivedOwner() {
@@ -272,8 +250,6 @@ class HangarControllerTest {
     verify(hangarService).deleteAllShipsForUser(ownerId);
   }
 
-  // ── GET /users/{userId}/ships (admin) ─────────────────────────────────
-
   @Test
   void getUserShips_admin_usesPathUserId_notJwt() {
     UUID targetUser = UUID.randomUUID();
@@ -285,14 +261,10 @@ class HangarControllerTest {
 
     PageResponse<ShipDto> result = controller.getUserShips(targetUser, 0, 20, null);
 
-    // Admin endpoint MUST take the user id from the path — the test would catch a regression that
-    // accidentally reads the calling admin's own JWT id instead.
     verify(hangarService).getMyShips(eq(targetUser), any(Pageable.class));
     verify(userService, never()).getUserIdFromJwt(any());
     assertThat(result.content()).containsExactly(d);
   }
-
-  // ── POST /users/{userId}/ships (admin) ───────────────────────────────
 
   @Test
   void addUserShip_admin_passesPathUserIdAndRequestToService() {
@@ -309,8 +281,6 @@ class HangarControllerTest {
     assertThat(result).isSameAs(dto);
     verify(hangarService).addShip(targetUser, request);
   }
-
-  // ── PUT /users/{userId}/ships/{shipId} ───────────────────────────────
 
   @Test
   void updateUserShip_admin_passesPathUserIdShipIdAndRequest() {
@@ -329,8 +299,6 @@ class HangarControllerTest {
     verify(hangarService).updateShip(targetUser, shipId, request);
   }
 
-  // ── DELETE /users/{userId}/ships/{shipId} ────────────────────────────
-
   @Test
   void deleteUserShip_admin_passesPathUserIdAndShipId() {
     UUID targetUser = UUID.randomUUID();
@@ -340,8 +308,6 @@ class HangarControllerTest {
 
     verify(hangarService).deleteShip(targetUser, shipId);
   }
-
-  // ── POST /import/ships ────────────────────────────────────────────────
 
   @Test
   void importShips_forwardsJwtDerivedOwnerAndFileToService() {
@@ -360,18 +326,9 @@ class HangarControllerTest {
     verify(hangarImportService).importShips(ownerId, file);
   }
 
-  // ── POST /import/fleetview (deprecated) ──────────────────────────────
-
-  // Deliberately invokes the deprecated-for-removal HangarController.importFleetview to pin its
-  // grace-period routing; the [removal] warning is expected and unavoidable when testing the
-  // deprecated endpoint directly.
   @Test
   @SuppressWarnings("removal")
   void importFleetview_deprecatedPath_routesToSameService() {
-    // The deprecated endpoint MUST end up at the same HangarImportService.importShips so the
-    // grace-period clients keep getting the modern import behaviour (UEX-aware ship matching,
-    // duplicate detection). A regression that sends the deprecated path to a different code
-    // path would silently change behaviour for existing automation.
     Jwt jwt = jwt("alice-sub");
     UUID ownerId = UUID.randomUUID();
     MultipartFile file =
@@ -387,16 +344,12 @@ class HangarControllerTest {
     verify(hangarImportService).importShips(ownerId, file);
   }
 
-  // ── POST /ships/reset-fitted ──────────────────────────────────────────
-
   @Test
   void resetAllFittedStatus_delegatesToService() {
     controller.resetAllFittedStatus();
 
     verify(hangarService).resetAllFittedStatus();
   }
-
-  // ── POST /ships/home-location ─────────────────────────────────────────
 
   @Test
   void setHomeLocationForMyShips_forwardsJwtDerivedOwnerAndLocation_andWrapsCount() {
@@ -409,16 +362,12 @@ class HangarControllerTest {
     SetHomeLocationResponseDto result =
         controller.setHomeLocationForMyShips(jwt, new SetHomeLocationRequestDto(locationId));
 
-    // The owner is JWT-derived (never client-supplied); the controller wraps the affected-ship
-    // count returned by the service.
     assertThat(result.updatedCount()).isEqualTo(4);
     verify(hangarService).setHomeLocationForMyShips(ownerId, locationId);
   }
 
   @Test
   void getSquadronOverview_paginationDefaults_neverFailIncludeFlagPropagation() {
-    // Sanity-check: the role-decision branch must continue to feed includeOwnerDetails even
-    // when the page/size/sort params arrive as null (defaults applied by PaginationUtil).
     Page<SquadronShipOverviewDto> page = new PageImpl<>(List.of());
     when(hangarService.getSquadronOverview(any(Pageable.class), anyBoolean(), isNull()))
         .thenReturn(page);
@@ -430,8 +379,6 @@ class HangarControllerTest {
 
   @Test
   void getSquadronOverview_forwardsSearchTermToService() {
-    // covers REQ-HANGAR-001 — the server-side ship-type filter travels from the HTTP boundary
-    // into the service untouched, so a filtered result is paginated across the whole fleet.
     Page<SquadronShipOverviewDto> page = new PageImpl<>(List.of());
     when(hangarService.getSquadronOverview(any(Pageable.class), anyBoolean(), eq("Cutlass")))
         .thenReturn(page);

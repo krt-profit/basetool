@@ -50,9 +50,7 @@ public final class Problems {
   /** Name of the problem extension member carrying the request's correlation id. */
   public static final String CORRELATION_ID_MEMBER = "correlationId";
 
-  private Problems() {
-    // Static factory holder — not instantiable.
-  }
+  private Problems() {}
 
   /**
    * Builds a problem with the stable {@code code} extension and, when the MDC carries one under the

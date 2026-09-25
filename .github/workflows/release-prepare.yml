@@ -1,33 +1,5 @@
 name: Release · Prepare
 
-# Phase 1 of the two-phase release flow (no force-pushed tags, no rewritten
-# history -- see also release-publish.yml).
-#
-# Trigger: manual `workflow_dispatch` with the target version (e.g. 0.3.55).
-# There is no hand-cut git tag anymore; you click "Run workflow" and type the
-# version. This job then PREPARES the release on a branch and opens a PR:
-#
-#   1. Tidy historical CHANGELOG drift (reconcile_changelog.py).
-#   2. Cut `## [Unreleased]` into `## [vX.Y.Z] - <today>` and open a fresh empty
-#      `[Unreleased]` (cut_release.py). This is a pure text transform, so -- unlike
-#      `git tag --contains` reconciliation -- it needs no tag to exist yet, which
-#      is exactly what lets us prepare the changelog BEFORE the tag is created.
-#   3. Regenerate the CycloneDX SBOMs of every SHIPPED module -- backend,
-#      frontend, ingest and keycloak-spi -- dropping pure serial-number /
-#      timestamp churn (bom_unchanged.py, issue #416). The module list is
-#      enforced by .github/scripts/check_sbom_coverage.py, not by memory.
-#   4. Commit the result on a `release/vX.Y.Z` branch and open a PR to main.
-#
-# Merging that PR is what actually releases: release-publish.yml then tags the
-# merge commit and publishes the GitHub Release + images. Closing the PR without
-# merging cancels the release cleanly -- no tag, no orphaned commit on main.
-#
-# Why this instead of force-moving a human-pushed tag: a tag is immutable by
-# contract. Moving one leaves every teammate (and every other CI run) on a stale
-# ref until they `git fetch --force --tags`. Here the tag is born -- once -- on a
-# commit that already carries the tidied changelog + fresh SBOM, and the only
-# thing that lands on main is an ordinary, reviewable PR merge.
-
 on:
   workflow_dispatch:
     inputs:
@@ -36,14 +8,13 @@ on:
         required: true
         type: string
 
-# One preparation at a time; never cancel a half-prepared release.
 concurrency:
   group: release-prepare
   cancel-in-progress: false
 
 permissions:
-  contents: write        # create the release/* branch
-  pull-requests: write   # open the release PR
+  contents: write
+  pull-requests: write
 
 env:
   REGISTRY: ghcr.io
@@ -73,7 +44,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Checkout main (full history for blame + reconcile)
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: main
           fetch-depth: 0
@@ -106,21 +77,6 @@ jobs:
           TAG: ${{ steps.ver.outputs.tag }}
         run: python3 .github/scripts/cut_release.py "${TAG}"
 
-      # Every module that ships an artifact, not only the two Spring Boot web
-      # apps. `ingest` had the plugin and a committed BOM but was missing from
-      # this line, so its file aged in place for two months and reached v1.7.3
-      # naming 126 stale component versions -- a scanner reading it would clear
-      # CVEs the shipped image actually carries. `keycloak-spi` had no SBOM at
-      # all while promote.yml pushes its bundle to production.
-      #
-      # `--no-build-cache`: a release SBOM is never served from a cache. The step above restores
-      # the Gradle caches, build cache included, and cyclonedx-gradle's `cyclonedxDirectBom` is
-      # cacheable with inputs that do not see project dependencies -- adding `logging-support` to
-      # the three apps left its cache key unchanged, so a restored entry would have shipped the
-      # old component list (2026-09-23). The root build already makes both SBOM tasks untracked,
-      # which alone rules out UP-TO-DATE and FROM-CACHE; the flag keeps that true here even if the
-      # build script ever regresses. Each `cyclonedxBom` is finalized by `verifyCyclonedxBom`,
-      # which fails this step unless the BOM lists exactly the resolved runtime classpath.
       - name: Regenerate CycloneDX SBOMs
         run: >-
           ./gradlew :backend:cyclonedxBom :frontend:cyclonedxBom
@@ -134,9 +90,6 @@ jobs:
             xml="${module}/docs/${module}-bom.xml"
             old="$(mktemp)"
             git show "HEAD:${json}" > "$old" 2>/dev/null || true
-            # Restore BOTH json and xml when only the volatile serialNumber +
-            # metadata.timestamp rotated; the JSON verdict is authoritative as
-            # both encode the same dependency graph.
             if python3 .github/scripts/bom_unchanged.py "$old" "$json"; then
               echo "::notice::${module} SBOM unchanged (serial/timestamp churn only) -- restoring committed copy"
               git checkout -- "$json" "$xml"
@@ -148,23 +101,12 @@ jobs:
 
       - name: Commit on the release branch (GitHub-signed via API)
         env:
-          # createCommitOnBranch signs the commit with GitHub's own key, so the
-          # release commit is "Verified" and satisfies the required_signatures
-          # rule on main. A plain `git commit` on the runner is unsigned (the
-          # runner holds no signing key) and would block the release PR. The
-          # default GITHUB_TOKEN is enough -- this is a commit, not a PR, so the
-          # org's no-Actions-PRs policy does not apply -- and it keeps
-          # github-actions[bot] as the author, which the DCO check exempts. No
-          # signing key is ever stored on or handed to the runner.
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.ver.outputs.tag }}
           BRANCH: ${{ steps.ver.outputs.branch }}
           BOT_EMAIL: "41898282+github-actions[bot]@users.noreply.github.com"
         run: |
           set -euo pipefail
-          # Commit only the known release artifacts -- never an incidental change
-          # an earlier step left in the working tree (a `chmod +x ./gradlew` used to
-          # flip the mode bit here; it is gone, and this list still stands guard).
           paths=(CHANGELOG.md backend/docs frontend/docs ingest/docs keycloak-spi/docs)
           mapfile -t files < <(git diff --name-only HEAD -- "${paths[@]}")
           if [ "${#files[@]}" -eq 0 ]; then
@@ -173,8 +115,6 @@ jobs:
           fi
           printf '::notice::committing release artifacts: %s\n' "${files[*]}"
           head_oid="$(git rev-parse HEAD)"
-          # Create the release branch at the current main tip; the signed commit
-          # then lands on top of it via the GraphQL API below.
           gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
             -f "ref=refs/heads/${BRANCH}" -f "sha=${head_oid}" >/dev/null
           python3 .github/scripts/create_signed_commit.py \
@@ -209,12 +149,6 @@ jobs:
           } > "$body"
           echo "path=${body}" >> "$GITHUB_OUTPUT"
 
-      # The release identity is the `basetool-release` GitHub App (ADR-0201), and nothing else can
-      # do this step. The tag ruleset "Version" restricts creating and updating `v*` tags to two
-      # bypass actors -- @greluc and this App -- so GITHUB_TOKEN is refused, and so is the PAT that
-      # RELEASE_TOKEN held until 2026-09-22 (measured: `Resource not accessible by personal access
-      # token`, HTTP 403, on the v1.10.0 release). An App token also does what GITHUB_TOKEN cannot:
-      # the events it causes trigger other workflows.
       - name: Refuse to start without the release App's key
         env:
           HAS_KEY: ${{ secrets.RELEASE_APP_PRIVATE_KEY != '' }}
@@ -226,38 +160,21 @@ jobs:
 
       - name: Mint a basetool-release App token
         id: app
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
         with:
-          # The App's CLIENT ID, and a literal on purpose: it is public (GET /apps/basetool-release
-          # returns it), so a variable would hide nothing, and it is the same App the tag ruleset
-          # names as a bypass actor -- rotating one without the other is a change worth reviewing.
-          # Not `app-id`: that input is deprecated in v3 and is the one a v4 bump will remove.
           client-id: Iv23liHT1h5peKsDnrUD
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
-          # Scoped to what this step needs, not to everything the installation allows.
           permission-contents: read
           permission-pull-requests: write
 
       - name: Open the release PR
         env:
-          # The krt-profit org policy forbids Actions from creating PRs with the
-          # default GITHUB_TOKEN (the same constraint refresh-versions.yml
-          # documents), so the basetool-release App opens it instead. A real
-          # identity here is also what makes the PR's required status checks run
-          # at all: a PR opened by GITHUB_TOKEN does NOT trigger pull_request
-          # workflows (GitHub's anti-recursion rule), so the branch-protection
-          # checks would never report and the PR could never be merged. The
-          # commit above stays GITHUB_TOKEN's on purpose: its github-actions[bot]
-          # author is the one the DCO check exempts. release-publish.yml mints the
-          # same App's token for the tag, so one identity drives the release.
           GH_TOKEN: ${{ steps.app.outputs.token }}
           TAG: ${{ steps.ver.outputs.tag }}
           BRANCH: ${{ steps.ver.outputs.branch }}
           NOTES: ${{ steps.notes.outputs.path }}
         run: |
           set -euo pipefail
-          # Best-effort label so humans can filter release PRs; the publish
-          # workflow keys off the release/ branch name, not the label.
           gh label create release --color FFA500 --description "Automated release PR" 2>/dev/null || true
           gh pr create --base main --head "${BRANCH}" \
             --title "chore(release): ${TAG}" \

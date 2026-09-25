@@ -136,8 +136,6 @@ class P4kImportMatchingVerificationTest {
   void reimport_matchesEveryType_backfillsUuidsAndResolvesIngredient_withoutCreatingRows() {
     byte[] bytes = catalog();
 
-    // 1) Seed the "existing" UEX/Wiki master data (one row of every type, carrying the canonical
-    // UUID) via the seed path.
     P4kImportResultDto seeded = service.applyImport(bytes, true);
     assertEquals(1, seeded.manufacturers().created(), "manufacturer seeded");
     assertEquals(1, seeded.items().created(), "item seeded");
@@ -145,8 +143,6 @@ class P4kImportMatchingVerificationTest {
     assertEquals(2, seeded.commodities().created(), "both commodities seeded");
     assertEquals(1, seeded.blueprints().created(), "blueprint seeded");
 
-    // 2) Strip the canonical UUIDs (the UEX-origin "no UUID yet" state) and unresolve the blueprint
-    // ingredient. The resource material keeps its UUID so the ingredient can resolve back to it.
     Manufacturer mfg =
         manufacturerRepository
             .findFirstByAbbreviationIgnoreCaseOrderByCreatedAtAsc("UPS")
@@ -171,8 +167,6 @@ class P4kImportMatchingVerificationTest {
     blueprint.getIngredients().get(0).setMaterial(null);
     blueprintRepository.saveAndFlush(blueprint);
 
-    // 3) Re-import without seeding: every row must re-match by name/class_name/code/key, backfill
-    // its canonical UUID, and the ingredient must re-resolve — with no new rows created.
     P4kImportResultDto merged = service.applyImport(bytes, false);
 
     assertEquals(1, merged.manufacturers().matched(), "manufacturer re-matched by code");
@@ -193,7 +187,6 @@ class P4kImportMatchingVerificationTest {
     assertEquals(0, merged.blueprints().created(), "no blueprint re-created");
     assertTrue(merged.ingredientsResolved() >= 1, "the unresolved ingredient was re-linked");
 
-    // The backfill actually restored the canonical UUIDs on the rows.
     assertEquals(
         UUID.fromString(MFG_GUID),
         manufacturerRepository

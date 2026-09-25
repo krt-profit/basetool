@@ -144,26 +144,11 @@ public class OrgChartService {
 
     OrgUnit orgUnit = resolveScopeOrgUnit(scope, request.orgUnitId());
     final OrgChartPosition parent = resolveAndValidateParent(type, orgUnit, request.parentId());
-    // A kommando_group-linked Kommando mirrors a functional rank: its whole subtree (Stv. /
-    // Ensigns)
-    // is managed under Organisation -> Leitung (epic #800, REQ-ROLE-006), so the chart editor may
-    // not
-    // bolt children onto it — the seat is read-only here, mirror-writes go through OrgChartService.
     if (parent != null && parent.getKommandoGroup() != null) {
       throw new BadRequestException(ERR_ACCOUNT_MANAGED);
     }
     validateCardinality(type, orgUnit);
     final String name = validateAndNormalizeName(type, request.name());
-    // Account-linked seats are a mirror of the functional ranks (epic #800, REQ-ROLE-006): the
-    // chart
-    // editor may only place a free-text holder or leave a Kommando leaderless — an account is
-    // appointed under Organisation -> Leitung and projected here by OrgChartService.mirror*. The
-    // create is still fully validated above (scope / parent / cardinality / name) so a free-text
-    // create hits the same guards; an account-holder create is always refused. We run
-    // validateUserUnique first even though the account is rejected so a duplicate-in-scope account
-    // still surfaces its own specific error before the generic refusal — preserving the error
-    // precedence the pre-demotion contract (and createPosition_userAlreadyInScope_isRejected)
-    // expects.
     if (user != null) {
       validateUserUnique(scope, orgUnit, request.userId());
       throw new BadRequestException(ERR_ACCOUNT_MANAGED);
@@ -173,8 +158,6 @@ public class OrgChartService {
     position.setPositionType(type);
     position.setOrgUnit(orgUnit);
     position.setUser(user);
-    // Mutually exclusive with the account: resolveHolderForCreate rejects supplying both, so
-    // displayName is null whenever an account was resolved.
     position.setDisplayName(displayName);
     position.setName(name);
     position.setParent(parent);
@@ -215,16 +198,9 @@ public class OrgChartService {
         Entities.require(
             positionRepository.findById(id), () -> "OrgChartPosition not found: " + id);
     OptimisticLock.check(position.getVersion(), request.version(), OrgChartPosition.class, id);
-    // The chart editor may not assign an account, nor touch a seat the rank mirror manages — an
-    // account-held or kommando_group-linked position reflects the functional ranks and is edited
-    // under Organisation -> Leitung (epic #800, REQ-ROLE-006). Free-text holders and leaderless /
-    // legacy Kommandos stay editable here.
     if (request.userId() != null || isMirrorManaged(position)) {
       throw new BadRequestException(ERR_ACCOUNT_MANAGED);
     }
-    // Symmetric with createPosition: a position is held by an account OR a free-text name, never
-    // both, so a single update may not set both at once. A bare userId still clears any existing
-    // free-text name below (the regression-free swap); only supplying both together is ambiguous.
     if (request.userId() != null && StringNormalization.trimToNull(request.displayName()) != null) {
       throw new BadRequestException(ERR_HOLDER_AMBIGUOUS);
     }
@@ -235,7 +211,6 @@ public class OrgChartService {
       position.setName(StringNormalization.trimToNull(request.name()));
     }
     if (request.userId() != null) {
-      // Account holder: assign (if changed) and clear any free-text name in the same transaction.
       User current = position.getUser();
       if (current == null || !request.userId().equals(current.getId())) {
         User newUser =
@@ -248,8 +223,6 @@ public class OrgChartService {
       }
       position.setDisplayName(null);
     } else if (request.displayName() != null) {
-      // Free-text holder: a non-blank typed name replaces the account holder; a blank value clears
-      // it, which is only allowed where a holder is optional (a COMMAND_LEAD Kommando).
       String typed = StringNormalization.trimToNull(request.displayName());
       if (typed == null
           && position.getUser() == null
@@ -293,12 +266,9 @@ public class OrgChartService {
       throw new BadRequestException(ERR_VACATE_NOT_COMMAND);
     }
     OptimisticLock.check(position.getVersion(), version, OrgChartPosition.class, id);
-    // A kommando_group-linked Kommando mirrors a functional rank — its Kommandoleiter is vacated by
-    // removing the rank under Organisation -> Leitung (epic #800, REQ-ROLE-006), not here.
     if (position.getKommandoGroup() != null) {
       throw new BadRequestException(ERR_ACCOUNT_MANAGED);
     }
-    // A vacated Kommando is fully empty: drop both an account and any free-text leader name.
     position.setUser(null);
     position.setDisplayName(null);
     return mapper.toDto(positionRepository.save(position));
@@ -318,10 +288,6 @@ public class OrgChartService {
     OrgChartPosition position =
         Entities.require(
             positionRepository.findById(id), () -> "OrgChartPosition not found: " + id);
-    // A mirror-managed seat (account-held, or a kommando_group-linked Kommando) reflects a
-    // functional rank — it is removed by clearing the rank / deleting the Kommandogruppe under
-    // Organisation -> Leitung (epic #800, REQ-ROLE-006), not from the chart. Free-text holders and
-    // leaderless / legacy positions stay removable here.
     if (isMirrorManaged(position)) {
       throw new BadRequestException(ERR_ACCOUNT_MANAGED);
     }
@@ -340,17 +306,6 @@ public class OrgChartService {
   private static boolean isMirrorManaged(@NotNull OrgChartPosition position) {
     return position.getUser() != null || position.getKommandoGroup() != null;
   }
-
-  // ------------------------------------------------- role-model mirror (REQ-ROLE-006) --
-  // The functional rank on org_unit_membership is the source of truth; these methods keep the
-  // descriptive account-linked chart seats in lockstep with it (epic #800, REQ-ROLE-006). They run
-  // with MANDATORY propagation: the appointment that triggered them (OrgUnitMembershipService /
-  // KommandoGroupService) has already opened a read-write transaction, opened the delegated-authz
-  // gate and persisted the membership row, so the mirror joins that very transaction (same-tx
-  // requirement) and never starts one of its own — calling a mirror method outside a transaction is
-  // a programming error and fails fast. The mirror only ever writes the chart; the authority
-  // cascade
-  // still never reads it (the chart grants nothing), so the ArchUnit chart invariants stay green.
 
   /**
    * Mirrors a Bereich leadership appointment onto the chart: ensures the appointee holds exactly
@@ -373,8 +328,6 @@ public class OrgChartService {
           case KOORDINATOR -> OrgChartPositionType.BEREICHSKOORDINATOR;
           case OPERATOR -> OrgChartPositionType.BEREICHSOPERATOR;
         };
-    // The single Bereichsleiter slot is reassigned (so the partial unique index holds); the
-    // unbounded Koordinator / Operator ranks just append a fresh seat.
     if (type == OrgChartPositionType.BEREICHSLEITER) {
       upsertSingletonSeat(bereichId, type, userId);
     } else if (!reuseFreeTextSeat(bereichId, type, null, userId)) {
@@ -788,8 +741,6 @@ public class OrgChartService {
     return orgUnitRepository.getReferenceById(orgUnitId);
   }
 
-  // ----------------------------------------------------------------- write guards --
-
   /**
    * Resolves the account holder for a create, enforcing the "account OR free-text name, never both"
    * rule. Returns the {@link User} when {@code userId} is given (and {@code displayName} is not),
@@ -810,7 +761,6 @@ public class OrgChartService {
       throw new BadRequestException(ERR_HOLDER_AMBIGUOUS);
     }
     if (userId == null) {
-      // A free-text name fills the seat; a Kommando may also be created before any holder exists.
       if (displayName != null || type == OrgChartPositionType.COMMAND_LEAD) {
         return null;
       }
@@ -852,11 +802,6 @@ public class OrgChartService {
     if (unit.getKind() != expectedKind) {
       throw new BadRequestException(ERR_SCOPE_MISMATCH);
     }
-    // The org chart is descriptive across the WHOLE organisation (ADR-0029, REQ-ORG-026): every
-    // active unit of any tier may be staffed, regardless of is_profit_eligible. That flag governs
-    // Job-Order processing only (a non-Profit Staffel/SK still appears on the chart and can hold
-    // functional ranks), so the sole create-time gate here is the active flag — uniform across
-    // Staffel/SK and Bereich/OL.
     if (!unit.isActive()) {
       throw new BadRequestException(ERR_UNIT_INACTIVE);
     }
@@ -883,8 +828,6 @@ public class OrgChartService {
       }
       return parent;
     }
-    // ENSIGN: a null parent means "reports directly to the Staffelleiter"; a non-null parent must
-    // be a Kommando in the same Staffel.
     return parentId == null ? null : loadCommandLeadParent(parentId, orgUnit);
   }
 
@@ -937,20 +880,13 @@ public class OrgChartService {
         }
       }
       case BEREICHSLEITER -> {
-        // Epic #692, REQ-ORG-026: at most one Bereichsleiter PER Bereich (scoped to org_unit_id),
-        // unlike the legacy AREA_LEAD which is a global singleton.
         if (positionRepository.countByOrgUnitIdAndPositionType(
                 orgUnit.getId(), OrgChartPositionType.BEREICHSLEITER)
             > 0) {
           throw new BadRequestException(ERR_DUPLICATE_LEAD);
         }
       }
-      // DEPUTY_COMMAND_LEAD's "at most one per Kommando" is enforced during parent resolution;
-      // AREA_COORDINATOR / AREA_OPERATOR / AREA_COMMANDER, BEREICHSKOORDINATOR / BEREICHSOPERATOR
-      // and OL_MEMBER are unbounded.
-      default -> {
-        // no cardinality limit
-      }
+      default -> {}
     }
   }
 

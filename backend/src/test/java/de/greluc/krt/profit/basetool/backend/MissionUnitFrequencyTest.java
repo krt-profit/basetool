@@ -102,7 +102,6 @@ class MissionUnitFrequencyTest {
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
 
-    // The ship owner must be a registered participant before the ship can be pinned to a unit.
     missionService.addParticipant(
         mission.getId(), officerUser.getId(), null, null, null, null, null);
   }
@@ -185,7 +184,6 @@ class MissionUnitFrequencyTest {
 
   @Test
   void testAddUnitWithoutShip() throws Exception {
-    // shipId is null
     String requestJson =
         String.format(
             "{\"shipTypeId\": \"%s\", \"shipId\": null, \"frequency\": 150.00, \"name\": \"Unit"

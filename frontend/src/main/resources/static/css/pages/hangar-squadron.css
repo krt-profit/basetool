@@ -1,17 +1,9 @@
-/* Page stylesheet of templates/hangar-squadron.html, moved out of its inline style block
- * (FE-PERF-02). Linked in the same place the block stood, so the cascade order is
- * unchanged. */
-
 @layer base, components, page, migration, utilities;
 
 @layer page {
     .details-row {
         display: none;
     }
-    /* Toggled per row by the inline details handler below. A
-   tr:has(details[open]) sibling rule here forced a style recalculation
-   across the whole table on every expand and visibly janked the UI
-   (same fix as blueprint-overview, REQ-INV-012). */
     .details-row.sq-expanded {
         display: table-row;
     }
@@ -48,7 +40,6 @@
     .sub-table tr:hover {
         background-color: rgba(231, 126, 35, 0.05);
     }
-    /* ---- Server-side ship-type filter above the table ---- */
     .squadron-filter-form {
         display: flex;
         flex-wrap: wrap;

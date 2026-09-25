@@ -139,10 +139,7 @@
     </th:block>
 </main>
 
-<!--/* The dialogs render only where their openers and their script do: in the admin's
-     all-squadrons view the page shows a pick-a-squadron prompt and loads neither. */-->
 <th:block th:unless="${isAllSquadronsMode}">
-<!--/* Create Modal */-->
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='modal-create', titleKey='promotion.admin.ranks.modal.create.title', variant='krt-modal--wide', body=~{::modal-create-body})}">
     <th:block th:ref="modal-create-body">
         <div class="krt-modal-body">
@@ -158,7 +155,6 @@
             </div>
         </div>
 
-        <!--/* Scope explanation: helps the admin avoid the global/topic-wide/category combo trap. */-->
         <div class="pa-scope-info">
             <strong th:text="#{promotion.admin.ranks.scope.label}">Anwendungsbereich</strong>:
             <span th:utext="#{promotion.admin.ranks.scope.hint}">Beide Felder leer = globale Regel. Nur Themenbereich = gilt themenbereich-weit. Themenbereich + Kategorie = nur diese Kategorie.</span>
@@ -203,7 +199,6 @@
     </th:block>
 </th:block>
 
-<!--/* Edit Modal */-->
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='modal-edit', titleKey='promotion.admin.ranks.modal.edit.title', variant='krt-modal--wide', body=~{::modal-edit-body})}">
     <th:block th:ref="modal-edit-body">
         <div class="krt-modal-body">
@@ -267,16 +262,6 @@
 </th:block>
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}" th:unless="${isAllSquadronsMode}">
-    /*<![CDATA[*/
-/*
-     * Categories-by-topic map for the cascade. We build it client-side from
-     * the per-topic <option> set already in the DOM rather than serialising
-     * a separate JSON island (which would duplicate the data the model
-     * already carries). The model attribute categoriesByTopic is the
-     * authoritative source — to expose it we render a hidden <select>
-     * cluster below and read from there. Simpler approach: synthesise via
-     * Thymeleaf-inlined literals.
-     */
     var AR_CATEGORIES_BY_TOPIC = /*[[${categoriesByTopic}]]*/ {};
 
     var MSG_SAVED         = /*[[#{promotion.admin.ranks.saved}]]*/ 'Saved';
@@ -292,7 +277,6 @@
     var MSG_OK            = /*[[#{general.confirm}]]*/ 'OK';
     var MSG_CANCEL        = /*[[#{general.cancel}]]*/ 'Cancel';
     var MSG_REFRESH_FAILED = /*[[#{promotion.refresh.failed}]]*/ 'Saved, but the view could not be refreshed. Please reload the page.';
-    /*]]>*/
 </script>
 <script th:src="@{/js/promotion-admin-rank-requirements.js}" defer th:attr="nonce=${cspNonce}" th:unless="${isAllSquadronsMode}"></script>
 </body>

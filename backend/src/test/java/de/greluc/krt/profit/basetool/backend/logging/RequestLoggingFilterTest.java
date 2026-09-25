@@ -69,16 +69,13 @@ class RequestLoggingFilterTest {
 
   @Test
   void fastRequest_ShouldBeLoggedAtInfo() throws ServletException, IOException {
-    // Given
     filter = filterWithThreshold(10_000L);
     MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/missions");
     MockHttpServletResponse response = new MockHttpServletResponse();
     response.setStatus(200);
 
-    // When
     filter.doFilter(request, response, (req, res) -> {});
 
-    // Then
     assertThat(appender.list).hasSize(1);
     ILoggingEvent event = appender.list.get(0);
     assertThat(event.getLevel()).isEqualTo(Level.INFO);
@@ -87,16 +84,13 @@ class RequestLoggingFilterTest {
 
   @Test
   void slowRequest_ShouldBeLoggedAtWarn() throws ServletException, IOException {
-    // Given: threshold 0 ms makes every request "slow"
     filter = filterWithThreshold(0L);
     MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/missions");
     MockHttpServletResponse response = new MockHttpServletResponse();
     response.setStatus(201);
 
-    // When
     filter.doFilter(request, response, (req, res) -> {});
 
-    // Then
     assertThat(appender.list).hasSize(1);
     ILoggingEvent event = appender.list.get(0);
     assertThat(event.getLevel()).isEqualTo(Level.WARN);
@@ -106,17 +100,14 @@ class RequestLoggingFilterTest {
 
   @Test
   void slowNotificationStreamRelay_ShouldStayAtInfo() throws ServletException, IOException {
-    // Given: threshold 0 ms makes every request "slow", but the SSE relay is exempt
     filter = filterWithThreshold(0L);
     MockHttpServletRequest request =
         new MockHttpServletRequest("GET", "/api/v1/notifications/stream");
     MockHttpServletResponse response = new MockHttpServletResponse();
     response.setStatus(200);
 
-    // When
     filter.doFilter(request, response, (req, res) -> {});
 
-    // Then: exactly one line, at INFO, without the "Slow request" WARN prefix
     assertThat(appender.list).hasSize(1);
     ILoggingEvent event = appender.list.get(0);
     assertThat(event.getLevel()).isEqualTo(Level.INFO);
@@ -127,14 +118,11 @@ class RequestLoggingFilterTest {
 
   @Test
   void actuatorRequest_ShouldBeSkipped() throws ServletException, IOException {
-    // Given
     MockHttpServletRequest request = new MockHttpServletRequest("GET", "/actuator/health");
     MockHttpServletResponse response = new MockHttpServletResponse();
 
-    // When
     filter.doFilter(request, response, (req, res) -> {});
 
-    // Then
     assertThat(appender.list).isEmpty();
   }
 

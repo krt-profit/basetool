@@ -106,25 +106,15 @@ class JobOrderReferenceNeedsTest {
   /** Real: the two-kind normalisation is the thing under test. */
   @InjectMocks private JobOrderMaterialRequirementResolver requirementResolver;
 
-  // Constructed in the @BeforeEach rather than by @InjectMocks: two of its collaborators are real,
-  // co-built services
   private JobOrderQueryService queryService;
 
   /** Swaps the two behaviour-under-test collaborators in and opens the visibility gates. */
   @BeforeEach
   void wireRealCollaborators() {
-    // @InjectMocks fills every collaborator with a MOCK; the two whose behaviour is asserted are
-    // replaced by the real instances afterwards.
-    // Built through the constructor instead of patched in afterwards: these fields are
-    // `private final`, and reflective mutation of a final field is what JEP 500 (JDK 26)
-    // warns about and a later release will refuse. Arg order matches the
-    // @RequiredArgsConstructor field-declaration order of each service.
-    // A `null` argument is a dependency this fixture never reaches -- exactly what
-    // @InjectMocks passed before, only visible now.
     queryService =
         new JobOrderQueryService(
             jobOrderRepository,
-            null, // materialRepository
+            null,
             inventoryItemRepository,
             ownerScopeService,
             jobOrderMapper,
@@ -132,8 +122,7 @@ class JobOrderReferenceNeedsTest {
             jobOrderItemService,
             stockProjectionService,
             requirementResolver,
-            null // inventoryItemMapper
-            );
+            null);
     when(ownerScopeService.canViewJobOrders()).thenReturn(true);
     when(ownerScopeService.canSeeJobOrder(any(JobOrder.class))).thenReturn(true);
     when(jobOrderItemService.requiredMaterialIds(any(JobOrder.class))).thenReturn(Set.of());
@@ -188,9 +177,6 @@ class JobOrderReferenceNeedsTest {
   @Test
   @DisplayName("an ITEM order contributes through its blueprint-derived requirements")
   void itemOrder_projectsTheAggregatedRequirement() {
-    // The picker offers crafting orders for a material their blueprint consumes (REQ-ORDERS-018),
-    // and those carry no job_order_material rows — reading `materials` would leave exactly the
-    // orders that are hardest to look up by hand without a figure.
     JobOrder order = newOrder(JobOrderType.ITEM);
     givenOrders(order);
     when(jobOrderItemService.aggregateMaterials(order))
@@ -220,8 +206,6 @@ class JobOrderReferenceNeedsTest {
   @Test
   @DisplayName("a PIECE material's figures are whole units, not fractions")
   void pieceMaterial_roundsToWholeUnits() {
-    // REQ-INV-027: every amount the split UI shows renders whole for a PIECE material. Rounding on
-    // the projection is what keeps the picker label and the demand overview printing one number.
     givenOrders(materialOrder(10.0, null), "PIECE");
     givenLinkedStock(new JobOrderMaterialStockRow(ORDER_ID, MATERIAL_ID, null, 3.4));
 
@@ -230,10 +214,6 @@ class JobOrderReferenceNeedsTest {
     assertEquals(3.0, need.bookedAmount());
     assertEquals(7.0, need.outstandingAmount());
   }
-
-  // ---------------------------------------------------------------
-  // item-mode needs (#1742)
-  // ---------------------------------------------------------------
 
   /** The plain item case: what is neither delivered nor already earmarked is still needed. */
   @Test
@@ -257,12 +237,10 @@ class JobOrderReferenceNeedsTest {
   @Test
   @DisplayName("the figure is unchanged by a handover, which consumes the earmark it delivers")
   void itemOrder_isStableAcrossAHandover() {
-    // Before: 4 built and earmarked, nothing delivered.
     givenOrders(itemOrder(10, 0, 0));
     givenLinkedItemStock(new JobOrderGameItemStockRow(ORDER_ID, GAME_ITEM_ID, 4.0));
     assertEquals(6, onlyItemNeed(queryService.findAllActiveReference(true)).outstandingAmount());
 
-    // After: JobOrderItemHandoverService consumed the earmark as it delivered those same 4.
     givenOrders(itemOrder(10, 0, 4));
     givenLinkedItemStock();
 
@@ -331,10 +309,6 @@ class JobOrderReferenceNeedsTest {
         queryService.findAllActiveReference(true).get(0).gameItemNeeds().isEmpty(),
         "a MATERIAL order has no ordered items to need");
   }
-
-  // ---------------------------------------------------------------
-  // fixtures
-  // ---------------------------------------------------------------
 
   /**
    * Stubs the scoped active-order read.

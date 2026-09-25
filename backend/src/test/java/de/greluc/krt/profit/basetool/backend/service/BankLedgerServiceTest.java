@@ -122,17 +122,13 @@ class BankLedgerServiceTest {
 
   @Test
   void bookDeposit_createsAccountAndHolderLegAndExactlyOneAuditRow() {
-    // Given
     long auditBefore = auditEventRepository.count();
 
-    // When
     BankTransactionDto tx =
         bankLedgerService.bookDeposit(
             new BankDepositRequest(
                 account.getId(), holderA.getId(), new BigDecimal("500"), "seed"));
 
-    // Then: one account leg (+500) and one holder leg (+500 global); a deposit is fee-free (the
-    // depositor bears their own in-game fee, REQ-BANK-033, ADR-0052)
     assertEquals(BankTransactionType.DEPOSIT, tx.type());
     assertEquals(0, storedFee(tx).signum(), "deposit is fee-free");
     assertEquals(0, balance(account).compareTo(new BigDecimal("500")));
@@ -145,10 +141,8 @@ class BankLedgerServiceTest {
 
   @Test
   void bookWithdrawal_rejectsAccountOverdraftWithStableCode() {
-    // Given: the account holds 100
     deposit(account, holderA, "100");
 
-    // When: withdraw 250 — the account cannot cover it
     BankConflictException ex =
         assertThrows(
             BankConflictException.class,
@@ -157,7 +151,6 @@ class BankLedgerServiceTest {
                     new BankWithdrawalRequest(
                         account.getId(), holderA.getId(), new BigDecimal("250"), null)));
 
-    // Then
     assertEquals(BankConflictException.CODE_BANK_OVERDRAFT, ex.getCode());
     assertEquals("100", ex.getProperties().get("available"));
     assertEquals(0, balance(account).compareTo(new BigDecimal("100")), "balance unchanged");
@@ -165,11 +158,6 @@ class BankLedgerServiceTest {
 
   @Test
   void bookWithdrawal_fromMandatingAccount_blankJustification_rejected() {
-    // REQ-BANK-045: a direct withdrawal leaving a CARTEL / CARTEL_BANK / SPECIAL account must carry
-    // a
-    // non-blank Begründung; a blank one is rejected with BANK_JUSTIFICATION_REQUIRED and the
-    // balance
-    // is untouched.
     BankAccount special = newMandatingAccount("Sonderkonto " + UUID.randomUUID());
     deposit(special, holderA, "500");
 
@@ -194,9 +182,6 @@ class BankLedgerServiceTest {
 
   @Test
   void bookWithdrawal_fromMandatingAccount_persistsJustification() {
-    // REQ-BANK-045: a non-blank Begründung is stored on the ledger transaction header so it
-    // surfaces
-    // in the booking history and the statement PDF.
     BankAccount special = newMandatingAccount("Sonderkonto " + UUID.randomUUID());
     deposit(special, holderA, "500");
 
@@ -218,8 +203,6 @@ class BankLedgerServiceTest {
 
   @Test
   void bookDeposit_persistsStaffNote() {
-    // REQ-BANK-054: the bank employee's own note rides along on a DEPOSIT too — unlike the
-    // Begruendung, which the debit-only rules of REQ-BANK-045 gate.
     BankTransactionDto tx =
         bankLedgerService.bookDeposit(
             new BankDepositRequest(
@@ -241,8 +224,6 @@ class BankLedgerServiceTest {
 
   @Test
   void bookWithdrawal_persistsStaffNoteAlongsideJustification() {
-    // The two are independent fields with different authors: the Begruendung comes from the
-    // requester / booking party, the staff note from the employee doing the booking.
     BankAccount special = newMandatingAccount("Sonderkonto " + UUID.randomUUID());
     deposit(special, holderA, "500");
 
@@ -267,37 +248,25 @@ class BankLedgerServiceTest {
 
   @Test
   void bookWithdrawal_allowsHolderToGoNegativeWhenAccountCovers() {
-    // Given: account holds 1000 (A:300, B:700) — the account covers a 400 payout plus its fee,
-    // holder A does not
     deposit(account, holderA, "300");
     deposit(account, holderB, "700");
 
-    // When: A pays out 400 to a recipient — the fee (round(400 * 0.005) = 2) is added on top
-    // (ADR-0052), so the account and holder A are debited the gross 402; A fronts the missing 102
-    // (no holder overdraft, ADR-0039)
     bankLedgerService.bookWithdrawal(
         new BankWithdrawalRequest(account.getId(), holderA.getId(), new BigDecimal("400"), null));
 
-    // Then: the account drops by the gross 402, holder A's GLOBAL balance goes negative
     assertEquals(0, balance(account).compareTo(new BigDecimal("598")));
     assertEquals(0, holderTotal(holderA).compareTo(new BigDecimal("-102")));
   }
 
   @Test
   void bookWithdrawal_addsFeeOnTopSoTheAccountBearsItAndTheRecipientGetsTheFullAmount() {
-    // Given (REQ-BANK-033, ADR-0052): the entered amount is what the recipient must receive; the
-    // 0.5% fee is added on top and borne by the debited account. A 1000 payout needs 1005 in the
-    // account (1000 + round(1000 * 0.005) = 5 fee).
     deposit(account, holderA, "1005");
 
-    // When: pay out 1000
     BankTransactionDto tx =
         bankLedgerService.bookWithdrawal(
             new BankWithdrawalRequest(
                 account.getId(), holderA.getId(), new BigDecimal("1000"), null));
 
-    // Then: the account and holder are debited the gross 1005; the recorded fee is 5 and the
-    // recipient effectively received the full 1000 (gross - fee)
     assertEquals(0, storedFee(tx).compareTo(new BigDecimal("5")));
     assertEquals(0, balance(account).signum(), "account bore the gross 1005");
     assertEquals(0, holderTotal(holderA).signum(), "holder bore the gross 1005");
@@ -305,11 +274,8 @@ class BankLedgerServiceTest {
 
   @Test
   void bookWithdrawal_rejectsWhenTheFeeOnTopWouldOverdrawTheAccount() {
-    // Given: the account holds exactly the entered amount but not the fee on top (ADR-0052)
     deposit(account, holderA, "1000");
 
-    // When / Then: a 1000 payout needs 1005 (1000 + 5 fee); the account cannot cover the gross, so
-    // the booking is refused rather than driving the account negative (REQ-BANK-006)
     BankConflictException ex =
         assertThrows(
             BankConflictException.class,
@@ -323,11 +289,8 @@ class BankLedgerServiceTest {
 
   @Test
   void bookTransfer_sameHolder_isFeeFreeAndLegsSumToZero() {
-    // Given (REQ-BANK-033): a same-holder transfer moves no money in-game (the holder just
-    // re-labels which account owns it), so it carries no fee and both legs net to zero.
     deposit(account, holderA, "1000");
 
-    // When: move 400 to another account, but custody stays with holder A
     BankTransactionDto tx =
         bankLedgerService.bookTransfer(
             new BankTransferRequest(
@@ -339,7 +302,6 @@ class BankLedgerServiceTest {
                 "Umschichtung"),
             true);
 
-    // Then: two account legs summing to zero AND two holder legs summing to zero; no fee recorded
     List<BankCounterLeg> accountLegs = postingRepository.findLegsByTransactionIds(List.of(tx.id()));
     assertEquals(2, accountLegs.size());
     assertEquals(0, sum(accountLegs.stream().map(BankCounterLeg::amount).toList()).signum());
@@ -351,13 +313,8 @@ class BankLedgerServiceTest {
 
   @Test
   void bookTransfer_holderChange_addsFeeOnTopAndCreditsFullAmountToDestination() {
-    // Given (REQ-BANK-033, ADR-0052): a transfer that changes the holder is a real in-game send, so
-    // the 0.5% fee (seeded operation.transfer_fee_rate) is added on top — the source is debited the
-    // gross (amount + fee), the destination credited the full entered amount, and the two legs net
-    // to -fee. Moving 1000 needs 1005 in the source.
     deposit(account, holderA, "1005");
 
-    // When: deliver 1000 to another account AND another holder
     BankTransactionDto tx =
         bankLedgerService.bookTransfer(
             new BankTransferRequest(
@@ -369,8 +326,6 @@ class BankLedgerServiceTest {
                 "Bereichsanteil"),
             true);
 
-    // Then: fee = round(1000 * 0.005) = 5; the source is debited the gross 1005, the destination
-    // receives the full 1000, the legs net to -5
     assertEquals(0, storedFee(tx).compareTo(new BigDecimal("5")));
     List<BankCounterLeg> accountLegs = postingRepository.findLegsByTransactionIds(List.of(tx.id()));
     assertEquals(
@@ -394,15 +349,8 @@ class BankLedgerServiceTest {
 
   @Test
   void bookWithdrawal_feeInclusive_debitsEnteredAmountAndRecipientGetsAmountMinusFee() {
-    // Given (REQ-BANK-033, #999): in the fee-inclusive mode the entered amount is what is DEBITED
-    // and
-    // the recipient gets amount - fee. A 1000 inclusive payout at 0.5% debits exactly 1000 (not
-    // 1005), records fee 5, and the recipient effectively receives 995 (the 500000 -> 497500
-    // example
-    // scaled down). Only the entered amount needs to be in the account.
     deposit(account, holderA, "1000");
 
-    // When: pay out 1000 with fee-inclusive on
     BankTransactionDto tx =
         bankLedgerService.bookWithdrawal(
             new BankWithdrawalRequest(
@@ -415,9 +363,6 @@ class BankLedgerServiceTest {
                 null,
                 true));
 
-    // Then: the recorded fee is still 5, but the account/holder are debited exactly the entered
-    // 1000
-    // (balance 0), so the recipient got amount - fee = 995.
     assertEquals(0, storedFee(tx).compareTo(new BigDecimal("5")));
     assertEquals(0, balance(account).signum(), "account debited exactly the entered 1000");
     assertEquals(0, holderTotal(holderA).signum(), "holder debited exactly the entered 1000");
@@ -425,14 +370,8 @@ class BankLedgerServiceTest {
 
   @Test
   void bookTransfer_feeInclusive_debitsEnteredAmountAndCreditsAmountMinusFee() {
-    // Given (REQ-BANK-033, #999): a holder-changing transfer in the fee-inclusive mode debits the
-    // source exactly the entered amount and credits the destination amount - fee; the account legs
-    // still net to -fee, so the ledger-integrity invariant holds. Moving 1000 needs only 1000 in
-    // the
-    // source (not 1005).
     deposit(account, holderA, "1000");
 
-    // When: deliver 1000 (fee-inclusive) to another account AND another holder
     BankTransactionDto tx =
         bankLedgerService.bookTransfer(
             new BankTransferRequest(
@@ -447,9 +386,6 @@ class BankLedgerServiceTest {
                 true),
             true);
 
-    // Then: fee = 5; source debited exactly 1000 (balance 0), destination credited 995, and both
-    // the
-    // account legs and the holder legs still net to -5 (integrity preserved).
     assertEquals(0, storedFee(tx).compareTo(new BigDecimal("5")));
     List<BankCounterLeg> accountLegs = postingRepository.findLegsByTransactionIds(List.of(tx.id()));
     assertEquals(
@@ -473,11 +409,6 @@ class BankLedgerServiceTest {
 
   @Test
   void bookWithdrawal_feeInclusive_rejectsWhenAmountDoesNotExceedFee() {
-    // Given (REQ-BANK-033, #999 decision #4): under a punitive fee rate the whole entered amount is
-    // consumed by the fee, so nothing would arrive in the fee-inclusive mode. fee = round(1 * 0.99)
-    // =
-    // 1, so amount - fee = 0. The rate is a global setting seeded by V79; flip it for this test and
-    // restore it afterwards so no other test sees the punitive rate.
     SystemSetting rate =
         systemSettingRepository.findById("operation.transfer_fee_rate").orElseThrow();
     String original = rate.getValue();
@@ -486,8 +417,6 @@ class BankLedgerServiceTest {
     try {
       deposit(account, holderA, "10");
 
-      // When / Then: a fee-inclusive payout of 1 is refused before the overdraft check, balance
-      // intact
       BankConflictException ex =
           assertThrows(
               BankConflictException.class,
@@ -514,10 +443,8 @@ class BankLedgerServiceTest {
 
   @Test
   void bookTransfer_rejectsSameAccount() {
-    // Given
     deposit(account, holderA, "100");
 
-    // When / Then: an account-to-account transfer must target a DIFFERENT account
     BankConflictException ex =
         assertThrows(
             BankConflictException.class,
@@ -536,23 +463,15 @@ class BankLedgerServiceTest {
 
   @Test
   void bookHolderTransfer_tinyAmount_isFeeFreeAndBooksNoAccountLeg() {
-    // Given: holder A holds 800 (via a deposit onto the account)
     deposit(account, holderA, "800");
     BigDecimal accountBefore = balance(account);
     long auditBefore = auditEventRepository.count();
 
-    // When: A hands 50 of physical custody to B. The fee round(50 * 0.005) = 0 rounds away, so this
-    // stays the legacy fee-free Umbuchung shape (REQ-BANK-031, #998): no account leg is booked, A
-    // is
-    // debited exactly 50 and B credited exactly 50. (Fee-bearing Umbuchungen are covered by the
-    // dedicated, isolated BankHolderTransferFeeTest, since the CARTEL account is a singleton.)
     BankTransactionDto tx =
         bankLedgerService.bookHolderTransfer(
             new BankHolderTransferRequest(
                 holderA.getId(), holderB.getId(), new BigDecimal("50"), "Schichtwechsel"));
 
-    // Then: only holder balances move; the account is untouched and the tx books no account leg;
-    // no fee is recorded and the two holder legs net to zero.
     assertEquals(BankTransactionType.HOLDER_TRANSFER, tx.type());
     assertEquals(0, storedFee(tx).signum(), "a tiny Umbuchung whose fee rounds to 0 is fee-free");
     assertEquals(0, balance(account).compareTo(accountBefore), "account balance unchanged");
@@ -582,31 +501,22 @@ class BankLedgerServiceTest {
 
   @Test
   void bookHolderTransfer_allowsNegativeSourceAndDeactivatedHolders() {
-    // Given: B is deactivated and holds nothing; A holds nothing either
     holderB.setActive(false);
     holderRepository.save(holderB);
 
-    // When: reconcile B's stash even though it is deactivated; A goes negative (no holder
-    // overdraft).
-    // A tiny fee-free amount (round(50 * 0.005) = 0) keeps this focused on the holder dimension, so
-    // A
-    // is debited exactly 50 and B credited exactly 50 with no CARTEL account leg (#998).
     bankLedgerService.bookHolderTransfer(
         new BankHolderTransferRequest(
             holderA.getId(), holderB.getId(), new BigDecimal("50"), null));
 
-    // Then: source debited 50 (goes negative), destination credited the full 50
     assertEquals(0, holderTotal(holderA).compareTo(new BigDecimal("-50")));
     assertEquals(0, holderTotal(holderB).compareTo(new BigDecimal("50")));
   }
 
   @Test
   void bookDeposit_rejectsClosedAccount() {
-    // Given
     account.setStatus(BankAccountStatus.CLOSED);
     accountRepository.save(account);
 
-    // When / Then
     BankConflictException ex =
         assertThrows(
             BankConflictException.class,
@@ -619,11 +529,9 @@ class BankLedgerServiceTest {
 
   @Test
   void bookDeposit_rejectsInactiveHolder() {
-    // Given
     holderA.setActive(false);
     holderRepository.save(holderA);
 
-    // When / Then
     BankConflictException ex =
         assertThrows(
             BankConflictException.class,
@@ -636,7 +544,6 @@ class BankLedgerServiceTest {
 
   @Test
   void reverseTransaction_createsNegatedMirrorOnBothLedgersAndKeepsOriginalUntouched() {
-    // Given
     deposit(account, holderA, "1000");
     BankTransactionDto transfer =
         bankLedgerService.bookTransfer(
@@ -653,11 +560,9 @@ class BankLedgerServiceTest {
     long postingsBefore = postingRepository.count();
     long holderPostingsBefore = holderPostingRepository.count();
 
-    // When
     BankTransactionDto reversal =
         bankLedgerService.reverseTransaction(transfer.id(), "Tippfehler korrigiert");
 
-    // Then: account legs are a negated mirror; original survives; balances restored
     List<BankCounterLeg> reversalAccountLegs =
         postingRepository.findLegsByTransactionIds(List.of(reversal.id()));
     assertEquals(originalAccountLegs.size(), reversalAccountLegs.size());
@@ -684,11 +589,9 @@ class BankLedgerServiceTest {
 
   @Test
   void reverseTransaction_rejectsSecondReversal() {
-    // Given
     BankTransactionDto deposit = deposit(account, holderA, "100");
     bankLedgerService.reverseTransaction(deposit.id(), null);
 
-    // When / Then
     BankConflictException ex =
         assertThrows(
             BankConflictException.class,
@@ -698,15 +601,10 @@ class BankLedgerServiceTest {
 
   @Test
   void reverseTransaction_rejectsWhenAccountWouldGoNegative() {
-    // Given: deposit 201 to A, then pay 200 out — with the 1 aUEC fee on top (ADR-0052) the gross
-    // debit is 201, so the account is back to zero
     BankTransactionDto deposit = deposit(account, holderA, "201");
     bankLedgerService.bookWithdrawal(
         new BankWithdrawalRequest(account.getId(), holderA.getId(), new BigDecimal("200"), null));
 
-    // When / Then: undoing the deposit would drive the ACCOUNT negative (the holder may go
-    // negative,
-    // but the account may not) — rejected with the account overdraft code
     BankConflictException ex =
         assertThrows(
             BankConflictException.class,
@@ -716,7 +614,6 @@ class BankLedgerServiceTest {
 
   @Test
   void reverseTransaction_rejectsReversingAWipeReset() {
-    // Given: a WIPE_RESET transaction (a deliberate end-state, REQ-BANK-013)
     BankTransaction wipe =
         transactionRepository.save(
             BankTransaction.builder()
@@ -724,7 +621,6 @@ class BankLedgerServiceTest {
                 .createdAt(Instant.now())
                 .build());
 
-    // When / Then: it cannot itself be reversed (REQ-BANK-004)
     BankConflictException ex =
         assertThrows(
             BankConflictException.class,
@@ -734,11 +630,9 @@ class BankLedgerServiceTest {
 
   @Test
   void reverseTransaction_rejectsReversingAReversal() {
-    // Given: a deposit and its reversal
     BankTransactionDto deposit = deposit(account, holderA, "100");
     BankTransactionDto reversal = bankLedgerService.reverseTransaction(deposit.id(), null);
 
-    // When / Then: the reversal itself is not reversible — reverse the original instead
     BankConflictException ex =
         assertThrows(
             BankConflictException.class,
@@ -748,27 +642,19 @@ class BankLedgerServiceTest {
 
   @Test
   void resetAllBalances_zeroesAccountsAndHoldersKeepsHistoryAndIsIdempotent() {
-    // Given: this test's accounts and holders hold money before the wipe. The wipe is bank-WIDE and
-    // the test DB is shared, so global result counts are not concurrency-safe — every assertion
-    // therefore pins THIS test's own entities (their end state is robust regardless of any
-    // concurrent wipe by a sibling test).
     deposit(account, holderA, "300");
     deposit(account, holderB, "700");
     deposit(otherAccount, holderB, "250");
     long postingsBefore = postingRepository.count();
 
-    // When
     bankLedgerService.resetAllBalances();
 
-    // Then: both account balances AND both holder globals (the two decoupled dimensions, ADR-0039)
-    // are zero; the ledger only grew (append-only — history preserved, nothing deleted).
     assertEquals(0, balance(account).signum());
     assertEquals(0, balance(otherAccount).signum());
     assertEquals(0, holderTotal(holderA).signum());
     assertEquals(0, holderTotal(holderB).signum());
     assertTrue(postingRepository.count() > postingsBefore, "history preserved, postings added");
 
-    // And: a second run is idempotent — this test's entities stay at zero and nothing throws.
     bankLedgerService.resetAllBalances();
     assertEquals(0, balance(account).signum());
     assertEquals(0, balance(otherAccount).signum());
@@ -778,7 +664,6 @@ class BankLedgerServiceTest {
 
   @Test
   void concurrentWithdrawals_cannotJointlyOverdrawTheAccount() throws Exception {
-    // Given: 500 on the account; 4 threads withdraw 200 each — at most 2 can succeed
     deposit(account, holderA, "500");
     CountDownLatch ready = new CountDownLatch(THREADS);
     CountDownLatch go = new CountDownLatch(1);
@@ -814,8 +699,6 @@ class BankLedgerServiceTest {
       pool.shutdownNow();
     }
 
-    // Then: exactly 2 succeed (each gross debit is 200 + round(200 * 0.005) = 201, so 2 x 201 = 402
-    // <= 500; a third would overdraw the account). The fee on top (ADR-0052) leaves 500 - 402 = 98.
     assertEquals(2, success.get(), "exactly two withdrawals fit into the balance");
     assertEquals(THREADS - 2, conflict.get());
     assertEquals(0, balance(account).compareTo(new BigDecimal("98")));
@@ -823,12 +706,8 @@ class BankLedgerServiceTest {
 
   @Test
   void auditRows_oneRowPerSuccessfulBookingAndNoneForRejections() {
-    // Given
     long before = auditEventRepository.count();
 
-    // When: deposit + withdrawal + account-transfer + holder-transfer succeed (4 mutations); the
-    // reversal of the deposit is rejected (the account no longer covers the original 1000) and must
-    // NOT audit.
     BankTransactionDto deposit = deposit(account, holderA, "1000");
     bankLedgerService.bookWithdrawal(
         new BankWithdrawalRequest(account.getId(), holderA.getId(), new BigDecimal("100"), null));
@@ -848,18 +727,15 @@ class BankLedgerServiceTest {
         BankConflictException.class,
         () -> bankLedgerService.reverseTransaction(deposit.id(), null));
 
-    // Then
     assertEquals(before + 4, auditEventRepository.count(), "one audit row per successful booking");
   }
 
   @Test
   void bookDeposit_recordsCounterpartyUserHandleAndOrgUnitSnapshotAndAuditTarget() {
-    // Given (REQ-BANK-044): an Einzahler who belongs to one Staffel
     User depositor = newUser("einzahler");
     Squadron staffel = newSquadron("Staffel " + UUID.randomUUID());
     linkMembership(depositor, staffel);
 
-    // When: the deposit names the counterparty user and their org unit
     BankTransactionDto tx =
         bankLedgerService.bookDeposit(
             new BankDepositRequest(
@@ -870,13 +746,11 @@ class BankLedgerServiceTest {
                 depositor.getId(),
                 staffel.getId()));
 
-    // Then: the header carries the user + handle + org-unit snapshots (deletion-proof)
     BankTransaction stored = transactionRepository.findById(tx.id()).orElseThrow();
     assertEquals(depositor.getId(), stored.getCounterpartyUserId());
     assertEquals(depositor.getEffectiveName(), stored.getCounterpartyHandle());
     assertEquals(staffel.getId(), stored.getCounterpartyOrgUnitId());
     assertEquals(staffel.getName(), stored.getCounterpartyOrgUnitName());
-    // And the DEPOSIT_BOOKED audit row points at the counterparty and names them in its detail
     BankAuditEvent audit = auditForTransaction(account.getId(), tx.id());
     assertEquals(depositor.getId(), audit.getTargetUserId());
     assertTrue(audit.getDetails().contains(depositor.getEffectiveName()));
@@ -885,11 +759,9 @@ class BankLedgerServiceTest {
 
   @Test
   void bookWithdrawal_recordsCounterpartyUserWithoutOrgUnitAndAuditTarget() {
-    // Given (REQ-BANK-044): a payout to a recorded Empfänger, no org unit chosen
     deposit(account, holderA, "500");
     User recipient = newUser("empfaenger");
 
-    // When
     BankTransactionDto tx =
         bankLedgerService.bookWithdrawal(
             new BankWithdrawalRequest(
@@ -902,7 +774,6 @@ class BankLedgerServiceTest {
                 null,
                 false));
 
-    // Then: the user + handle are snapshotted, the org unit stays empty
     BankTransaction stored = transactionRepository.findById(tx.id()).orElseThrow();
     assertEquals(recipient.getId(), stored.getCounterpartyUserId());
     assertEquals(recipient.getEffectiveName(), stored.getCounterpartyHandle());
@@ -914,11 +785,9 @@ class BankLedgerServiceTest {
 
   @Test
   void bookDeposit_rejectsCounterpartyOrgUnitThatIsNotAMembership() {
-    // Given (REQ-BANK-044): a user who is NOT a member of the chosen org unit
     User depositor = newUser("fremd");
     Squadron unrelated = newSquadron("Fremd " + UUID.randomUUID());
 
-    // When / Then: the org unit must be one of the counterparty's own memberships
     assertThrows(
         BadRequestException.class,
         () ->
@@ -934,10 +803,8 @@ class BankLedgerServiceTest {
 
   @Test
   void bookDeposit_withoutCounterparty_leavesHeaderFieldsAndAuditTargetNull() {
-    // Given / When: a plain deposit records no counterparty (the optional default)
     BankTransactionDto tx = deposit(account, holderA, "200");
 
-    // Then: every counterparty column is null and the audit row has no target user
     BankTransaction stored = transactionRepository.findById(tx.id()).orElseThrow();
     assertNull(stored.getCounterpartyUserId());
     assertNull(stored.getCounterpartyHandle());
@@ -948,11 +815,8 @@ class BankLedgerServiceTest {
 
   @Test
   void bookDeposit_recordsExternalCounterpartyNameAndAnyOrgUnitWithoutUserId() {
-    // Given (REQ-BANK-044, #994): an external Einzahler with NO tool account, attributed to an org
-    // unit they are not a member of (any active org unit is allowed for an external counterparty).
     Squadron anyStaffel = newSquadron("Staffel " + UUID.randomUUID());
 
-    // When: the deposit records a free-text name + that org unit, no counterparty user
     BankTransactionDto tx =
         bankLedgerService.bookDeposit(
             new BankDepositRequest(
@@ -967,8 +831,6 @@ class BankLedgerServiceTest {
                 anyStaffel.getId(),
                 "Max Mustermann"));
 
-    // Then: the handle snapshots the free-text name, the org-unit snapshot is set, but NO
-    // counterparty_user_id FK is stored and the audit target user is null (no PII beyond the label)
     BankTransaction stored = transactionRepository.findById(tx.id()).orElseThrow();
     assertNull(stored.getCounterpartyUserId(), "an external counterparty has no user FK");
     assertEquals("Max Mustermann", stored.getCounterpartyHandle());
@@ -982,10 +844,8 @@ class BankLedgerServiceTest {
 
   @Test
   void bookWithdrawal_externalCounterparty_nameOnly_snapshotsNameWithNullUserAndOrgUnit() {
-    // Given (REQ-BANK-044, #994): an external Empfänger recorded by name only, no org unit
     deposit(account, holderA, "500");
 
-    // When
     BankTransactionDto tx =
         bankLedgerService.bookWithdrawal(
             new BankWithdrawalRequest(
@@ -1000,7 +860,6 @@ class BankLedgerServiceTest {
                 false,
                 "Erika Extern"));
 
-    // Then: the name is snapshotted with no user FK and no org unit
     BankTransaction stored = transactionRepository.findById(tx.id()).orElseThrow();
     assertNull(stored.getCounterpartyUserId());
     assertEquals("Erika Extern", stored.getCounterpartyHandle());
@@ -1011,10 +870,8 @@ class BankLedgerServiceTest {
 
   @Test
   void bookDeposit_rejectsBothRegisteredAndExternalCounterparty() {
-    // Given (REQ-BANK-044, #994): a counterparty is either a registered user or an external name
     User depositor = newUser("doppelt");
 
-    // When / Then: supplying both is a 400
     assertThrows(
         BadRequestException.class,
         () ->
@@ -1059,8 +916,6 @@ class BankLedgerServiceTest {
     BankAccount a = new BankAccount();
     a.setAccountNo(String.format("KB-%04d", accountRepository.nextAccountNoValue()));
     a.setName(name);
-    // AREA carries a free-form area name and no org-unit FK (V150/V168 owner-ref CHECK) — a
-    // justification-optional type, so the general ledger tests need no Begründung (REQ-BANK-045).
     a.setType(BankAccountType.AREA);
     a.setAreaName(name);
     a.setStatus(BankAccountStatus.ACTIVE);

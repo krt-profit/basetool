@@ -1,26 +1,4 @@
-/*
- * KRT Keycloak login theme.
- *
- * DESIGN-TOKEN SOURCE OF TRUTH: the canonical KRT design tokens (colors,
- * typography stack, spacing) are defined in `frontend/src/main/resources/
- * static/css/styles.css :root`. This file mirrors the same values so the
- * Keycloak login renders identically to the in-app screens (same orange,
- * same dark background, same Lato headlines (bold + uppercase), same Lato body).
- *
- * MAINTENANCE RULE: any styleguide change to a token must be reflected in
- * both files in the same commit. The `.btn` / `.btn-secondary` aliases at
- * the bottom of this file let templates use the same class names the
- * frontend uses, so future Keycloak template patches do not have to learn
- * a second naming convention.
- */
 
-/* Fonts */
-/*
- * WOFF2 first (~40% the size of TTF/OTF), TTF/OTF as a fallback for legacy
- * browsers. `font-display: swap` shows the system fallback immediately and
- * swaps in the brand font once it has arrived, eliminating the FOIT blank
- * period that the default `auto` causes. Matches frontend/static/css/styles.css.
- */
 @font-face {
     font-family: 'Lato';
     src: url('../fonts/Lato-Light.woff2') format('woff2');
@@ -59,14 +37,7 @@
     --color-gray-4: #141414;
     --color-surface-input: #1C1C1C;
 
-    /* Semantic tokens — REQUIRED so validation errors render red, not the
-       brand orange. Mirror of frontend styles.css. Keep these values identical
-       with account/krt-account-v3.css :root (token-sync rule). */
     --color-danger: #A3000A;
-    /* Accessible danger as TEXT — the canonical #A3000A is ~2.3:1 on black and
-       fails WCAG as small text; use this lighter tint when the colour IS the
-       error text. Keep #A3000A for borders/blooms/fills. Mirror of frontend
-       styles.css --color-danger-text. Keep identical with account :root. */
     --color-danger-text: #F2564B;
     --color-success: #239E33;
     --color-warning: #FFD23F;
@@ -75,12 +46,10 @@
     --font-headline: 'Lato', sans-serif;
     --font-body: 'Lato', sans-serif;
 
-    /* Glows — orange bloom for the primary CTA, red bloom for error fields. */
     --glow-primary: 0 0 8px rgba(231, 126, 35, 0.25);
     --glow-danger:  0 0 8px rgba(163, 0, 10, 0.30);
 }
 
-/* Force override PatternFly variables globally */
 :root, * {
     --pf-c-form-control--BackgroundColor: var(--color-bg-black) !important;
     --pf-v5-c-form-control--BackgroundColor: var(--color-bg-black) !important;
@@ -107,9 +76,6 @@
     --pf-v6-global--primary-color--100: var(--color-primary) !important;
 }
 
-/* Hard reset for all backgrounds to remove the orange grid completely.
-   NOTE: `body` is intentionally NOT in this list — it carries the top-bloom
-   gradient below. Every other PF surface stays hard-reset to flat black. */
 html, .login-pf-page, .login-pf-body, [class*="login-pf"], [class*="pf-c-background"], [class*="pf-v5-c-background"], [class*="pf-v6-c-background"] {
     background-image: none !important;
     background-color: var(--color-bg-black) !important;
@@ -121,12 +87,6 @@ html, .login-pf-page, .login-pf-body, [class*="login-pf"], [class*="pf-c-backgro
     --pf-v6-c-background-image--BackgroundImage: none !important;
 }
 
-/* Defence-in-depth: keep any PatternFly v5/v6 login/page wrappers TRANSPARENT
-   (not black) so the body top-bloom below always shows through, regardless of
-   which PF major Keycloak renders. NOTE: the diamond grid on this KC 26.6 build
-   is actually PF *v3*'s `bg-login.jpg` set on <body> — that is handled by the
-   !important body rule above; this block just stops a future PF wrapper from
-   covering the bloom. (The login card is not a `pf-*` element, so untouched.) */
 [class*="pf-v6-c-login"], [class*="pf-c-login"],
 [class*="pf-v6-c-page"], [class*="pf-c-page"] {
     background-image: none !important;
@@ -142,12 +102,6 @@ body {
     justify-content: center;
     align-items: center;
     min-height: 100vh;
-    /* Flat black + a soft top bloom, matching the app login so the SSO redirect
-       has no visual seam. !important is REQUIRED: Keycloak's
-       `import=common/keycloak` pulls in PatternFly v3's vendor CSS, which sets
-       `body { background-image: url(.../bg-login.jpg) }` (the diamond grid) and
-       loads after this file — so without !important PF's body rule wins on source
-       order and the grid shows instead of the bloom. */
     background-color: var(--color-bg-black) !important;
     background-image:
         radial-gradient(circle at 50% -10%, rgba(231, 126, 35, 0.10), transparent 55%) !important;
@@ -164,11 +118,9 @@ body {
     max-width: 450px;
     box-shadow: 0 0 20px rgba(231, 126, 35, 0.1);
     position: relative;
-    /* Basic centering adjustments when inside keycloak layout */
     margin: auto;
 }
 
-/* Technische HUD-Ecken (Sci-Fi Aesthetic) */
 .login-container::before, .login-container::after {
     content: '';
     position: absolute;
@@ -185,12 +137,6 @@ body {
     border-left: none; border-top: none;
 }
 
-/*
- * Brand mark above the login title. Kept small so it complements but does
- * not dominate the "IRIDIUM BASETOOL" headline below. Uses the same SVG the
- * frontend renders in the page header so users see one consistent mark
- * across browser SSO redirects and the in-app navigation.
- */
 .login-logo {
     display: block;
     width: 96px;
@@ -237,7 +183,6 @@ input.pf-v5-c-form-control {
     border-radius: 0 !important;
 }
 
-/* Hide PatternFly pseudo-element borders/backgrounds */
 .pf-c-form-control::before, .pf-c-form-control::after,
 .pf-v5-c-form-control::before, .pf-v5-c-form-control::after,
 .pf-v6-c-form-control::before, .pf-v6-c-form-control::after,
@@ -251,7 +196,6 @@ input.pf-v5-c-form-control {
     border: none !important;
 }
 
-/* If PatternFly wraps the input in a span, target the inner input specifically */
 span.pf-v5-c-form-control input,
 span.pf-v6-c-form-control input,
 span.pf-c-form-control input {
@@ -307,7 +251,6 @@ button.pf-v5-c-button.pf-m-primary {
     appearance: none !important;
     -webkit-appearance: none !important;
     border-radius: 0 !important;
-    /* The single filled-orange CTA per screen carries the brand bloom (action hierarchy). */
     box-shadow: var(--glow-primary) !important;
 }
 
@@ -324,7 +267,7 @@ input[type="button"]:hover,
 button[type="submit"]:hover,
 button.pf-c-button.pf-m-primary:hover,
 button.pf-v5-c-button.pf-m-primary:hover {
-    background-color: var(--color-accent-light) !important; /* lighten — system-standard primary hover */
+    background-color: var(--color-accent-light) !important;
 }
 
 .krt-button:active,
@@ -343,7 +286,6 @@ button.pf-v5-c-button.pf-m-primary:active {
     transform: scale(0.98);
 }
 
-/* Secondary Buttons */
 button.krt-button-secondary[type="submit"],
 button.krt-button-secondary,
 a.krt-button-secondary,
@@ -404,7 +346,6 @@ button[name="cancel-aia"]:hover {
     color: var(--color-bg-black) !important;
 }
 
-/* Checkboxes */
 input.krt-checkbox[type="checkbox"],
 .krt-checkbox,
 input[type="checkbox"],
@@ -460,9 +401,8 @@ input[type="checkbox"]:checked::after,
     transform: rotate(45deg);
 }
 
-/* Keycloak specific overrides */
 #kc-header {
-    display: none; /* We handle the header inside our form */
+    display: none;
 }
 #kc-info, #kc-registration {
     text-align: center;
@@ -488,7 +428,6 @@ input[type="checkbox"]:checked::after,
     letter-spacing: 1px;
 }
 
-/* Keycloak default page titles and text */
 #kc-page-title {
     font-family: var(--font-headline);
     color: var(--color-primary);
@@ -519,7 +458,6 @@ input[type="checkbox"]:checked::after,
     text-decoration: underline;
 }
 
-/* Custom helper classes to replace inline styles */
 .krt-title-lato {
     font-family: var(--font-body) !important;
     text-transform: none !important;
@@ -542,12 +480,9 @@ input[type="checkbox"]:checked::after,
     margin-top: 5px;
 }
 .krt-error-message::before {
-    content: '\26A0  '; /* ⚠ — errors read as danger, not as the brand accent */
+    content: '\26A0  ';
 }
 
-/* Keycloak validation errors — semantic red across PF v5 / v6 / legacy. The
-   brand orange is reserved for actions + identity; an error shown in orange
-   reads as a call-to-action instead of a problem. */
 #input-error,
 .kc-error-message,
 .kc-feedback-text,
@@ -568,7 +503,6 @@ input[type="checkbox"]:checked::after,
     color: var(--color-danger-text) !important;
 }
 
-/* Invalid fields get a red bottom border + red glow (overriding the orange focus). */
 input[aria-invalid="true"],
 textarea[aria-invalid="true"],
 select[aria-invalid="true"],
@@ -639,7 +573,6 @@ select[aria-invalid="true"],
     text-decoration: underline !important;
 }
 
-/* Remove default Keycloak white background and borders */
 .pf-c-login__main, .pf-v5-c-login__main, .pf-v6-c-login__main,
 .card-pf, .login-pf-page .card-pf,
 .pf-c-login__main-body, .pf-v5-c-login__main-body, .pf-v6-c-login__main-body,
@@ -651,7 +584,6 @@ select[aria-invalid="true"],
     box-shadow: none !important;
 }
 
-/* Add login-container HUD style to standard PatternFly login cards if they don't contain .login-container */
 .pf-v5-c-login__main:not(:has(.login-container)),
 .pf-v6-c-login__main:not(:has(.login-container)),
 .pf-c-login__main:not(:has(.login-container)) {
@@ -664,10 +596,9 @@ select[aria-invalid="true"],
     box-shadow: 0 0 20px rgba(231, 126, 35, 0.1) !important;
     position: relative !important;
     margin: auto !important;
-    display: block; /* ensure block level for auto margins */
+    display: block;
 }
 
-/* HUD Corners for the PatternFly main card */
 .pf-v5-c-login__main:not(:has(.login-container))::before, 
 .pf-v5-c-login__main:not(:has(.login-container))::after,
 .pf-v6-c-login__main:not(:has(.login-container))::before, 
@@ -693,8 +624,6 @@ select[aria-invalid="true"],
     border-left: none; border-top: none;
 }
 
-/* --- Language Selector Dropdown Styling --- */
-/* Positioning and Wrapper */
 .pf-v5-c-login__main-header-utilities,
 .pf-v6-c-login__main-header-utilities,
 .pf-c-login__main-header-utilities,
@@ -705,7 +634,6 @@ select[aria-invalid="true"],
     z-index: 100;
 }
 
-/* Base button / toggle */
 #kc-locale button,
 #kc-current-locale-link,
 #kc-locale-dropdown .pf-v5-c-dropdown__toggle,
@@ -735,7 +663,6 @@ select[aria-invalid="true"],
     transition: all 0.3s ease;
 }
 
-/* Override PatternFly internal variables and pseudo-elements that cause bright backgrounds */
 #kc-locale .pf-v5-c-menu-toggle,
 #kc-locale .pf-v6-c-menu-toggle,
 #kc-locale .pf-c-menu-toggle,
@@ -808,7 +735,6 @@ select[aria-invalid="true"],
     color: var(--color-primary) !important;
 }
 
-/* The dropdown menu (hidden by default) */
 #kc-locale-dropdown .pf-v5-c-dropdown__menu,
 #kc-locale-dropdown .pf-v6-c-dropdown__menu,
 #kc-locale-dropdown .pf-c-dropdown__menu,
@@ -821,7 +747,7 @@ select[aria-invalid="true"],
 .pf-v6-c-dropdown__menu,
 .pf-v5-c-menu,
 .pf-v6-c-menu {
-    display: none !important; /* Hide by default, force hover logic */
+    display: none !important;
     position: absolute;
     top: 100%;
     right: 0;
@@ -834,7 +760,6 @@ select[aria-invalid="true"],
     min-width: 120px;
 }
 
-/* Force show on hover of the wrapper */
 #kc-locale-dropdown:hover .pf-v5-c-dropdown__menu,
 #kc-locale-dropdown:hover .pf-v6-c-dropdown__menu,
 #kc-locale-dropdown:hover .pf-c-dropdown__menu,
@@ -848,7 +773,6 @@ select[aria-invalid="true"],
     display: block !important;
 }
 
-/* Dropdown items */
 .pf-v5-c-dropdown__menu-item,
 .pf-v6-c-dropdown__menu-item,
 .pf-c-dropdown__menu-item,
@@ -890,7 +814,6 @@ select[aria-invalid="true"],
     color: var(--color-bg-black) !important;
 }
 
-/* Remove default Patternfly styling that might conflict */
 .pf-v5-c-dropdown.pf-m-expanded .pf-v5-c-dropdown__menu,
 .pf-v6-c-dropdown.pf-m-expanded .pf-v6-c-dropdown__menu,
 .pf-c-dropdown.pf-m-expanded .pf-c-dropdown__menu,
@@ -899,7 +822,6 @@ select[aria-invalid="true"],
     display: block !important;
 }
 
-/* Hide carets/icons that look bad or just let them color match */
 .pf-v5-c-dropdown__toggle-icon,
 .pf-v6-c-dropdown__toggle-icon,
 .pf-c-dropdown__toggle-icon,
@@ -909,8 +831,6 @@ select[aria-invalid="true"],
     color: var(--color-primary) !important;
 }
 
-
-/* Utility classes for layout previously handled by inline styles */
 .krt-mb-20 {
     margin-bottom: 20px !important;
 }
@@ -924,17 +844,6 @@ select[aria-invalid="true"],
     height: auto !important;
 }
 
-/*
- * Frontend-class aliases.
- *
- * The in-app frontend uses `.btn`, `.btn-secondary`, `.btn-danger` for
- * buttons. The Keycloak FTL templates historically use `.krt-button` /
- * `.krt-button-secondary` because that is what the upstream FTL fragments
- * expect to be overridden. To keep templates portable and to let an
- * engineer copy a snippet from the app into a Keycloak template (or vice
- * versa) without renaming classes, both naming conventions render the
- * same visuals — these rules forward to the `.krt-button*` cascade above.
- */
 .btn {
     width: auto;
     display: inline-block;
@@ -972,11 +881,6 @@ select[aria-invalid="true"],
     background-color: #D41A25;
 }
 
-/* ---- Keyboard focus (A11y) -------------------------------------------------
-   Inputs already show an orange focus glow; give buttons, links, checkboxes and
-   the locale toggle a visible focus ring too so keyboard users always see where
-   they are. PF's own blue focus ring is suppressed elsewhere — this is the KRT
-   replacement, not an addition on top of it. */
 .krt-button:focus-visible,
 .krt-button-secondary:focus-visible,
 .btn:focus-visible,
@@ -1001,11 +905,6 @@ input[type="checkbox"]:focus-visible,
     outline-offset: 2px !important;
 }
 
-/* ── Social / IdP login (Discord etc.) ───────────────────────────────────────
-   Rendered by login.ftl's social block on the Keycloak login page itself.
-   Secondary, OUTLINED on the input surface so the filled-orange primary CTA
-   stays the single brand bloom per screen (action hierarchy). Square-first,
-   Lato bold uppercase; orange border + bloom on hover/focus. */
 .krt-social {
     margin-top: 24px;
 }
@@ -1063,10 +962,6 @@ input[type="checkbox"]:focus-visible,
     outline: none;
 }
 
-/* The Discord mark in the social button. Monochrome (`fill: currentColor`) so it
-   inherits the button text colour — gray at rest, brand orange on hover/focus —
-   matching the monochrome-icon design-system convention (same as the sidebar
-   mark and the footer GitHub mark). */
 .krt-social-icon {
     width: 20px;
     height: 20px;

@@ -1,131 +1,25 @@
-# Override for spinning up the dev stack with test-only credentials from
-# .env.test. The base docker-compose.yml hardcodes the production-facing
-# KEYCLOAK_ISSUER_URI (https://profit-base.online/auth/realms/iri) into all
-# three of the x-backend, x-frontend and x-ingest templates; this file points
-# everything at the locally-imported `iri` realm on the host-mapped Keycloak
-# port 18080 instead, using host.docker.internal so that the same URL works both
-# inside containers and from the host browser on Docker Desktop.
-#
-# SPRING_PROFILES_ACTIVE is pinned to `dev` for all three apps here as well.
-# The base file already does this on its own `*-dev` services, so these lines
-# are belt-and-braces rather than load-bearing — but they are worth keeping
-# explicit, because the failure they prevent is silent: under the prod profile
-# Actuator moves onto an internal-only management port (ADR-0090/ADR-0134)
-# while the image's HEALTHCHECK keeps probing the app port, so the container
-# answers 404 to its own probe and stays `unhealthy` forever without logging
-# anything wrong.
-#
-# Usage:
-#   docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml \
-#       --profile dev up -d
-#
-# After Keycloak is healthy, browse to http://localhost:18081 and log in as
-# test-admin / test-admin-pw (defined in realm-export.json).
-#
-# Prerequisites in the worktree (all gitignored):
-#   .env.test                            — credentials
-#   realm-export.json                    — Keycloak realm dump with test-admin user
-#
-# The TLS material is NOT a prerequisite any more: docker/test-tls/ carries a
-# committed keystore, shared by every test stack and by the Android dev build, so
-# there is nothing to generate and no CA to install by hand. It is bind-mounted
-# below at /run/secrets/keystore.p12 with a hardcoded path rather than through
-# IRI_KEYSTORE_HOST_PATH — that variable still selects the PRODUCTION keystore in
-# the base file, and a test stack must never be one typo away from mounting it.
-# See docker/test-tls/README.md and ADR-0139.
-#
-# This file is intentionally not auto-loaded (no `.override.yml` name) — it
-# has to be passed explicitly so the production-targeted `docker compose up`
-# in other contexts is not affected.
-
 services:
   keycloak-dev:
     environment:
-      # Make Keycloak emit issuer URLs that resolve identically from inside
-      # Docker (backend / frontend containers reach the host via
-      # host.docker.internal) and from the host browser (Docker Desktop
-      # resolves host.docker.internal to localhost). KC_HOSTNAME_STRICT=false
-      # also tolerates plain http://localhost:18080 access during testing.
-      # A BARE hostname on purpose: with no full URL configured Keycloak resolves
-      # scheme, port and context path from the request, which is exactly what
-      # makes one value work from both sides.
       KC_HOSTNAME: host.docker.internal
       KC_HOSTNAME_STRICT: "false"
-      # KC_HOSTNAME_PORT is GONE (2026-09-13): it is not an option of Keycloak 26 at all — the
-      # hostname v2 rewrite replaced it, and the current reference lists only `hostname`,
-      # `hostname-admin`, `hostname-backchannel-dynamic`, `hostname-debug` and `hostname-strict`.
-      # It has therefore been doing nothing here, while the comment above claimed it was what made
-      # the issuer resolve identically inside and outside Docker. What actually does that is the
-      # bare hostname: with no full URL configured Keycloak resolves scheme, port AND context path
-      # from the request, so :18080 and /auth come back on their own.
       KC_HTTP_ENABLED: "true"
-      # The SAME relative path production serves under (ADR-0166). The test stack has no edge, so
-      # it cannot reproduce production's same-ORIGIN arrangement — but it can and does reproduce the
-      # same PATH, which is the half that config gets wrong: a realm export, a discovery URL or a
-      # redirect that assumes Keycloak sits at the root breaks here exactly as it would there, and
-      # the e2e login exercises it on every run.
       KC_HTTP_RELATIVE_PATH: /auth
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
       KC_DB_USERNAME: ${KC_POSTGRES_USER}
       KC_DB_PASSWORD: ${KC_POSTGRES_PASSWORD}
 
-# ---------------------------------------------------------------------------
-# Log destinations.
-#
-# The base compose bind-mounts the PRODUCTION host layout — /var/iri/<svc>/log — which does not
-# exist on a developer machine and is not writable by the containers' unprivileged UID (10001).
-# Logback then fails to open its appender, and because that happens during Spring Boot's logging
-# initialisation it takes the whole start-up with it: the container restarts in a loop and the
-# stack reports "backend-dev is unhealthy" with the actual cause buried under a stack trace about
-# an appender.
-#
-# tmpfs instead, and NOT a named volume — which was the first fix and did not work. Docker populates
-# a fresh named volume from the image's content at that path, ownership included, and the images ship
-# /app/logs/backend.log and backend-error.log owned by root. The container then owns the directory
-# but not the files inside it, so it can create new ones and cannot APPEND to those two, which is
-# exactly what Logback does (openFile(..., append=true)). Production is unaffected because the host
-# log directory is pre-chowned to uid 10001 and its files were written by the service itself.
-#
-# A tmpfs starts genuinely empty, copies nothing from the image and needs no chown. Logs in a test
-# stack are throwaway anyway — nothing here ships them to Loki — and the mount disappears with the
-# container, which suits a stack documented to end in `down --volumes`.
-#
-# `!override` and not a plain list: Compose MERGES volume lists across files, so an added entry
-# would sit beside the production bind rather than replace it, and the broken mount would still be
-# there. Each list therefore repeats the keystore mount the base declares.
-# ---------------------------------------------------------------------------
   backend-dev:
     environment:
       SPRING_PROFILES_ACTIVE: dev
-      # The committed test keystore's password. Pinned here rather than read from
-      # .env.test so every test stack opens the same file with the same value.
       SERVER_SSL_KEY_STORE_PASSWORD: basetool-test
-      # Disable the notification Redis fan-out for the test/e2e stack. The base compose anchor
-      # force-enables it (APP_NOTIFICATIONS_REDIS_FANOUT_ENABLED:-true) for every backend service, but
-      # this is a single-instance stack: there is no peer replica to fan out to, so the fan-out is a
-      # pure no-op here. Keeping it off avoids coupling the e2e boot to a healthy redis-dev for zero
-      # test value; the enabled path is covered off the container by the dedicated fan-out tests (unit,
-      # real-Redis integration, and config wiring). Since #1246 the backend resolves
-      # spring.data.redis.host from REDIS_HOST in the base config (the anchor sets it to `redis`), so an
-      # enabled fan-out here would connect to redis-dev rather than crash against localhost:6379 — but a
-      # single-instance stack still has nothing to gain from it. Prod is unaffected (prod profile keeps
-      # the fan-out on with host=redis).
       APP_NOTIFICATIONS_REDIS_FANOUT_ENABLED: "false"
-      # Override the prod-target issuer URI baked into the base template.
       KEYCLOAK_ISSUER_URI: http://host.docker.internal:18080/auth/realms/iri
-      # Admin-API calls stay on the internal Docker network — no need to go
-      # via host.docker.internal for service-to-service traffic. The /auth is the
-      # server's relative path and applies to the internal hop exactly as it does
-      # to the public one (ADR-0166); see the base template for what 404s without it.
       KEYCLOAK_ADMIN_URL: http://keycloak:18080/auth
       KEYCLOAK_REALM: iri
       KEYCLOAK_ADMIN_CLIENT_ID: backend-service
       KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET}
-    # Make host.docker.internal resolvable from inside the container on
-    # platforms that don't ship the alias by default (Linux). On Docker
-    # Desktop (Mac/Windows) the alias is already present; the extra_hosts
-    # entry is a no-op there.
     volumes: !override
       - type: tmpfs
         target: /app/logs
@@ -138,20 +32,9 @@ services:
   frontend-dev:
     environment:
       SPRING_PROFILES_ACTIVE: dev
-      # The committed test keystore's password. Pinned here rather than read from
-      # .env.test so every test stack opens the same file with the same value.
       SERVER_SSL_KEY_STORE_PASSWORD: basetool-test
       KEYCLOAK_ISSUER_URI: http://host.docker.internal:18080/auth/realms/iri
-      # application-prod.yml hardcodes `spring.data.redis.host: redis`, but
-      # application-dev.yml (activated by the SPRING_PROFILES_ACTIVE override
-      # above) reads `${REDIS_HOST:localhost}` instead. Inside the container
-      # stack `localhost:6379` is the JVM itself, not the redis-dev service,
-      # so explicitly point the dev profile at the Docker network alias.
       REDIS_HOST: redis
-      # application-dev.yml uses `backend.base-url: ${BACKEND_URL:http://localhost:11261}`;
-      # the prod template already exports BACKEND_URL=https://backend:11261 so
-      # this only needs to flip back to the in-container alias when the dev
-      # profile activates inside Docker.
       BACKEND_URL: https://backend:11261
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -165,25 +48,10 @@ services:
 
   ingest-dev:
     environment:
-      # Matches backend-dev and frontend-dev above — see the profile note in this file's header.
-      # This service was the one exception: it declared no `environment:` at all, so it inherited
-      # SPRING_PROFILES_ACTIVE: prod from the x-ingest anchor and bound Actuator to the management
-      # port 11272 while the image went on probing 11262 — a gateway that started perfectly and sat
-      # `unhealthy` forever.
       SPRING_PROFILES_ACTIVE: dev
-      # The committed test keystore's password. Pinned here rather than read from
-      # .env.test so every test stack opens the same file with the same value.
       SERVER_SSL_KEY_STORE_PASSWORD: basetool-test
-      # Same reason as backend-dev: the base template points at the PRODUCTION realm, and the JWKS
-      # fetch that would follow is an outbound call from a developer machine to prod. Tokens carry
-      # the issuer the browser saw (localhost:18080), so this is also the only value that can
-      # validate them. The fetch is lazy, so an unreachable Keycloak does not block start-up.
       KEYCLOAK_ISSUER_URI: http://host.docker.internal:18080/auth/realms/iri
-      # The base template defaults this to https://profit-base.online — the gateway hands it to the
-      # desktop extractor as the "open the pre-filled page" target, so in an isolated stack it would
-      # send a developer's browser to PRODUCTION. Pin it to this stack's own frontend.
       FRONTEND_URL: http://localhost:18081
-    # Resolvable on platforms that do not ship the alias (Linux); a no-op on Docker Desktop.
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes: !override
@@ -191,6 +59,4 @@ services:
         target: /app/logs
         tmpfs:
           mode: 0o777
-      # Restores the mount `!override` dropped: the gateway serves HTTPS on 11262 like the other
-      # two, so replacing its volume list without repeating the keystore left it unable to start.
       - ./docker/test-tls/basetool-test-ingest.p12:/run/secrets/keystore.p12:ro

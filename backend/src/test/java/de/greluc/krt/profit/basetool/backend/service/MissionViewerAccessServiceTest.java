@@ -58,13 +58,10 @@ class MissionViewerAccessServiceTest {
 
   @Test
   void isAuthenticated_delegatesToAuthHelper() {
-    // Given
     when(authHelperService.isAuthenticated()).thenReturn(true);
 
-    // When
     boolean result = missionViewerAccessService.isAuthenticated();
 
-    // Then
     assertTrue(result, "isAuthenticated must return the AuthHelperService result verbatim");
     verify(authHelperService).isAuthenticated();
   }
@@ -87,16 +84,13 @@ class MissionViewerAccessServiceTest {
 
   @Test
   void canManageMission_delegatesWithRawAuthentication() {
-    // Given
     UUID missionId = UUID.randomUUID();
     Authentication authentication = mock(Authentication.class);
     when(authHelperService.rawAuthentication()).thenReturn(authentication);
     when(missionSecurityService.canManageMission(missionId, authentication)).thenReturn(true);
 
-    // When
     boolean result = missionViewerAccessService.canManageMission(missionId);
 
-    // Then
     assertTrue(result, "canManageMission must return the MissionSecurityService result verbatim");
     verify(missionSecurityService).canManageMission(missionId, authentication);
     verify(missionSecurityService, never()).canManageManagers(missionId, authentication);
@@ -104,34 +98,27 @@ class MissionViewerAccessServiceTest {
 
   @Test
   void canManageManagers_delegatesToSecurityServiceCanManageManagers() {
-    // Given
     UUID missionId = UUID.randomUUID();
     Authentication authentication = mock(Authentication.class);
     when(authHelperService.rawAuthentication()).thenReturn(authentication);
     when(missionSecurityService.canManageManagers(missionId, authentication)).thenReturn(true);
 
-    // When
     boolean result = missionViewerAccessService.canManageManagers(missionId);
 
-    // Then
     assertTrue(result, "canManageManagers must return the MissionSecurityService result verbatim");
     verify(missionSecurityService).canManageManagers(missionId, authentication);
-    // Guards the wire-up defect: canManageManagers must NOT route to canManageMission.
     verify(missionSecurityService, never()).canManageMission(missionId, authentication);
   }
 
   @Test
   void canManageMission_returnsFalseWhenSecurityServiceDenies() {
-    // Given
     UUID missionId = UUID.randomUUID();
     Authentication authentication = mock(Authentication.class);
     when(authHelperService.rawAuthentication()).thenReturn(authentication);
     when(missionSecurityService.canManageMission(missionId, authentication)).thenReturn(false);
 
-    // When
     boolean result = missionViewerAccessService.canManageMission(missionId);
 
-    // Then
     assertFalse(result, "canManageMission must propagate a deny decision unchanged");
   }
 }

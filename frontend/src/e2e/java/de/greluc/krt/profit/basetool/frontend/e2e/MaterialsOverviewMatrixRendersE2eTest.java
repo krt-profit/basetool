@@ -113,17 +113,11 @@ class MaterialsOverviewMatrixRendersE2eTest {
       try {
         E2eSupport.navigate(page, baseUrl + "/materials/overview");
 
-        // The core regression: the client un-hides the matrix once the data load resolves. On the
-        // pre-fix frontend #tableContainer stays display:none (its krtm-display-none-5790 class was
-        // never removed), so this visibility assertion is the discriminator.
         assertThat(page.locator("#tableContainer"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(15_000));
         assertThat(page.locator("#matrixLoading")).isHidden();
         assertThat(page.locator("#matrixError")).isHidden();
 
-        // Guards the spacer fix: a blocked inline style attribute is reported to the console. With
-        // real data the virtual scroller emits spacer rows, so a reintroduced style="height:.." (or
-        // any other blocked inline style on this page) would surface here.
         List<String> cspStyleViolations =
             consoleLog.stream().filter(line -> line.contains("style-src-attr")).toList();
         assertTrue(

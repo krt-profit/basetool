@@ -70,7 +70,6 @@ public class NotificationParamsCodec {
     try {
       return objectMapper.writeValueAsString(params);
     } catch (JacksonException e) {
-      // A Map<String,String> is always serializable; treat the impossible case as "no params".
       log.warn("Failed to serialize notification params; storing none — {}", e.getMessage());
       return null;
     }

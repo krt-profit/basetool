@@ -87,7 +87,6 @@ class DefaultBlueprintProvisioningIntegrationTest {
     assertThat(personalBlueprintRepository.existsByOwnerUserIdAndProductKey(user, keyA)).isTrue();
     assertThat(personalBlueprintRepository.existsByOwnerUserIdAndProductKey(user, keyB)).isTrue();
 
-    // Re-running grants nothing new for the keys already owned (ON CONFLICT DO NOTHING).
     int beforeKeys =
         personalBlueprintRepository
             .findAllByOwnerUserIdAndProductKeyIn(user, java.util.List.of(keyA, keyB))

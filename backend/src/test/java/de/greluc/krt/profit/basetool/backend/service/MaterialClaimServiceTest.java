@@ -134,10 +134,6 @@ class MaterialClaimServiceTest {
     squadronB.setProfitEligible(true);
   }
 
-  // ---------------------------------------------------------------
-  // open-remaining math
-  // ---------------------------------------------------------------
-
   @Nested
   class GetClaimBucketsTests {
 
@@ -196,18 +192,11 @@ class MaterialClaimServiceTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // upsert guards
-  // ---------------------------------------------------------------
-
   @Nested
   class UpsertGuardTests {
 
     @BeforeEach
     void delegateSelfToRealService() {
-      // upsertClaim now runs each attempt through self.getObject() so the retry gets a fresh
-      // REQUIRES_NEW transaction. In-process there is no proxy, so point self at the service under
-      // test — the orchestrator then invokes the real within-transaction body.
       when(self.getObject()).thenReturn(service);
     }
 
@@ -237,7 +226,6 @@ class MaterialClaimServiceTest {
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
       adminCaller();
 
-      // NONE bucket does not exist on this GOOD-only order.
       CreateClaimDto dto =
           new CreateClaimDto(MATERIAL_ID, QualityRequirement.NONE, SQUADRON_A, 5.0);
       assertThrows(BadRequestException.class, () -> service.upsertClaim(ORDER_ID, dto));
@@ -249,7 +237,6 @@ class MaterialClaimServiceTest {
       JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, 700, 10.0);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
       adminCaller();
-      // Squadron B already holds 8 on the bucket; A requesting 5 would total 13 > 10.
       when(materialClaimRepository.findByJobOrderIdAndMaterialIdAndQualityRequirement(
               ORDER_ID, MATERIAL_ID, QualityRequirement.GOOD))
           .thenReturn(List.of(claim(order, QualityRequirement.GOOD, squadronB, 8.0)));
@@ -283,9 +270,6 @@ class MaterialClaimServiceTest {
 
     @Test
     void nonProfitEligibleSquadron_rejected() {
-      // Only Profit-side squadrons may sign up for SK-order material — a squadron the admin has not
-      // marked profit-eligible is rejected even when every other invariant (open SK order, known
-      // bucket, no overclaim, admin caller) passes.
       JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, 700, 10.0);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
       adminCaller();
@@ -299,7 +283,6 @@ class MaterialClaimServiceTest {
       Squadron nonProfit = new Squadron();
       nonProfit.setId(SQUADRON_A);
       nonProfit.setShorthand("NPF");
-      // profit-eligible defaults to false — left unset on purpose.
       when(orgUnitRepository.findById(SQUADRON_A)).thenReturn(Optional.of(nonProfit));
 
       assertThrows(
@@ -309,11 +292,6 @@ class MaterialClaimServiceTest {
 
     @Test
     void editOwnClaimUpwardExcludesOwnAmountFromCeiling() {
-      // Regression guard for the self-exclusion filter in upsertClaimWithinTransaction: the
-      // claimedByOthers sum skips the caller's own org unit. Squadron A already holds 8 on a 10-SCU
-      // bucket and raises it to 10 — its own 8 must NOT count against the ceiling (double-counting
-      // would compute 8+10=18>10 and wrongly reject the edit), so the raise is accepted and the new
-      // amount lands in place. Drops or inverts of the !equals filter re-break this.
       JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, 700, 10.0);
       MaterialClaim ownExisting = claim(order, QualityRequirement.GOOD, squadronA, 8.0);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
@@ -339,10 +317,6 @@ class MaterialClaimServiceTest {
       verify(materialClaimRepository).save(ownExisting);
     }
   }
-
-  // ---------------------------------------------------------------
-  // upsert insert vs. update
-  // ---------------------------------------------------------------
 
   @Nested
   class UpsertInsertUpdateTests {
@@ -399,10 +373,6 @@ class MaterialClaimServiceTest {
       verify(materialClaimRepository).save(existing);
     }
   }
-
-  // ---------------------------------------------------------------
-  // audit: claim upsert mode (created vs. updated)
-  // ---------------------------------------------------------------
 
   @Nested
   class ClaimUpsertAuditTests {
@@ -480,10 +450,6 @@ class MaterialClaimServiceTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // permission matrix
-  // ---------------------------------------------------------------
-
   @Nested
   class PermissionTests {
 
@@ -532,10 +498,6 @@ class MaterialClaimServiceTest {
 
     @Test
     void responsibleSkLogisticianOrLead_mayManageForeignSquadronClaim() {
-      // An authority of the responsible SK manages any claim. Both an SK logistician
-      // (is_logistician) and an SK lead (is_lead, which is automatically a logistician of its SK
-      // via
-      // CustomJwtGrantedAuthoritiesConverter) surface here as the contextual LOGISTICIAN@skId.
       JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, 700, 10.0);
       when(jobOrderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
       when(authHelperService.isAdmin()).thenReturn(false);
@@ -558,10 +520,6 @@ class MaterialClaimServiceTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // concurrency: find-or-create race retry (last-writer-wins)
-  // ---------------------------------------------------------------
-
   /**
    * Pins the concurrency contract of the claim upsert: two logisticians of the same squadron
    * lodging the first claim on one bucket race on the unique index / {@code @Version}, and the
@@ -580,7 +538,6 @@ class MaterialClaimServiceTest {
       MaterialClaimService spied = spy(service);
       when(self.getObject()).thenReturn(spied);
       ClaimDto expected = sampleClaimDto();
-      // First attempt loses the INSERT race (unique index), retry finds the winner's row and wins.
       doThrow(new DataIntegrityViolationException("uq_material_claim_bucket_org_unit"))
           .doReturn(expected)
           .when(spied)
@@ -597,7 +554,6 @@ class MaterialClaimServiceTest {
       MaterialClaimService spied = spy(service);
       when(self.getObject()).thenReturn(spied);
       ClaimDto expected = sampleClaimDto();
-      // First attempt loses the @Version race on the existing row, retry reloads and wins.
       doThrow(new ObjectOptimisticLockingFailureException(MaterialClaim.class, null))
           .doReturn(expected)
           .when(spied)
@@ -613,8 +569,6 @@ class MaterialClaimServiceTest {
     void propagatesConflict_whenEveryAttemptLosesTheRace() {
       MaterialClaimService spied = spy(service);
       when(self.getObject()).thenReturn(spied);
-      // A pathological, never-winning race: the bounded retry gives up and surfaces the conflict so
-      // the exception maps to a truthful 409, never a 500.
       doThrow(new ObjectOptimisticLockingFailureException(MaterialClaim.class, null))
           .when(spied)
           .upsertClaimWithinTransaction(ORDER_ID, payload);
@@ -622,7 +576,6 @@ class MaterialClaimServiceTest {
       assertThrows(
           ObjectOptimisticLockingFailureException.class,
           () -> service.upsertClaim(ORDER_ID, payload));
-      // Exactly MAX_UPSERT_ATTEMPTS attempts (four swallowed + one propagating).
       verify(spied, times(5)).upsertClaimWithinTransaction(ORDER_ID, payload);
     }
 
@@ -630,10 +583,6 @@ class MaterialClaimServiceTest {
       return new ClaimDto(UUID.randomUUID(), null, 4.0, null, null, 0L);
     }
   }
-
-  // ---------------------------------------------------------------
-  // withdraw + reconciliation
-  // ---------------------------------------------------------------
 
   @Nested
   class WithdrawAndReconciliationTests {
@@ -670,9 +619,6 @@ class MaterialClaimServiceTest {
 
     @Test
     void withdrawClaim_recordsWithdrawnAuditEvent() {
-      // A withdrawal on the audited Auftraege area must emit JOB_ORDER_CLAIM_WITHDRAWN carrying the
-      // claim + squadron ids (never a name / PII). Dropping the auditService.record call drops the
-      // sign-up cancellation from the job-order audit trail.
       JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, 700, 10.0);
       MaterialClaim claim = claim(order, QualityRequirement.GOOD, squadronA, 3.0);
       UUID claimId = UUID.randomUUID();
@@ -715,7 +661,6 @@ class MaterialClaimServiceTest {
 
     @Test
     void withdrawOrphanedClaims_deletesOnlyClaimsWhoseBucketIsGone() {
-      // Order now only requires the GOOD bucket; a stale NONE-bucket claim is orphaned.
       JobOrder order = materialOrder(responsibleSk, JobOrderStatus.OPEN, 700, 10.0);
       MaterialClaim live = claim(order, QualityRequirement.GOOD, squadronA, 3.0);
       MaterialClaim orphan = claim(order, QualityRequirement.NONE, squadronB, 2.0);
@@ -729,15 +674,12 @@ class MaterialClaimServiceTest {
 
     @Test
     void withdrawOrphanedClaims_itemOrder_usesItemDerivedBuckets() {
-      // Phase 7 (#347): the orphan computation is kind-agnostic — for an ITEM order the surviving
-      // buckets come from the item-derived materials, not from a JobOrderMaterial list.
       JobOrder order = new JobOrder();
       order.setId(ORDER_ID);
       order.setType(JobOrderType.ITEM);
       order.setResponsibleOrgUnit(responsibleSk);
       order.setStatus(JobOrderStatus.OPEN);
       JobOrderItem item = new JobOrderItem();
-      // Only the GOOD bucket survives on the (edited) item order.
       item.setMaterials(
           new HashSet<>(Set.of(itemMaterial(material, QualityRequirement.GOOD, 10.0))));
       order.setItems(new HashSet<>(Set.of(item)));
@@ -751,10 +693,6 @@ class MaterialClaimServiceTest {
       verify(materialClaimRepository).deleteAll(List.of(orphan));
     }
   }
-
-  // ---------------------------------------------------------------
-  // helpers
-  // ---------------------------------------------------------------
 
   private void adminCaller() {
     when(authHelperService.isAdmin()).thenReturn(true);

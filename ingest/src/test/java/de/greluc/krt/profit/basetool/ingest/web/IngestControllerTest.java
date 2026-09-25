@@ -104,9 +104,6 @@ class IngestControllerTest {
 
   @Test
   void shouldRejectUnauthenticatedCaller() throws Exception {
-    // The 401 used to be an empty body; it now carries the same RFC 7807 shape as every other
-    // ingest error so the extractor can branch on `code` (REQ-API-004), while keeping the RFC 6750
-    // challenge its OAuth client reads.
     mockMvc
         .perform(
             post("/v1/refinery-extract")
@@ -179,8 +176,6 @@ class IngestControllerTest {
 
   @Test
   void shouldReject400OnAMalformedJsonBody() throws Exception {
-    // Exercises the ResponseEntityExceptionHandler override: a body Jackson cannot read must come
-    // back as the same RFC 7807 shape as every other gateway problem, not as a container error.
     mockMvc
         .perform(
             post("/v1/refinery-extract")
@@ -194,8 +189,6 @@ class IngestControllerTest {
 
   @Test
   void shouldListTheFieldErrorsOnAValidationRejectAndAlsoLogThem() throws Exception {
-    // "Mein Extrakt wird abgelehnt" is the most common support question; until the WARN existed the
-    // failing constraint lived only in the response body, so the operator had to ask for it back.
     List<ILoggingEvent> events =
         LogCapture.capture(
             GlobalExceptionHandler.class,
@@ -222,8 +215,6 @@ class IngestControllerTest {
 
   @Test
   void shouldLogAMalformedBodyWithoutEchoingItsContent() throws Exception {
-    // Jackson's message quotes the offending part of the body — here a user's extract — so only
-    // the exception class may be logged (REQ-OBS-004).
     List<ILoggingEvent> events =
         LogCapture.capture(
             GlobalExceptionHandler.class,
@@ -246,8 +237,6 @@ class IngestControllerTest {
 
   @Test
   void shouldServeTheOpenApiDocumentWithoutAuthentication() throws Exception {
-    // The committed spec is generated from this endpoint; it is permitted in non-prod and disabled
-    // outright in prod (springdoc.api-docs.enabled=false).
     mockMvc
         .perform(
             org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/v3/api-docs"))

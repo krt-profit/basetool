@@ -27,7 +27,6 @@
     </div>
 
     <div class="hud-box mt-2">
-        <!--/* Filters collapse behind one toggle (REQ-FE-021); "Neuer Auftrag" stays in the page head above. */-->
         <div class="actions-bar">
             <div th:replace="~{fragments/components :: filterToggle('refinery-filter-panel', 'refinery-filter-toggle')}"></div>
         </div>
@@ -82,7 +81,6 @@
                 </td>
                 <td th:text="${order.owner != null ? order.owner.effectiveName : '-'}"></td>
                 <td class="nowrap">
-                    <!--/* Server-Rendering explizit in UTC, Anzeige wird im Browser per JS in Browser-Lokalzeit (DST-korrekt) konvertiert. */-->
                     <span class="local-datetime-display" th:data-utc="${order.endsAt != null ? order.endsAt.toEpochMilli() : 'null'}" th:text="${order.endsAt != null ? #temporals.format(order.endsAt, 'dd.MM. HH:mm', 'UTC') + ' UTC' : '-'}"></span>
                 </td>
                 <td th:text="${order.location != null ? order.location.name : '-'}"></td>

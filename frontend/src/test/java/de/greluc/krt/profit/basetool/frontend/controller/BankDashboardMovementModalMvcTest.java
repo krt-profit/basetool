@@ -89,9 +89,6 @@ class BankDashboardMovementModalMvcTest {
   @Test
   @WithMockUser(roles = "BANK_EMPLOYEE")
   void dashboard_noBookableAccount_omitsMovementModal() throws Exception {
-    // A dashboard whose only account is CLOSED -> no ACTIVE account -> canBook false. The movement
-    // modal (and its CTA) must be absent. Pre-fix, the modal rendered unconditionally because th:if
-    // shared the element with th:replace.
     when(backendApiClient.get(eq("/api/v1/bank/dashboard"), eq(BankDashboardDto.class)))
         .thenReturn(new BankDashboardDto(true, List.of(card("CLOSED")), null));
 
@@ -106,10 +103,6 @@ class BankDashboardMovementModalMvcTest {
   @Test
   @WithMockUser(roles = "BANK_EMPLOYEE")
   void dashboard_withBookableAccount_rendersMovementModal() throws Exception {
-    // An ACTIVE account in the dashboard -> canBook true -> the CTA and the movement modal render
-    // (positive control, so the gating does not over-suppress). No separate account fetch is
-    // needed:
-    // canBook is read from the dashboard itself, and the modal's account pickers search on demand.
     when(backendApiClient.get(eq("/api/v1/bank/dashboard"), eq(BankDashboardDto.class)))
         .thenReturn(new BankDashboardDto(true, List.of(card("ACTIVE")), null));
 
@@ -118,8 +111,6 @@ class BankDashboardMovementModalMvcTest {
         .andExpect(status().isOk())
         .andExpect(content().string(Matchers.containsString("id=\"bank-movement-modal\"")))
         .andExpect(content().string(Matchers.containsString("bank-movement-open")))
-        // REQ-FE-017/ADR-0106: the modal's source + destination account pickers are remote-search
-        // comboboxes and preload no account roster.
         .andExpect(
             content()
                 .string(Matchers.containsString("data-krt-combobox=\"remote-bank-accounts\"")));

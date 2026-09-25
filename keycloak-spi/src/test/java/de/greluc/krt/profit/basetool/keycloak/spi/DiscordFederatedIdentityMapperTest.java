@@ -108,7 +108,6 @@ class DiscordFederatedIdentityMapperTest {
 
   @Test
   void fallsBackToDefaultAlias_whenAliasConfigMissing() {
-    // No idp.alias in the config -> the mapper must still query the "discord" alias.
     when(userProvider.getFederatedIdentity(realm, user, "discord"))
         .thenReturn(new FederatedIdentityModel("discord", DISCORD_ID, "discorduser"));
 

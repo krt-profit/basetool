@@ -121,9 +121,6 @@ class AccountConsolidationServiceTest {
 
     User result = service.consolidate(DUPLICATE_ID, TARGET_ID, 0L, ADMIN_ID);
 
-    // The identity is linked onto the survivor first, the duplicate's app_user row goes next, and
-    // its Keycloak user LAST. That last step being last is what makes a retry safe: a rolled-back
-    // database half leaves the Keycloak user intact for a clean re-read.
     InOrder order = inOrder(keycloakService, userAccountMergeService, userDeletionService);
     order.verify(keycloakService).linkDiscordIdentity(TARGET_ID, SNOWFLAKE, "duplicate");
     order.verify(userAccountMergeService).merge(DUPLICATE_ID, TARGET_ID, ADMIN_ID);
@@ -134,9 +131,7 @@ class AccountConsolidationServiceTest {
             UserDeletionService.KeycloakPresenceCheck.WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER);
     order.verify(keycloakService).deleteUser(DUPLICATE_ID);
 
-    // The duplicate's in-Keycloak guard is cleared before the FK-safe purge runs.
     assertFalse(duplicate.isInKeycloak());
-    // The survivor ends up carrying the link and the captured nickname.
     assertEquals(SNOWFLAKE, result.getDiscordUserId());
     assertEquals("SquadNick", result.getDiscordGuildNickname());
 

@@ -86,11 +86,9 @@ class P4kImportJobRunnerTest {
     order.verify(importService).previewImport(bytes);
     order.verify(jobService).markSucceeded(eq(id), anyString());
     verify(importService, never()).applyImport(any(), anyBoolean());
-    verify(jobService, never())
-        .deletePayload(any()); // a preview keeps its payload for a later apply
+    verify(jobService, never()).deletePayload(any());
     verify(jobService, never()).markFailed(any(), anyString());
     verify(jobService).pruneOldJobs();
-    // A preview changes no master data, so it must never evict the caches.
     verify(cacheEvictionService, never()).evictP4kSyncedMasterData();
   }
 
@@ -106,9 +104,8 @@ class P4kImportJobRunnerTest {
     verify(importService).applyImport(bytes, true);
     verify(importService, never()).previewImport(any());
     verify(jobService).markSucceeded(eq(id), anyString());
-    verify(jobService).deletePayload(id); // an apply is terminal -> reclaim the bytes
+    verify(jobService).deletePayload(id);
     verify(jobService).pruneOldJobs();
-    // A committed apply rewrote master data -> evict the P4K-synced caches.
     verify(cacheEvictionService).evictP4kSyncedMasterData();
   }
 
@@ -123,8 +120,7 @@ class P4kImportJobRunnerTest {
     runner.run(id, P4kImportJobKind.APPLY, false);
 
     verify(jobService).markFailed(id, "empty catalog");
-    verify(jobService).deletePayload(id); // the payload is still reclaimed on a failed apply
-    // The apply rolled back, so nothing changed -> the caches must NOT be evicted.
+    verify(jobService).deletePayload(id);
     verify(cacheEvictionService, never()).evictP4kSyncedMasterData();
   }
 

@@ -37,22 +37,11 @@
 
     <div class="hud-box mt-2">
 
-        <!--/* ShipTypes Section */-->
         <div class="data-section">
             <div class="flex-between-mb">
                 <h2 th:text="#{ship.shiptypes}">Schiffstypen</h2>
                 <div class="form-group krtm-margin-bottom-0-width-300px-position-relativ-70af">
                     <input type="text" id="filterShipTypes" th:placeholder="#{general.filter.name.placeholder}" data-trigger="filter-table" data-table-id="shipTypesTable" autocomplete="off">
-                    <!--/*
-                      Ship-type names are exposed to JavaScript via this server-
-                      rendered <datalist> instead of a Thymeleaf JS-inline
-                      expression. Thymeleaf 3.1 truncates the surrounding
-                      <script> block right after the first List/Collection
-                      JS-inline serialisation, so the second autocomplete
-                      binding (manufacturers) plus filterTable + the modal
-                      close handler would silently never wire. Keep the
-                      datalist; do NOT move this back into <script>.
-                    */-->
                     <datalist id="shipTypeNames-data" class="krtm-display-none-5790">
                         <option th:each="st : ${shipTypes}" th:value="${st.name}"></option>
                     </datalist>
@@ -88,17 +77,11 @@
             </div>
         </div>
 
-        <!--/* Manufacturers Section */-->
         <div class="data-section">
             <div class="flex-between-mb">
                 <h2 th:text="#{ship.manufacturers}">Hersteller</h2>
                 <div class="form-group krtm-margin-bottom-0-width-300px-position-relativ-70af">
                     <input type="text" id="filterManufacturers" th:placeholder="#{general.filter.name.placeholder}" data-trigger="filter-table" data-table-id="manufacturersTable" autocomplete="off">
-                    <!--/*
-                      Manufacturer names datalist — companion to the shipTypes
-                      datalist above. See that comment for the Thymeleaf 3.1
-                      truncation bug.
-                    */-->
                     <datalist id="mfgNames-data" class="krtm-display-none-5790">
                         <option th:each="m : ${manufacturers}" th:value="${m.name}"></option>
                     </datalist>
@@ -136,9 +119,7 @@
     </div>
 </main>
 
-<!--/* Modals */-->
 <div sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
-    <!--/* Reset Fitted Confirmation Modal */-->
     <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='reset-fitted-confirm-modal', titleKey='hangar.ship.reset_fitted.confirm.title', variant='krt-modal--danger', closeTrigger='ship-close-modal', body=~{::reset-fitted-confirm-modal-body})}">
         <th:block th:ref="reset-fitted-confirm-modal-body">
             <div class="krt-modal-body">
@@ -154,7 +135,6 @@
 
 <script th:src="@{/js/autocomplete.js}" defer th:attr="nonce=${cspNonce}"></script>
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
-    /*<![CDATA[*/
     var shipDataI18n = {
         saved:        /*[[#{notification.success.save}]]*/ 'Gespeichert.',
         toggleError:  /*[[#{shipdata.toggle.error}]]*/ 'Sichtbarkeit konnte nicht geaendert werden.',
@@ -169,7 +149,6 @@
         reloadQuestion:       /*[[#{frontend.ajax.conflict.question}]]*/ 'Aktuelle Werte laden?'
     };
     var shipDataResetUrl = /*[[@{/ship-data/reset-fitted}]]*/ '/ship-data/reset-fitted';
-    /*]]>*/
 </script>
 <script th:src="@{/js/ship-data.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>

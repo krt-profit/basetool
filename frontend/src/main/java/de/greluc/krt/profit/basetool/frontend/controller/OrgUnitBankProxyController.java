@@ -417,8 +417,6 @@ public class OrgUnitBankProxyController {
       return ResponseEntity.ok().headers(headers).body(pdf);
     } catch (WebClientResponseException e) {
       log.warn("Org-unit statement proxy: backend returned {} for {}", e.getStatusCode(), uri);
-      // Relay the backend status, but a generic reason — the raw WebClient message can leak the
-      // internal backend URI to the browser (the 500 branch already uses a generic message).
       throw new ResponseStatusException(e.getStatusCode(), "Could not generate the statement.");
     } catch (ResponseStatusException e) {
       throw e;

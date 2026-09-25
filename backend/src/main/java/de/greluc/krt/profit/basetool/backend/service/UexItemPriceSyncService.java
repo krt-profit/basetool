@@ -106,8 +106,6 @@ public class UexItemPriceSyncService {
     log.info("Starting synchronization of UEX item prices...");
     UexClient.FetchResult<UexItemPriceDto> fetched = uexClient.getItemPrices();
     if (fetched.notModified()) {
-      // Matrix byte-identical to the last run: nothing to upsert, and no stale-row sweep either —
-      // every (item, terminal) pair it would clear is still in the (unchanged) feed.
       log.info("UEX item-price matrix unchanged since the last sync (304) — nothing to import.");
       return;
     }
@@ -142,9 +140,6 @@ public class UexItemPriceSyncService {
               + "({} dto(s) received). Refusing to wipe the entire item-price matrix.",
           dtos.size());
     } else {
-      // Cleared in bounded chunks rather than with one `id NOT IN :seenIds` statement: that form
-      // bound a parameter per row UEX returned (23 770 today) and would hit PostgreSQL's 65 535
-      // bind-parameter ceiling as the matrix grows (REQ-DATA-014).
       int cleared =
           chunkWriter.inNewTransaction(
               () ->

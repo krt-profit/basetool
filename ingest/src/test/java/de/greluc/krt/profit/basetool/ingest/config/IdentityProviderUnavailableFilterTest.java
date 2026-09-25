@@ -164,9 +164,6 @@ class IdentityProviderUnavailableFilterTest {
 
   @Test
   void keycloak4xx_isNotTreatedAsAnOutage() throws Exception {
-    // Only an upstream 5xx means "Keycloak is unwell". A 4xx from the JWKS endpoint is a
-    // configuration problem, and silently turning it into a retryable 503 would tell every client
-    // to keep retrying a request that can never succeed.
     FilterChain chain =
         (req, res) -> {
           throw new AuthenticationServiceException(
@@ -182,8 +179,6 @@ class IdentityProviderUnavailableFilterTest {
 
   @Test
   void selfReferentialCauseChain_doesNotSpin() {
-    // A cause that points at itself would loop forever without the guard; the bounded walk must
-    // simply give up and rethrow.
     RuntimeException looping =
         new RuntimeException("looping") {
           private static final long serialVersionUID = 1L;
@@ -207,8 +202,6 @@ class IdentityProviderUnavailableFilterTest {
 
   @Test
   void deeplyNestedTransportCauseBeyondTheWalkBound_isRethrownRatherThanMisclassified() {
-    // The walk is bounded at 12 links; a transport cause buried deeper is not found, and rethrowing
-    // (rather than guessing) keeps the classification honest.
     Throwable cause = new SocketTimeoutException("Read timed out");
     for (int i = 0; i < 20; i++) {
       cause = new IllegalStateException("layer " + i, cause);
@@ -228,8 +221,6 @@ class IdentityProviderUnavailableFilterTest {
 
   @Test
   void alreadyCommittedResponse_isRethrownInsteadOfRewritten() throws Exception {
-    // Once bytes are on the wire the 503 body cannot be written any more; rethrowing lets the
-    // container abort the response rather than appending a second, corrupt document.
     FilterChain chain =
         (req, res) -> {
           ((MockHttpServletResponse) res).setCommitted(true);

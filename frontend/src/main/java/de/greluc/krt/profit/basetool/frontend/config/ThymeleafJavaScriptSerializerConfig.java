@@ -111,23 +111,11 @@ public class ThymeleafJavaScriptSerializerConfig {
 
     JavaTimeAwareJavaScriptSerializer() {
       ObjectMapper m = new ObjectMapper();
-      // Render java.time.* as ISO-8601 strings — matches CLAUDE.md ("All times in UTC") and the
-      // TimezoneSerializationTest contract enforced elsewhere in the codebase.
       m.registerModule(new JavaTimeModule());
       m.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
       m.getFactory().setCharacterEscapes(new ThymeleafCompatibleEscapes());
-      // Jackson's writeValue(Writer, ...) closes the writer by default when AUTO_CLOSE_TARGET
-      // is on. Thymeleaf shares ONE writer across the entire template render, so closing it
-      // after an inline expression silently truncates everything that follows in the same
-      // <script> block (including the event-handler registration at the bottom of the
-      // promotion-admin-rank-requirements template). Disabling the feature keeps the writer
-      // open so Thymeleaf can continue emitting the rest of the page after the JSON island.
       m.getFactory().disable(JsonGenerator.Feature.AUTO_CLOSE_TARGET);
       this.mapper = m;
-      // Reuse Thymeleaf's stock Jackson-backed serializer for the primitive path so that
-      // pure-String
-      // values (the most common case in templates) get byte-for-byte identical output to what
-      // ships before this configuration was introduced.
       this.delegate = new StandardJavaScriptSerializer(true);
     }
 
@@ -193,13 +181,6 @@ public class ThymeleafJavaScriptSerializerConfig {
     @Nullable
     @Override
     public SerializableString getEscapeSequence(int ch) {
-      // The escape outputs (e.g. the 6-char string "'") are intentionally Unicode escape
-      // sequences in JSON, NOT shorter Java escapes like \". They have to land on the wire as
-      // literal backslash-u-0027 so the surrounding <script> block stays well-formed even when
-      // the original value is an apostrophe. We construct them via jsUnicodeEscape(int) instead
-      // of literal "'"/""" string literals so Checkstyle's IllegalTokenText rule
-      // (which suggests \' / \" as shorter alternatives) does not flag the source — the
-      // shorter Java escapes would change the *Java* literal but produce a wrong JSON output.
       return switch (ch) {
         case '<', '>', '&', '\'', '"' -> jsUnicodeEscape(ch);
         case '/' -> new SerializedString("\\/");
@@ -210,9 +191,6 @@ public class ThymeleafJavaScriptSerializerConfig {
 
     @NotNull
     private static SerializedString jsUnicodeEscape(int codePoint) {
-      // Uppercase hex to match Thymeleaf's stock JacksonThymeleafEscapes output byte-for-byte;
-      // mixing cases would surface as a diff in any snapshot test that compares rendered HTML
-      // against a recorded fixture.
       return new SerializedString(String.format("\\u%04X", codePoint));
     }
   }

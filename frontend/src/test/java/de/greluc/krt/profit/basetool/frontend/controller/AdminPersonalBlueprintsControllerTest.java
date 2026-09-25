@@ -83,7 +83,6 @@ class AdminPersonalBlueprintsControllerTest {
     try {
       server.shutdown();
     } catch (Exception ignored) {
-      // already shut down
     }
   }
 

@@ -96,8 +96,6 @@ class SseDeliveryThroughFilterChainTest {
    */
   @MockitoBean private CustomJwtGrantedAuthoritiesConverter authoritiesConverter;
 
-  // HTTP/1.1 explicitly, for the reason ManagementPortIsolationTest gives: the JDK client's HTTP/2
-  // stream handling can RST_STREAM against a Tomcat still warming up under full-suite load.
   private final HttpClient http =
       HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
 
@@ -126,9 +124,6 @@ class SseDeliveryThroughFilterChainTest {
   @DisplayName("the notification stream delivers its first event to a real socket")
   void notificationStreamDeliversToASocket() throws Exception {
     assertThat(firstLineOf("/api/v1/notifications/stream"))
-        // The service sends `connected` the moment it registers the emitter, so the very first
-        // frame is already proof. Waiting for a heartbeat instead would cost 20 s per run and test
-        // the same property.
         .as("first frame of the notification stream")
         .contains("connected");
   }
@@ -163,9 +158,6 @@ class SseDeliveryThroughFilterChainTest {
 
     HttpResponse<Stream<String>> response = http.send(request, HttpResponse.BodyHandlers.ofLines());
     if (response.statusCode() != 200) {
-      // The body is read into the message deliberately: every refusal on this path is an RFC 7807
-      // document naming the gate, and a bare status code sends the next reader hunting for which
-      // of the four filters in front of the stream said no.
       throw new AssertionError(
           "status "
               + response.statusCode()
@@ -175,8 +167,6 @@ class SseDeliveryThroughFilterChainTest {
               + response.body().toList());
     }
 
-    // The read has to be interruptible: a swallowed stream blocks forever rather than failing, so
-    // an ordinary read on this thread would hang the build instead of reporting the defect.
     CompletableFuture<List<String>> firstLine =
         CompletableFuture.supplyAsync(
             () -> response.body().filter(line -> !line.isBlank()).limit(1).toList());

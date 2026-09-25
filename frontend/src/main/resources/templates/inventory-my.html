@@ -29,9 +29,6 @@
         <h1>Mein Lager</h1>
     </div>
 
-    <!--/* Material <-> Items view switch (REQ-INV-030): server-rendered navigation links in the
-         shared .tab-nav DS pattern; the view= query parameter picks which tree the server
-         renders (no client-side toggling of two prerendered trees). */-->
     <div class="tab-nav mt-2" role="tablist" th:aria-label="#{inventory.items.view.aria}">
         <a th:href="@{/inventory/my}" class="tab" role="tab"
            th:classappend="${view != 'items'} ? ' active' : ''" th:aria-selected="${view != 'items'}"
@@ -45,20 +42,11 @@
         <div th:if="${error}" class="hud-box hud-box-error">
             <p th:text="#{__${error}__}">Fehler</p>
         </div>
-        
 
         <div class="actions-bar">
             <a th:href="@{/inventory}" class="btn btn-ghost">&laquo; Zurück zur Staffelübersicht</a>
             <a th:href="@{/inventory/input(source='my')}" class="btn btn--cta" th:text="#{inventory.input.new}">Neuen Eintrag erfassen</a>
 
-            <!--/* Filter toggle (REQ-INV-037): the panel below holds the whole filter row, which
-                 wraps onto lines of its own and pushes the bulk bar and the table down. The
-                 button collapses it, and carries the number of active filters so a collapsed
-                 panel can never hide WHY the table is narrowed — that count is the only thing
-                 standing between "tidy" and "silently filtered".
-
-                 Rendered EXPANDED and collapsed by script on load: `hidden` is the collapse
-                 mechanism, so without JavaScript the filters stay reachable and usable. */-->
             <div th:replace="~{fragments/components :: filterToggle('myFilterPanel', 'lager-filter-toggle')}"></div>
         </div>
 
@@ -82,11 +70,6 @@
                             </div>
                         </div>
                     </div>
-                    <!--/* Location filter (REQ-INV-040): the options are the locations that
-                         currently hold stock in this view's scope, never the location catalog —
-                         that is the whole universe, which is why every location PICKER on this
-                         page searches server-side instead. A filter multi-select cannot search,
-                         so the controller derives these from the grouped result's stack keys. */-->
                     <div class="flex-gap-sm">
                         <label class="form-label-xs" th:text="#{inventory.filter.location}">Standort:</label>
                         <div class="multi-select-container" id="locationFilterContainer">
@@ -160,12 +143,6 @@
                     </label>
                     <button type="button" class="btn btn-ghost" data-trigger="inv-my-reset-filter" th:text="#{inventory.filter.reset}">Filter zur\u00fccksetzen</button>
                 </form>
-                <!--/* Item-view filters (REQ-INV-030): gameItem multi-select populated only from
-                     items that currently have stock in the caller's scope (never the full
-                     catalog), the job-order filter, and the personal flags. All element ids are
-                     item-prefixed so the template source keeps ids unique (HTMLHint id-unique);
-                     the checkbox CLASSES are shared with the material form \u2014 only one form
-                     renders per view, so the class-driven collection cannot mix. */-->
                 <form th:if="${view == 'items'}" th:action="@{/inventory/my}" method="get" id="myItemsFilterForm" class="my-inventory-filter no-track krtm-margin-0-display-flex-gap-1rem-align-items-c-5700">
                     <input type="hidden" name="view" value="items">
                     <div class="flex-gap-sm">
@@ -186,11 +163,6 @@
                             </div>
                         </div>
                     </div>
-                    <!--/* Location filter (REQ-INV-040): the options are the locations that
-                         currently hold stock in this view's scope, never the location catalog —
-                         that is the whole universe, which is why every location PICKER on this
-                         page searches server-side instead. A filter multi-select cannot search,
-                         so the controller derives these from the grouped result's stack keys. */-->
                     <div class="flex-gap-sm">
                         <label class="form-label-xs" th:text="#{inventory.filter.location}">Standort:</label>
                         <div class="multi-select-container" id="itemLocationFilterContainer">
@@ -242,10 +214,6 @@
         </div>
 
         <div class="bulk-checkout-bar" id="bulkCheckoutBar">
-            <!--/* "Alle markieren" (REQ-INV-034): selects every entry of the current filtered view —
-                 across collapsed stacks and pagination — by fetching all matching entry ids from
-                 /inventory/my/entry-ids, so the user need not expand and tick each one before
-                 "Markierte ausbuchen". Toggles to "Auswahl aufheben" once a full selection is on. */-->
             <button type="button" id="bulkSelectAllBtn" class="btn btn-ghost"
                     data-state="off"
                     th:data-text-select="#{inventory.bulk.selectAll}"
@@ -255,9 +223,6 @@
             <button type="button" id="bulkCheckoutBtn" class="btn btn-ghost" disabled
                     th:text="#{inventory.bulk.checkout.btn}"
                     data-trigger="inv-my-open-bulk">Markierte ausbuchen</button>
-            <!--/* Massen-Umbuchen (REQ-INV-036): the same marked selection, moved in full instead of
-                 discarded — to another Ort/Nutzer, or across the personal marker. Shares the
-                 selection set and the enabled/disabled state with "Markierte ausbuchen". */-->
             <button type="button" id="bulkRebookBtn" class="btn btn-ghost" disabled
                     th:text="#{inventory.bulk.rebook.btn}"
                     data-trigger="inv-my-open-bulk-rebook">Markierte umbuchen</button>
@@ -267,12 +232,6 @@
         <div class="overflow-x-auto" id="myInventoryTableContainer" th:fragment="inventoryTableFragment">
             <div class="table-responsive">
             <th:block th:if="${view != 'items'}">
-            <!--/* Consolidated tree table (das-kartell-design .tree-table): one sticky header
-                 for all depths; Material -> Standort/Stack -> Eintrag shown by indentation +
-                 rails instead of three repeated <thead> sets. The per-material bulk select-all
-                 moves into the material row's action cell; per-entry checkboxes live in the
-                 lazy-loaded leaf rows. Stack-key data-attributes, lazy-load hooks and the
-                 delegated data-trigger handlers are preserved verbatim. */-->
             <div class="tree-table krtm-tree-cols-minmax-200px-1-4fr-minmax-220px-1-88e9" id="inventoryTable" th:data-user-id="${#authentication.name}">
                 <div class="tree-row tree-head">
                     <div class="tree-cell" th:text="#{inventory.tree.stock}">Bestand</div>
@@ -332,7 +291,6 @@
                             </div>
                             <div class="tree-stack-entries krtm-display-none-5790">
                                 <div class="stack-entries-content">
-                                    <!--/* entries lazily loaded on expand via /inventory/my/stack/entries (ADR-0003) */-->
                                 </div>
                             </div>
                         </div>
@@ -345,12 +303,6 @@
             </div>
             </th:block>
             <th:block th:if="${view == 'items'}">
-            <!--/* Item tree (REQ-INV-030): GameItem -> Standort/Stack -> lazy entries on the
-                 page-scoped four-column .lager-items-tree grid — no quality column, whole-unit
-                 amounts, kind badge + manufacturer on the group row. The runtime id
-                 "inventoryTable" is emitted via th:id so the template source keeps ids unique
-                 (only one tree renders per view). Same lazy-load and data-trigger wiring as the
-                 material tree; the stack key is gameItemId + location + personal + org unit. */-->
             <div class="tree-table lager-items-tree" th:id="'inventoryTable'" th:data-user-id="${#authentication.name}">
                 <div class="tree-row tree-head">
                     <div class="tree-cell" th:text="#{inventory.tree.stock}">Bestand</div>
@@ -402,7 +354,6 @@
                             </div>
                             <div class="tree-stack-entries krtm-display-none-5790">
                                 <div class="stack-entries-content">
-                                    <!--/* entries lazily loaded on expand via /inventory/my/game-item-stack/entries (REQ-INV-030) */-->
                                 </div>
                             </div>
                         </div>
@@ -476,10 +427,6 @@
                 </div>
             </div>
 
-            <!--/* Variante C "Herkunft" (deduct-from) picker (REQ-INV-027): inventory-herkunft.js
-                 fills [data-herkunft-body] from the source entry's chips when the modal opens, so
-                 the user chooses which Auftrag / Einsatz slices (or the rest) the ausgebuchte Menge
-                 comes from. Hidden for an entry with no earmark tags. */-->
             <div class="form-group mb-1 krtm-hidden" data-herkunft="bookout"
                  data-herkunft-amount-id="amount"
                  data-herkunft-submit-id="bookOutSubmitBtn"
@@ -500,12 +447,6 @@
     </th:block>
 </th:block>
 
-<!--/* Umbuchen (rebooking) modal — REQ-INV-007 + the transfer consolidation. Hosts two modes:
-     LOCATION (the relocated book-out TRANSFER: move stock to another Ort/Nutzer/OrgUnit) and
-     PERSONAL (toggle the personal marker: personal <-> shared squadron pool). The direction of the
-     PERSONAL mode is inferred from the source row's personal flag. All inputs are plain (no
-     th:field) with umbuchen-prefixed ids so they never collide with the Ausbuchen modal; the write
-     is JS-driven through krtFetch. */-->
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='umbuchenModal', titleKey='inventory.rebook.title', variant='krt-modal--wide', closeTrigger='inv-my-close-umbuchen', body=~{::umbuchenModal-body})}">
     <th:block th:ref="umbuchenModal-body">
         <form id="umbuchenForm">
@@ -555,8 +496,6 @@
                     </div>
                     <div class="flex-1">
                         <label for="umbuchenTargetLocationId" class="form-label" th:text="#{inventory.bookout.targetLocation}">Umbuchen zu Ort</label>
-                        <!--/* Server-side location search (remote-locations): no preloaded catalog; inventory-my.js
-                             seeds the row's current location (value + label) when the modal opens. */-->
                         <select id="umbuchenTargetLocationId" class="w-full" data-krt-combobox="remote-locations"></select>
                     </div>
                 </div>
@@ -564,9 +503,6 @@
                     <label for="umbuchenTargetOwningOrgUnitId" class="form-label" th:text="#{inventory.bookout.targetOrgUnit}">Buchen in OrgUnit</label>
                     <select id="umbuchenTargetOwningOrgUnitId" class="w-full"></select>
                 </div>
-                <!--/* Variante C "Herkunft" (deduct-from) picker (REQ-INV-027) for the transfer: the
-                     moved row inherits the reduced tags ("Marken mitnehmen"). Inside the transfer
-                     fields, so it hides in PERSONAL mode; inventory-my.js fills it on open. */-->
                 <div class="form-group mb-1 krtm-hidden" data-herkunft="umbuchen"
                      data-herkunft-amount-id="umbuchenAmount"
                      data-herkunft-submit-id="umbuchenSubmitBtn">
@@ -584,8 +520,6 @@
                 </div>
             </div>
 
-            <!--/* REQ-INV-026: per-action stock-merge opt-in for the moved / rebooked quantity. Shown
-                 by inventory-my.js only for an SCU material (PIECE always merges). */-->
             <div id="umbuchenMergeRow" class="form-group check-row mb-1 krtm-hidden">
                 <input type="checkbox" id="umbuchenMergeStock">
                 <div>
@@ -636,12 +570,6 @@
     </th:block>
 </th:block>
 
-<!--/* Massen-Umbuchen modal (REQ-INV-036) — the bulk counterpart of #umbuchenModal. Two differences
-     from the single-row dialog: there is no amount input (every marked row moves in full, since the
-     selection spans collapsed stacks and later pages and a per-row quantity could not be reviewed),
-     and the two personal directions are OWN radio options instead of one direction inferred from the
-     source row — a bulk selection can mix personal and shared stock, so the target state is stated
-     explicitly and rows already in it are skipped server-side. */-->
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='bulkRebookModal', titleKey='inventory.bulk.rebook.modal.title', variant='krt-modal--wide', closeTrigger='inv-my-close-bulk-rebook', body=~{::bulkRebookModal-body})}">
     <th:block th:ref="bulkRebookModal-body">
         <form id="bulkRebookForm">
@@ -672,9 +600,6 @@
                     </div>
                     <div class="flex-1">
                         <label for="bulkRebookTargetLocationId" class="form-label" th:text="#{inventory.bookout.targetLocation}">Umbuchen zu Ort</label>
-                        <!--/* Server-side location search (remote-locations): no preloaded catalog. Unlike
-                             the single-row modal there is no current location to seed — the selection can
-                             span many — so it opens empty and the user picks the destination. */-->
                         <select id="bulkRebookTargetLocationId" class="w-full" data-krt-combobox="remote-locations"></select>
                     </div>
                 </div>
@@ -682,18 +607,11 @@
 
             <p id="bulkRebookPersonalHint" class="krtm-color-var-color-gray-1-font-family-lato-sans-c5ea krtm-hidden"></p>
 
-            <!--/* One org-unit picker for both pools that need one: the LOCATION target owner's, and the
-                 owner's own for DEPERSONALIZE. PERSONALIZE hides it — a personalized row keeps its
-                 source stamp. */-->
             <div id="bulkRebookOrgUnitWrapper" class="krtm-display-none-margin-top-0-75rem-d00c">
                 <label for="bulkRebookOrgUnitId" class="form-label" th:text="#{inventory.rebook.targetOrgUnit}">Buchen in OrgUnit</label>
                 <select id="bulkRebookOrgUnitId" class="w-full"></select>
             </div>
 
-            <!--/* REQ-INV-026: the per-action stock-merge opt-in, applied to every moved row. Always
-                 offered here (unlike the single-row modal, which hides it for PIECE): a bulk selection
-                 can mix SCU and PIECE stock, and the backend ignores the flag for the rows that
-                 always merge anyway. */-->
             <div id="bulkRebookMergeRow" class="form-group check-row mb-1">
                 <input type="checkbox" id="bulkRebookMergeStock">
                 <div>
@@ -711,7 +629,6 @@
 </th:block>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
-<!--/* Shared Materialbörse release / edit modal, reused by the "Für Börse freigeben" leaf checkbox */-->
 <th:block th:replace="~{fragments/materialboerse-modal :: releaseModal}"/>
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
     var stackEntriesI18n = {
@@ -730,9 +647,6 @@
         selectAllFailed: /*[[#{inventory.bulk.selectAll.error}]]*/ 'Die Eintr\u00e4ge konnten nicht ermittelt werden.'
     };
 
-    // REQ-INV-036 Massen-Umbuchen strings. `success` covers the all-moved case, `successPartial` the
-    // mixed one ({0} moved / {1} skipped) and `noneMoved` the all-skipped one \u2014 the page must not
-    // report a selection that was entirely already-at-target as a plain success.
     var bulkRebookI18n = {
         modalMessage: /*[[#{inventory.bulk.rebook.modal.message}]]*/ 'Sollen die {0} markierten Eintr\u00e4ge vollst\u00e4ndig umgebucht werden?',
         success: /*[[#{inventory.bulk.rebook.success}]]*/ 'Massenumbuchung erfolgreich: {0} Eintr\u00e4ge umgebucht.',
@@ -745,9 +659,6 @@
         hintDepersonalize: /*[[#{inventory.bulk.rebook.hint.depersonalize}]]*/ 'Alle markierten Eintr\u00e4ge werden ins gemeinsame Lager umgebucht.'
     };
 
-    // #577 part 2: the single book-out and the bulk-checkout now save in place through the shared
-    // krtFetch/krtCsrf foundation (REQ-FE-002/005). Both reuse the OPTIMISTIC_LOCK reload-confirm via
-    // these localized conflict strings (the shared frontend.ajax.conflict.* foundation set).
     var inventoryConflictI18n = {
         title: /*[[#{frontend.ajax.conflict.title}]]*/ 'Konflikt: Jemand war schneller',
         reloadDetailFallback: /*[[#{frontend.ajax.conflict.detail}]]*/ 'Die Daten wurden zwischenzeitlich ge\u00e4ndert.',
@@ -755,9 +666,6 @@
         dismissLabel: /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Schlie\u00dfen',
         reloadQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Aktuelle Werte laden?'
     };
-    // The book-out modal's strings, read by the shared inventory-common.js: the write toasts plus
-    // the terminal picker's placeholders (loading / choose / none / error / no material) and the
-    // "{0} ({1} aUEC)" price label of a terminal that buys the material.
     var bookOutI18n = {
         success: /*[[#{success.inventory.bookout}]]*/ 'Eintrag erfolgreich ausgebucht',
         error: /*[[#{error.inventory.bookout.failed}]]*/ 'Fehler beim Ausbuchen des Eintrags',
@@ -768,7 +676,6 @@
         terminalNoMaterial: /*[[#{inventory.bookout.terminal.noMaterial}]]*/ 'Kein Material gew\u00e4hlt',
         terminalPrice: /*[[#{inventory.bookout.terminal.price}]]*/ '{0} ({1} aUEC)'
     };
-    // REQ-INV-007 personal-rebooking (Umbuchung) modal strings.
     var umbuchenI18n = {
         success: /*[[#{success.inventory.rebook}]]*/ 'Eintrag erfolgreich umgebucht',
         error: /*[[#{error.inventory.rebook.failed}]]*/ 'Fehler beim Umbuchen des Eintrags',
@@ -791,9 +698,6 @@
         confirmMessage: /*[[#{inventory.note.confirmRemove.message}]]*/ 'Notiz wirklich entfernen?'
     };
 
-    // Variante C allocation-chip strings (REQ-INV-027): the toast + rest-chip i18n the
-    // /js/inventory-my.js allocation module reads (add/edit/remove of a job-order or mission
-    // quantity slice). restFree/restOver carry a {0} placeholder the module substitutes.
     var assocI18n = {
         saved: /*[[#{notification.success.assoc.saved}]]*/ 'Zuordnung gespeichert.',
         conflict: /*[[#{error.inventory.update.conflict}]]*/ 'Der Eintrag wurde in der Zwischenzeit von einem anderen Nutzer ge\u00e4ndert. Bitte lade die Seite neu.',
@@ -805,11 +709,6 @@
         failed: /*[[#{error.inventory.update.failed}]]*/ 'Fehler beim Aktualisieren des Lagers.'
     };
 
-    // Variante C "Herkunft" (deduct-from) picker strings (REQ-INV-027): inventory-herkunft.js reads
-    // these to label each dimension, the rest chip, the "assign at least" warning and the coupled
-    // SELL proceeds hint. order/mission reuse the Auftrag/Einsatz captions; rest/min/personal carry
-    // a {0} placeholder the module substitutes. `auto` annotates a dimension the picker fills and
-    // locks itself (single tag, no rest).
     var herkunftI18n = {
         order: /*[[#{inventory.order}]]*/ 'Auftrag',
         mission: /*[[#{inventory.tree.field.mission}]]*/ 'Einsatz',
@@ -821,7 +720,6 @@
         auto: /*[[#{inventory.herkunft.auto}]]*/ 'Automatisch vorbef\u00fcllt: einzige Marke, kein Rest'
     };
 
-    // "F\u00fcr B\u00f6rse freigeben" leaf-checkbox strings (inventory-materialboerse.js).
     var materialboerseInventoryI18n = {
         statusOn: /*[[#{materialboerse.inventory.forExchange.on}]]*/ 'Auf B\u00f6rse',
         statusPrivate: /*[[#{materialboerse.inventory.forExchange.private}]]*/ 'privat',

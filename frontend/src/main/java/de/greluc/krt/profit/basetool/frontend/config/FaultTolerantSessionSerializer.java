@@ -190,9 +190,6 @@ public class FaultTolerantSessionSerializer implements RedisSerializer<Object> {
     } catch (SerializationException ex) {
       UnreadableSessionValue marker = describe(ex);
       count(marker);
-      // No WARN here: SessionAttributeDiagnosticMapper writes it, with the attribute name that
-      // makes it actionable. This line covers the reads that never reach that mapper — the
-      // keyspace-notification payload in RedisIndexedSessionRepository#onMessage.
       log.debug(
           "Dropped an unreadable session value (cause={}, typeId={}, baseType={})",
           marker.cause(),

@@ -104,7 +104,6 @@ class AnonymisedHandleRenderTest {
   private static final Pattern RESTRICTED_ATTRIBUTE =
       Pattern.compile("th:(attr|attrappend|attrprepend|data-[\\w-]+)=\"([^\"]*)\"");
 
-  // covers REQ-SEC-062 - an erased handle must never reach a page as its raw token
   @Test
   void everyRenderedHandleGoesThroughTheDisplayHelper() throws IOException {
     List<String> unwrapped = new ArrayList<>();
@@ -113,7 +112,6 @@ class AnonymisedHandleRenderTest {
       String content = Files.readString(template, StandardCharsets.UTF_8);
       Matcher attribute = RENDERING_ATTRIBUTE.matcher(content);
       while (attribute.find()) {
-        // Blanked rather than removed, so every offset below still addresses the same character.
         String expression = MESSAGE_LOOKUP.matcher(attribute.group(1)).replaceAll(this::blanked);
         Matcher accessor = SNAPSHOT_ACCESSOR.matcher(expression);
         while (accessor.find()) {
@@ -180,12 +178,8 @@ class AnonymisedHandleRenderTest {
         .isEmpty();
   }
 
-  // covers REQ-SEC-062 - the matcher has to be able to see an unwrapped render at all
   @Test
   void theMatcherFlagsAnUnwrappedRenderInEitherSpelling() {
-    // The previous anti-vacuity check counted files containing "@handles.display(" and asserted
-    // "> 5", which is true of a matcher that finds nothing: it measured the templates, not the
-    // scan. This exercises the matcher against both spellings it used to be blind to.
     assertThat(findUnwrapped("th:text=\"${order.handle}\""))
         .as("property navigation, the spelling two already-wrapped sites use")
         .isNotEmpty();
@@ -250,8 +244,6 @@ class AnonymisedHandleRenderTest {
    * @return {@code true} when this occurrence feeds a comparison or an emptiness test
    */
   private static boolean isPredicate(String expression, int at, int end) {
-    // The trailing "()" may sit outside the match: the pattern's word boundary cannot hold between
-    // ")" and a space, so it backtracks and the call parentheses are left for us to step over.
     String after = expression.substring(end).replaceFirst("^\\(\\)", "").stripLeading();
     if (after.startsWith("!=") || after.startsWith("==")) {
       return true;
@@ -279,8 +271,6 @@ class AnonymisedHandleRenderTest {
     if (wrapper < 0) {
       return false;
     }
-    // Nothing but the navigation may sit between the wrapper and the accessor, or the wrapper
-    // belongs to an earlier occurrence in the same expression.
     String between = expression.substring(wrapper + WRAPPER.length(), at);
     return between.matches("[A-Za-z0-9_.\\[\\]]*");
   }

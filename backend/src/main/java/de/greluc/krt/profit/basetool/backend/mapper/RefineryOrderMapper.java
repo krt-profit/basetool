@@ -60,7 +60,6 @@ public interface RefineryOrderMapper {
    */
   @Mapping(target = "profit", expression = "java(computeProfit(entity))")
   @Mapping(target = "owningSquadron", source = "owningOrgUnit")
-  // owningOrgUnitId is the create/update picker INPUT; the read side publishes owningSquadron.
   @Mapping(target = "owningOrgUnitId", ignore = true)
   RefineryOrderDto toDto(RefineryOrder entity);
 
@@ -131,7 +130,6 @@ public interface RefineryOrderMapper {
    * service (resolved from the JWT) and stripped here.
    */
   @Mapping(target = "owner", ignore = true)
-  // The owning org unit is resolved by the service from owningOrgUnitId (REQ-ORG-016).
   @Mapping(target = "owningOrgUnit", ignore = true)
   @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "updatedAt", ignore = true)

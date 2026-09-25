@@ -100,10 +100,6 @@ class ProfileDescriptionInPlaceE2eTest {
         E2eSupport.navigate(page, baseUrl + "/profile");
         page.waitForLoadState();
 
-        // Marker on the live document: a full navigation/reload wipes it, so its survival proves
-        // the
-        // save stayed in place. The position:fixed footer can cover the bottom submit button, so it
-        // is dropped out of the way before the (non-navigating) AJAX click.
         page.evaluate("() => { window.__krtNoReload = true; }");
         page.evaluate(
             "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
@@ -121,9 +117,6 @@ class ProfileDescriptionInPlaceE2eTest {
             page.evaluate("() => window.__krtNoReload === true"),
             "Description save must update in place — no page reload on success.");
 
-        // Forced stale CSRF token: corrupt the meta token, clear the prior toast, save again. The
-        // first request 403s; krtFetch must refetch GET /csrf, update the meta tag, and retry once,
-        // so the save still succeeds (and still without a reload).
         page.evaluate(
             "() => { const m = document.querySelector('meta[name=\"_csrf\"]'); if (m) {"
                 + " m.setAttribute('content', 'stale-invalid-token'); } }");

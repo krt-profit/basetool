@@ -111,10 +111,6 @@ class OptimisticLockingTest {
 
   @AfterEach
   void cleanupSeedRows() {
-    // Without an outer @Transactional we keep the rows alive across the test;
-    // siblings like ShipTypeTest assume `shipTypeRepository.findAll().get(0)`
-    // returns *their* row, so we explicitly remove our seed entities in
-    // reverse FK order (Ship -> ShipType + Membership + User) to keep them isolated.
     if (shipId != null) {
       shipRepository.deleteById(shipId);
     }
@@ -135,7 +131,6 @@ class OptimisticLockingTest {
     owner.setUsername("oltest-" + owner.getId());
     userRepository.save(owner);
     ownerId = owner.getId();
-    // Post-R9 D3 (V101): the user's Staffel link lives only in org_unit_membership.
     OrgUnitMembership membership = new OrgUnitMembership();
     membership.setId(new OrgUnitMembershipId(owner.getId(), Squadron.IRIDIUM_ID));
     membership.setUser(owner);

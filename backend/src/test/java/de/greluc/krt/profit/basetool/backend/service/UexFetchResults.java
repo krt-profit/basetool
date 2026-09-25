@@ -39,9 +39,7 @@ import java.util.List;
  */
 final class UexFetchResults {
 
-  private UexFetchResults() {
-    // Test fixture holder — not instantiable.
-  }
+  private UexFetchResults() {}
 
   /**
    * Wraps rows as a normal {@code 200} outcome: the feed answered with content and is therefore

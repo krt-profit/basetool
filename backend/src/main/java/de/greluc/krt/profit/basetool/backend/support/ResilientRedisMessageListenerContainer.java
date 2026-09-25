@@ -187,8 +187,6 @@ public class ResilientRedisMessageListenerContainer extends RedisMessageListener
     try {
       super.start();
       if (stopRequested) {
-        // Shutdown began while this attempt was in flight: do not leave behind a subscription that
-        // the lifecycle processor has already walked past and will never stop.
         super.stop(NO_OP_CALLBACK);
         return;
       }
@@ -197,10 +195,6 @@ public class ResilientRedisMessageListenerContainer extends RedisMessageListener
         log.info("Redis fan-out subscription re-established for container '{}'.", describe());
       }
     } catch (RuntimeException ex) {
-      // Upstream sets the started flag before it throws, so without this the container claims to be
-      // running and every later start() is a silent no-op. See the class Javadoc. It must be
-      // super.stop(Runnable) and not super.stop(): the latter dispatches virtually back into this
-      // class's override, which would cancel the retry scheduled two lines below.
       super.stop(NO_OP_CALLBACK);
       if (isRetry) {
         log.debug("Redis fan-out subscription retry for '{}' failed again.", describe(), ex);

@@ -49,9 +49,7 @@ import org.jetbrains.annotations.Nullable;
 @JBossLog
 final class BackendTrustSupport {
 
-  private BackendTrustSupport() {
-    // Utility class — not instantiable.
-  }
+  private BackendTrustSupport() {}
 
   /**
    * Builds an HTTP client trusting the configured backend truststore, falling back to the default
@@ -104,8 +102,6 @@ final class BackendTrustSupport {
       context.init(null, trustManagerFactory.getTrustManagers(), null);
       return context;
     } catch (GeneralSecurityException | IOException e) {
-      // Misconfigured / unreadable truststore — fall back to default trust. The HTTPS call then
-      // fails against the self-signed cert and the precheck fails open; never trust-all.
       log.warn(
           "Failed to load the backend truststore; the Discord account-existence precheck will fail"
               + " open until it is fixed.",

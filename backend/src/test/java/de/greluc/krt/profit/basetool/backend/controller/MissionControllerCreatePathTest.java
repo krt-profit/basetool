@@ -81,9 +81,6 @@ class MissionControllerCreatePathTest {
 
     UUID attackerTargetId = UUID.randomUUID();
     UUID attackerSquadronId = UUID.randomUUID();
-    // Craft a JSON payload that ATTEMPTS to mass-assign id / version / owningSquadron / parent /
-    // owner / managers. Jackson drops unknown fields silently (we want them dropped — strict mode
-    // would 400 valid frontend payloads that include the read-DTO fields).
     String body =
         "{"
             + "\"id\":\""
@@ -120,15 +117,9 @@ class MissionControllerCreatePathTest {
     Mockito.verify(missionService).createMission(captor.capture());
     CreateMissionRequest forwarded = captor.getValue();
 
-    // Caller-supplied benign fields flow through ...
     org.junit.jupiter.api.Assertions.assertEquals("Attacker Mission", forwarded.name());
     org.junit.jupiter.api.Assertions.assertEquals("benign field", forwarded.description());
     org.junit.jupiter.api.Assertions.assertEquals(Boolean.TRUE, forwarded.isInternal());
-
-    // ... but the CreateMissionRequest record has no slots for id/version/owningSquadron/etc., so
-    // the binding layer cannot smuggle them in. The service receives a record whose only
-    // information about the request is the safe subset. This is the structural fix for C-3.
-    // (No assertions on "absent" fields needed — they don't exist as accessors on the record.)
   }
 
   @Test

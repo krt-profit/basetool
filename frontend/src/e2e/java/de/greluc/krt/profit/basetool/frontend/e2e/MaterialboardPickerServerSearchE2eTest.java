@@ -113,9 +113,6 @@ class MaterialboardPickerServerSearchE2eTest {
         assertThat(page.locator("#mb-modal [data-mb-picker-input]"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
 
-        // Typing must trigger a server query carrying the fragment; the debounced fetch fires
-        // within
-        // ~200 ms, well inside waitForRequest's default budget.
         Request search =
             page.waitForRequest(
                 request ->

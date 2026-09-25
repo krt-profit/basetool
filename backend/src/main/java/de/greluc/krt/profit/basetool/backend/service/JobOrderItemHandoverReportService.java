@@ -126,9 +126,6 @@ public class JobOrderItemHandoverReportService {
       KrtPdfSupport.addMetaRow(metaTable, "AUFTRAGSNUMMER", jobOrderNumber);
       KrtPdfSupport.addMetaRow(metaTable, "DATUM DER ÜBERGABE", handoverDate);
       KrtPdfSupport.addMetaRow(metaTable, "UHRZEIT DER ÜBERGABE", handoverTime + " (Lokalzeit)");
-      // A recipient whose handle an Art. 17 request erased renders as the
-      // placeholder rather than as the raw sentinel (REQ-SEC-062). The handover
-      // itself is untouched; only the name is gone.
       KrtPdfSupport.addMetaRow(
           metaTable,
           "EMPFÄNGER (HANDLE)",

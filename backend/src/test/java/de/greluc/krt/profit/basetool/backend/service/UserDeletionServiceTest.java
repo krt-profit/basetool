@@ -77,14 +77,8 @@ class UserDeletionServiceTest {
   @Mock private NotificationRuleRepository notificationRuleRepository;
   @Mock private MemberEvaluationRepository memberEvaluationRepository;
 
-  // The identity seam. deleteUser borrows getCurrentUser() for the fallback-admin path; the
-  // reassign/delete tests never trigger the fallback (findAllAdmins returns a usable admin) so they
-  // leave this mock untouched.
   @Mock private UserService userService;
 
-  // The bank seam is injected as an ObjectProvider (ADR-0070); deleteUser resolves it to audit a
-  // responsible-holder change when a deleted user was a leader. Stubbed lenient so the early-throw
-  // tests (which never reach the delete) do not trip strict-stubs; the seam mock no-ops.
   @Mock
   private ObjectProvider<OrgUnitBankResponsibilityService> orgUnitBankResponsibilityServiceProvider;
 
@@ -132,11 +126,9 @@ class UserDeletionServiceTest {
 
   @Test
   void shouldPurgeAccountDataAndReassignSharedAggregates() {
-    // Given
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(userRepository.findAllAdmins()).thenReturn(List.of(admin));
 
-    // Then: account-owned data is purged, keyed by id / Keycloak subject...
     userDeletionService.deleteUser(userId);
 
     verify(inventoryItemRepository).deleteByUserId(userId);
@@ -146,7 +138,6 @@ class UserDeletionServiceTest {
     verify(notificationRepository).deleteAllForRecipient(userId);
     verify(notificationRuleRepository).deleteSelectorsByUserId(userId);
     verify(memberEvaluationRepository).deleteAllByUserId(userId);
-    // ...while the shared/historical aggregates only change owner.
     verify(refineryOrderRepository).updateOwner(user, admin);
     verify(missionRepository).updateOwner(user, admin);
     verify(missionOwnershipRepository).updateOwner(user, admin);
@@ -162,7 +153,6 @@ class UserDeletionServiceTest {
 
   @Test
   void deleteUser_recordsPurgeAndReassignmentEventsWithRowCounts_whenRowsAffected() {
-    // Given the deleted user owns warehouse rows, ships, personal data and refinery orders.
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(userRepository.findAllAdmins()).thenReturn(List.of(admin));
     when(inventoryItemRepository.deleteByUserId(userId)).thenReturn(3);
@@ -170,10 +160,8 @@ class UserDeletionServiceTest {
     when(personalBlueprintRepository.deleteAllByOwnerUserId(userId)).thenReturn(8);
     when(refineryOrderRepository.updateOwner(user, admin)).thenReturn(2);
 
-    // When
     userDeletionService.deleteUser(userId);
 
-    // Then each summary event fires, carrying the affected-row counts.
     verify(auditService)
         .record(
             eq(AuditEventType.INVENTORY_PURGED_ON_USER_DELETION),
@@ -203,9 +191,6 @@ class UserDeletionServiceTest {
 
   @Test
   void deleteUser_refusesWhenKeycloakStillHasTheAccount_evenThoughTheStoredFlagSaysOtherwise() {
-    // The stored in_keycloak flag is only a cached mirror; a swallowed sync error can leave it
-    // stale at false. Since the deletion now purges rather than reassigns, acting on a stale flag
-    // would destroy an ACTIVE member's Lager, hangar and personal data. Keycloak decides.
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(keycloakService.userExists(userId)).thenReturn(true);
 
@@ -233,9 +218,6 @@ class UserDeletionServiceTest {
         userId, UserDeletionService.KeycloakPresenceCheck.WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER);
 
     verify(userRepository).delete(user);
-    // The probe is not merely tolerated, it is not asked: the caller has the answer already, and
-    // an Admin-API round trip per consolidation would be a call whose result cannot change
-    // anything.
     verify(keycloakService, never()).userExists(any());
   }
 
@@ -274,11 +256,6 @@ class UserDeletionServiceTest {
 
   @Test
   void deleteUser_removesTheStrayRowOfAConfiguredGatewayServiceAccount() {
-    // The one row for which the two Keycloak views disagree by construction: an unfiltered
-    // GET /users omits service accounts, so the roster sync marks it gone, while userExists asks
-    // by id and finds it. Production is in exactly this state - the gateway's first call ran the
-    // registration flow on itself before the machine-identity carve-out existed (ADR-0129) - and
-    // without this exemption the row can never be deleted through the admin UI.
     gatewayClientIds.add("basetool-ingest-gateway");
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(userRepository.findAllAdmins()).thenReturn(List.of(admin));
@@ -293,14 +270,7 @@ class UserDeletionServiceTest {
 
   @Test
   void deleteUser_stillRefusesAMemberWhoseNameMerelyLooksLikeAServiceAccount() {
-    // The exemption is keyed on the name KEYCLOAK reports for that id, matched against the exact
-    // name a configured client's service account must have. Measured against Keycloak 26.7:
-    // `service-account-foo` can be created when no client `foo` exists (201), so the prefix alone
-    // proves nothing; the name of an EXISTING service account is refused (409), so the exact name
-    // of a configured client cannot be held by a hand-made account.
     gatewayClientIds.add("basetool-ingest-gateway");
-    // The LOCAL mirror says service-account-…; Keycloak, asked by id, says otherwise. The name is
-    // read from Keycloak precisely so a stale or edited local value cannot stand in for it.
     user.setUsername("service-account-basetool-ingest-gateway");
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(keycloakService.userExists(userId)).thenReturn(true);
@@ -313,10 +283,6 @@ class UserDeletionServiceTest {
 
   @Test
   void deleteUser_refusesCleanlyWhenTheServiceAccountCheckItselfFails() {
-    // The regression this closes: the first cut asked Keycloak's CLIENTS endpoint, production
-    // answered 403 (the backend's admin client manages users, it does not inspect clients), and
-    // that exception escaped as an unexpected 500 on the deletion. A check that cannot establish
-    // its answer must refuse, not explode.
     gatewayClientIds.add("basetool-ingest-gateway");
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(keycloakService.userExists(userId)).thenReturn(true);
@@ -330,8 +296,6 @@ class UserDeletionServiceTest {
 
   @Test
   void deleteUser_refusesWhenKeycloakCannotBeReached_ratherThanAssumingTheAccountIsGone() {
-    // Fail-closed: an unreachable Keycloak is not evidence of absence. The exception propagates and
-    // nothing is purged.
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(keycloakService.userExists(userId))
         .thenThrow(new ResourceAccessException("keycloak unreachable"));
@@ -345,18 +309,13 @@ class UserDeletionServiceTest {
 
   @Test
   void deleteUser_alwaysRecordsTheUserDeletedMarker_evenWhenTheAccountOwnedNothing() {
-    // REQ-AUDIT-001: the deletion mutates several audited areas, so it always leaves exactly one
-    // marker event to anchor the per-area purge events — unlike those, it is unconditional.
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(userRepository.findAllAdmins()).thenReturn(List.of(admin));
 
-    // When
     userDeletionService.deleteUser(userId);
 
-    // Then the marker fires...
     verify(auditService)
         .record(eq(AuditEventType.USER_DELETED), isNull(), isNull(), eq(userId), any());
-    // ...but the per-area events stay silent for an account that owned nothing (all mocks yield 0).
     verify(auditService, never())
         .record(eq(AuditEventType.INVENTORY_PURGED_ON_USER_DELETION), any(), any(), any(), any());
     verify(auditService, never())
@@ -368,17 +327,11 @@ class UserDeletionServiceTest {
 
   @Test
   void shouldReassignMissionOwnershipCompanionBeforeDeletingUser() {
-    // Given a user that owns missions: the mission_ownership companion (its owner_id FK has no
-    // ON DELETE clause) must be reassigned in lock-step with mission.owner and strictly before the
-    // app_user row is removed, otherwise the dangling owner_id FK-fails (23503) on delete.
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(userRepository.findAllAdmins()).thenReturn(List.of(admin));
 
-    // When
     userDeletionService.deleteUser(userId);
 
-    // Then the companion is reassigned alongside the mission owner, the audit-only material-claim
-    // stamp is cleared, and all of that happens strictly before the app_user row is removed.
     var inOrder =
         inOrder(
             missionRepository, missionOwnershipRepository, materialClaimRepository, userRepository);
@@ -390,10 +343,6 @@ class UserDeletionServiceTest {
 
   @Test
   void shouldClearDiscordApprovalAuditBeforeDeletingUser() {
-    // Regression (epic #720 / V173): the approval-audit FKs carry no ON DELETE clause, so the audit
-    // must be cleared before the app_user row is removed, or the delete 409s on
-    // user_approval_event_user_id_fkey — the reported "approved Discord registration can no longer
-    // be deleted" failure.
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(userRepository.findAllAdmins()).thenReturn(List.of(admin));
 
@@ -408,32 +357,26 @@ class UserDeletionServiceTest {
 
   @Test
   void shouldNotDeleteUserStillInKeycloak() {
-    // Given
     user.setInKeycloak(true);
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
 
-    // When & Then
     assertThrows(BadRequestException.class, () -> userDeletionService.deleteUser(userId));
     verify(userRepository, never()).delete(any());
   }
 
   @Test
   void shouldThrowExceptionIfNoAdminFound() {
-    // Given findAllAdmins yields nobody and getCurrentUser() is empty (default Optional mock).
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(userRepository.findAllAdmins()).thenReturn(Collections.emptyList());
 
-    // When & Then
     assertThrows(IllegalStateException.class, () -> userDeletionService.deleteUser(userId));
     verify(userRepository, never()).delete(any());
   }
 
   @Test
   void shouldThrowExceptionIfUserNotFound() {
-    // Given
     when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
-    // When & Then
     assertThrows(NoSuchElementException.class, () -> userDeletionService.deleteUser(userId));
   }
 
@@ -447,12 +390,8 @@ class UserDeletionServiceTest {
 
     @Test
     void fallsBackToCurrentUser_whenCurrentUserIsAdmin_andFindAllAdminsHasNoOther() {
-      // The user being deleted IS the only "admin" in findAllAdmins() — they
-      // get filtered out of that list. The fallback resolves to the current
-      // logged-in admin, which is a different user with the ADMIN role.
       User toDelete = newUser(userId);
       toDelete.setInKeycloak(false);
-      // toDelete also has ADMIN role — that's the scenario being tested
       toDelete.setRoles(new HashSet<>(Set.of(roleNamed("ADMIN"))));
 
       UUID currentAdminId = UUID.randomUUID();
@@ -460,7 +399,6 @@ class UserDeletionServiceTest {
       currentAdmin.setRoles(new HashSet<>(Set.of(roleNamed("ADMIN"))));
 
       when(userRepository.findById(userId)).thenReturn(Optional.of(toDelete));
-      // findAllAdmins returns only the user being deleted -> filtered out.
       when(userRepository.findAllAdmins()).thenReturn(List.of(toDelete));
       when(userService.getCurrentUser()).thenReturn(Optional.of(currentAdmin));
 
@@ -472,8 +410,6 @@ class UserDeletionServiceTest {
 
     @Test
     void throws_whenCurrentUserIsAlsoTheUserBeingDeleted() {
-      // The user trying to delete themselves can't be their own reassignment
-      // target — must throw.
       User toDelete = newUser(userId);
       toDelete.setInKeycloak(false);
       toDelete.setRoles(new HashSet<>(Set.of(roleNamed("ADMIN"))));
@@ -488,8 +424,6 @@ class UserDeletionServiceTest {
 
     @Test
     void throws_whenCurrentUserIsNotAdmin() {
-      // findAllAdmins has only the user being deleted; current user is logged in
-      // but has no ADMIN role -> no fallback, throw.
       User toDelete = newUser(userId);
       toDelete.setInKeycloak(false);
 

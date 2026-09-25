@@ -68,7 +68,6 @@ class TermsAcceptanceGateFilterTest {
 
   @BeforeEach
   void setUp() {
-    // No active profile: the production path. The `test` profile stands the filter down entirely.
     filter = new TermsAcceptanceGateFilter(backendApiClient, new MockEnvironment());
     SecurityContextHolder.getContext()
         .setAuthentication(

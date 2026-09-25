@@ -100,9 +100,6 @@ public class AdminMaterialsPageController {
   @GetMapping
   public String listMaterials(Model model) {
     try {
-      // includeHidden=true: the admin catalog must show wiki-only commodities imported invisible
-      // (§4.3) so they can be reviewed and unhidden. Trading pages call the same endpoint without
-      // the flag and get only visible rows.
       CompleteCatalog<MaterialDto> materialsCatalog =
           CatalogPages.fetchAll(
               page ->
@@ -112,8 +109,6 @@ public class AdminMaterialsPageController {
       List<MaterialDto> materials = new ArrayList<>(materialsCatalog.items());
       model.addAttribute("catalogTruncated", materialsCatalog.truncated());
 
-      // Provide a list of all materials for assignment to RAW materials
-      // (bypass UEX data errors where refined materials are not marked correctly)
       List<MaterialDto> refinedMaterials =
           materials.stream()
               .sorted(
@@ -327,23 +322,15 @@ public class AdminMaterialsPageController {
               request.version());
 
       backendApiClient.put("/api/v1/materials/" + id, body, Void.class);
-      // Every material edit changes the cached material catalogues (list, lookup, job-order,
-      // matrix)
-      // regardless of updateType, so evict the MATERIAL domain unconditionally (REQ-DATA-007). The
-      // former updateType guard missed CATEGORY / REFINED / QUANTITY_TYPE edits, leaving those
-      // lists
-      // stale up to the TTL.
       backendApiClient.evict(CacheDomain.MATERIAL);
       MaterialDto updatedMaterial =
           backendApiClient.get("/api/v1/materials/" + id, MaterialDto.class);
       return ResponseEntity.ok(updatedMaterial);
     } catch (BackendServiceException e) {
       BackendErrorLogging.warn(log, "PUT /api/v1/materials", id, e);
-      // In case of OptimisticLocking, backend usually returns 409 Conflict
       return ResponseEntity.status(500).build();
     } catch (Exception e) {
       log.error("Ajax update material failed", e);
-      // In case of OptimisticLocking, backend usually returns 409 Conflict
       return ResponseEntity.status(500).build();
     }
   }

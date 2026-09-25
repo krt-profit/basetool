@@ -106,9 +106,7 @@ class SpecialCommandE2eTest {
         E2eSupport.login(page, baseUrl, ADMIN_USER, ADMIN_PASSWORD);
         E2eSupport.navigate(page, baseUrl + "/admin/special-commands");
         page.waitForLoadState();
-        // A full reload would wipe this marker; the #582 in-place create leaves it intact.
         page.evaluate("window.__krtNoReload = true;");
-        // The create form lives in a modal opened by the "Neues Spezialkommando" button.
         page.locator("#add-sc-btn").click();
         page.locator("#sc-name").fill(SK_UI_NAME);
         page.locator("#sc-shorthand").fill("ESKU");
@@ -117,10 +115,6 @@ class SpecialCommandE2eTest {
             Boolean.TRUE,
             page.evaluate("window.__krtNoReload === true"),
             "creating an SK must save in place without reloading the page");
-        // Re-load the list fresh (as the other create flows do); asserting on the post-submit page
-        // directly proved flaky. Match the new SK by its table row, not a bare text locator. Via
-        // the retry helper — WebKit can abort this post-submit GET (HTTP/2 INTERNAL_ERROR). See
-        // E2eSupport#navigate.
         E2eSupport.navigate(page, baseUrl + "/admin/special-commands");
         page.waitForLoadState();
         assertThat(
@@ -154,11 +148,9 @@ class SpecialCommandE2eTest {
         E2eSupport.navigate(page, baseUrl + "/admin/special-commands");
         page.waitForLoadState();
 
-        // Open the confirm modal from the seeded SK's row, then confirm the deactivate.
         Locator row =
             page.locator("tbody tr").filter(new Locator.FilterOptions().setHasText(SK_DELETE_NAME));
         assertThat(row).isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
-        // A full reload would wipe this marker; the #582 in-place deactivate leaves it intact.
         page.evaluate("window.__krtNoReload = true;");
         row.locator(".delete-btn").click();
         assertThat(page.locator("#sc-delete-modal"))
@@ -169,7 +161,6 @@ class SpecialCommandE2eTest {
             page.evaluate("window.__krtNoReload === true"),
             "deactivating an SK must save in place without reloading the page");
 
-        // The active-only list no longer shows the SK.
         E2eSupport.navigate(page, baseUrl + "/admin/special-commands");
         page.waitForLoadState();
         assertThat(
@@ -177,7 +168,6 @@ class SpecialCommandE2eTest {
                     .filter(new Locator.FilterOptions().setHasText(SK_DELETE_NAME)))
             .hasCount(0, new LocatorAssertions.HasCountOptions().setTimeout(20_000));
 
-        // includeInactive surfaces it again, flagged inactive — proving a soft-delete, not a purge.
         E2eSupport.navigate(page, baseUrl + "/admin/special-commands?includeInactive=true");
         page.waitForLoadState();
         Locator inactiveRow =

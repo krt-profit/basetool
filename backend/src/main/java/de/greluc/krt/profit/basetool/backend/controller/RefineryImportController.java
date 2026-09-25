@@ -78,11 +78,6 @@ public class RefineryImportController {
   })
   public RefineryImportDraftDto importExtract(
       @CurrentUserId UUID owner, @RequestBody @Valid @NotNull RefineryExtractDto extract) {
-    // Plain @CurrentUserId again. When the ingest gateway calls this, ActingMemberFilter has
-    // already
-    // replaced the security identity with the member it acts for (ADR-0129), so there is nothing
-    // special to do here — which is exactly the point of doing it in the filter rather than at the
-    // call site: EVERY identity consumer sees the member, not just the two that were remembered.
     return refineryImportService.buildDraft(extract, owner);
   }
 }

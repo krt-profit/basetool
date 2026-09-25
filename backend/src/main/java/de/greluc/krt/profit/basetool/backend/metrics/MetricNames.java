@@ -34,8 +34,6 @@ package de.greluc.krt.profit.basetool.backend.metrics;
  */
 public final class MetricNames {
 
-  // --- Scheduled-job health (TaskMetrics) ------------------------------------------------
-
   /** Counter {@code basetool_scheduled_job_executions_total}; tags: task, outcome. */
   public static final String SCHEDULED_JOB_EXECUTIONS = "basetool.scheduled.job.executions";
 
@@ -122,12 +120,8 @@ public final class MetricNames {
    */
   public static final String REDIS_FANOUT_SUBSCRIBED = "basetool.redis.fanout.subscribed";
 
-  // --- External-sync events (SyncReportService) ------------------------------------------
-
   /** Counter {@code basetool_sync_events_total} — tags {@code source}, {@code event_type}. */
   public static final String SYNC_EVENTS = "basetool.sync.events";
-
-  // --- External outbound-fetch failures (UexClient / ScWikiClient) -----------------------
 
   /**
    * Counter {@code basetool_external_fetch_errors_total} — tag {@code source} ({@link #SOURCE_UEX}
@@ -136,8 +130,6 @@ public final class MetricNames {
    * "succeeds" (REQ-OBS-011).
    */
   public static final String EXTERNAL_FETCH_ERRORS = "basetool.external.fetch.errors";
-
-  // --- Keycloak Admin-API sync (KeycloakService) -----------------------------------------
 
   /**
    * Counter {@code basetool_keycloak_sync_fetch_failures_total} (untagged). Bumped when the daily
@@ -191,8 +183,6 @@ public final class MetricNames {
   public static final String NOTIFICATION_RETENTION_DELETED =
       "basetool.notification.retention.deleted";
 
-  // --- Identity (UserReconciliationService) ----------------------------------------------
-
   /**
    * Counter {@code basetool_user_callsign_collisions_total} (untagged). Bumped when a login
    * presents a subject that matches no {@code app_user} row while another row holds the same {@code
@@ -233,12 +223,8 @@ public final class MetricNames {
    */
   public static final String USER_DISCORD_LINK_COLLISIONS = "basetool.user.discord.link.collisions";
 
-  // --- HTTP error rate (GlobalExceptionHandler) ------------------------------------------
-
   /** Counter {@code basetool_http_error_total} — tag {@code code} (stable RFC-7807 code). */
   public static final String HTTP_ERROR = "basetool.http.error";
-
-  // --- Audited mutations (AuditService) --------------------------------------------------
 
   /** Counter {@code basetool_audit_events_total} — tag {@code domain} ({@code AuditDomain}). */
   public static final String AUDIT_EVENTS = "basetool.audit.events";
@@ -250,8 +236,6 @@ public final class MetricNames {
    * signal (counts only — never amounts or holder identities; #1041 item 10, REQ-OBS-011).
    */
   public static final String BANK_AUDIT_EVENTS = "basetool.bank.audit.events";
-
-  // --- Rate-limit rejections (RateLimitingFilter) ----------------------------------------
 
   /**
    * Counter {@code basetool_ratelimit_rejections_total} — tags {@code bucket} and {@code
@@ -281,8 +265,6 @@ public final class MetricNames {
    * path set is tiny and fixed.
    */
   public static final String REQUEST_BODY_REJECTED = "basetool.request.body.rejected";
-
-  // --- Public-surface client attribution (A8, REQ-OBS-018) -------------------------------
 
   /**
    * Counter {@code basetool_api_client_requests_total} — tag {@code client_id}. Bumped once per
@@ -327,8 +309,6 @@ public final class MetricNames {
    */
   public static final String AUTH_FAILURES = "basetool.auth.failures";
 
-  // --- Discord SPI precheck (DiscordAccountExistenceController) ---------------------------
-
   /**
    * Counter {@code basetool_discord_precheck_total} — tag {@code outcome} ({@link
    * #DISCORD_PRECHECK_OK} / {@link #DISCORD_PRECHECK_UNAUTHORIZED} / {@link
@@ -338,19 +318,13 @@ public final class MetricNames {
    */
   public static final String DISCORD_PRECHECK = "basetool.discord.precheck";
 
-  // --- Bank ledger integrity (BankLedgerIntegrityTask) -----------------------------------
-
   /** Gauge {@code basetool_bank_ledger_integrity_violations} — tag {@code category}. */
   public static final String BANK_LEDGER_INTEGRITY_VIOLATIONS =
       "basetool.bank.ledger.integrity.violations";
 
-  // --- Job-order integrity (JobOrderIntegrityTask) ---------------------------------------
-
   /** Gauge {@code basetool_job_order_integrity_violations} — tag {@code category}. */
   public static final String JOB_ORDER_INTEGRITY_VIOLATIONS =
       "basetool.job.order.integrity.violations";
-
-  // --- Approval / work-queue depth (BusinessMetricsCollector) ----------------------------
 
   /** Gauge {@code basetool_registration_pending_count} — pending user registrations. */
   public static final String REGISTRATION_PENDING = "basetool.registration.pending.count";
@@ -518,8 +492,6 @@ public final class MetricNames {
    */
   public static final String SSE_REDIS_ERRORS = "basetool.sse.redis.errors";
 
-  // --- Tag keys --------------------------------------------------------------------------
-
   /**
    * Tag key: the scheduled job ({@link ScheduledJob#label()}). Named {@code task}, NOT {@code job}
    * (#1041 item 23): the Prometheus scrape adds its own {@code job="basetool-backend"} label, and a
@@ -618,8 +590,6 @@ public final class MetricNames {
    * compile time.
    */
   public static final String TAG_FANOUT = "fanout";
-
-  // --- Bounded tag values (not an application enum) --------------------------------------
 
   /** Catalogue identity of the cross-kind game-item sweep, on {@link #TAG_SWEEP}. */
   public static final String SWEEP_ITEM = "item";
@@ -1136,7 +1106,5 @@ public final class MetricNames {
    */
   public static final String TRACING_ENABLED = "basetool.tracing.enabled";
 
-  private MetricNames() {
-    // Constants holder — not instantiable.
-  }
+  private MetricNames() {}
 }

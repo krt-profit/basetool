@@ -159,9 +159,6 @@ public class BlueprintProductService {
         .filter(name -> name != null && !name.isBlank())
         .map(normalizer::normalize)
         .filter(key -> !key.isEmpty())
-        // Sort the candidate product keys so the pick is deterministic when several active
-        // blueprints produce this game item (findByOutputItemId has no ORDER BY); the lowest key
-        // keeps the derived identity stable across runs.
         .sorted()
         .findFirst()
         .flatMap(this::resolveByProductKey);

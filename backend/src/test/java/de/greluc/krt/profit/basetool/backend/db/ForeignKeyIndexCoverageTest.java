@@ -111,8 +111,6 @@ class ForeignKeyIndexCoverageTest {
 
   @Test
   void sweepSeesTheSchema_aKnownCoveredForeignKeyIsNotReported() {
-    // A canary against a query that silently matches nothing: the schema has well over a hundred
-    // foreign keys, and ship.owner_id (V34's idx_ship_owner_id) is one the sweep must consider.
     JdbcTemplate jdbc = new JdbcTemplate(dataSource);
     Integer foreignKeys =
         jdbc.queryForObject(

@@ -108,31 +108,24 @@ class HandleAnonymisationServiceTest {
     when(jobOrderItemHandoverRepository.anonymiseRecipientHandle(any(), any())).thenReturn(each);
   }
 
-  // covers REQ-SEC-062 - every place a handle snapshot survives a deletion is reached
   @Test
   void anonymisesEveryPlaceAHandleSurvives() {
     stubCounts(2);
 
     HandleAnonymisationService.AnonymisationResult result = service.anonymise(USER, ONE_SPELLING);
 
-    // Id-matched, reached while the foreign key still points at the account.
     verify(auditEventRepository).anonymiseActorHandle(USER, SENTINEL);
     verify(bankAuditEventRepository).anonymiseActorHandle(USER, SENTINEL);
     verify(bankTransactionRepository).anonymiseCounterpartyHandle(USER, SENTINEL);
     verify(bankBookingRequestRepository).anonymiseHandles(USER, SENTINEL);
     verify(bankHolderRepository).anonymiseHandle(USER, SENTINEL);
-    // Text-matched, because these columns have no user id beside them.
     verify(auditEventRepository).anonymiseSubjectLabel(HANDLE, SENTINEL);
     verify(jobOrderRepository).anonymiseHandle(HANDLE, SENTINEL);
     verify(jobOrderHandoverRepository).anonymiseRecipientHandle(HANDLE, SENTINEL);
     verify(jobOrderItemHandoverRepository).anonymiseRecipientHandle(HANDLE, SENTINEL);
-    // Nine statements at 2 rows each -- eight columns, with bank_booking_request's four handle
-    // columns rewritten by one statement.
     assertThat(result.total()).isEqualTo(18);
   }
 
-  // covers REQ-SEC-062 - a handover typed with the username is erased as surely as one typed with
-  // the display name
   @Test
   void runsEveryTextMatchedColumnOncePerSpelling() {
     stubCounts(1);
@@ -145,13 +138,10 @@ class HandleAnonymisationServiceTest {
       verify(jobOrderRepository).anonymiseHandle(spelling, SENTINEL);
       verify(auditEventRepository).anonymiseSubjectLabel(spelling, SENTINEL);
     }
-    // The id-matched ones run once, not once per spelling: repeating them would inflate the
-    // receipt's counts while changing nothing on disk.
     verify(auditEventRepository).anonymiseActorHandle(USER, SENTINEL);
     verify(bankHolderRepository).anonymiseHandle(USER, SENTINEL);
   }
 
-  // covers REQ-SEC-062 - a member whose display name equals their username is still one spelling
   @Test
   void deduplicatesIdenticalSpellings() {
     stubCounts(1);
@@ -162,7 +152,6 @@ class HandleAnonymisationServiceTest {
     verify(jobOrderRepository).anonymiseHandle(HANDLE, SENTINEL);
   }
 
-  // covers REQ-SEC-062 - the receipt is written AFTER the updates, so the update cannot scrub it
   @Test
   void writesTheMarkerEventsAfterTheUpdates() {
     stubCounts(1);
@@ -191,7 +180,6 @@ class HandleAnonymisationServiceTest {
         .record(eq(BankAuditEventType.HANDLE_SNAPSHOTS_ANONYMISED), any(), any(), eq(USER), any());
   }
 
-  // covers REQ-SEC-062 - writing the erased handle into the receipt would undo the erasure
   @Test
   void theMarkerPayloadNeverCarriesTheErasedHandle() {
     stubCounts(3);
@@ -206,7 +194,6 @@ class HandleAnonymisationServiceTest {
     assertThat(details.getValue().toString()).contains("activityAudit");
   }
 
-  // covers REQ-SEC-062 - the marker records how many spellings were matched, never the spellings
   @Test
   void theMarkerPayloadRecordsTheSpellingCount() {
     stubCounts(1);
@@ -221,7 +208,6 @@ class HandleAnonymisationServiceTest {
     assertThat(details.getValue().toString()).doesNotContain("TheirUsername");
   }
 
-  // covers REQ-SEC-062 - matching an empty name would rewrite every row that has none
   @Test
   void skipsTheTextMatchedColumnsWhenNoNameIsKnown() {
     stubCounts(1);
@@ -235,11 +221,9 @@ class HandleAnonymisationServiceTest {
     assertThat(result.materialHandovers()).isZero();
     assertThat(result.itemHandovers()).isZero();
     assertThat(result.jobOrders()).isZero();
-    // The five id-matched places still ran.
     assertThat(result.total()).isEqualTo(5);
   }
 
-  // covers REQ-SEC-062 - a null collection is the already-deleted-account case and must not throw
   @Test
   void toleratesNoSpellingsAtAll() {
     stubCounts(0);

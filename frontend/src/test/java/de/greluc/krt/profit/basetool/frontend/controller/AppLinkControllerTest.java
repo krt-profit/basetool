@@ -90,8 +90,6 @@ class AppLinkControllerTest {
   @Test
   @DisplayName("the callback redirects anonymously instead of 404-ing mid-login")
   void callbackRedirectsAnonymously() throws Exception {
-    // Anonymous on purpose: the device that could not open the app often has no web session
-    // either, and behind the catch-all this would answer 302 into the OAuth entry point.
     mvc()
         .perform(get(CALLBACK_WITH_CODE))
         .andExpect(status().isSeeOther())
@@ -101,10 +99,6 @@ class AppLinkControllerTest {
   @Test
   @DisplayName("the redirect target carries no part of the authorization code")
   void redirectDropsTheAuthorizationCode() throws Exception {
-    // The whole point of redirecting rather than rendering. A page served at the callback would
-    // leave the code in the address bar, in the history entry, and — since the response is
-    // Referrer-Policy: strict-origin-when-cross-origin — in the Referer of every same-origin
-    // subresource it pulls.
     String location =
         mvc().perform(get(CALLBACK_WITH_CODE)).andReturn().getResponse().getRedirectedUrl();
 
@@ -127,8 +121,6 @@ class AppLinkControllerTest {
   @Test
   @DisplayName("the help page resolves its text, rather than printing the keys")
   void helpPageResolvesItsMessages() throws Exception {
-    // A missing bundle entry renders as ??appLink.title_de?? and still returns 200, so the status
-    // assertion above cannot see it.
     String body =
         mvc().perform(get("/app/link-help")).andReturn().getResponse().getContentAsString();
 

@@ -89,9 +89,6 @@ class SecurityConfigInternalJwksDecoderTest {
     signedJwt.sign(new ECDSASigner(ecJwk));
     String token = signedJwt.serialize();
 
-    // No keycloak-trust bundle registered -> buildDecoder falls back to the default client and
-    // fetches the plain-HTTP MockWebServer JWKS; the assertion is purely about the accepted alg
-    // set.
     NimbusJwtDecoder decoder =
         SecurityConfig.buildDecoder(
             "https://keycloak.example/realms/iri", jwkSetUri, new DefaultSslBundleRegistry());

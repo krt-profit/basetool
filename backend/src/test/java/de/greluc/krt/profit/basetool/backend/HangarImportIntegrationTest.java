@@ -92,7 +92,6 @@ class HangarImportIntegrationTest {
     user1.setId(UUID.randomUUID());
     user1.setUsername("importuser");
     userRepository.save(user1);
-    // Post-R9 D3 (V101): home Staffel via membership row.
     OrgUnitMembership iridiumMembership = new OrgUnitMembership();
     iridiumMembership.setId(new OrgUnitMembershipId(user1.getId(), Squadron.IRIDIUM_ID));
     iridiumMembership.setUser(user1);
@@ -108,13 +107,8 @@ class HangarImportIntegrationTest {
     typeZeus = shipTypeRepository.save(typeZeus);
   }
 
-  // -------------------------------------------------------------------------
-  // Success: matched ships are imported, unmatched ships are reported
-  // -------------------------------------------------------------------------
-
   @Test
   void importFleetview_success_importsMatchedShips() throws Exception {
-    // Given
     String json =
         """
         [
@@ -127,7 +121,6 @@ class HangarImportIntegrationTest {
         new MockMultipartFile(
             "file", "fleetview.json", "application/json", json.getBytes(StandardCharsets.UTF_8));
 
-    // When
     String response =
         mockMvc
             .perform(
@@ -139,7 +132,6 @@ class HangarImportIntegrationTest {
             .getResponse()
             .getContentAsString();
 
-    // Then
     FleetviewImportResponseDto result =
         objectMapper.readValue(response, FleetviewImportResponseDto.class);
     assertEquals(2, result.importedCount());
@@ -147,17 +139,11 @@ class HangarImportIntegrationTest {
     assertEquals(0, result.duplicateCount());
     assertTrue(result.skippedShips().contains("unknown xz99"));
 
-    // Verify ships are actually in the DB
     assertEquals(2, shipRepository.findByOwnerId(user1.getId()).size());
   }
 
-  // -------------------------------------------------------------------------
-  // Unauthenticated request → 401
-  // -------------------------------------------------------------------------
-
   @Test
   void importFleetview_unauthenticated_returns401() throws Exception {
-    // Given
     String json =
         """
         [{"name":"135c","shipname":"","type":"ship"}]
@@ -166,23 +152,16 @@ class HangarImportIntegrationTest {
         new MockMultipartFile(
             "file", "fleetview.json", "application/json", json.getBytes(StandardCharsets.UTF_8));
 
-    // When / Then
     mockMvc
         .perform(multipart("/api/v1/hangar/import/fleetview").file(file))
         .andExpect(status().isUnauthorized());
   }
 
-  // -------------------------------------------------------------------------
-  // Empty file → 400
-  // -------------------------------------------------------------------------
-
   @Test
   void importFleetview_emptyFile_returns400() throws Exception {
-    // Given
     MockMultipartFile emptyFile =
         new MockMultipartFile("file", "fleetview.json", "application/json", new byte[0]);
 
-    // When / Then
     mockMvc
         .perform(
             multipart("/api/v1/hangar/import/fleetview")
@@ -191,13 +170,8 @@ class HangarImportIntegrationTest {
         .andExpect(status().isBadRequest());
   }
 
-  // -------------------------------------------------------------------------
-  // Invalid JSON → 400
-  // -------------------------------------------------------------------------
-
   @Test
   void importFleetview_invalidJson_returns400() throws Exception {
-    // Given
     MockMultipartFile file =
         new MockMultipartFile(
             "file",
@@ -205,7 +179,6 @@ class HangarImportIntegrationTest {
             "application/json",
             "NOT JSON".getBytes(StandardCharsets.UTF_8));
 
-    // When / Then
     mockMvc
         .perform(
             multipart("/api/v1/hangar/import/fleetview")
@@ -214,13 +187,8 @@ class HangarImportIntegrationTest {
         .andExpect(status().isBadRequest());
   }
 
-  // -------------------------------------------------------------------------
-  // Re-import (same file twice): already owned ship → no new ship created
-  // -------------------------------------------------------------------------
-
   @Test
   void importFleetview_reImport_noNewShipCreatedWhenAlreadyPresent() throws Exception {
-    // Given: 135c is already in user's hangar (1 existing)
     Ship existing = new Ship();
     existing.setOwningOrgUnit(iridium);
     existing.setShipType(type135c);
@@ -236,7 +204,6 @@ class HangarImportIntegrationTest {
         new MockMultipartFile(
             "file", "fleetview.json", "application/json", json.getBytes(StandardCharsets.UTF_8));
 
-    // When: same file imported again
     String response =
         mockMvc
             .perform(
@@ -248,24 +215,16 @@ class HangarImportIntegrationTest {
             .getResponse()
             .getContentAsString();
 
-    // Then: no new ship created (hangar count already >= JSON count)
     FleetviewImportResponseDto result =
         objectMapper.readValue(response, FleetviewImportResponseDto.class);
     assertEquals(0, result.importedCount());
-    // duplicateCount = ships for which hangar count already met JSON count
     assertEquals(1, result.duplicateCount());
 
-    // Verify only 1 ship in DB (no duplicate)
     assertEquals(1, shipRepository.findByOwnerId(user1.getId()).size());
   }
 
-  // -------------------------------------------------------------------------
-  // Partial duplicate: JSON has 2× same ship, hangar has 1 → 1 new created
-  // -------------------------------------------------------------------------
-
   @Test
   void importFleetview_partialDuplicate_createsOnlyMissingShips() throws Exception {
-    // Given: 1× 135c already in hangar
     Ship existing = new Ship();
     existing.setOwningOrgUnit(iridium);
     existing.setShipType(type135c);
@@ -273,7 +232,6 @@ class HangarImportIntegrationTest {
     existing.setInsurance("LTI");
     shipRepository.save(existing);
 
-    // JSON requests 2× 135c
     String json =
         """
         [
@@ -285,7 +243,6 @@ class HangarImportIntegrationTest {
         new MockMultipartFile(
             "file", "fleetview.json", "application/json", json.getBytes(StandardCharsets.UTF_8));
 
-    // When
     String response =
         mockMvc
             .perform(
@@ -297,23 +254,16 @@ class HangarImportIntegrationTest {
             .getResponse()
             .getContentAsString();
 
-    // Then: 1 new 135c created (2 in JSON - 1 in hangar)
     FleetviewImportResponseDto result =
         objectMapper.readValue(response, FleetviewImportResponseDto.class);
     assertEquals(1, result.importedCount());
     assertEquals(0, result.duplicateCount());
 
-    // Verify 2 ships in DB
     assertEquals(2, shipRepository.findByOwnerId(user1.getId()).size());
   }
 
-  // -------------------------------------------------------------------------
-  // Case-insensitive matching
-  // -------------------------------------------------------------------------
-
   @Test
   void importFleetview_caseInsensitiveMatch_importsShip() throws Exception {
-    // Given: fleetview.json uses uppercase "135C" but DB has "135c"
     String json =
         """
         [{"name":"135C","shipname":"","type":"ship"}]
@@ -322,7 +272,6 @@ class HangarImportIntegrationTest {
         new MockMultipartFile(
             "file", "fleetview.json", "application/json", json.getBytes(StandardCharsets.UTF_8));
 
-    // When
     String response =
         mockMvc
             .perform(
@@ -334,20 +283,14 @@ class HangarImportIntegrationTest {
             .getResponse()
             .getContentAsString();
 
-    // Then
     FleetviewImportResponseDto result =
         objectMapper.readValue(response, FleetviewImportResponseDto.class);
     assertEquals(1, result.importedCount());
     assertEquals(0, result.skippedCount());
   }
 
-  // -------------------------------------------------------------------------
-  // Individual ship name from shipname field is set
-  // -------------------------------------------------------------------------
-
   @Test
   void importFleetview_setsIndividualShipName() throws Exception {
-    // Given
     String json =
         """
         [{"name":"zeus mk ii mr","shipname":"Stella Aeterna","type":"ship"}]
@@ -356,7 +299,6 @@ class HangarImportIntegrationTest {
         new MockMultipartFile(
             "file", "fleetview.json", "application/json", json.getBytes(StandardCharsets.UTF_8));
 
-    // When
     mockMvc
         .perform(
             multipart("/api/v1/hangar/import/fleetview")
@@ -364,21 +306,12 @@ class HangarImportIntegrationTest {
                 .with(jwt().jwt(builder -> builder.subject(user1.getId().toString()))))
         .andExpect(status().isOk());
 
-    // Then
     Ship imported = shipRepository.findByOwnerId(user1.getId()).stream().findFirst().orElseThrow();
     assertEquals("Stella Aeterna", imported.getName());
   }
 
-  // -------------------------------------------------------------------------
-  // StarJump FleetViewer ("Hangar Link"): object root with a canvasItems array,
-  // auto-detected on the canonical /import/ships endpoint. Exercises a name match
-  // (135c via defaultText), a slug fallback (zeus via uexSlug when the display
-  // name misses), and a dropped TEXTGROUP item, end-to-end against the real DB.
-  // -------------------------------------------------------------------------
-
   @Test
   void importShips_starjumpFleetviewer_nameAndSlugFallback() throws Exception {
-    // Give the Zeus a UEX slug so the slug-fallback stage can resolve it.
     typeZeus.setUexSlug("zeus-mkii-mr");
     typeZeus = shipTypeRepository.save(typeZeus);
 
@@ -403,7 +336,6 @@ class HangarImportIntegrationTest {
             "application/json",
             json.getBytes(StandardCharsets.UTF_8));
 
-    // When
     String response =
         mockMvc
             .perform(
@@ -415,20 +347,12 @@ class HangarImportIntegrationTest {
             .getResponse()
             .getContentAsString();
 
-    // Then: both SHIP items resolve (one by name, one by slug); the TEXTGROUP is ignored.
     FleetviewImportResponseDto result =
         objectMapper.readValue(response, FleetviewImportResponseDto.class);
     assertEquals(2, result.importedCount());
     assertEquals(0, result.skippedCount());
     assertEquals(2, shipRepository.findByOwnerId(user1.getId()).size());
   }
-
-  // -------------------------------------------------------------------------
-  // Fleetyards (https://fleetyards.net): a flat array keyed by the camelCase
-  // shipCode/manufacturerCode pair, auto-detected on the canonical /import/ships
-  // endpoint. Exercises a name match (135c) with a custom shipName plus an
-  // unmatched entry, end-to-end against the real DB.
-  // -------------------------------------------------------------------------
 
   @Test
   void importShips_fleetyards_nameMatchAndCustomName() throws Exception {
@@ -455,7 +379,6 @@ class HangarImportIntegrationTest {
             "application/json",
             json.getBytes(StandardCharsets.UTF_8));
 
-    // When
     String response =
         mockMvc
             .perform(
@@ -467,7 +390,6 @@ class HangarImportIntegrationTest {
             .getResponse()
             .getContentAsString();
 
-    // Then: 135c matched and named; the alien entry reported as skipped.
     FleetviewImportResponseDto result =
         objectMapper.readValue(response, FleetviewImportResponseDto.class);
     assertEquals(1, result.importedCount());

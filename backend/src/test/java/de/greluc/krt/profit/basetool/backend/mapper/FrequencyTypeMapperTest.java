@@ -33,7 +33,6 @@ class FrequencyTypeMapperTest {
 
   @Test
   void toDto_shouldMapAllFields() {
-    // Given
     UUID id = UUID.randomUUID();
     FrequencyType entity = new FrequencyType();
     entity.setId(id);
@@ -43,10 +42,8 @@ class FrequencyTypeMapperTest {
     entity.setSortIndex(5);
     entity.setVersion(4L);
 
-    // When
     FrequencyTypeDto dto = mapper.toDto(entity);
 
-    // Then
     assertNotNull(dto);
     assertEquals(id, dto.id());
     assertEquals("Combat", dto.name());
@@ -58,14 +55,11 @@ class FrequencyTypeMapperTest {
 
   @Test
   void toEntity_shouldMapAllFields() {
-    // Given
     UUID id = UUID.randomUUID();
     FrequencyTypeDto dto = new FrequencyTypeDto(id, "Recon", "Recon channel", false, 12, 2L);
 
-    // When
     FrequencyType entity = mapper.toEntity(dto);
 
-    // Then
     assertNotNull(entity);
     assertEquals(id, entity.getId());
     assertEquals("Recon", entity.getName());
@@ -77,15 +71,12 @@ class FrequencyTypeMapperTest {
 
   @Test
   void roundtrip_shouldPreserveAllFields() {
-    // Given
     FrequencyTypeDto original =
         new FrequencyTypeDto(
             UUID.randomUUID(), "Logistics", "Cargo and supply chatter", true, 1, 7L);
 
-    // When
     FrequencyTypeDto back = mapper.toDto(mapper.toEntity(original));
 
-    // Then
     assertEquals(original, back);
   }
 

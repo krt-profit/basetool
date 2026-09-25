@@ -44,9 +44,7 @@ public final class LogMasker {
   /** Replacement used when a value is completely hidden. */
   public static final String FULL_MASK = "***";
 
-  private LogMasker() {
-    // utility class
-  }
+  private LogMasker() {}
 
   /**
    * Masks an e-mail address so that only the first character of the local part and the full domain
@@ -64,7 +62,7 @@ public final class LogMasker {
       return FULL_MASK;
     }
     String local = email.substring(0, at);
-    String domain = email.substring(at); // includes '@'
+    String domain = email.substring(at);
     char first = local.charAt(0);
     return first + "***" + domain;
   }

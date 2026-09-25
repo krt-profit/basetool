@@ -102,8 +102,6 @@ public class MissionPeerRedactor {
    */
   @NotNull
   public MissionDto cleanupMissionForPeer(@NotNull MissionDto dto) {
-    // Both flags, not just canManageManagers: the Verwaltung tab opens on either
-    // (mission-detail.html), and the owner field it shows is the one canEdit lets a caller change.
     boolean managing =
         Boolean.TRUE.equals(dto.canEdit()) || Boolean.TRUE.equals(dto.canManageManagers());
 
@@ -135,18 +133,8 @@ public class MissionPeerRedactor {
         cleanedUnits,
         dto.frequencies(),
         dto.operation(),
-        // Owner and managers stay hidden from a peer who is only reading — but not from one the
-        // very same response tells it may CHANGE them. See managesThisMission below.
         managing ? dto.owner() : null,
         managing ? dto.managers() : null,
-        // canEdit / canManageManagers are answers ABOUT THE CALLER, computed per request by
-        // MissionMapper from their own authorities — not somebody else's data, and telling a
-        // caller what they may do cannot disclose anything they do not already have. They were
-        // forced to false while this pass only ever ran for outsiders, for whom the answer was
-        // false anyway. Since ADR-0159 the pass runs for every caller below Logistician, and a
-        // MISSION_MANAGER is one: the hierarchy declares ADMIN/OFFICER above both roles but never
-        // MISSION_MANAGER above LOGISTICIAN. Forcing them off would hide the management controls
-        // from the person who owns the Einsatz.
         dto.canEdit(),
         dto.canManageManagers(),
         dto.version(),
@@ -155,29 +143,16 @@ public class MissionPeerRedactor {
         dto.flagsVersion(),
         dto.checkedInParticipants(),
         dto.registeredParticipants(),
-        // Squadron shorthand is not sensitive (MULTI_SQUADRON_PLAN.md section 7) — forwarded so
-        // the detail view shows the owning-squadron badge.
         dto.owningSquadron(),
         dto.owningOrgUnitVersion(),
-        // Party lead is a public leadership designation (like the Führungspositionen list) and the
-        // UserReferenceDto carries only the callsign tuple
-        // (username/displayName/effectiveName/rank)
-        // — no email or real name — so it is forwarded unchanged.
         dto.partyLeadUser(),
         dto.partyLeadGuestName(),
         dto.partyLeadVersion(),
-        // Ablauf steps, goals (Ziele) and meeting point (Treffpunkt) are non-PII mission
-        // planning data — forwarded like the assigned units and frequencies. So is the long
-        // Markdown description above: it was the one field the outsider tier hid, and with that
-        // tier gone (ADR-0159) a peer is a member of the organisation and reads it.
         dto.steps(),
         dto.stepsVersion(),
         dto.objectives(),
         dto.objectivesVersion(),
         dto.meetingPoint(),
-        // A lock counter, not data about anybody: it says how often the owner changed and nothing
-        // about who. Forwarded so a peer who may change the owner (managing, above) has something
-        // to echo; for one who may not, it is as harmless as the other section counters.
         dto.ownershipVersion());
   }
 
@@ -202,7 +177,6 @@ public class MissionPeerRedactor {
         dto.ship() == null ? null : cleanupShipForPeer(dto.ship()),
         dto.frequency(),
         dto.highValueUnit(),
-        // UserReferenceDto — the public callsign tuple only, same rationale as partyLeadUser.
         dto.responsibleUser(),
         dto.note(),
         dto.version(),
@@ -235,7 +209,6 @@ public class MissionPeerRedactor {
         dto.location(),
         dto.fitted(),
         dto.owner() == null ? null : cleanupUserForPeer(dto.owner()),
-        // Squadron shorthand is not sensitive — same call as the mission's own owningSquadron.
         dto.owningSquadron(),
         dto.version());
   }
@@ -287,11 +260,6 @@ public class MissionPeerRedactor {
   @Nullable
   @Contract("null -> null; !null -> !null")
   public UserDto cleanupUserForPeer(@Nullable UserDto dto) {
-    // Null in, null out - the same contract UserDtoRedaction.toPeerShape carries, and the reason
-    // this guard exists rather than relying on every caller. That method's Javadoc now names this
-    // one as its sibling, so a developer who reaches for the mission-surface twin on the strength
-    // of that cross-reference and hands it a nullable UserDto would otherwise get a 500. Every
-    // current caller already guards; the guard is for the next one.
     if (dto == null) {
       return null;
     }
@@ -300,20 +268,19 @@ public class MissionPeerRedactor {
         dto.username(),
         dto.displayName(),
         dto.effectiveName(),
-        null, // email
+        null,
         dto.rank(),
-        null, // description
-        null, // roles
-        null, // permissions
-        null, // lastReadAnnouncementId
-        false, // isLogistician
-        false, // isMissionManager
+        null,
+        null,
+        null,
+        null,
+        false,
+        false,
         dto.inKeycloak(),
-        null, // squadron – not exposed to a peer
-        null, // squadrons – not exposed to a peer
+        null,
+        null,
         dto.version(),
-        null, // joinDate – not exposed to a peer
-        null // discordLinked – not exposed to a peer
-        );
+        null,
+        null);
   }
 }

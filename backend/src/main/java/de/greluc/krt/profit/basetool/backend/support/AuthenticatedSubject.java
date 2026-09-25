@@ -69,9 +69,7 @@ public final class AuthenticatedSubject {
   /** Authorized-party claim: the Keycloak client id a token was issued to (OIDC Core section 2). */
   private static final String AUTHORIZED_PARTY_CLAIM = "azp";
 
-  private AuthenticatedSubject() {
-    // Utility holder — not instantiable.
-  }
+  private AuthenticatedSubject() {}
 
   /**
    * Extracts the acting subject, whether it arrived in a token or was established for a member.
@@ -96,14 +94,8 @@ public final class AuthenticatedSubject {
       return Optional.ofNullable(jwt.getSubject()).filter(s -> !s.isBlank());
     }
     if (authentication instanceof SubjectAuthentication subjectAuth) {
-      // ofNullable, matching the two branches above, although the interface contract is @NotNull:
-      // an implementation that breaks that contract should yield "no subject" here rather than a
-      // NullPointerException inside a security filter.
       return Optional.ofNullable(subjectAuth.subject()).filter(s -> !s.isBlank());
     }
-    // Everything else has no subject — NOT a fallback to getName(). See the class Javadoc: on an
-    // AnonymousAuthenticationToken that name is a placeholder, and on a username/password token it
-    // is the member's callsign, which REQ-OBS-004 keeps out of logs entirely.
     return Optional.empty();
   }
 

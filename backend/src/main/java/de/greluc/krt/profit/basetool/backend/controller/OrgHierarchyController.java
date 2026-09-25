@@ -327,8 +327,6 @@ public class OrgHierarchyController {
    */
   @NotNull
   private BereichMemberResponse toBereichMember(@NotNull OrgUnitMembership m) {
-    // The three Bereich booleans are derived from the unified rank (epic #800, REQ-ROLE-001) — the
-    // is_bereichs* columns were dropped in the Phase 5 cleanup (V187).
     MembershipRole role = m.getRole();
     return new BereichMemberResponse(
         m.getId().getOrgUnitId(),
@@ -347,9 +345,6 @@ public class OrgHierarchyController {
    */
   @NotNull
   private OlMemberResponse toOlMember(@NotNull OrgUnitMembership m) {
-    // The OL-member boolean is derived from the unified rank (epic #800, REQ-ROLE-001) —
-    // is_ol_member
-    // was dropped in the Phase 5 cleanup (V187).
     return new OlMemberResponse(
         m.getId().getOrgUnitId(),
         m.getId().getUserId(),

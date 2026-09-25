@@ -118,19 +118,15 @@ class OrgChartKeyboardA11yE2eTest {
       Page page = context.newPage();
       try {
         E2eSupport.navigate(page, STACK.baseUrl() + "/org-chart");
-        // The roving init runs in the end-of-body script; wait until a node is actually tabbable
-        // rather than merely present, so the assertions below never race the initialisation.
         page.waitForSelector(TABBABLE_ITEM);
 
         Locator items = page.locator(TREE_ITEMS);
         int count = items.count();
         assertTrue(count >= 2, "seeded chart should render at least two tree nodes, got " + count);
 
-        // On load: exactly one tabbable node, and it is the first in document order.
         assertThat(page.locator(TABBABLE_ITEM)).hasCount(1);
         assertThat(items.first()).hasAttribute("tabindex", "0");
 
-        // End -> last node, Home -> first node; the single-tabbable invariant survives both.
         items.first().focus();
         page.keyboard().press("End");
         assertThat(items.last()).isFocused();
@@ -141,8 +137,6 @@ class OrgChartKeyboardA11yE2eTest {
         assertThat(items.first()).isFocused();
         assertThat(page.locator(TABBABLE_ITEM)).hasCount(1);
 
-        // The first node is the Bereichsleiter at level 1. ArrowRight descends to its first child
-        // (the next, one-level-deeper node); ArrowLeft ascends back to it.
         assertEquals("1", activeAriaLevel(page), "first node is the level-1 Bereichsleiter");
         page.keyboard().press("ArrowRight");
         assertEquals("2", activeAriaLevel(page), "ArrowRight moves to the level-2 first child");
@@ -172,27 +166,20 @@ class OrgChartKeyboardA11yE2eTest {
         E2eSupport.navigate(page, STACK.baseUrl() + "/org-chart");
         enterEditMode(page);
 
-        // The "Stab hinzufügen" button is always present for an admin and opens the dialog with
-        // both the staff-type and user pickers, giving several focusables to trap between.
         Locator trigger = page.locator("[data-trigger='oc-add-staff']");
         trigger.click();
         Locator modal = page.locator("#oc-modal");
         assertThat(modal).isVisible();
 
-        // The page chrome is taken out of the tab order and hidden from assistive tech.
         assertTrue(
             isInert(page, "main"), "background <main> must be inert while the dialog is open");
         assertThat(page.locator("main")).hasAttribute("aria-hidden", "true");
 
-        // Tab repeatedly: focus must never leave the dialog content.
         for (int i = 0; i < 8; i++) {
           page.keyboard().press("Tab");
           assertTrue(focusInsideModalContent(page), "Tab #" + (i + 1) + " let focus escape dialog");
         }
 
-        // The trap wraps at both ends: from the first focusable Shift+Tab lands on the last, and
-        // from the last focusable Tab lands on the first. The "×" close button is the first
-        // focusable in DOM order; the submit button is the last.
         Locator firstFocusable = page.locator("#oc-modal .krt-modal-close");
         Locator lastFocusable = page.locator("#oc-modal [data-trigger='oc-modal-submit']");
 
@@ -204,7 +191,6 @@ class OrgChartKeyboardA11yE2eTest {
         page.keyboard().press("Tab");
         assertThat(firstFocusable).isFocused();
 
-        // Esc closes the dialog, restores the chrome and returns focus to the triggering button.
         page.keyboard().press("Escape");
         assertThat(modal).isHidden();
         assertThat(trigger).isFocused();
@@ -234,22 +220,11 @@ class OrgChartKeyboardA11yE2eTest {
    */
   @Test
   void successfulEditPreservesHorizontalScrollPosition() {
-    // A narrow viewport so a handful of side-by-side Kommando columns overflow the chart container
-    // and make it horizontally scrollable; tall enough that the editor dialog fits comfortably.
     try (BrowserContext context = authedContext(500, 900)) {
       Page page = context.newPage();
       try {
         E2eSupport.navigate(page, STACK.baseUrl() + "/org-chart");
 
-        // Always create at least one leaderless Kommando (so a renameable node exists for the
-        // oc-rename step below), then keep adding — up to the 4/Staffel cap — until the chart
-        // overflows horizontally. The shared ephemeral stack may already make the all-Staffeln
-        // chart
-        // scrollable (sibling suites seed extra Staffeln/SKs into it), in which case a width-only
-        // condition would create none and leave no oc-rename control to drive. Each create
-        // refreshes
-        // the chart in place; edit mode survives it and is re-entered idempotently inside the
-        // helper.
         for (int i = 0; i < 4 && (i == 0 || maxScrollLeft(page) <= 0); i++) {
           createLeaderlessKommando(page, "E2E Breite " + i);
         }
@@ -257,11 +232,6 @@ class OrgChartKeyboardA11yE2eTest {
             maxScrollLeft(page) > 0,
             "chart should be horizontally scrollable after adding Kommando columns");
 
-        // Rename the rightmost Kommando — a genuine, in-place-refreshing edit that does not change
-        // the chart width. Clicking the control scrolls it into view; then scroll fully right so
-        // that
-        // the
-        // control the editor re-focuses on close is already visible (no focus-driven scroll reset).
         enterEditMode(page);
         page.locator("[data-trigger='oc-rename']").last().click();
         assertThat(page.locator("#oc-modal")).isVisible();
@@ -272,10 +242,6 @@ class OrgChartKeyboardA11yE2eTest {
         page.locator("#oc-name").fill("E2E Renamed");
         clickAndAwaitRefresh(page, page.locator("#oc-modal [data-trigger='oc-modal-submit']"));
 
-        // After the in-place refresh swaps a fresh tree into #oc-chart (which resets the
-        // container's
-        // scroll), refreshChart() restores the captured horizontal offset in its swap .then(); wait
-        // for that restore to land before reading, so the assertions below do not race it.
         page.waitForFunction(
             "(t) => { const el = document.getElementById('oc-chart');"
                 + " return el && Math.abs(Math.round(el.scrollLeft) - t) <= 3; }",
@@ -294,8 +260,6 @@ class OrgChartKeyboardA11yE2eTest {
       }
     }
   }
-
-  // ---------------------------------------------------------------------- helpers --
 
   /**
    * Opens a new authenticated browser context with HTTPS errors ignored (the stack uses a
@@ -372,10 +336,6 @@ class OrgChartKeyboardA11yE2eTest {
             + "  });"
             + "}");
     submit.click();
-    // 30 s, not 15 s: the in-place refresh re-renders the entire org chart, which on the shared
-    // ephemeral stack keeps growing as sibling suites seed Staffeln/SKs into it. Under CI load that
-    // full re-render has overrun a 15 s budget (the create step times out before the chart
-    // returns).
     page.waitForFunction(
         "() => window.__ocSwapped === true",
         null,

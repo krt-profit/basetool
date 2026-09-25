@@ -1,58 +1,17 @@
 server:
   tomcat:
-    # No Tomcat MBean registry (FE-PERF-07, 2026-09-22). It was enabled only so TomcatMetrics could
-    # publish tomcat_threads_* for the "Spring Boot apps" dashboard (epic #936), but under virtual
-    # threads those gauges are always -1; the panel reads http_server_requests_active_seconds_count.
     relaxed-query-chars: "{,},[,]"
     relaxed-path-chars: "{,},[,]"
-    # Same M-3 connector-level tuning as the backend. The frontend's request
-    # profile is even more burst-prone than the backend's because every page
-    # render is a fan-out of 1..4 backend WebClient calls; under load a hung
-    # backend ties up the frontend request worker for the entire response
-    # timeout and the accept queue is what decides between "request queues" and
-    # "request gets refused at the socket layer".
-    #
-    # No `threads.max` / `threads.min-spare` (FE-PERF-07, removed 2026-09-22): with
-    # `spring.threads.virtual.enabled=true` below, Spring Boot gives the connector an external
-    # VirtualThreadExecutor, and Tomcat applies its pool settings only to its own internal
-    # executor — the keys were inert, and the tomcat_threads_* gauges read -1. Concurrency is
-    # measured by http_server_requests_active_seconds_count instead; ManagementPortIsolationTest
-    # pins the executor and that gauge. `accept-count` and `max-connections` act before the executor and still apply.
     accept-count: 200
     max-connections: 10000
-    # Tomcat 11.0.8+ lowered the `maxPartCount` connector default from 1000 to 10 as a multipart
-    # DoS hardening. That bites us hard: the frontend's in-place AJAX writes (epic #571) submit
-    # their forms as `multipart/form-data` via `FormData`, so EVERY form field is its own part —
-    # not just file uploads. A refinery order or a job order with several line items already has
-    # well over 10 fields, so on Tomcat 11 the save 500s with `FileCountLimitExceededException`
-    # (whose "attachment" text is a hardcoded Tomcat label, not a real field name). We restore the
-    # pre-11.0.8 default of 1000: generous enough for the largest legitimate editor (a refinery
-    # order with ~30 goods is ~165 parts) while still bounding a malicious flood. The request-size
-    # caps below remain the real volume guard; `GlobalExceptionHandler` turns any residual breach
-    # into a clean 413 instead of a 500 (REQ-FE-009).
     max-part-count: 1000
   max-http-request-header-size: 65536
   http2:
     enabled: true
   port: 18081
-  # SEC-02: the forwarded-header handling is registered explicitly in ForwardedHeaderConfig instead
-  # of by the `framework` auto-config. Spring's ForwardedHeaderFilter still rebuilds scheme/host from
-  # X-Forwarded-Proto/-Host for the OAuth2 redirect URI and HSTS (identical to `framework`), but it
-  # is ordered one slot AFTER ClientIpContextFilter so the latter can read the RAW X-Forwarded-For
-  # and resolve the client IP trusted-proxy-aware (Spring Boot pins the auto-registered filter to
-  # Integer.MIN_VALUE, which no filter can precede). `framework` consumed the header and exposed only
-  # the spoofable leftmost entry, letting an unauthenticated caller mint a fresh per-IP rate-limit
-  # bucket per request. See ForwardedHeaderConfig + ClientIpContextFilter + app.client-ip.
   forward-headers-strategy: none
   ssl:
     enabled: true
-    # Default keeps backwards compatibility for local development and the test
-    # stack, where the keystore is bind-mounted into the JAR as a classpath
-    # resource at `frontend/src/main/resources/keystore.p12`. In production the
-    # keystore MUST NOT be baked into the image (see CLAUDE.md and
-    # `.dockerignore`) — docker-compose overrides this with a `file:` URL
-    # pointing at a runtime bind mount so the production cert lives outside
-    # the GHCR image and never enters the registry.
     key-store: ${SERVER_SSL_KEY_STORE:classpath:keystore.p12}
     key-store-password: ${SERVER_SSL_KEY_STORE_PASSWORD}
     key-store-type: PKCS12
@@ -63,42 +22,17 @@ server:
     mime-types: text/html,text/plain,text/css,application/javascript,application/json,image/svg+xml
   servlet:
     session:
-      # Servlet-container default only. With @EnableRedisIndexedHttpSession the
-      # Redis repository — not the container — owns the session TTL, and the idle
-      # window is now TWO-TIER (REQ-SEC-025, ADR-0088): the repository default is
-      # the short `app.session.anonymous-timeout` (throwaway un-authenticated
-      # sessions), promoted to `app.session.authenticated-timeout` (720h, the
-      # 30-day "stay logged in" window) on a successful login. Kept at 720h so it
-      # never contradicts the authenticated window; it is not what expires an
-      # authenticated user's Redis session.
       timeout: 720h
       cookie:
-        # The `__Host-` prefix (FE-SEC-06) makes the browser refuse the cookie unless it is Secure,
-        # has Path=/ and carries NO Domain attribute — so no sibling subdomain and no plain-http
-        # response can ever set or overwrite the session cookie (cookie tossing / session
-        # fixation). All three conditions already held; the prefix makes the browser enforce them.
-        # Do not add `domain:` or a non-root `path:` here: the browser would then drop the cookie
-        # and every login would fail. Renaming the cookie from `SESSION` signed every member out
-        # once, at the deploy that shipped it (the old cookie names nothing the app reads any more).
         name: __Host-SESSION
         secure: true
         http-only: true
         same-site: strict
-        # Persist the session cookie for 30 days so the login survives a browser
-        # restart. Without max-age this is a session cookie that dies on browser
-        # close, forcing a fresh login even though the Redis-backed session is
-        # still valid.
         max-age: 30d
 
 spring:
   servlet:
     multipart:
-      # L-4: mirror the backend's explicit multipart caps. The frontend's multipart endpoints are
-      # the import proxies (HangarImportProxyController / PersonalBlueprintImportProxyController /
-      # AdminP4kImportPageController), which buffer the whole upload via file.getBytes() and relay
-      # it to the backend. The admin-only P4K catalog import is the large one and drives the 64 MB
-      # ceiling; keep these in lockstep with the backend caps. An explicit cap stops a large upload
-      # from materialising unbounded in the heap.
       max-file-size: 64MB
       max-request-size: 72MB
   threads:
@@ -106,19 +40,6 @@ spring:
       enabled: true
   data:
     redis:
-      # Bound the Lettuce command + connect timeout (ADR-0114). Without an explicit value Lettuce's
-      # 60 s command-timeout default governs EVERY Redis command — including the reactive PING the
-      # auto-configured RedisReactiveHealthIndicator runs (spring-boot-starter-webflux is on the
-      # classpath, so Boot registers the REACTIVE Redis health contributor, not the blocking one).
-      # `redis` sits in the readiness health group (ADR-0084), which gates the Docker HEALTHCHECK —
-      # and that probe times out after 5 s and flips the container `unhealthy` after 3 misses. An
-      # unbounded PING against a stalled Redis therefore hangs /actuator/health/readiness far past
-      # that window, every probe times out, and the frontend flaps into the maintenance page (the
-      # 2026-07-20 reactive-degradation incident). 2 s is >1000x the sub-millisecond co-located-Redis
-      # RTT yet well inside the 5 s probe window: a stalled Redis now fails the PING fast (a truthful
-      # DOWN) instead of hanging, while a genuine Redis outage still correctly fails readiness because
-      # every request needs the Redis-backed session. Env-overridable so an operator can retune
-      # without a rebuild.
       timeout: ${SPRING_DATA_REDIS_TIMEOUT:2s}
       connect-timeout: ${SPRING_DATA_REDIS_CONNECT_TIMEOUT:2s}
   cache:
@@ -132,23 +53,10 @@ spring:
     fallback-to-system-locale: false
   web:
     resources:
-      # WebMvcConfig registers one resource handler per asset tree that actually exists. Boot's
-      # auto-configured mappings would otherwise land in the same registry next to them — `/**`,
-      # which matches every URL and so reinstates exactly the per-render chain walk the narrow
-      # patterns remove, plus `/webjars/**`, which nothing here uses (no webjar is on the
-      # classpath). Turning the defaults off is what makes WebMvcConfig's patterns the only ones.
-      # It also retires `cache.cachecontrol` (max-age 365d + must-revalidate), which only ever
-      # reached Boot's own registrations: WebMvcConfig sets `immutable` on every tree itself, and
-      # leaving the weaker setting here suggested a header the app does not send.
       add-mappings: false
       chain:
         strategy:
           content:
-            # Load-bearing beyond the resource chain: `@ConditionalOnEnabledResourceChain` reads
-            # this key to register `ResourceUrlEncodingFilter`, which is what rewrites every
-            # Thymeleaf `@{...}` asset link to its content-hashed URL. WebMvcConfig builds the
-            # chain itself, so `add-mappings: false` above costs nothing here, but switching this
-            # to `false` would silently stop the hashing app-wide.
             enabled: true
     error:
       whitelabel:
@@ -159,18 +67,8 @@ spring:
         registration:
           keycloak:
             client-id: basetool-frontend
-            # ADR-0001 / REQ-SEC-069: the client TYPE follows the secret. With
-            # KEYCLOAK_FRONTEND_CLIENT_SECRET set, FrontendClientAuthenticationConfig makes this a
-            # confidential client (client_secret_basic + PKCE); empty, it stays the public client
-            # below (none + PKCE). One variable, so the method and the secret cannot disagree.
             client-secret: ${KEYCLOAK_FRONTEND_CLIENT_SECRET:}
             client-authentication-method: none
-            # Audit finding L-4 (2026-05-20): `offline_access` produces a long-lived refresh
-            # token. Refresh tokens are persisted in the Redis-backed Spring Session anyway, so
-            # the scope adds no functional capability — but its presence widens the blast radius
-            # of a Redis snapshot leak (the offline refresh token can outlive the Spring Session
-            # and re-establish access). The session-based flow handles refresh via the regular
-            # OAuth2 client-registration, no `offline_access` required.
             scope: openid, profile, email, roles
             authorization-grant-type: authorization_code
             redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
@@ -179,88 +77,28 @@ spring:
             user-name-attribute: preferred_username
 
 app:
-  # Published at /.well-known/assetlinks.json so Android hands the login callback to the app
-  # instead of to a browser. The fingerprint list is a LIST on purpose: a signing-key rotation has
-  # to publish the new digest while the old key is still installed on every device, so both must be
-  # servable at once. Overridable per environment; the default is the production release key.
   android-app-link:
     package-name: ${APP_ANDROID_PACKAGE_NAME:de.greluc.krt.profit.basetool.android}
     sha256-cert-fingerprints: "${APP_ANDROID_CERT_FINGERPRINTS:E8:40:20:5E:EC:16:F5:FD:CD:BA:8B:44:81:18:06:3C:4A:37:E6:16:20:99:CC:49:00:DF:23:80:C1:AF:50:64}"
   http:
-    # REQ-SEC-070 / ADR-0211: verify that the backend's certificate names `backend` on the
-    # pinned prod path. Off by default (the chain is pinned, as before); on once every service has
-    # its own leaf from the internal CA, where the name is what tells the services apart.
     verify-backend-hostname: ${INTERNAL_TLS_VERIFY_HOSTNAME:false}
     connect-timeout: 2s
     response-timeout: 5s
-    # The data-export download is the one backend call expected to take a long time: an Art. 15
-    # export runs ~29 statements across the whole schema and then renders a PDF. On the shared 5 s
-    # response-timeout a member with years of history got a read timeout and a 500. Applied per
-    # request (DataExportProxyController), so an ordinary page render keeps failing fast -- and
-    # deliberately NOT routed through the Resilience4j chain, because retrying a minute-long export
-    # on a timeout multiplies the work that timed out. Env override: APP_HTTP_EXPORT_RESPONSE_TIMEOUT.
     export-response-timeout: ${APP_HTTP_EXPORT_RESPONSE_TIMEOUT:120s}
     read-timeout: 3s
     write-timeout: 3s
-    # The wire protocol and encoding of the frontend->backend hop (ADR-0161 8.1 / 8.5,
-    # REQ-API-011). Written out with their defaults rather than left implicit, because both are
-    # meant to be flipped from the environment during a measurement and an operator has to be able
-    # to see that they exist. Env overrides: APP_HTTP_BACKEND_PROTOCOL, APP_HTTP_CODEC,
-    # APP_HTTP_MAX_CONCURRENT_STREAMS.
-    #
-    # backend-protocol: H2 offers HTTP/2 by ALPN and falls back to HTTP/1.1 on a plain-http URL;
-    #   HTTP11 restores the pre-2026-09-10 behaviour byte for byte. The SSE relay ignores this and
-    #   stays on HTTP/1.1 either way -- see WebClientConfig#connector for why.
-    # max-concurrent-streams: how many streams ride one backend connection before the pool opens
-    #   another. 20 mirrors Tomcat 11.0.25's maxConcurrentStreamExecution, which is NOT advertised
-    #   in the SETTINGS frame: past it the server queues rather than dispatches, so a client that
-    #   let the pool collapse onto one connection would cap backend concurrency at twenty.
-    # codec: CBOR asks for `application/cbor, application/json`; JSON asks for JSON alone. Only the
-    #   response direction negotiates -- request bodies stay JSON, and RFC 7807 problems stay
-    #   problem+json regardless (REQ-API-011).
     backend-protocol: ${APP_HTTP_BACKEND_PROTOCOL:H2}
     max-concurrent-streams: ${APP_HTTP_MAX_CONCURRENT_STREAMS:20}
     codec: ${APP_HTTP_CODEC:CBOR}
   livesync:
-    # Cross-replica live-sync fan-out (REQ-FE-015, ADR-0094). Reuses the Redis the frontend already
-    # runs for Spring Session: the changed relay publishes to a pub/sub channel and every instance
-    # relays it to its own local WebSocket rooms. On by default (and disabled entirely under the
-    # test profile, which runs no Redis). Set false to force purely local, single-instance relay.
     redis:
       enabled: ${APP_LIVESYNC_REDIS_ENABLED:true}
       channel: ${APP_LIVESYNC_REDIS_CHANNEL:basetool:livesync:changed}
-      # Second channel for the editor-presence gossip (ADR-0126): each instance publishes its own
-      # complete presence snapshot per actively-edited topic, peers mirror it and merge it into the
-      # dots they render. Separate from the changed channel so the consume side can tell the two
-      # payload formats apart and the periodic gossip never masks the changed relay in the metrics.
       presence-channel: ${APP_LIVESYNC_REDIS_PRESENCE_CHANNEL:basetool:livesync:presence}
   session:
-    # Two-tier session idle timeout (REQ-SEC-025, ADR-0088). Every NEW session starts with the short
-    # ANONYMOUS window; a successful login promotes it to the long AUTHENTICATED window (in
-    # SessionLifetimeUpgradeSuccessHandler). This stops the throwaway sessions Spring Security mints
-    # for un-authenticated traffic — chiefly the CSRF-token session created when an anonymous client
-    # renders a form-bearing permit-all page, plus pre-login OAuth2 authorizationRequest state — from
-    # lingering the full login window: those orphans previously accreted >16k 30-day Redis sessions
-    # against ~30 real principals (basetool_active_sessions runaway) on a collision course with the
-    # Redis `maxmemory noeviction` ceiling. Real members keep the unchanged 30-day "stay logged in"
-    # window. Applied by RedisSessionConfig (anonymous = repository default) and the login success
-    # handler (authenticated = post-login bump).
     anonymous-timeout: ${APP_SESSION_ANONYMOUS_TIMEOUT:30m}
     authenticated-timeout: ${APP_SESSION_AUTHENTICATED_TIMEOUT:720h}
-    # Which classes a session value may name as its @class type id (REQ-SEC-067, ADR-0206,
-    # SessionTypeAllowList). off = every class, the validator of before; report (default) = every
-    # class is still read, a class outside the list is counted in
-    # basetool_session_type_refused_total{mode="report"} and named once in a WARN; enforce = such a
-    # class is refused and that one attribute dropped. Lenient: any case, and an unknown value falls
-    # back to report with a WARN.
     type-allow-list: ${APP_SESSION_TYPE_ALLOW_LIST:report}
-    # Spring Session's startup step against Redis (RedisSessionConfig). Under the shared `default`
-    # user (no spring.data.redis.username) it is the CONFIG GET/SET of keyspace notifications; under
-    # a per-service ACL user it is a PING and no CONFIG, which that user may not run (REQ-SEC-068).
-    # Only the image build's AOT training run switches it off (docker/app/Dockerfile, IMG-PERF-12),
-    # because it is the one step of the context refresh that opens a Redis connection. Every
-    # deployment keeps true: a frontend that cannot reach its session store must fail its startup
-    # (ADR-0084).
     configure-keyspace-notifications: true
   ui:
     notification-duration: 5000
@@ -273,70 +111,12 @@ app:
     structured-enabled: false
   monitoring:
     scrape:
-      # Basic-auth credentials for GET /actuator/prometheus (REQ-OBS-005, ADR-0072). Fail-closed:
-      # when either variable is unset/blank, MonitoringScrapeSecurityConfig denies every request
-      # to the endpoint. Set both only where a Prometheus scraper actually runs; never commit
-      # real values.
       username: ${MONITORING_SCRAPE_USER:}
       password: ${MONITORING_SCRAPE_PASSWORD:}
 
-# Actuator: expose `health` so the Docker HEALTHCHECK / docker-compose
-# `service_healthy` gating can reach it (bare status only, so unauthenticated
-# callers cannot enumerate internal components) plus `prometheus` for the
-# monitoring scrape (REQ-OBS-005). `/actuator/prometheus` is NOT public:
-# MonitoringScrapeSecurityConfig guards it with fail-closed basic auth (denyAll
-# until MONITORING_SCRAPE_USER/PASSWORD are set), and BotProtectionFilter
-# whitelists exactly this path so the scrape reaches the security chain at all.
-#
-# The `readiness` group is widened from Spring's default (just `readinessState`)
-# to include the indicators whose `DOWN` actually means "stop sending traffic to
-# this frontend instance":
-#   - backend     — custom BackendHealthIndicator probes the backend's own
-#                   /actuator/health/readiness, so a backend outage drops the
-#                   frontend out of `service_healthy` immediately on startup —
-#                   the auto-configured Resilience4j CircuitBreakerHealthIndicator
-#                   only flips DOWN once enough real traffic has tripped a breaker,
-#                   which is too late for startup-gating.
-#   - redis       — auto-configured; Spring Session persists OIDC tokens and
-#                   flash attributes in Redis, so a Redis outage logs users out
-#                   on every request.
-#   - diskSpace   — auto-configured; <10 MB free trips DOWN, otherwise the
-#                   LogstashEncoder JSON appender would silently lose logs in
-#                   prod.
-#   - ssl         — auto-configured when server.ssl.enabled=true; warns when
-#                   the keystore certificate is within the expiry threshold.
-# The custom KeycloakHealthIndicator is deliberately NOT in this group (ADR-0084):
-# because this readiness group gates the Docker container health, a transient
-# Keycloak outage would otherwise flip the frontend container `unhealthy` and feed
-# the same deploy-loop thrash as the 2026-07-09 backend incident. A Keycloak blip
-# must not cycle the frontend container — the indicator bean stays registered
-# (root /actuator/health aggregate + WARN logs keep it observable), it just no
-# longer gates container liveness. The `backend` indicator stays: an actual
-# backend outage genuinely means this frontend cannot serve, and the deploy loop
-# no longer restart-storms on a merely-unhealthy container (ADR-0083).
-# `livenessState` is likewise not in this group.
-# The Docker HEALTHCHECK in docker/app/Dockerfile (stage runtime-frontend) points at /actuator/health/readiness
-# so this group is what gates docker-compose `service_healthy`.
 management:
   endpoints:
     web:
-      # `loggers` is exposed so a log level can be raised at RUNTIME instead of requiring a config
-      # change plus a redeploy plus a force-recreate. That matters because the most diagnostic lines
-      # in this codebase sit at DEBUG on purpose (bot blocks, the per-IP rate limit, the open circuit
-      # breaker, a relayed backend 4xx) — without this endpoint they exist but are unreachable during
-      # an incident. It adds no PUBLIC surface: `/actuator/health*` is the only permitted actuator
-      # path there, everything else falls through to `anyRequest().authenticated()` on the public
-      # connector.
-      #
-      # The management port is the other half of the story, and it is not "no surface". In prod the
-      # endpoints move to it, and ADR-0090 leaves that port UNAUTHENTICATED — a trade made when
-      # everything exposed was read-only. `loggers` is not: a ROOT logger at TRACE writes bearer
-      # tokens and request bodies into a Loki stream retained for 744h. There is no identity on
-      # that port to gate on, so application-prod.yml removes the mutator instead
-      # (`management.endpoint.loggers.access: read-only`).
-      # Read: GET /actuator/loggers/<logger> — everywhere, including prod.
-      # Write: POST {"configuredLevel":"DEBUG"} — dev and test only; not persisted, so a restart
-      # returns to the configured levels (REQ-OBS-016).
       exposure:
         include: health, prometheus, loggers
   endpoint:
@@ -350,24 +130,10 @@ management:
           include: readinessState, backend, redis, diskSpace, ssl
   metrics:
     tags:
-      # Common tag on every meter; the Grafana "Spring Boot apps" dashboard selects the
-      # module through this `application` label (epic #936 dashboard set).
       application: basetool-frontend
     distribution:
-      # Publish latency histogram buckets for http.server.requests so the "HTTP p95 Latency"
-      # dashboard panel can compute histogram_quantile (Spring Boot emits no buckets by
-      # default). Bounded to 5ms..10s to keep the per-URI bucket cardinality in check (epic #936).
-      # http.client.requests (the WebClient calls to the backend, observation-wired in
-      # WebClientConfig) gets the SAME 5ms..10s bounds so a client-p95-vs-server-p95 overlay can
-      # separate "backend slow" from "frontend slow"; matching the bounds keeps both histograms on
-      # the same ~14 buckets instead of Micrometer's unbounded ~66-bucket default (#1041 item 11).
       percentiles-histogram:
         "[http.server.requests]": true
-        # The in-flight long-task timers Micrometer derives from each observation
-        # (`<name>.active`) inherit the histogram by prefix, which exported ~50 bucket series per
-        # label set that nothing reads: the In-flight Requests panel reads only `_count`.
-        # Switched off for the `.active` timers alone; the latency histograms stay
-        # (ManagementPortIsolationTest).
         "[http.server.requests.active]": false
         "[http.client.requests.active]": false
         "[http.client.requests]": true
@@ -380,33 +146,16 @@ management:
   tracing:
     export:
       otlp:
-        # Second half of the master gate: without the monitoring stack the OTLP span exporter
-        # bean is not even instantiated (Boot gates it via ConditionalOnEnabledTracingExport;
-        # belt and braces on top of management.opentelemetry.enabled below).
         enabled: ${MONITORING_TRACING_ENABLED:false}
     sampling:
-      # Only honored while tracing is enabled. Low traffic makes full sampling affordable;
-      # revisited in the Phase-3 tuning (epic #936).
       probability: ${MONITORING_TRACING_SAMPLING_PROBABILITY:1.0}
   opentelemetry:
-    # Master gate for distributed tracing (REQ-OBS-009, epic #936 Phase 1b). Default false keeps
-    # dev/test/e2e and a prod host without the monitoring stack inert: no OTel tracer, no span
-    # exporter, no export attempts (Boot leaves only no-op propagators behind). Phase 2 sets
-    # MONITORING_TRACING_ENABLED=true together with the OTLP endpoint below. Boot 4 note: THIS
-    # flag is the gate the OTel tracing auto-configuration actually honours
-    # (@ConditionalOnEnabledOpenTelemetry); the legacy `management.tracing.enabled` is not
-    # consumed by any Boot 4.1 auto-configuration (verified against the module bytecode) and an
-    # endpoint-only gate is likewise not possible - tracing would be active by default.
     enabled: ${MONITORING_TRACING_ENABLED:false}
     resource-attributes:
-      # Align the trace service name with the `application` metric tag so Grafana's
-      # logs<->traces<->metrics correlation uses one identity per module.
       "service.name": basetool-frontend
     tracing:
       export:
         otlp:
-          # OTLP HTTP endpoint of the span collector (Phase 2: Alloy on the scrape network,
-          # http://alloy:4318/v1/traces). Only honored while tracing is enabled.
           endpoint: ${MONITORING_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
 
 logging:
@@ -414,24 +163,7 @@ logging:
     org.springframework.web: INFO
     org.springframework.security: INFO
     io.github.resilience4j: INFO
-    # REQ-OBS-013: this is a THRESHOLD, not a demotion (corrected 2026-09-02 — the note here used to
-    # claim it demoted ERROR to WARN; it never did). The OTLP exporter logs a transport failure at
-    # JUL SEVERE, which arrives as ERROR and clears a WARN threshold untouched. Accepted, because the
-    # SDK's ThrottlingLogger caps that source at <= 1/min — two orders below LogbackErrorSpike's
-    # > 0.2/s — and an unreachable Alloy pages via TargetDown regardless. The pin's real effect is
-    # dropping the exporter's INFO chatter; not OFF, which would also drop the only local breadcrumb.
     io.opentelemetry.exporter: WARN
-    # REQ-OBS-001: a 404 this application answers on purpose must not also warn. DispatcherServlet
-    # writes "No mapping for GET /favicon.ico" through this dedicated logger UNCONDITIONALLY — before
-    # throwExceptionIfNoHandlerFound is consulted, so before GlobalExceptionHandler.handleNotFound
-    # renders the 404 page it is designed to render. /favicon.ico and /sm/** are permitAll with no
-    # file behind them by design (see WebMvcConfig#addResourceHandlers): the favicons are declared by
-    # <link rel="icon"> against /logos/, and /sm/ is a path browser extensions probe. So the WARN
-    # warns about the app working as intended, in the same stream the bot rules and the asset-shaped
-    # type mismatch were demoted out of. ERROR rather than OFF: this logger has no other output, and
-    # a level still leaves it reachable via /actuator/loggers. Pinned on the LOGGER, not on
-    # org.springframework.web, so every other web logger keeps INFO. Nothing is lost — the request is
-    # still access-logged and still rendered as the 404 page.
     org.springframework.web.servlet.PageNotFound: ERROR
 
 resilience4j:
@@ -449,10 +181,6 @@ resilience4j:
         waitDurationInOpenState: 5s
         failureRateThreshold: 50
         eventConsumerBufferSize: 10
-        # A missing/expired frontend OAuth2 token (client_authorization_required) is a per-session
-        # auth state, not a backend-health signal — it must neither count toward the failure rate
-        # nor open the breaker for everyone else. GlobalExceptionHandler turns it into a re-login
-        # redirect instead (REQ-SEC-012).
         ignoreExceptions:
           - org.springframework.security.oauth2.client.ClientAuthorizationException
     instances:
@@ -468,20 +196,9 @@ resilience4j:
         baseConfig: default
   retry:
     configs:
-      # Retry budget chosen to keep worst-case page-render latency bounded: at the previous
-      # `maxAttempts: 3, waitDuration: 1s` an upstream that responded after the 3 s read-timeout
-      # then queued another two attempts behind a 1 s wait each — six extra seconds on top of the
-      # backend's own timeout, which the user perceived as a blank page. Drop to a single retry
-      # at 500 ms; that still papers over the typical transient (a single packet loss or a
-      # Reactor-Netty connection reset on a stale pooled connection) without inflating the
-      # tail-latency budget for legitimate slow upstreams. Long-running ones reach the circuit
-      # breaker faster too.
       default:
         maxAttempts: 2
         waitDuration: 500ms
-        # Retrying a client_authorization_required gains nothing (the token is gone until an
-        # interactive re-login) and only multiplies the log lines — fail fast so the user is
-        # redirected promptly (REQ-SEC-012).
         ignoreExceptions:
           - org.springframework.security.oauth2.client.ClientAuthorizationException
     instances:
@@ -489,13 +206,6 @@ resilience4j:
         baseConfig: default
   bulkhead:
     configs:
-      # Bulkhead concurrency raised 50 -> 100 to match the Reactor-Netty connection pool (sized at
-      # 100 in `WebClientConfig`). A single mission-detail or hangar render fans out to four parallel
-      # backend calls (see `ParallelPageLoader`), and under heavy mission-planning bursts (plus the
-      # live-update SSE/presence traffic) the 50-slot gate left half the pool unusable and queued
-      # legitimate calls behind `maxWaitDuration: 1s`, surfacing as slow renders. 100 lets callers use
-      # every pooled connection while still capping a runaway: the 101st concurrent call queues at the
-      # gate rather than over-subscribing Netty.
       default:
         maxConcurrentCalls: 100
         maxWaitDuration: 1s

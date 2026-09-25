@@ -95,10 +95,8 @@ class ItemInventoryOperationsE2eTest {
    */
   private static Path storageState;
 
-  // Shared reference data (seeded once).
   private static String opsHubLocId;
 
-  // Per-scenario game items + rows (one item per scenario, see class Javadoc).
   private static String einbuchenGameItemId;
   private static String opsGameItemId;
   private static String opsItemRowId;
@@ -108,8 +106,6 @@ class ItemInventoryOperationsE2eTest {
   private static String gateItemOrderId;
   private static String gateMaterialOrderId;
 
-  // REQ-INV-039 (#1742) need-label fixture: an ITEM order for 7 units with nothing manufactured,
-  // delivered or earmarked, and never written to by another case — so the label is a fixed 7.
   private static String needGameItemId;
   private static String needItemOrderId;
 
@@ -132,8 +128,6 @@ class ItemInventoryOperationsE2eTest {
         E2eSupport.authenticatedStorageState(browser, STACK.baseUrl(), USERNAME, PASSWORD);
 
     opsHubLocId = seeder.createLocation(USERNAME, PASSWORD, "E2E Item Ops Hub");
-    // One blueprint ingredient shared by every seeded widget — the bookable-item predicate only
-    // needs the blueprint to exist, the ingredient material itself is never booked here.
     String ingredientMatId =
         seeder.ensureJobOrderMaterial(USERNAME, PASSWORD, "E2E Item Ingredient Mat");
 
@@ -180,7 +174,6 @@ class ItemInventoryOperationsE2eTest {
    * exactly the entered amount) and that the new row is reachable in the {@code
    * /inventory/my?view=items} tree: gameItem group → stack → lazily loaded entry leaf.
    */
-  // covers REQ-INV-029/030
   @Test
   void einbuchenCreatesItemStock() {
     assumeTrue(STACK.managesStack(), "needs the JDBC-seeded bookable game-item catalog");
@@ -190,21 +183,15 @@ class ItemInventoryOperationsE2eTest {
           E2eSupport.navigate(page, STACK.baseUrl() + "/inventory/input?source=my");
           page.waitForLoadState();
 
-          // Item mode: the toggle hides+disables the material block (no quality field renders)
-          // and switches the amount to whole units (REQ-INV-029).
           page.getByTestId("inventory-mode-item").check();
           E2eSupport.selectComboboxByValue(
               page.locator(".krt-combobox:has(#gameItemId) .krt-combobox__input"),
               einbuchenGameItemId);
-          // The location lookup is long-cached, so pick whatever the combobox offers (the
-          // stack assertion is location-agnostic — the widget is unique to this scenario).
           E2eSupport.selectComboboxFirstOption(
               page.locator(".krt-combobox:has(#locationId) .krt-combobox__input"));
           page.locator("#amount").fill("3");
 
           double before = totalAmount(myItemStacks(einbuchenGameItemId));
-          // #577: book-in is an X-Requested-With AJAX twin (navigate-after-AJAX on success), so
-          // wait on the XHR POST; keep the footer-clear so the trusted click is not intercepted.
           page.evaluate(
               "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
                   + " 'none'; } }");
@@ -217,13 +204,8 @@ class ItemInventoryOperationsE2eTest {
               AMOUNT_DELTA,
               "the booked-in whole amount must add to the widget's item stock");
 
-          // Let the success handler's own navigation to the source listing settle before driving
-          // the item view, so the explicit navigate below never aborts it mid-flight.
           page.waitForURL(url -> url.contains("/inventory/my"));
 
-          // REQ-INV-030: the new stock is reachable through the item tree — group, stack, entry.
-          // The row (and the location the cached combobox happened to offer) is read back through
-          // the flat catalog=ITEM list, since the create response is consumed by the page.
           JsonObject row = findMyItemRow(einbuchenGameItemId);
           openMyItemViewToEntry(
               page,
@@ -241,7 +223,6 @@ class ItemInventoryOperationsE2eTest {
    * at the source through the book-out modal — the source stack falls under the deletion epsilon
    * and vanishes, leaving only the destination stack.
    */
-  // covers REQ-INV-029/030/031
   @Test
   void umbuchenAndBookOutItemRow() {
     assumeTrue(STACK.managesStack(), "needs the JDBC-seeded bookable game-item catalog");
@@ -250,8 +231,6 @@ class ItemInventoryOperationsE2eTest {
         page -> {
           openMyItemViewToEntry(page, opsGameItemId, opsHubLocId, opsItemRowId);
 
-          // Item view renders no quality column (no .tree-gauge anywhere in the tree) and the
-          // entry carries no mission split — only the Auftrag dimension exists on item rows.
           assertThat(page.locator("#inventoryTable .tree-gauge")).hasCount(0);
           assertThat(
                   page.locator(
@@ -266,7 +245,6 @@ class ItemInventoryOperationsE2eTest {
                           + "'][data-assoc-field='JOB_ORDER']"))
               .isVisible();
 
-          // Umbuchen: transfer 20 whole units to a different (cached) location.
           page.locator("button[data-trigger='inv-my-umbuchen'][data-id='" + opsItemRowId + "']")
               .click();
           assertThat(page.locator("#umbuchenModal")).isVisible();
@@ -285,8 +263,6 @@ class ItemInventoryOperationsE2eTest {
               AMOUNT_DELTA,
               "destination receives 20");
 
-          // Ausbuchen (DISCARD, full remainder): the source row falls under the deletion epsilon
-          // and its stack vanishes — only the destination stack remains.
           openMyItemViewToEntry(page, opsGameItemId, opsHubLocId, opsItemRowId);
           page.locator("button[data-trigger='inv-my-bookout'][data-id='" + opsItemRowId + "']")
               .click();
@@ -318,7 +294,6 @@ class ItemInventoryOperationsE2eTest {
    * filter). The mission allocation section is hidden outright — item rows reject the mission
    * dimension.
    */
-  // covers REQ-INV-031
   @Test
   void einbuchenAllocationGateFiltersOrdersByCatalog() {
     assumeTrue(STACK.managesStack(), "needs the JDBC-seeded bookable game-item catalog");
@@ -329,15 +304,12 @@ class ItemInventoryOperationsE2eTest {
           page.waitForLoadState();
 
           page.getByTestId("inventory-mode-item").check();
-          // Item mode has no mission dimension (REQ-INV-031): the section is hidden outright.
           assertThat(page.locator("#missionAllocGroup"))
               .hasClass(Pattern.compile(".*krtm-hidden.*"));
 
           E2eSupport.selectComboboxByValue(
               page.locator(".krt-combobox:has(#gameItemId) .krt-combobox__input"), gateGameItemId);
 
-          // A fresh allocation row is filtered by the picked gameItem on add: the qualifying ITEM
-          // order stays selectable, the MATERIAL order is disabled + hidden.
           page.locator("[data-trigger='inv-input-add-order']").click();
           Locator orderSelect = page.locator("#jobOrderAllocRows [data-alloc-target]").first();
           assertThat(orderSelect).isVisible();
@@ -357,7 +329,6 @@ class ItemInventoryOperationsE2eTest {
    * <p>Also pins the deliberate asymmetry: item rows carry no quality at all (REQ-INV-029), so the
    * material picker's quality marker must never appear here.
    */
-  // covers REQ-INV-039 (item mode)
   @Test
   void checkInItemOrderOptionStatesTheOutstandingNeed() {
     assumeTrue(STACK.managesStack(), "needs the JDBC-seeded bookable game-item catalog");
@@ -376,22 +347,10 @@ class ItemInventoryOperationsE2eTest {
               page.locator(
                   "#jobOrderAllocRows [data-alloc-target] option[value='" + needItemOrderId + "']");
           assertThat(option).hasCount(1);
-          // "#<id> - <handle> (OPEN) · noch 7 Stück". Pin the SUFFIX, not a lone digit: the
-          // option's own auto-incremented displayId can itself contain a 7, so ".*7.*" would pass
-          // with the label missing entirely. The separator and the "noch" of the need message can
-          // only come from the suffix, and the word boundary keeps "noch 70" from passing.
-          //
-          // ESCAPE THEM TWICE. In a Java string literal \s is a SPACE (a Java 15 escape,
-          // not a regex one) and \b is a BACKSPACE, U+0008 — so the single-backslash form
-          // compiles to `·<SP>*noch<SP>*7<BS>` and can never match rendered text, whatever the
-          // page does. That is why this sat red in every browser. The material sibling gets
-          // away with the same mistake only because it carries no \b.
           assertThat(option)
               .hasText(
                   Pattern.compile(".*·\\s*noch\\s*7\\b.*"),
                   new LocatorAssertions.HasTextOptions().setTimeout(10_000));
-          // Item rows carry no quality (REQ-INV-029), so the material picker's floor marker
-          // ("benötigt 650+") must never appear here.
           assertThat(option).not().hasText(Pattern.compile(".*benötigt.*"));
         });
   }
@@ -404,7 +363,6 @@ class ItemInventoryOperationsE2eTest {
    * the widget's group total drop to 60 IN PLACE (its own filtered fragment re-fetch rides the
    * {@code view=items} query state).
    */
-  // covers REQ-INV-030 (item view) + REQ-FE-010/015 (single inventory/stock seam)
   @Test
   void liveSyncItemWrite() {
     assumeTrue(STACK.managesStack(), "needs the JDBC-seeded bookable game-item catalog");
@@ -426,11 +384,8 @@ class ItemInventoryOperationsE2eTest {
         expandAllItemViewToLeaf(pageA);
         expandAllItemViewToLeaf(pageB);
 
-        // A full reload on A would clear this marker; the live in-place swap leaves it intact.
         pageA.evaluate("window.__krtNoReload = true;");
 
-        // Deterministic wait: A is registered with the relay once its `inventory` subscribe is
-        // acked.
         pageA.waitForCondition(
             () ->
                 Boolean.TRUE.equals(
@@ -439,7 +394,6 @@ class ItemInventoryOperationsE2eTest {
                             + " window.krtLiveSync.subscribedTopics().indexOf('inventory') >="
                             + " 0)")));
 
-        // Context B books out 40 of the 100 units (broadcasts inventory/[stock] on success).
         pageB
             .locator("button[data-trigger='inv-admin-bookout'][data-id='" + syncItemRowId + "']")
             .click();
@@ -448,8 +402,6 @@ class ItemInventoryOperationsE2eTest {
         pageB.locator("#amount").fill("40");
         submitTransferInPlace(pageB, "#bookOutSubmitBtn");
 
-        // The assertion under test: context A — which did nothing — re-renders its item tree in
-        // place (the global room coalesces at ~1.5 s) and shows the reduced whole-unit total.
         assertThat(pageA.locator(groupAmount))
             .containsText(
                 Pattern.compile("(?<!\\d)60(?!\\d)"),
@@ -465,10 +417,6 @@ class ItemInventoryOperationsE2eTest {
       }
     }
   }
-
-  // --------------------------------------------------------------------------------------------
-  // Shared flow scaffolding
-  // --------------------------------------------------------------------------------------------
 
   /** A single UI flow body, run inside a fresh authenticated context with failure diagnostics. */
   @FunctionalInterface
@@ -542,8 +490,6 @@ class ItemInventoryOperationsE2eTest {
     if (isCollapsed(page, stackSelector + " + div.tree-stack-entries")) {
       stackHeader.click();
     }
-    // 20 s, not the 5 s default: the lazy stack-entries fetch + render is slow on WebKit under
-    // load.
     assertThat(page.locator("div.tree-row--leaf[data-item-id='" + rowId + "']"))
         .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
   }
@@ -637,10 +583,6 @@ class ItemInventoryOperationsE2eTest {
     throw new IllegalStateException(
         "No transfer-target location distinct from the source was offered in the dropdown");
   }
-
-  // --------------------------------------------------------------------------------------------
-  // API verification helpers (read the same grouped catalog=ITEM endpoint the item views use)
-  // --------------------------------------------------------------------------------------------
 
   /**
    * Fetches the owned ("my") grouped item Lager for one game item and returns that item's stacks as

@@ -111,16 +111,11 @@ public class SsoReAuthenticationEntryPoint implements AuthenticationEntryPoint {
     String uri = request.getRequestURI();
 
     if (isBackgroundRequest(request)) {
-      // Background fetch / EventSource / WS handshake with a dead session. Do NOT redirect — that
-      // would clobber the session's single saved OAuth2 authorization request and break the user's
-      // real interactive re-login (#1137). Answer 401 + X-Reauthenticate so the JS does one
-      // controlled window redirect, leaving the saved-request slot for the genuine navigation.
       writeReauthChallenge(request, response);
       return;
     }
 
     if (isSsoAlreadyAttempted(request)) {
-      // Silent re-auth already tried and failed – fall back to interactive login
       log.info(
           "[SSO] Silent re-auth already attempted and failed, falling back to interactive login."
               + " URI={} | remoteAddr={}",
@@ -136,15 +131,10 @@ public class SsoReAuthenticationEntryPoint implements AuthenticationEntryPoint {
             + " remoteAddr={} | session={}",
         uri,
         request.getRemoteAddr(),
-        // A fingerprint, never the raw id: the session id is a bearer credential (APPSEC-12).
         SessionIdFingerprint.of(request.getSession(false)));
 
-    // Mark that a silent SSO attempt is in progress (prevents redirect loops)
     setSsoAttemptedCookie(response);
 
-    // Redirect to Keycloak with prompt=none for silent re-authentication.
-    // Spring Security's SavedRequestAwareAuthenticationSuccessHandler will restore
-    // the original request URI after successful authentication.
     String redirectUrl = request.getContextPath() + OAUTH2_AUTHORIZATION_BASE + "?prompt=none";
 
     log.debug("[SSO] Redirecting to silent SSO endpoint: {}", redirectUrl);
@@ -235,9 +225,6 @@ public class SsoReAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
   private void setSsoAttemptedCookie(@NotNull HttpServletResponse response) {
     log.debug("[SSO] Setting SSO_ATTEMPTED cookie to prevent redirect loop");
-    // SameSite=Strict to match the session / XSRF cookies (security audit gap-fill); jakarta's
-    // Cookie has no SameSite setter, so emit a ResponseCookie Set-Cookie header. 60s max-age — only
-    // needed for the redirect cycle.
     writeSsoAttemptedCookie(response, "1", 60);
   }
 

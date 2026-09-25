@@ -120,9 +120,6 @@ class MembershipRoleMigrationEquivalenceTest {
     return MembershipRole.MEMBER;
   }
 
-  // --- Legacy boolean predicates, copied verbatim from the four readers as they stood before the
-  // Phase-2 switch. These are the "before" side of the equivalence. ---
-
   /** {@code CustomJwtGrantedAuthoritiesConverter.confersFlatOfficerRole} before Phase 2. */
   private static boolean legacyConfersFlatOfficerRole(LegacyFlags f) {
     return f.lead()
@@ -180,52 +177,42 @@ class MembershipRoleMigrationEquivalenceTest {
     for (LegacyFlags f : LEGACY_PROFILES) {
       MembershipRole role = backfill(f);
 
-      // CustomJwtGrantedAuthoritiesConverter.confersFlatOfficerRole ->
-      // role.confersOwnLevelOversight
       assertEquals(
           legacyConfersFlatOfficerRole(f),
           role.confersOwnLevelOversight(),
           () -> "flat officer role diverged for " + role);
 
-      // CustomJwtGrantedAuthoritiesConverter.confersOwnUnitOfficerReach -> SK_LEAD || squadron rank
       assertEquals(
           legacyOwnUnitOfficerReach(f),
           role == MembershipRole.SK_LEAD || role.isSquadronRank(),
           () -> "own-unit officer reach diverged for " + role);
 
-      // OrgUnitCascadeService OL short-circuit -> role == OL_MEMBER
       assertEquals(
           legacyOlReach(f),
           role == MembershipRole.OL_MEMBER,
           () -> "OL reach diverged for " + role);
 
-      // OrgUnitCascadeService area cascade -> role.isAreaRank()
       assertEquals(
           legacyAreaCascade(f), role.isAreaRank(), () -> "area cascade diverged for " + role);
 
-      // OwnerScopeService.currentOversightScope own-unit branch -> SK_LEAD || squadron rank
       assertEquals(
           legacyOversightOwnUnit(f),
           role == MembershipRole.SK_LEAD || role.isSquadronRank(),
           () -> "oversight own-unit diverged for " + role);
 
-      // OwnerScopeService.isOversightSeat -> role.confersOwnLevelOversight()
       assertEquals(
           legacyIsOversightSeat(f),
           role.confersOwnLevelOversight(),
           () -> "oversight seat diverged for " + role);
 
-      // OwnerScopeService.isAreaOrOlSeat -> role.isAreaOrOl()
       assertEquals(
           legacyIsAreaOrOlSeat(f), role.isAreaOrOl(), () -> "area-or-OL seat diverged for " + role);
 
-      // OrgUnitMembershipService.userHoldsLeadershipRole -> SK_LEAD || isAreaOrOl()
       assertEquals(
           legacyUserHoldsLeadershipRole(f),
           role == MembershipRole.SK_LEAD || role.isAreaOrOl(),
           () -> "silo-leader guard diverged for " + role);
 
-      // OrgUnitCascadeService cascadesDownward classifier mirrors area-cascade OR OL reach.
       assertEquals(
           legacyAreaCascade(f) || legacyOlReach(f),
           role.cascadesDownward(),
@@ -246,8 +233,6 @@ class MembershipRoleMigrationEquivalenceTest {
   @Test
   void squadronRanks_getOwnSquadronGrantOnly_noCascadeNoAreaNoSiloGuard() {
     for (MembershipRole role : SQUADRON_RANKS) {
-      // Own-squadron officer-equivalent reach: minted by the converter per-row loop and seen by
-      // OwnerScopeService.currentOversightScope / isOversightSeat.
       assertTrue(
           role == MembershipRole.SK_LEAD || role.isSquadronRank(),
           () -> "squadron rank must mint own-unit officer reach: " + role);
@@ -255,12 +240,10 @@ class MembershipRoleMigrationEquivalenceTest {
           role.confersOwnLevelOversight(),
           () -> "squadron rank must be an oversight seat: " + role);
 
-      // But strictly own-squadron: no downward cascade, not an area/OL seat.
       assertFalse(role.isAreaRank(), () -> "squadron rank must not be an area rank: " + role);
       assertFalse(role.isAreaOrOl(), () -> "squadron rank must not be area-or-OL: " + role);
       assertFalse(role.cascadesDownward(), () -> "squadron rank must not cascade: " + role);
 
-      // Exempt from the silo-leader guard — squadron ranks ARE Staffel members (REQ-ORG-017).
       assertFalse(
           role == MembershipRole.SK_LEAD || role.isAreaOrOl(),
           () -> "squadron rank must be exempt from the silo-leader guard: " + role);

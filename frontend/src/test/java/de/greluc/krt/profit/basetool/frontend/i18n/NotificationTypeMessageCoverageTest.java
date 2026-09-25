@@ -79,8 +79,6 @@ class NotificationTypeMessageCoverageTest {
   private static final Pattern CONSTANT =
       Pattern.compile("^\\s{2}([A-Z][A-Z0-9_]*)\\s*(?:,|;|$)", Pattern.MULTILINE);
 
-  // covers REQ-NOTIF-001 - a notification the member cannot read is a notification that did not
-  // happen
   @Test
   void everyNotificationTypeHasATemplateInEveryBundle() throws IOException {
     Set<String> constants = notificationTypes();
@@ -122,7 +120,6 @@ class NotificationTypeMessageCoverageTest {
         .as("NotificationType.java not found at " + NOTIFICATION_TYPE.toAbsolutePath())
         .isTrue();
     String source = Files.readString(NOTIFICATION_TYPE, StandardCharsets.UTF_8);
-    // Only the enum body: a constant-shaped line could otherwise be picked out of the header.
     int body = source.indexOf("public enum NotificationType");
     assertThat(body).as("the enum declaration").isGreaterThan(0);
 

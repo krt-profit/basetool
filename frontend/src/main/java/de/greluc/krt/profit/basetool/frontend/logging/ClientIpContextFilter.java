@@ -174,8 +174,6 @@ public class ClientIpContextFilter extends OncePerRequestFilter implements Order
     if (remoteAddr == null) {
       return null;
     }
-    // A direct connection (dev, or an attacker reaching the container directly) can never influence
-    // attribution: its X-Forwarded-For is not trusted, so the raw peer is used.
     if (xffHeader == null || xffHeader.isBlank() || !isTrusted(remoteAddr, trustedProxies)) {
       return remoteAddr;
     }
@@ -189,7 +187,6 @@ public class ClientIpContextFilter extends OncePerRequestFilter implements Order
         return candidate;
       }
     }
-    // Every hop was itself a trusted proxy (no client address present): fall back to the peer.
     return remoteAddr;
   }
 
@@ -208,8 +205,7 @@ public class ClientIpContextFilter extends OncePerRequestFilter implements Order
         if (matcher.matches(ip)) {
           return true;
         }
-      } catch (IllegalArgumentException ex) {
-        // Unparseable candidate (not an IP literal): cannot be a trusted proxy.
+      } catch (IllegalArgumentException ignored) {
       }
     }
     return false;

@@ -1,17 +1,3 @@
-# Tempo trace store, monolithic mode. Tempo 3.x (config verified via `tempo -config.verify`). #936,
-# #1036, ADR-0076.
-#
-# Tempo 3.0 is a breaking architecture rewrite: the 2.x `ingester` and `compactor` blocks are gone
-# (the write path is now live-store + backend-scheduler/backend-worker) and Tempo parses config with
-# yaml.UnmarshalStrict, so a stale 2.x field is a hard startup failure. We stay MONOLITHIC
-# (`-target=all`, the default) — all components run in one process and NO Kafka is required (the
-# distributor pushes trace data in-process directly to the live-store; Kafka is a microservices-only
-# requirement in 3.x). The local filesystem backend remains supported in monolithic mode. Our span
-# volume (three low-traffic Spring apps + Keycloak on one host) is orders of magnitude below Grafana's
-# ~25-35 MB/s microservices threshold, so monolithic is the recommended and simplest mode for us
-# (ADR-0076, extends ADR-0072). Trace retention stays 14 days and local-only; the store is
-# deliberately excluded from backups (ephemeral diagnostics, ADR-0072). The OTLP receivers MUST bind
-# 0.0.0.0 explicitly — Tempo defaults them to localhost, which Alloy could not reach.
 server:
   http_listen_port: 3200
   grpc_listen_port: 9095
@@ -25,10 +11,6 @@ distributor:
         http:
           endpoint: "0.0.0.0:4318"
 
-# 14-day retention (336h) — equals the 3.x default; set explicitly so the ADR-0072 retention decision
-# stays visible in config. In 3.x the backend-scheduler plans compaction/retention jobs and the
-# backend-worker executes them (both run in-process under -target=all), replacing the removed 2.x
-# compactor. Location per the official migrate-to-3 example.
 backend_scheduler:
   provider:
     compaction:
@@ -47,18 +29,6 @@ storage:
     wal:
       path: /var/tempo/wal
 
-# (#1041 item 22a) Metrics-generator — service-graph ONLY. Lighting the already-wired Grafana
-# serviceMap/nodeGraph panels (they read `traces_service_graph_*` from the Prometheus datasource).
-# The generator survives Tempo 3.0 and runs in-process under `-target=all` (the distributor pushes to
-# it directly; no Kafka). It remote-writes to Prometheus, which needs `--web.enable-remote-write-receiver`
-# AND — because the Prometheus web listener is basic-auth-protected — credentials: it reuses the
-# existing `grafana` user (owner decision, #1041 item 22a), so the container runs with
-# `-config.expand-env=true` and `${PROMETHEUS_WEB_PASSWORD}` is injected from the service env. Span-
-# metrics stays a NON-goal (server-side http_server_requests histograms back the latency alerts; the
-# RED dashboard uses TraceQL metrics on the Tempo datasource, zero new Prometheus series). Cardinality
-# is bounded by the trimmed 8-bucket histogram + max_active_series; the graph is tiny (~4 services), so
-# filter_policies are omitted for now. tempo.yaml needs a container RESTART. Memory: enabling the
-# embedded agent adds pressure on the 512M cap — a raise is tracked in #937 (ADR-0076), not reverted here.
 metrics_generator:
   registry:
     collection_interval: 15s
@@ -75,10 +45,6 @@ metrics_generator:
     service_graphs:
       histogram_buckets: [0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4, 12.8]
 
-# Scoped overrides ONLY — 3.0 parses with yaml.UnmarshalStrict, so the legacy flat
-# `overrides: { metrics_generator_processors: [...] }` form makes Tempo REFUSE TO START. The
-# processors list uses HYPHENATED names (service-graphs), unlike the processor config block above
-# (service_graphs). max_active_series is the hard cardinality cap (default limiter_type: series).
 overrides:
   defaults:
     metrics_generator:

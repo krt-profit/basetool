@@ -22,7 +22,6 @@
 </header>
 
 <main>
-    <!--/* Head: greeting + facts subtitle, mirroring the blueprints master-detail head. */-->
     <div class="greeting hud-box krt-personal-inventory-header">
         <h1 th:text="#{personalInventory.title}">Persoenliches Inventar</h1>
         <p class="krt-subtitle" th:text="|${page != null ? page.totalElements : items.size()} ${#messages.msg('personalInventory.facts.count')}|">42 Eintraege</p>
@@ -54,10 +53,6 @@
             </form>
         </div>
 
-        <!--/* AJAX swap target (REQ-FE-002): the search filter re-renders only this block via
-             personal-inventory.js + krtFetch; the no-JS GET fallback still reloads the page. The
-             row edit/delete buttons are krtEvents-delegated, so swapped-in rows stay live. The
-             hidden total drives the header subtitle + tab-count resync after a swap. */-->
         <div id="pi-results">
         <th:block th:fragment="results">
         <span id="pi-total-meta" hidden
@@ -119,7 +114,6 @@
     </div>
 </main>
 
-<!--/* Create / Edit modal (KRT modal frame, no native dialogs) */-->
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='krt-pi-modal', titleKey='personalInventory.modal.create.title', variant='krt-modal--wide', titleId='krt-pi-modal-title', open=${showItemModal != null}, closeTrigger='pi-close-modal', body=~{::krt-pi-modal-body})}">
     <th:block th:ref="krt-pi-modal-body">
 
@@ -172,7 +166,6 @@
     </th:block>
 </th:block>
 
-<!--/* Delete confirmation modal (KRT danger frame; the body names what is deleted) */-->
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='krt-pi-delete-modal', titleKey='personalInventory.action.delete.confirm.title', variant='krt-modal--danger', closeTrigger='pi-close-delete', body=~{::krt-pi-delete-modal-body})}">
     <th:block th:ref="krt-pi-delete-modal-body">
         <div class="krt-modal-body">
@@ -190,7 +183,6 @@
 
 <th:block th:replace="~{fragments/toast :: toast}" />
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
-    /*<![CDATA[*/
     window.krtPersonalInventoryI18n = {
         createTitle: /*[[#{personalInventory.modal.create.title}]]*/ 'Eintrag anlegen',
         editTitle:   /*[[#{personalInventory.modal.edit.title}]]*/   'Eintrag bearbeiten',
@@ -215,7 +207,6 @@
     window.krtPersonalInventoryEndpoints = {
         uexSearch: /*[[@{/personal-inventory/uex-search}]]*/ '/personal-inventory/uex-search'
     };
-    /*]]>*/
 </script>
 <script th:src="@{/js/personal-inventory.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>

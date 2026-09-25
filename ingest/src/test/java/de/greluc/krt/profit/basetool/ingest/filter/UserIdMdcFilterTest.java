@@ -100,7 +100,6 @@ class UserIdMdcFilterTest {
 
   @Test
   void neverLogsTheCallsignEvenThoughTheTokenCarriesIt() throws Exception {
-    // REQ-OBS-004: preferred_username is a name and must never reach an appender.
     assertThat(runWith(jwt("2b9f1c3e-0000-4000-8000-abcdefabcdef", "Falcon")))
         .isNotEqualTo("Falcon");
   }
@@ -117,7 +116,6 @@ class UserIdMdcFilterTest {
 
   @Test
   void keepsTheSeedWhenTheSubjectIsBlank() throws Exception {
-    // A blank sub in the MDC would render as an empty [] field and read as a bug in the log format.
     assertThat(runWith(jwt("   ", "Falcon"))).isEqualTo(CorrelationIdFilter.ANONYMOUS);
   }
 
@@ -138,8 +136,6 @@ class UserIdMdcFilterTest {
 
   @Test
   void leavesTheKeyInPlaceForTheOuterAccessLogLine() throws Exception {
-    // The value must survive the filter so RequestLoggingFilter — which logs outside the security
-    // chain — still renders the subject. CorrelationIdFilter owns the removal.
     runWith(jwt("2b9f1c3e-0000-4000-8000-abcdefabcdef", "Falcon"));
 
     assertThat(MDC.get("userId")).isEqualTo("2b9f1c3e-0000-4000-8000-abcdefabcdef");

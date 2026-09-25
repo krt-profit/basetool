@@ -220,8 +220,6 @@ public class Material extends AbstractEntity<UUID> {
   @ToString.Exclude
   private MaterialCategory category;
 
-  // ───── KRT P4K Reader source lane (catalog import) ─────
-
   /**
    * DataForge {@code __ref} commodity GUID observed by the KRT P4K Reader import. Kept alongside
    * (not in place of) {@link #scwikiUuid}: the importer backfills {@code scwiki_uuid} only when it

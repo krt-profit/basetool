@@ -5,7 +5,6 @@ build/
 !**/src/main/**/build/
 !**/src/test/**/build/
 
-### STS ###
 .apt_generated
 .classpath
 .factorypath
@@ -17,7 +16,6 @@ bin/
 !**/src/main/**/bin/
 !**/src/test/**/bin/
 
-### IntelliJ IDEA ###
 .idea
 *.iws
 *.iml
@@ -26,25 +24,16 @@ out/
 !**/src/main/**/out/
 !**/src/test/**/out/
 
-### NetBeans ###
 /nbproject/private/
 /nbbuild/
 /dist/
 /nbdist/
 /.nb-gradle/
 
-### VS Code ###
 .vscode/
 
 *.p12
 keystore.p12
-# The one exception, and it is deliberate: the test stack's shared TLS material
-# (ADR-0139). It is a throwaway built to be published -- the CA key that signed it
-# was destroyed at generation time and the server key can only serve loopback and
-# docker-network names. The two rules above stay so the PRODUCTION keystore, which
-# is named exactly keystore.p12, still cannot land next to it.
-# Since REQ-SEC-070 the material has production's shape: one leaf per service plus a CA-only
-# truststore, all under the basetool-test- prefix.
 !docker/test-tls/basetool-test-*.p12
 realm-export.json
 *.log
@@ -52,54 +41,34 @@ Mining_Hub_V0.3.0.py
 *.log.zip
 /datenschutz.md
 
-### Environment files (never commit) ###
 .env
 .env.*
 !.env.example
 /frontend/logs/
 /backend/logs/
-# The ingest module was missing here while its siblings were covered. `*.log` above does not
-# match logback's rotated `*.log.gz`, so a local test run left compressed logs staged as
-# untracked files ready to be committed by a `git add .`.
 /ingest/logs/
 /ToDo.md
 /.claude/worktrees/
 /input/
 /log.txt
 
-### Local test-stack helpers (never commit; local-only, may carry throwaway creds) ###
 /docker-compose.localkc.yml
 /bank-seed.ps1
 /seed-orgs.sql
 
-### Node / web-asset linting (gradle-node-plugin) ###
 node_modules/
 
-### Python bytecode caches from the .claude skill helper scripts ###
 __pycache__/
 *.pyc
 
-### Release-notes local progress tracker (never commit) ###
 /.release-notes-state.json
 ssh Befehle.txt
 
-# Scratch files from local verification runs. One of these carried a test-stack access
-# token into a commit once; the rule is that nothing secret lands in the repo, and the cheapest
-# way to keep it is to make `git add -A` unable to pick them up.
 *.tmp
 .ui.xml
 
-# Ansible (ADR-0188): an inventory names real machines and this repository is public.
 ansible/inventory/hosts.yml
 ansible/collections/
-# ansible-galaxy builds a throwaway GPG home here while verifying a collection's signatures.
-# It is a byproduct of installing, not part of the tree, and on a case-sensitive filesystem
-# with ordinary permissions it shows up as untracked on every machine that has run the
-# install once.
 ansible/gpg/
-# ansible-lint drops a cache here the first time it runs. Fetched state, like collections/.
 ansible/.ansible/
-# refreshVersions recreates this on every `./gradlew refreshVersions -PrefreshVersions` run, even in
-# catalog mode where it holds no versions. It was committed, empty, until 2026-09-23 (BLD-PERF-04,
-# DOC-20); nothing reads it, and a copy lying around is tool output, not source.
 /versions.properties

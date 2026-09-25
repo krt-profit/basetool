@@ -96,8 +96,6 @@ class InventoryBulkRebookAjaxControllerTest {
                         + locationId
                         + "\",\"mergeStock\":true}"))
         .andExpect(status().isOk())
-        // The page distinguishes a full success from a largely-skipped run, so both counts must
-        // survive the relay unchanged.
         .andExpect(jsonPath("$.rebooked").value(3))
         .andExpect(jsonPath("$.skipped").value(2));
 
@@ -175,9 +173,6 @@ class InventoryBulkRebookAjaxControllerTest {
   @Test
   @WithMockUser
   void bulkRebook_missingMode_returns422AndDoesNotCallBackend() throws Exception {
-    // The mode drives which write the backend performs, so a payload without one must never reach
-    // it — the guard lives here because @Valid would surface as a 500 through the frontend's
-    // GlobalExceptionHandler.
     mockMvc
         .perform(
             post("/inventory/bulk-rebook")

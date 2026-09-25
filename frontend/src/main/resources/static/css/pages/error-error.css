@@ -1,7 +1,3 @@
-/* Page stylesheet of templates/error/error.html, moved out of its inline style block
- * (FE-PERF-02). Linked in the same place the block stood, so the cascade order is
- * unchanged. */
-
 @layer base, components, page, migration, utilities;
 
 @layer page {
@@ -73,7 +69,6 @@
         justify-content: center;
         gap: 0.75rem;
     }
-    /* Make sure main takes full screen if no sidebar */
     main {
         margin-left: 0;
         padding-top: 80px;

@@ -36,13 +36,10 @@ class RefineryOrderStartedAtParsingTest {
 
   @Test
   void shouldParseIsoInstantWithZAsUtc() {
-    // Given: 16:30 Europe/Berlin Sommerzeit == 14:30:00Z
     String input = "2026-04-19T14:30:00Z";
 
-    // When
     Instant parsed = RefineryOrderWriteController.parseStartedAt(input);
 
-    // Then
     assertEquals(Instant.parse("2026-04-19T14:30:00Z"), parsed);
   }
 
@@ -57,7 +54,6 @@ class RefineryOrderStartedAtParsingTest {
 
   @Test
   void shouldParseIsoOffsetDateTimeSummerTime() {
-    // Given: Sommerzeit Europe/Berlin (+02:00), User-Eingabe 16:30 lokal
     String input = "2026-04-19T16:30:00+02:00";
 
     Instant parsed = RefineryOrderWriteController.parseStartedAt(input);
@@ -68,7 +64,6 @@ class RefineryOrderStartedAtParsingTest {
 
   @Test
   void shouldParseIsoOffsetDateTimeWinterTime() {
-    // Given: Winterzeit Europe/Berlin (+01:00), User-Eingabe 16:30 lokal
     String input = "2026-11-15T16:30:00+01:00";
 
     Instant parsed = RefineryOrderWriteController.parseStartedAt(input);
@@ -87,9 +82,6 @@ class RefineryOrderStartedAtParsingTest {
 
   @Test
   void shouldTreatLocalDateTimeWithoutZoneAsUtcDefensively() {
-    // Defensiver Fallback: Ein LocalDateTime ohne Zone darf KEINE
-    // System-Default-Zone anwenden (frueherer Bug: ZoneId.systemDefault()),
-    // da dies zu doppelter DST-Umrechnung fuehrt.
     String input = "2026-04-19T14:30";
 
     Instant parsed = RefineryOrderWriteController.parseStartedAt(input);
@@ -108,14 +100,11 @@ class RefineryOrderStartedAtParsingTest {
 
   @Test
   void shouldBeIdempotentAcrossRoundTrip() {
-    // Given: Ein Instant, als ISO-String serialisiert
     Instant original =
         OffsetDateTime.of(2026, 4, 19, 16, 30, 0, 0, ZoneOffset.ofHours(2)).toInstant();
 
-    // When: durch den Parser geschickt
     Instant roundTripped = RefineryOrderWriteController.parseStartedAt(original.toString());
 
-    // Then: exakt derselbe Instant
     assertEquals(original, roundTripped);
   }
 }

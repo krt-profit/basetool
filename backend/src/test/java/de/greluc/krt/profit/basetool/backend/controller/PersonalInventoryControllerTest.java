@@ -54,15 +54,12 @@ class PersonalInventoryControllerTest {
 
   @Test
   void listShouldDeriveOwnerUserIdFromJwtAndReturnPageResponse() {
-    // Given
     Page<PersonalInventoryItemResponse> page =
         new PageImpl<>(List.of(sampleResponse()), PageRequest.of(0, 10), 1);
     when(service.listOwn(eq(SUB), any(), any())).thenReturn(page);
 
-    // When
     PageResponse<PersonalInventoryItemResponse> result = controller.list(0, 10, null, null, SUB);
 
-    // Then
     assertNotNull(result);
     assertEquals(1, result.totalElements());
     assertEquals(1, result.content().size());
@@ -71,16 +68,13 @@ class PersonalInventoryControllerTest {
 
   @Test
   void createShouldDelegateToServiceWithJwtSub() {
-    // Given
     PersonalInventoryItemCreateRequest req =
         new PersonalInventoryItemCreateRequest("x", null, 1, PersonalInventoryLocationType.CITY, 1);
     PersonalInventoryItemResponse expected = sampleResponse();
     when(service.createOwn(SUB, req)).thenReturn(expected);
 
-    // When
     PersonalInventoryItemResponse result = controller.create(req, SUB);
 
-    // Then
     assertSame(expected, result);
     ArgumentCaptor<UUID> subCaptor = ArgumentCaptor.forClass(UUID.class);
     verify(service).createOwn(subCaptor.capture(), eq(req));

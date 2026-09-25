@@ -221,11 +221,6 @@ public class AccessGateService {
    * @return {@code true} iff the caller may read the mission.
    */
   public boolean canSeeMission(@NotNull UUID missionId) {
-    // em.find scope load (#1139): reads only status / isInternal / owningOrgUnit and walks the
-    // parent chain — never the roster — so it must not run the graphed roster findById inside the
-    // security interceptor's transaction (which would load the aggregate a second time before the
-    // controller transaction loads it again). em.find loads no collection graph and never
-    // auto-flushes.
     return missionRepository
         .findByIdForAuthorization(missionId)
         .map(
@@ -284,7 +279,6 @@ public class AccessGateService {
    * @return {@code true} iff the caller may edit the mission.
    */
   public boolean canEditMission(@NotNull UUID missionId) {
-    // em.find scope load (#1139): reads only owningOrgUnit — no roster, no auto-flush.
     return missionRepository
         .findByIdForAuthorization(missionId)
         .map(m -> m.getOwningOrgUnit() == null || canEditSquadron(m.getOwningOrgUnit().getId()))

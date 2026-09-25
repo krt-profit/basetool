@@ -132,10 +132,6 @@ class MissionDatetimeSplitLayoutE2eTest {
         return { measured: measured, violations: violations };
       }
       """
-          // Double.toString + replace, NOT String.formatted("%f"): the default locale decides
-          // the decimal separator, so a German JVM would splice "0,500000" into the script and
-          // evaluate() would die of a syntax error instead of reporting a layout verdict.
-          // Double.toString is locale-independent by contract.
           .replace("%s", Double.toString(OVERFLOW_TOLERANCE_PX));
 
   private static Playwright playwright;
@@ -182,9 +178,6 @@ class MissionDatetimeSplitLayoutE2eTest {
         "crew",
         "mission-datetime-split-modal",
         page -> {
-          // The crew board renders one edit button per participant; the seeded self-registration
-          // guarantees exactly one. Opening it runs krtModalOpen(), which is what makes the two
-          // datetime groups measurable.
           Locator editBtn = page.locator(".edit-participant-btn").first();
           assertThat(editBtn).isVisible();
           editBtn.click();
@@ -206,8 +199,6 @@ class MissionDatetimeSplitLayoutE2eTest {
         "mission-datetime-split-verwaltung",
         page -> {
           assertThat(page.locator("#pane-verw")).isVisible();
-          // Planned row (meeting / planned start / planned end) plus the actual start/end row —
-          // the latter only renders on an existing mission, which this seeded one is.
           assertNoOverflowAcrossWidths("#pane-verw", page, 5);
         });
   }
@@ -237,9 +228,6 @@ class MissionDatetimeSplitLayoutE2eTest {
    * @param width the viewport width currently applied, named in the failure message
    */
   private static void assertNoOverflow(String scope, Page page, int expectedGroups, int width) {
-    // Wildcard types, not Map<String, Object>: Playwright hands back a raw Object and a
-    // parameterised cast would be unchecked, which the project bans papering over with
-    // @SuppressWarnings. Nothing here needs the element types.
     Map<?, ?> probe = (Map<?, ?>) page.evaluate(PROBE_JS, scope);
     List<?> violations = (List<?>) probe.get("violations");
     assertTrue(

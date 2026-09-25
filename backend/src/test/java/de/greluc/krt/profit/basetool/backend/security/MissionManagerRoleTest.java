@@ -105,7 +105,6 @@ class MissionManagerRoleTest {
     managerMember.setId(UUID.randomUUID());
     managerMember.setUsername("manager");
     userRepository.save(managerMember);
-    // Post-R9 D3 (V101): the MissionManager flag lives on the Staffel membership row only.
     saveIridiumMembership(managerMember, false, true);
 
     mission = new Mission();
@@ -150,12 +149,12 @@ class MissionManagerRoleTest {
             null,
             null,
             0L,
-            Collections.emptyList(), // steps
-            0L, // stepsVersion
-            Collections.emptyList(), // objectives
-            0L, // objectivesVersion
+            Collections.emptyList(),
+            0L,
+            Collections.emptyList(),
+            0L,
             null,
-            null); // meetingPoint
+            null);
     return objectMapper.writeValueAsString(dto);
   }
 
@@ -172,11 +171,6 @@ class MissionManagerRoleTest {
 
   @Test
   void missionManagerShouldBeAbleToUpdateMission() throws Exception {
-    // Post-V89 every Mission carries a non-null owning_squadron_id, so the canManageMission
-    // gate now ALWAYS evaluates the squadron-scope check on top of the role check. The
-    // ROLE_MISSION_MANAGER authority alone is no longer enough — the JWT subject must
-    // resolve to a User whose squadron matches the mission's. managerMember is in IRIDIUM
-    // (see @BeforeEach), same as the test mission.
     mockMvc
         .perform(
             put("/api/v1/missions/" + mission.getId())
@@ -249,9 +243,6 @@ class MissionManagerRoleTest {
 
   @Test
   void missionDtoShouldHaveCanEditTrueForMissionManager() throws Exception {
-    // Same V89-driven contract change as missionManagerShouldBeAbleToUpdateMission: the
-    // squadron-scope gate runs on every canEditMission evaluation now that the column is
-    // NOT NULL, so the JWT subject must resolve to a User in the mission's squadron.
     mockMvc
         .perform(
             get("/api/v1/missions/" + mission.getId())
@@ -269,9 +260,6 @@ class MissionManagerRoleTest {
 
   @Test
   void missionDtoShouldHaveCanEditFalseForRegularMember() throws Exception {
-    // The authority is what makes this caller the regular member the name claims: the mission read
-    // asks for membership since REQ-SEC-007, and `default-roles-iri` grants KRT Member to every
-    // account Keycloak creates - so a bare token models an account shape that cannot occur.
     mockMvc
         .perform(
             get("/api/v1/missions/" + mission.getId())
@@ -295,7 +283,6 @@ class MissionManagerRoleTest {
     user.setUsername("manager_user");
     userRepository.save(user);
     userRepository.flush();
-    // Post-R9 D3 (V101): the MissionManager flag lives on the Staffel membership row only.
     saveIridiumMembership(user, false, true);
 
     Jwt jwt =

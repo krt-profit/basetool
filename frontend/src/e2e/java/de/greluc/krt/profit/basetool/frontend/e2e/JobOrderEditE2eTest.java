@@ -123,14 +123,6 @@ class JobOrderEditE2eTest {
       try {
         E2eSupport.navigate(page, baseUrl + "/orders/" + jobOrderId);
 
-        // The edit button toggles the LOGISTICIAN-gated modal open via the global modal delegation;
-        // the controller pre-fills the form, but the material picker (a searchable combobox — its
-        // data-role now sits on the enhancer's hidden input) is built from a 10-min-cached material
-        // lookup that need not yet contain this order's freshly-seeded material — so its th:field
-        // selection can fall through to an empty picker (observed under WebKit, where the order's
-        // material was absent from the cached options). Pick the first offered option to guarantee
-        // the required field is set; the test asserts only that the amount round-trips, so which
-        // material is chosen is immaterial.
         page.locator("[data-trigger='open-modal-display'][data-modal-id='edit-modal']").click();
         E2eSupport.selectComboboxFirstOption(
             page.locator(
@@ -141,12 +133,6 @@ class JobOrderEditE2eTest {
 
         page.locator("#edit-modal button[type='submit']").click();
 
-        // Verify by polling the backend read-back instead of gating on the submit's own browser
-        // event. The edit is a full-page POST -> redirect -> GET, and under CI load WebKit drops
-        // both the navigation-settled event (awaitFormPost) and the POST response event
-        // (waitForResponse, 30 s timeout) even though the write committed. Polling the order until
-        // it reflects the new amount decouples the assertion from that flaky event; a click that
-        // never posted leaves the amount unchanged, so the poll still fails the test.
         JsonObject order = awaitMaterialAmount(page, jobOrderId, 250.0);
         assertEquals(
             250.0,

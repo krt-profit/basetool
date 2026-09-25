@@ -70,7 +70,6 @@ class UexCommodityServiceTest {
 
   @Test
   void shouldProcessCommodityDtoAndCreateNewMaterialAndLocation() {
-    // Given
     UexCommodityPriceDto dto =
         UexCommodityPriceDto.builder()
             .idCommodity(1)
@@ -81,9 +80,6 @@ class UexCommodityServiceTest {
             .priceSell(BigDecimal.valueOf(30.0))
             .build();
 
-    // The catalogue phase is not what this test is about, but it now runs against a FetchResult
-    // rather than a bare list, so it has to be stubbed explicitly — an unstubbed mock hands back
-    // null and the phase NPEs before the price phase is ever reached.
     when(uexClient.getCommodities()).thenReturn(fetched(List.of()));
     when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of(dto)));
     when(materialRepository.findUexCommodityRefs()).thenReturn(List.of());
@@ -103,10 +99,8 @@ class UexCommodityServiceTest {
     when(materialPriceRepository.findPriceKeyRefs()).thenReturn(List.of());
     stubPriceSaveAssignsId();
 
-    // When
     uexCommodityService.fetchAndProcessCommoditiesPrices();
 
-    // Then
     ArgumentCaptor<MaterialPrice> priceCaptor = ArgumentCaptor.forClass(MaterialPrice.class);
     verify(materialPriceRepository).save(priceCaptor.capture());
 
@@ -115,21 +109,16 @@ class UexCommodityServiceTest {
     assertEquals(BigDecimal.valueOf(30.0), savedPrice.getPriceSell());
   }
 
-  // ─── Commodity catalogue sync (first pass) ──────────────────────────────
-
   @Test
   void commoditySync_savesRefinedMaterialWithCorrectType() {
-    // Given
-    UexCommodityDto refined = commodity(1, "Titanium", /*isRefined*/ 1, /*isRefinable*/ 0);
+    UexCommodityDto refined = commodity(1, "Titanium", 1, 0);
     when(uexClient.getCommodities()).thenReturn(fetched(List.of(refined)));
     when(uexClient.getCommoditiesPricesAll()).thenReturn(fetched(List.of()));
     when(materialRepository.findByIdCommodity(1)).thenReturn(Optional.empty());
     when(materialRepository.findByName("Titanium")).thenReturn(Optional.empty());
 
-    // When
     uexCommodityService.fetchAndProcessCommoditiesPrices();
 
-    // Then
     ArgumentCaptor<Material> cap = ArgumentCaptor.forClass(Material.class);
     verify(materialRepository).save(cap.capture());
     assertEquals(1, cap.getValue().getIdCommodity());
@@ -169,7 +158,6 @@ class UexCommodityServiceTest {
 
   @Test
   void commoditySync_reusesExistingMaterial_whenIdCommodityMatches() {
-    // Given an existing material with id_commodity=4
     UUID existingId = UUID.randomUUID();
     Material existing = new Material();
     existing.setId(existingId);
@@ -194,7 +182,6 @@ class UexCommodityServiceTest {
 
   @Test
   void commoditySync_linksByName_whenIdCommodityIsNewButNameMatches() {
-    // Given an existing material with no id_commodity but matching name
     Material existingByName = new Material();
     existingByName.setName("Diamond");
     existingByName.setIdCommodity(null);
@@ -216,7 +203,6 @@ class UexCommodityServiceTest {
 
   @Test
   void commoditySync_flipsManualToUexOnly_whenNameMatchAdoptsManualMaterial() {
-    // Given a manually-entered material with source_systems=MANUAL and no id_commodity yet
     Material manual = new Material();
     manual.setName("Raw Ouratite");
     manual.setIdCommodity(null);
@@ -229,12 +215,8 @@ class UexCommodityServiceTest {
     when(materialRepository.findByIdCommodity(42)).thenReturn(Optional.empty());
     when(materialRepository.findByName("Raw Ouratite")).thenReturn(Optional.of(manual));
 
-    // When
     uexCommodityService.fetchAndProcessCommoditiesPrices();
 
-    // Then — id_commodity backfilled AND the provenance flips off MANUAL so the manual badge
-    // disappears on the next render (the derived isManualEntry wire field follows source_systems).
-    // The admin-set isManualRawMaterial override stays intact (UEX may not classify it as raw).
     ArgumentCaptor<Material> cap = ArgumentCaptor.forClass(Material.class);
     verify(materialRepository).save(cap.capture());
     assertSame(manual, cap.getValue());
@@ -251,7 +233,6 @@ class UexCommodityServiceTest {
 
   @Test
   void commoditySync_leavesUexOnlyProvenanceUntouched_whenAdoptedByNameMatchOnNonManualRow() {
-    // Existing row matched by name but never MANUAL → provenance stays UEX_ONLY (no-op).
     Material existing = new Material();
     existing.setName("Bexalite");
     existing.setIdCommodity(null);
@@ -272,10 +253,6 @@ class UexCommodityServiceTest {
 
   @Test
   void commoditySync_promotesWikiOnlyMaterialToBothAndVisible_whenAdoptedByName() {
-    // A commodity the Wiki imported first: WIKI_ONLY + invisible (§4.3). UEX now sources it by
-    // name-match, which validates it as a real trade commodity — provenance must flip to BOTH and
-    // the row must become visible in trading flows (§6.1). This is the M1 regression: the commodity
-    // sync previously left adopted Wiki rows stuck at WIKI_ONLY (and hidden).
     Material wikiOnly = new Material();
     wikiOnly.setName("Bluemoon Fungus");
     wikiOnly.setIdCommodity(null);
@@ -305,8 +282,6 @@ class UexCommodityServiceTest {
 
   @Test
   void commoditySync_flipsManualToUexOnly_whenAdoptedByName() {
-    // R9 Step 1: a MANUAL row adopted by UEX flips to UEX_ONLY (it is now UEX-sourced; it was never
-    // in the Wiki, so it does not become BOTH). Contrast the WIKI_ONLY → BOTH promotion above.
     Material manual = new Material();
     manual.setName("Admin Special");
     manual.setIdCommodity(null);
@@ -340,7 +315,6 @@ class UexCommodityServiceTest {
 
   @Test
   void commoditySync_swallowsExceptionPerRow_andContinuesBatch() {
-    // Given — first row save throws, second must still save
     UexCommodityDto bad = commodity(10, "Bad", 0, 0);
     UexCommodityDto good = commodity(11, "Good", 0, 0);
     when(uexClient.getCommodities()).thenReturn(fetched(List.of(bad, good)));
@@ -360,11 +334,8 @@ class UexCommodityServiceTest {
               return m;
             });
 
-    // When
     assertDoesNotThrow(() -> uexCommodityService.fetchAndProcessCommoditiesPrices());
 
-    // Then — the chunk failed on the bad row and was replayed row by row (REQ-DATA-005): the bad
-    // row twice, the good one once in the replay, where it commits on its own.
     ArgumentCaptor<Material> saved = ArgumentCaptor.forClass(Material.class);
     verify(materialRepository, times(3)).save(saved.capture());
     assertEquals("Good", saved.getAllValues().getLast().getName());
@@ -381,12 +352,6 @@ class UexCommodityServiceTest {
     verify(uexClient).getCommoditiesPricesAll();
     verify(materialRepository, never()).save(any());
   }
-
-  // ─── Price sync (second pass) ───────────────────────────────────────────
-  //
-  // Since BE-PERF-09 the price phase resolves material, terminal and existing price row from three
-  // id maps read once per run (findUexCommodityRefs / findUexTerminalRefs / findPriceKeyRefs) and
-  // loads each chunk's existing rows with one findAllById, instead of three lookups per row.
 
   @Test
   void priceSync_updatesExistingPriceRow_inPlace() {
@@ -444,7 +409,6 @@ class UexCommodityServiceTest {
     assertEquals(Boolean.FALSE, cap.getValue().getStatusBuy(), "0 maps to false");
     assertEquals(Boolean.TRUE, cap.getValue().getStatusSell(), "1 maps to true");
     assertEquals(Instant.ofEpochSecond(1700000100L), cap.getValue().getDateModified());
-    // The three maps replaced the three per-row lookups.
     verify(materialRepository, never()).findByIdCommodity(any());
     verify(terminalRepository, never()).findByIdTerminal(any());
     verify(materialPriceRepository, never()).findByMaterialIdAndTerminalId(any(), any());
@@ -485,7 +449,6 @@ class UexCommodityServiceTest {
 
   @Test
   void priceSync_createsPlaceholderMaterial_whenIdAndNameUnknown() {
-    // Given a price row referencing a commodity we have never seen
     UUID terminalId = UUID.randomUUID();
     Terminal terminal = new Terminal();
     terminal.setId(terminalId);
@@ -524,16 +487,12 @@ class UexCommodityServiceTest {
         matCap.getValue().getType(),
         "Placeholder materials default to NO_REFINE");
 
-    // The price row is written against the freshly created material.
     verify(materialPriceRepository).save(any(MaterialPrice.class));
     verify(materialRepository).getReferenceById(matCap.getValue().getId());
   }
 
   @Test
   void priceSync_isolatesAFailingRow_andTheOtherRowStillCommits() {
-    // REQ-DATA-005: the chunk fails on the first row and rolls back; replayed row by row, the bad
-    // row fails alone and the good one commits. Until 2026-09-22 the whole sync was one
-    // transaction, so a row the database refused would have rolled every row back.
     UexCommodityPriceDto bad =
         new UexCommodityPriceDto(
             1, "A", 1, "T1", BigDecimal.ONE, BigDecimal.ONE, 0, 0, 0, 0, 0, 1L);
@@ -565,16 +524,12 @@ class UexCommodityServiceTest {
 
     assertDoesNotThrow(() -> uexCommodityService.fetchAndProcessCommoditiesPrices());
 
-    // chunk [bad] throws at the first save; replay: bad (throws again), good (commits).
     verify(materialPriceRepository, times(3)).save(any());
     verify(materialPriceRepository).findIdsWithLivePrices();
   }
 
-  // ─── Stale-row cleanup (price-sync postlude) ────────────────────────────
-
   @Test
   void priceSync_clearsStaleRows_passingExactlyTheSeenIdsToTheRepository() {
-    // Given — one DTO that we know will be upserted successfully
     UUID materialId = UUID.randomUUID();
     UUID terminalId = UUID.randomUUID();
     UUID assignedPriceId = UUID.randomUUID();
@@ -596,19 +551,11 @@ class UexCommodityServiceTest {
               mp.setId(assignedPriceId);
               return mp;
             });
-    // One priced row survives from an earlier run and is NOT in this run's feed - the sweep's
-    // whole purpose.
     when(materialPriceRepository.findIdsWithLivePrices())
         .thenReturn(List.of(assignedPriceId, stalePriceId));
 
-    // When
     uexCommodityService.fetchAndProcessCommoditiesPrices();
 
-    // Then - every pre-existing (material, terminal) row that UEX dropped from this run gets its
-    // prices nulled, and the row we just upserted does not. This is the Quantanium regression:
-    // terminals that stop listing a commodity used to keep stale priceBuy values forever. The
-    // sweep now works by subtracting the seen ids from the priced rows and clearing the remainder
-    // in bounded chunks, so what reaches the repository is the STALE set (REQ-DATA-014).
     ArgumentCaptor<Collection<UUID>> idsCap = ArgumentCaptor.captor();
     verify(materialPriceRepository).clearPricesByIds(idsCap.capture());
     assertEquals(Set.of(stalePriceId), Set.copyOf(idsCap.getValue()));
@@ -616,8 +563,6 @@ class UexCommodityServiceTest {
 
   @Test
   void priceSync_skipsStaleCleanup_whenEveryRowFailsAndSeenSetIsEmpty() {
-    // Given — the only DTO names an unknown terminal, so nothing is written and the seen-id set
-    // ends up empty.
     UexCommodityPriceDto orphan =
         new UexCommodityPriceDto(
             1, "X", 9999, "Unknown", BigDecimal.ONE, BigDecimal.ONE, 0, 0, 0, 0, 0, 1L);
@@ -628,16 +573,11 @@ class UexCommodityServiceTest {
     when(terminalRepository.findUexTerminalRefs()).thenReturn(List.of());
     when(materialPriceRepository.findPriceKeyRefs()).thenReturn(List.of());
 
-    // When
     uexCommodityService.fetchAndProcessCommoditiesPrices();
 
-    // Then — refusing to clear-everything when the sync produced nothing is the whole point:
-    // a transient burst of failures must not wipe the entire price matrix.
     verify(materialPriceRepository, never()).findIdsWithLivePrices();
     verify(materialPriceRepository, never()).clearPricesByIds(any());
   }
-
-  // ─── helpers ────────────────────────────────────────────────────────────
 
   /**
    * Stubs {@link MaterialPriceRepository#save} so it assigns a fresh UUID to any transient {@link
@@ -661,29 +601,29 @@ class UexCommodityServiceTest {
     return new UexCommodityDto(
         id,
         name,
-        /*code*/ "C", /*kind*/
+        "C",
         "k",
-        /*weightScu*/ 1.0, /*priceBuy*/
-        1.0, /*priceSell*/
         1.0,
-        /*isAvailable*/ 1, /*isAvailableLive*/
-        1, /*isExtractable*/
+        1.0,
+        1.0,
+        1,
+        1,
         0,
-        /*isMineral*/ 0, /*isRaw*/
-        0, /*isPure*/
+        0,
+        0,
         0,
         isRefinable,
         isRefined,
-        /*isHarvestable*/ 0, /*isBuyable*/
-        1, /*isSellable*/
-        1, /*isTemporary*/
         0,
-        /*isIllegal*/ 0, /*isVolatileQt*/
-        0, /*isVolatileTime*/
+        1,
+        1,
         0,
-        /*isInert*/ 0, /*isExplosive*/
-        0, /*isBuggy*/
-        0, /*isFuel*/
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
         0);
   }
 }

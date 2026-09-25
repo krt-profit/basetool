@@ -135,9 +135,6 @@ public class AccountConsolidationService {
         Entities.require(userRepository.findById(duplicateId), "Duplicate account not found");
     OptimisticLock.checkOptionalClient(duplicate.getVersion(), version, User.class, duplicateId);
     if (duplicateId.equals(adminId)) {
-      // Not paternalism: the purge reassigns shared aggregates to "some other admin", and the
-      // acting admin dissolving themselves mid-operation is the one case where that fallback is
-      // reasoning about the account being removed.
       throw new BusinessConflictException("An administrator cannot dissolve their own account");
     }
 
@@ -151,8 +148,6 @@ public class AccountConsolidationService {
     assertTargetCanTakeTheLink(target, link.orElse(null));
     String guildNickname = duplicate.getDiscordGuildNickname();
 
-    // Identity first, then the database, then the duplicate's Keycloak user -- see the class
-    // Javadoc for why the last step is last.
     link.ifPresent(
         resolved ->
             keycloakService.linkDiscordIdentity(
@@ -256,7 +251,6 @@ public class AccountConsolidationService {
       @NotNull UUID adminId) {
     if (userRepository.existsById(duplicateId)) {
       userAccountMergeService.merge(duplicateId, targetUserId, adminId);
-      // merge() clears the persistence context, so this is a fresh read of the now-emptied row.
       userRepository
           .findById(duplicateId)
           .ifPresent(

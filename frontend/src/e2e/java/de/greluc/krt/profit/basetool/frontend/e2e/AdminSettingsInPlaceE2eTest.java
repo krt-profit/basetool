@@ -117,9 +117,6 @@ class AdminSettingsInPlaceE2eTest {
         E2eSupport.navigate(page, baseUrl + "/admin/settings");
         page.waitForLoadState();
 
-        // Marker on the live document: a full navigation/reload wipes it, so its survival proves
-        // both saves stayed in place. The position:fixed footer can cover the bottom submit button,
-        // so it is dropped out of the way before the (non-navigating) AJAX clicks.
         page.evaluate("() => { window.__krtNoReload = true; }");
         page.evaluate(
             "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
@@ -128,12 +125,9 @@ class AdminSettingsInPlaceE2eTest {
         Locator yellowDays = page.locator("#ageYellowDays");
         Locator submit = page.locator("#admin-settings-form button[type='submit']");
 
-        // Two distinct yellow-day values, both kept below the red threshold (default 90) so the
-        // cross-field invariant (yellow < red) never rejects the save for an unrelated reason.
         int firstValue = 31;
         int secondValue = 32;
 
-        // First in-place save: a genuinely different value.
         yellowDays.fill(String.valueOf(firstValue));
         saveInPlace(page, submit);
         assertEquals(
@@ -142,8 +136,6 @@ class AdminSettingsInPlaceE2eTest {
             "the settings save must update in place — no page reload on success");
         assertEquals(firstValue, persistedYellowDays(), "the first in-place save must persist");
 
-        // Second consecutive in-place save WITHOUT a reload: only succeeds if the twin wrote the
-        // fresh @Version back into the hidden input (otherwise the stale version 409s).
         yellowDays.fill(String.valueOf(secondValue));
         saveInPlace(page, submit);
         assertEquals(

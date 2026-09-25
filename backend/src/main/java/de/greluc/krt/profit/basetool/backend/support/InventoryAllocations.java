@@ -171,12 +171,6 @@ public final class InventoryAllocations {
       return;
     }
     double reduced = (slice.getAmount() != null ? slice.getAmount() : 0.0) - amount;
-    // Remove at the SCU rounding boundary, not at EPSILON: a residual in (EPSILON, 5e-4) —
-    // reachable
-    // from a >3-decimal SCU handover amount — would survive an EPSILON test yet round to 0.000 on
-    // the slice's @PreUpdate flush, persisting a phantom zero-amount chip that then blocks
-    // re-earmarking the order (the unique (item, order) slot is taken). Dropping the slice whenever
-    // it would round to zero keeps that from happening.
     if (InventoryItem.roundToScuScale(reduced) <= 0.0) {
       item.getJobOrderAllocations().remove(slice);
     } else {

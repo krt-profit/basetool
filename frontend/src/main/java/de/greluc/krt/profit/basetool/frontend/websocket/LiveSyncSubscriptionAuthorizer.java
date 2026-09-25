@@ -199,10 +199,6 @@ public class LiveSyncSubscriptionAuthorizer {
       @Nullable Set<String> authorities) {
     Set<String> requiredAnyRole = topic.topicClass().requiredAnyRole();
     if (requiredAnyRole != null) {
-      // Local, backend-free role check against the handshake-captured authorities (bank staff /
-      // orgunit-bank). A missing capture is indeterminate — fail open for these non-presence rooms
-      // (opaque keys only; each fragment re-pull re-authorizes per viewer through the servlet
-      // path).
       if (authorities == null) {
         return failOpen(topic);
       }
@@ -219,16 +215,9 @@ public class LiveSyncSubscriptionAuthorizer {
     }
     String probePath = topic.topicClass().authProbePath();
     if (probePath == null) {
-      // Authenticated-only global room: nothing to probe.
       return Decision.ALLOW;
     }
     if (accessToken == null || accessToken.isBlank()) {
-      // No captured token snapshot (e.g. a session whose token lapsed — the snapshot is never
-      // refreshed, so this is a steady state, not a blip): indeterminate. Non-presence classes fail
-      // open (opaque keys only; each fragment re-pull re-authorizes); a presence class fails closed
-      // so a lapsed-token caller cannot pull the editor-identity snapshot of a mission it can't
-      // read
-      // (F1).
       return failOpen(topic);
     }
     if (topic.resourceId() != null) {
@@ -243,9 +232,6 @@ public class LiveSyncSubscriptionAuthorizer {
     if (capabilityField != null) {
       return probeCapability(topic, probePath, capabilityField, accessToken, activeOrgUnitId);
     }
-    // A global class with a probe path but neither an id nor a capability field is a
-    // misconfiguration
-    // rather than a runtime state; authenticated access suffices.
     return Decision.ALLOW;
   }
 
@@ -271,11 +257,8 @@ public class LiveSyncSubscriptionAuthorizer {
       UUID activeOrgUnitId) {
     Decision primary = probeOne(topic, primaryUri, accessToken, activeOrgUnitId);
     if (primary != Decision.DENY || fallbackUri == null) {
-      // ALLOW (2xx or a transient fail-open) is final; an explicit DENY with no fallback is final.
       return primary;
     }
-    // The primary explicitly refused (403/404); the org-unit fallback read decides — a 2xx there
-    // allows, a second explicit refusal denies, a transient failure fails open.
     return probeOne(topic, fallbackUri, accessToken, activeOrgUnitId);
   }
 

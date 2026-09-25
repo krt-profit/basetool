@@ -138,13 +138,6 @@ public class UserProxyController {
    * @return matching user records (raw JSON maps), never {@code null}
    */
   private List<Map<String, Object>> forwardSearch(String backendPath, String query) {
-    // L-1: build the URI with only the fixed (safe) paging params via UriComponentsBuilder so a
-    // crafted `&` in the term cannot inject extra parameters. The free-text `query` rides as a
-    // WebClient URI-template variable ({query}) rather than baked into the pre-encoded
-    // toUriString() output: that value would otherwise be percent-encoded a second time by the
-    // WebClient (space -> %2520, umlaut -> %25C3%25BC), so a multi-word / umlaut search reached the
-    // backend mangled and matched nothing (the #371 re-encoding trap). A null query is normalised
-    // to the empty match-all filter, still forwarded so browse mode returns the scoped roster.
     String uri =
         org.springframework.web.util.UriComponentsBuilder.fromPath(backendPath)
             .queryParam("size", PickerSearch.PAGE_SIZE)

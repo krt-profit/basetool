@@ -516,12 +516,6 @@ public class OrgUnitMembershipQueryService {
     if (rows.isEmpty()) {
       return List.of();
     }
-    // One polymorphic batch load feeds the name sort — the previous per-row subclass-typed
-    // findById calls inside the comparator were both an N+1 and a proxy-narrowing source
-    // (HHH000179) whenever the transaction already held one of the ids as a base-typed proxy.
-    // The kind-match preserves the old discriminator-filter semantics (a drifted or
-    // non-Staffel/non-SK row sorts under the empty name, exactly as its typed lookup missed
-    // before).
     Map<UUID, OrgUnit> units = loadOrgUnitsById(rows);
     List<OrgUnitMembership> sorted = new ArrayList<>(rows);
     sorted.sort(

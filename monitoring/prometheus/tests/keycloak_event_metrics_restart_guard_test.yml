@@ -1,31 +1,9 @@
-# promtool unit test for KeycloakEventMetricsAbsent (#1041 item 6).
-#
-# The alert asks "is Keycloak's user-event metrics subsystem recording?", and the absence of
-# `keycloak_user_events_total` alone cannot answer it. That series is a TAGGED Micrometer counter:
-# it does not exist until the first matching event, and a restart empties the registry. So a
-# freshly restarted Keycloak that nobody has signed in to yet is byte-for-byte indistinguishable
-# from one whose event listener is switched off — which is why this alert fired after every deploy
-# on 2026-09-14 while the configuration was demonstrably correct
-# (KC_EVENT_METRICS_USER_ENABLED=true, and only keycloak_session_expiration_task_seconds* present).
-#
-# Waiting longer does not separate the two: a quiet night can pass without a single login. What
-# separates them is OPPORTUNITY, so the rule now requires the token/auth endpoints to have actually
-# been exercised. These two cases pin exactly that distinction — remove the traffic clause and the
-# first one starts firing again.
-#
-# Run locally (no promtool on the host — use an ephemeral container, see monitoring/README.md):
-#   docker run --rm -v "$PWD/monitoring/prometheus:/work" -w /work \
-#     prom/prometheus:v3.14.0 promtool test rules tests/keycloak_event_metrics_restart_guard_test.yml
-
 rule_files:
   - ../alerts/business.yml
 
 evaluation_interval: 1m
 
 tests:
-  # The case that produced the false alarm: Keycloak up and scraped, the counter absent because the
-  # registry is empty after a restart, and nobody has tried to sign in. Silent for a full hour —
-  # well past the rule's `for: 15m`, so this is not merely testing the delay.
   - name: silent - restarted, no counter yet, and nobody has signed in
     interval: 1m
     input_series:
@@ -38,8 +16,6 @@ tests:
         alertname: KeycloakEventMetricsAbsent
         exp_alerts: []
 
-  # The case worth waking someone for: the token endpoint IS being exercised, so events are
-  # happening, and the counter is still not there. That is the subsystem failing to record.
   - name: fires - sign-ins are happening and the counter is still missing
     interval: 1m
     input_series:
@@ -57,10 +33,6 @@ tests:
               summary: "Keycloak user-event metrics absent while Keycloak is up"
               description: "keycloak_user_events_total is not being exported while the Keycloak scrape is up — KeycloakLoginErrorSpike is blind. Check the Keycloak metrics/event listener config."
 
-  # The /auth spelling. ADR-0166 moved the public surface under /auth while the management surface
-  # stayed at the root, and Keycloak's uri label carries the resolved route — so the regex has to
-  # accept both. Without the `(/auth)?` group this case goes silent and the alert becomes blind on
-  # production specifically.
   - name: fires - same, with the post-ADR-0166 /auth prefix on the uri label
     interval: 1m
     input_series:
@@ -78,7 +50,6 @@ tests:
               summary: "Keycloak user-event metrics absent while Keycloak is up"
               description: "keycloak_user_events_total is not being exported while the Keycloak scrape is up — KeycloakLoginErrorSpike is blind. Check the Keycloak metrics/event listener config."
 
-  # Keycloak itself down: not this alert's business, whatever the traffic series says.
   - name: silent - Keycloak is not up
     interval: 1m
     input_series:

@@ -61,9 +61,6 @@ class PersonalInventoryBlueprintsControllerTest {
   void search_delegatesToBackend_andDefaultsLimitTo25() {
     BlueprintProductDto dto =
         new BlueprintProductDto("arclight pistol", "Arclight Pistol", 2, "Behring", "key", false);
-    // The free-text term is forwarded as a URI-template variable ({q}) with the raw value passed
-    // separately — eq("arc") pins that raw value, so a URLEncoder-into-the-string regression (which
-    // would put "arc" inside the URI and drop the third argument) fails to match here.
     when(backendApiClient.get(
             contains("/api/v1/blueprints/products/search?q={q}&limit=25"), anyTypeRef(), eq("arc")))
         .thenReturn(List.of(dto));

@@ -48,9 +48,6 @@ import org.springframework.beans.factory.annotation.Autowired;
     })
 public abstract class JobOrderMapper {
 
-  // Field injection, because MapStruct's generated subclass has a no-arg constructor — the same
-  // shape as MissionMapper. Depends only on the support-package leaf interface, never on the
-  // service layer or SecurityContextHolder (ArchUnit mapperLayerShouldNotReachIntoSecurityContext).
   @Autowired protected StockViewerAccess stockAccess;
 
   /**
@@ -95,12 +92,8 @@ public abstract class JobOrderMapper {
   @Mapping(target = "items", ignore = true)
   @Mapping(target = "aggregatedMaterials", ignore = true)
   @Mapping(target = "itemHandovers", ignore = true)
-  // Per-order redaction decision is not an entity property; it is stamped by the read path
-  // (JobOrderService.getJobOrderById) via JobOrderDto#withRedacted, so the mapper leaves it false.
   @Mapping(target = "redacted", ignore = true)
   @Mapping(target = "canEdit", expression = "java(resolveCanEdit(jobOrder))")
-  // MapStruct reads a record's wither as a fluent setter of a property named after it; there
-  // is no such property, so it is ignored.
   @Mapping(target = "withAssignees", ignore = true)
   @Mapping(target = "withRedacted", ignore = true)
   public abstract JobOrderDto toDto(JobOrder jobOrder);
@@ -155,8 +148,6 @@ public abstract class JobOrderMapper {
     if (assignees == null) {
       return null;
     }
-    // One membership query + one Staffel load for the whole Bearbeiter list instead of up to three
-    // queries per assignee (REQ-DATA-003).
     assigneeUserMapper.primeStaffelMemberships(
         assignees.stream().map(JobOrderAssignee::getUser).toList());
     return assignees.stream()

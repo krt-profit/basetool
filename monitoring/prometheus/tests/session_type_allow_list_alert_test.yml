@@ -1,23 +1,9 @@
-# promtool unit tests for SessionTypeOutsideAllowList (REQ-SEC-067, ADR-0206).
-#
-# The counter behind this rule rises in two very different ways, and the rule has to catch both:
-#   - under mode="report" (what a deploy ships) Jackson caches the deserializer it resolved, so a
-#     class outside the allow-list is counted ONCE per class and slot per frontend lifetime. One
-#     increment is the entire signal, and it is the gate for switching production to `enforce`.
-#   - under mode="enforce" every refused read counts.
-# A rule that waited for a rate, or carried a `for:`, would never see the first case.
-#
-# Run locally (no promtool on the host — use an ephemeral container, see monitoring/README.md):
-#   docker run --rm --entrypoint sh -v "$PWD/monitoring/prometheus:/work" -w /work \
-#     prom/prometheus:v3.14.0 -c 'promtool test rules tests/session_type_allow_list_alert_test.yml'
-
 rule_files:
   - ../alerts/business.yml
 
 evaluation_interval: 1m
 
 tests:
-  # The report-mode shape exactly: a counter that steps from 0 to 1 once and never moves again.
   - name: fires - a single report-mode refusal
     interval: 1m
     input_series:
@@ -34,8 +20,6 @@ tests:
               summary: "A session value names a class outside the session type allow-list (mode=report)"
               description: "The frontend read a session value whose @class type id is not on SessionTypeAllowList. Find the WARN line from SessionTypeAllowList in the frontend log: it names the class once per frontend lifetime. mode=report means the value was read as before and nothing broke, but APP_SESSION_TYPE_ALLOW_LIST=enforce would drop it: if the class is legitimately stored in the session (a new form or DTO outside frontend.model, a new Spring or container type) add it to the list and do not enforce until this has stayed silent; if it is not, something other than this frontend wrote into Redis. mode=enforce means the value was refused and that attribute reads as not set, which is correct for a foreign class and a defect for a legitimate one (REQ-SEC-067)."
 
-  # The same single step, an hour and more later: the window has moved past it and the alert
-  # resolves. It fired once, which is what a one-off finding deserves.
   - name: silent - the single refusal has left the one-hour window
     interval: 1m
     input_series:
@@ -46,7 +30,6 @@ tests:
         alertname: SessionTypeOutsideAllowList
         exp_alerts: []
 
-  # The steady state the switch to `enforce` waits for.
   - name: silent - nothing outside the list
     interval: 1m
     input_series:
@@ -57,7 +40,6 @@ tests:
         alertname: SessionTypeOutsideAllowList
         exp_alerts: []
 
-  # Enforce mode keeps the mode label, so the page says which of the two meanings it is.
   - name: fires - enforce-mode refusals are labelled as such
     interval: 1m
     input_series:

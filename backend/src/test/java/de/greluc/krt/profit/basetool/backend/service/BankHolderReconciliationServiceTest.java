@@ -60,7 +60,6 @@ class BankHolderReconciliationServiceTest {
 
   @Test
   void reconcile_createsActiveRoleManagedHolderForABankRoleUserWithoutOne() {
-    // Given: one employee, no holder yet
     UUID userId = UUID.randomUUID();
     User user = new User();
     user.setId(userId);
@@ -73,10 +72,8 @@ class BankHolderReconciliationServiceTest {
     when(holderRepository.save(any(BankHolder.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
-    // When
     service.reconcileAll();
 
-    // Then: the holder is created active, role-managed, with the effective-name handle snapshot
     ArgumentCaptor<BankHolder> saved = ArgumentCaptor.forClass(BankHolder.class);
     verify(holderRepository).save(saved.capture());
     assertTrue(saved.getValue().isActive());
@@ -88,7 +85,6 @@ class BankHolderReconciliationServiceTest {
 
   @Test
   void reconcile_deactivatesRoleManagedHolderWhoseUserLostTheBankRole() {
-    // Given: no bank-role users, but an active role-managed holder still exists
     when(userRepository.findUserIdsByRoleCode("BANK_EMPLOYEE")).thenReturn(Set.of());
     when(userRepository.findUserIdsByRoleCode("BANK_MANAGEMENT")).thenReturn(Set.of());
     User formerStaff = new User();
@@ -103,10 +99,8 @@ class BankHolderReconciliationServiceTest {
     when(holderRepository.save(any(BankHolder.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
-    // When
     service.reconcileAll();
 
-    // Then: the holder is deactivated (balance kept) and the deactivation is audited
     assertFalse(holder.isActive());
     verify(holderRepository).save(holder);
     verify(bankAuditService)
@@ -115,7 +109,6 @@ class BankHolderReconciliationServiceTest {
 
   @Test
   void reconcile_reactivatesAnAutoDeactivatedHolderRegainingTheRole() {
-    // Given: a user who is bank staff again, with a previously auto-deactivated role-managed holder
     UUID userId = UUID.randomUUID();
     User user = new User();
     user.setId(userId);
@@ -132,10 +125,8 @@ class BankHolderReconciliationServiceTest {
     when(holderRepository.save(any(BankHolder.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
-    // When
     service.reconcileAll();
 
-    // Then
     assertTrue(holder.isActive());
     verify(bankAuditService)
         .record(
@@ -144,7 +135,6 @@ class BankHolderReconciliationServiceTest {
 
   @Test
   void reconcile_leavesAManuallyRegisteredHolderUntouched() {
-    // Given: a bank-role user who already has a MANUAL holder (role_managed = false)
     UUID userId = UUID.randomUUID();
     User user = new User();
     user.setId(userId);
@@ -159,10 +149,8 @@ class BankHolderReconciliationServiceTest {
     when(holderRepository.findByUserIdIn(any())).thenReturn(List.of(manual));
     when(holderRepository.findByRoleManagedTrueAndActiveTrue()).thenReturn(List.of());
 
-    // When
     service.reconcileAll();
 
-    // Then: no holder is created, reactivated or deactivated — the manual row is left as-is
     verify(holderRepository, never()).save(any());
     verify(bankAuditService, never()).record(any(), any(), any(), any(), any());
     assertFalse(manual.isRoleManaged(), "a manual holder is never flipped to role-managed");

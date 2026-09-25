@@ -42,10 +42,6 @@ import org.springframework.beans.factory.annotation.Autowired;
     uses = {UserMapper.class, MaterialMapper.class, SquadronMapper.class})
 public abstract class InventoryItemMapper {
 
-  // MapStruct generates a concrete subclass whose constructor takes no arguments, so the seam comes
-  // in by field injection — the same shape as MissionMapper and UserMapper. The mapper depends only
-  // on the support-package leaf interface, never on the service layer or on SecurityContextHolder
-  // (ArchUnit mapperLayerShouldNotReachIntoSecurityContext).
   @Autowired protected StockViewerAccess stockAccess;
 
   /**
@@ -88,8 +84,6 @@ public abstract class InventoryItemMapper {
   @Mapping(target = "missionRest", expression = "java(missionRest(inventoryItem))")
   @Mapping(target = "owningSquadron", source = "owningOrgUnit")
   @Mapping(target = "canEdit", expression = "java(resolveCanEdit(inventoryItem))")
-  // MapStruct reads a record's wither as a fluent setter of a property named after it; there
-  // is no such property, so it is ignored.
   @Mapping(target = "withVersion", ignore = true)
   public abstract InventoryItemDto toDto(InventoryItem inventoryItem);
 

@@ -258,8 +258,6 @@ class InventoryItemStackQueryDataTest {
         .hasSize(2);
   }
 
-  // --- game-item stock rows (V220, REQ-INV-029) ------------------------------
-
   /**
    * With {@code material_id} nullable since V220, the material stack projections must exclude
    * game-item rows explicitly ({@code i.material IS NOT NULL}): an item row surfacing as a
@@ -268,7 +266,6 @@ class InventoryItemStackQueryDataTest {
    * dimension. Seeds one material and one game-item row for the same owner/location and pins each
    * projection to exactly its own catalog population.
    */
-  // covers REQ-INV-029 (material stacks exclude NULL-material rows; item stacks serve them)
   @Test
   void materialAndItemStackProjections_splitByCatalog_withAnItemRowPresent() {
     User user = new User();
@@ -307,8 +304,6 @@ class InventoryItemStackQueryDataTest {
     inventoryItemRepository.save(itemRow);
     entityManager.flush();
 
-    // The user-scoped material stacks return ONLY the material stack — never a null-material
-    // group for the item row.
     List<InventoryStackAggregate> materialStacks =
         inventoryItemRepository.findUserStacks(
             user.getId(), false, null, false, null, null, false, null, false, null, false, false);
@@ -317,7 +312,6 @@ class InventoryItemStackQueryDataTest {
         .hasSize(1);
     assertThat(materialStacks.get(0).material().getId()).isEqualTo(material.getId());
 
-    // The global material stacks carry no null-material group either (admin all-scope sweep).
     List<InventoryStackAggregate> globalStacks =
         inventoryItemRepository.findGlobalStacks(
             false, null, false, null, null, false, null, false, null, true, null, Set.of());
@@ -325,7 +319,6 @@ class InventoryItemStackQueryDataTest {
         .as("no global material stack may carry a null material with an item row present")
         .allSatisfy(stack -> assertThat(stack.material()).isNotNull());
 
-    // The item stack siblings serve the game-item population, keyed without a quality dimension.
     List<InventoryItemStackAggregate> userItemStacks =
         inventoryItemRepository.findUserItemStacks(
             user.getId(), false, null, false, null, false, null, false, false);
@@ -352,8 +345,6 @@ class InventoryItemStackQueryDataTest {
    * excluded by {@code i.gameItem IS NOT NULL} — surfacing as a null-gameItem tuple would NPE the
    * grouped assembly downstream).
    */
-  // covers REQ-INV-028/029 (aggregated item view renders the appended gameItem.name sort on
-  // Postgres)
   @Test
   void getAggregatedItemInventory_aggregatesPerItem_sortsByName_andExcludesMaterialRows() {
     User user = new User();
@@ -412,8 +403,6 @@ class InventoryItemStackQueryDataTest {
     inventoryItemRepository.save(materialRow);
     entityManager.flush();
 
-    // Drive the query exactly like InventoryAggregationService.getAggregatedItemInventory does
-    // for an admin all-scope caller under the controller's ITEM_AGGREGATED_DEFAULT_SORT.
     Page<Object[]> page =
         inventoryItemRepository.getAggregatedItemInventory(
             true,
@@ -447,8 +436,6 @@ class InventoryItemStackQueryDataTest {
     assertThat(((Number) seeded.get(1)[1]).doubleValue()).isEqualTo(7.0);
   }
 
-  // --- select-all flat entry-id queries (REQ-INV-034) ------------------------
-
   /**
    * The material select-all id query ({@link InventoryItemRepository#findUserEntryIds}) returns the
    * raw ids of <em>every</em> matching material entry the owner holds — the flat companion of
@@ -459,8 +446,6 @@ class InventoryItemStackQueryDataTest {
    * location for the owner, one item entry for the owner (must be excluded) and one material entry
    * for another user (must be excluded).
    */
-  // covers REQ-INV-034 (material select-all returns all own material entry ids, owner-scoped,
-  // item rows excluded)
   @Test
   void findUserEntryIds_returnsAllOwnMaterialEntries_excludesOtherUsersAndItemRows() {
     User owner = new User();
@@ -539,7 +524,6 @@ class InventoryItemStackQueryDataTest {
    * entry ids, {@code nonPersonalOnly = true} only the shared ones. Seeds one personal and one
    * shared material entry for the owner and pins each toggle to its own id.
    */
-  // covers REQ-INV-034 (material select-all id query respects the personal-only toggles)
   @Test
   void findUserEntryIds_personalAndNonPersonalOnly_narrowToMatchingEntries() {
     User owner = new User();
@@ -631,7 +615,6 @@ class InventoryItemStackQueryDataTest {
    * (the {@code i.gameItem IS NOT NULL} guard). Seeds two item entries and one material entry for
    * the owner and asserts only the item ids come back.
    */
-  // covers REQ-INV-034 (item select-all returns all own item entry ids, material rows excluded)
   @Test
   void findUserItemEntryIds_returnsAllOwnItemEntries_excludesMaterialRows() {
     User owner = new User();

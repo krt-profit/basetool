@@ -111,9 +111,6 @@ class OwnerScopeServiceTest {
 
   @Mock private HttpServletRequest request;
 
-  // Built in wireDelegates() rather than by @InjectMocks: its three collaborators are real
-  // instances, and Mockito injects neither one @InjectMocks target into another nor an object it
-  // did not create. See wireDelegates().
   private OwnerScopeService service;
 
   private static final UUID MEMBER_USER_ID = UUID.randomUUID();
@@ -126,11 +123,6 @@ class OwnerScopeServiceTest {
 
   @BeforeEach
   void setUp() {
-    // REQ-SEC-052: every scoped read now requires a login, and RequestScopeResolver throws rather
-    // than hand back an all-empty predicate for a caller with no identity. These cases are about
-    // WHAT a caller in scope may see, not about whether they are logged in, so the principal is a
-    // class-wide given. The refusal itself is asserted in RequestScopeResolverScopeTest.
-    // UnauthenticatedCallerTests.
     lenient().when(authHelper.isAuthenticated()).thenReturn(true);
 
     squadronA = new Squadron();
@@ -143,13 +135,7 @@ class OwnerScopeServiceTest {
 
     memberUserInA = new User();
     memberUserInA.setId(MEMBER_USER_ID);
-    // Post-R9 D3 (V101): the home Staffel is sourced from org_unit_membership only.
 
-    // Epic #692 / REQ-ORG-015: the cascade expansion is delegated to OrgUnitCascadeService (tested
-    // independently in OrgUnitCascadeServiceTest). The default stub here mirrors the no-leadership
-    // case — expansion collapses to the direct membership ids — so every pre-#692 scenario behaves
-    // byte-for-byte as before. The dedicated cascade scenarios below override it with an expanded
-    // set to verify OwnerScopeService routes the cascade output into the scope predicate.
     lenient()
         .when(
             orgUnitCascadeService.expandWithDescendants(
@@ -164,18 +150,12 @@ class OwnerScopeServiceTest {
               return ids;
             });
 
-    // The "name-sorted primary" definition is owned by StaffelMembershipResolver (tested
-    // independently in StaffelMembershipResolverTest). Delegate the mock to a real instance backed
-    // by the squadron-repo mock so the single-Staffel cheap existence check and the two-Staffel
-    // name-sort are exercised through the real resolver — without re-stubbing it per scenario.
     StaffelMembershipResolver realResolver =
         new StaffelMembershipResolver(squadronRepository, orgUnitRepository);
     lenient()
         .when(staffelMembershipResolver.resolveNameSortedStaffelIds(any()))
         .thenAnswer(
             invocation -> realResolver.resolveNameSortedStaffelIds(invocation.getArgument(0)));
-    // The resolver's single-Staffel fast path now does a cheap existsById to drop a dangling row
-    // (finding #4). Every Staffel in these scenarios exists, so resolve it to present.
     lenient().when(squadronRepository.existsById(any())).thenReturn(true);
 
     wireDelegates();
@@ -303,7 +283,6 @@ class OwnerScopeServiceTest {
     void nonAdmin_returnsPersistentUserSquadron() {
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      // Post-R9 D3 (V101): home Staffel via org_unit_membership.
       when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
               MEMBER_USER_ID, OrgUnitKind.SQUADRON))
           .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
@@ -323,7 +302,6 @@ class OwnerScopeServiceTest {
     void nonAdmin_userWithoutSquadron_returnsEmpty() {
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      // No Staffel membership row → empty.
       when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
               MEMBER_USER_ID, OrgUnitKind.SQUADRON))
           .thenReturn(List.of());
@@ -333,10 +311,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void nonAdmin_twoStaffeln_noMatchingPin_returnsNameSortedPrimary() {
-      // REQ-ORG-017: with two Staffeln and no active pin the fallback is the deterministic
-      // name-sorted primary (Alpha < Bravo), resolved through StaffelMembershipResolver — the rows
-      // /
-      // squadron entities are returned in non-alphabetical order to prove the sort decides.
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
       when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
@@ -354,9 +328,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void nonAdmin_twoStaffeln_pinMatchesNonPrimary_returnsPinned() {
-      // An active pin that points at one of the caller's Staffeln wins over the name-sorted
-      // primary;
-      // the pin path never touches the squadron table.
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
       when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(
@@ -432,8 +403,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void member_seesOwnStaffelAndEverySkTheyBelongTo() {
-      // Detail/edit visibility now mirrors the list scope: a member sees the union of their Staffel
-      // and every Spezialkommando membership, not just the home Staffel.
       UUID skId = UUID.randomUUID();
       lenient().when(authHelper.isAdmin()).thenReturn(false);
       lenient().when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
@@ -451,8 +420,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void squadronlessSkMember_seesTheirSk() {
-      // The reported case: an SK lead with NO Staffel membership. The old home-Staffel-only gate
-      // denied them every org unit including their own SK; the membership union now grants the SK.
       UUID skId = UUID.randomUUID();
       lenient().when(authHelper.isAdmin()).thenReturn(false);
       lenient().when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
@@ -466,8 +433,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void nonAdminPinnedToOneMembership_seesOnlyThePin() {
-      // Mirrors the list scope: pinning one membership narrows detail/edit to that org unit,
-      // exactly as currentScopePredicate() narrows the IN-clause to the pinned id.
       UUID skId = UUID.randomUUID();
       lenient().when(authHelper.isAdmin()).thenReturn(false);
       lenient().when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
@@ -487,8 +452,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void nonAdminForeignPin_collapsesToMembershipUnion() {
-      // A spoofed/stale pin to an org unit the caller is not a member of must NOT grant foreign
-      // access; it collapses to the membership union (same defence as currentScopePredicate()).
       lenient().when(authHelper.isAdmin()).thenReturn(false);
       lenient().when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
       lenient()
@@ -548,10 +511,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void nonMember_ofResponsibleSk_cannotSee_eventThoughTheOrderItselfIsPublic() {
-      // The defining distinction from canSeeJobOrder: an SK-responsible order is publicly readable,
-      // but the named-member blueprint coverage is restricted to members of that SK. A profit
-      // member
-      // who is not in the SK is denied — there is no SK-public escape on this gate.
       UUID skId = UUID.randomUUID();
       SpecialCommand sk = new SpecialCommand();
       sk.setId(skId);
@@ -611,7 +570,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void member_ofResponsibleSquadron_canSeeOwners() {
-      // covers REQ-ORDERS-029 (squadron-responsible order: coincides with canSeeJobOrder)
       JobOrder order = orderResponsibleTo(squadronA);
       when(jobOrderRepository.findById(order.getId())).thenReturn(Optional.of(order));
       lenient().when(authHelper.isAdmin()).thenReturn(false);
@@ -625,7 +583,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void nonMember_ofResponsibleSquadron_cannotSeeOwners() {
-      // covers REQ-ORDERS-029
       JobOrder order = orderResponsibleTo(squadronB);
       when(jobOrderRepository.findById(order.getId())).thenReturn(Optional.of(order));
       lenient().when(authHelper.isAdmin()).thenReturn(false);
@@ -639,11 +596,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void requestingSideMember_ofPublicSkOrder_cannotSeeOwners() {
-      // covers REQ-ORDERS-029 — the defining case: an SK-responsible order is publicly readable
-      // (canSeeJobOrder is true for any profit member), but the fulfilling side's inventory
-      // owner/location is restricted to members of that SK. A profit member from the merely
-      // REQUESTING squadron is denied — there is no SK-public escape on this gate, so the endpoint
-      // redacts owner/location for them (ADR-0107).
       UUID skId = UUID.randomUUID();
       SpecialCommand sk = new SpecialCommand();
       sk.setId(skId);
@@ -660,7 +612,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void member_ofResponsibleSk_canSeeOwners() {
-      // covers REQ-ORDERS-029
       UUID skId = UUID.randomUUID();
       SpecialCommand sk = new SpecialCommand();
       sk.setId(skId);
@@ -677,7 +628,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void adminWithoutPin_canSeeAnyOrdersOwners() {
-      // covers REQ-ORDERS-029
       JobOrder order = orderResponsibleTo(squadronB);
       when(jobOrderRepository.findById(order.getId())).thenReturn(Optional.of(order));
       when(authHelper.isAdmin()).thenReturn(true);
@@ -688,7 +638,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void unknownOrder_returnsFalse() {
-      // covers REQ-ORDERS-029
       UUID missing = UUID.randomUUID();
       when(jobOrderRepository.findById(missing)).thenReturn(Optional.empty());
 
@@ -731,9 +680,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void ownerlessPublicMission_isVisibleToEveryone() {
-      // An ownerless leadership ("Bereichsleitung") mission carries no owning OrgUnit. When
-      // public (not internal) it is visible to everyone, anonymous visitors included — the default
-      // the create flow stamps for a membershipless leadership owner.
       UUID missionId = UUID.randomUUID();
       Mission mission = newMission(missionId, null, false);
       when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
@@ -743,9 +689,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void ownerlessInternalMission_isVisibleToMembersOrAbove() {
-      // An internal ownerless mission is "internal to the whole organisation": visible to any
-      // member-or-above — the membershipless analogue of a Staffel-internal mission being visible
-      // to its Staffel.
       UUID missionId = UUID.randomUUID();
       Mission mission = newMission(missionId, null, true);
       when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
@@ -756,8 +699,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void ownerlessInternalMission_isHiddenFromOutsiders() {
-      // A guest / anonymous outsider (isMemberOrAbove() == false) must not see an internal
-      // ownerless mission, mirroring how internal Staffel missions stay hidden from outsiders.
       UUID missionId = UUID.randomUUID();
       Mission mission = newMission(missionId, null, true);
       when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
@@ -800,9 +741,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void ownerlessMission_passesPerRowEditCheck() {
-      // An ownerless leadership mission has no owning OrgUnit to scope against, so the per-row
-      // canEditMission check is a no-op (true). The real write restriction is then
-      // MissionSecurityService.canManageMission's role/owner gate (see MissionSecurityServiceTest).
       UUID missionId = UUID.randomUUID();
       Mission mission = newMission(missionId, null, false);
       when(missionRepository.findByIdForAuthorization(missionId)).thenReturn(Optional.of(mission));
@@ -824,9 +762,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void skResponsibleOrder_isPublicToProfitEligibleViewer() {
-      // An SK-responsible order is the shared central queue: visible to any profit-eligible caller
-      // without a squadron-scope check. The member-in-A default is profit-eligible, so the SK
-      // short-circuit fires once the viewer gate passes.
       UUID orderId = UUID.randomUUID();
       when(jobOrderRepository.findById(orderId))
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, newSpecialCommand())));
@@ -837,8 +772,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void skResponsibleOrder_invisibleToNonProfitMember() {
-      // The viewer-side profit gate suppresses even the otherwise-public SK queue for a caller who
-      // belongs to no profit-eligible org unit.
       UUID orderId = UUID.randomUUID();
       when(jobOrderRepository.findById(orderId))
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, newSpecialCommand())));
@@ -849,7 +782,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void skResponsibleOrder_visibleToAdmin() {
-      // Admins keep system-wide visibility — the profit gate short-circuits to true for them.
       UUID orderId = UUID.randomUUID();
       when(jobOrderRepository.findById(orderId))
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, newSpecialCommand())));
@@ -920,9 +852,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void nonProfitRequester_canSeeOwnRequestedOrder() {
-      // A non-profit member may read an order their OWN org unit requested via the requester
-      // escape,
-      // even though the profit gate denies the normal canSeeJobOrder path.
       UUID orderId = UUID.randomUUID();
       var order = jobOrderResponsibleTo(orderId, newSpecialCommand());
       order.setRequestingOrgUnit(squadronA);
@@ -935,7 +864,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void nonProfitMember_cannotSeeForeignRequestedOrder() {
-      // An order requested by a DIFFERENT org unit is not the caller's own — no requester escape.
       UUID orderId = UUID.randomUUID();
       var order = jobOrderResponsibleTo(orderId, newSpecialCommand());
       order.setRequestingOrgUnit(squadronB);
@@ -947,8 +875,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void nonProfitRequester_canEditOwnUndeliveredOrder() {
-      // The whole-order freeze is not tripped (no handover) → the requester may edit their own
-      // order.
       UUID orderId = UUID.randomUUID();
       var order = jobOrderResponsibleTo(orderId, newSpecialCommand());
       order.setRequestingOrgUnit(squadronA);
@@ -961,7 +887,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void requester_cannotEditOwnOrder_onceDelivered() {
-      // Whole-order freeze: once any handover exists the requester can no longer edit.
       UUID orderId = UUID.randomUUID();
       var order = jobOrderResponsibleTo(orderId, newSpecialCommand());
       order.setRequestingOrgUnit(squadronA);
@@ -989,11 +914,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void skResponsibleOrder_isOpenToTheRoleGate_forProfitEligibleCaller() {
-      // SK-order edits are governed by the endpoint's LOGISTICIAN+ role gate, not by squadron
-      // scope,
-      // so this returns true for the SK case for any profit-eligible caller (the member-in-A
-      // default
-      // is profit-eligible) — letting any profit squadron contribute to the shared queue.
       UUID orderId = UUID.randomUUID();
       when(jobOrderRepository.findById(orderId))
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, newSpecialCommand())));
@@ -1004,8 +924,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void skResponsibleOrder_notEditableByNonProfitMember() {
-      // The viewer-side profit gate also blocks edits: a non-profit member cannot act on the SK
-      // queue even though the order is otherwise only role-gated.
       UUID orderId = UUID.randomUUID();
       when(jobOrderRepository.findById(orderId))
           .thenReturn(Optional.of(jobOrderResponsibleTo(orderId, newSpecialCommand())));
@@ -1065,7 +983,7 @@ class OwnerScopeServiceTest {
 
     @Test
     void memberOfProfitEligibleOrgUnit_canView() {
-      stubMemberInSquadronA(); // member-in-A default is profit-eligible (count > 0)
+      stubMemberInSquadronA();
 
       assertTrue(service.canViewJobOrders());
     }
@@ -1167,7 +1085,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void owner_retainsAccessToOwnItemStampedToForeignOrgUnit() {
-      // The caller owns the item but it is stamped to squadron B (e.g. they switched org units).
       InventoryItem item = ownedItem(memberUserInA, squadronB);
       when(inventoryItemRepository.findById(item.getId())).thenReturn(Optional.of(item));
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
@@ -1182,8 +1099,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void owner_retainsAccessAfterLosingAllMembershipsWhileItemStaysStamped() {
-      // The caller owns the item, the row is still stamped to squadron A, but the caller now has no
-      // membership at all. The owner escape short-circuits before any scope/membership read.
       InventoryItem item = ownedItem(memberUserInA, squadronA);
       when(inventoryItemRepository.findById(item.getId())).thenReturn(Optional.of(item));
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
@@ -1194,8 +1109,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void nonOwnerOutsideScope_isStillDeniedEvenWhenTheItemHasAnOwner() {
-      // A non-owner who is not a member of the item's owning org unit must still be rejected — the
-      // owner escape is per-owner, not a blanket open door.
       User otherOwner = new User();
       otherOwner.setId(UUID.randomUUID());
       InventoryItem item = ownedItem(otherOwner, squadronB);
@@ -1212,7 +1125,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void owner_retainsAccessToOwnShipStampedToForeignOrgUnit() {
-      // The caller owns the ship but it is stamped to squadron B (e.g. they switched org units).
       Ship ship = ownedShip(memberUserInA, squadronB);
       when(shipRepository.findById(ship.getId())).thenReturn(Optional.of(ship));
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
@@ -1235,7 +1147,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void owner_retainsAccessToOwnRefineryOrderStampedToForeignOrgUnit() {
-      // The caller owns the order but it is stamped to squadron B (e.g. they switched org units).
       RefineryOrder order = ownedRefineryOrder(memberUserInA, squadronB);
       when(refineryOrderRepository.findById(order.getId())).thenReturn(Optional.of(order));
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
@@ -1306,9 +1217,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void ownerlessOperation_isVisibleToMembersOrAbove() {
-      // #500 / REQ-ORG-009: an ownerless leadership ("Bereichsleitung") operation carries no owning
-      // OrgUnit. Operations have no public escape, so it is visible to organisation
-      // members-or-above only — the org-wide analogue of a Staffel-internal operation.
       UUID opId = UUID.randomUUID();
       Operation op = new Operation();
       op.setId(opId);
@@ -1321,8 +1229,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void ownerlessOperation_isHiddenFromGuestsAndAnonymous() {
-      // A guest / anonymous outsider (isMemberOrAbove() == false) must not see an ownerless
-      // operation, mirroring how internal Staffel operations stay hidden from outsiders.
       UUID opId = UUID.randomUUID();
       Operation op = new Operation();
       op.setId(opId);
@@ -1335,9 +1241,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void ownerlessOperation_passesPerRowEditCheck() {
-      // An ownerless leadership operation has no owning OrgUnit to scope against, so the per-row
-      // canEditOperation check is a no-op (true). The real write restriction is the controller's
-      // role gate (hasRole('MISSION_MANAGER') on update, hasRole('ADMIN') on delete).
       UUID opId = UUID.randomUUID();
       Operation op = new Operation();
       op.setId(opId);
@@ -1349,16 +1252,12 @@ class OwnerScopeServiceTest {
 
     @Test
     void participantSeesOperationOfForeignSquadron() {
-      // #500: any authenticated user who participated in one of the operation's missions may view
-      // the operation (and their payout) even when it belongs to a Staffel they are not a member
-      // of.
-      // Participation grants view only — not edit.
       UUID opId = UUID.randomUUID();
       Operation op = new Operation();
       op.setId(opId);
       op.setOwningOrgUnit(squadronB);
       when(operationRepository.findById(opId)).thenReturn(Optional.of(op));
-      stubMemberInSquadronA(); // caller is a member of A, not B
+      stubMemberInSquadronA();
       when(operationRepository.existsParticipantUserInOperation(opId, MEMBER_USER_ID))
           .thenReturn(true);
 
@@ -1420,10 +1319,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void logisticianOutsideTargetsScope_isDenied() {
-      // The fix (PR #808 security review): a logistician whose strict scope does not cover any of
-      // the target user's units can no longer reach that user's refinery orders via the flat
-      // ROLE_LOGISTICIAN. This is the org-wide gap closed for every oversight rank, squadron ranks
-      // included.
       UUID targetUserId = UUID.randomUUID();
       lenient().when(authHelper.isAdmin()).thenReturn(false);
       lenient().when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
@@ -1474,9 +1369,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void owner_seesAndEditsOwnOwnerlessShip() {
-      // The owner escape (REQ-ORG-011) grants the owner directly, before the ownerless/admin
-      // branch,
-      // so no isAdmin() stub is needed.
       Ship ship = ownerlessShip(memberUserInA);
       when(shipRepository.findById(ship.getId())).thenReturn(Optional.of(ship));
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
@@ -1498,9 +1390,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void adminPinnedToSquadron_doesNotSeeOwnerlessShip() {
-      // A pinned admin is scoped like any member; an ownerless row has no scope to match, and the
-      // pinned admin is not the owner, so access is denied (it would still be reachable by clearing
-      // the pin → all-scopes mode).
       Ship ship = ownerlessShip(memberUserInA);
       when(shipRepository.findById(ship.getId())).thenReturn(Optional.of(ship));
       when(authHelper.isAdmin()).thenReturn(true);
@@ -1514,9 +1403,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void owner_seesAndEditsOwnOwnerlessRefineryOrder() {
-      // The owner escape (REQ-ORG-011) grants the owner directly, before the ownerless/admin
-      // branch,
-      // so no isAdmin() stub is needed.
       RefineryOrder order = ownerlessRefineryOrder(memberUserInA);
       when(refineryOrderRepository.findById(order.getId())).thenReturn(Optional.of(order));
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
@@ -1538,8 +1424,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void owner_seesAndEditsOwnOwnerlessInventoryItem() {
-      // The owner escape (REQ-ORG-011) grants the owner directly, before the ownerless/admin branch
-      // is consulted — so no isAdmin() stub is needed.
       InventoryItem item = ownerlessInventoryItem(memberUserInA);
       when(inventoryItemRepository.findById(item.getId())).thenReturn(Optional.of(item));
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
@@ -1623,9 +1507,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void canSeeSquadron_calledTwice_hitsMembershipRepoOnce() {
-      // canSeeSquadron now evaluates the same scope vector as the list queries
-      // (currentScopePredicate). The membership lookup behind it is request-scoped, so repeated
-      // per-row detail/edit checks in one request collapse to a single org_unit_membership read.
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
       when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
@@ -1639,9 +1520,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void blueprintGateAndOversightScopes_shareOneMembershipRead() {
-      // REQ-DATA-003: the blueprint-overview gate plus the cascading and own-level oversight scopes
-      // all read the caller's membership rows; the request-scoped memo collapses what was a
-      // separate findAllByIdUserId per resolver (incl. the gate+body double-read) into one query.
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
@@ -1658,9 +1536,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void canViewJobOrders_calledTwice_runsProfitEligibilityCountOnce() {
-      // The profit-eligibility verdict is request-constant, yet on the order-lookup path
-      // canViewJobOrders() is consulted once per row via canSeeJobOrder. The request-scoped memo
-      // collapses the repeated countProfitEligibleByIdIn aggregate to a single query per request.
       stubMemberInSquadronA();
 
       assertTrue(service.canViewJobOrders());
@@ -1670,9 +1545,6 @@ class OwnerScopeServiceTest {
     }
   }
 
-  // --- resolveSquadronForPickerOutput (R5.d picker shared helper, hardened in R6.b
-  //     to enforce the plan §5.5.1 0/1/>1 membership matrix) ----------------------
-
   @Test
   void resolveSquadronForPickerOutput_singleStaffelOnlyMembership_nullPicker_autoStamps() {
     Squadron homeStaffel = new Squadron();
@@ -1680,7 +1552,6 @@ class OwnerScopeServiceTest {
     homeStaffel.setId(homeStaffelId);
     User user = new User();
     user.setId(UUID.randomUUID());
-    // Post-R9 D3 (V101): every membership (Staffel + SK) comes from findAllByIdUserId.
     when(orgUnitMembershipRepository.findAllByIdUserId(user.getId()))
         .thenReturn(List.of(staffelMembership(user.getId(), homeStaffelId)));
     when(orgUnitRepository.findById(homeStaffelId)).thenReturn(Optional.of(homeStaffel));
@@ -1692,9 +1563,6 @@ class OwnerScopeServiceTest {
 
   @Test
   void resolveSquadronForPickerOutput_noMembershipAtAll_throwsBadRequest() {
-    // Memberless user (admin / guest / freshly created without a backfill) — must be rejected
-    // before the stamp lands. Post-R9 D3 (V101) the legacy Staffel column is dropped, so the
-    // membership-table emptiness is the single criterion.
     User user = new User();
     user.setId(UUID.randomUUID());
     when(orgUnitMembershipRepository.findAllByIdUserId(user.getId())).thenReturn(List.of());
@@ -1708,10 +1576,6 @@ class OwnerScopeServiceTest {
 
   @Test
   void resolveSquadronForPickerOutput_multipleMemberships_nullPicker_throwsOwnerRequired() {
-    // User in Staffel + at least one SK. Plan §5.5.1: ambiguous, must reject. Before R6.b
-    // this path silently stamped the legacy Staffel — exactly the audit regression #4.
-    // Since REQ-ORG-023 the refusal is its own type, so the frontend can render a localized
-    // instruction instead of echoing this English message into a German toast.
     Squadron homeStaffel = new Squadron();
     UUID homeStaffelId = UUID.randomUUID();
     homeStaffel.setId(homeStaffelId);
@@ -1735,8 +1599,6 @@ class OwnerScopeServiceTest {
 
   @Test
   void resolveSquadronForPickerOutput_multiMembership_nullPicker_withPin_stampsPinnedStaffel() {
-    // REQ-ORG-017 "pin, else choose": a two-Staffel user who pinned one of their Staffeln via the
-    // switcher need not re-pick — the pinned Staffel is stamped instead of a 400.
     Squadron staffelA = new Squadron();
     UUID staffelAId = UUID.randomUUID();
     staffelA.setId(staffelAId);
@@ -1759,8 +1621,6 @@ class OwnerScopeServiceTest {
 
   @Test
   void resolveSquadronForPickerOutput_multiMembership_nullPicker_foreignPin_stillThrows() {
-    // A pin onto an org unit the user is NOT a member of does not disambiguate — still force a
-    // pick.
     UUID staffelAId = UUID.randomUUID();
     UUID staffelBId = UUID.randomUUID();
     User user = new User();
@@ -1781,7 +1641,6 @@ class OwnerScopeServiceTest {
 
   @Test
   void resolveOrgUnitForPickerOutput_multiMembership_nullPicker_withPin_stampsPinned() {
-    // The OrgUnit-variant shares the matrix: a pinned two-Staffel user is stamped to the pin.
     Squadron staffelA = new Squadron();
     UUID staffelAId = UUID.randomUUID();
     staffelA.setId(staffelAId);
@@ -1820,7 +1679,6 @@ class OwnerScopeServiceTest {
 
   @Test
   void resolveSquadronForPickerOutput_validMultiMembershipStaffelPick_returnsPickedSquadron() {
-    // User has Staffel + SK; picker output points at the Staffel. Honoured.
     Squadron homeStaffel = new Squadron();
     UUID homeStaffelId = UUID.randomUUID();
     homeStaffel.setId(homeStaffelId);
@@ -1841,8 +1699,6 @@ class OwnerScopeServiceTest {
 
   @Test
   void resolveSquadronForPickerOutput_foreignOrgUnitChoice_throwsBadRequest() {
-    // Picker output references an OrgUnit the target user does NOT belong to (membership
-    // forgery vector).
     UUID homeStaffelId = UUID.randomUUID();
     User user = new User();
     user.setId(UUID.randomUUID());
@@ -1860,9 +1716,6 @@ class OwnerScopeServiceTest {
 
   @Test
   void resolveSquadronForPickerOutput_pickedOrgUnitIsSpecialCommand_throwsBadRequest() {
-    // The user has Staffel + SK; the picker points at the SK. The polymorphic load resolves the
-    // SK row, but the legacy resolver's Squadron filter (the in-Java successor of the old
-    // kind='SQUADRON' discriminator query) rejects it, so the soft block fires.
     UUID homeStaffelId = UUID.randomUUID();
     User user = new User();
     user.setId(UUID.randomUUID());
@@ -1884,9 +1737,6 @@ class OwnerScopeServiceTest {
         ex.getMessage().toLowerCase().contains("spezialkommando ownership"), ex.getMessage());
   }
 
-  // --- resolveOrgUnitForPickerOutput (V99-aligned SK-unblocking successor of
-  // resolveSquadronForPickerOutput; honours SK selections once V99 lifts the legacy NOT NULL) ---
-
   @Test
   void resolveOrgUnitForPickerOutput_singleStaffelOnlyMembership_nullPicker_returnsStaffel() {
     Squadron homeStaffel = new Squadron();
@@ -1902,15 +1752,11 @@ class OwnerScopeServiceTest {
         service.resolveOrgUnitForPickerOutput(user, null);
 
     assertSame(homeStaffel, result);
-    // One polymorphic load resolves the Staffel — no per-kind probe chain anymore (HHH000179 fix).
     verify(orgUnitRepository).findById(homeStaffelId);
   }
 
   @Test
   void resolveOrgUnitForPickerOutput_pickedSpecialCommand_isHonoured() {
-    // V99 unblocks SK ownership: the new method now returns the SpecialCommand entity instead
-    // of throwing "not yet supported". The legacy resolver still rejects, which proves the
-    // dual-track is clean.
     UUID homeStaffelId = UUID.randomUUID();
     User user = new User();
     user.setId(UUID.randomUUID());
@@ -1946,10 +1792,6 @@ class OwnerScopeServiceTest {
         assertThrows(
             BadRequestException.class,
             () -> service.resolveOrgUnitForPickerOutput(user, foreignId));
-    // A foreign pick the caller cannot edit is still rejected (epic #692 Phase 4 only widens the
-    // accepted set to the caller's editable scope; this caller has none). Pin to the explicit-pick
-    // rejection branch via its unique "editable scope" wording — the empty-membership branch also
-    // contains the word "membership", so asserting that alone would not discriminate the branches.
     assertTrue(ex.getMessage().toLowerCase().contains("editable scope"), ex.getMessage());
   }
 
@@ -1965,10 +1807,6 @@ class OwnerScopeServiceTest {
     assertTrue(ex.getMessage().toLowerCase().contains("no org-unit membership"), ex.getMessage());
   }
 
-  // --- resolveOrgUnitForPickerOutputNullable (ownerless-personal-aggregate variant: a
-  // membershipless user with no explicit picker output resolves to null instead of a 400; every
-  // other matrix branch is delegated to the same shared tail as the strict resolver) ---
-
   @Test
   void resolveOrgUnitForPickerOutputNullable_noMembership_nullPicker_returnsNull() {
     User user = new User();
@@ -1980,9 +1818,6 @@ class OwnerScopeServiceTest {
 
   @Test
   void resolveOrgUnitForPickerOutputNullable_noMembership_withPicker_throwsBadRequest() {
-    // A membershipless user cannot claim ownership of an org unit they do not belong to — a
-    // non-null picker output is still a foreign-org-unit forgery, even though the null-picker case
-    // is now allowed (ownerless).
     User user = new User();
     user.setId(UUID.randomUUID());
     when(orgUnitMembershipRepository.findAllByIdUserId(user.getId())).thenReturn(List.of());
@@ -2075,9 +1910,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void onlyFlatAuthorityNoContextual_returnsFalse() {
-      // The flat ROLE_LOGISTICIAN authority is intentionally NOT matched — that's the
-      // back-compat surface for hasRole('LOGISTICIAN') gates. The contextual helper requires
-      // the contextual authority explicitly.
       UUID orgUnit = UUID.randomUUID();
       when(authHelper.isAdmin()).thenReturn(false);
       org.springframework.security.core.GrantedAuthority flat =
@@ -2130,7 +1962,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void logisticianFlagWithoutOfficerOrLead_isDenied() {
-      // is_logistician alone does NOT grant the overview — only officer / admin / SK-lead do.
       OrgUnitMembership logisticianStaffel = staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID);
       logisticianStaffel.setLogistician(true);
       when(authHelper.isAdmin()).thenReturn(false);
@@ -2153,7 +1984,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void bereichLeader_canAccess() {
-      // Epic #692 Phase 6: a Bereichsleitung seat is an oversight seat — it unlocks the overview.
       OrgUnitMembership bereichSeat = bereichMembershipRow(MEMBER_USER_ID, UUID.randomUUID());
       bereichSeat.setRole(MembershipRole.BEREICHSLEITER);
       when(authHelper.isAdmin()).thenReturn(false);
@@ -2179,8 +2009,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void flaglessBereichSeat_isDenied() {
-      // A chart-only (flag-less) Bereich seat — an SK-Leiter's organisational membership
-      // (REQ-ORG-017, owner Q1) — is NOT an oversight seat and must not unlock the overview.
       OrgUnitMembership flaglessBereich = bereichMembershipRow(MEMBER_USER_ID, UUID.randomUUID());
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(false);
@@ -2204,8 +2032,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void officerWithoutAreaOrOlSeat_doesNotQualify() {
-      // The officer role / a plain Staffel membership is not a Bereich/OL seat — special accounts
-      // (Sonderkonten) stay hidden for officers (REQ-BANK-028).
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
       when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
@@ -2216,7 +2042,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void skLead_doesNotQualify() {
-      // An SK-lead oversees only their own SK account, not the org-wide special accounts.
       OrgUnitMembership lead = skMembership(MEMBER_USER_ID, UUID.randomUUID());
       lead.setRole(MembershipRole.SK_LEAD);
       when(authHelper.isAdmin()).thenReturn(false);
@@ -2261,8 +2086,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void flaglessBereichSeat_doesNotQualify() {
-      // A chart-only (flag-less) Bereich seat — an SK-Leiter's organisational membership
-      // (REQ-ORG-017) — is not an oversight seat and does not unlock the special-account view.
       OrgUnitMembership flaglessBereich = bereichMembershipRow(MEMBER_USER_ID, UUID.randomUUID());
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
@@ -2339,7 +2162,6 @@ class OwnerScopeServiceTest {
 
       ScopePredicate scope = service.currentOversightScope();
 
-      // Their Staffel is NOT in scope (they are not an officer there); only the led SK is.
       assertEquals(Set.of(skId), scope.memberOrgUnitIds());
     }
 
@@ -2410,8 +2232,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void bereichLeader_viewScopeCascadesToBereichAndChildren() {
-      // Epic #692 Phase 6: the view (F1) scope drills down — a Bereichsleitung oversees its Bereich
-      // (its AREA account) AND every child Staffel/SK (their ORG_UNIT accounts), via the cascade.
       UUID bereichId = UUID.randomUUID();
       UUID childStaffelId = UUID.randomUUID();
       OrgUnitMembership bereichSeat = bereichMembershipRow(MEMBER_USER_ID, bereichId);
@@ -2457,7 +2277,6 @@ class OwnerScopeServiceTest {
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.hasReachableRole("ROLE_OFFICER")).thenReturn(true);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
-      // The officer's own Staffel is sourced from readPersistentSquadronFromUser (kind=SQUADRON).
       when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
           .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
       when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
@@ -2498,9 +2317,7 @@ class OwnerScopeServiceTest {
 
       ScopePredicate scope = service.currentOwnLevelOversightScope();
 
-      // Only the Bereich (its AREA account) — NOT the child Staffel/SK accounts.
       assertEquals(Set.of(bereichId), scope.memberOrgUnitIds());
-      // The own-level scope must never apply the descendant cascade.
       verify(orgUnitCascadeService, never()).cascadedOfficerReach(any());
     }
 
@@ -2534,8 +2351,6 @@ class OwnerScopeServiceTest {
       assertTrue(scope.memberOrgUnitIds().isEmpty());
     }
   }
-
-  // --- helpers ------------------------------------------------------------------
 
   private Mission newMission(UUID id, Squadron owningSquadron, boolean isInternal) {
     Mission mission = new Mission();
@@ -2571,9 +2386,6 @@ class OwnerScopeServiceTest {
             orgUnitMembershipRepository.findAllByIdUserIdAndKind(
                 MEMBER_USER_ID, OrgUnitKind.SQUADRON))
         .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
-    // canViewJobOrders() reads the all-kinds membership union and the profit-eligibility count.
-    // The default member-in-A is treated as profit-eligible so the existing canSeeJobOrder member
-    // scenarios still pass the viewer gate; the non-profit case is stubbed explicitly per test.
     lenient()
         .when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
         .thenReturn(List.of(staffelMembership(MEMBER_USER_ID, SQUADRON_A_ID)));
@@ -2647,8 +2459,6 @@ class OwnerScopeServiceTest {
 
       ScopePredicate predicate = service.currentScopePredicate();
 
-      // HARD INVARIANT (REQ-ORG-015): OL/Bereich leadership is a concrete membership union, never
-      // admin-all — otherwise the SK-lifecycle / promotion / ownerless-row admin carve-outs leak.
       assertFalse(predicate.adminAllScope());
       assertNull(predicate.activeOrgUnitId());
       assertTrue(predicate.memberOrgUnitIds().contains(DESCENDANT_STAFFEL_ID));
@@ -2657,8 +2467,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void olMember_seesEveryUnitInTheConcreteUnion_butStillNotAdminAllScope() {
-      // OL expansion materialises every org-unit id (including a "foreign" Staffel) as a concrete
-      // set — reach is total, but adminAllScope stays false.
       stubBereichLeaderWithCascade(Set.of(BEREICH_A_ID, DESCENDANT_STAFFEL_ID, FOREIGN_STAFFEL_ID));
 
       assertTrue(service.canSeeSquadron(FOREIGN_STAFFEL_ID));
@@ -2676,7 +2484,6 @@ class OwnerScopeServiceTest {
       assertEquals(DESCENDANT_STAFFEL_ID, predicate.activeOrgUnitId());
       assertFalse(predicate.adminAllScope());
       assertTrue(service.canSeeSquadron(DESCENDANT_STAFFEL_ID));
-      // The Bereich itself is no longer in scope while pinned to one descendant.
       assertFalse(service.canSeeSquadron(BEREICH_A_ID));
     }
   }
@@ -2731,12 +2538,9 @@ class OwnerScopeServiceTest {
       de.greluc.krt.profit.basetool.backend.model.Bereich bereich = newBereich();
       when(orgUnitMembershipRepository.findAllByIdUserId(leader.getId()))
           .thenReturn(List.of(bereichLeadMembership(leader.getId())));
-      // Every kind resolves through the single polymorphic load (HHH000179 fix).
       when(orgUnitRepository.findById(BEREICH_ID)).thenReturn(Optional.of(bereich));
 
-      // Auto-stamp (null pick) onto the leader's single direct membership = their own Bereich.
       assertSame(bereich, service.resolveOrgUnitForPickerOutput(leader, null));
-      // Explicit pick of the same Bereich resolves identically.
       assertSame(bereich, service.resolveOrgUnitForPickerOutput(leader, BEREICH_ID));
     }
 
@@ -2750,14 +2554,12 @@ class OwnerScopeServiceTest {
 
       when(orgUnitMembershipRepository.findAllByIdUserId(leader.getId()))
           .thenReturn(List.of(bereichLeadMembership(leader.getId())));
-      // canEditOrgUnit(descendant) → currentScopePredicate → cascade reach includes the descendant.
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(leader.getId()));
       when(orgUnitCascadeService.expandWithDescendants(any()))
           .thenReturn(Set.of(BEREICH_ID, DESCENDANT_STAFFEL_ID));
       when(orgUnitRepository.findById(DESCENDANT_STAFFEL_ID)).thenReturn(Optional.of(descendant));
 
-      // The descendant is NOT a direct membership, but the leader oversees it → stamp succeeds.
       assertSame(descendant, service.resolveOrgUnitForPickerOutput(leader, DESCENDANT_STAFFEL_ID));
     }
 
@@ -2771,7 +2573,6 @@ class OwnerScopeServiceTest {
           .thenReturn(List.of(bereichLeadMembership(leader.getId())));
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(leader.getId()));
-      // Cascade reaches only the Bereich + its own descendant, NOT the foreign Staffel.
       when(orgUnitCascadeService.expandWithDescendants(any()))
           .thenReturn(Set.of(BEREICH_ID, DESCENDANT_STAFFEL_ID));
 
@@ -2784,11 +2585,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void subordinateCannotSeeOrEditBereichOwnedScope_strictSilo() {
-      // Defense-in-depth read-gate lock (REQ-ORG-016 strict silo: the level above is invisible to a
-      // subordinate). A plain Staffel member under the Bereich carries no leadership flag, so the
-      // cascade is the identity (default stub) — their scope is their own Staffel only, never the
-      // parent Bereich. A BEREICH-owned aggregate (owningOrgUnit.id == BEREICH_ID) is therefore
-      // never in scope for them, in either the read or the write gate.
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
       when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
@@ -2808,21 +2604,14 @@ class OwnerScopeServiceTest {
       ol.setShorthand("OL");
       when(orgUnitMembershipRepository.findAllByIdUserId(olLeader.getId()))
           .thenReturn(List.of(olMembership(olLeader.getId())));
-      // Every kind resolves through the single polymorphic load (HHH000179 fix); this exercises
-      // the ORGANISATIONSLEITUNG kind (the Bereich tests cover the BEREICH kind).
       when(orgUnitRepository.findById(OL_ID)).thenReturn(Optional.of(ol));
 
-      // Auto-stamp (null pick) onto the leader's single direct OL membership.
       assertSame(ol, service.resolveOrgUnitForPickerOutput(olLeader, null));
-      // Explicit pick of the same OL resolves identically.
       assertSame(ol, service.resolveOrgUnitForPickerOutput(olLeader, OL_ID));
     }
 
     @Test
     void leaderCreatesOnBehalfOfDescendantSk_resolvesViaPolymorphicLoad() {
-      // The cascade reaches a Bereich's SKs as well as its Staffeln, so a create-on-behalf pick can
-      // land on a Spezialkommando (sibling to leaderCreatesOnBehalfOfDescendant, which covers the
-      // Staffel case).
       User leader = new User();
       leader.setId(UUID.randomUUID());
       UUID descendantSkId = UUID.randomUUID();
@@ -2843,14 +2632,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void createOnBehalfForAnotherUser_keysGateOnCallerScopeNotTargetMemberships() {
-      // The genuine caller != targetUser divergence (inventory book-out/transfer, refinery store):
-      // the row is attributed to the RECEIVER, but the pick is validated against the CALLER's
-      // editable scope. A pick foreign to the receiver yet within the leader-caller's cascade is
-      // honoured — proving the gate keys canEditOrgUnit on the caller, not the target user. (Were
-      // it
-      // keyed on the target user's memberships, this would 400, since the receiver is not a member
-      // of
-      // the descendant.)
       User leaderCaller = new User();
       leaderCaller.setId(UUID.randomUUID());
       User receiver = new User();
@@ -2860,10 +2641,8 @@ class OwnerScopeServiceTest {
       descendant.setId(DESCENDANT_STAFFEL_ID);
       descendant.setShorthand("DSC");
 
-      // The RECEIVER's only direct membership is an unrelated Staffel — NOT the descendant.
       when(orgUnitMembershipRepository.findAllByIdUserId(receiver.getId()))
           .thenReturn(List.of(staffelMembership(receiver.getId(), receiverHomeStaffelId)));
-      // The CALLER is the Bereich leader; their cascade oversees the descendant.
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(leaderCaller.getId()));
       when(orgUnitMembershipRepository.findAllByIdUserId(leaderCaller.getId()))
@@ -2878,10 +2657,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void createOnBehalf_pickForeignToBothReceiverAndCaller_throws() {
-      // The complement of the previous test: a pick that is in neither the receiver's memberships
-      // nor
-      // the caller's editable cascade is still rejected, so the widening cannot launder a fully
-      // foreign pick through the create-on-behalf path.
       User leaderCaller = new User();
       leaderCaller.setId(UUID.randomUUID());
       User receiver = new User();
@@ -2939,8 +2714,6 @@ class OwnerScopeServiceTest {
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
       when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))
           .thenReturn(List.of(olMembershipRow(MEMBER_USER_ID, OL_ID)));
-      // The pin points at a unit in the OL member's reach, so it is honoured and the widening does
-      // not apply — a pinned unit overview shows only the pinned unit, like every scoped surface.
       when(request.getHeader(OwnerScopeService.ACTIVE_ORG_UNIT_HEADER))
           .thenReturn(OL_ID.toString());
 
@@ -3022,7 +2795,6 @@ class OwnerScopeServiceTest {
 
     @Test
     void nonAdmin_targetOutsideScope_throwsAccessDenied() {
-      // Member of A only; target B is neither a membership nor within the editable (cascade) scope.
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(MEMBER_USER_ID));
       when(orgUnitMembershipRepository.findAllByIdUserId(MEMBER_USER_ID))

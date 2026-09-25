@@ -58,8 +58,6 @@ import org.springframework.web.context.WebApplicationContext;
 @SpringBootTest
 class BankManagePageControllerOrgUnitPickerMvcTest {
 
-  // Epic #692 Phase 6 (REQ-ORG-019): the bank create form sources its picker from the all-kinds
-  // endpoint (Staffel + SK + Bereich + OL), so it can link AREA→Bereich and CARTEL→OL.
   private static final String ACTIVE_URI = "/api/v1/org-units/active-all-kinds";
 
   @Autowired private WebApplicationContext context;
@@ -83,8 +81,6 @@ class BankManagePageControllerOrgUnitPickerMvcTest {
     OrgUnitMembershipOptionDto staffel =
         new OrgUnitMembershipOptionDto(orgUnitId, "Staffel IRIDIUM", "IRI", "SQUADRON", true);
 
-    // The accounts / holders / users fetches may return null; the controller defaults them to empty
-    // lists. Only the org-unit catalog needs a concrete option to assert the picker label.
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
     when(backendApiClient.getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS), anyTypeRef()))
         .thenReturn(List.of(staffel));
@@ -93,9 +89,7 @@ class BankManagePageControllerOrgUnitPickerMvcTest {
         .perform(get("/bank/manage"))
         .andExpect(status().isOk())
         .andExpect(view().name("bank-manage"))
-        // The visible label is the org-unit name plus its shorthand — never the literal "null".
         .andExpect(content().string(Matchers.containsString("Staffel IRIDIUM (IRI)")))
-        // The option value is the org-unit id, so a submitted form actually carries an orgUnitId.
         .andExpect(content().string(Matchers.containsString("value=\"" + orgUnitId + "\"")))
         .andExpect(content().string(Matchers.not(Matchers.containsString(">null</option>"))));
   }

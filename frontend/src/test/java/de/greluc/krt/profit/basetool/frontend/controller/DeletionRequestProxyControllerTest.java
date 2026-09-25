@@ -72,8 +72,6 @@ class DeletionRequestProxyControllerTest {
 
   @Test
   void request_aStringFlagIsNotATrueFlag() {
-    // A hand-written client sending "true" has not expressed the wish in the form the API takes,
-    // and the erasure it would trigger cannot be undone.
     BackendApiClient client = mock(BackendApiClient.class);
     DeletionRequestProxyController controller = new DeletionRequestProxyController(client);
 
@@ -94,8 +92,6 @@ class DeletionRequestProxyControllerTest {
 
   @Test
   void request_relaysTheBackendStatusRatherThanFlatteningItTo500() {
-    // A second request while one is pending is a 409 the card turns into a specific message; a 500
-    // would show the generic failure toast instead.
     BackendApiClient client = mock(BackendApiClient.class);
     when(client.post(eq(URI), any(), eq(Object.class)))
         .thenThrow(new BackendServiceException("already pending", new RuntimeException(), 409));
@@ -171,10 +167,6 @@ class DeletionRequestProxyControllerTest {
 
   @Test
   void card_saysSoWhenTheBackendIsDownRatherThanClaimingNoRequest() {
-    // The card is swapped in after a write that already succeeded, so failing the fragment would
-    // leave the old state on screen. Rendering the no-request state is not the answer either: a
-    // DECLINED request carries the refusal reason Art. 12(4) obliges the controller to tell the
-    // member, and it used to disappear from the page with nothing said.
     BackendApiClient client = mock(BackendApiClient.class);
     when(client.get(
             eq(URI), ArgumentMatchers.<ParameterizedTypeReference<Map<String, Object>>>any()))
@@ -200,7 +192,6 @@ class DeletionRequestProxyControllerTest {
 
     controller.card(model);
 
-    // A member who has never asked is not an error, and the card must still offer the action.
     assertEquals(false, model.getAttribute("deletionRequestUnavailable"));
   }
 

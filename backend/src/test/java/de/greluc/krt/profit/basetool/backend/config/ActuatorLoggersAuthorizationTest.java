@@ -78,7 +78,6 @@ class ActuatorLoggersAuthorizationTest {
   @Test
   @WithAnonymousUser
   void shouldRejectAnonymousLoggerWrite() throws Exception {
-    // Given / When / Then: no credentials at all -> the RFC 7807 entry point answers 401.
     mockMvc
         .perform(post(PROBE_PATH).contentType(MediaType.APPLICATION_JSON).content(LEVEL_BODY))
         .andExpect(status().isUnauthorized());
@@ -87,8 +86,6 @@ class ActuatorLoggersAuthorizationTest {
   @Test
   @WithMockUser(roles = Roles.KRT_MEMBER)
   void shouldForbidAuthenticatedNonAdminLoggerWrite() throws Exception {
-    // Given / When / Then: an ordinary authenticated member must NOT be able to raise a log level;
-    // this is the exact case the `anyRequest().authenticated()` catch-all used to let through.
     mockMvc
         .perform(post(PROBE_PATH).contentType(MediaType.APPLICATION_JSON).content(LEVEL_BODY))
         .andExpect(status().isForbidden());
@@ -97,8 +94,6 @@ class ActuatorLoggersAuthorizationTest {
   @Test
   @WithMockUser(roles = Roles.OFFICER)
   void shouldForbidOfficerLoggerWrite() throws Exception {
-    // Given / When / Then: OFFICER is the highest non-admin role and does not imply ADMIN in the
-    // role hierarchy, so it must be refused too — the gate is admin-only, not "privileged-ish".
     mockMvc
         .perform(post(PROBE_PATH).contentType(MediaType.APPLICATION_JSON).content(LEVEL_BODY))
         .andExpect(status().isForbidden());
@@ -107,8 +102,6 @@ class ActuatorLoggersAuthorizationTest {
   @Test
   @WithMockUser(roles = Roles.ADMIN)
   void shouldAllowAdminLoggerWrite() throws Exception {
-    // Given / When / Then: the runtime log-level control REQ-OBS-016 exists for must stay usable
-    // for an admin. The endpoint's write operation returns no body -> 204.
     mockMvc
         .perform(post(PROBE_PATH).contentType(MediaType.APPLICATION_JSON).content(LEVEL_BODY))
         .andExpect(status().isNoContent());
@@ -117,8 +110,6 @@ class ActuatorLoggersAuthorizationTest {
   @Test
   @WithMockUser(roles = Roles.KRT_MEMBER)
   void shouldStillAllowAuthenticatedNonAdminToReadLoggers() throws Exception {
-    // Given / When / Then: only the mutator is admin-gated. The read keeps riding the authenticated
-    // catch-all, so a non-admin can still see which levels are in effect.
     mockMvc.perform(get("/actuator/loggers")).andExpect(status().isOk());
   }
 }

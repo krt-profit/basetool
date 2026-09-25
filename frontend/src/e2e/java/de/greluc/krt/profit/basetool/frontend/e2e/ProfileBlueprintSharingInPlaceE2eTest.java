@@ -110,9 +110,6 @@ class ProfileBlueprintSharingInPlaceE2eTest {
         E2eSupport.navigate(page, baseUrl + "/profile");
         page.waitForLoadState();
 
-        // Marker on the live document: a full navigation/reload wipes it, so its survival proves
-        // both saves stayed in place. The position:fixed footer can cover the bottom submit button,
-        // so it is dropped out of the way before the (non-navigating) AJAX clicks.
         page.evaluate("() => { window.__krtNoReload = true; }");
         page.evaluate(
             "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
@@ -122,11 +119,8 @@ class ProfileBlueprintSharingInPlaceE2eTest {
             page.locator("#profile-blueprint-sharing-form input[name='shareBlueprintsGlobally']");
         Locator submit = page.locator("#profile-blueprint-sharing-form button[type='submit']");
 
-        // Both saves are genuine boolean flips: start from the current state, flip to the opposite,
-        // then back — each is a real change and therefore a real @Version bump.
         boolean initial = checkbox.isChecked();
 
-        // First in-place save: the opposite value.
         checkbox.setChecked(!initial);
         saveInPlace(page, submit);
         assertEquals(
@@ -135,9 +129,6 @@ class ProfileBlueprintSharingInPlaceE2eTest {
             "Blueprint-sharing save must update in place — no page reload on success.");
         assertEquals(!initial, persistedBlueprintSharing(), "the first in-place save must persist");
 
-        // Second consecutive in-place save WITHOUT a reload, back to the initial value: only
-        // succeeds if the twin wrote the fresh @Version back (otherwise the stale version 409s
-        // OPTIMISTIC_LOCK).
         checkbox.setChecked(initial);
         saveInPlace(page, submit);
         assertEquals(

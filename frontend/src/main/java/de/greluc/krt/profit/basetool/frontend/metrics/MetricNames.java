@@ -597,7 +597,5 @@ public final class MetricNames {
    */
   public static final String TRACING_ENABLED = "basetool.tracing.enabled";
 
-  private MetricNames() {
-    // Constants holder — not instantiable.
-  }
+  private MetricNames() {}
 }

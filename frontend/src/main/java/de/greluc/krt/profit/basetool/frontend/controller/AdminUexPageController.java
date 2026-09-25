@@ -259,9 +259,6 @@ public class AdminUexPageController {
               current.uexSyncedAt(),
               hidden);
       backendApiClient.put("/api/v1/terminals/" + id, body, Void.class);
-      // Flipping a terminal's hidden flag changes the cached terminal catalogue (the
-      // profit-calculator
-      // star-system dropdown reads it), so evict the TERMINAL domain (REQ-DATA-007).
       backendApiClient.evict(CacheDomain.TERMINAL);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
@@ -479,9 +476,6 @@ public class AdminUexPageController {
       bySystem.computeIfAbsent(poi.starSystemName(), SystemAccumulator::new).pois.add(poi);
     }
 
-    // Bucket terminals into (system, city) / (system, station); leftovers go on the
-    // system's orphan list. Names are matched case-insensitively to be resilient to
-    // small whitespace/casing drift between the UEX dump and the parent record.
     Map<String, Map<String, List<TerminalDto>>> cityTerminals = new LinkedHashMap<>();
     Map<String, Map<String, List<TerminalDto>>> stationTerminals = new LinkedHashMap<>();
     for (TerminalDto term : terminals) {
@@ -530,12 +524,6 @@ public class AdminUexPageController {
         stationNodes.add(new SpaceStationNode(station, List.copyOf(matched)));
       }
 
-      // Terminals whose claimed cityName/spaceStationName does not match any
-      // record we just fetched would otherwise vanish from the page. Realistic
-      // cause: a UEX sweep populated terminals before the parent city/station
-      // sweep on a fresh install, or a parent record was retired but the
-      // terminal still references it. Either way the admin still needs the
-      // override buttons, so we surface these on the per-system orphan list.
       List<TerminalDto> systemOrphans = new ArrayList<>(acc.orphanTerminals);
       sysCityBuckets.forEach(
           (k, v) -> {
@@ -728,10 +716,7 @@ public class AdminUexPageController {
     final List<TerminalDto> orphanTerminals = new ArrayList<>();
 
     @SuppressWarnings("unused")
-    SystemAccumulator(String unusedSystemName) {
-      // computeIfAbsent supplies the system name; we don't need to store it because
-      // the surrounding TreeMap already keys by it.
-    }
+    SystemAccumulator(String unusedSystemName) {}
   }
 
   /**

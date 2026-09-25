@@ -85,10 +85,6 @@ public class HandoffStagingService {
     String handoffId = URL_ENCODER.encodeToString(raw);
     String value = objectMapper.writeValueAsString(new StagedHandoff(kind, draftJson));
 
-    // Size guard. The 2 MiB ingress cap is an ingress cap; it was never a staging policy, and using
-    // it as one let one caller park megabytes per stage in a Redis that is SHARED with the
-    // frontend's Spring Session store and runs `--maxmemory-policy noeviction` - where reaching the
-    // ceiling refuses writes rather than evicting, so the symptom is that nobody can log in.
     long stagedBytes = value.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
     if (stagedBytes > ingestProperties.maxHandoffBytes()) {
       log.warn(
@@ -102,17 +98,6 @@ public class HandoffStagingService {
 
     redisTemplate.opsForValue().set(key(sub, handoffId), value, ingestProperties.handoffTtl());
     trimSubjectIndex(sub, handoffId);
-    // Diagnostic correlator (REQ-OBS-004): log a NON-reversible hash of the subject and of the
-    // handoff id — never the raw subject (pseudonymous PII), the raw id (a bearer-grade secret that
-    // travels in the browser URL), or the draft. The frontend's consume logs the same two hashes,
-    // so
-    // a stage/consume pair can be lined up to tell a subject mismatch (different sub hash) apart
-    // from
-    // an expired / already-consumed handoff (matching sub hash, key absent) — the exact ambiguity
-    // behind the "Import-Link abgelaufen oder ungültig" reports.
-    // draftLen is the cheapest possible answer to "the pre-filled form came up empty": a two-byte
-    // draft is an empty backend response, a plausible size is a real draft and moves the search to
-    // the frontend's consume side. The draft itself is never logged.
     log.info(
         "Staged {} handoff (sub=u-{}, hid=h-{}, draftLen={}, ttl={})",
         kind,
@@ -143,8 +128,6 @@ public class HandoffStagingService {
   private void trimSubjectIndex(@NotNull String sub, @NotNull String handoffId) {
     String indexKey = INDEX_PREFIX + sub;
     try {
-      // RPUSH answers the list's length after the push, so it is the size already — a separate
-      // LLEN was one more Redis round trip per stage for a number we had in hand.
       Long size = redisTemplate.opsForList().rightPush(indexKey, handoffId);
       redisTemplate.expire(indexKey, ingestProperties.handoffTtl());
       long excess = size == null ? 0L : size - ingestProperties.maxHandoffsPerSubject();

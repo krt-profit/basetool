@@ -51,24 +51,8 @@ public final class PiiMasker {
 
   private static final String JWT_PATTERN =
       "(eyJ[a-zA-Z0-9_-]{5,}\\.eyJ[a-zA-Z0-9_-]{5,}\\.[a-zA-Z0-9_-]{5,})";
-  // Domain uses possessive label groups (?:label\.)++TLD so adjacent quantifiers cannot overlap —
-  // avoids the O(n^2) backtracking the previous [a-zA-Z0-9.-]+\.[a-zA-Z]{2,} exhibited on long
-  // no-TLD '@'-strings, which run on every log line (security audit L5).
-  // The LOCAL part is possessive and length-bounded too, and the L5 fix was incomplete without it:
-  // it stayed a greedy `+`, so Matcher.find() restarting at every index still walked a long
-  // local-part run quadratically. {1,64}+ is RFC 5321's local-part limit, so bounding it rejects
-  // nothing real (security audit MEDIUM-8).
   private static final String EMAIL_PATTERN =
       "([a-zA-Z0-9_!#$%&'*+/=?`{|}~^.-]{1,64}+@(?:[a-zA-Z0-9-]++\\.)++[a-zA-Z]{2,})";
-  // Value class includes the standard-base64 alphabet (+, /, =) so a base64 secret logged next to
-  // one of these keywords is masked in full, not truncated at the first +/=/ (security audit L6).
-  // The keyword must be followed by a real separator - ":", "=" or whitespace. With the
-  // separator optional, every identifier that merely CONTAINS one of the keywords was eaten
-  // together with everything after it: a stack frame
-  // "BearerTokenAuthenticationFilter.doFilter" reached the log as "BearerToken***" and
-  // "...intercept.AuthorizationFilter.doFilter" as "Authorization***", which is exactly the
-  // information an incident needs. Requiring the separator loses no secret: a token is logged as
-  // "token=x", "token: x" or "Bearer x", never as "tokenx".
   private static final String KEYWORD_TOKEN_PATTERN =
       "(?i)(bearer\\s+|(?:token|session[-_]?id|authorization)"
           + "(?:\\s*[:=]\\s*|\\s+)(?:bearer\\s+)?)([a-zA-Z0-9\\-_\\.+/=]+)";

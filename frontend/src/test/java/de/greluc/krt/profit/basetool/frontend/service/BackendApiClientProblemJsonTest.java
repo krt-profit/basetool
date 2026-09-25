@@ -174,11 +174,6 @@ class BackendApiClientProblemJsonTest {
                           + " account holds no role.\","
                           + "\"code\":\"NO_ROLE\",\"correlationId\":\"corr-no-role\"}");
               case "/api/v1/no-body" -> new MockResponse().setResponseCode(500);
-              // A successful response whose body is cut off mid-flight: headers and status go out,
-              // then the socket closes before Content-Length is satisfied. This is the production
-              // shape of a backend connection dying under an in-flight request, and the only way
-              // to reach the branch it exercises — Spring wraps a body-side failure into a
-              // WebClientResponseException carrying the status that ALREADY arrived, i.e. a 200.
               case "/api/v1/body-cut" ->
                   new MockResponse()
                       .setResponseCode(200)

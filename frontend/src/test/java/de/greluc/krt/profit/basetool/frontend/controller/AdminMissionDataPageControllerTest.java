@@ -40,19 +40,16 @@ class AdminMissionDataPageControllerTest {
 
   @Test
   void listData_ShouldSortListsAscendingByName() {
-    // Arrange
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     AdminMissionDataPageController controller =
         new AdminMissionDataPageController(backendApiClient, new ParallelPageLoader());
     Model model = new ConcurrentModel();
 
-    // Data for JobTypes (A, C, B) -> Expected (A, B, C)
     List<Map<String, Object>> jobTypes = new ArrayList<>();
     jobTypes.add(Map.of("name", "Alpha"));
     jobTypes.add(Map.of("name", "Charlie"));
     jobTypes.add(Map.of("name", "Bravo"));
 
-    // Data for Squadrons (X, Z, Y) -> Expected (X, Y, Z)
     List<Map<String, Object>> squadrons = new ArrayList<>();
     squadrons.add(Map.of("name", "X-Ray"));
     squadrons.add(Map.of("name", "Zulu"));
@@ -73,10 +70,8 @@ class AdminMissionDataPageControllerTest {
             anyTypeRef()))
         .thenReturn(squadronsPage);
 
-    // Act
     controller.listData(false, false, false, null, model);
 
-    // Assert
     @SuppressWarnings("unchecked")
     List<JobTypeDto> sortedJobTypes = (List<JobTypeDto>) model.getAttribute("jobTypes");
     assertEquals("Alpha", sortedJobTypes.get(0).name());
@@ -93,10 +88,8 @@ class AdminMissionDataPageControllerTest {
     assertEquals(Boolean.FALSE, model.getAttribute("frequencyTypesTruncated"));
   }
 
-  // covers REQ-ADMIN-001 — job types beyond the first backend page stay visible and editable
   @Test
   void listData_concatenatesAllJobTypePages() {
-    // Arrange — the job-type catalog spans two backend pages
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     AdminMissionDataPageController controller =
         new AdminMissionDataPageController(backendApiClient, new ParallelPageLoader());
@@ -116,10 +109,8 @@ class AdminMissionDataPageControllerTest {
     when(backendApiClient.get(eq(base + "&page=0"), anyTypeRef())).thenReturn(firstPage);
     when(backendApiClient.get(eq(base + "&page=1"), anyTypeRef())).thenReturn(secondPage);
 
-    // Act
     controller.listData(false, false, false, null, model);
 
-    // Assert — all three job types render, sorted, and nothing was flagged truncated
     @SuppressWarnings("unchecked")
     List<JobTypeDto> jobTypes = (List<JobTypeDto>) model.getAttribute("jobTypes");
     assertEquals(3, jobTypes.size(), "the second backend page must not be dropped");
@@ -129,11 +120,8 @@ class AdminMissionDataPageControllerTest {
     assertEquals(Boolean.FALSE, model.getAttribute("jobTypesTruncated"));
   }
 
-  // covers REQ-ADMIN-002 — a capped walk raises the per-section warning flags, never staying
-  // silent
   @Test
   void listData_capHit_setsPerSectionTruncatedFlags() {
-    // Arrange — every catalog reports more pages than the safety cap allows
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     AdminMissionDataPageController controller =
         new AdminMissionDataPageController(backendApiClient, new ParallelPageLoader());
@@ -147,10 +135,8 @@ class AdminMissionDataPageControllerTest {
     when(backendApiClient.get(org.mockito.ArgumentMatchers.anyString(), anyTypeRef()))
         .thenReturn(endlessPage);
 
-    // Act
     controller.listData(false, false, false, null, model);
 
-    // Assert — each section carries its own truncation flag for its in-fragment banner
     assertEquals(Boolean.TRUE, model.getAttribute("jobTypesTruncated"));
     assertEquals(Boolean.TRUE, model.getAttribute("squadronsTruncated"));
     assertEquals(Boolean.TRUE, model.getAttribute("frequencyTypesTruncated"));

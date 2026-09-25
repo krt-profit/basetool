@@ -125,8 +125,6 @@ public class BankRequestQueuePageController {
     model.addAttribute("requests", requests);
     model.addAttribute("selectedStatuses", selectedStatuses);
     model.addAttribute("holders", holders == null ? List.<BankHolderDto>of() : holders);
-    // Active holders feed the transfer-confirm destination-holder select (REQ-BANK-040): a
-    // destination may only receive money on an active holder.
     model.addAttribute(
         "activeHolders",
         holders == null
@@ -135,24 +133,9 @@ public class BankRequestQueuePageController {
     if ("requestQueue".equals(fragment)) {
       return "bank-requests :: requestQueue";
     }
-    // Full-page render only: assemble the direct-booking "Kontobewegung" modal's data
-    // (REQ-BANK-023, #997). The CTA + modal live OUTSIDE the swapped requestQueue fragment, so a
-    // filter toggle or a confirm/reject swap never re-reads these; the modal books straight against
-    // the chosen account.
-    // The modal's source account and transfer destination are server-side account-search comboboxes
-    // (remote-bank-accounts, REQ-FE-017/ADR-0106) that fetch matching active accounts on demand, so
-    // no account roster is preloaded here. canBook (whether to offer the modal at all) is a cheap
-    // one-row existence probe against the same caller-scoped search endpoint rather than the former
-    // unbounded 500-cap preload; a same-account transfer stays rejected by the backend
-    // (REQ-BANK-006).
     PageResponse<BankAccountDto> activeProbe =
         backendApiClient.get("/api/v1/bank/accounts?status=ACTIVE&size=1", BANK_ACCOUNT_PAGE);
     model.addAttribute("canBook", activeProbe != null && activeProbe.totalElements() > 0);
-    // The direct-booking counterparty picker (REQ-BANK-044) is a server-side searchable combobox
-    // (remote-bank-users, #1193 follow-up) that queries /users/search-bank on demand, so no user
-    // roster is preloaded here.
-    // All active org units (all kinds) feed the external-counterparty unit picklist (REQ-BANK-044,
-    // #994) in the direct-booking modal.
     List<OrgUnitMembershipOptionDto> allOrgUnits =
         backendApiClient.get("/api/v1/org-units/active-all-kinds", ORG_UNIT_OPTION_LIST);
     model.addAttribute(

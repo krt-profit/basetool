@@ -113,8 +113,6 @@ class SpecialCommandMembersPageControllerMvcTest {
         .thenReturn(List.of(member));
   }
 
-  // An admin gets the full page with the admin-only lead-toggle column (posting to the admin
-  // area) and a back link to the SK overview.
   @Test
   @WithMockUser(roles = "ADMIN")
   void detail_admin_rendersLeadToggleAndBackToOverview() throws Exception {
@@ -142,8 +140,6 @@ class SpecialCommandMembersPageControllerMvcTest {
                             + "/flags")));
   }
 
-  // An officer the backend admits (the SK's lead) gets the page without the lead toggle and with a
-  // back link to the Leitung page.
   @Test
   @WithMockUser(roles = "OFFICER")
   void detail_officer_rendersWithoutLeadToggleAndBackToLeitung() throws Exception {
@@ -159,8 +155,6 @@ class SpecialCommandMembersPageControllerMvcTest {
         .andExpect(content().string(containsString("id=\"add-member-modal\"")));
   }
 
-  // A plain member never reaches the page shell: the class-level ADMIN_OR_OFFICER gate refuses
-  // before any backend call.
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void detail_member_returns403WithoutBackendCall() throws Exception {
@@ -171,8 +165,6 @@ class SpecialCommandMembersPageControllerMvcTest {
     verify(backendApiClient, never()).get(eq("/api/v1/special-commands/" + skId), anyTypeRef());
   }
 
-  // An officer who does not lead this SK passes the coarse gate, but the backend refuses the SK
-  // read; the page answers with the standard 403 page instead of a redirect.
   @Test
   @WithMockUser(roles = "OFFICER")
   void detail_backendRefuses_returns403Page() throws Exception {
@@ -184,8 +176,6 @@ class SpecialCommandMembersPageControllerMvcTest {
         .andExpect(status().isForbidden());
   }
 
-  // Any other backend failure keeps the old behaviour: redirect back with an error parameter —
-  // for a non-admin back to the Leitung page.
   @Test
   @WithMockUser(roles = "OFFICER")
   void detail_backendFails_redirectsToBackUrlWithError() throws Exception {
@@ -198,8 +188,6 @@ class SpecialCommandMembersPageControllerMvcTest {
         .andExpect(redirectedUrl("/organisation/leitung?error=LoadSpecialCommandDetailFailed"));
   }
 
-  // covers #582 / REQ-FE-005 — the member-roster fragment GET renders only the membersResults
-  // fragment; the add-member modal (which lives outside the fragment) is not present.
   @Test
   @WithMockUser(roles = "ADMIN")
   void detail_fragmentMembers_rendersOnlyMembersFragment() throws Exception {
@@ -213,8 +201,6 @@ class SpecialCommandMembersPageControllerMvcTest {
         .andExpect(content().string(not(containsString("add-member-modal"))));
   }
 
-  // covers #582 — the add-member twin relays to the backend and returns 200 for an officer the
-  // backend admits; a roster mutation does not touch the SK catalogue, so it does not evict.
   @Test
   @WithMockUser(roles = "OFFICER")
   void addMemberAjax_officer_returns200WithoutEviction() throws Exception {
@@ -234,8 +220,6 @@ class SpecialCommandMembersPageControllerMvcTest {
     verify(backendApiClient, never()).evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);
   }
 
-  // A backend refusal of a member write (not the lead of this SK) is relayed as 403 so krtFetch
-  // shows the error instead of re-swapping.
   @Test
   @WithMockUser(roles = "OFFICER")
   void removeMemberAjax_backendRefuses_relays403() throws Exception {
@@ -251,7 +235,6 @@ class SpecialCommandMembersPageControllerMvcTest {
         .andExpect(status().isForbidden());
   }
 
-  // The classic (no-JS) flags form redirects back to the SK member page, not the admin area.
   @Test
   @WithMockUser(roles = "OFFICER")
   void patchMemberFlags_classic_redirectsToMemberPage() throws Exception {

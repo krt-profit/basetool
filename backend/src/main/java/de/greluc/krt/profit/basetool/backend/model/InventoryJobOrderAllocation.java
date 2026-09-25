@@ -85,7 +85,7 @@ public class InventoryJobOrderAllocation extends AbstractEntity<UUID> {
 
   @Min(0)
   @Column(nullable = false)
-  private Double amount; // SCU
+  private Double amount;
 
   /**
    * Whether the stock earmarked to this job order has been delivered (Variante A, REQ-INV-027) —

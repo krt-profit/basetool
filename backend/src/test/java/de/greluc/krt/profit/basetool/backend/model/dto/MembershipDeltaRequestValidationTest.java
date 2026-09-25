@@ -62,15 +62,12 @@ class MembershipDeltaRequestValidationTest {
 
   @Test
   void invalidStaffelChangeElementCascadesToViolation() {
-    // Given a staffeln entry that violates @NotNull squadronId
     MembershipDeltaRequest req =
         new MembershipDeltaRequest(
             List.of(new StaffelChange(null, Boolean.FALSE, Boolean.FALSE)), null);
 
-    // When
     Set<ConstraintViolation<MembershipDeltaRequest>> violations = validator.validate(req);
 
-    // Then the element-level constraint is reported via the cascade
     assertTrue(
         violations.stream().anyMatch(v -> v.getPropertyPath().toString().contains("squadronId")),
         "StaffelChange.squadronId @NotNull must be validated through List<@Valid StaffelChange>");
@@ -78,7 +75,6 @@ class MembershipDeltaRequestValidationTest {
 
   @Test
   void invalidSpecialCommandChangeElementCascadesToViolation() {
-    // Given an SK entry that violates @NotNull action
     MembershipDeltaRequest req =
         new MembershipDeltaRequest(
             null,
@@ -86,10 +82,8 @@ class MembershipDeltaRequestValidationTest {
                 new SpecialCommandChange(
                     UUID.randomUUID(), null, Boolean.FALSE, Boolean.FALSE, null)));
 
-    // When
     Set<ConstraintViolation<MembershipDeltaRequest>> violations = validator.validate(req);
 
-    // Then the element-level constraint is reported via the cascade
     assertTrue(
         violations.stream().anyMatch(v -> v.getPropertyPath().toString().contains("action")),
         "SpecialCommandChange.action @NotNull must be validated through List<@Valid ...>");
@@ -97,13 +91,11 @@ class MembershipDeltaRequestValidationTest {
 
   @Test
   void wellFormedPayloadHasNoViolations() {
-    // Given a valid delta touching both sides
     MembershipDeltaRequest req =
         new MembershipDeltaRequest(
             List.of(new StaffelChange(UUID.randomUUID(), null, null)),
             List.of(new SpecialCommandChange(UUID.randomUUID(), Action.ADD, null, null, null)));
 
-    // When / Then
     assertTrue(validator.validate(req).isEmpty(), "a well-formed payload must have no violations");
   }
 }

@@ -75,8 +75,6 @@ public class AdminDataExportController {
   public ResponseEntity<DataExportService.DataExport> exportJson(@PathVariable UUID userId) {
     DataExportService.DataExport export = dataExportService.export(userId);
     dataExportService.recordExport(userId, "json", export.totalRows(), false);
-    // Pinned, not negotiated -- see DataExportController#exportJson. An admin serving an access
-    // request has to be able to hand the member a file they can actually open.
     return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(export);
   }
 
@@ -86,8 +84,6 @@ public class AdminDataExportController {
    * @param userId the member the export is about
    * @return the PDF
    */
-  // No `produces` -- it is a mapping condition, and the frontend's Accept header does not include
-  // application/pdf, so it would answer 406. See DataExportController#exportPdf.
   @GetMapping("/pdf")
   @PreAuthorize("hasRole('ADMIN')")
   @Operation(summary = "Export another member's data as a PDF")

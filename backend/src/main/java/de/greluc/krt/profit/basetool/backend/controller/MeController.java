@@ -130,15 +130,8 @@ public class MeController {
         ownerScopeService.canAccessBlueprintOverview(),
         ownerScopeService.canViewJobOrders(),
         ownerScopeService.canViewOwnJobOrders(),
-        // Through the hierarchy on purpose: a Bankleitung holds BANK_MANAGEMENT and NOT
-        // BANK_EMPLOYEE, so a direct check would hide the staff bank from the people who run it.
         authHelperService.hasReachableRole(Roles.authority(Roles.BANK_EMPLOYEE)),
         authHelperService.hasReachableRole(Roles.authority(Roles.BANK_MANAGEMENT)),
-        // Same reason, and the reason these three exist at all. UserDto's isLogistician /
-        // isMissionManager are membership projections — resolveLogistician() reads the Staffel
-        // rows and nothing else — so they are false for an ADMIN, who by design holds no Staffel
-        // membership. A client gating on them hides actions from exactly the people most entitled
-        // to perform them. These are the authorisation answer instead of the membership one.
         authHelperService.isLogisticianOrAbove(),
         authHelperService.hasReachableRole(Roles.authority(Roles.MISSION_MANAGER)),
         authHelperService.isAdmin());

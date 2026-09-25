@@ -140,7 +140,6 @@ public class HangarController {
         PaginationUtil.createPageRequest(
             page, size, sort, Set.of("name", "insurance", "fitted", "id"), "name");
     Page<Ship> p = hangarService.getAllShips(pageable);
-    // Every row may have a different owner: seed the owners' Staffel memo in two queries.
     userMapper.primeStaffelMemberships(p.getContent().stream().map(Ship::getOwner).toList());
     return PageResponse.of(p.map(shipMapper::toDto));
   }
@@ -166,9 +165,6 @@ public class HangarController {
       @RequestParam(required = false) Integer size,
       @RequestParam(required = false) String sort,
       @RequestParam(required = false) String search) {
-    // Role-based shaping of the response is decided HERE, at the HTTP boundary, so
-    // the service stays pure business logic and does not need to read
-    // SecurityContextHolder itself (architecture rule enforced by ArchitectureTest).
     boolean includeOwnerDetails = authHelperService.isAdminOrOfficer();
     Pageable pageable =
         PaginationUtil.createPageRequest(
@@ -239,8 +235,6 @@ public class HangarController {
     hangarService.deleteAllShipsForUser(userService.getUserIdFromJwt(jwt));
     return ResponseEntity.noContent().build();
   }
-
-  // Admin endpoints
 
   /**
    * Admin-only: lists a target user's hangar. User id comes from the path (not the JWT) so admins

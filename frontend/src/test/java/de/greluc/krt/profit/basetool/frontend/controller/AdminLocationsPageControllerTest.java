@@ -74,10 +74,8 @@ class AdminLocationsPageControllerTest {
     verify(backendApiClient).evict(CacheDomain.LOCATION);
   }
 
-  // covers REQ-ADMIN-001 — locations beyond the first backend page stay visible and editable
   @Test
   void listData_concatenatesAllBackendPages_andSorts() {
-    // Given — two backend pages: [Port Olisar] + [Area18]
     LocationDto portOlisar =
         new LocationDto(UUID.randomUUID(), "Port Olisar", "Crusader station", false, false, 0L);
     LocationDto area18 =
@@ -89,10 +87,8 @@ class AdminLocationsPageControllerTest {
         .thenReturn(new PageResponse<>(List.of(area18), 1, 1000, 2, 2, List.of("name,asc")));
     ConcurrentModel model = new ConcurrentModel();
 
-    // When
     String view = controller.listData(model);
 
-    // Then — both pages render, sorted case-insensitively, with no truncation flagged
     assertEquals("admin/locations", view);
     @SuppressWarnings("unchecked")
     List<LocationDto> locations = (List<LocationDto>) model.getAttribute("locations");

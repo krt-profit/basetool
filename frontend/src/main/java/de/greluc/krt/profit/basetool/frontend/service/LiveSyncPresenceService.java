@@ -176,11 +176,6 @@ public class LiveSyncPresenceService {
         byTopic.computeIfAbsent(topic, ignored -> new ConcurrentHashMap<>());
     Map<String, Entry> editors = sections.get(sectionKey);
     if (editors == null) {
-      // Refuse a first-seen section once the topic is already at the distinct-section cap, rather
-      // than growing the map. Guards against a crafted client looping focus frames with unique
-      // section keys to exhaust memory (the handler additionally rate-limits and length-caps the
-      // key). A concurrent pair of first-sightings may overshoot the cap by a small constant, which
-      // is harmless — the bound is a memory ceiling, not an exact count.
       if (sections.size() >= MAX_SECTIONS_PER_TOPIC) {
         return false;
       }
@@ -374,10 +369,6 @@ public class LiveSyncPresenceService {
         remoteByTopic.computeIfAbsent(topic, ignored -> new ConcurrentHashMap<>());
     RemotePartition previous = origins.get(originId);
     if (previous == null && origins.size() >= MAX_REMOTE_ORIGINS_PER_TOPIC) {
-      // Refuse a first-seen origin at the cap rather than growing the map or evicting an
-      // established peer. The frontend runs a handful of replicas, so reaching this means a
-      // spoofed or misconfigured publisher, and the established partitions are the trustworthy
-      // ones.
       log.debug(
           "Refusing mirrored presence partition for topic {}: origin cap {} reached",
           topic,

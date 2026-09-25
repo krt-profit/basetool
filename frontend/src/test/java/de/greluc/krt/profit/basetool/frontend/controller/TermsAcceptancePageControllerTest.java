@@ -82,8 +82,6 @@ class TermsAcceptancePageControllerTest {
   @BeforeEach
   void setup() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-    // Stubbed for every test rather than per case: the gate cannot render without the wording,
-    // so leaving it out would fail each test for a reason unrelated to what it asserts.
     when(backendApiClient.get(eq(DOCUMENT_URI), eq(TermsDocumentDto.class))).thenReturn(document());
   }
 
@@ -142,9 +140,6 @@ class TermsAcceptancePageControllerTest {
 
     mockMvc
         .perform(get("/terms/accept"))
-        // The error page, not the gate. Asserted on the resolved view rather than on the
-        // status: the advice renders error/error and MockMvc reports the pre-dispatch 200,
-        // so a status assertion here would pass for a gate that rendered perfectly fine.
         .andExpect(view().name("error/error"))
         .andExpect(content().string(not(containsString("4. Pflichten der Nutzer"))));
   }

@@ -82,8 +82,6 @@ class JobOrderHandoverButtonLayoutTest {
   @BeforeEach
   void setup() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-    // The logistician caller is a non-admin, so the order-detail profit gate would otherwise
-    // redirect to /orders/create. Stub the capability as a profit-eligible viewer.
     when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
         .thenReturn(LayoutResponses.capabilities(true, true, true));
   }
@@ -102,7 +100,6 @@ class JobOrderHandoverButtonLayoutTest {
 
   @Test
   void orderDetail_HandoverButton_ShouldAppearAfterAssigneesSection_NotInHeader() throws Exception {
-    // Given
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     JobOrderDto order =
@@ -135,7 +132,6 @@ class JobOrderHandoverButtonLayoutTest {
             eq(de.greluc.krt.profit.basetool.frontend.model.dto.UserDto.class)))
         .thenReturn(null);
 
-    // When
     MvcResult result =
         mockMvc
             .perform(get("/orders/" + orderId).with(authentication(logisticianToken(userId))))
@@ -144,10 +140,6 @@ class JobOrderHandoverButtonLayoutTest {
 
     String html = result.getResponse().getContentAsString();
 
-    // Then: Button muss nach dem Bearbeiter-Bereich erscheinen. Anchored on the button's own
-    // data-testid marker: the former "openHandoverModal()" needle matched the inline script that
-    // #924 moved into static/js/orders-detail.js (and, sitting at the end of the body, it was
-    // always after every markup index anyway).
     int assigneesSectionIndex = html.indexOf("Bearbeiter");
     int handoverButtonIndex = html.indexOf("data-testid=\"order-handover-open\"");
 
@@ -161,7 +153,6 @@ class JobOrderHandoverButtonLayoutTest {
         .as("Handover-Button muss nach dem Bearbeiter-Bereich erscheinen")
         .isGreaterThan(assigneesSectionIndex);
 
-    // Then: Button darf nicht im Header-Bereich (flex-between) erscheinen
     int headerEnd = html.indexOf("</div>", html.indexOf("flex-between"));
     assertThat(handoverButtonIndex)
         .as("Handover-Button darf nicht im Header-Bereich (flex-between) erscheinen")

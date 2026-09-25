@@ -74,7 +74,6 @@ public class SessionDebugFilter extends OncePerRequestFilter {
     if (session == null) {
       return null;
     }
-    // Spring Security stores the context under this well-known attribute name
     Object ctx = session.getAttribute("SPRING_SECURITY_CONTEXT");
     if (ctx instanceof SecurityContext secCtx) {
       return secCtx.getAuthentication();
@@ -97,9 +96,7 @@ public class SessionDebugFilter extends OncePerRequestFilter {
     String uri = request.getRequestURI();
     String method = request.getMethod();
 
-    // --- PRE-filter: log session state BEFORE Spring Security processes the request ---
     HttpSession sessionBefore = request.getSession(false);
-    // PRE: read from ThreadLocal — Spring Security has loaded it from the session at this point
     Authentication authBefore = SecurityContextHolder.getContext().getAuthentication();
 
     if (sessionBefore != null) {
@@ -130,14 +127,9 @@ public class SessionDebugFilter extends OncePerRequestFilter {
           authBefore != null && authBefore.isAuthenticated());
     }
 
-    // --- Execute filter chain ---
     filterChain.doFilter(request, response);
 
-    // --- POST-filter: log session state AFTER Spring Security processed the request ---
     HttpSession sessionAfter = request.getSession(false);
-    // POST: Spring Security has already cleared the ThreadLocal after processing (especially on
-    // redirects).
-    // Read the authentication from the session attribute directly to get the true persisted state.
     Authentication authAfter = getAuthFromSession(sessionAfter);
 
     if (sessionAfter != null) {
@@ -157,7 +149,6 @@ public class SessionDebugFilter extends OncePerRequestFilter {
             authAfter.getName(),
             authAfter.getClass().getSimpleName());
       }
-      // Warn if authentication was present before but lost from session after the request
       boolean hadAuthBefore = authBefore != null && authBefore.isAuthenticated();
       boolean hasAuthAfter = authAfter != null && authAfter.isAuthenticated();
       if (hadAuthBefore && !hasAuthAfter) {

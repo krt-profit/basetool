@@ -63,7 +63,6 @@ import org.springframework.web.context.WebApplicationContext;
  * four amount columns or the contributing-order drill-down fails the build instead of only
  * surfacing at runtime.
  */
-// covers REQ-ORDERS-034
 @SpringBootTest
 @ActiveProfiles("test")
 class JobOrderMaterialDemandRenderTest {
@@ -173,9 +172,6 @@ class JobOrderMaterialDemandRenderTest {
         .contains("data-testid=\"demand-group\"");
     assertThat(html).as("the org unit's badge").contains(">IRI<");
     assertThat(html).as("the material name").contains("Titanium");
-    // The four columns are the point of the page: demand, the stock already booked against those
-    // orders, the signal-only claims, and the resulting gathering gap.
-    // No thousands separator: the amount formatting mirrors the order tables' `'NONE'` grouping.
     assertThat(html).as("required amount").contains("1000,000");
     assertThat(html).as("booked amount").contains("250,000");
     assertThat(html).as("claimed amount").contains("100,000");
@@ -219,7 +215,6 @@ class JobOrderMaterialDemandRenderTest {
     assertThat(html).as("contributing order linked by display id").contains("#7");
     assertThat(html).as("drill-down links to the order detail").contains("/orders/" + orderId);
     assertThat(html).as("an item order still contributes material").contains("order-kind-item");
-    // Collapsed by default: the drill-down row carries the hidden class and the toggle reports it.
     assertThat(html).as("drill-down starts hidden").contains("krtm-display-none-5790");
     assertThat(html).as("toggle reports the collapsed state").contains("aria-expanded=\"false\"");
   }
@@ -254,7 +249,6 @@ class JobOrderMaterialDemandRenderTest {
             .getResponse()
             .getContentAsString();
 
-    // A PIECE material must never show a fractional count (REQ-ORDERS-001/002).
     assertThat(html).as("whole-unit demand").contains(">12 ");
     assertThat(html).as("no SCU decimals on a PIECE row").doesNotContain("12,000");
   }
@@ -278,16 +272,6 @@ class JobOrderMaterialDemandRenderTest {
 
     assertThat(html).as("no group sections").doesNotContain("data-testid=\"demand-group\"");
     assertThat(html).as("empty state copy").contains("keine offenen oder in Bearbeitung");
-    // Regression guard: the unit-aware amount fragment must live in its own fragments file. While
-    // it
-    // was declared at the top level of THIS page template, Thymeleaf rendered the declaration
-    // itself
-    // on every full-page render, emitting a stray "0.000 SCU" (its parameters unbound, so the null
-    // fallback) after the closing </main> — visible in the browser on every view of the page,
-    // including this empty one. An empty overview renders no amount at all, so the unbound fallback
-    // appearing here means the definition has moved back into the page. Matched literally: the
-    // shared head/footer fragments legitimately mention "SCU" in comments and the krtScuI18n
-    // bootstrap, so a bare "SCU" check would pass vacuously.
     assertThat(html)
         .as("no stray unbound amount leaked from the fragment declaration")
         .doesNotContain("0.000 SCU")
@@ -309,7 +293,6 @@ class JobOrderMaterialDemandRenderTest {
   }
 
   @Test
-  // covers REQ-ORDERS-034
   void demandPage_rendersTheCollapsibleFilterPanelAndSortableHeaders() throws Exception {
     UUID userId = UUID.randomUUID();
     MaterialDto titanium = material("Titanium", "SCU");
@@ -334,8 +317,6 @@ class JobOrderMaterialDemandRenderTest {
             .getResponse()
             .getContentAsString();
 
-    // The panel is rendered EXPANDED server-side and collapsed by the JS, so a client without JS
-    // keeps its filters (the Lager idiom, REQ-INV-037).
     assertThat(html).as("filter toggle").contains("data-testid=\"demand-filter-toggle\"");
     assertThat(html)
         .as("toggle controls the panel")
@@ -349,7 +330,6 @@ class JobOrderMaterialDemandRenderTest {
     assertThat(html).as("quality filters").contains("data-testid=\"demand-quality-good\"");
     assertThat(html).as("hide-covered toggle").contains("data-testid=\"demand-hide-covered\"");
 
-    // Sorting reads these attributes; the JS must never parse the localised cell text.
     assertThat(html).as("sortable outstanding header").contains("data-sort-key=\"outstanding\"");
     assertThat(html).as("unsorted by default").contains("aria-sort=\"none\"");
     assertThat(html).as("numeric sort key on the row").contains("data-outstanding=\"10.0\"");
@@ -357,12 +337,9 @@ class JobOrderMaterialDemandRenderTest {
   }
 
   @Test
-  // covers REQ-ORDERS-034
   void demandPage_materialFilterListsEachMaterialOnce() throws Exception {
     UUID userId = UUID.randomUUID();
     MaterialDto titanium = material("Titanium", "SCU");
-    // The same material in two quality buckets AND in two org-unit groups must still yield exactly
-    // one filter option - the filter narrows by material, not by bucket.
     MaterialDemandRowDto good =
         new MaterialDemandRowDto(titanium, "GOOD", 10.0, 0.0, 0.0, 10.0, List.of());
     MaterialDemandRowDto none =
@@ -411,7 +388,6 @@ class JobOrderMaterialDemandRenderTest {
             .getResponse()
             .getContentAsString();
 
-    // The live-sync receiver swaps this fragment in place, so it must not carry the page chrome.
     assertThat(html).as("fragment only").doesNotContain("<html");
     assertThat(html).as("fragment only").doesNotContain("id=\"hamburger\"");
   }

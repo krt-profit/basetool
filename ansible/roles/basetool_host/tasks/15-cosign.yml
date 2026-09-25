@@ -1,15 +1,4 @@
 ---
-# cosign, the host half of REQ-OPS-015's supply-chain seam.
-#
-# `deploy.sh` verifies every resolved digest against the release workflow's keyless signature
-# before it pulls, extracts or applies anything, and it is FAIL-CLOSED on that check. A host
-# without cosign therefore cannot deploy — which is why this is provisioning and not an optional
-# extra, and why the role would rather refuse than leave it half-installed.
-#
-# Why a pinned download and not a package: measured 2026-09-18, cosign is in no enabled repository
-# on Rocky 10 and not in EPEL 10 either. See defaults/main.yml for the trust argument behind the
-# checksum pin — in short, the role compares against a value reviewed in git, never against a
-# checksum file it just downloaded from the same place as the binary.
 
 - name: Read the installed cosign version, if there is one
   ansible.builtin.command: "{{ basetool_host_cosign_path }} version --json"
@@ -19,9 +8,6 @@
   check_mode: false
 
 - name: Download cosign
-  # `checksum:` makes this idempotent AND verified in one step: Ansible fetches, hashes, and
-  # fails the task if the digest differs — so a tampered or truncated download never reaches
-  # the destination path, and an unchanged one is not re-fetched.
   ansible.builtin.get_url:
     url: "{{ basetool_host_cosign_url }}"
     dest: "{{ basetool_host_cosign_path }}"
@@ -32,8 +18,6 @@
   register: basetool_host_cosign_download
 
 - name: Confirm the binary that landed actually runs
-  # get_url verified the bytes; this verifies they are a working cosign on this host. A correct
-  # checksum on a binary built for another libc would pass the first check and fail every deploy.
   ansible.builtin.command: "{{ basetool_host_cosign_path }} version"
   register: basetool_host_cosign_check
   changed_when: false

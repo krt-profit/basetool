@@ -359,9 +359,6 @@ public class MaterialRequestService {
         requestLabel(request),
         request.getOwner() == null ? null : request.getOwner().getId(),
         AuditDetails.of("request", requestId));
-    // Notify the owner about the would-be supplier (REQ-MARKET-020). Published only on a genuinely
-    // new signal (the idempotent-duplicate return above skips it), inside this transaction so the
-    // after-commit listener never fires for a rolled-back signal.
     if (request.getOwner() != null) {
       eventPublisher.publishEvent(
           new MaterialRequestFulfillmentSignalledEvent(

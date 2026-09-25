@@ -82,8 +82,6 @@ class LiveSyncStreamServiceTest {
     RecordingEmitter emitter = service.emitters().getFirst();
     assertThat(emitter.events()).hasSize(1);
     assertThat(emitter.events().getFirst().name()).isEqualTo("subscribed");
-    // The client keys "is this screen live?" off this list; a topic missing from it will never
-    // deliver, and silence is indistinguishable from "nothing changed yet".
     assertThat(emitter.events().getFirst().data()).contains("inventory").contains("materialboard");
   }
 
@@ -117,8 +115,6 @@ class LiveSyncStreamServiceTest {
 
     service.deliver(INVENTORY, List.of());
 
-    // A frame with no sections would tell every receiver "something changed" with no way to narrow
-    // the reload, which is precisely what section keys exist to prevent.
     assertThat(service.emitters().getFirst().eventNames()).containsExactly("subscribed");
   }
 
@@ -144,8 +140,6 @@ class LiveSyncStreamServiceTest {
 
     assertThat(meterRegistry.counter(MetricNames.LIVESYNC_STREAMS_EVICTED).count()).isEqualTo(1.0);
     service.deliver(INVENTORY, List.of("stock"));
-    // The evicted one is the first opened; the newest — the screen the member is looking at —
-    // still gets its frame.
     assertThat(service.emitters().getFirst().eventNames()).containsExactly("subscribed");
     assertThat(service.emitters().getLast().eventNames()).containsExactly("subscribed", "changed");
     assertThat(opened).hasSize(LiveSyncStreamService.MAX_STREAMS_PER_SUB + 1);
@@ -160,8 +154,6 @@ class LiveSyncStreamServiceTest {
     service.deliver(INVENTORY, List.of("stock"));
     service.deliver(INVENTORY, List.of("stock"));
 
-    // Exactly one failed attempt: after the first the subscription is gone from the room, so the
-    // second delivery does not even reach it.
     assertThat(service.emitters().getFirst().failedSends()).isEqualTo(1);
     assertThat(meterRegistry.get(MetricNames.LIVESYNC_SEND_FAILURES).counters()).isNotEmpty();
   }
@@ -204,8 +196,7 @@ class LiveSyncStreamServiceTest {
   @DisplayName(
       "BE-PERF-13: a subscriber whose write blocks does not hold the publisher or its peers")
   void aBlockedSubscriberDoesNotHoldThePublisher() throws InterruptedException {
-    meterRegistry =
-        new SimpleMeterRegistry(); // the setUp service already owns the gauges on the old one
+    meterRegistry = new SimpleMeterRegistry();
     RecordingStreamService async = new RecordingStreamService(meterRegistry, virtualThreads);
     async.subscribe(ALICE, List.of(INVENTORY));
     async.subscribe(BOB, List.of(INVENTORY));
@@ -214,7 +205,6 @@ class LiveSyncStreamServiceTest {
     awaitEvents(stuck, 1);
     stuck.blockFromNowOn();
 
-    // The publishing thread returns at once although ALICE's socket is not being read.
     assertTimeoutPreemptively(
         Duration.ofSeconds(2), () -> async.deliver(INVENTORY, List.of("stock")));
 
@@ -230,8 +220,7 @@ class LiveSyncStreamServiceTest {
   @Test
   @DisplayName("BE-PERF-13: frames reach one stream in the order they were published")
   void orderPerStreamSurvivesConcurrentDelivery() throws InterruptedException {
-    meterRegistry =
-        new SimpleMeterRegistry(); // the setUp service already owns the gauges on the old one
+    meterRegistry = new SimpleMeterRegistry();
     RecordingStreamService async = new RecordingStreamService(meterRegistry, virtualThreads);
     async.subscribe(ALICE, List.of(INVENTORY));
     RecordingEmitter emitter = async.emitters().getFirst();
@@ -250,14 +239,12 @@ class LiveSyncStreamServiceTest {
   @Test
   @DisplayName("BE-PERF-13: a full delivery queue drops and counts instead of growing")
   void aFullQueueDropsAndCounts() throws InterruptedException {
-    meterRegistry =
-        new SimpleMeterRegistry(); // the setUp service already owns the gauges on the old one
+    meterRegistry = new SimpleMeterRegistry();
     RecordingStreamService async = new RecordingStreamService(meterRegistry, virtualThreads);
     async.subscribe(ALICE, List.of(INVENTORY));
     RecordingEmitter stuck = async.emitters().getFirst();
     awaitEvents(stuck, 1);
     stuck.blockFromNowOn();
-    // One frame is taken by the drain and parks in the blocked write; the queue then fills.
     async.deliver(INVENTORY, List.of("first"));
     stuck.awaitBlocked();
 
@@ -346,8 +333,6 @@ class LiveSyncStreamServiceTest {
         failedSends++;
         throw new IOException("client gone");
       }
-      // The builder emits the wire form in pieces — "event:", the name, a newline, "data:", the
-      // payload — so it has to be reassembled before either field can be read.
       StringBuilder wire = new StringBuilder();
       for (DataWithMediaType part : builder.build()) {
         wire.append(part.getData());
@@ -373,9 +358,7 @@ class LiveSyncStreamServiceTest {
     }
 
     @Override
-    public void complete() {
-      // No async context in a unit test; completing would throw.
-    }
+    public void complete() {}
 
     void failFromNowOn() {
       failing = true;

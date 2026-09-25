@@ -68,7 +68,6 @@ class MaterialCollectionControllerTest {
 
   @Test
   void getMaterialCollection_responsibleSideViewer_returnsListUnredacted() {
-    // covers REQ-ORDERS-029
     UUID jobOrderId = UUID.randomUUID();
     List<MaterialCollectionEntryDto> expected = List.of(sampleEntry());
     when(inventoryItemService.getMaterialCollection(jobOrderId)).thenReturn(expected);
@@ -83,7 +82,6 @@ class MaterialCollectionControllerTest {
 
   @Test
   void getMaterialCollection_requestingSideViewer_returnsRedactedList() {
-    // covers REQ-ORDERS-029
     UUID jobOrderId = UUID.randomUUID();
     List<MaterialCollectionEntryDto> raw = List.of(sampleEntry());
     List<MaterialCollectionEntryDto> redacted = List.of(sampleEntry());

@@ -116,11 +116,6 @@ class PendingApprovalRenderMvcTest {
 
   @Test
   void rejectedRegistration_neverPromisesAnApprovalThatCannotArrive() throws Exception {
-    // The regression itself. REJECTED is terminal — the backend answers a second decision with a
-    // 409 — so none of the waiting wording may reach a rejected user: not the "an administrator
-    // will approve it" body, not the "1 to 2 days" expectation, and not the "this page continues
-    // automatically" promise. The waiting block is left out of the document entirely rather than
-    // hidden, so this is an absence assertion and not a visibility one.
     String html = render("REJECTED", "de");
 
     assertThat(html).doesNotContain("id=\"pending-approval-waiting\"");
@@ -136,8 +131,6 @@ class PendingApprovalRenderMvcTest {
 
   @Test
   void rejectedRegistration_titlesTheTabForTheRejectionToo() throws Exception {
-    // The tab title is the one string a user sees without scrolling back to the page, and it is
-    // rendered from a separate expression than the heading, so it can drift on its own.
     String html = render("REJECTED", "de");
 
     assertThat(html)
@@ -147,8 +140,6 @@ class PendingApprovalRenderMvcTest {
 
   @Test
   void rejectedRegistration_isRenderedInEnglishToo() throws Exception {
-    // Guards the bundle wiring in both locales: a key added to only one of them renders as the raw
-    // key, which the German-only assertions above would not notice.
     String html = render("REJECTED", "en");
 
     assertThat(html)
@@ -172,7 +163,6 @@ class PendingApprovalRenderMvcTest {
 
   @Test
   void unreadableBackend_fallsBackToTheWaitingCopy() throws Exception {
-    // Fail-safe direction end to end: an outage must not render an accusation.
     when(backendApiClient.get(REGISTRATION_STATUS, RegistrationStatusDto.class)).thenReturn(null);
 
     String html =

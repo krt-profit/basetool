@@ -45,7 +45,6 @@ class UserProxyControllerTest {
 
   @Test
   void searchUsers_ShouldCallWebClient() {
-    // Arrange
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     UserProxyController controller = new UserProxyController(backendApiClient);
 
@@ -57,10 +56,8 @@ class UserProxyControllerTest {
             eq("query")))
         .thenReturn(mockPageResponse);
 
-    // Act
     List<Map<String, Object>> result = controller.searchUsers("query");
 
-    // Assert — the free-text query rides as a single-encoded URI variable, not baked into the URI.
     assertNotNull(result);
     verify(backendApiClient)
         .get(
@@ -69,10 +66,6 @@ class UserProxyControllerTest {
             eq("query"));
   }
 
-  // #1344 regression: a multi-word query must reach the backend single-encoded (the real spaces),
-  // not double-encoded (%2520). The controller passes it as a WebClient URI-template variable so
-  // the
-  // client encodes it once; verify the raw value is forwarded verbatim as that variable.
   @Test
   void searchUsers_passesMultiWordQueryAsUriVariable() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
@@ -96,10 +89,6 @@ class UserProxyControllerTest {
             eq("John Doe"));
   }
 
-  // #1193: opening the picker without typing (browse mode) fires an empty ?query=, which the
-  // frontend's emptyAsNull string binder collapses to null. The proxy must normalise it back to an
-  // empty match-all filter and still forward query=, so the backend returns the scoped roster
-  // instead of 500ing on a required param.
   @Test
   void searchUsers_NullQuery_ForwardsEmptyMatchAllFilter() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
@@ -123,8 +112,6 @@ class UserProxyControllerTest {
             eq(""));
   }
 
-  // #1193: the bank-audience twin forwards to the widened backend search endpoint (ADR-0089) with
-  // the same paging/sort contract as the regular search.
   @Test
   void searchUsersForBank_ShouldCallBankSearchEndpoint() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
@@ -148,9 +135,6 @@ class UserProxyControllerTest {
             eq("query"));
   }
 
-  // REQ-FE-016: both user searches fetch exactly one row past the render cap. Fewer and the
-  // overflow hint in the comboboxes and the mission autocompletes can never render; the old 1000
-  // shipped every matching user to a list that shows 50.
   @Test
   void bothUserSearches_fetchOneRowPastTheRenderCap() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
@@ -169,10 +153,6 @@ class UserProxyControllerTest {
     }
   }
 
-  // The Umbuchen owner pickers (inventory-my.js / inventory-admin.js) and the bank counterparty
-  // picker (REQ-BANK-044) fetch this proxy with ?allKinds=true; the flag must reach the backend
-  // URI or the response silently narrows to Staffel/SK and a Bereich/OL owner disappears from the
-  // picker (#1328).
   @Test
   void userMemberships_ShouldForwardAllKindsTrueToBackend() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
@@ -188,7 +168,6 @@ class UserProxyControllerTest {
         .get(eq("/api/v1/users/" + id + "/memberships?allKinds=true"), anyTypeRef());
   }
 
-  // Without the opt-in flag the proxy forwards the backend default (Staffel/SK only) explicitly.
   @Test
   void userMemberships_ShouldForwardAllKindsFalseByDefault() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
@@ -203,8 +182,6 @@ class UserProxyControllerTest {
         .get(eq("/api/v1/users/" + id + "/memberships?allKinds=false"), anyTypeRef());
   }
 
-  // A null backend payload degrades to an empty list so the dependent picker hides instead of the
-  // page script blowing up on a null iteration.
   @Test
   void userMemberships_ShouldReturnEmptyListOnNullBackendResponse() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
@@ -218,8 +195,6 @@ class UserProxyControllerTest {
     assertTrue(result.isEmpty());
   }
 
-  // #1193: the single-user lookup backs the remote-users combobox edit-mode seed (resolve a stored
-  // id to its display name without preloading the roster).
   @Test
   void getUser_ShouldResolveSingleUserById() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
@@ -234,7 +209,6 @@ class UserProxyControllerTest {
     verify(backendApiClient).get(eq("/api/v1/users/" + id), anyTypeRef());
   }
 
-  // A lookup failure degrades to null so the combobox falls back to the raw id rather than 500ing.
   @Test
   void getUser_ShouldReturnNullOnFailure() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);

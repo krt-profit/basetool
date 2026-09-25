@@ -118,8 +118,6 @@ class MissionFinanceEntryControllerSecurityTest {
             UUID.randomUUID(),
             "bob.callsign",
             "Bob",
-            // effectiveName == displayName by construction (User.getEffectiveName), never a
-            // realname
             "Bob",
             "bob@example.invalid",
             null,
@@ -152,9 +150,6 @@ class MissionFinanceEntryControllerSecurityTest {
   void createFinanceEntry_anonymous_isUnauthorized() throws Exception {
     UUID missionId = UUID.randomUUID();
 
-    // The finance ledger is no longer anonymous: POST /api/v1/finance-entries is URL-gated to
-    // authenticated callers, so an anonymous request is rejected with 401 (the resource server's
-    // bearer entry point) before the controller or any service is reached.
     mockMvc
         .perform(
             post("/api/v1/finance-entries")
@@ -173,9 +168,6 @@ class MissionFinanceEntryControllerSecurityTest {
   @Test
   void createFinanceEntry_roleLessRoleLess_isForbidden() throws Exception {
     UUID missionId = UUID.randomUUID();
-    // canSeeMission would pass for a non-internal mission, but the method gate also requires
-    // isMemberOrAbove(); a role-less GUEST is treated like an anonymous visitor and denied with 403
-    // before the service is invoked.
     when(ownerScopeService.canSeeMission(missionId)).thenReturn(true);
 
     mockMvc
@@ -213,13 +205,11 @@ class MissionFinanceEntryControllerSecurityTest {
                             + "\",\"type\":\"INCOME\",\"amount\":500.00,\"note\":\"my-line\"}")
                     .with(jwt().authorities(member())))
             .andExpect(status().isCreated())
-            // The public callsign confirms which line was created…
             .andExpect(jsonPath("$.participant.user.username").value("bob.callsign"))
             .andReturn()
             .getResponse()
             .getContentAsString();
 
-    // …but H-1: even a member must not get a peer's email back on create.
     org.junit.jupiter.api.Assertions.assertFalse(
         body.contains("bob@example.invalid"),
         "member create response must not echo the participant's email");
@@ -244,13 +234,11 @@ class MissionFinanceEntryControllerSecurityTest {
                             + "\",\"type\":\"INCOME\",\"amount\":500.00}")
                     .with(jwt().authorities(officer())))
             .andExpect(status().isCreated())
-            // the participant callsign still confirms which line was created…
             .andExpect(jsonPath("$.participant.user.username").value("bob.callsign"))
             .andReturn()
             .getResponse()
             .getContentAsString();
 
-    // …but H-1 (refined): even an authenticated Officer must not get a peer's email back on create.
     org.junit.jupiter.api.Assertions.assertFalse(
         body.contains("bob@example.invalid"),
         "authenticated create response must not echo the participant's email");
@@ -334,19 +322,9 @@ class MissionFinanceEntryControllerSecurityTest {
     verify(financeEntryService, never()).createEntry(any());
   }
 
-  // ---------------------------------------------------------------------------
-  // Audit finding H-1: the mission-finance READ endpoints used to be gated only by
-  // isAuthenticated(), so any authenticated user could read any mission's ledger (and the nested
-  // participant email) by UUID — a cross-squadron IDOR. They now carry
-  // @ownerScopeService.canSeeMission AND redact participant PII for every caller (email is a
-  // profile-only field — never echoed to a peer, not even to a Logistician/Officer).
-  // ---------------------------------------------------------------------------
-
   @Test
   void getFinanceEntries_authenticatedNonMember_isForbidden() throws Exception {
     UUID missionId = UUID.randomUUID();
-    // canSeeMission == false models a foreign squadron's internal mission: the @PreAuthorize gate
-    // denies before the service is ever invoked.
     when(ownerScopeService.canSeeMission(missionId)).thenReturn(false);
 
     mockMvc
@@ -375,9 +353,6 @@ class MissionFinanceEntryControllerSecurityTest {
   @Test
   void getFinanceEntries_roleLessRoleLess_isForbidden() throws Exception {
     UUID missionId = UUID.randomUUID();
-    // Even with canSeeMission granting visibility of a non-internal mission, a role-less GUEST is
-    // treated like an anonymous visitor on the mission's payout view: isMemberOrAbove() fails the
-    // method gate, so the ledger read is denied with 403 before the service is invoked.
     when(ownerScopeService.canSeeMission(missionId)).thenReturn(true);
 
     mockMvc
@@ -402,7 +377,6 @@ class MissionFinanceEntryControllerSecurityTest {
                 get("/api/v1/missions/{id}/finance-entries", missionId)
                     .with(jwt().authorities(member())))
             .andExpect(status().isOk())
-            // public callsign stays visible
             .andExpect(jsonPath("$.content[0].participant.user.username").value("bob.callsign"))
             .andReturn()
             .getResponse()
@@ -426,14 +400,11 @@ class MissionFinanceEntryControllerSecurityTest {
                 get("/api/v1/missions/{id}/finance-entries", missionId)
                     .with(jwt().authorities(officer())))
             .andExpect(status().isOk())
-            // the public callsign still comes through — only the PII is stripped
             .andExpect(jsonPath("$.content[0].participant.user.username").value("bob.callsign"))
             .andReturn()
             .getResponse()
             .getContentAsString();
 
-    // H-1 (refined): redaction is unconditional — even an Officer must not receive a peer's email
-    // through the ledger; email is shown only to the user themselves in their own profile.
     org.junit.jupiter.api.Assertions.assertFalse(
         body.contains("bob@example.invalid"),
         "an Officer must not receive participant email through the finance ledger either");

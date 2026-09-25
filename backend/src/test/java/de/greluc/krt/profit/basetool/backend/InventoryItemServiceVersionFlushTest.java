@@ -80,17 +80,12 @@ class InventoryItemServiceVersionFlushTest {
 
   @Mock private AuditService auditService;
   @Mock private OwnerScopeService ownerScopeService;
-  // Constructed in the @BeforeEach rather than by @InjectMocks: the REAL checkout sub-service is
-  // one of its arguments
   private InventoryItemService inventoryItemService;
 
   private InventoryCheckoutService realCheckoutService;
 
   @BeforeEach
   void wireCheckoutDelegate() {
-    // The facade delegates the book-out flow to InventoryCheckoutService; Mockito does not inject
-    // one @InjectMocks target into another, so build the real sub-service from the same mocks and
-    // set it on the facade. updateNote stays on the facade and uses the mocks directly.
     realCheckoutService =
         new InventoryCheckoutService(
             inventoryItemRepository,
@@ -102,26 +97,20 @@ class InventoryItemServiceVersionFlushTest {
             inventoryItemMapper,
             ownerScopeService,
             auditService);
-    // Built through the constructor instead of patched in afterwards: these fields are
-    // `private final`, and reflective mutation of a final field is what JEP 500 (JDK 26)
-    // warns about and a later release will refuse. Arg order matches the
-    // @RequiredArgsConstructor field-declaration order of each service.
-    // A `null` argument is a dependency this fixture never reaches -- exactly what
-    // @InjectMocks passed before, only visible now.
     inventoryItemService =
         new InventoryItemService(
             inventoryItemRepository,
             userRepository,
             materialRepository,
-            null, // gameItemRepository
+            null,
             locationRepository,
             jobOrderRepository,
             missionRepository,
             inventoryItemMapper,
             ownerScopeService,
-            null, // jobOrderItemService
+            null,
             auditService,
-            null, // inventoryAggregationService
+            null,
             realCheckoutService);
   }
 
@@ -164,7 +153,6 @@ class InventoryItemServiceVersionFlushTest {
 
     when(inventoryItemRepository.findById(itemId)).thenReturn(Optional.of(item));
 
-    // DISCARD a partial amount so the row is reduced (not deleted) and its DTO is returned.
     InventoryItemBookOutDto dto =
         new InventoryItemBookOutDto(
             3.0, null, null, CheckoutType.DISCARD, null, null, 0L, null, null, null, null);

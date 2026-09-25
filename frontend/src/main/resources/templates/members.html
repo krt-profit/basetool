@@ -27,7 +27,6 @@
 
     <div class="hud-box mt-2">
 
-        <!--/* Filters collapse behind one toggle (REQ-FE-021). */-->
         <div class="actions-bar">
             <div th:replace="~{fragments/components :: filterToggle('members-filter-panel', 'members-filter-toggle')}"></div>
         </div>
@@ -70,8 +69,6 @@
             <tbody>
                 <tr th:each="user : ${users}">
                     <td th:text="${user.effectiveName}">Username</td>
-                    <!--/* REQ-ORG-017 — a member may hold up to two Staffeln; render every badge
-                         (mirrors the SK column's separated-badge style). */-->
                     <td>
                         <span th:if="${user.squadrons != null and !user.squadrons.isEmpty()}">
                             <th:block th:each="sq, st : ${user.squadrons}">
@@ -83,8 +80,6 @@
                         <span th:if="${user.squadrons == null or user.squadrons.isEmpty()}"
                               class="squadron-badge squadron-badge-muted">&mdash;</span>
                     </td>
-                    <!--/* SPEZIALKOMMANDO_PLAN.md §7.5 — comma-separated SK shorthand list (neutral
-                         badge style so SK pins do not compete with the Staffel brand colour). */-->
                     <td>
                         <span th:if="${userSkMemberships != null and userSkMemberships.get(user.id) != null and !userSkMemberships.get(user.id).isEmpty()}">
                             <th:block th:each="sk, st : ${userSkMemberships.get(user.id)}">
@@ -131,12 +126,6 @@
         </table>
         </div>
         
-        <!--/* Consolidate-a-duplicate modal (no native dialogs, REQ-UI). The remedy for a member who
-             ended up with two accounts once the duplicate has already been approved: the approval
-             queue's own link action is gone by then, because that queue serves PENDING/REJECTED
-             only (ADR-0140) and the action guards on PENDING in the service too. Same
-             server-searched account picker as the queue's dialogs -- they differ in what moves, not
-             in how the account is chosen. */-->
         <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='consolidate-modal', titleKey='members.consolidate.modal.title', variant='krt-modal--wide', body=~{::consolidate-modal-body})}">
             <th:block th:ref="consolidate-modal-body">
                 <div class="krt-modal-body">
@@ -170,9 +159,6 @@
         const resultsContainer = document.getElementById('members-results');
         let membersFilterTimer = null;
 
-        // In-place filter + pagination (epic #571 / #573). The GET form stays the no-JS fallback;
-        // the row actions (delete) are delegated via krtEvents
-        // below, so they keep working after the results fragment is swapped.
         function applyMembersFilter() {
             if (!filterForm || !resultsContainer || !window.krtFetch) {
                 if (filterForm) filterForm.submit();
@@ -238,9 +224,6 @@
     const MSG_CONSOLIDATE_ERROR = "[[#{error.user.consolidate}]]";
     const MSG_CONSOLIDATE_NO_TARGET = "[[#{error.user.consolidate.no_target}]]";
 
-    // Re-render the current (filtered/paginated) member list so a deleted row drops out and the
-    // pagination + SK column stay coherent. The URL already carries the active filter (kept in
-    // sync by applyMembersFilter's history:true), so re-fetch it as a fragment swap (#571/#573).
     function refreshMembersResults() {
         const container = document.getElementById('members-results');
         if (!container || !window.krtFetch) {
@@ -253,9 +236,6 @@
         });
     }
 
-    // Exposed for the live multi-user sync receiver in members.js (#1235, REQ-FE-015): a peer's
-    // member edit / delete / Keycloak sync re-renders THIS viewer's own filtered, paginated roster
-    // through the very same swap the local delete already uses.
     window.krtRefreshMembersResults = refreshMembersResults;
 
     async function deleteUser(userId) {
@@ -272,9 +252,6 @@
         });
     }
 
-    // Admin-triggered manual Keycloak sync. POSTs to /members/sync (krtFetch handles CSRF and
-    // disables the trigger button for the round-trip), shows a toast on completion and then re-swaps
-    // the member list so the refreshed roster is visible without a full-page reload.
     function syncMembersNow() {
         window.krtFetch.write({
             method: 'POST',
@@ -287,11 +264,6 @@
         });
     }
 
-    // --- Consolidate a duplicate account (REQ-SEC-055, #1828) ----------------------------------
-    // The admin acts on the DUPLICATE's row and picks the account that survives, which is why the
-    // row id goes into the URL and the picked one into the body. Everything the duplicate owns
-    // moves, its Discord identity is re-linked, and its row disappears -- so the whole roster
-    // fragment is re-swapped rather than one row patched.
     const consolidateModal = document.getElementById('consolidate-modal');
     let consolidateSource = null;
 
@@ -357,10 +329,6 @@
         });
     }
 
-    // Delegated event bindings (CSP-safe replacement for inline onclick/onchange).
-    // The matching data-trigger attribute is set on the delete button above; using the
-    // global event-delegation helper keeps the wiring working when Thymeleaf re-renders
-    // the member table on filter/pagination changes.
     if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         window.krtEvents.on('click', 'members-delete-user', function (el) {
             deleteUser(el.getAttribute('data-user-id'));

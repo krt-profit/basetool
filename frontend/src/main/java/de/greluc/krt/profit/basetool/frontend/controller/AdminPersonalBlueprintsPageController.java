@@ -124,10 +124,6 @@ public class AdminPersonalBlueprintsPageController {
       Model model) {
     boolean isFragment = "results".equals(fragment);
     UUID selectedSub = RelayParams.uuidOrNull(userSub);
-    // The member picker is now a server-side searchable combobox (remote-users, #1193): instead of
-    // preloading the whole roster, seed only the selected member's option (edit-mode label) via a
-    // single lookup. It lives OUTSIDE the swap target, so a same-user filter swap does not touch
-    // it.
     if (!isFragment && selectedSub != null) {
       model.addAttribute("selectedUser", fetchUser(selectedSub));
     }
@@ -375,7 +371,6 @@ public class AdminPersonalBlueprintsPageController {
     try {
       return backendApiClient.get("/api/v1/users/" + userSub, UserDto.class);
     } catch (Exception e) {
-      // REQ-OBS-004: log the id only, never the resolved name.
       log.warn(
           "Failed to fetch selected member {} for admin personal blueprints picker", userSub, e);
       return null;
@@ -398,11 +393,6 @@ public class AdminPersonalBlueprintsPageController {
               .append(PAGE_SIZE)
               .append("&sort=productName,asc");
       if (q != null && !q.isBlank()) {
-        // Free-text term as a WebClient URI-template variable so it is percent-encoded exactly once
-        // across the frontend->backend hop (REQ-FE-016); URLEncoder form-encoding (space -> '+')
-        // double-encodes umlauts / reserved chars when WebClient's TEMPLATE_AND_VALUES mode
-        // re-encodes the '%', yielding zero matches. The user id above needs no encoding at all
-        // now that it is bound as a UUID.
         uri.append("&q={q}");
         return backendApiClient.get(uri.toString(), PERSONAL_BLUEPRINT_PAGE_TYPE, q);
       }

@@ -91,7 +91,6 @@ class JobTypeServiceTest {
     when(jobTypeRepository.existsByNameIgnoreCaseAndIdNot("Sammler", id)).thenReturn(false);
     when(jobTypeRepository.findById(id)).thenReturn(Optional.of(existing));
 
-    // archetype MISSION but NOT a leadership role + isMissionLead requested -> rejected.
     JobTypeDto dto =
         new JobTypeDto(id, "Sammler", null, JobTypeArchetype.MISSION, null, true, false, true, 0L);
 

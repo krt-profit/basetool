@@ -122,7 +122,6 @@ class MissionUnitResponsibleClearE2eTest {
         CLEAR_ROW_UNIT,
         "mission-unit-responsible-clear-row",
         (page, combo) -> {
-          // Discoverable path: pick the combobox "clear" row.
           E2eSupport.clearCombobox(combo);
           assertThat(combo).hasValue("");
         });
@@ -140,10 +139,6 @@ class MissionUnitResponsibleClearE2eTest {
         DELETE_UNIT,
         "mission-unit-responsible-clear-delete",
         (page, combo) -> {
-          // Delete-to-clear: empty the textbox, then Tab away so the combobox blurs. Its blur
-          // handler
-          // runs on a 150 ms debounce and, before the fix, restored the just-removed name — so wait
-          // past that window before asserting the box stays empty.
           combo.fill("");
           combo.press("Tab");
           page.waitForTimeout(400);
@@ -172,34 +167,18 @@ class MissionUnitResponsibleClearE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        // Open the seeded mission on the crew tab (?tab=crew deeplink — the unit boxes and their
-        // edit
-        // buttons live in the "Teilnehmer & Einheiten" pane).
         E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=crew");
         page.waitForLoadState();
 
-        // The unit's edit button (located by data-name) carries the seeded responsible id; open it.
         Locator editBtn = page.locator(".edit-unit-btn[data-name='" + unitName + "']");
         assertThat(editBtn).hasAttribute("data-responsible", responsibleUserId);
         editBtn.click();
 
-        // The modal's responsible picker is a searchable combobox; opening the modal pre-selects
-        // the
-        // seeded participant, so the textbox shows their (non-empty) name.
         Locator responsibleCombo = page.locator("#edit-unit-modal .krt-combobox__input");
         assertThat(responsibleCombo).hasValue(Pattern.compile(".+"));
 
-        // Path-specific clear step (dropdown row vs delete-to-clear).
         clearAction.run(page, responsibleCombo);
 
-        // Save in place (the unit edit swaps the crew pane via AJAX — no Post/Redirect/Get). Mark
-        // the window to prove no full reload happened, then web-first-wait for the re-rendered edit
-        // button to no longer carry a responsible id — which also proves the clear was persisted,
-        // since the crew pane re-renders from the backend's fresh state. Thymeleaf omits an
-        // empty-valued th:data-* attribute entirely (as it does for this button's data-ship /
-        // data-frequency when empty) and the click handler reads it back with `|| ''`, so a cleared
-        // unit carries NO responsible id: the attribute is absent (or, were it ever rendered,
-        // empty). Assert it holds no non-empty value rather than a literal "".
         page.evaluate("window.__krtNoReload = true;");
         page.locator("#edit-unit-form button[type='submit']").click();
         assertThat(page.locator(".edit-unit-btn[data-name='" + unitName + "']"))

@@ -127,20 +127,10 @@ public class ClientIdentityFilter extends OncePerRequestFilter {
       throws ServletException, IOException {
     Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
     if (!isAuthenticated(authentication)) {
-      // Unauthenticated: the resource-server chain owns that answer (401 + WWW-Authenticate). This
-      // filter must not turn a missing token into a 403, which would tell a client to stop retrying
-      // when re-authenticating is exactly what it should do.
       filterChain.doFilter(request, response);
       return;
     }
     if (!(authentication instanceof JwtAuthenticationToken jwtAuthentication)) {
-      // Fail CLOSED. Every check below reads the token's claims, so an authenticated principal
-      // that is not a JWT would have skipped all of them — and passed `.authenticated()` anyway.
-      // No such principal exists on this chain today (both the bearer and the DPoP provider yield
-      // a JwtAuthenticationToken); this is what keeps a future authentication mechanism from
-      // silently bypassing the REQ-INGEST-011 allowlist, the way the DPoP filter-ordering bug once
-      // almost did. Never softened by audit-only: there is no client population to measure here,
-      // only a gate that would otherwise not run.
       refuseNonJwtPrincipal(request, response, authentication);
       return;
     }
@@ -154,9 +144,6 @@ public class ClientIdentityFilter extends OncePerRequestFilter {
           .counter(MetricNames.INGEST_CLIENT_REJECTED, MetricNames.TAG_REASON, rejection.reason())
           .increment();
       if (!properties.auditOnly()) {
-        // WARN, not DEBUG: unlike the pre-auth bot/rate-limit rejects, reaching this point required
-        // a VALID realm token, so this cannot be flooded by an anonymous scanner and every
-        // occurrence is worth a human look (REQ-OBS-001).
         log.warn(
             "Ingest client rejected: reason={}, clientId={}, path={} {}",
             rejection.reason(),
@@ -177,8 +164,6 @@ public class ClientIdentityFilter extends OncePerRequestFilter {
             rejection.detail());
         return;
       }
-      // Audit-only: the operator is measuring the blast radius before enforcing, so the request is
-      // served. Logged at WARN all the same — a silent "would have rejected" defeats the purpose.
       log.warn(
           "Ingest client would be rejected (audit-only): reason={}, clientId={}, path={} {}",
           rejection.reason(),
@@ -213,8 +198,6 @@ public class ClientIdentityFilter extends OncePerRequestFilter {
       @NotNull HttpServletRequest request, @Nullable String authorizedParty) {
     if (!properties.allowedClientIds().isEmpty()) {
       if (authorizedParty == null) {
-        // Fail-closed on an ABSENT claim. Treating "no azp" as "nothing to check" would silently
-        // disable the gate the moment a realm change stopped stamping the claim.
         return new Rejection(
             MetricNames.REASON_MISSING_AZP, notApprovedDetail("no client identity in the token"));
       }

@@ -87,7 +87,6 @@ class BusinessMetricsCollectorTest {
             materialExchangeOfferRepository,
             materialExchangeRequestRepository,
             new TaskMetrics(registry));
-    // @PostConstruct is not invoked for a plain unit-constructed bean.
     collector.registerGauges();
   }
 
@@ -122,7 +121,6 @@ class BusinessMetricsCollectorTest {
 
   @Test
   void refresh_reportsZeroForEmptyQueuesAndAges() {
-    // No stubs: every count returns 0L and every MIN(createdAt) returns null.
     collector.refresh();
 
     assertThat(gauge(MetricNames.REGISTRATION_PENDING)).isEqualTo(0.0d);
@@ -134,8 +132,6 @@ class BusinessMetricsCollectorTest {
     assertThat(gauge(MetricNames.DELETION_REQUEST_PENDING_OLDEST_AGE)).isEqualTo(0.0d);
   }
 
-  // covers REQ-SEC-061 — the erasure-request queue is sampled, and its age gauge is what the
-  // Art. 12(3) deadline is measured against
   @Test
   void refresh_populatesTheDeletionRequestQueueGauges() {
     when(deletionRequestRepository.countByStatus(DeletionRequestStatus.PENDING)).thenReturn(1L);
@@ -145,11 +141,9 @@ class BusinessMetricsCollectorTest {
     collector.refresh();
 
     assertThat(gauge(MetricNames.DELETION_REQUEST_PENDING)).isEqualTo(1.0d);
-    // Past the 14-day DeletionRequestOverdue threshold, still inside the one-month statutory limit.
     assertThat(gauge(MetricNames.DELETION_REQUEST_PENDING_OLDEST_AGE)).isGreaterThan(1209600.0d);
   }
 
-  // covers REQ-SEC-059 - the half-finished-deletion gauges are sampled and report the OLDEST wait
   @Test
   void refresh_populatesTheUnfinishedDeletionGauges() {
     when(userRepository.countOrphanedMemberAccounts()).thenReturn(2L);
@@ -159,18 +153,11 @@ class BusinessMetricsCollectorTest {
     collector.refresh();
 
     assertThat(gauge(MetricNames.USERS_PENDING_DELETION)).isEqualTo(2.0d);
-    // Past the 7-day UserDeletionUnfinished threshold, which is the number the alert compares.
     assertThat(gauge(MetricNames.USERS_PENDING_DELETION_OLDEST_AGE)).isGreaterThan(604800.0d);
   }
 
-  // covers REQ-SEC-059 - the service-account exclusion is in the query, not in a config lookup
   @Test
   void refresh_readsTheOrphanQueriesThatExcludeServiceAccounts() {
-    // The exclusion used to depend on app.security.ingest-gateway.client-ids, which defaults
-    // empty -- and empty is exactly the configuration in which the orphan row gets created, because
-    // the machine-identity carve-out is gated on the same property. So it could only ever protect
-    // a deployment that would not have created the row. It is unconditional now, which is what
-    // these two verifications pin: the unfiltered counts must not be reachable at all.
     collector.refresh();
 
     verify(userRepository).countOrphanedMemberAccounts();
@@ -181,8 +168,6 @@ class BusinessMetricsCollectorTest {
   void refresh_recordsSuccessfulRunThroughTaskMetrics() {
     collector.refresh();
 
-    // The sampler is instrumented under business_metrics so a wedged refresh() is not a silent
-    // failure (#1041 item 3): one successful execution and a fresh last-success timestamp.
     assertThat(execCount(MetricNames.OUTCOME_SUCCESS)).isEqualTo(1.0d);
     assertThat(lastSuccess()).isGreaterThan(0.0d);
   }
@@ -192,16 +177,8 @@ class BusinessMetricsCollectorTest {
     when(userRepository.countByApprovalStatus(ApprovalStatus.PENDING))
         .thenThrow(new RuntimeException("DB down"));
 
-    // Must not propagate — the scheduler thread has to survive.
     collector.refresh();
 
-    // The failed sample is recorded as a failure and publishes NO last-success gauge at all. A 0
-    // would be wrong: BusinessMetricsStale computes time() - gauge, so a 0 fires it as "last
-    // succeeded 1970-01-01" rather than because the sampler wedged (the 2026-08-10 sentinel bug).
-    // A sampler that has never succeeded in this process is caught by ScheduledJobFailureStreak on
-    // the failure counter below — at a 60s cadence that trips within minutes. BusinessMetricsStale
-    // keeps covering the case it was written for: a sampler that succeeded, then wedged, freezing a
-    // REAL timestamp while ApprovalOverdue reads stale queue gauges.
     assertThat(execCount(MetricNames.OUTCOME_FAILURE)).isEqualTo(1.0d);
     assertThat(
             registry

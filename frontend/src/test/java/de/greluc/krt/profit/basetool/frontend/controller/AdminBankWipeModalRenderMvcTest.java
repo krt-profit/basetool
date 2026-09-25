@@ -71,14 +71,11 @@ class AdminBankWipeModalRenderMvcTest {
             .getContentAsString();
 
     assertThat(html).contains("id=\"bank-wipe-modal\"");
-    // variant param: the fragment appends krt-modal--danger to the base .krt-modal.
     assertThat(html).contains("class=\"krt-modal krt-modal--danger\"");
-    // unified close trigger on the fragment's close-X.
     assertThat(html)
         .contains("class=\"krt-modal-close\"")
         .contains("data-trigger=\"close-modal-display\"")
         .contains("data-modal-id=\"bank-wipe-modal\"");
-    // projected body present; the bespoke confirm form appears exactly once (no double-render).
     assertThat(html).contains("data-testid=\"bank-wipe-submit\"");
     assertThat(StringUtils.countOccurrencesOf(html, "data-bank-wipe")).isEqualTo(1);
   }

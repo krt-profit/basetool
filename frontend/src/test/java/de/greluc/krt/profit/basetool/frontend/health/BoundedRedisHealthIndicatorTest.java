@@ -42,19 +42,13 @@ class BoundedRedisHealthIndicatorTest {
 
   @Test
   void hangingDelegateIsCutOffAsDownWithinTheBound() {
-    // Given: a delegate that never completes — the shape of the wedged Lettuce acquisition, which
-    // no command timeout reaches.
     BoundedRedisHealthIndicator indicator =
         new BoundedRedisHealthIndicator(Mono::never, Duration.ofMillis(200));
 
-    // When
     Instant start = Instant.now();
     Health health = indicator.health().block(Duration.ofSeconds(5));
     Duration elapsed = Duration.between(start, Instant.now());
 
-    // Then: DOWN with the timeout detail, and well before the 5s Docker HEALTHCHECK budget the
-    // bound exists to protect (a regression dropping the timeout operator would trip the block()
-    // bound instead).
     assertNotNull(health, "the bounded check must emit a health result");
     assertEquals(Status.DOWN, health.getStatus(), "a timed-out PING must report DOWN");
     assertEquals(
@@ -68,15 +62,12 @@ class BoundedRedisHealthIndicatorTest {
 
   @Test
   void healthyDelegatePassesThroughUntouched() {
-    // Given: a delegate that answers promptly with its own detail.
     Health up = Health.up().withDetail("version", "7.4.0").build();
     BoundedRedisHealthIndicator indicator =
         new BoundedRedisHealthIndicator(() -> Mono.just(up), Duration.ofSeconds(1));
 
-    // When
     Health health = indicator.health().block(Duration.ofSeconds(5));
 
-    // Then: the delegate's health arrives unmodified — the bound is transparent on the happy path.
     assertNotNull(health, "the bounded check must emit a health result");
     assertEquals(Status.UP, health.getStatus(), "a healthy delegate must stay UP");
     assertEquals("7.4.0", health.getDetails().get("version"), "delegate details must pass through");

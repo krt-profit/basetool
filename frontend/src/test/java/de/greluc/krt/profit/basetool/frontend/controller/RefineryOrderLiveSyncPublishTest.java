@@ -76,9 +76,6 @@ class RefineryOrderLiveSyncPublishTest {
 
   @Test
   void topicsAndSectionsUsedHere_areTheOnesTheRegistryWhitelists() {
-    // Guards the string literals below (and in the controller): the relay silently DROPS a section
-    // key outside its class whitelist, so a typo would leave every peer stale with no error — the
-    // REQ-FE-010 failure mode. Pin both rooms this controller publishes to.
     assertThat(LiveSyncTopicClass.REFINERY.prefix()).isEqualTo("refinery");
     assertThat(LiveSyncTopicClass.REFINERY.allowedSections()).containsExactlyElementsOf(QUEUE);
     assertThat(LiveSyncTopicClass.INVENTORY_ALL.prefix()).isEqualTo("inventory");
@@ -123,8 +120,6 @@ class RefineryOrderLiveSyncPublishTest {
 
     controller.storeOrder(id, storeForm(), noErrors(), redirectAttributes);
 
-    // "Einlagern" writes the refined output into the inventory, so an open Lager must refresh too —
-    // without this cross-room poke it would sit stale until a manual reload (REQ-INV-027, #1307).
     verify(liveSyncLocalBus).publish("refinery", QUEUE);
     verify(liveSyncLocalBus).publish("inventory", STOCK);
   }
@@ -153,7 +148,6 @@ class RefineryOrderLiveSyncPublishTest {
 
   @Test
   void storeOrderAjax_onValidationFailure_pokesNeitherRoom() {
-    // A rejected store never reached the backend; nothing changed for peers to re-fetch.
     UUID id = UUID.randomUUID();
     BindingResult errors = noErrors();
     errors.reject("invalid");

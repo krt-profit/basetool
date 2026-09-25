@@ -276,10 +276,6 @@ public class IngestController {
       throw new BadRequestException("The blueprint export must be a JSON object.");
     }
     byte[] bytes = objectMapper.writeValueAsBytes(export);
-    // The body stays opaque (the backend parses it), but the envelope's provenance triple is read
-    // here so the blueprint path gets the same client-identity check and shape logging the refinery
-    // path has (REQ-INGEST-011). The export carries `tool`/`toolVersion`/`schemaVersion` itself, so
-    // this needs no extra header and no extractor change.
     return ingestService.ingestBlueprint(
         jwt.getSubject(), acceptLanguage, bytes, Provenance.from(export));
   }

@@ -111,8 +111,6 @@ class OrgUnitBankAccessServiceTest {
   @Mock private BankBookingRequestService bankBookingRequestService;
   @Mock private BankAuditService bankAuditService;
 
-  // Constructed in the @BeforeEach rather than by @InjectMocks: two of its collaborators are real,
-  // co-built sub-services
   private OrgUnitBankAccessService service;
 
   @BeforeEach
@@ -144,10 +142,6 @@ class OrgUnitBankAccessServiceTest {
     OrgUnitBankApprovalLimitService approvalLimitService =
         new OrgUnitBankApprovalLimitService(
             bankAccountRepository, approvalLimitRepository, userRepository, bankAuditService);
-    // Built through the constructor instead of patched in afterwards: these fields are
-    // `private final`, and reflective mutation of a final field is what JEP 500 (JDK 26)
-    // warns about and a later release will refuse. Arg order matches the
-    // @RequiredArgsConstructor field-declaration order of each service.
     service =
         new OrgUnitBankAccessService(
             ownerScopeService,
@@ -292,8 +286,6 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void listOverseenOrgUnitBalances_holderGrantedMembershipRole_makesAccountVisible() {
-    // REQ-BANK-035: a member with no oversight still sees an account where the holder granted their
-    // membership role on the owning unit.
     UUID staffelId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     OrgUnit staffel = squadron(staffelId, "Own", "OWN");
@@ -316,14 +308,11 @@ class OrgUnitBankAccessServiceTest {
     List<OrgUnitBankBalanceDto> result = service.listOverseenOrgUnitBalances();
 
     assertThat(result).extracting(OrgUnitBankBalanceDto::accountId).containsExactly(accountId);
-    // REQ-BANK-039: eligibility = view eligibility, so a member who may view a request-capable
-    // account may now also request against it (previously own-level oversight only).
     assertThat(result.getFirst().canRequest()).isTrue();
   }
 
   @Test
   void listOverseenOrgUnitBalances_cartelAccountVisibleToAnyMember() {
-    // REQ-BANK-037: the CARTEL/KRT account is always visible to every KRT member.
     UUID olId = UUID.randomUUID();
     UUID cartelId = UUID.randomUUID();
     Organisationsleitung ol = new Organisationsleitung();
@@ -347,7 +336,6 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void listOverseenOrgUnitBalances_cartelBankVisibleOnlyToProfitBereichsleiter() {
-    // REQ-BANK-037: CARTEL_BANK is held by the Profit-Bereichsleiter; a non-holder does not see it.
     UUID profitBereichId = UUID.randomUUID();
     UUID cartelBankId = UUID.randomUUID();
     Bereich profit = new Bereich();
@@ -374,8 +362,6 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void listOverseenOrgUnitBalances_specialAccountsSeenByBereichsleiterNotByOfficer() {
-    // REQ-BANK-037 (tightened REQ-BANK-028): Sonderkonten auto-visible to OL members and
-    // Bereichsleiter; an officer (squadron rank only) does not see them.
     UUID specialId = UUID.randomUUID();
     BankAccount special = specialAccount(specialId, "KB-0001", BankAccountStatus.ACTIVE);
     when(ownerScopeService.currentOversightScope())
@@ -418,7 +404,6 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void getViewableAccountBookings_redactsHolderHandles() {
-    // REQ-BANK-038: the player-custody columns are nulled before they cross the wire.
     UUID staffelId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0001", squadron(staffelId, "Own", "OWN"));
@@ -452,19 +437,13 @@ class OrgUnitBankAccessServiceTest {
     BankBookingDto redacted = page.getContent().getFirst();
     assertThat(redacted.holderHandle()).isNull();
     assertThat(redacted.counterHolderHandle()).isNull();
-    // REQ-BANK-044 (amended): the deposit/withdrawal counterparty (Einzahler/Empfänger) is now KEPT
-    // for org-unit viewers (owner decision); only the aUEC-custody Halter columns stay redacted.
     assertThat(redacted.counterpartyHandle()).isEqualTo("carol");
     assertThat(redacted.counterpartyOrgUnitName()).isEqualTo("Staffel Rot");
     assertThat(redacted.counterAccountNo()).isEqualTo("KB-0002");
-    // REQ-BANK-054: the requester-supplied note/Begruendung stay (they are not player-identifying),
-    // but the bank employee's own note is internal and must not reach an org-unit member.
     assertThat(redacted.note()).isEqualTo("note");
     assertThat(redacted.justification()).isEqualTo("Reparatur");
     assertThat(redacted.staffNote()).isNull();
     assertThat(redacted.amount()).isEqualByComparingTo("-100");
-    // REQ-BANK-045: the Begründung is not player-identifying, so it survives redaction like the
-    // note.
     assertThat(redacted.note()).isEqualTo("note");
     assertThat(redacted.justification()).isEqualTo("Reparatur");
   }
@@ -485,7 +464,6 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void getViewableBalanceSeries_delegatesForViewableAccount() {
-    // REQ-BANK-049: pure balance math for a viewable account — view-authorized, no redaction.
     UUID staffelId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0001", squadron(staffelId, "Own", "OWN"));
@@ -518,10 +496,6 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void getViewableAccountDetail_deniedWhenCallerMayNotView() {
-    // The backend endpoint is only isAuthenticated()-gated (it diverges from the page controller's
-    // MEMBER_OR_ABOVE gate), so a non-member — e.g. a GUEST hitting GET
-    // /api/v1/org-units/bank/accounts/{id} directly — must be stopped by the seam's canView guard
-    // before any account detail is loaded.
     UUID accountId = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0001", squadron(UUID.randomUUID(), "Own", "OWN"));
     when(bankAccountRepository.findById(accountId)).thenReturn(Optional.of(account));
@@ -534,7 +508,6 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void exportViewableStatement_authorizesAndPassesRedactionFlag() {
-    // REQ-BANK-038: the seam authorizes view access, then asks for the Halter-redacted variant.
     UUID staffelId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0001", squadron(staffelId, "Own", "OWN"));
@@ -606,8 +579,6 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void admin_maySetTargetAndConfigureVisibilityOnAnyAccountWithoutBeingHolder() {
-    // The admin override: an admin who is not the responsible holder may still set the balance
-    // target and configure the visibility of a Staffel account.
     UUID staffelId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0001", squadron(staffelId, "Own", "OWN"));
@@ -618,7 +589,6 @@ class OrgUnitBankAccessServiceTest {
     when(viewGrantRepository.existsByAccountIdAndGranteeKindAndRoleCode(
             accountId, BankAccountViewGranteeKind.MEMBERSHIP_ROLE, MembershipRole.ENSIGN.name()))
         .thenReturn(false);
-    // The admin holds no STAFFELLEITER role on the unit.
     when(ownerScopeService.currentUserHoldsRoleOnOrgUnit(staffelId, MembershipRole.STAFFELLEITER))
         .thenReturn(false);
 
@@ -662,7 +632,6 @@ class OrgUnitBankAccessServiceTest {
     when(ownerScopeService.currentUserHoldsRoleOnOrgUnit(staffelId, MembershipRole.STAFFELLEITER))
         .thenReturn(true);
 
-    // A squadron account has no BEREICHSKOORDINATOR bucket.
     assertThrows(
         de.greluc.krt.profit.basetool.backend.exception.BadRequestException.class,
         () -> service.addRoleVisibility(accountId, MembershipRole.BEREICHSKOORDINATOR.name()));
@@ -671,8 +640,6 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void createBookingRequest_viewableAccount_resolvesAndDelegates() {
-    // REQ-BANK-042: a deposit delegates straight through with no limit and no owner approval; it
-    // bypasses the view gate entirely (the oversight scope is never consulted for a deposit).
     UUID orgUnitId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0001", squadron(orgUnitId, "Own", "OWN"));
@@ -703,8 +670,6 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void createBookingRequest_splitDeposit_passesSplitSnapshotToCreate() {
-    // REQ-BANK-043: a split deposit request forwards split_enabled + split_percent to the
-    // org-unit-blind create(); the split is DEPOSIT-only and never approval-limited.
     UUID orgUnitId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0001", squadron(orgUnitId, "Own", "OWN"));
@@ -744,8 +709,6 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void createBookingRequest_depositOnUnviewableAccount_succeedsWithoutApprovalOrLimit() {
-    // REQ-BANK-042: a deposit is requestable against ANY active account by ANY user — no view gate,
-    // no oversight consult and never approval-limited (requiresOwnerApproval=false, limit=null).
     UUID orgUnitId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0001", squadron(orgUnitId, "Foreign", "FRG"));
@@ -771,15 +734,12 @@ class OrgUnitBankAccessServiceTest {
         .thenReturn(expected);
 
     assertThat(service.createBookingRequest(request)).isSameAs(expected);
-    // No view-eligibility check (oversight scope) and no approval-limit lookup for a deposit.
     verifyNoInteractions(ownerScopeService);
     verify(approvalLimitRepository, never()).findByAccountId(any());
   }
 
   @Test
   void createBookingRequest_depositOnSpecialAccount_succeeds() {
-    // REQ-BANK-042: a deposit may target a non-request-capable type (SPECIAL / CARTEL_BANK) too —
-    // isRequestCapable is not consulted for a deposit.
     UUID accountId = UUID.randomUUID();
     BankAccount special = specialAccount(accountId, "KB-0009", BankAccountStatus.ACTIVE);
     CreateBankBookingRequest request =
@@ -808,8 +768,6 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void createBookingRequest_depositAboveConfiguredLimit_neverFlagsApproval() {
-    // REQ-BANK-042: even with a user limit far below the amount, a deposit is never flagged and the
-    // limit rows are not consulted.
     UUID orgUnitId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     UUID caller = UUID.randomUUID();
@@ -860,7 +818,6 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void createBookingRequest_depositWithDestination_throwsBadRequest() {
-    // REQ-BANK-042/-040: a deposit must not carry a destination account.
     UUID accountId = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0001", squadron(UUID.randomUUID(), "Own", "OWN"));
     CreateBankBookingRequest request =
@@ -895,7 +852,6 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void createBookingRequest_aboveUserLimit_flagsRequiresOwnerApproval() {
-    // REQ-BANK-041: an individual-user limit below the requested amount flags the request.
     UUID orgUnitId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     UUID caller = UUID.randomUUID();
@@ -949,10 +905,6 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void createBookingRequest_withdrawalNoLimit_alwaysFlagsRequiresOwnerApproval() {
-    // REQ-BANK-041 (amended): when NO approval limit applies to the requester (no user, role or
-    // all-members limit configured), a withdrawal/transfer ALWAYS needs the responsible holder's
-    // approval — requiresOwnerApproval=true with applicableLimit=null. (Before the amendment a
-    // missing limit meant unlimited / never-needs-approval.)
     UUID orgUnitId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0001", squadron(orgUnitId, "Own", "OWN"));
@@ -1000,9 +952,6 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void createBookingRequest_transfer_passesDestination() {
-    // REQ-BANK-040: a transfer carries its destination account through to the request service.
-    // REQ-BANK-041 (amended): no approval limit is configured for this account, so the request now
-    // always needs the responsible holder's approval (requiresOwnerApproval=true, limit=null).
     UUID orgUnitId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     UUID destId = UUID.randomUUID();
@@ -1050,11 +999,6 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void createBookingRequest_nonMemberViewGrantHolder_notCappedByAllMembers_needsApproval() {
-    // REQ-BANK-047 (amends REQ-BANK-041): the all-members ceiling is now MEMBERS-ONLY. An outsider
-    // holding only a USER *view* grant (canView via the grant, but NOT a member of the owning unit
-    // and matching no USER/role limit) is NOT covered by the all-members limit — they fall through
-    // to approval-required (applicableLimit = null, requiresOwnerApproval = true,
-    // RESPONSIBLE_HOLDER).
     UUID orgUnitId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     UUID outsider = UUID.randomUUID();
@@ -1074,9 +1018,6 @@ class OrgUnitBankAccessServiceTest {
     when(viewGrantRepository.findByAccountId(accountId)).thenReturn(List.of(viewGrant));
     when(approvalLimitRepository.findByAccountId(accountId)).thenReturn(List.of(allMembers));
     when(authHelperService.currentUserId()).thenReturn(Optional.of(outsider));
-    // The outsider is NOT a member of the owning unit (currentUserIsMemberOfOrgUnit defaults
-    // false),
-    // so the ALL_MEMBERS ceiling does not apply.
     when(bankBookingRequestService.create(
             eq(accountId),
             eq(BankBookingRequestType.WITHDRAWAL),
@@ -1115,9 +1056,6 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void createBookingRequest_allMembersLimit_appliesToActualOwningUnitMember() {
-    // REQ-BANK-047: the ALL_MEMBERS ceiling now applies ONLY to an actual member of the owning
-    // unit.
-    // A member requesting above the ceiling is flagged for the responsible holder's approval.
     UUID orgUnitId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     UUID member = UUID.randomUUID();
@@ -1195,8 +1133,6 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void createBookingRequest_krtWithinEmployeeCeiling_needsNoApproval() {
-    // REQ-BANK-047: a KRT withdrawal at or below T1 needs no external approval; the bank employee
-    // self-approves. applicable_limit is T1 (display), required_approver null.
     UUID accountId = UUID.randomUUID();
     krtAccountWithTiers(accountId, "1000", "5000");
     CreateBankBookingRequest request =
@@ -1239,7 +1175,6 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void createBookingRequest_krtMiddleBand_routesToBereichsleiterProfit() {
-    // REQ-BANK-047: a KRT withdrawal above T1 and at/below T2 needs the Bereichsleiter Profit.
     UUID accountId = UUID.randomUUID();
     krtAccountWithTiers(accountId, "1000", "5000");
     CreateBankBookingRequest request =
@@ -1282,7 +1217,6 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void createBookingRequest_krtTopBand_routesToOrganisationsleitung() {
-    // REQ-BANK-047: a KRT withdrawal above T2 needs the Organisationsleitung.
     UUID accountId = UUID.randomUUID();
     krtAccountWithTiers(accountId, "1000", "5000");
     CreateBankBookingRequest request =
@@ -1325,10 +1259,6 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void createBookingRequest_byResponsibleHolder_needsNoApproval() {
-    // REQ-BANK-041 (owner decision): the responsible holder disposes freely over their own account.
-    // No limit is configured, which for anyone else would mean approval-required — the
-    // Staffelleiter
-    // is exempt regardless: requiresOwnerApproval=false, applicableLimit=null, no approver.
     UUID orgUnitId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0020", squadron(orgUnitId, "Nemesis", "NEM"));
@@ -1373,14 +1303,11 @@ class OrgUnitBankAccessServiceTest {
             eq(null),
             eq(null),
             eq(null));
-    // The holder's exemption short-circuits before any limit lookup.
     verify(approvalLimitRepository, never()).findByAccountId(accountId);
   }
 
   @Test
   void createBookingRequest_byResponsibleHolderAboveConfiguredLimit_stillNeedsNoApproval() {
-    // REQ-BANK-041 (owner decision): limits bind everyone EXCEPT the holder — a ceiling configured
-    // on the account (here an all-members limit far below the amount) does not apply to them.
     UUID orgUnitId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     BankAccount account = account(accountId, "KB-0020", squadron(orgUnitId, "Nemesis", "NEM"));
@@ -1429,8 +1356,6 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void createBookingRequest_krtByOlMember_bypassesAmountLadder() {
-    // REQ-BANK-041/-047 (owner decision): an OL member is the KRT account's responsible holder, so
-    // the amount ladder does not bind them — an amount above T2 still needs no approver.
     UUID accountId = UUID.randomUUID();
     krtAccountWithTiers(accountId, "1000", "5000");
     when(ownerScopeService.currentUserIsOlMember()).thenReturn(true);
@@ -1474,8 +1399,6 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void grantOwnerApproval_byNonResponsibleHolder_throwsAccessDenied() {
-    // Security review (S1): only the account's responsible holder (or an admin) may grant the
-    // in-app owner approval; a non-responsible, non-admin caller is rejected before any delegation.
     UUID requestId = UUID.randomUUID();
     UUID orgUnitId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
@@ -1493,8 +1416,6 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void grantOwnerApproval_byResponsibleHolder_delegates() {
-    // Security review (S1): the responsible holder (Staffelleiter of the owning unit) passes the
-    // guard and the seam delegates the blind mutation to the booking-request service.
     UUID requestId = UUID.randomUUID();
     UUID orgUnitId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
@@ -1518,12 +1439,6 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void grantOwnerApproval_byAdmin_approvesAnyKrtBand() {
-    // REQ-BANK-047/ADR-0109: an admin may approve every KRT band, not just its band approver.
-    // canApprove short-circuits on isAdmin() before the band switch, so a BANK_MANAGEMENT-band
-    // request is granted WITHOUT stubbing hasReachableRole(BANK_MANAGEMENT) — proving the admin
-    // bypass (the same short-circuit covers the ORGANISATIONSLEITUNG band). A regression that
-    // dropped the admin bypass would fall into the switch, find hasBankManagement() == false and
-    // throw AccessDenied instead of delegating.
     UUID requestId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     BankAccount cartel =
@@ -1548,12 +1463,6 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void createBookingRequest_krtAboveT1_unsetAreaLeadCeiling_routesToBankManagement() {
-    // REQ-BANK-047/ADR-0109: on the KRT (CARTEL) account an UNSET area-lead ceiling (T2 == null)
-    // means the Bankleitung covers everything above T1 and the Organisationsleitung band is empty.
-    // An over-T1 request with T2 unset must route to BANK_MANAGEMENT via the `t2 == null ||`
-    // short-circuit — never NPE on compareTo(null) nor mis-route to ORGANISATIONSLEITUNG. The three
-    // existing ladder tests only exercise the both-thresholds-set path, so this pins the null
-    // guard.
     UUID accountId = UUID.randomUUID();
     BankAccount cartel =
         typedAccount(
@@ -1586,8 +1495,6 @@ class OrgUnitBankAccessServiceTest {
 
     service.createBookingRequest(request);
 
-    // The single create call routed to BANK_MANAGEMENT with the T1 display ceiling — never
-    // ORGANISATIONSLEITUNG, whose band is empty when T2 is unset.
     verify(bankBookingRequestService)
         .create(
             eq(accountId),
@@ -1607,10 +1514,6 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void raiseCartelDirectBookingRequest_middleBand_routesToBankManagement() {
-    // REQ-BANK-047/ADR-0109: the bank-staff over-ceiling auto-request path files a band-routed
-    // request via the SAME create() call as the officer path, but without the canView/canRequest
-    // gate (the caller already passed the BankSecurityService capability gate) and carrying the
-    // direct-booking note + justification. T1 < 3000 <= T2 routes to the Bankleitung.
     UUID accountId = UUID.randomUUID();
     BankAccount cartel =
         typedAccount(
@@ -1661,7 +1564,6 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void raiseCartelDirectBookingRequest_topBand_routesToOrganisationsleitung() {
-    // Above T2 the auto-request routes to the Organisationsleitung (REQ-BANK-047/ADR-0109).
     UUID accountId = UUID.randomUUID();
     BankAccount cartel =
         typedAccount(
@@ -1707,12 +1609,6 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void createBookingRequest_userLimitWinsOverHigherRoleTier() {
-    // REQ-BANK-041/-047: an individual USER limit wins outright via the early return, even when a
-    // matched membership-role tier is HIGHER. USER=100 and a matched MEMBERSHIP_ROLE=1000 both
-    // apply
-    // to a 500-aUEC withdrawal: the resolved ceiling must be 100, so the request is flagged
-    // (requiresOwnerApproval=true). If the early return regressed into the max() loop the caller
-    // would get 1000 and the withdrawal would auto-approve — a financial-control bypass.
     UUID orgUnitId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     UUID caller = UUID.randomUUID();
@@ -1734,9 +1630,6 @@ class OrgUnitBankAccessServiceTest {
     when(approvalLimitRepository.findByAccountId(accountId))
         .thenReturn(List.of(roleLimit, userLimit));
     when(authHelperService.currentUserId()).thenReturn(Optional.of(caller));
-    // The role tier would match and is higher — the USER early return must still win (the role stub
-    // is never reached under correct code; it pins the regression scenario the early return
-    // guards).
     when(ownerScopeService.currentUserHoldsRoleOnOrgUnit(orgUnitId, MembershipRole.ENSIGN))
         .thenReturn(true);
     when(bankBookingRequestService.create(
@@ -1776,13 +1669,6 @@ class OrgUnitBankAccessServiceTest {
 
   @Test
   void createBookingRequest_multipleMatchedTiers_usesMostPermissiveMax() {
-    // REQ-BANK-041/-047: with no USER limit, the resolved ceiling is the MOST PERMISSIVE (max)
-    // value
-    // across every membership tier the caller matches. On a Bereichskonto a caller matching both a
-    // MEMBERSHIP_ROLE=100 and the AREA_MEMBERS=1000 cascade must be capped at 1000, so a 500-aUEC
-    // withdrawal auto-approves (requiresOwnerApproval=false). If best.max() regressed to
-    // first-match
-    // or min the caller would be capped at 100 and wrongly forced into approval.
     UUID bereichId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     UUID caller = UUID.randomUUID();
@@ -1861,7 +1747,6 @@ class OrgUnitBankAccessServiceTest {
 
     assertThat(own).hasSize(1);
     assertThat(own.getFirst().staffNote()).isNull();
-    // Everything else survives verbatim -- the requester still reads back their own note.
     assertThat(own.getFirst().note()).isEqualTo("from sale");
     assertThat(own.getFirst().id()).isEqualTo(withNote.id());
     assertThat(own.getFirst().version()).isEqualTo(withNote.version());
@@ -1877,8 +1762,6 @@ class OrgUnitBankAccessServiceTest {
   void listRequestsForResponsibleAccounts_keepsTheStaffNote() {
     UUID accountId = UUID.randomUUID();
     UUID orgUnitId = UUID.randomUUID();
-    // An admin is responsible for every account, which keeps this focused on the redaction rather
-    // than on re-deriving responsible-holder resolution (covered by its own service test).
     when(authHelperService.isAdmin()).thenReturn(true);
     when(bankAccountRepository.findAllByOrderByAccountNoAsc())
         .thenReturn(List.of(account(accountId, "KB-0001", null)));

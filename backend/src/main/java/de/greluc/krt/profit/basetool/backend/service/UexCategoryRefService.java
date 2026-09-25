@@ -78,9 +78,6 @@ public class UexCategoryRefService {
     log.info("Starting synchronization of UEX categories...");
     UexClient.FetchResult<UexCategoryDto> fetched = uexClient.getCategories();
     if (fetched.notModified()) {
-      // A conditional-GET hit: the category table is byte-identical to the last run, so there is
-      // nothing to upsert. The persisted rows are still the current truth and are handed to the
-      // item sync unchanged — this is a healthy no-op, not the outage the WARN below reports.
       log.info("UEX category catalogue unchanged since the last sync (304) — nothing to import.");
       return chunkWriter.inNewTransaction(repository::findAll);
     }
@@ -91,9 +88,6 @@ public class UexCategoryRefService {
     }
 
     Instant now = Instant.now();
-    // BE-PERF-09 / REQ-DATA-005: written after the fetch in chunk transactions of their own; a
-    // refused chunk is replayed row by row. Each row reports what it did, so a replay cannot
-    // double-count.
     SyncChunkWriter.Outcome<String> outcome =
         chunkWriter.write(
             dtos,
@@ -132,9 +126,6 @@ public class UexCategoryRefService {
     }
     String type = dto.type() == null ? "item" : dto.type();
     if (!"item".equals(type) && !"vehicle".equals(type)) {
-      // uex_category.type is constrained to ('item','vehicle') (chk_uex_category_type, V109), the
-      // only types the item sync reads. UEX also returns other types (e.g. 'service') that carry
-      // no items; skip them so a single unsupported type never aborts the whole UEX sweep.
       log.debug("Skipping UEX category {} with unsupported type '{}'", dto.id(), type);
       return "skipped";
     }

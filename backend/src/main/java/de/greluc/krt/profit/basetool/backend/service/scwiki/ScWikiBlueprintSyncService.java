@@ -166,10 +166,6 @@ public class ScWikiBlueprintSyncService {
             new ParameterizedTypeReference<ScWikiResponseDto<ScWikiBlueprintDto>>() {},
             "blueprints");
     if (listResult.notModified()) {
-      // Blueprint list unchanged since the last sync (ETag 304): the per-UUID detail fetches are
-      // never reached (they only run for the enumerated list), so nothing is upserted — but this is
-      // a healthy run. Report the live blueprint count so an all-304 run is not read as a zero-item
-      // outage (#1182). A genuine empty-200 falls through to isEmpty() and reports 0.
       long live = blueprintRepository.countLiveScwikiBlueprints();
       log.info(
           "SC Wiki blueprint list unchanged since last sync (304) — reporting {} live blueprint"
@@ -189,10 +185,6 @@ public class ScWikiBlueprintSyncService {
     int processed = 0;
     int unresolvedLines = 0;
     int detailMisses = 0;
-    // #327 curated output-name override bookkeeping. overrideKeysSeen maps each override-bearing
-    // scwiki_key the feed carried this run to the upstream output_name observed for it;
-    // overrideKeysFired holds the keys whose guard actually matched. A key seen but not fired means
-    // CIG changed the wrong name and the override is obsolete (reported after the loop).
     Map<String, String> overrideKeysSeen = new LinkedHashMap<>();
     Set<String> overrideKeysFired = new HashSet<>();
 
@@ -202,10 +194,6 @@ public class ScWikiBlueprintSyncService {
       }
       try {
         seen.add(listDto.uuid());
-        // requirement_groups (the stat modifiers) and summary_properties are detail-only, so fetch
-        // each blueprint's detail. Pace + fetch OUTSIDE any transaction so no blueprint row lock is
-        // held across the HTTP round-trip; the DB write runs in its own REQUIRES_NEW transaction
-        // (via the self proxy) so a deadlock rolls back only this recipe and the loop continues.
         scWikiClient.paceForRateLimit();
         ScWikiBlueprintDto detail =
             scWikiClient.fetchOne(
@@ -216,8 +204,6 @@ public class ScWikiBlueprintSyncService {
           detailMisses++;
         }
         ScWikiBlueprintDto dto = detail != null ? detail : listDto;
-        // Override bookkeeping (the correction itself is applied inside the upsert): record the key
-        // as seen and, if the guard matches, as fired, so an obsolete override can be reported.
         if (outputNameOverrides.isRegistered(dto.key())) {
           overrideKeysSeen.put(dto.key(), dto.outputName());
           if (outputNameOverrides.fires(dto.key(), dto.outputName())) {
@@ -233,10 +219,6 @@ public class ScWikiBlueprintSyncService {
     }
 
     if (!seen.isEmpty() && !listResult.complete()) {
-      // The list page walk could not vouch for the census (a page failed, the pagination metadata
-      // went missing on a full page, or meta.total disagreed with the merged rows). The uuids we
-      // did see are real, but every blueprint on the pages that were never fetched is absent from
-      // `seen` for that reason alone and would be tombstoned for it. Defer to the next full run.
       log.warn(
           "Skipping the blueprint scwiki_deleted sweep: the Wiki blueprint page walk did not"
               + " enumerate the whole feed this run, so the {} uuid(s) it saw are not a complete"
@@ -291,8 +273,6 @@ public class ScWikiBlueprintSyncService {
     Blueprint bp = blueprintRepository.findByScwikiUuid(scwikiUuid).orElseGet(Blueprint::new);
     bp.setScwikiUuid(scwikiUuid);
     bp.setScwikiKey(dto.key());
-    // #327: correct known CIG-mislabeled output names before persisting. Guarded + self-healing —
-    // the upstream value passes through untouched unless it matches a registered wrong name.
     bp.setOutputName(outputNameOverrides.correct(dto.key(), dto.outputName()));
     bp.setCategoryUuid(dto.categoryUuid());
     bp.setCraftTimeSeconds(dto.craftTimeSeconds());
@@ -307,8 +287,6 @@ public class ScWikiBlueprintSyncService {
     if (dto.requirementGroups() != null && !dto.requirementGroups().isEmpty()) {
       unresolved = applyRequirementGraph(bp, dto, runId);
     } else {
-      // Fallback: no detail (transient miss) — use the flat list ingredients and leave any
-      // previously captured group / summary data untouched so a miss never wipes good stats.
       unresolved = applyIngredients(bp, dto, runId);
     }
     applyDismantleReturns(bp, dto, runId);

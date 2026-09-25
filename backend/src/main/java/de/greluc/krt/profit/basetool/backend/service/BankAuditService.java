@@ -118,19 +118,11 @@ public class BankAuditService {
             .accountId(accountId)
             .transactionId(transactionId)
             .targetUserId(targetUserId)
-            // Persist the rendered payload; a null stays null (no details), any other CharSequence
-            // (an AuditDetails composer or a raw String) is stringified byte-identically.
             .details(details == null ? null : details.toString())
-            // Read at write time from the SAME authentication the actor came from, so the two
-            // halves of "who, through what" can never describe different requests. Always a
-            // value, never null: a caller with no token records `none`, which the row's `system`
-            // actor handle then distinguishes from the token-with-no-azp case (REQ-AUDIT-005).
             .clientId(
                 clientAttribution.labelOf(authHelperService.currentAuthentication().orElse(null)))
             .build();
     BankAuditEvent saved = auditEventRepository.save(event);
-    // Bank-trail volume signal (#1041 item 10): counts only, tagged by the bounded
-    // BankAuditEventType — never amounts, account numbers or holder identities (REQ-OBS-006/-011).
     meterRegistry
         .counter(MetricNames.BANK_AUDIT_EVENTS, MetricNames.TAG_EVENT_TYPE, eventType.name())
         .increment();

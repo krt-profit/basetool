@@ -31,7 +31,6 @@ public interface LocationMapper {
   LocationDto toDto(Location entity);
 
   /** Builds a new {@link Location} entity from the inbound DTO. */
-  // city / spaceStation are UEX-synced placement, never accepted from the admin form.
   @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "updatedAt", ignore = true)
   @Mapping(target = "city", ignore = true)

@@ -88,7 +88,6 @@ class HalfWrittenSessionHashIntegrationTest {
     connectionFactory.afterPropertiesSet();
     connectionFactory.start();
 
-    // Assembled exactly as RedisSessionConfig assembles it in production.
     RedisSerializer<Object> sessionSerializer =
         new FaultTolerantSessionSerializer(
             new GenericJacksonJsonRedisSerializer(
@@ -153,9 +152,6 @@ class HalfWrittenSessionHashIntegrationTest {
 
   @Test
   void aDeltaWriteAfterTheHashVanishesReCreatesItHalfWritten() {
-    // The producer, reproduced: read a live session, lose its hash underneath the request, then let
-    // the request commit. saveDelta HSETs only what changed, so the key comes back holding one
-    // field — and carries a TTL again, which is why the state is durable rather than a blip.
     RedisIndexedSessionRepository.RedisSession session = repository.createSession();
     repository.save(session);
     String id = session.getId();
@@ -178,8 +174,6 @@ class HalfWrittenSessionHashIntegrationTest {
 
   @Test
   void aHalfWrittenHashReadsAsNoSessionInsteadOfThrowing() {
-    // The fix. Before it, findById threw IllegalStateException out of the repository and every
-    // request that browser made answered 500 until the cookie was deleted by hand.
     String id = halfWrittenSession();
 
     double before = unmappable(CREATION_TIME);
@@ -193,9 +187,6 @@ class HalfWrittenSessionHashIntegrationTest {
 
   @Test
   void theHalfWrittenHashIsNotRepairedFromTheReadPath() {
-    // ADR-0157's boundary, pinned: the mapper reports and gives up, it never writes. Repairing here
-    // would put a Redis write on the session READ path — the subsystem that took the whole
-    // application down twice inside two releases. The orphan is left to expire with its TTL.
     String id = halfWrittenSession();
 
     repository.findById(id);
@@ -207,8 +198,6 @@ class HalfWrittenSessionHashIntegrationTest {
 
   @Test
   void aSessionThatKeepsItsRequiredFieldsIsUnaffected() {
-    // The guard must not change the ordinary read. An unmappable hash is the exception; every
-    // healthy session still loads, and nothing is counted.
     RedisIndexedSessionRepository.RedisSession session = repository.createSession();
     session.setAttribute("welcomeMessageShown", Boolean.TRUE);
     repository.save(session);

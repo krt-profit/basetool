@@ -45,7 +45,5 @@ final class DiscordHttp {
   /** The shared client; default trust (Discord presents a publicly-trusted certificate). */
   static final HttpClient CLIENT = HttpClient.newBuilder().connectTimeout(TIMEOUT).build();
 
-  private DiscordHttp() {
-    // Constant holder — not instantiable.
-  }
+  private DiscordHttp() {}
 }

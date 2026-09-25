@@ -103,9 +103,6 @@ public class DiscordRegistrationAdminController {
   public List<PendingRegistrationDto> list(
       @RequestParam(name = "status", required = false)
           @Nullable
-          // ACTIVE is a legal ApprovalStatus but not a legal argument here (it would dump every
-          // member), so the published schema advertises only the two values that can succeed
-          // rather than the whole enum springdoc would otherwise reflect.
           @Parameter(schema = @Schema(allowableValues = {"PENDING", "REJECTED"}))
           ApprovalStatus status) {
     List<User> users =

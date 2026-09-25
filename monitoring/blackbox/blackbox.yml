@@ -1,21 +1,10 @@
-# Blackbox exporter probe modules. blackbox_exporter 0.28.x (verified 2026-07). Epic #936.
-# The http_2xx module terminates TLS on the https:// targets, so probe_ssl_earliest_cert_expiry is
-# emitted for the certificate-expiry alert. fail_if_not_ssl stays false so a handshake still returns
-# metrics rather than failing outright.
-#
-# The deny/posture modules below (REQ-OBS-012) assert edge configuration that lives only in the NPM
-# admin DB and would otherwise drift invisibly. Deliberately NOT covered here: the Keycloak /admin
-# allow-list — probes from this exporter hairpin through the host and are SNAT'd to the Docker
-# bridge gateways, which are exactly the allow-listed sources, so from this vantage point /admin
-# always looks reachable. That assertion runs externally instead
-# (.github/workflows/edge-deny-probe.yml).
 modules:
   http_2xx:
     prober: http
     timeout: 10s
     http:
       valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
-      valid_status_codes: []  # defaults to 2xx
+      valid_status_codes: []
       method: GET
       follow_redirects: true
       fail_if_ssl: false
@@ -25,13 +14,6 @@ modules:
       tls_config:
         insecure_skip_verify: false
 
-  # Internal self-signed TLS probe (#1041 item 8, REQ-OBS-008). Validates the basetool-CA-signed
-  # keystore.p12 cert on the three app modules and emits probe_ssl_earliest_cert_expiry, so the
-  # (unfiltered) CertificateExpiringSoon alert catches the internal cert's expiry 14 days ahead —
-  # before it simultaneously breaks all three app scrapes, the frontend->backend WebClient and the
-  # NPM->Grafana re-encryption (today only a same-day TargetDown warns). The apps answer their root
-  # with an auth/redirect status, so any of 200/302/303/401/403 counts as reachable. follow_redirects
-  # stays false so a redirect target's cert is not probed instead.
   https_internal:
     prober: http
     timeout: 10s
@@ -47,10 +29,6 @@ modules:
       tls_config:
         ca_file: /etc/blackbox/certs/basetool-ca.crt
 
-  # Grafana serves its OWN self-signed cert (not basetool-CA-signed), so chain validation would fail;
-  # insecure_skip_verify lets the handshake complete while blackbox still emits
-  # probe_ssl_earliest_cert_expiry for the expiry alert. Same accepted status set (Grafana's
-  # OIDC-gated root redirects / 401s).
   https_internal_insecure:
     prober: http
     timeout: 10s
@@ -66,10 +44,6 @@ modules:
       tls_config:
         insecure_skip_verify: true
 
-  # Auth-protected public endpoints (the ingest gateway answers 401 on its probed path). A 401 still
-  # proves the endpoint is reachable AND the TLS cert is valid — exactly what this probe checks. A real
-  # outage (timeout / connection error / 5xx) is NOT in the valid list and still fails the probe, so
-  # probe_success flips to 0 and the BlackboxProbeFailed alert still catches it.
   http_2xx_or_401:
     prober: http
     timeout: 10s
@@ -85,34 +59,12 @@ modules:
       tls_config:
         insecure_skip_verify: false
 
-  # IPv6 reachability. The public vhosts now carry AAAA records (owner-confirmed 2026-07-06), so a
-  # broken IPv6 path is a real user-facing regression the IPv4 http_2xx job cannot see. These modules
-  # pin the probe to IPv6 with NO v4 fallback, so probe_success flips to 0 when the endpoint is
-  # unreachable over IPv6 while IPv4 still answers. Otherwise identical to their IPv4 counterparts.
-  # NOTE (issue #1252): this only measures the REAL edge because the blackbox-exporter container has its
-  # own IPv6 egress — the net-blackbox-v6 bridge in docker-compose.monitoring.yml. Without it the
-  # container has no v6 route and every probe here CONNECT-fails locally, a STRUCTURAL false
-  # EdgeIpv6Unreachable, not an edge regression. The modules are correct as-is; the v6 route is
-  # load-bearing — do not drop net-blackbox-v6 from the exporter's networks list.
-  #
-  # THAT ROUTE IS NECESSARY AND NOT SUFFICIENT under rootless Podman — learned 2026-09-22, and the
-  # note above reads as a complete answer, which is how the gap survived the cutover. The exporter
-  # had its v6 route and reached Cloudflare over IPv6 fine; what it could not reach was its own
-  # machine, in EITHER family, because a rootless container has no hairpin. ADR-0196 aliases the
-  # public names to `host-gateway` to solve that — and `host-gateway` is IPv4 only, so these two
-  # ip6-pinned modules were left with no address at all and failed with "no suitable address found"
-  # against an edge serving IPv6 perfectly well.
-  #
-  # Three things now have to hold together, and each is silent on its own: the v6 route (here),
-  # a v6 `--map-guest-addr` in the rootless netns's pasta (containers.conf, from the Ansible role),
-  # and a v6 `AddHost` for these names on this container (the 10-host-alias.conf drop-in). See
-  # ADR-0196 Amendment 1.
   http_2xx_ipv6:
     prober: http
     timeout: 10s
     http:
       valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
-      valid_status_codes: []  # defaults to 2xx
+      valid_status_codes: []
       method: GET
       follow_redirects: true
       fail_if_ssl: false
@@ -137,29 +89,6 @@ modules:
       tls_config:
         insecure_skip_verify: false
 
-  # Public DNS resolution. The probe TARGET is the resolver (see prometheus.yml: 1.1.1.1); the query
-  # name/type live here. Requires NOERROR AND at least one answer RR carrying an address of the
-  # queried family, so a NODATA response (zone still NOERROR but the A/AAAA record silently removed)
-  # fails the probe, not only NXDOMAIN. preferred_ip_protocol ip4 connects to the v4 resolver; the
-  # query type (A vs AAAA) is what is asserted.
-  #
-  # `fail_if_none_matches_regexp` ("at least ONE answer RR matches"), never
-  # `fail_if_not_matches_regexp` ("EVERY answer RR matches"). The latter cannot express this
-  # assertion on a name that is a CNAME: the answer section then carries the alias RR *and* the
-  # address RR, and an alias RR matches no address regexp, so the probe fails while DNS is perfectly
-  # healthy. That is what fired DnsResolutionFailed for blackbox-dns-api-a/-aaaa from their first
-  # scrape on 2026-08-18 — api.profit-base.online is a CNAME to the apex. The apex modules escaped
-  # it only because the apex carries direct A/AAAA records (a CNAME there is not legal anyway), so
-  # they answer with a single RR; they are written the same way here because the difference was
-  # never intentional, and a future zone edit must not be able to resurrect this.
-  #
-  # The regexp deliberately does NOT bind the owner name. These probes assert that the name RESOLVES
-  # to an address, not which intermediate names the chain runs through — binding the owner is the
-  # exact mistake above, and it would misfire again on any legitimate re-pointing of the CNAME. It
-  # IS anchored to an address literal, so an answer holding only a CNAME (alias whose target has no
-  # address record) still fails. Verified against a local blackbox_exporter v0.28.0 over a CoreDNS
-  # zone: direct-A, CNAME-chain, dangling-CNAME, NODATA and NXDOMAIN each keep their intended
-  # verdict — only the CNAME-chain verdict changes, from a false failure to a pass.
   dns_apex_a:
     prober: dns
     timeout: 5s
@@ -186,14 +115,6 @@ modules:
         fail_if_none_matches_regexp:
           - "\\s+\\d+\\s+IN\\s+AAAA\\s+[0-9a-fA-F:.]+$"
 
-  # Same assertions for the API vhost of the mobile-client exposure (ADR-0135). Its records are
-  # separate from the apex's, so the apex probes above prove nothing about them: a zone edit that
-  # drops api.profit-base.online leaves both apex probes green while every app in the field loses
-  # the backend. Live since the phase-F cut-over (docs/archive/API_VHOST_ROLLOUT_RUNBOOK.md); the jobs that
-  # drive them are blackbox-dns-api-a / -aaaa in prometheus.yml.
-  #
-  # api.profit-base.online is a CNAME to the apex, so these two are the modules the owner-bound
-  # regexp broke — see the directive note above before touching the assertion.
   dns_api_a:
     prober: dns
     timeout: 5s
@@ -220,9 +141,6 @@ modules:
         fail_if_none_matches_regexp:
           - "\\s+\\d+\\s+IN\\s+AAAA\\s+[0-9a-fA-F:.]+$"
 
-  # Succeeds ONLY on exactly 404 — the /actuator edge deny (ADR-0072 compensating control). The
-  # live block is `location /actuator { return 404; }`; if it drifts, the Spring apps answer the
-  # probed /actuator/prometheus path with 401 (fail-closed basic auth) and the probe fails.
   http_deny_404:
     prober: http
     timeout: 10s
@@ -238,18 +156,6 @@ modules:
       tls_config:
         insecure_skip_verify: false
 
-  # Succeeds ONLY when a former public page sends an anonymous visitor into the OAuth2 flow —
-  # REQ-SEC-052 seen from outside, where a member's browser sees it. `/missions` was reachable
-  # without a login until ADR-0159; the redirect is now the whole user-visible contract, and the
-  # failure it guards against is silent in both directions: an edge rule or cache that starts
-  # serving the page from somewhere else reads as 200, and a chain misconfiguration that drops the
-  # entry point reads as 401 on a page a browser navigated to. Either is a regression nothing else
-  # would page on — the app's own sweeps run inside the process, against MockMvc.
-  #
-  # follow_redirects stays false so the FIRST response is asserted; following it would land on
-  # Keycloak and assert Keycloak's status instead. The Location regexp binds only the entry-point
-  # path, not the query, because the first visit carries `?prompt=none` (silent SSO) and a later
-  # one does not.
   http_members_only_redirect:
     prober: http
     timeout: 10s
@@ -259,16 +165,8 @@ modules:
       method: GET
       follow_redirects: false
       headers:
-        # Asserted as a BROWSER NAVIGATION, which is the only shape that redirects: a background
-        # call answers 401 by design (REQ-SEC-012), and probing without these headers would assert
-        # the wrong half of the contract.
         Accept: "text/html,application/xhtml+xml"
         Sec-Fetch-Mode: "navigate"
-        # And says it is us, so the frontend's request cache does not remember the probe.
-        # `Sec-Fetch-Mode: navigate` is the branch that cache saves, and saving creates a Redis
-        # session: three targets every 30s against a 30-minute anonymous timeout settle at roughly
-        # 180 permanently resident sessions, for ever. Monitoring the members-only change must not
-        # reintroduce the session accretion the change removed (WP-F 11, REQ-SEC-025).
         X-Basetool-Probe: "members-only"
       fail_if_header_not_matches:
         - header: Location
@@ -280,8 +178,6 @@ modules:
       tls_config:
         insecure_skip_verify: false
 
-  # Succeeds ONLY when plain-HTTP port 80 answers with a redirect to https:// — the per-host
-  # "Force SSL" toggle in NPM. follow_redirects stays false so the first response is asserted.
   http_force_ssl_redirect:
     prober: http
     timeout: 10s
@@ -296,9 +192,6 @@ modules:
       preferred_ip_protocol: "ip4"
       ip_protocol_fallback: false
 
-  # Succeeds ONLY when the FIRST response already carries Strict-Transport-Security (app-side HSTS
-  # per security-audit finding H-9, forwarded through the edge). follow_redirects stays false —
-  # following would assert the redirect target's (Keycloak's) headers instead of the probed host's.
   http_2xx_hsts:
     prober: http
     timeout: 10s
@@ -317,11 +210,6 @@ modules:
       tls_config:
         insecure_skip_verify: false
 
-  # HSTS on a surface whose probeable path answers 401. The API vhost proxies an allow-list of
-  # /api/** families and 404s everything else, so there is no unauthenticated 2xx to probe — the
-  # plain http_2xx_hsts module would fail on the status before it ever looked at the header and
-  # read as "HSTS is broken". Spring Security writes the header on the 401 too, so the assertion is
-  # unchanged; only the accepted status set differs.
   http_2xx_or_401_hsts:
     prober: http
     timeout: 10s
@@ -340,20 +228,6 @@ modules:
       tls_config:
         insecure_skip_verify: false
 
-  # Succeeds ONLY when a public path answers 200 on the FIRST response — the inverse of
-  # http_members_only_redirect, and the module REQ-SEC-052's public half was missing.
-  #
-  # follow_redirects is the whole point. http_2xx follows them, so a probe there stays green after
-  # a public path has regressed into the OAuth entry point: the probe dutifully follows the 302,
-  # Keycloak answers 200, and the module reports success on an endpoint that is now the login page.
-  # That is worse than no probe, because it reads as coverage. Asserting the first response is what
-  # makes the difference, and it is why this module exists separately rather than as another
-  # blackbox-http target.
-  #
-  # The failure it guards is silent and prod-only: a cache rule, a stale upstream, a mis-ordered
-  # NPM location, or a permitAll entry lost in a merge. The app's own sweeps run in-process against
-  # MockMvc and stay green through every one of those. /.well-known/assetlinks.json broke exactly
-  # this way once and was found from a member's report of a broken login.
   http_public_200_no_redirect:
     prober: http
     timeout: 10s
@@ -363,12 +237,6 @@ modules:
       method: GET
       follow_redirects: false
       headers:
-        # No Accept header is set on purpose: the targets span HTML pages, a manifest, JSON and
-        # plain text, and a probe that named one type would assert content negotiation rather than
-        # reachability. Blackbox sends no Accept by default, which every one of them answers.
-        #
-        # Declares itself, so the frontend's request cache does not remember the probe and mint a
-        # Redis session per hit — same reason as http_members_only_redirect above.
         X-Basetool-Probe: "public-surface"
       fail_if_ssl: false
       fail_if_not_ssl: false
@@ -377,25 +245,6 @@ modules:
       tls_config:
         insecure_skip_verify: false
 
-  # Succeeds ONLY when the Android App Link's web-side fallback answers `303` to /app/link-help on
-  # the FIRST response (REQ-SEC-038). The sibling of http_public_200_no_redirect, split off because
-  # this one path must NOT answer 200: rendering a page at /app/callback is precisely the failure
-  # the redirect exists to prevent.
-  #
-  # The URL carries a live authorization code, so the redirect is the security half rather than a
-  # convenience — it takes the code out of the address bar and out of the history entry. A
-  # regression that renders instead of redirecting leaves the code in both, and on 2026-09-15 a
-  # `Google-Read-Aloud` fetch requested the full callback URL, code included, within a second of
-  # each attempt. A regression that loses the `permitAll` entry sends the member back into OAuth
-  # with a dead code, which is the loop the route was added to break.
-  #
-  # Both regressions are invisible to the app's own tests: AppLinkControllerTest runs in-process
-  # against MockMvc and stays green through an edge rule, a cache, or a permitAll entry lost in a
-  # merge. Before the route existed this failed as `No mapping for GET /app/callback` and was found
-  # from a member's report of a login that died mid-flight.
-  #
-  # The Location regexp accepts the absolute and the relative spelling: Spring answers with the
-  # absolute form today, and which one it sends is not part of the contract.
   http_app_link_fallback_303:
     prober: http
     timeout: 10s
@@ -405,13 +254,9 @@ modules:
       method: GET
       follow_redirects: false
       headers:
-        # Declares itself, so the frontend's request cache does not remember the probe and mint a
-        # Redis session per hit — same reason as the two modules above.
         X-Basetool-Probe: "app-link-fallback"
       fail_if_header_not_matches:
         - header: Location
-          # Single-quoted so the regexp's backslash is not a YAML escape: the exporter refuses to
-          # load a config with an unknown escape character, and "\." is one.
           regexp: '^(https://profit-base\.online)?/app/link-help$'
       fail_if_ssl: false
       fail_if_not_ssl: false

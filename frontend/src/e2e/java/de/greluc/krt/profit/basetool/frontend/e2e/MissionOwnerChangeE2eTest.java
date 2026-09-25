@@ -133,7 +133,6 @@ class MissionOwnerChangeE2eTest {
             page.evaluate("window.__krtNoReload === true"),
             "the owner change must update in place — no full-page reload");
 
-        // A second manager's page, opened before the change, still says 0.
         page.evaluate(
             "document.getElementById('owner-row').setAttribute('data-ownership-version', '0')");
         Response stale = changeOwner(page, officerId, OFFICER);

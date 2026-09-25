@@ -1,10 +1,6 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
-<!--/*
-  Test-only harness for fragments/modal-wrapper :: modal, rendered by ModalWrapperRenderTest
-  through the Spring Thymeleaf engine: one call per parameter shape the templates use.
-*/-->
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='h-plain', titleKey='info.delete', body=~{::h-plain-body})}">
     <th:block th:ref="h-plain-body">
         <div class="krt-modal-body"><p>PLAIN-BODY</p></div>

@@ -78,7 +78,6 @@ class SessionMetricsConfigTest {
 
     config.seedFromRedis();
 
-    // aaaa + bbbb counted; the per-session `expires:` marker key is skipped -> a finite 2, not NaN.
     assertThat(gauge()).isEqualTo(2.0);
   }
 

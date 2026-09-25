@@ -85,8 +85,6 @@ class StalePriceSweepTest {
   @Test
   @DisplayName("the per-statement id count stays bounded no matter how large the matrix is")
   void splitsIntoBoundedChunks() {
-    // The whole point: 2.5 chunks' worth of stale rows must never become one statement with 2 500
-    // bind parameters, because that is the shape that ends at the 65 535 protocol limit.
     int staleCount = StalePriceSweep.CHUNK_SIZE * 2 + 500;
     Set<UUID> priced = new LinkedHashSet<>();
     for (int i = 0; i < staleCount; i++) {

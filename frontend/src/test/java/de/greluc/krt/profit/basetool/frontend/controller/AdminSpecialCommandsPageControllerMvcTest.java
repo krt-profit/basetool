@@ -96,7 +96,6 @@ class AdminSpecialCommandsPageControllerMvcTest {
     return new PageResponse<>(List.of(sc), 0, 1000, 1L, 1, List.of());
   }
 
-  // covers REQ-FE-002 — the full page renders the swap-target wrapper.
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_fullPage_rendersSwapWrapper() throws Exception {
@@ -110,10 +109,6 @@ class AdminSpecialCommandsPageControllerMvcTest {
         .andExpect(content().string(containsString("id=\"sc-results\"")));
   }
 
-  // covers the .form-group checkbox regression class (PR #1405) — the page-scoped .form-group
-  // input rule ties the global KRT square-checkbox rule at (0,1,1) and, rendering after
-  // styles.css, would win and stretch any .form-group checkbox/radio into a full-width padded
-  // bar. Pins the :where() exclusion so the page rule can never capture checkbox/radio inputs.
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_ShouldExcludeCheckboxesFromFormGroupInputRule() throws Exception {
@@ -129,9 +124,6 @@ class AdminSpecialCommandsPageControllerMvcTest {
                     ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
   }
 
-  // covers REQ-FE-002 — fragment=results renders only the inner SK-list block: the row is present,
-  // but the swap-target wrapper, the create modal and the toolbar button (all outside the fragment)
-  // are not.
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_fragmentResults_rendersOnlyInnerFragment() throws Exception {
@@ -148,8 +140,6 @@ class AdminSpecialCommandsPageControllerMvcTest {
         .andExpect(content().string(not(containsString("id=\"add-sc-btn\""))));
   }
 
-  // covers #582 — the SK-create twin (X-Requested-With + form params) relays to the backend and
-  // returns 200; the list page re-swaps the SK-list fragment.
   @Test
   @WithMockUser(roles = "ADMIN")
   void createSpecialCommandAjax_withHeader_returns200() throws Exception {
@@ -168,8 +158,6 @@ class AdminSpecialCommandsPageControllerMvcTest {
         .andExpect(status().isOk());
   }
 
-  // covers #582 — the member lead-toggle twin (X-Requested-With + isLead/version) PATCHes the lead
-  // flag and returns 200.
   @Test
   @WithMockUser(roles = "ADMIN")
   void toggleMemberLeadAjax_withHeader_returns200() throws Exception {
@@ -187,9 +175,6 @@ class AdminSpecialCommandsPageControllerMvcTest {
         .andExpect(status().isOk());
   }
 
-  // The SK member page moved to /organisation/special-commands/{id} (SK leads manage members
-  // too, and the admin area stays admin-only); the old admin URL only redirects there so bookmarks
-  // and links keep working. The roster tests live in SpecialCommandMembersPageControllerMvcTest.
   @Test
   @WithMockUser(roles = "ADMIN")
   void detail_oldAdminUrl_redirectsToMemberPage() throws Exception {
@@ -201,7 +186,6 @@ class AdminSpecialCommandsPageControllerMvcTest {
         .andExpect(redirectedUrl("/organisation/special-commands/" + skId));
   }
 
-  // The classic lead-toggle fallback now lands on the SK member page, not the old admin URL.
   @Test
   @WithMockUser(roles = "ADMIN")
   void toggleMemberLead_classic_redirectsToMemberPage() throws Exception {
@@ -219,8 +203,6 @@ class AdminSpecialCommandsPageControllerMvcTest {
         .andExpect(redirectedUrl("/organisation/special-commands/" + skId));
   }
 
-  // The lead toggle stays admin-only: an officer (e.g. an SK lead) is refused before any backend
-  // call, even though the SK member page itself is open to officers.
   @Test
   @WithMockUser(roles = "OFFICER")
   void toggleMemberLeadAjax_officer_returns403() throws Exception {
@@ -239,8 +221,6 @@ class AdminSpecialCommandsPageControllerMvcTest {
     verify(backendApiClient, never()).patch(contains("/lead"), any(), eq(Void.class));
   }
 
-  // covers #582 — header routing: the same SK-create URL WITHOUT the header still hits the classic
-  // form handler and redirects (no-JS fallback preserved).
   @Test
   @WithMockUser(roles = "ADMIN")
   void createSpecialCommand_withoutHeader_redirects() throws Exception {
@@ -258,9 +238,6 @@ class AdminSpecialCommandsPageControllerMvcTest {
         .andExpect(status().is3xxRedirection());
   }
 
-  // REQ-DATA-007 — every SK lifecycle mutation evicts the SQUADRON + ORG_UNIT caches so the cached
-  // org-units pickers + OrgUnitContextAdvice's SK catalogue cannot serve a stale
-  // name/active/profit-eligible up to the TTL. Classic create path.
   @Test
   @WithMockUser(roles = "ADMIN")
   void createSpecialCommand_classic_evictsStaticDataCache() throws Exception {
@@ -353,8 +330,6 @@ class AdminSpecialCommandsPageControllerMvcTest {
     verify(backendApiClient).evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);
   }
 
-  // REQ-DATA-007 — a member-roster mutation does NOT change the SK catalogue's
-  // name/shorthand/active/profit-eligible fields, so it must NOT evict the shared cache.
   @Test
   @WithMockUser(roles = "ADMIN")
   void memberMutation_doesNotEvictStaticDataCache() throws Exception {

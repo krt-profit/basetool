@@ -102,10 +102,6 @@ public class AdminBlueprintsPageController {
             .append("&sort=outputName,asc");
     boolean hasSearch = trimmed != null;
     if (hasSearch) {
-      // Pass the free-text term as a WebClient URI-template variable so it is percent-encoded
-      // exactly once across the frontend->backend hop. URLEncoder form-encoding (space -> '+')
-      // double-encodes umlauts / reserved chars when re-encoded on the hop, yielding zero matches
-      // (see BackendApiClient#get(String, ParameterizedTypeReference, Object...)).
       uri.append("&search={search}");
     }
 
@@ -124,16 +120,11 @@ public class AdminBlueprintsPageController {
         populateEmpty(model);
       }
     } catch (BackendServiceException e) {
-      // The search term is admin-typed free text: sanitised before it reaches the logger so a
-      // pasted newline cannot fabricate a second log line (CWE-117). Level unchanged — an
-      // unreachable backend is an expected, already-metered failure.
       log.debug(
           "Error loading blueprints data (search={})", LogSafe.text(trimmed, MAX_LOGGED_QUERY), e);
       model.addAttribute("error", "error.admin.blueprints.load");
       populateEmpty(model);
     } catch (Exception e) {
-      // Stays ERROR: this is the catch(Exception) catch-all for a genuinely unexpected failure,
-      // which REQ-OBS-001 sanctions at ERROR. Same sanitising as the branch above.
       log.error(
           "Error loading blueprints data (search={})", LogSafe.text(trimmed, MAX_LOGGED_QUERY), e);
       model.addAttribute("error", "error.admin.blueprints.load");

@@ -85,10 +85,6 @@ class MeControllerTest {
 
   @Test
   void getCapabilities_logisticianFlagIsTheHierarchyAnswer_notTheMembershipOne() {
-    // The whole reason this flag exists. UserDto.isLogistician is resolveLogistician(), which reads
-    // Staffel membership rows and nothing else, so it is false for an admin — who holds no Staffel
-    // membership by design and may still edit every Lager row. A client gating on the membership
-    // projection hid the write actions from exactly the people most entitled to perform them.
     when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
 
     assertTrue(controller.getCapabilities().isLogisticianOrAbove());
@@ -104,10 +100,6 @@ class MeControllerTest {
 
   @Test
   void getCapabilities_missionManagerFlagResolvesThroughTheHierarchy() {
-    // Reached by MISSION_MANAGER, OFFICER and ADMIN alike — the same hierarchy the payout
-    // endpoint's hasRole('MISSION_MANAGER') applies.
-    // getCapabilities() asks hasReachableRole three times; under strict stubbing every argument
-    // the method is called with has to be answered, not just the one under test.
     when(authHelperService.hasReachableRole(Roles.authority(Roles.BANK_EMPLOYEE)))
         .thenReturn(false);
     when(authHelperService.hasReachableRole(Roles.authority(Roles.BANK_MANAGEMENT)))
@@ -120,8 +112,6 @@ class MeControllerTest {
 
   @Test
   void getCapabilities_adminFlagIsItsOwnAnswer() {
-    // Not "above a role" but a different scope: an admin sees every org unit rather than their
-    // own memberships, which is what the pinnable-org-unit branch turns on.
     when(authHelperService.isAdmin()).thenReturn(true);
 
     assertTrue(controller.getCapabilities().isAdmin());
@@ -130,9 +120,6 @@ class MeControllerTest {
 
   @Test
   void getPinnableOrgUnits_adminGetsTheWholeActiveCatalogue() {
-    // The branch that was missing in the Android client: an admin holds no membership, so the
-    // membership list would have offered them nothing to pin at all. All four kinds, so an admin
-    // reaches at least as far as an OL member does through the cascade.
     List<OrgUnitMembershipOptionDto> catalogue = List.of();
     when(authHelperService.isAdmin()).thenReturn(true);
     when(orgUnitMembershipQueryService.listAllPinnableOptions()).thenReturn(catalogue);
@@ -144,9 +131,6 @@ class MeControllerTest {
 
   @Test
   void getPinnableOrgUnits_everyoneElseGetsTheirReachNotOnlyTheirBelonging() {
-    // Deliberately the drill-down reach rather than listOptionsForUser: that list is a member's
-    // DIRECT Staffel/SK rows, which is empty for somebody whose only seat is on a Bereich or the
-    // OL — and those units own aggregates, so an empty switcher was hiding reachable data.
     UUID callerId = UUID.randomUUID();
     List<OrgUnitMembershipOptionDto> mine = List.of();
     when(authHelperService.isAdmin()).thenReturn(false);
@@ -236,9 +220,6 @@ class MeControllerTest {
 
   @Test
   void getLayout_answersTheFourLayoutQuestionsFromTheSameResolvers() {
-    // BE-PERF-07: one call instead of /active-org-unit + /org-units + /capabilities +
-    // /notifications/unread-count. The answers must be the individual endpoints' answers, so a
-    // client can switch between the two shapes without a behaviour change.
     UUID active = UUID.randomUUID();
     UUID callerId = UUID.randomUUID();
     List<OrgUnitMembershipOptionDto> catalogue = List.of();

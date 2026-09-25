@@ -109,9 +109,6 @@ class MaterialsProfitCalculationRendersE2eTest {
         E2eSupport.navigate(page, baseUrl + "/materials/profit-calculation");
         assertThat(page.locator("#resultsTable")).isVisible();
 
-        // Index 0 is the placeholder option; anything after is a seeded ship. Picking one fires
-        // the profit-update handler, which renders the migrated loading row and then a data or
-        // no-data row into #profitBody — the former-inline-style status <td>s under test.
         if (page.locator("#shipSelect option").count() > 1) {
           page.locator("#shipSelect").selectOption(new SelectOption().setIndex(1));
           assertThat(page.locator("#profitBody tr").first())

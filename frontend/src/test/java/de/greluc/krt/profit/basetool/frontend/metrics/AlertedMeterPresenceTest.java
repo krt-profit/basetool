@@ -72,11 +72,8 @@ class AlertedMeterPresenceTest {
    */
   private static final List<String> ALERTED_METERS =
       List.of(
-          // monitoring/prometheus/alerts/apps.yml — CircuitBreakerOpen
           "resilience4j.circuitbreaker.state",
-          // monitoring/prometheus/alerts/apps.yml — the bulkhead saturation rule
           "resilience4j.bulkhead.available.concurrent.calls",
-          // monitoring/prometheus/alerts/apps.yml — the retry-rate rule
           "resilience4j.retry.calls");
 
   @Test

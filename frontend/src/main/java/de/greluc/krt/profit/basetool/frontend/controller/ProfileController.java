@@ -109,12 +109,10 @@ public class ProfileController {
     model.addAttribute("username", principal.getPreferredUsername());
     model.addAttribute("email", principal.getEmail());
 
-    // Default from Token
     model.addAttribute("rank", getSingleClaim(principal, "rank"));
     model.addAttribute("description", getSingleClaim(principal, "description"));
     model.addAttribute("displayName", getSingleClaim(principal, "displayName"));
 
-    // Fetch from Backend to get latest DB state
     try {
       Map<String, Object> user = backendApiClient.get("/api/v1/users/me", STRING_OBJECT_MAP_TYPE);
 
@@ -122,9 +120,6 @@ public class ProfileController {
         if (user.get("rank") != null) {
           model.addAttribute("rank", user.get("rank"));
         }
-        // Always overwrite description from DB, even if null (to allow clearing)
-        // But if DB is null and Token has it? Prefer DB (it might have been deleted locally).
-        // Actually, if DB has null, we might want to show empty.
         if (user.containsKey("description")) {
           model.addAttribute("description", user.get("description"));
         }
@@ -141,24 +136,15 @@ public class ProfileController {
             model.addAttribute(
                 "monthsInSquadron", ChronoUnit.MONTHS.between(joinDate, LocalDate.now()));
           } catch (Exception ignored) {
-            // joinDate missing or malformed — leave attribute unset
           }
         }
-        // REQ-ORG-017: surface the user's FULL Staffel membership set (up to two) so the identity
-        // band shows every Staffel affiliation, not just the single active-context pin. Each
-        // element
-        // is the serialised SquadronReferenceDto ({name, shorthand}).
         if (user.get("squadrons") instanceof java.util.List<?> squadrons) {
           model.addAttribute("profileSquadrons", squadrons);
         }
       }
-    } catch (Exception e) {
-      // Backend unavailable? Keep Token data.
+    } catch (Exception ignored) {
     }
 
-    // Default payout preference, fetched from its own lightweight endpoint so the central UserDto
-    // contract stays untouched. Resilient: a backend hiccup or an unexpected value leaves the
-    // selector at PAYOUT rather than failing the whole page.
     PayoutPreference defaultPayoutPreference = PayoutPreference.PAYOUT;
     try {
       Map<String, Object> pref =
@@ -168,18 +154,11 @@ public class ProfileController {
             PayoutPreference.valueOf(String.valueOf(pref.get("defaultPayoutPreference")));
       }
     } catch (Exception e) {
-      // Backend unavailable or unrecognised value — keep the PAYOUT default. Logged at debug
-      // (not error) because this is an optional sub-fetch on a page that still renders fine; a
-      // persistently failing endpoint then leaves a breadcrumb instead of silently hiding the
-      // user's saved preference. No PII is logged.
       log.debug(
           "Could not load the default payout preference; defaulting the selector to PAYOUT", e);
     }
     model.addAttribute("defaultPayoutPreference", defaultPayoutPreference);
 
-    // Global blueprint-sharing opt-in, fetched from its own lightweight endpoint (same isolation
-    // from the central UserDto as the payout preference). Resilient: a backend hiccup leaves the
-    // toggle off rather than failing the whole page.
     boolean shareBlueprintsGlobally = false;
     try {
       Map<String, Object> sharing =
@@ -189,8 +168,6 @@ public class ProfileController {
             Boolean.parseBoolean(String.valueOf(sharing.get("shareBlueprintsGlobally")));
       }
     } catch (Exception e) {
-      // Backend unavailable — keep the off default. Logged at debug (not error) because this is an
-      // optional sub-fetch on a page that still renders fine. No PII is logged.
       log.debug(
           "Could not load the global blueprint-sharing flag; defaulting the toggle to off", e);
     }
@@ -198,31 +175,18 @@ public class ProfileController {
 
     model.addAttribute("keycloakAccountUrl", issuerUri + "/account");
 
-    // The member's own Art. 17 erasure request, if they have one (REQ-SEC-061). Isolated like the
-    // two sub-fetches above, so a backend hiccup does not fail the whole profile page.
-    //
-    // A failure is reported as a failure, though, and that is a correction. It used to render as
-    // the no-request state, which means a DECLINED request could quietly disappear from the page
-    // -- and that card is the surface Art. 12(4) obliges the controller to carry the refusal
-    // reason on. The member could not tell the difference between "you never asked" and "we
-    // cannot show you what you asked". The flag also suppresses the raise action, so nobody
-    // submits a second request on top of one they cannot see.
     Map<String, Object> deletionRequest = null;
     boolean deletionRequestUnavailable = false;
     try {
       deletionRequest =
           backendApiClient.get("/api/v1/users/me/deletion-request", STRING_OBJECT_MAP_TYPE);
     } catch (Exception e) {
-      // Debug, not error: 204 (no request) is the normal case, and this path is not an outage.
       log.debug("Could not load the member's deletion request; the card says so", e);
       deletionRequestUnavailable = true;
     }
     model.addAttribute("deletionRequest", deletionRequest);
     model.addAttribute("deletionRequestUnavailable", deletionRequestUnavailable);
 
-    // Identity-tile initials for the read-only identity block (Variante A profile redesign).
-    // Derived from the already-resolved display name (token, then DB overlay) with a username
-    // fallback — no new avatar/upload feature, just the squared monogram the design calls for.
     model.addAttribute(
         "initials",
         computeInitials(
@@ -283,8 +247,6 @@ public class ProfileController {
       @AuthenticationPrincipal OidcUser principal,
       RedirectAttributes redirectAttributes) {
     if (bindingResult.hasErrors()) {
-      // Render the profile view directly; the BindingResult stays request-scoped so it
-      // never goes through a Redis-serialised FlashMap (see RedisSessionConfig).
       return profile(model, principal);
     }
     try {
@@ -398,7 +360,6 @@ public class ProfileController {
       @AuthenticationPrincipal OidcUser principal,
       RedirectAttributes redirectAttributes) {
     if (bindingResult.hasErrors()) {
-      // Render inline so the BindingResult stays request-scoped (never a Redis FlashMap).
       return profile(model, principal);
     }
     try {
@@ -514,7 +475,6 @@ public class ProfileController {
       @AuthenticationPrincipal OidcUser principal,
       RedirectAttributes redirectAttributes) {
     if (bindingResult.hasErrors()) {
-      // Render inline so the BindingResult stays request-scoped (never a Redis FlashMap).
       return profile(model, principal);
     }
     try {
@@ -618,7 +578,6 @@ public class ProfileController {
         return MapPayloadValues.longOrZero(me.get("version"));
       }
     } catch (Exception ignored) {
-      // Re-fetch failed — fall through to the best-effort increment below.
     }
     return (priorVersion == null ? 0L : priorVersion) + 1;
   }

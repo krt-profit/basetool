@@ -115,9 +115,6 @@ public class AdminTermsPageController {
       PendingCountView count = backendApiClient.get(PENDING_COUNT_URI, PendingCountView.class);
       pending = count == null ? null : count.pending();
     } catch (BackendServiceException e) {
-      // Already logged at the BackendApiClient boundary (REQ-OBS-001). The page renders its
-      // "could not be loaded" state rather than an error screen, so an admin checking the rollout
-      // during a backend wobble sees which half of the page is missing.
       log.debug("Terms consent overview could not be read from the backend.", e);
     }
 
@@ -126,13 +123,6 @@ public class AdminTermsPageController {
     model.addAttribute("termsPage", rows);
     model.addAttribute("termsPendingCount", pending);
     model.addAttribute("termsLoadFailed", rows == null);
-    // krtFetch.swap appends `fragment=results` and expects a section-sized response. Returning the
-    // whole document here would nest header, nav, the heading and the filter form INSIDE
-    // #admin-terms-results on every filter change and page click — swap() only bails on a redirect
-    // or a non-2xx, and a full page is neither, so nothing would report the breakage.
-    //
-    // The fragment is named adminTermsResults rather than `results` on purpose: a fragment whose
-    // name equals its container id re-nests itself on swap.
     return "results".equals(fragment) ? "admin/terms :: adminTermsResults" : "admin/terms";
   }
 

@@ -188,9 +188,6 @@ public class AdminOrgStructurePageController {
         "create Bereich (ajax)",
         () -> {
           Object created = backendApiClient.post(BACKEND_BEREICHE, request, Object.class);
-          // A new Bereich appears in the cached /org-units/active-all-kinds picker, so evict the
-          // shared
-          // catalogue cache or that picker stays stale up to the TTL (REQ-DATA-007 eviction gate).
           backendApiClient.evict(CacheDomain.ORG_UNIT);
           return ResponseEntity.ok(created);
         });
@@ -211,8 +208,6 @@ public class AdminOrgStructurePageController {
         "create Organisationsleitung (ajax)",
         () -> {
           Object created = backendApiClient.post(BACKEND_OL, request, Object.class);
-          // The Organisationsleitung appears in the cached /org-units/active-all-kinds picker →
-          // evict.
           backendApiClient.evict(CacheDomain.ORG_UNIT);
           return ResponseEntity.ok(created);
         });
@@ -237,9 +232,6 @@ public class AdminOrgStructurePageController {
           Object updated =
               backendApiClient.patch(
                   "/api/v1/org-hierarchy/org-units/" + id + "/parent", request, Object.class);
-          // Re-parenting changes the org-unit tree the cached /org-units/active-all-kinds picker
-          // renders
-          // (a unit can move under a different Bereich), so evict the shared catalogue cache.
           backendApiClient.evict(CacheDomain.ORG_UNIT);
           return ResponseEntity.ok(updated);
         });

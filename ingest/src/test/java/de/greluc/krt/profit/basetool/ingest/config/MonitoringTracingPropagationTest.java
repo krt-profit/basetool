@@ -81,14 +81,11 @@ class MonitoringTracingPropagationTest {
 
   @Test
   void shouldPropagateTraceparentHeaderOnBackendRelayCall() throws Exception {
-    // Given
     mockBackend.enqueue(new MockResponse().setResponseCode(200).setBody("{}"));
 
-    // When
     backendRestClient.get().uri("/api/v1/settings").retrieve().toBodilessEntity();
     RecordedRequest recorded = mockBackend.takeRequest(10, TimeUnit.SECONDS);
 
-    // Then: the instrumented client injected the W3C trace context (version-traceId-spanId-flags).
     assertThat(recorded).isNotNull();
     assertThat(recorded.getHeader("traceparent"))
         .as("backend relay call must carry the W3C traceparent header")

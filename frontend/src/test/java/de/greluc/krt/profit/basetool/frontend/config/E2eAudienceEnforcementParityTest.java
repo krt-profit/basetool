@@ -123,7 +123,6 @@ class E2eAudienceEnforcementParityTest {
     String source = Files.readString(resolve(STACK_EXTENSION), StandardCharsets.UTF_8);
     Matcher matcher = EXPECTED_AUDIENCE_CONSTANT.matcher(source);
     if (!matcher.find()) {
-      // Never pass silently: a renamed constant would otherwise turn this whole test into a no-op.
       return fail(
           "EXPECTED_AUDIENCE constant not found in %s — this parity test cannot verify anything;"
                   .formatted(STACK_EXTENSION)

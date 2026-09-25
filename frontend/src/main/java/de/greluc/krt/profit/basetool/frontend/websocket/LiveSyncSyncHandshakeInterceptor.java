@@ -111,10 +111,6 @@ public class LiveSyncSyncHandshakeInterceptor implements HandshakeInterceptor {
     try {
       Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
       if (authentication != null) {
-        // Capture the caller's authorities verbatim (the frontend does a literal authority match —
-        // no role hierarchy) so a later subscribe to a locally role-gated global room (the bank
-        // staff / orgunit-bank rooms) can be authorized on a WebSocket message thread that has no
-        // SecurityContext. Never logged.
         Set<String> authorities =
             authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
@@ -131,9 +127,6 @@ public class LiveSyncSyncHandshakeInterceptor implements HandshakeInterceptor {
         }
       }
     } catch (RuntimeException e) {
-      // A best-effort token capture: a failure only degrades subscribe-auth to fail-open, so it
-      // must
-      // never abort the handshake. Logged without the token.
       log.debug("Live-sync /ws/sync token capture failed; subscribes will fail open", e);
     }
     return true;
@@ -176,7 +169,5 @@ public class LiveSyncSyncHandshakeInterceptor implements HandshakeInterceptor {
       @NotNull ServerHttpRequest request,
       @NotNull ServerHttpResponse response,
       @NotNull WebSocketHandler wsHandler,
-      Exception exception) {
-    // intentionally empty
-  }
+      Exception exception) {}
 }

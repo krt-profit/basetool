@@ -127,7 +127,6 @@ class RefineryOrderCreateImportRenderTest {
 
   @Test
   void createPage_rendersImportDraftWithFlagsAndSuggestions() throws Exception {
-    // Given — a flashed pre-fill: two duplicate-material rows + one unmatched row with suggestions
     RefineryOrderForm form = new RefineryOrderForm();
     List<RefineryGoodForm> goods = new ArrayList<>();
     goods.add(good(MATERIAL_ID, 957, 448, 618));
@@ -152,53 +151,36 @@ class RefineryOrderCreateImportRenderTest {
             null,
             null);
 
-    // When / Then — the full template renders with banner, inline flag and suggestion chip
     mockMvc
         .perform(
             get("/refinery-orders/create")
                 .with(oidcLogin())
                 .flashAttr("refineryOrderForm", form)
                 .flashAttr("importIssues", List.of(unresolvedLocation))
-                // String key on purpose: the JSON Redis session stringifies flash-map keys, so
-                // the controller flashes (and the template matches) string-form indices.
                 .flashAttr("importRowIssues", Map.of("2", List.of(unmatched)))
                 .flashAttr("importGoodsMatched", 2)
                 .flashAttr("importGoodsTotal", 4)
                 .flashAttr("importRowsSkipped", 1))
         .andExpect(status().isOk())
         .andExpect(view().name("refinery-orders-create"))
-        // banner with counters and the order-level finding
         .andExpect(content().string(containsString("data-testid=\"refinery-import-banner\"")))
-        // duplicate-material rows render as separate selects
         .andExpect(content().string(containsString("inputMaterialId_0")))
         .andExpect(content().string(containsString("inputMaterialId_1")))
         .andExpect(content().string(containsString("inputMaterialId_2")))
-        // the unmatched row carries the inline flag block and the one-click suggestion chip
         .andExpect(content().string(containsString("data-testid=\"refinery-import-row-flags-2\"")))
         .andExpect(content().string(containsString("data-testid=\"refinery-import-suggestion-2\"")))
         .andExpect(content().string(containsString("data-material-id=\"" + SUGGESTION_ID + "\"")))
-        // the matched rows keep their pre-selected material: some option must carry the
-        // selected marker (a bare value="<id>" match would hit every dropdown's option list)
         .andExpect(content().string(containsString("value=\"" + MATERIAL_ID + "\"")))
         .andExpect(content().string(containsString("selected=\"selected\"")))
-        // the import upload control is present and exempt from the unsaved-changes guard:
-        // picking a file must not arm the leave-page warning (the import replaces the form
-        // wholesale, REQ-REFINERY-013)
         .andExpect(content().string(containsString("data-testid=\"refinery-import-button\"")))
         .andExpect(
             content().string(containsString("<form id=\"refineryImportForm\" class=\"no-track\"")))
-        // ADR-0069: the file-picker auto-submit moved from inline JS into the extracted
-        // refinery-orders-create.js page module (requestSubmit, so the unsaved-changes guard
-        // clears); pin that the page loads it. Auto-submit itself is exercised by the e2e suite.
         .andExpect(content().string(containsString("/js/refinery-orders-create.js")))
         .andExpect(content().string(containsString("</html>")));
   }
 
   @Test
   void createPage_rendersScExtractorReleaseLink_besideTheImportButton() throws Exception {
-    // covers REQ-REFINERY-021 — the import bar carries a link to the desktop SC Extractor's latest
-    // release next to the import trigger it feeds, opened in a new tab with a safe rel. It must
-    // render INSIDE the upload form, because .import-extract-bar puts the flex row on the form.
     mockMvc
         .perform(get("/refinery-orders/create").with(oidcLogin()))
         .andExpect(status().isOk())
@@ -227,7 +209,6 @@ class RefineryOrderCreateImportRenderTest {
 
   @Test
   void createPage_rendersZeroMatchesHintAndBlockingTint() throws Exception {
-    // Given — a draft where no row matched and the order is un-quoted (BLOCKING finding)
     RefineryOrderForm form = new RefineryOrderForm();
     form.setGoods(new ArrayList<>(List.of(good(null, 250, null, 618))));
     ImportIssueDto unquotedOrder =
@@ -239,13 +220,10 @@ class RefineryOrderCreateImportRenderTest {
             null,
             null);
 
-    // When / Then — the banner adds the explicit zero-matches hint and the BLOCKING finding
-    // renders with the danger tint (REQ-REFINERY-016 / REQ-REFINERY-014)
     mockMvc
         .perform(
             get("/refinery-orders/create")
                 .with(oidcLogin())
-                // pin the resolved locale so the asserted bundle text is deterministic
                 .locale(java.util.Locale.GERMAN)
                 .flashAttr("refineryOrderForm", form)
                 .flashAttr("importIssues", List.of(unquotedOrder))
@@ -266,7 +244,6 @@ class RefineryOrderCreateImportRenderTest {
 
   @Test
   void createPage_rendersBackendProblemDetailVerbatim() throws Exception {
-    // Given — an envelope-level reject surfaced as verbatim localized text
     mockMvc
         .perform(
             get("/refinery-orders/create")
@@ -300,10 +277,6 @@ class RefineryOrderCreateImportRenderTest {
         .andExpect(model().attribute("materials", hasSize(2)));
   }
 
-  // covers the .form-group checkbox regression class (PR #1405) — the page-scoped .form-group
-  // input rule ties the global KRT square-checkbox rule at (0,1,1) and, rendering after
-  // styles.css, would win and stretch any .form-group checkbox/radio into a full-width padded
-  // bar. Pins the :where() exclusion so the page rule can never capture checkbox/radio inputs.
   @Test
   void createPage_ShouldExcludeCheckboxesFromFormGroupInputRule() throws Exception {
     mockMvc

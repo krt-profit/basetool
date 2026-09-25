@@ -115,9 +115,6 @@ class MemberEditInPlaceE2eTest {
         page.waitForLoadState();
         assertThat(page.locator("#member-edit-form")).isVisible();
 
-        // Marker on the live document: a full navigation/reload wipes it, so its survival proves
-        // the
-        // save stayed in place. The position:fixed footer can cover the bottom submit button.
         page.evaluate("() => { window.__krtNoReload = true; }");
         page.evaluate(
             "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
@@ -165,14 +162,11 @@ class MemberEditInPlaceE2eTest {
         page.waitForLoadState();
         assertThat(page.locator("#member-edit-form")).isVisible();
 
-        // Precondition: no second Staffel yet → the add button shows, slot 2 is hidden.
         assertThat(page.locator("#staffel-add-2")).isVisible();
         assertThat(page.locator("#staffel-slot-2")).isHidden();
 
         page.locator("#staffel-add-2").click();
 
-        // The fix: the class-based toggle reveals slot 2 and hides the button (before the fix the
-        // button vanished but slot 2 never appeared).
         assertThat(page.locator("#staffel-slot-2")).isVisible();
         assertThat(page.locator("#staffel-add-2")).isHidden();
       } catch (RuntimeException | AssertionError failure) {
@@ -181,8 +175,6 @@ class MemberEditInPlaceE2eTest {
       }
     }
   }
-
-  // ---------------------------------------------------------------------- helpers --
 
   /**
    * Opens a new authenticated browser context with HTTPS errors ignored (the stack uses a

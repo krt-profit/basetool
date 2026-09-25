@@ -25,8 +25,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 
-// covers REQ-MISSION-001 (whole-aUEC HALF_UP display rounding) - see
-// docs/specs/whole-number-amounts.md
 /**
  * Unit tests for {@link MoneyFormat} — the Thymeleaf-facing rounding helper used by the operation
  * and mission detail templates to render aUEC totals without decimal places. The tests pin two

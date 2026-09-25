@@ -41,7 +41,6 @@ class BlueprintNameNormalizerTest {
 
   @Test
   void foldsUnicodeDoubleQuotesToAscii() {
-    // SC Wiki uses curly quotes, the SCMDB export uses straight quotes — they must match.
     assertEquals(
         normalizer.normalize("Arclight \"Nightstalker\" Pistol"),
         normalizer.normalize("Arclight “Nightstalker” Pistol"));

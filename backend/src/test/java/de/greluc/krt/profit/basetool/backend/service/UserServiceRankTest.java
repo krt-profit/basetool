@@ -63,7 +63,6 @@ class UserServiceRankTest {
 
     when(userRepository.findById(id)).thenReturn(Optional.of(user));
 
-    // Officer rank must be 1-12. Trying 13.
     assertThrows(
         IllegalArgumentException.class,
         () -> userService.updateUserAttributes(id, 13, null, null, 0L, null));
@@ -96,7 +95,6 @@ class UserServiceRankTest {
 
     when(userRepository.findById(id)).thenReturn(Optional.of(user));
 
-    // Member rank must be 13-20. Trying 5.
     assertThrows(
         IllegalArgumentException.class,
         () -> userService.updateUserAttributes(id, 5, null, null, 0L, null));

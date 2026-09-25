@@ -157,7 +157,6 @@ class ServiceAccountTokenProviderTest {
     ServiceAccountTokenProvider provider = provider(true);
 
     assertThat(provider.currentToken()).isEqualTo("AT-1");
-    // expires_in 10s minus the 30s default skew is already in the past, so the next call re-mints.
     assertThat(provider.currentToken()).isEqualTo("AT-2");
     assertThat(keycloak.getRequestCount()).isEqualTo(2);
   }
@@ -208,7 +207,6 @@ class ServiceAccountTokenProviderTest {
   /** A partially configured gateway is treated as unconfigured — all three values or none. */
   @Test
   void treatsAPartialConfigurationAsUnconfigured() {
-    // secret deliberately left blank
     ServiceAccountProperties properties =
         TestProperties.serviceAccount(
             "token-uri", keycloak.url("/token").toString(), "client-id", "basetool-ingest-gateway");

@@ -1,43 +1,9 @@
 #!/usr/bin/env bash
-#
-# Regression tests for scripts/generate-quadlet.py's compose-to-Quadlet translation.
-#
-# Pure python against synthetic service mappings -- no host, no containers, no
-# network, runs in under a second.
-#
-# Usage:
-#   scripts/generate-quadlet.test.sh
-#
-# Why this file exists. The generator had a drift check from the start, and the
-# drift check compares the generator against its own output -- so a translation
-# that is uniformly wrong is uniformly consistent and reports clean. Four defects
-# reached the tree behind that green check (PR #1933 review, 2026-09-18):
-#
-#   * an exec-form `CMD` healthcheck re-joined into an unquoted shell string, so
-#     a password containing a space broke the probe forever and one containing
-#     `;` ran whatever followed, inside the container, every five seconds;
-#   * `Notify=healthy` with no `TimeoutStartSec=`, capping four services at
-#     systemd's 90s default -- keycloak's own numbers allow 330s -- which with
-#     Restart=always is a restart loop that never reports healthy;
-#   * raw systemd `%` specifiers copied into `Exec=`, measured LIVE on the
-#     testing host: both databases were running with log_line_prefix expanded to
-#     the machine id, the unit name and the architecture;
-#   * a prefix-unsafe substring replace in the health-variable rewrite.
-#
-# Every one of them is a property of the translation, not of the output, which is
-# the level this file tests at.
 
 # shellcheck disable=SC2016
-# The single quotes are the subject of the tests, not an oversight: the fixtures
-# feed the translator LITERAL ${...} and `%` text, and a double-quoted string
-# would let bash expand it before the translator ever saw it.
 
 set -uo pipefail
 
-# The shell on a Windows workstation rewrites any argument that looks like a POSIX path list --
-# `./a:/b` reaches python as a Windows path list -- and the volume fixtures below are exactly
-# that shape. Only arguments starting with `print(` -- the python bodies -- are exempted, so the
-# generator's own path argument is still translated for a native python. Inert on Linux and in CI.
 export MSYS2_ARG_CONV_EXCL='print('
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -54,8 +20,6 @@ FAILED=0
 ok()  { PASSED=$((PASSED + 1)); printf '  ok    %s\n' "$*"; }
 bad() { FAILED=$((FAILED + 1)); printf '  FAIL  %s\n' "$*"; }
 
-# Runs a python expression against the loaded generator module and prints the
-# result. $1 is the python body; it may use `g` for the module.
 run_py() {
   "$PY" - "$GENERATOR" <<'PYEOF' "$1"
 import importlib.util
@@ -72,7 +36,6 @@ except g.Refusal as exc:
 PYEOF
 }
 
-# $1 label, $2 python body, $3 expected substring
 expect() {
   local label="$1" body="$2" want="$3" got
   got="$(run_py "$body" 2>&1)"
@@ -85,7 +48,6 @@ expect() {
   fi
 }
 
-# $1 label, $2 python body, $3 substring that must NOT appear
 expect_not() {
   local label="$1" body="$2" unwanted="$3" got
   got="$(run_py "$body" 2>&1)"
@@ -195,28 +157,16 @@ expect "a name the container is handed under no name at all is still refused" \
 
 echo
 echo "== the host aliases that exist only under Quadlet =="
-# node-exporter and alloy become HOST services here, so on a Podman host nothing answers to
-# those names on the container network and prometheus.yml's targets go permanently down --
-# measured on the testing host, two of its five down targets. The alias lives in the UNIT
-# rather than in prometheus.yml, because that file rides the bundle and one bundle serves the
-# Docker host too, where the same names must keep resolving to real containers.
 expect "prometheus gets a host alias for alloy" \
   'print(" ".join(sorted(g.PODMAN_HOST_ALIASES["prometheus"])))' \
   'alloy'
 expect "...and for node-exporter" \
   'print(" ".join(sorted(g.PODMAN_HOST_ALIASES["prometheus"])))' \
   'node-exporter'
-# Each alias must name a service the translation actually made a host service, or the alias
-# points at a host that is not serving and the target stays down with a new explanation.
 expect "every alias names a service the generator made a host service" \
   'print(all(g.DISPOSITION.get(a, ("",))[0] == "host-service" for v in g.PODMAN_HOST_ALIASES.values() for a in v))' \
   'True'
 
-# The push direction of the same boundary. The apps send spans TO alloy, and when it became a
-# host service `alloy` stopped resolving inside them: measured on the testing host, both
-# otelcol_receiver_accepted_spans_total and tempo_distributor_spans_received_total were ABSENT
-# -- the trace pipeline had never carried a span and nothing reported it, because the drop
-# happens in each app's own exporter, where no alert looks.
 for svc in backend frontend ingest keycloak; do
   expect "${svc} can resolve alloy, which it pushes spans to" \
     "print('alloy' in g.PODMAN_HOST_ALIASES.get('${svc}', ()))" \
@@ -224,16 +174,6 @@ for svc in backend frontend ingest keycloak; do
 done
 
 echo "== every address the front end can present the PROXY header from =="
-# The peer the edge presents to haproxy is the container's OWN address, and podman chooses WHICH of
-# its networks that address comes from. Measured on the production host 2026-09-22, three recreates
-# with nothing else changed: net-proxy-frontend, then net-proxy-grafana, then net-proxy-api. So the
-# question is not which network to pin -- it is that ALL of them are pinned, which is the only thing
-# that makes the candidate set finite.
-#
-# While only the ingress address was pinned: set_real_ip_from never matched, nginx discarded the
-# PROXY header and the edge logged 2340 requests in ten minutes from one bridge address -- one
-# rate-limit bucket for the whole internet, the 2026-07-20 outage reached by another road, with a
-# valid configuration throughout.
 expect "the ingress address is pinned" \
   'print(g.FRONT_END["edge"]["pins"]["net-edge-ingress"])' \
   '172.28.15.10'
@@ -243,17 +183,10 @@ d = yaml.safe_load(io.open(g.COMPOSE_APP, encoding="utf-8"));
 nets = d["services"]["edge"]["networks"];
 print(sorted(nets) == sorted(g.FRONT_END["edge"]["pins"]))' \
   'True'
-# High on purpose, except on the ingress network the edge has to itself: netavark allocates from
-# the low end and these networks are shared with the upstream they front, whose container drifts
-# upward on every recreate. A low pin is a collision waiting to happen.
 expect "every shared-network pin is out of the allocator's way" \
   'print(all(int(a.split(".")[-1]) > 200 for n, a in g.FRONT_END["edge"]["pins"].items() if n != "net-edge-ingress"))' \
   'True'
 
-# The three representations of that set -- this table, the emitted unit, and the role variable that
-# becomes EDGE_TRUSTED_PROXY -- have to agree, and the generator REFUSES when they do not. The
-# checks below mutate the table and read the refusal, because a guard that has never been seen to
-# fail is a guard nobody has tested.
 expect "the role's trusted list names exactly the pinned addresses" \
   'g.generate(); print("no refusal")' \
   'no refusal'
@@ -271,31 +204,21 @@ expect "a pinned address the role does not trust is refused" \
   'pinned for edge but missing from basetool_host_edge_trusted_proxies'
 
 echo "== the loopback publishes a host service depends on =="
-# AddHost= solves container->host. Nothing solves host->container, because rootless Podman keeps
-# the container network in a user namespace: a published port is the only way in.
 expect "loki publishes for the host-native shipper" \
   'print(g.PODMAN_LOOPBACK_PUBLISH["loki"][0])' \
   '127.0.0.1:3100:3100'
-# Every one of them must be bound to loopback, or a port meant for one local process is on the wire.
 expect "every loopback publish is actually on loopback" \
   'print(all(p.startswith("127.0.0.1:") for v in g.PODMAN_LOOPBACK_PUBLISH.values() for p in v))' \
   'True'
-# The collision that decided tempo's host port: the host-native alloy binds 0.0.0.0:4317 for its
-# own OTLP receiver, and 0.0.0.0 includes loopback. Publishing tempo there would fail to bind, and
-# the symptom would be a container that will not start rather than anything naming this choice.
 expect "no loopback publish collides with alloy's own OTLP ports" \
   'print(all(p.split(":")[1] not in ("4317", "4318") for v in g.PODMAN_LOOPBACK_PUBLISH.values() for p in v))' \
   'True'
-# A publish for a service the translation deleted would be silently inert.
 expect "every loopback publish names a service that is still a container" \
   'print(all(g.DISPOSITION.get(s, ("",))[0] != "delete" for s in g.PODMAN_LOOPBACK_PUBLISH))' \
   'True'
 
 echo "== a stop grace is podman's stop timeout, and systemd waits longer than podman (OPS-PERF-01) =="
-# Quadlet's ExecStop is `podman rm -f`, which kills after the CONTAINER's stop timeout -- podman's
-# 10 s default unless StopTimeout= says otherwise. Until 2026-09-22 only TimeoutStopSec= was emitted,
-# so every JVM, Loki, Tempo and both databases were SIGKILLed after 10 s whatever compose said.
-unit_of() { # $1 service -> python that prints that service's rendered unit from the real compose
+unit_of() {
   printf 'import io, yaml\nfor p in (g.COMPOSE_APP, g.COMPOSE_MON):\n    d = yaml.safe_load(io.open(p, encoding="utf-8"))\n    s = (d.get("services") or {}).get("%s")\n    if s is not None:\n        print(g.render_container("%s", s))\n' "$1" "$1"
 }
 expect "a 30s grace becomes StopTimeout=30" \
@@ -329,10 +252,6 @@ print("mismatched:", bad)' \
   'mismatched: []'
 
 echo "== native Quadlet keys instead of raw podman arguments (OPS-MOD-01) =="
-# PodmanArgs= is appended to `podman run` unread, so a typo in it ships; a key is validated by the
-# generator. RunInit=, Ulimit= and the network Options= all exist in podman 5.8's
-# podman-systemd.unit(5) -- the comment that said "Quadlet has no Init= key" looked for the wrong
-# name. --cpus and --oom-score-adj have no key and stay arguments.
 expect "init: true becomes RunInit=true" \
   'print(g.render_container("x", {"image": "a/b:1", "init": True}))' \
   'RunInit=true'
@@ -359,8 +278,6 @@ expect_not "the measured control no longer reads as an unmeasured hypothesis" \
   'HYPOTHESIS'
 
 echo "== the config tree is mounted read-only, everywhere (OPS-SEC-04) =="
-# keycloak mounted its theme, its provider directory and realm-export.json writable until
-# 2026-09-22. /var/iri/code is what the deployer rewrites on every release.
 expect "a writable config-tree mount is refused" \
   'print(g._volume("./keycloak-theme/krt-theme:/opt/keycloak/themes/krt-theme", "keycloak"))' \
   'REFUSAL: keycloak: mounts /var/iri/code/keycloak-theme/krt-theme from the config tree without `:ro`'
@@ -389,8 +306,6 @@ for net in net-db-backend net-db-keycloak net-redis-backend net-redis-frontend n
     "files, _ = g.generate(); print(files['quadlet/systemd/${net}.network'])" \
     'Internal=true'
 done
-# The networks that carry egress for someone must NOT be internal: the edge's ingress bridge (the
-# only DNAT target for the published ports), acme's egress and the scrape network.
 for net in net-edge-ingress net-acme-egress net-monitoring-scrape net-backend-keycloak; do
   expect "${net} is not internal" \
     "files, _ = g.generate(); print('Internal=true' in files['quadlet/systemd/${net}.network'].splitlines())" \

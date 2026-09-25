@@ -123,18 +123,11 @@ class FaultTolerantSessionSerializerTest {
 
   @Test
   void anUnreadableValueBecomesAMarkerRatherThanAnException() {
-    // The marker, not `null`: `null` is what Spring Session already means by "this attribute is not
-    // set", and the application tombstones attributes on every role re-check and terms re-check, so
-    // null could not tell poison from housekeeping. SessionAttributeDiagnosticMapper turns the
-    // marker back into the null the rest of the stack expects, after naming the attribute.
     assertInstanceOf(UnreadableSessionValue.class, wrap(ALWAYS_FAILS).deserialize(new byte[] {9}));
   }
 
   @Test
   void aWriteFailureIsNotSwallowed() {
-    // Deliberately asymmetric. A session that cannot be written must fail loudly: silently
-    // accepting the write would hand the member a session that forgets everything it was told,
-    // which is harder to diagnose than an error and corrupts nothing visibly while doing it.
     RedisSerializer<Object> serializer =
         wrap(
             new RedisSerializer<>() {
@@ -167,18 +160,12 @@ class FaultTolerantSessionSerializerTest {
 
   @Test
   void theProductionPayloadShapeIsSurvivableAndNamesItsShape() {
-    // The exact shape from the incident: a JSON object with no `@class`. Read as Object under the
-    // NON_FINAL default typing that SecurityJacksonModules activates, Jackson demands the type id
-    // and throws `missing type id property '@class'`. Unwrapped, that is the 500.
     RedisSerializer<Object> raw = productionSerializer();
     byte[] withoutTypeId = "{\"token\":\"x\"}".getBytes(StandardCharsets.UTF_8);
     assertThrows(SerializationException.class, () -> raw.deserialize(withoutTypeId));
 
     UnreadableSessionValue marker = drop(raw, withoutTypeId);
 
-    // `absent` is the single most informative value this field takes: it says the value was written
-    // by a FINAL runtime type — a record, a List.of(…), any final class — which NON_FINAL typing
-    // writes without a type id and then refuses to read back.
     assertEquals("InvalidTypeIdException", marker.cause());
     assertEquals(UnreadableSessionValue.TYPE_ID_ABSENT, marker.typeId());
     assertEquals("java.lang.Object", marker.baseType());
@@ -186,10 +173,6 @@ class FaultTolerantSessionSerializerTest {
 
   @Test
   void aStaleNestedClassNameIsNamedInFull() {
-    // The upgrade-shaped failure: a session written by an older build carries a @class that this
-    // build can no longer resolve. Sessions live up to 720 hours and outlive several deploys, so
-    // this is the shape a rename produces — and the type id IS the answer, which is exactly what
-    // the incident's log line could not say.
     RedisSerializer<Object> raw = productionSerializer();
     byte[] stale =
         ("{\"@class\":\"java.util.LinkedHashMap\","
@@ -203,11 +186,6 @@ class FaultTolerantSessionSerializerTest {
 
   @Test
   void aTypeIdThatIsNotAClassNameIsNotLoggedVerbatim() {
-    // Measured, not defensive. A `List.of(…)` stored as a session attribute is written as a bare
-    // JSON array — no @class, because the JDK's immutable list is final — and the reader then takes
-    // ELEMENT ZERO for the type id. Jackson reports `Could not resolve type id 'sensitive-value'`,
-    // where that string is the member's own data. Logging it verbatim would put session payload in
-    // a log line, which REQ-OBS-004 forbids outright.
     RedisSerializer<Object> raw = productionSerializer();
     byte[] bareArray = raw.serialize(List.of("member@example.invalid", "second"));
 
@@ -218,16 +196,6 @@ class FaultTolerantSessionSerializerTest {
 
   @Test
   void theAttributeThatCausedTheOutageIsSurvivable() {
-    // The culprit, found by surveying the live session hashes: SPRING_SECURITY_LAST_EXCEPTION.
-    // Spring Security parks the last failed authentication in the session, and this value writes
-    // cleanly WITH its @class and then cannot be read back — reconstruction dies on
-    // `IllegalArgumentException: authenticationRequest cannot be null`, a field the serialized form
-    // never carried. Reading a session deserializes every field, so this one poisons the whole
-    // session: from the next request on, that member gets a 500 on everything.
-    //
-    // It is not a regression. The same probe fails identically on v1.6.12, so the trap has been
-    // latent for as long as sessions have been JSON — a release only has to make an authentication
-    // FAIL to arm it. PR #1755 stopped the write; this pins that the read stays survivable.
     RedisSerializer<Object> raw = productionSerializer();
     byte[] stored =
         raw.serialize(
@@ -237,8 +205,6 @@ class FaultTolerantSessionSerializerTest {
 
     UnreadableSessionValue marker = drop(raw, stored);
 
-    // A third distinct bucket, and the reason the triage key in the class Javadoc has three lines
-    // rather than two: this failure never reaches Jackson's type resolution at all.
     assertEquals("IllegalArgumentException", marker.cause());
   }
 
@@ -253,8 +219,6 @@ class FaultTolerantSessionSerializerTest {
 
   @Test
   void aCauseCycleDoesNotHangTheRequestThread() {
-    // The cause walk this class shipped with guarded only against self-reference, so a two-element
-    // cycle spun forever — inside a catch block on the session read path, i.e. on every request.
     Exception first = new IllegalStateException("first");
     Exception second = new IllegalStateException("second");
     first.initCause(second);
@@ -281,7 +245,6 @@ class FaultTolerantSessionSerializerTest {
 
   @Test
   void everyDropIsCountedUnderABoundedCauseTag() {
-    // 496 dropped values produced no number at all on 2026-09-02. This is that number.
     wrap(ALWAYS_FAILS).deserialize(new byte[] {9});
     wrap(ALWAYS_FAILS).deserialize(new byte[] {9});
 
@@ -294,8 +257,6 @@ class FaultTolerantSessionSerializerTest {
 
   @Test
   void anUnknownCauseFoldsIntoTheOtherBucketRatherThanBecomingALabel() {
-    // A tag fed from an arbitrary exception class name is an unbounded label, and a novel failure
-    // would then be a cardinality incident rather than a log line (REQ-OBS-006).
     drop(ALWAYS_FAILS, new byte[] {9});
 
     assertEquals(

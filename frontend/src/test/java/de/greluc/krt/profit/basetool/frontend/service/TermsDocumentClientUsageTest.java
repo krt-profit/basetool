@@ -84,8 +84,6 @@ class TermsDocumentClientUsageTest {
             .filter(name -> !name.endsWith("#<init>"))
             .collect(Collectors.toSet());
 
-    // The constructor assignment is filtered out above; what is left is every method that reads the
-    // field. One entry, and it is the named one — a second would mean a second anonymous call.
     assertThat(readers)
         .as("only the terms document may be fetched without a caller")
         .containsExactly("BackendApiClient#getTermsDocumentAnonymously");

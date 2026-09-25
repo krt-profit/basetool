@@ -1,28 +1,9 @@
-# promtool unit tests for the three rules added by the 2026-09-02 production log triage:
-# SessionValueDropsSustained, RedisFanoutUnsubscribed and ScWikiOrphanSweepStandingDown.
-#
-# Each of the three watches a failure that USED to be loud and is now quiet, so the thing worth
-# pinning in every case is the negative: the healthy shape must not fire.
-#   - SessionValueDropsSustained: a low trickle is not the storm, and neither is the one-off burst
-#     a backlog repair produces since ADR-0157 (each poisoned session now drops exactly once).
-#   - RedisFanoutUnsubscribed: a fan-out that is subscribed, and one switched off entirely (series
-#     absent), must both stay silent.
-#   - ScWikiOrphanSweepStandingDown: reason="not_modified" is a fully-cached HEALTHY night that also
-#     stands the sweep down. If the rule matched it, it would fire on every healthy deployment —
-#     which is the whole reason the counter carries a reason tag instead of being a bare count.
-#
-# Run locally (no promtool on the host — use an ephemeral container, see monitoring/README.md):
-#   docker run --rm --entrypoint sh -v "$PWD/monitoring/prometheus:/work" -w /work \
-#     prom/prometheus:v3.14.0 -c 'promtool test rules tests/log_triage_2026_09_02_alerts_test.yml'
-
 rule_files:
   - ../alerts/business.yml
 
 evaluation_interval: 1m
 
 tests:
-  # The 2026-09-02 storm: 496 drops over ~three hours, i.e. ~2.75/min, sustained. Well past the
-  # >20-per-15m threshold and held far longer than the 30m `for`.
   - name: fires - sustained session-value drops at the storm's observed rate
     interval: 1m
     input_series:
@@ -38,9 +19,6 @@ tests:
               summary: "Frontend is dropping unreadable session values (45 per 15m)"
               description: "Session values in Redis cannot be deserialized and are being dropped, so those attributes read as not set. Find the WARN line from SessionAttributeDiagnosticMapper in the frontend log: it names the attribute, the cause and the unresolved type id. typeId=absent means a FINAL-typed value (a record, a List.of/Map.of) was written into a session and can never be read back; a class name means that class was renamed or removed since the session was written; cause=IllegalArgumentException means a top-level @class no longer resolves. Since ADR-0157 the value is REMOVED from the session on the request that dropped it, so each poisoned session drops exactly once: a burst that decays is a backlog being repaired and is expected on a deploy, while a rate that stays up for 30m means something is still WRITING an unreadable value every request — check that the frontend startup line \"Session serializer forces an @class type id for: [...]\" lists what you expect, and that no code path puts a final type into a session (REQ-SEC-049, REQ-SEC-050)."
 
-  # A low trickle of drops. Real, worth a log line, not worth waking anyone. Before ADR-0157 this
-  # was a stale poisoned session being re-read forever; since the repair it can only be a slow
-  # arrival of newly-poisoned sessions, and either way it is below the storm.
   - name: silent - a low trickle of session-value drops
     interval: 1m
     input_series:
@@ -51,11 +29,6 @@ tests:
         alertname: SessionValueDropsSustained
         exp_alerts: []
 
-  # The shape a REQ-SEC-050 repair produces on the deploy that first drains a backlog: every
-  # poisoned session contributes ONE drop as its next request comes in, then stops. increase[15m]
-  # spikes far above the threshold and falls back to zero once the burst leaves the window, so it
-  # cannot hold the 30m `for`. If this ever starts firing, the repair is not sticking and the
-  # values are being re-poisoned.
   - name: silent - a backlog of poisoned sessions repairing itself
     interval: 1m
     input_series:
@@ -66,8 +39,6 @@ tests:
         alertname: SessionValueDropsSustained
         exp_alerts: []
 
-  # The fan-out retrying forever without ever subscribing: up, healthy, serving, and silently not
-  # receiving anything a peer publishes.
   - name: fires - livesync fan-out never subscribes
     interval: 1m
     input_series:
@@ -84,8 +55,6 @@ tests:
               summary: "Redis livesync fan-out has not been subscribed for 10m"
               description: "The livesync pub/sub container on the backend is not listening, so cross-instance delivery for that channel is dead: a peer replica's change never reaches this instance. The container retries every 5s, so 10 minutes means Redis is genuinely unreachable from the backend rather than merely restarting — check the redis container and the net-redis-backend network. The backend deliberately stays up and serving while this is true (ADR-0084, ADR-0143), so nothing else will page."
 
-  # A container recreate: unsubscribed for a couple of minutes, then the 5s retry wins. The `for: 10m`
-  # is what keeps an ordinary redeploy off the pager.
   - name: silent - a brief unsubscribed window during a container recreate
     interval: 1m
     input_series:
@@ -96,8 +65,6 @@ tests:
         alertname: RedisFanoutUnsubscribed
         exp_alerts: []
 
-  # Three incomplete census runs in 72h — the sweep has not tombstoned anything for three days while
-  # the sync kept reporting success.
   - name: fires - three incomplete SC-Wiki runs stand the orphan sweep down
     interval: 1h
     input_series:
@@ -113,9 +80,6 @@ tests:
               summary: "SC-Wiki orphan sweep has stood down on three incomplete runs in 72h"
               description: "The cross-kind scwiki_deleted sweep refused to run on at least three syncs in 72h because the census could not be vouched for. The refusal is correct — sweeping a half-walked feed would soft-delete every row that was merely never fetched — but rows the Wiki has actually dropped are not being tombstoned while the sync keeps reporting success. Since ADR-0195 an incomplete KIND pass alone no longer causes this: it fires only when the residual /api/items pass could not vouch for its own census, or when a kind pass was served a row that residual census does not contain (logged as 'the kind endpoints are not a subset of the item pool after all'). Both are new upstream shapes rather than the long-standing /api/vehicle-items tie — so unlike ScWikiCensusIncompleteStreak, this one firing is always worth reading. Grep the backend log for 'Skipping cross-kind orphan sweep (reason=incomplete' and the census WARNs above it. reason=not_modified is a healthy fully-cached run and is deliberately not matched here."
 
-  # The case that decides whether the reason tag was worth having. A fully-cached run stands the sweep
-  # down every single night; an untagged counter would be indistinguishable from the failure above and
-  # this rule would page daily on a perfectly healthy deployment.
   - name: silent - nightly all-304 runs stand the sweep down healthily
     interval: 1h
     input_series:

@@ -55,11 +55,8 @@ class MaterialProxyControllerTest {
 
   @InjectMocks private MaterialProxyController controller;
 
-  // ── getMaterialTerminals ────────────────────────────────────────────────
-
   @Test
   void getMaterialTerminals_proxiesById_andReturnsBackendResponse() {
-    // Given
     UUID materialId = UUID.randomUUID();
     List<Map<String, Object>> backendData =
         List.of(
@@ -69,10 +66,8 @@ class MaterialProxyControllerTest {
             eq("/api/v1/materials/" + materialId + "/terminals"), anyTypeRef()))
         .thenReturn(backendData);
 
-    // When
     List<Map<String, Object>> result = controller.getMaterialTerminals(materialId);
 
-    // Then
     assertEquals(backendData, result);
     verify(backendApiClient)
         .get(eq("/api/v1/materials/" + materialId + "/terminals"), anyTypeRef());
@@ -80,35 +75,26 @@ class MaterialProxyControllerTest {
 
   @Test
   void getMaterialTerminals_withNullBackendResponse_returnsEmptyList() {
-    // Given — the backend returned null (e.g. material not found, 204 No Content)
     UUID materialId = UUID.randomUUID();
     when(backendApiClient.<List<Map<String, Object>>>get(
             eq("/api/v1/materials/" + materialId + "/terminals"), anyTypeRef()))
         .thenReturn(null);
 
-    // When
     List<Map<String, Object>> result = controller.getMaterialTerminals(materialId);
 
-    // Then — never propagate null upstream; Thymeleaf templates iterate with
-    // `${terminals}` and would NPE on a null collection.
     assertNotNull(result);
     assertTrue(result.isEmpty());
   }
 
-  // ── getProfitCalculation ────────────────────────────────────────────────
-
   @Test
   void getProfitCalculation_withoutStarSystemNames_buildsBaseUri() {
-    // Given
     UUID shipId = UUID.randomUUID();
     when(backendApiClient.<List<Map<String, Object>>>get(
             anyString(), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of());
 
-    // When
     controller.getProfitCalculation(shipId, null);
 
-    // Then - no query parameters and no URI-variable placeholders beyond the mandatory shipId
     ArgumentCaptor<String> uriCap = ArgumentCaptor.captor();
     verify(backendApiClient).get(uriCap.capture(), anyTypeRef(), any(Object[].class));
     assertEquals("/api/v1/materials/profit-calculation?shipId=" + shipId, uriCap.getValue());
@@ -116,16 +102,13 @@ class MaterialProxyControllerTest {
 
   @Test
   void getProfitCalculation_withEmptyStarSystemList_buildsBaseUri() {
-    // Given - explicit empty list should behave like null
     UUID shipId = UUID.randomUUID();
     when(backendApiClient.<List<Map<String, Object>>>get(
             anyString(), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of());
 
-    // When
     controller.getProfitCalculation(shipId, List.of());
 
-    // Then
     ArgumentCaptor<String> uriCap = ArgumentCaptor.captor();
     verify(backendApiClient).get(uriCap.capture(), anyTypeRef(), any(Object[].class));
     assertEquals("/api/v1/materials/profit-calculation?shipId=" + shipId, uriCap.getValue());
@@ -133,18 +116,13 @@ class MaterialProxyControllerTest {
 
   @Test
   void getProfitCalculation_withMultipleStarSystems_appendsEachAsRepeatedPlaceholder() {
-    // Given
     UUID shipId = UUID.randomUUID();
     when(backendApiClient.<List<Map<String, Object>>>get(
             anyString(), anyTypeRef(), any(Object[].class)))
         .thenReturn(List.of());
 
-    // When
     controller.getProfitCalculation(shipId, List.of("Stanton", "Pyro"));
 
-    // Then - each star system is its own repeated query parameter (NOT CSV-encoded), carried as a
-    // {fN} URI-template variable so the WebClient encodes it (REQ-SEC-051). Mockito matches varargs
-    // element-wise, so two selected systems mean two capture() slots.
     ArgumentCaptor<String> uriCap = ArgumentCaptor.captor();
     ArgumentCaptor<Object> varCap = ArgumentCaptor.captor();
     verify(backendApiClient)
@@ -155,7 +133,6 @@ class MaterialProxyControllerTest {
             + shipId
             + "&starSystemNames={f0}&starSystemNames={f1}",
         template);
-    // Values are relayed as URI variables in selection order, never inlined into the template.
     assertEquals(List.of("Stanton", "Pyro"), varCap.getAllValues());
   }
 
@@ -179,11 +156,6 @@ class MaterialProxyControllerTest {
 
   @Test
   void getProfitCalculation_withUriSyntaxInStarSystemName_relaysItAsAVariableNotAsQuerySyntax() {
-    // Regression for CodeQL alert 877 (java/ssrf). The previous implementation built the URI with
-    // `UriComponentsBuilder` and called `builder.build().toUriString()`, which returns RAW
-    // UriComponents and encodes nothing - so a star-system name carrying `&` or `=` opened
-    // additional query parameters on the backend request. The hostile value must now leave the
-    // controller as a URI VARIABLE, with the template still holding exactly one placeholder.
     UUID shipId = UUID.randomUUID();
     String hostile = "Stanton&shipId=00000000-0000-0000-0000-000000000000&page=99";
     when(backendApiClient.<List<Map<String, Object>>>get(
@@ -199,7 +171,6 @@ class MaterialProxyControllerTest {
     assertEquals(
         "/api/v1/materials/profit-calculation?shipId=" + shipId + "&starSystemNames={f0}",
         template);
-    // The injected parameters never reach the template - they stay one opaque value.
     assertFalse(template.contains("page=99"), template);
     assertEquals(1, template.split("shipId=", -1).length - 1, template);
     assertEquals(hostile, varCap.getValue());
@@ -207,16 +178,13 @@ class MaterialProxyControllerTest {
 
   @Test
   void getProfitCalculation_withNullBackendResponse_returnsEmptyList() {
-    // Given
     UUID shipId = UUID.randomUUID();
     when(backendApiClient.<List<Map<String, Object>>>get(
             anyString(), anyTypeRef(), any(Object[].class)))
         .thenReturn(null);
 
-    // When
     List<Map<String, Object>> result = controller.getProfitCalculation(shipId, null);
 
-    // Then
     assertNotNull(result);
     assertTrue(result.isEmpty());
   }

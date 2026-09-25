@@ -84,12 +84,8 @@ class MissionFrequencyServiceTest {
     final UUID mid = mission.getId();
     final UUID tid = type.getId();
 
-    // First set: the INSERT branch of the atomic ON CONFLICT upsert.
     missionService.addOrUpdateMissionFrequency(mid, tid, new BigDecimal("100.00"));
 
-    // Setting the SAME channel again hits ON CONFLICT DO UPDATE — no duplicate row and no phantom
-    // 409 (the typed upsert takes no client version; last-writer-wins by design, #1148). The former
-    // find-then-insert would have needed a retry here under a real race.
     Mission updated =
         assertDoesNotThrow(
             () -> missionService.addOrUpdateMissionFrequency(mid, tid, new BigDecimal("222.50")));
@@ -108,7 +104,6 @@ class MissionFrequencyServiceTest {
 
     assertEquals(1, updated.getFrequencies().size());
     MissionFrequency freq = updated.getFrequencies().iterator().next();
-    // Custom rows carry a trimmed label and no global type.
     assertNull(freq.getFrequencyType());
     assertEquals("Bergungsteam", freq.getName());
     assertEquals(new BigDecimal("42.10"), freq.getValue());
@@ -137,12 +132,10 @@ class MissionFrequencyServiceTest {
     missionService.addCustomMissionFrequency(mission.getId(), "Alpha", new BigDecimal("1.00"));
     MissionFrequency freq = onlyFrequency(mission.getId());
 
-    // First edit succeeds and bumps the row version to 1 (flushed below).
     missionService.updateCustomMissionFrequency(
         mission.getId(), freq.getId(), "Alpha", new BigDecimal("2.00"), freq.getVersion());
     missionFrequencyRepository.flush();
 
-    // A second edit echoing the now-stale original version (0) surfaces as a 409.
     UUID freqId = freq.getId();
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
@@ -161,7 +154,6 @@ class MissionFrequencyServiceTest {
         mission.getId(), type.getId(), new BigDecimal("50.00"));
     MissionFrequency typed = onlyFrequency(mission.getId());
 
-    // Reaching a typed (global) row through the custom endpoint is rejected.
     UUID typedId = typed.getId();
     Long v = typed.getVersion();
     assertThrows(
@@ -185,15 +177,12 @@ class MissionFrequencyServiceTest {
   @Test
   void testAddTypedFrequencyWhenCustomExistsDoesNotNpe() {
     Mission mission = newPlannedMission("Mixed Freq Mission");
-    // A custom row (frequencyType == null) is present first.
     missionService.addCustomMissionFrequency(mission.getId(), "Recon", new BigDecimal("10.00"));
 
     FrequencyType type = new FrequencyType();
     type.setName("Tac");
     type = frequencyTypeRepository.save(type);
 
-    // Upserting a NEW typed frequency must scan past the custom row without dereferencing its null
-    // frequencyType (regression guard for the V201 nullable-type change).
     Mission updated =
         missionService.addOrUpdateMissionFrequency(
             mission.getId(), type.getId(), new BigDecimal("122.00"));

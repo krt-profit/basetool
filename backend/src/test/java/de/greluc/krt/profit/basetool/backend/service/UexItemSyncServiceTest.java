@@ -83,8 +83,6 @@ class UexItemSyncServiceTest {
 
   @BeforeEach
   void setUp() {
-    // self.getObject() must return the real instance so the per-item REQUIRES_NEW upsert runs its
-    // actual logic; lenient() because tests that fetch no items never enter the loop.
     lenient().when(self.getObject()).thenReturn(service);
 
     helmetsCategory = new UexCategory();
@@ -145,8 +143,6 @@ class UexItemSyncServiceTest {
     when(uexClient.getItemsForCategory(3)).thenReturn(fetched(helmet));
     when(gameItemRepository.findByUexItemId(42)).thenReturn(Optional.empty());
     when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
-    // BE-PERF-09: the company alias is read once per run into an id map, and the per-item
-    // transaction turns the id back into a reference — no per-item alias query.
     when(manufacturerAliasRepository.findCompanyRefs()).thenReturn(List.of(ref(1, rsi.getId())));
     when(manufacturerRepository.getReferenceById(rsi.getId())).thenReturn(rsi);
     when(gameItemRepository.save(any(GameItem.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -167,7 +163,6 @@ class UexItemSyncServiceTest {
     assertSame(rsi, persisted.getManufacturer());
     assertEquals("Venture Helmet White", persisted.getName());
     assertNotNull(persisted.getUexSyncedAt());
-    // Wiki columns stay untouched (R2 does not write them).
     assertNull(persisted.getScwikiSyncedAt());
     assertNull(persisted.getDescriptionEn());
   }
@@ -175,7 +170,6 @@ class UexItemSyncServiceTest {
   @Test
   void syncItems_handlesEmptyUuidByLeavingExternalUuidNull() {
     UexItemDto avionics = helmetDto(99, "Random Flight Blade", "", helmetsCategory);
-    // shift category section to Avionics for this case
     helmetsCategory.setSection("Avionics");
     helmetsCategory.setName("Flight Blade");
 
@@ -223,12 +217,6 @@ class UexItemSyncServiceTest {
 
   @Test
   void syncItems_leavesExternalUuidNull_whenIncomingUuidAlreadyOwnedByAnotherRow() {
-    // The prod failure on item 4752 ("Pulse Greycat Laser Pistol"): UEX gives a base weapon and its
-    // skins ONE shared in-game uuid, but external_uuid is UNIQUE. This skin already has its own row
-    // (resolved by uex_item_id, external_uuid still null); the base weapon's row already owns the
-    // shared uuid. Backfilling it onto the skin would hit uk_game_item_external_uuid. The guard
-    // must
-    // leave external_uuid null and sync every other column instead of throwing.
     UUID sharedUuid = UUID.randomUUID();
     UexItemDto skin =
         helmetDto(4752, "Pulse Greycat Laser Pistol", sharedUuid.toString(), helmetsCategory);
@@ -264,9 +252,6 @@ class UexItemSyncServiceTest {
     assertEquals("Pulse Greycat Laser Pistol", persisted.getName(), "other columns still sync");
     assertEquals(GameItemKind.ARMOR, persisted.getKind());
 
-    // The decline is expected steady state (no per-item WARN, #1205): the run summary surfaces it
-    // as
-    // a single aggregate count so prod keeps visibility without one warning per sync per sibling.
     verify(syncReportService)
         .logUexEvent(
             any(),
@@ -279,9 +264,6 @@ class UexItemSyncServiceTest {
 
   @Test
   void syncItems_doesNotDowngradeKindToGeneric_whenUexReCataloguesAWikiSpecificRow() {
-    // A paint Wiki filed as VEHICLE_ITEM (via /vehicle-items); UEX later lists the same
-    // external_uuid under the "Liveries" section (deriveKind → GENERIC). The §6.3.1
-    // more-specific-wins merge must keep VEHICLE_ITEM — UEX must not downgrade it to GENERIC.
     UUID externalUuid = UUID.randomUUID();
     UexItemDto paint =
         helmetDto(21, "100i Auspicious Red Dog Livery", externalUuid.toString(), liveriesCategory);
@@ -318,18 +300,11 @@ class UexItemSyncServiceTest {
     int upserted = service.syncItems();
 
     verify(gameItemRepository, never()).markUexDeletedExcept(any(), any());
-    // Zero upserts is the tally fed to basetool_scheduled_job_items_total{job=uex_sync} — a UEX
-    // catalogue outage returning empty 200 responses shows here as 0 (#1041 item 2, SyncZeroItems).
     assertEquals(0, upserted, "an empty UEX catalogue must report zero upserts");
   }
 
   @Test
   void syncItems_reportsLiveCatalogueSize_whenCatalogueUnchanged304() {
-    // Healthy no-op: UEX serves every category from the conditional-GET cache (304 Not Modified),
-    // so
-    // the run upserts nothing. Reporting 0 would be indistinguishable from the empty-200 outage
-    // SyncZeroItems targets, so the run reports the live catalogue size instead — keeping
-    // basetool_scheduled_job_items_total{job=uex_sync} non-zero on an unchanged catalogue.
     when(categoryRefService.syncCategories()).thenReturn(List.of(helmetsCategory));
     when(uexClient.getItemsForCategory(3)).thenReturn(unchanged());
     when(gameItemRepository.countLiveUexItems()).thenReturn(4200L);
@@ -344,8 +319,6 @@ class UexItemSyncServiceTest {
 
   @Test
   void syncItems_reportsZeroWithoutCatalogueFallback_whenEmpty200Outage() {
-    // A genuine empty-200 outage (no 304 anywhere) must still report 0 so SyncZeroItems fires — the
-    // live-catalogue fallback must never mask a real outage.
     when(categoryRefService.syncCategories()).thenReturn(List.of(helmetsCategory));
     when(uexClient.getItemsForCategory(3)).thenReturn(fetched());
 
@@ -358,11 +331,6 @@ class UexItemSyncServiceTest {
 
   @Test
   void syncItems_skipsOrphanSweep_whenAnyCategoryUnchanged304_evenWithFreshItems() {
-    // Mixed run: category 3 returns a fresh item, category 75 is unchanged (304). seenUexItemIds
-    // then holds only category 3's item — an INCOMPLETE view of the catalogue. Running the orphan
-    // sweep would wrongly soft-delete category 75's cached items, so it must be skipped this run.
-    // The upsert count still reflects the fresh item (non-zero), so the catalogue-size fallback for
-    // the all-unchanged case does not apply.
     UexItemDto helmet =
         helmetDto(11, "Venture Helmet", UUID.randomUUID().toString(), helmetsCategory);
     when(categoryRefService.syncCategories())
@@ -383,12 +351,6 @@ class UexItemSyncServiceTest {
 
   @Test
   void syncItems_skipsOrphanSweep_whenACategoryFetchFailed_evenWithFreshItems() {
-    // The data-loss case this gate exists for: category 3 answers with a fresh item, category 75's
-    // call fails (5xx / timeout / decode error / non-ok envelope) and is swallowed into an EMPTY
-    // list — the same shape a legitimately empty category returns, and UEX really has two of those.
-    // seenUexItemIds therefore holds nothing from category 75, and sweeping would soft-delete every
-    // one of its items — up to ~500 rows for the largest category — until the next healthy run
-    // re-upserted them. Only FetchResult.complete() can tell the two apart (REQ-DATA-014).
     UexItemDto helmet =
         helmetDto(11, "Venture Helmet", UUID.randomUUID().toString(), helmetsCategory);
     when(categoryRefService.syncCategories())
@@ -408,10 +370,6 @@ class UexItemSyncServiceTest {
 
   @Test
   void syncItems_runsOrphanSweep_whenAnEmptyCategoryAnsweredCompletely() {
-    // The other half of the same distinction: an empty category that ANSWERED (complete, zero rows)
-    // must not stand the sweep down — two UEX item categories are permanently empty, so treating
-    // "no rows" as a failure would suppress orphan detection forever, which is the shape of the
-    // SC-Wiki census bug (ADR-0147).
     UexItemDto helmet =
         helmetDto(11, "Venture Helmet", UUID.randomUUID().toString(), helmetsCategory);
     when(categoryRefService.syncCategories())
@@ -442,8 +400,6 @@ class UexItemSyncServiceTest {
     int upserted = service.syncItems();
 
     verify(gameItemRepository).markUexDeletedExcept(any(), any());
-    // One item upserted → the count reported to basetool_scheduled_job_items_total{job=uex_sync}
-    // (#1041 item 2).
     assertEquals(1, upserted, "one processed item must report one upsert");
   }
 
@@ -460,8 +416,6 @@ class UexItemSyncServiceTest {
 
     service.syncItems();
 
-    // Exactly one summary row per run (carrying the tally), so the run shows on the admin UEX tab
-    // without one event per created item; then the UEX retention sweep runs.
     verify(syncReportService)
         .logUexEvent(
             any(),
@@ -528,11 +482,6 @@ class UexItemSyncServiceTest {
 
   @Test
   void syncItems_isolatesPerItem_oneFailingItemDoesNotAbortTheCategory() {
-    // Regression for the shipped prod incident (3376 cascade failures, no "Finished" summary): the
-    // item loop used to run in ONE transaction, so a single uk_game_item_external_uuid collision
-    // poisoned the Hibernate session and every SUBSEQUENT item's autoflush re-threw the dead
-    // insert, rolling back the whole run. With per-item REQUIRES_NEW isolation the caller's catch
-    // skips only the colliding row; the rest of the category still commits and the summary writes.
     UexItemDto colliding = helmetDto(100, "Colliding Helmet", "", helmetsCategory);
     UexItemDto surviving = helmetDto(200, "Surviving Helmet", "", helmetsCategory);
 
@@ -553,17 +502,12 @@ class UexItemSyncServiceTest {
 
     int upserted = assertDoesNotThrow(service::syncItems);
 
-    // Both items are attempted (the loop never aborts); only the surviving row commits.
     verify(gameItemRepository, times(2)).save(any(GameItem.class));
     verify(gameItemRepository).save(argThat(g -> Integer.valueOf(200).equals(g.getUexItemId())));
     assertEquals(1, upserted, "the failing item must not be counted, the surviving one must be");
-    // The orphan sweep still runs, keyed only on the surviving id — the collided id never entered
-    // the seen-set, so a poisoned run does not wipe the local catalogue.
     verify(gameItemRepository)
         .markUexDeletedExcept(
             argThat(ids -> ids.contains(200) && !ids.contains(100)), any(Instant.class));
-    // The run summary is still emitted despite the mid-loop failure (the missing "Finished" line
-    // was the prod symptom).
     verify(syncReportService)
         .logUexEvent(
             any(),
@@ -576,9 +520,6 @@ class UexItemSyncServiceTest {
 
   @Test
   void upsertItemWithinTransaction_opensItsOwnTransaction() throws NoSuchMethodException {
-    // Pin the REQUIRES_NEW propagation by reflection: it is the whole mechanism that keeps a
-    // uk_game_item_external_uuid collision from poisoning the run's session. Demoting it to the
-    // default REQUIRED (or dropping @Transactional) silently reintroduces the whole-run rollback.
     Transactional tx =
         UexItemSyncService.class
             .getMethod(
@@ -590,8 +531,6 @@ class UexItemSyncServiceTest {
         Propagation.REQUIRES_NEW,
         tx.propagation(),
         "the per-item write must run in its own transaction so a collision isolates to one item");
-    // The run calls the overload that takes the preloaded lookups (BE-PERF-09); it must be
-    // REQUIRES_NEW just the same.
     Transactional withLookups =
         UexItemSyncService.class
             .getMethod(
@@ -607,10 +546,6 @@ class UexItemSyncServiceTest {
 
   @Test
   void syncItems_keepsExistingExternalUuid_whenUexShipsADifferentUuid() {
-    // A local row already carries external_uuid=A (e.g. written by the Wiki side). UEX later
-    // ships a valid but DIFFERENT uuid=B for the same uex_item_id. The guard must keep the
-    // existing key A: overwriting it would silently repoint the game_item to a different in-game
-    // asset and break every blueprint-ingredient / item-price join keyed on external_uuid.
     UUID keptUuidA = UUID.randomUUID();
     UUID incomingUuidB = UUID.randomUUID();
     UexItemDto helmet =
@@ -640,12 +575,10 @@ class UexItemSyncServiceTest {
         keptUuidA,
         persisted.getExternalUuid(),
         "UEX must not overwrite an existing external_uuid with a different one");
-    // Every other UEX column still syncs from the DTO.
     assertEquals("Ballistic Helmet", persisted.getName(), "name still updates");
     assertEquals("ballistic-helmet", persisted.getUexSlug(), "slug still updates");
     assertEquals(500, persisted.getUexItemId());
     assertNotNull(persisted.getUexSyncedAt(), "uex_synced_at still stamped");
-    // The incoming uuid B is never resolved as an owner — the row was matched by uex_item_id.
     verify(gameItemRepository, never()).findByExternalUuid(incomingUuidB);
   }
 

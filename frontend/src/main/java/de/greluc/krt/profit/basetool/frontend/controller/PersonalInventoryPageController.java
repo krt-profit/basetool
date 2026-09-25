@@ -141,14 +141,6 @@ public class PersonalInventoryPageController {
       Model model,
       RedirectAttributes redirectAttributes) {
     if (bindingResult.hasErrors()) {
-      // Render the list view directly instead of redirecting. We must NOT push the
-      // BindingResult into a FlashAttribute: BeanPropertyBindingResult holds a back-
-      // reference to its model map (which in turn re-contains the BindingResult), and
-      // the GenericJacksonJsonRedisSerializer used for Spring Session blows up on the
-      // self-referencing cycle with `Document nesting depth (501) exceeds the maximum
-      // allowed (500)`. Spring already exposes both `personalInventoryForm` and the
-      // associated BindingResult through @ModelAttribute, so the modal can re-display
-      // the user's input and the field errors without any flash hand-off.
       model.addAttribute("showItemModal", true);
       model.addAttribute("modalAction", "/personal-inventory/add");
       populateListing(model, null, null, null, null);
@@ -193,8 +185,6 @@ public class PersonalInventoryPageController {
       Model model,
       RedirectAttributes redirectAttributes) {
     if (bindingResult.hasErrors()) {
-      // Same rationale as add(): render directly to avoid pushing the
-      // self-referencing BindingResult through the Redis-backed FlashMap.
       model.addAttribute("showItemModal", true);
       model.addAttribute("modalAction", "/personal-inventory/" + id + "/update");
       populateListing(model, null, null, null, null);
@@ -241,8 +231,6 @@ public class PersonalInventoryPageController {
     }
     return "redirect:/personal-inventory";
   }
-
-  // ----------------------------------------------------- AJAX twins (epic #571 / REQ-FE-005)
 
   /**
    * Header-gated AJAX twin of {@link #add}: creates an item and returns {@code 204} so {@code
@@ -372,19 +360,10 @@ public class PersonalInventoryPageController {
     try {
       String query = q == null ? "" : q;
       int effectiveLimit = limit == null ? 25 : Math.min(2000, Math.max(1, limit));
-      // Pass the free-text term as a WebClient URI-template variable so it is percent-encoded
-      // exactly once across the frontend->backend hop; URLEncoder form-encoding (space -> '+')
-      // double-encodes umlauts / reserved chars when re-encoded on the hop, yielding zero matches.
       String uri = "/api/v1/uex/locations/search?q={q}&limit=" + effectiveLimit;
       List<UexLocationDto> result = backendApiClient.get(uri, UEX_LOCATION_LIST_TYPE, query);
       return result == null ? Collections.emptyList() : result;
     } catch (Exception e) {
-      // DEBUG, not WARN: this endpoint fires ONE REQUEST PER KEYSTROKE. With the backend down, a
-      // single member typing a location name produces one line per character — a log-flood vector
-      // triggered accidentally by ordinary use, which REQ-OBS-001 puts at DEBUG. The outage itself
-      // is already carried by basetool_backend_client_errors_total and by the WebClient/resilience
-      // logging, so nothing is lost. The query is user-typed free text and goes through LogSafe so
-      // it cannot inject a forged log line (CWE-117).
       log.debug(
           "UEX location typeahead failed for query='{}': {}",
           LogSafe.text(q, MAX_LOGGED_QUERY),
@@ -419,7 +398,6 @@ public class PersonalInventoryPageController {
         uri.append("&sort=").append(URLEncoder.encode(sort, StandardCharsets.UTF_8));
       }
       if (q != null && !q.isBlank()) {
-        // Free-text term as a WebClient URI-template variable (encoded once); see uexSearch.
         uri.append("&q={q}");
         return backendApiClient.get(uri.toString(), PERSONAL_INVENTORY_ITEM_PAGE_TYPE, q);
       }

@@ -267,7 +267,6 @@ class BackendPropertiesValidationTest {
                 .isEqualTo(Duration.ofMinutes(5)));
   }
 
-  // covers REQ-SEC-033 carve-out (APPSEC-10) — a zero export capacity would refuse every export
   @Test
   void shouldFail_WhenSubjectExportCapacityIsZero() {
     rateLimitRunner
@@ -288,7 +287,6 @@ class BackendPropertiesValidationTest {
         });
   }
 
-  // covers REQ-AUDIT-006 (BE-MOD-03) — P0D would put the cutoff at "now" and purge the whole trail
   @Test
   void shouldFail_WhenAuditRetentionMaxAgeIsZero() {
     auditRetentionRunner
@@ -343,7 +341,6 @@ class BackendPropertiesValidationTest {
         });
   }
 
-  // covers REQ-SEC-057 (BE-MOD-03) — "not zero on purpose" is a startup check now
   @Test
   void shouldFail_WhenRejectedRetentionMaxAgeIsZero() {
     rejectedRetentionRunner
@@ -366,7 +363,6 @@ class BackendPropertiesValidationTest {
                 .isEqualTo(Duration.ofDays(90)));
   }
 
-  // covers REQ-NOTIF-009 (BE-MOD-03) — both windows carry the floor
   @Test
   void shouldFail_WhenNotificationReadMaxAgeIsZero() {
     notificationRetentionRunner
@@ -384,7 +380,6 @@ class BackendPropertiesValidationTest {
         .run((context) -> assertThat(context).hasFailed());
   }
 
-  // covers REQ-NOTIF-009 — an unread notification is never reaped sooner than a read one
   @Test
   void shouldFail_WhenNotificationUnreadWindowIsShorterThanReadWindow() {
     notificationRetentionRunner

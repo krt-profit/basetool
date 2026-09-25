@@ -221,15 +221,12 @@ public class HandleAnonymisationService {
     String sentinel = HandleAnonymisation.SENTINEL;
     Set<String> names = usableSpellings(spellings);
 
-    // Id-matched: these reach the rows because the account still exists at this point.
     int activityAudit = auditEventRepository.anonymiseActorHandle(userId, sentinel);
     int bankAudit = bankAuditEventRepository.anonymiseActorHandle(userId, sentinel);
     int bankTransactions = bankTransactionRepository.anonymiseCounterpartyHandle(userId, sentinel);
     int bookingRequests = bankBookingRequestRepository.anonymiseHandles(userId, sentinel);
     int bankHolders = bankHolderRepository.anonymiseHandle(userId, sentinel);
 
-    // Text-matched: once per spelling, because whoever typed the name wrote what they call the
-    // person and that is as likely to be the Discord nickname as the display name.
     int jobOrders = 0;
     int materialHandovers = 0;
     int itemHandovers = 0;
@@ -251,8 +248,6 @@ public class HandleAnonymisationService {
             materialHandovers,
             itemHandovers);
 
-    // The markers go in AFTER the updates, so they are not scrubbed by them. The payload carries
-    // counts and the target reference only -- never the handle that was just removed.
     auditService.record(
         AuditEventType.HANDLE_SNAPSHOTS_ANONYMISED,
         userId,

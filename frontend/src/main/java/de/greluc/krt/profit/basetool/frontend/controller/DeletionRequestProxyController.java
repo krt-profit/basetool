@@ -93,9 +93,6 @@ public class DeletionRequestProxyController {
       unavailable = true;
     }
     model.addAttribute("deletionRequest", deletionRequest);
-    // Reported rather than swallowed: the swap happens after a write that already succeeded, and
-    // rendering the no-request state here would tell the member the opposite of what just
-    // happened. See the same flag in ProfileController.
     model.addAttribute("deletionRequestUnavailable", unavailable);
     return "fragments/profile-deletion-card :: card";
   }

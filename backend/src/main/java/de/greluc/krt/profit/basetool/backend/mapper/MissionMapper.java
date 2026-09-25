@@ -64,14 +64,6 @@ import org.springframework.beans.factory.annotation.Autowired;
     uses = {ShipMapper.class, UserMapper.class, OperationMapper.class, SquadronMapper.class})
 public abstract class MissionMapper {
 
-  // MapStruct generates a concrete subclass via the annotation processor; the generated subclass
-  // cannot accept additional constructor parameters, so we fall back to field-level @Autowired
-  // here.
-  // The mapper depends ONLY on the MissionViewerAccess leaf interface (support package), never on
-  // Spring's SecurityContextHolder (ArchUnit mapperLayerShouldNotReachIntoSecurityContext) and —
-  // since the cycle cleanup, ADR-0047 — never on the service layer directly: the implementation
-  // (MissionViewerAccessService) is what wires AuthHelperService + MissionSecurityService, so the
-  // mapper -> service edge that closed the mapper <-> service package cycle is gone.
   @Autowired protected MissionViewerAccess missionViewerAccess;
 
   /**
@@ -206,14 +198,6 @@ public abstract class MissionMapper {
   @Mapping(target = "owningSquadron", source = "mission.owningOrgUnit")
   @Mapping(target = "registeredCount", expression = "java(registeredCount)")
   public abstract MissionListDto toListDto(Mission mission, long registeredCount);
-
-  // toEntity(MissionDto) has been removed (audit finding C-3, 2026-05-20): the previous mapper
-  // copied id / version / owningSquadron / parent / isInternal straight from the response DTO
-  // into a fresh Mission entity, which made `missionRepository.save(entity)` invoke
-  // EntityManager.merge() and overwrite an attacker-supplied existing row. Write paths now go
-  // through dedicated CreateMissionRequest / UpdateMissionRequest records that physically lack
-  // those fields. The ArchUnit rule {@code missionDtoMustNotBeAcceptedAsRequestBody} keeps this
-  // direction one-way.
 
   /**
    * Projects a participant's {@code Set<OrgUnit>} affiliations into a deterministically ordered

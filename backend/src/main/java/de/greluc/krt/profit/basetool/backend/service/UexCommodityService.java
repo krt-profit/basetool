@@ -137,8 +137,6 @@ public class UexCommodityService {
     log.info("Starting synchronization of UEX commodity prices...");
     UexClient.FetchResult<UexCommodityPriceDto> priceFetch = uexClient.getCommoditiesPricesAll();
     if (priceFetch.notModified()) {
-      // Price matrix byte-identical to the last run: nothing to upsert, and — critically — no
-      // stale-row sweep either, since every row we would have "seen" is still current.
       log.info(
           "UEX commodity price matrix unchanged since the last sync (304) — nothing to import.");
       return;
@@ -189,9 +187,6 @@ public class UexCommodityService {
               + "({} dto(s) received, all failed). Refusing to wipe the entire price matrix.",
           dtos.size());
     } else {
-      // Same bounded-chunk sweep as the item-price matrix (REQ-DATA-014): the parameter count no
-      // longer scales with the number of rows the feed returned. Own transaction: the writes above
-      // have all committed, and the bulk update needs one.
       int cleared =
           chunkWriter.inNewTransaction(
               () ->
@@ -233,9 +228,6 @@ public class UexCommodityService {
                         .map(
                             m -> {
                               m.setIdCommodity(dto.id());
-                              // A manual entry has just been adopted by UEX. Flip its provenance
-                              // off MANUAL so the admin badge disappears; the link to UEX is
-                              // recorded via the INFO log and the now-populated idCommodity column.
                               if (m.getSourceSystems() == MaterialSourceSystem.MANUAL) {
                                 log.info(
                                     "Manual material '{}' is now linked to UEX commodity id={}",
@@ -256,9 +248,6 @@ public class UexCommodityService {
 
     material.setType(determineMaterialType(dto));
     material.setCode(dto.code());
-    // No slug: UEX's /commodities payload has no `slug` field, so the previous mapping only wrote
-    // null into material.slug on every run (REQ-DATA-015). The commodity's Wiki slug lives in its
-    // own column (scwiki_slug) and is written by the Wiki commodity sync.
     material.setKind(dto.kind());
     material.setWeightScu(dto.weightScu());
     material.setPriceBuy(dto.priceBuy());
@@ -314,8 +303,6 @@ public class UexCommodityService {
       @NotNull List<UexCommodityPriceDto> dtos, @NotNull UexMatrixLookups lookups) {
     Map<Integer, UexCommodityPriceDto> missing = new LinkedHashMap<>();
     for (UexCommodityPriceDto dto : dtos) {
-      // Regardless of whether the terminal is known — the placeholder was always created before
-      // the terminal check, and a commodity UEX prices somewhere is a commodity worth having.
       if (lookups.parentId(dto.idCommodity()) == null) {
         missing.putIfAbsent(dto.idCommodity(), dto);
       }
@@ -432,7 +419,7 @@ public class UexCommodityService {
                               dto.commodityName() != null
                                   ? dto.commodityName()
                                   : "Unknown-" + dto.idCommodity());
-                          newMaterial.setType(MaterialType.NO_REFINE); // Default type
+                          newMaterial.setType(MaterialType.NO_REFINE);
                           return materialRepository.save(newMaterial);
                         }))
         .getId();

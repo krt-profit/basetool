@@ -8,14 +8,6 @@
 @layer base, components, page, migration, utilities;
 
 @layer page {
-    /*
- * Terms-of-Use consent gate (REQ-SEC-028).
- *
- * A page of its own rather than classes in `inline-migration.css`, which is generated from former
- * inline styles and must not be hand-edited. Wider than the waiting page because it has to render
- * the full contract legibly, not one sentence.
- */
-
     .terms-accept-box {
         max-width: 60rem;
         margin: 2rem auto;
@@ -30,13 +22,6 @@
         font-size: 0.9rem;
     }
 
-    /*
- * The contract scrolls inside its own box instead of the page. Two reasons: the accept button stays
- * visible without hunting for it at the end of fourteen sections, and the viewer can see at a
- * glance that there is more text than fits - a page-length wall of text reads as "already read it".
- * `tabindex="0"` in the template makes the region keyboard-scrollable, which a scrollable div is
- * not by default.
- */
     .terms-accept-scroll {
         max-height: 26rem;
         overflow-y: auto;
@@ -69,7 +54,6 @@
         font-size: 0.9rem;
     }
 
-    /* Phone: the two actions stack, and the contract gets more of the shorter viewport. */
     @media (width <= 480px) {
         .terms-accept-actions {
             flex-direction: column;

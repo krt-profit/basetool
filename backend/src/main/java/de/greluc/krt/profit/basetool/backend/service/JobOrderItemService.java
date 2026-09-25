@@ -174,16 +174,11 @@ public class JobOrderItemService {
       if (ingredient.getKind() == BlueprintIngredientKind.RESOURCE) {
         material = ingredient.getMaterial();
         if (material == null) {
-          // Unresolved RESOURCE line: cannot be snapshotted, surfaces only as a create-time
-          // warning.
           continue;
         }
         double perUnit = ingredient.getQuantityScu() == null ? 0.0 : ingredient.getQuantityScu();
         rawQuantity = perUnit * line.amount();
       } else {
-        // ITEM ingredient: a craftable sub-assembly stays a separate adoptable line; a
-        // non-craftable
-        // item that maps to a known material is bridged to that material (piece count as quantity).
         material = bridgedMaterial(ingredient);
         if (material == null) {
           continue;
@@ -242,12 +237,6 @@ public class JobOrderItemService {
     Map<Key, Double> sums = new LinkedHashMap<>();
     Map<UUID, Material> materials = new LinkedHashMap<>();
     for (JobOrderItem item : order.getItems()) {
-      // Outstanding demand only: the material for the units still to be manufactured. Every
-      // production booking advances manufacturedAmount — whether it booked the material out of
-      // stock
-      // or the operator marked it "nicht ausbuchen" (REQ-ORDERS-025) — so this aggregate shrinks
-      // proportionally as production progresses, and a fully manufactured line contributes 0. The
-      // row is kept (possibly 0) so a material's quality bucket and its claims stay visible.
       int lineAmount = item.getAmount() != null ? item.getAmount() : 0;
       int manufactured = item.getManufacturedAmount() != null ? item.getManufacturedAmount() : 0;
       int remaining = Math.max(0, lineAmount - manufactured);
@@ -264,10 +253,6 @@ public class JobOrderItemService {
         .map(
             e -> {
               Material material = materials.get(e.getKey().materialId());
-              // currentStock and the claim fields stay neutral here — JobOrderService enriches them
-              // in mapToDtoWithStock: it sums the order-linked inventory per bucket (collection
-              // progress for the overview, #595) and overlays the SK claims (Phase 5, #345).
-              // Non-SK orders keep the null open-amount so the UI renders no claim columns.
               return new AggregatedMaterialDto(
                   materialMapper.toDto(material),
                   e.getKey().quality(),
@@ -469,8 +454,6 @@ public class JobOrderItemService {
    */
   @NotNull
   public Page<GameItemReferenceDto> findOrderableItems(String search, @NotNull Pageable pageable) {
-    // Empty string (not null) for "no filter": a null bind into the query's LOWER(CONCAT(...))
-    // makes PostgreSQL infer bytea and fail; "" matches every row via the %% pattern.
     String q = search != null && !search.isBlank() ? search.strip() : "";
     return blueprintRepository.findOrderableItems(q, pageable).map(this::gameItemRef);
   }
@@ -518,8 +501,6 @@ public class JobOrderItemService {
         int perUnit = ingredient.getQuantityUnits() == null ? 0 : ingredient.getQuantityUnits();
         List<BlueprintReferenceDto> subBlueprints = blueprintsForItem(subItem.getId());
         if (subBlueprints.isEmpty()) {
-          // Non-craftable item: if it maps to a known material it is a procurement requirement
-          // (PIECE piece-count), not a sub-assembly. Bridge it onto that shared material row.
           Material material = resolveItemMaterial(subItem, ingredient);
           if (material != null) {
             materials.add(
@@ -581,7 +562,6 @@ public class JobOrderItemService {
       return null;
     }
     if (!blueprintRepository.findByOutputItemId(subItem.getId()).isEmpty()) {
-      // Craftable: a genuine sub-assembly, handled as a separate adoptable line, not a material.
       return null;
     }
     return resolveItemMaterial(subItem, ingredient);

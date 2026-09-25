@@ -94,10 +94,6 @@ class MaterialgesuchPageControllerMvcTest {
         .thenReturn(new MaterialExchangeCountsDto(1, 0));
     when(backendApiClient.get(contains("/material-requests?"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(request), 0, 200, 1, 1, List.of()));
-    // Detail lookup: match the concrete request id, NOT the broad "/material-requests/" prefix.
-    // The prefix also matches "/material-requests/counts", and Mockito's last-matching-stub-wins
-    // would then route the counts call here (returning a MaterialRequestDto), so loadRequestCounts
-    // would hit a swallowed ClassCastException and silently render 0/0 instead of the stub.
     when(backendApiClient.get(contains("/material-requests/" + request.id()), anyClass()))
         .thenReturn(request);
   }
@@ -140,15 +136,9 @@ class MaterialgesuchPageControllerMvcTest {
         .andExpect(content().string(containsString("<strong>Titanium</strong>")))
         .andExpect(content().string(containsString("squadron-badge")))
         .andExpect(content().string(containsString(">IRI<")))
-        // A material request carries its stated minimum quality as a fact.
         .andExpect(content().string(containsString("600")))
-        // The owner (mine) sees the edit CTA.
         .andExpect(content().string(containsString("data-mg-edit")))
-        // The "Alle Gesuche" tab shows the stubbed request count (1) — proving the request-counts
-        // lookup is honoured, not shadowed by the detail stub; every other tab-count renders 0.
         .andExpect(content().string(containsString("<span class=\"tab-count\">1</span>")))
-        // Symmetric guard to the offers-mode test: the requests view renders only the request
-        // board, never the offers board's own list wrapper on top of it.
         .andExpect(content().string(not(containsString("id=\"mb-listwrap\""))));
   }
 

@@ -4,54 +4,24 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: ${KEYCLOAK_ISSUER_URI}
-  # SSL bundle that exposes the bind-mounted keystore.p12 as a TRUSTSTORE for the backend RestClient
-  # (the same keystore also backs the gateway's own HTTPS connector — see application.yml — but as a
-  # trust anchor it must validate the backend's self-signed https://backend:11261 cert).
-  # RestClientConfig consumes this via SslBundles.getBundle("backend-trust")
-  # on the prod path; if absent it falls back to the default JVM trust store. Same env vars the other
-  # modules already use — no new compose secret. Mirrors the frontend's backend-trust bundle.
   ssl:
     bundle:
       jks:
         backend-trust:
           truststore:
-            # REQ-SEC-070: the INTERNAL TRUSTSTORE -- the internal CA once the per-service
-            # certificates are rolled out; until then compose points it at the shared keystore,
-            # so nothing changes. Falls back to the own keystore when the variable is absent.
             location: ${INTERNAL_TLS_TRUSTSTORE:${SERVER_SSL_KEY_STORE:classpath:keystore.p12}}
             password: ${INTERNAL_TLS_TRUSTSTORE_PASSWORD:${SERVER_SSL_KEY_STORE_PASSWORD}}
             type: PKCS12
-        # REQ-SEC-024: pins the same bind-mounted self-signed keystore.p12 as a TRUSTSTORE for the
-        # OPT-IN internal JWKS fetch (https://keycloak:18443). Consumed via
-        # SslBundles.getBundle("keycloak-trust") only when app.security.jwt.jwk-set-uri is set; the
-        # shared cert's SAN carries dns:keycloak. Same env vars — no new compose secret.
         keycloak-trust:
           truststore:
-            # REQ-SEC-070: the INTERNAL TRUSTSTORE -- the internal CA once the per-service
-            # certificates are rolled out; until then compose points it at the shared keystore,
-            # so nothing changes. Falls back to the own keystore when the variable is absent.
             location: ${INTERNAL_TLS_TRUSTSTORE:${SERVER_SSL_KEY_STORE:classpath:keystore.p12}}
             password: ${INTERNAL_TLS_TRUSTSTORE_PASSWORD:${SERVER_SSL_KEY_STORE_PASSWORD}}
             type: PKCS12
 
-# OpenAPI document is disabled in prod (parity with the backend) — never reachable from outside.
 springdoc:
   api-docs:
     enabled: false
 
-# ADR-0090: serve Actuator (/actuator/health for the Docker HEALTHCHECK, /actuator/prometheus for the
-# scrape) on a DEDICATED internal-only management port instead of the public 11262 connector. NPM
-# fronts only 11262, and this port is never host-published nor on any net-proxy-* network, so
-# /actuator/** is unreachable from the internet by construction — the public connector answers 404
-# for it (belt to the REQ-OBS-012 NPM edge-deny braces). Prometheus reaches it over
-# net-monitoring-scrape; the Docker HEALTHCHECK reaches it over localhost (compose overrides the
-# image's default healthcheck to this port). HTTPS with the SAME bind-mounted keystore.p12 as the
-# 11262 connector (cert SAN carries dns:ingest) so the scrape stays HTTPS + pinned-CA (REQ-OBS-008).
-# Boot serves this from a separate management context whose security auto-config backs off given the
-# custom SecurityConfig chains, so the endpoint is UNAUTHENTICATED here — acceptable because it is
-# internal-only, mirroring Keycloak's port 9000 (REQ-SEC-014); ADR-0072's basic-auth is superseded by
-# this port isolation (REQ-OBS-005 amended). Prod-only: dev/test/e2e set no management port and keep
-# Actuator on 11262 with MonitoringScrapeSecurityConfig's fail-closed guard.
 management:
   server:
     port: 11272
@@ -62,20 +32,6 @@ management:
       key-store-type: PKCS12
       key-alias: basetool
   endpoint:
-    # REQ-OBS-016, prod only: the exposure list (application.yml) includes `loggers`, and its POST
-    # variant MUTATES a live log level. On the management port above there is no authentication to
-    # gate that on — every container on net-monitoring-scrape reaches 11272 unauthenticated — and a
-    # ROOT logger flipped to TRACE makes Spring Security / the HTTP clients write bearer tokens and
-    # request bodies into a Loki stream retained for 744 h. So the write is not merely gated here,
-    # it does not exist: `read-only` keeps GET /actuator/loggers (the whole diagnostic value during
-    # an incident) and leaves the write operation unregistered.
-    # The backend is deliberately the OTHER shape and that asymmetry is intentional. Since ADR-0134
-    # it has a management port too (11271), so the difference is no longer whether one exists: its
-    # ManagementPortSecurityConfig scopes the permit-all chain to an enumerated READ surface rather
-    # than to /actuator/**, so /actuator/loggers selects that chain not at all and falls through to
-    # SecurityConfig's filter chain, where the mutator CAN carry an identity check and is gated on
-    # ROLE_ADMIN instead of being removed. Full runtime control stays available in dev/test/e2e,
-    # which set no management port and never load this file.
     loggers:
       access: read-only
 
@@ -85,8 +41,4 @@ app:
     frontend-base-url: ${FRONTEND_URL}
   security:
     jwt:
-      # REQ-SEC-024: opt-in. Fetch the JWT signing keys from the INTERNAL Keycloak instead of
-      # hairpinning through the public edge. Empty (default) derives the JWKS from issuer-uri. When
-      # set, the key fetch uses the keycloak-trust bundle above (cert SAN dns:keycloak). Recommended:
-      #   https://keycloak:18443/auth/realms/iri/protocol/openid-connect/certs
       jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:}

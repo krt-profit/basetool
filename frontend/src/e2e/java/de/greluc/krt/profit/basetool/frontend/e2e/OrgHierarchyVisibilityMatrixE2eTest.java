@@ -87,9 +87,8 @@ class OrgHierarchyVisibilityMatrixE2eTest {
   private static Browser browser;
   private static BackendSeeder seeder;
 
-  // Seeded Bereiche and the per-Bereich item materials (1:1 material→Bereich in the grouped view).
-  private static String matAId; // owned by Bereich A (test-bereich's Bereich)
-  private static String matBId; // owned by Bereich B (foreign)
+  private static String matAId;
+  private static String matBId;
 
   /**
    * Seeds two Bereiche, one inventory item owned by each (admin create-on-behalf), and grants
@@ -104,11 +103,8 @@ class OrgHierarchyVisibilityMatrixE2eTest {
     }
     seeder = new BackendSeeder();
 
-    // Admin needs a membership so the create-on-behalf resolver reaches the canEditOrgUnit widening
-    // (a membershipless user with a non-null owner pick is rejected before that branch).
     seeder.ensureIridiumMembership(ADMIN_USER, ADMIN_PASSWORD);
-    seeder.getUserId(
-        BEREICH_USER, BEREICH_PASSWORD); // materialise test-bereich; it stays Staffel-less
+    seeder.getUserId(BEREICH_USER, BEREICH_PASSWORD);
 
     String bereichAId =
         seeder.createBereich(ADMIN_USER, ADMIN_PASSWORD, "E2E Vis Bereich A", "EVBA");
@@ -119,13 +115,11 @@ class OrgHierarchyVisibilityMatrixE2eTest {
     matAId = seeder.createRefineryMaterial(ADMIN_USER, ADMIN_PASSWORD, "E2E Vis Mat A");
     matBId = seeder.createRefineryMaterial(ADMIN_USER, ADMIN_PASSWORD, "E2E Vis Mat B");
 
-    // One Bereich-owned item per Bereich (admin create-on-behalf stamps the Bereich — REQ-ORG-016).
     seeder.createInventoryItemOwnedBy(
         ADMIN_USER, ADMIN_PASSWORD, matAId, locId, SEED_QUALITY, 100, bereichAId);
     seeder.createInventoryItemOwnedBy(
         ADMIN_USER, ADMIN_PASSWORD, matBId, locId, SEED_QUALITY, 100, bereichBId);
 
-    // test-bereich becomes Bereichsleiter of Bereich A only.
     seeder.addBereichLeader(
         ADMIN_USER,
         ADMIN_PASSWORD,

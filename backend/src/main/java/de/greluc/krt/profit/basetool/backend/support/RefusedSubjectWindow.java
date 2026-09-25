@@ -92,8 +92,6 @@ public final class RefusedSubjectWindow {
       lastSeenBySubject.put(subject, now);
       return;
     }
-    // At the cap with a subject we have not seen. Prune first — the cap is usually reached by stale
-    // entries, not by live ones — and admit it only if that freed room.
     prune(now);
     if (lastSeenBySubject.size() < maxTracked) {
       lastSeenBySubject.put(subject, now);

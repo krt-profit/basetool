@@ -103,14 +103,6 @@ public class SafeCsrfAdvice {
    * @return a fully-resolved token, or {@code null} when none is available.
    */
   private static @Nullable CsrfToken resolve(HttpServletRequest request) {
-    // REQ-SEC-052 / ADR-0159: an unauthenticated request gets no token forced. Forcing it is what
-    // made the default HttpSessionCsrfTokenRepository save into a NEW session, on every render of
-    // every public page — the landing page, the three legal pages and the error views. That is a
-    // session in Redis per crawler hit, for a page that carries no form and could never use one.
-    //
-    // The check is on the authentication rather than on the path, so a page added to the public
-    // list later inherits it. A member's request is unaffected: it already has a session, and the
-    // deferred token is resolved exactly as before.
     Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
     if (authentication == null
         || !authentication.isAuthenticated()
@@ -122,7 +114,6 @@ public class SafeCsrfAdvice {
       return null;
     }
     try {
-      // Forces the deferred supplier. This is the call that threw during the outage.
       token.getToken();
       return token;
     } catch (RuntimeException ex) {

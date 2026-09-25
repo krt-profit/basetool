@@ -53,15 +53,11 @@ public final class Roles {
   /** Prefix Spring Security authorities carry; {@code hasRole(...)} strips/re-adds it itself. */
   public static final String ROLE_PREFIX = "ROLE_";
 
-  // --- Role.code values (DB-seeded, Keycloak realm role names minus the ROLE_ prefix) ----------
-
   public static final String ADMIN = "ADMIN";
   public static final String OFFICER = "OFFICER";
   public static final String KRT_MEMBER = "KRT_MEMBER";
   public static final String BANK_EMPLOYEE = "BANK_EMPLOYEE";
   public static final String BANK_MANAGEMENT = "BANK_MANAGEMENT";
-
-  // --- Refusal markers (never seeded, never granted; see below) ---------------------------------
 
   /**
    * The marker authority an approved account holding no application role carries (REQ-SEC-053).
@@ -76,8 +72,6 @@ public final class Roles {
    * never a {@code Role.code} and never a Keycloak realm role, so there is no bare form of it.
    */
   public static final String NO_ROLE_MARKER = ROLE_PREFIX + "NO_ROLE";
-
-  // --- Hierarchy-derived roles (never seeded; see class Javadoc) ---------------------------------
 
   public static final String LOGISTICIAN = "LOGISTICIAN";
   public static final String MISSION_MANAGER = "MISSION_MANAGER";

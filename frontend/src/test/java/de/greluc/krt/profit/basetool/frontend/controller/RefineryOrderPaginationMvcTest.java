@@ -88,8 +88,6 @@ class RefineryOrderPaginationMvcTest {
     return new PageResponse<>(List.of(), pageIndex, pageSize, total, totalPages, List.of());
   }
 
-  // covers REQ-REFINERY-019 — a multi-page result renders the page-nav (prev/next) and the
-  // 10/50/100 size picker; both keep the default status filter, and size links jump back to page 0.
   @Test
   void viewOrders_multiPageResult_rendersPaginationAndSizePicker() throws Exception {
     when(backendApiClient.get(contains("/api/v1/refinery-orders/"), anyTypeRef()))
@@ -99,19 +97,16 @@ class RefineryOrderPaginationMvcTest {
         .perform(get("/refinery-orders").param("page", "1").with(oauth2Login()))
         .andExpect(status().isOk())
         .andExpect(view().name("refinery-orders-index"))
-        // page-nav: previous/first (page 0) and next (page 2), default status filter preserved
         .andExpect(
             content()
                 .string(
                     containsString(
                         "/refinery-orders?status=OPEN&amp;status=IN_PROGRESS&amp;page=0&amp;size=50")))
         .andExpect(content().string(containsString("status=IN_PROGRESS&amp;page=2&amp;size=50")))
-        // size picker: the two non-active sizes are links back to page 0
         .andExpect(content().string(containsString("status=IN_PROGRESS&amp;page=0&amp;size=10")))
         .andExpect(content().string(containsString("status=IN_PROGRESS&amp;page=0&amp;size=100")));
   }
 
-  // covers REQ-REFINERY-019 — the onlyMine toggle is preserved in every paging/sizing link.
   @Test
   void viewOrders_onlyMine_keepsToggleInPaginationLinks() throws Exception {
     when(backendApiClient.get(contains("/api/v1/refinery-orders/"), anyTypeRef()))
@@ -128,9 +123,6 @@ class RefineryOrderPaginationMvcTest {
         .andExpect(content().string(containsString("onlyMine=true&amp;page=0&amp;size=10")));
   }
 
-  // covers REQ-FE-005 — an AJAX swap request (fragment=results) renders only the inner table +
-  // pagination fragment: the data table and page-nav are present, but the wrapper div and the
-  // filter form (both outside the fragment) are not.
   @Test
   void viewOrders_fragmentResults_rendersOnlyTableFragment() throws Exception {
     when(backendApiClient.get(contains("/api/v1/refinery-orders/"), anyTypeRef()))
@@ -145,7 +137,6 @@ class RefineryOrderPaginationMvcTest {
         .andExpect(content().string(not(containsString("id=\"refinery-filter-form\""))));
   }
 
-  // covers REQ-REFINERY-019 — a single short page needs neither page-nav nor size picker.
   @Test
   void viewOrders_singleShortPage_rendersNeitherPageNavNorSizePicker() throws Exception {
     when(backendApiClient.get(contains("/api/v1/refinery-orders/"), anyTypeRef()))

@@ -122,7 +122,6 @@ class ReactorContextPropagationConfigTest {
 
   @Test
   void clientIpContext_isVisibleInsideMonoOnDifferentScheduler() {
-    // TEST-NET-3 documentation range (RFC 5737) — synthetic, never a real client address.
     String clientIp = "203.0.113.7";
     ClientIpContext.set(clientIp);
 
@@ -150,8 +149,6 @@ class ReactorContextPropagationConfigTest {
 
   @Test
   void userLocaleContext_isVisibleInsideMonoOnDifferentScheduler() {
-    // Pick a locale guaranteed to differ from the JVM default: on a propagation failure the worker
-    // falls back to LocaleContextHolder.getLocale() == default, which must not read as a pass.
     Locale target = Locale.JAPAN.equals(Locale.getDefault()) ? Locale.CANADA_FRENCH : Locale.JAPAN;
     LocaleContextHolder.setLocale(target);
 
@@ -179,7 +176,6 @@ class ReactorContextPropagationConfigTest {
 
   @Test
   void contextsDoNotLeakAcrossSubscriptions() {
-    // Set on the JUnit thread; both holders are populated.
     ActiveSquadronContext.set(UUID.fromString("7309b226-abf0-4022-857b-f2462cc8bbb5"));
     CorrelationContext.set("first-id");
 
@@ -197,8 +193,6 @@ class ReactorContextPropagationConfigTest {
     assertThat(firstActive.get()).isNotNull();
     assertThat(firstCorrelation.get()).isEqualTo("first-id");
 
-    // Clear, then submit a second subscription: it must observe null on the worker, not the
-    // previous subscription's snapshot. Proves the per-subscription cleanup of the SPI.
     ActiveSquadronContext.clear();
     CorrelationContext.clear();
 

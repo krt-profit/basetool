@@ -132,8 +132,6 @@ class OrgUnitBankLimitsDisplayMvcTest {
             128L,
             new BankCapabilitiesDto(false, false, false, false),
             readOnlyNonEmptyLimits());
-    // canManage drives settings != null; expose it via canSetTarget (canConfigureVisibility /
-    // canConfigureApprovalLimits stay false so the manager case needs no /users/lookup stub).
     return new OrgUnitBankAccountDetailDto(inner, true, canManage, false, true, false, null, false);
   }
 
@@ -197,9 +195,6 @@ class OrgUnitBankLimitsDisplayMvcTest {
               false,
               List.of(),
               false,
-              // The settings-tab editor is gated by settings.approvalLimits().canEdit(); keep it
-              // false so the (absent) editor tile stays out and only the settings != null branch is
-              // under test.
               new BankApprovalLimitsDto(
                   false, false, false, false, List.of(), Map.of(), null, null, List.of()));
       when(backendApiClient.get(
@@ -211,9 +206,6 @@ class OrgUnitBankLimitsDisplayMvcTest {
   @Test
   @WithMockUser(roles = {"OFFICER"})
   void orgUnitBank_managerView_omitsReadOnlyLimitsDisplay() throws Exception {
-    // canManage -> settings != null. The read-only limits display must NOT render: the manager gets
-    // the editor in the settings tab instead. Pre-fix the th:if/th:replace precedence bug let it
-    // render anyway, duplicating the editor below the KPIs.
     UUID accountId = UUID.randomUUID();
     stubDetail(accountId, true);
 
@@ -230,8 +222,6 @@ class OrgUnitBankLimitsDisplayMvcTest {
   @Test
   @WithMockUser(roles = {"OFFICER"})
   void orgUnitBank_plainViewer_showsReadOnlyLimitsDisplay() throws Exception {
-    // Not a manager -> settings == null. The read-only limits display DOES render (positive
-    // control): a plain viewer still sees the limits that apply to their own requests.
     UUID accountId = UUID.randomUUID();
     stubDetail(accountId, false);
 

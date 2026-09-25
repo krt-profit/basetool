@@ -72,7 +72,6 @@ class BankHolderLiveDisplayNameTest {
   void getHolders_prefersLiveDisplayName_reflectsRenames_andFallsBackToSnapshotForDeletedUser() {
     String suffix = UUID.randomUUID().toString().substring(0, 8);
 
-    // Alice starts without a display name; her holder's snapshot is therefore the username.
     String aliceUsername = "alice-un-" + suffix;
     User alice = newUser(aliceUsername, null);
     BankHolder aliceHolder = newHolder(alice, alice.getEffectiveName());
@@ -81,7 +80,6 @@ class BankHolderLiveDisplayNameTest {
         handleOf(aliceHolder.getId()),
         "with no display name the registry shows the username");
 
-    // Renaming Alice must be reflected live — the row no longer shows the frozen snapshot.
     String aliceDisplay = "alice-disp-" + suffix;
     alice.setDisplayName(aliceDisplay);
     userRepository.save(alice);
@@ -90,7 +88,6 @@ class BankHolderLiveDisplayNameTest {
         handleOf(aliceHolder.getId()),
         "the registry reflects the user's current display name, not the registration snapshot");
 
-    // Bob has a display name from the start: it is preferred over the username.
     User bob = newUser("bob-un-" + suffix, "bob-disp-" + suffix);
     BankHolder bobHolder = newHolder(bob, bob.getEffectiveName());
     assertEquals(
@@ -98,7 +95,6 @@ class BankHolderLiveDisplayNameTest {
         handleOf(bobHolder.getId()),
         "the display name is preferred over the username");
 
-    // A holder whose user is gone keeps showing the deletion-proof snapshot.
     String ghostSnapshot = "ghost-snap-" + suffix;
     BankHolder ghostHolder = newHolder(null, ghostSnapshot);
     assertEquals(
@@ -110,7 +106,6 @@ class BankHolderLiveDisplayNameTest {
   @Test
   void statement_showsLiveDisplayName_notTheRegistrationSnapshot() throws IOException {
     String suffix = UUID.randomUUID().toString().substring(0, 8);
-    // Carol's holder snapshot is the username; she gets a display name afterwards.
     String carolUsername = "cu-" + suffix;
     String carolDisplay = "cd-" + suffix;
     User carol = newUser(carolUsername, null);
@@ -147,9 +142,6 @@ class BankHolderLiveDisplayNameTest {
     user.setDisplayName(display);
     userRepository.save(user);
 
-    // getHolder() loads the row via findById and resolves the name through the lazy user proxy
-    // inside its read transaction — the holder-detail header must show the current display name
-    // (this also guards against a regression that drops the surrounding read transaction).
     assertEquals(display, bankHolderService.getHolder(holder.getId()).handle());
   }
 
@@ -163,8 +155,6 @@ class BankHolderLiveDisplayNameTest {
     user.setDisplayName(display);
     userRepository.save(user);
 
-    // A non-zero global balance so the holder appears in the report's HALTERBESTAND GESAMT section
-    // (fed by the live holderTotals() CASE projection).
     BankAccount account = newAccount("Live Name Report Konto " + UUID.randomUUID());
     bankLedgerService.bookDeposit(
         new BankDepositRequest(account.getId(), holder.getId(), new BigDecimal("500"), null));

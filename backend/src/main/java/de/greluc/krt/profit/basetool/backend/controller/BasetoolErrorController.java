@@ -82,12 +82,6 @@ public class BasetoolErrorController implements ErrorController {
    * @return the RFC&nbsp;7807 response for the resolved status
    */
   @RequestMapping("${server.error.path:${error.path:/error}}")
-  // One of the four paths REQ-SEC-052 serves without a token: it is Spring's own error dispatch
-  // and carries no data of its own, only the status the failed request already produced. Stated
-  // here rather than left to the URL matrix, because a gate that lives two folders away from the
-  // code is what REQ-SEC-052 set out to end. Verb-agnostic on purpose - an error is dispatched
-  // from whatever verb failed - which is also why the ArchUnit read/write rules could not see this
-  // method until they learned to select @RequestMapping alongside the verb-specific spellings.
   @PreAuthorize("permitAll()")
   public ResponseEntity<ProblemDetail> handleError(@NotNull HttpServletRequest request) {
     HttpStatus status = resolveStatus(request);

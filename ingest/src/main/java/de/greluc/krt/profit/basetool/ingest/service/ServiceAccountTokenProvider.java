@@ -172,10 +172,6 @@ public class ServiceAccountTokenProvider {
    */
   public @NotNull String currentToken() {
     if (!isConfigured()) {
-      // Deliberately the SAME type as a failed grant. To the sender both are "the gateway cannot
-      // act"; the distinction that matters to an operator lives in the log and in the metric, not
-      // in the exception type - and a dedicated type keeps the handler from having to catch
-      // IllegalStateException, which would swallow unrelated faults into a misleading 503.
       throw new ServiceAccountTokenException(
           "no service-account identity configured (app.ingest.service-account.*)", null);
     }
@@ -185,14 +181,11 @@ public class ServiceAccountTokenProvider {
     }
     mintLock.lock();
     try {
-      // Re-check under the lock: while this thread waited, another may have minted one.
       token = validCachedToken();
       if (token != null) {
         return token;
       }
       if (clock.instant().isBefore(backoffUntil)) {
-        // A grant failed moments ago. Asking again now would only block this request thread for
-        // the full timeout against the same broken endpoint; refuse at once instead.
         count(MetricNames.SA_TOKEN_BACKOFF);
         throw new ServiceAccountTokenException(
             "service-account grant failed recently; backing off", null);
@@ -256,8 +249,6 @@ public class ServiceAccountTokenProvider {
               .body(TOKEN_ANSWER);
     } catch (RuntimeException e) {
       failed();
-      // Exception class only. Keycloak echoes the client_id in its error body and the stack can
-      // carry the form, which holds the client secret (REQ-OBS-004).
       log.error(
           "The gateway could not obtain its own access token ({}); ingest writes are refused until"
               + " this recovers",
@@ -271,9 +262,6 @@ public class ServiceAccountTokenProvider {
       log.error("The gateway's token grant returned no access token; ingest writes are refused");
       throw new ServiceAccountTokenException("service-account grant returned no token", null);
     }
-    // expires_in is seconds; the skew keeps a token that expires mid-flight off the wire. A missing
-    // or unparseable value is treated as already expired, so the next call re-mints rather than
-    // caching something whose lifetime is unknown.
     long expiresIn = response.get("expires_in") instanceof Number n ? n.longValue() : 0L;
     long lifetime = Math.max(0, expiresIn - properties.refreshSkew().toSeconds());
     cached = new CachedToken(accessToken, clock.instant().plusSeconds(lifetime));

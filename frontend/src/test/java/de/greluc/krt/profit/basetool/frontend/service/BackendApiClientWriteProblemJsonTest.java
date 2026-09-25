@@ -97,8 +97,6 @@ class BackendApiClientWriteProblemJsonTest {
     server.shutdown();
   }
 
-  // ── POST ────────────────────────────────────────────────────────────────
-
   @Test
   void post_ShouldMapOptimisticLock409_andCountBackend4xx() throws Exception {
     server.enqueue(
@@ -113,17 +111,14 @@ class BackendApiClientWriteProblemJsonTest {
             BackendServiceException.class,
             () -> client.post("/api/v1/missions/1/core", "{\"version\":3}", String.class));
 
-    // The write path must preserve the stable RFC7807 code + status, not degrade to a generic 500.
     assertEquals(409, ex.getStatusCode());
     assertEquals("OPTIMISTIC_LOCK", ex.getProblemCode());
     assertEquals("corr-409", ex.getCorrelationId());
     assertEquals("Entity was updated concurrently", ex.getReadableErrorMessage());
 
-    // The call was genuinely a POST (the WebClientResponseException came from the write verb).
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
     assertEquals("POST", req.getMethod());
 
-    // REQ-OBS-011: counted once under reason=backend_4xx + method=POST, and NOT under backend_5xx.
     assertEquals(1.0d, count(MetricNames.REASON_BACKEND_4XX, "POST"));
     assertNull(
         findCounter(MetricNames.REASON_BACKEND_5XX, "POST"),
@@ -147,14 +142,11 @@ class BackendApiClientWriteProblemJsonTest {
     assertEquals(503, ex.getStatusCode());
     assertEquals(BackendServiceException.CODE_SERVICE_UNAVAILABLE, ex.getProblemCode());
 
-    // The 5xx side of the split: counted under backend_5xx, never backend_4xx.
     assertEquals(1.0d, count(MetricNames.REASON_BACKEND_5XX, "POST"));
     assertNull(
         findCounter(MetricNames.REASON_BACKEND_4XX, "POST"),
         "a 5xx write must not increment the backend_4xx counter");
   }
-
-  // ── PUT ─────────────────────────────────────────────────────────────────
 
   @Test
   void put_ShouldMapConflict409_andCountBackend4xx() {
@@ -174,8 +166,6 @@ class BackendApiClientWriteProblemJsonTest {
     assertEquals("BANK_BOOKING_CONFLICT", ex.getProblemCode());
     assertEquals(1.0d, count(MetricNames.REASON_BACKEND_4XX, "PUT"));
   }
-
-  // ── PATCH ───────────────────────────────────────────────────────────────
 
   @Test
   void patch_ShouldMapValidation400_andCountBackend4xx() {
@@ -198,8 +188,6 @@ class BackendApiClientWriteProblemJsonTest {
     assertEquals(1.0d, count(MetricNames.REASON_BACKEND_4XX, "PATCH"));
   }
 
-  // ── DELETE ──────────────────────────────────────────────────────────────
-
   @Test
   void delete_ShouldMapLocked423_andCountBackend4xx() {
     server.enqueue(
@@ -217,8 +205,6 @@ class BackendApiClientWriteProblemJsonTest {
     assertEquals("LOCKED", ex.getProblemCode());
     assertEquals(1.0d, count(MetricNames.REASON_BACKEND_4XX, "DELETE"));
   }
-
-  // ── GET (5xx split, previously unasserted) ───────────────────────────────
 
   @Test
   void get_Should503Problem_countBackend5xx() {
@@ -239,8 +225,6 @@ class BackendApiClientWriteProblemJsonTest {
         findCounter(MetricNames.REASON_BACKEND_4XX, "GET"),
         "a 5xx GET must not increment the backend_4xx counter");
   }
-
-  // ── helpers ──────────────────────────────────────────────────────────────
 
   private static MockResponse problemJson(int status, String body) {
     return new MockResponse()

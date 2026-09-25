@@ -18,17 +18,14 @@
 </header>
 <main>
     <div class="greeting hud-box error-container">
-        <!--/* Display status code if available, otherwise 'ERROR' */-->
         <div class="error-code" th:text="${status} ?: 'ERROR'">ERROR</div>
         
         <div class="error-title" th:text="#{error.generic.title}">System Malfunction</div>
         
-        <!--/* Display specific message if available, otherwise generic */-->
         <p class="error-message" th:text="${message} ?: #{error.generic.message}">
             Critical system failure detected. Technical personnel notified.
         </p>
 
-        <!--/* Correlation id so the user can quote it to support (RFC-7807 hardening) */-->
         <p class="error-correlation" th:if="${correlationId}">
             <span th:text="#{error.correlationId}">Reference code</span>:
             <code th:text="${correlationId}">00000000-0000-0000-0000-000000000000</code>

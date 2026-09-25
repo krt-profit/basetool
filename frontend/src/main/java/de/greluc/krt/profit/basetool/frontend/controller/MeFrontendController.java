@@ -154,12 +154,6 @@ public class MeFrontendController {
       session.removeAttribute(ACTIVE_ORG_UNIT_SESSION_KEY);
       redirectAttributes.addFlashAttribute("toastSuccess", "orgUnit.switcher.cleared");
     } else {
-      // Store as the UUID's canonical string form so the Redis-backed Spring Session can
-      // round-trip the value without serializer ambiguity. Spring Session's default
-      // JdkSerializationRedisSerializer plus the JSON wrapper in some configurations can
-      // change a UUID instance into a String on deserialization — storing the String
-      // representation up front avoids that brittleness and matches how the readers parse
-      // it back.
       session.setAttribute(ACTIVE_ORG_UNIT_SESSION_KEY, orgUnitId.toString());
       redirectAttributes.addFlashAttribute("toastSuccess", "orgUnit.switcher.activated");
     }

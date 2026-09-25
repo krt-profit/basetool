@@ -62,12 +62,10 @@ final class PlanetColorResolver {
    */
   private static final Map<String, String> CANONICAL =
       Map.ofEntries(
-          // Stanton
           Map.entry("hurston", "hurston"),
           Map.entry("crusader", "crusader"),
           Map.entry("arccorp", "arccorp"),
           Map.entry("microtech", "microtech"),
-          // Pyro
           Map.entry("pyro i", "pyro-1"),
           Map.entry("pyro ii", "pyro-2"),
           Map.entry("monox", "pyro-2"),
@@ -79,13 +77,10 @@ final class PlanetColorResolver {
           Map.entry("vatra", "pyro-5"),
           Map.entry("pyro vi", "pyro-6"),
           Map.entry("adir", "pyro-6"),
-          // Other notable systems
           Map.entry("terra", "terra"),
           Map.entry("delamar", "delamar"));
 
-  private PlanetColorResolver() {
-    // utility class - no instances
-  }
+  private PlanetColorResolver() {}
 
   /**
    * Resolves a CSS class name for the planet tint of a terminal column.

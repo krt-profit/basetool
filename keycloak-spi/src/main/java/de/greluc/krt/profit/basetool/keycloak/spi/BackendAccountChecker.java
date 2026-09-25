@@ -108,9 +108,6 @@ public class BackendAccountChecker {
           httpClient.send(
               buildRequest(url, sharedSecret, body), HttpResponse.BodyHandlers.ofString());
     } catch (IOException e) {
-      // TLS handshake failure / timeout / connection reset / DNS failure — fail open. Logged
-      // because failing OPEN means the duplicate-account check silently did not happen: the login
-      // proceeds and nothing else records that the probe never ran.
       log.warnf(
           e,
           "Account-existence probe could not reach the backend (%s); skipping the check.",
@@ -123,8 +120,6 @@ public class BackendAccountChecker {
     }
 
     if (response.statusCode() != 200) {
-      // 503 (feature off) / 401 (bad secret) / 5xx / anything else — fail open. The status is the
-      // diagnosis and a 401 in particular is a misconfiguration that would otherwise never surface.
       log.warnf(
           "Account-existence probe answered HTTP %d; skipping the check.", response.statusCode());
       return Result.UNKNOWN;

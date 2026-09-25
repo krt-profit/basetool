@@ -70,24 +70,18 @@ class BankAuditServiceTest {
   @Mock private BankAccountRepository accountRepository;
   @Mock private BankAuditEventMapper bankAuditEventMapper;
 
-  // The REAL attribution, not a mock: what needs pinning is the mapping itself -- a known azp
-  // survives verbatim, everything else lands in a bucket. A mock would let the row carry whatever
-  // the stub said and still pass while the mapping was broken.
   @Spy
   private ClientAttribution clientAttribution =
       new ClientAttribution(
           BoundProperties.defaults(ApiClientMetricsProperties.class),
           BoundProperties.defaults(IngestGatewayProperties.class));
 
-  // A real registry (spied so @InjectMocks wires it) so record() genuinely increments the counter
-  // and the test can read it back.
   @Spy private MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
   @InjectMocks private BankAuditService bankAuditService;
 
   @Test
   void record_persistsExactlyOneRowWithActorSnapshot() {
-    // Given
     UUID actorId = UUID.randomUUID();
     UUID accountId = UUID.randomUUID();
     User actor = new User();
@@ -98,11 +92,9 @@ class BankAuditServiceTest {
     when(auditEventRepository.save(any(BankAuditEvent.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
-    // When
     bankAuditService.record(
         BankAuditEventType.DEPOSIT_BOOKED, accountId, null, null, "+100 aUEC @greluc");
 
-    // Then
     ArgumentCaptor<BankAuditEvent> saved = ArgumentCaptor.forClass(BankAuditEvent.class);
     verify(auditEventRepository).save(saved.capture());
     BankAuditEvent row = saved.getValue();
@@ -112,8 +104,6 @@ class BankAuditServiceTest {
     assertEquals(accountId, row.getAccountId());
     assertEquals("+100 aUEC @greluc", row.getDetails());
     assertNotNull(row.getOccurredAt());
-    // The bank-trail volume counter is incremented, tagged by the bounded event type (#1041 item
-    // 10) — the only volume signal for the physically separate bank_audit_event table.
     assertEquals(
         1.0,
         meterRegistry
@@ -126,15 +116,12 @@ class BankAuditServiceTest {
 
   @Test
   void record_fallsBackToSystemActorWithoutResolvableUser() {
-    // Given
     when(authHelperService.currentUserId()).thenReturn(Optional.empty());
     when(auditEventRepository.save(any(BankAuditEvent.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
-    // When
     bankAuditService.record(BankAuditEventType.WIPE_RESET_EXECUTED, null, null, null, "x");
 
-    // Then
     ArgumentCaptor<BankAuditEvent> saved = ArgumentCaptor.forClass(BankAuditEvent.class);
     verify(auditEventRepository).save(saved.capture());
     assertEquals("system", saved.getValue().getActorHandle());
@@ -142,17 +129,14 @@ class BankAuditServiceTest {
 
   @Test
   void purgeBefore_deletesRowsAndRecordsPurgeMarker() {
-    // Given — an admin retention purge of the bank trail (REQ-AUDIT-004).
     Instant before = Instant.parse("2026-01-01T00:00:00Z");
     when(authHelperService.currentUserId()).thenReturn(Optional.empty());
     when(auditEventRepository.deleteByOccurredAtBefore(before)).thenReturn(3);
     when(auditEventRepository.save(any(BankAuditEvent.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
-    // When
     int deleted = bankAuditService.purgeBefore(before);
 
-    // Then — the count is returned and an AUDIT_LOG_PURGED marker carries the count + cutoff.
     assertEquals(3, deleted);
     verify(auditEventRepository).deleteByOccurredAtBefore(before);
     ArgumentCaptor<BankAuditEvent> saved = ArgumentCaptor.forClass(BankAuditEvent.class);
@@ -160,10 +144,6 @@ class BankAuditServiceTest {
     assertEquals(BankAuditEventType.AUDIT_LOG_PURGED, saved.getValue().getEventType());
     assertTrue(saved.getValue().getDetails().contains("deleted=3"), "details carry the count");
   }
-
-  // -----------------------------------------------------------------------------------------
-  // Originating-client attribution (REQ-AUDIT-005, GHSA-2vq5-8p8w-5r64)
-  // -----------------------------------------------------------------------------------------
 
   /**
    * A bearer-token authentication carrying one {@code azp}, the shape a real client request has.
@@ -196,9 +176,6 @@ class BankAuditServiceTest {
 
   @Test
   void record_stampsAKnownClientVerbatim() {
-    // Bank Employee and Bank Management have been on the mobile client's scope since it was
-    // provisioned, so a bank row from the app is not a hypothetical the way it briefly was on the
-    // shared trail -- it is the case this column exists for.
     when(authHelperService.currentAuthentication())
         .thenReturn(Optional.of(tokenFrom("basetool-android")));
 
@@ -207,7 +184,6 @@ class BankAuditServiceTest {
 
   @Test
   void record_collapsesAnUnknownClientToTheBoundedBucket() {
-    // The trail is evidence; a caller-chosen string must not be able to write itself into it.
     when(authHelperService.currentAuthentication())
         .thenReturn(Optional.of(tokenFrom("some-other-client")));
 
@@ -216,9 +192,6 @@ class BankAuditServiceTest {
 
   @Test
   void record_withoutATokenStampsNoneRatherThanNull() {
-    // `none` is a recorded answer. null is reserved for rows predating the column, and on THIS
-    // table a null means "not recorded" rather than "unambiguous anyway" -- so letting the two
-    // share a spelling would make a live blind spot look like history.
     when(authHelperService.currentAuthentication()).thenReturn(Optional.empty());
 
     BankAuditEvent row = recordAndCapture();
@@ -229,9 +202,6 @@ class BankAuditServiceTest {
 
   @Test
   void record_withATokenlessAuthenticationStampsNone() {
-    // An authentication with no JWT behind it (the acting-member identity of ADR-0129). Reading
-    // the azp must yield a value, never throw: this runs inside the business transaction and an
-    // exception would roll back the very mutation the row is recording.
     when(authHelperService.currentAuthentication())
         .thenReturn(Optional.of(new TestingAuthenticationToken("principal", "creds")));
 

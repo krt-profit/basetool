@@ -69,8 +69,6 @@ public final class SessionIdFingerprint {
           MessageDigest.getInstance("SHA-256").digest(sessionId.getBytes(StandardCharsets.UTF_8));
       return HexFormat.of().formatHex(digest).substring(0, FINGERPRINT_HEX_CHARS);
     } catch (NoSuchAlgorithmException e) {
-      // Every Java platform must provide SHA-256 (MessageDigest's own contract), so this is
-      // unreachable; answering with the placeholder keeps a log call from ever throwing.
       return NONE;
     }
   }

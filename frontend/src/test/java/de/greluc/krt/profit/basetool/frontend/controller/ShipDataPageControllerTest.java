@@ -58,10 +58,8 @@ class ShipDataPageControllerTest {
     assertEquals("ship-data", view);
   }
 
-  // covers REQ-ADMIN-001 — ship types beyond the first backend page stay visible and editable
   @Test
   void listData_concatenatesAllShipTypePages() {
-    // Given — one manufacturer page, two ship-type pages
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     ShipDataPageController controller = new ShipDataPageController(backendApiClient);
     Model model = new ConcurrentModel();
@@ -82,10 +80,8 @@ class ShipDataPageControllerTest {
             org.mockito.ArgumentMatchers.eq(shipTypesBase + "&page=1"), anyTypeRef()))
         .thenReturn(new PageResponse<>(java.util.List.of(aurora), 1, 1000, 2, 2, null));
 
-    // When
     controller.listData(model);
 
-    // Then — both pages render, sorted, with no truncation flagged
     @SuppressWarnings("unchecked")
     java.util.List<ShipTypeDto> shipTypes =
         (java.util.List<ShipTypeDto>) model.getAttribute("shipTypes");

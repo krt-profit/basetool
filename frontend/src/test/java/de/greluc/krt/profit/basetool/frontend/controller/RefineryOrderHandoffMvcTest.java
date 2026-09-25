@@ -123,13 +123,9 @@ class RefineryOrderHandoffMvcTest {
                 .with(oidcLogin().idToken(token -> token.subject(SUB.toString()))))
         .andExpect(status().isOk())
         .andExpect(view().name("refinery-orders-create"))
-        // The id is threaded to the page module, which will POST it to /import-handoff.
         .andExpect(model().attribute("pendingHandoffId", "tQfTskHGirAhVIpYj8BiDP876m0"))
-        // A safe navigation must not show the not-found notice and must not have consumed anything.
         .andExpect(model().attributeDoesNotExist("importErrorKey"));
 
-    // The crux of the fix: the navigational GET never touches the single-use Redis pickup, so a
-    // prefetch or a duplicate top-level load cannot burn it.
     verify(ingestHandoffService, never()).consume(any(), any(), any(), any());
   }
 
@@ -185,7 +181,6 @@ class RefineryOrderHandoffMvcTest {
                 .with(csrf()))
         .andExpect(status().isOk())
         .andExpect(view().name("refinery-orders-create :: refineryImportFormBody"))
-        // The review banner renders because the counters (importGoodsTotal) are present.
         .andExpect(model().attribute("importGoodsTotal", 2))
         .andExpect(model().attributeDoesNotExist("importErrorKey"))
         .andExpect(content().string(containsString("data-testid=\"refinery-import-banner\"")));

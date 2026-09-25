@@ -69,7 +69,6 @@ class BankReadNoNPlusOneTest {
 
   @Test
   void dashboardAndAccountListStayStatementBounded_independentOfAccountCount() {
-    // Given: many accounts, each with a posting (an N+1 read would scale with the account count)
     BankHolder holder = newHolder("vol-holder-" + UUID.randomUUID());
     UUID managerId = UUID.randomUUID();
     for (int i = 0; i < ACCOUNTS; i++) {
@@ -80,12 +79,10 @@ class BankReadNoNPlusOneTest {
     Statistics stats = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
     stats.setStatisticsEnabled(true);
 
-    // When: the management dashboard (every account) ...
     stats.clear();
     bankDashboardService.getDashboard(true, managerId);
     long dashboardStatements = stats.getPrepareStatementCount();
 
-    // ... and the paged management account list (no text/status/type filter — the full enum sets)
     stats.clear();
     bankAccountService.getAccounts(
         true,
@@ -96,7 +93,6 @@ class BankReadNoNPlusOneTest {
         PageRequest.of(0, 50));
     long listStatements = stats.getPrepareStatementCount();
 
-    // Then: a fixed handful of statements despite the 120 accounts (no per-account N+1)
     assertTrue(
         dashboardStatements <= STATEMENT_BOUND,
         () ->

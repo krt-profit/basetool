@@ -52,9 +52,6 @@
 
         <p class="event-detail" th:text="#{admin.syncReports.total} + ': ' + ${totalElements}">Gesamt: 0</p>
 
-        <!--/* AJAX swap target (REQ-FE-002): the prev/next pager re-renders only this block via
-             krtFetch within the active tab; the total above stays correct (paging keeps the same
-             source filter). Tabs remain plain navigation. The no-JS pager links reload the page. */-->
         <div id="sync-results">
         <th:block th:fragment="results">
         <div class="table-responsive">
@@ -112,7 +109,6 @@
         </form>
     </div>
 
-    <!--/* Delete Confirmation Modal */-->
     <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='purge-confirm-modal', titleKey='admin.syncReports.delete.confirm.title', variant='krt-modal--danger', body=~{::purge-confirm-modal-body})}">
         <th:block th:ref="purge-confirm-modal-body">
             <div class="krt-modal-body">

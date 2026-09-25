@@ -86,10 +86,6 @@ import org.springframework.web.bind.annotation.RestController;
 @Transactional
 public class OperationController {
 
-  // Whitelisted sort fields. Anything else from the request will cause
-  // PaginationUtil to throw IllegalArgumentException, which the global
-  // handler turns into a 400 — never let Sort accept arbitrary user input
-  // (unstable ordering + information disclosure risk via column names).
   private static final Set<String> ALLOWED_SORT =
       Set.of("id", "name", "status", "description", "createdAt", "updatedAt");
 
@@ -98,10 +94,6 @@ public class OperationController {
   private final OperationMapper operationMapper;
   private final OperationFinanceService operationFinanceService;
   private final AuthHelperService authHelperService;
-
-  // hasRole('MISSION_MANAGER') below also matches users with app_user.is_mission_manager=true —
-  // CustomJwtGrantedAuthoritiesConverter injects ROLE_MISSION_MANAGER from the DB flag at
-  // JWT-decode time.
 
   /**
    * Returns paged operation DTOs (whitelist-enforced sort, {@code id} appended as tiebreaker).
@@ -386,11 +378,6 @@ public class OperationController {
    * @return the refreshed paid-out status block for the participant, so the caller can patch the
    *     single "Bezahlt" cell without re-fetching (or the backend re-computing) the whole breakdown
    */
-  // Asymmetric authorization: any mission manager (or higher via the role
-  // hierarchy) can SET paidOut=true, but only OFFICER / ADMIN can clear it
-  // back to false — once a mission manager confirms a payout, only a
-  // squadron officer or admin may rescind that confirmation. The SpEL
-  // expression encodes both halves in one gate.
   @PutMapping("/{id}/payouts/paid-out")
   @PreAuthorize(
       "hasRole('"
@@ -488,9 +475,6 @@ public class OperationController {
   })
   public OperationDto updateOperation(
       @PathVariable UUID id, @Valid @RequestBody OperationUpdateDto updateDto) {
-    // Resolve the "can override the state machine" flag here, at the HTTP boundary,
-    // so the service stays pure business logic and does not have to read the
-    // SecurityContextHolder itself (architecture rule enforced by ArchitectureTest).
     boolean canOverrideStatus = authHelperService.isAdmin();
     return operationMapper.toDto(
         operationService.updateOperation(id, updateDto, canOverrideStatus));

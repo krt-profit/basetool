@@ -1,7 +1,3 @@
-/* Page stylesheet of templates/admin/uex.html, moved out of its inline style block
- * (FE-PERF-02). Linked in the same place the block stood, so the cascade order is
- * unchanged. */
-
 @layer base, components, page, migration, utilities;
 
 @layer page {
@@ -14,12 +10,6 @@
         font-family: var(--font-body);
         font-size: 0.8rem;
     }
-    /* Checkboxes and radios are excluded: width:100% + the padding would stretch the 1.2rem
-   KRT squares (styles.css) full-width. The exclusions sit in :where() so they add ZERO
-   specificity — the rule keeps the plain `.form-group input` weight (0,1,1) and stays
-   below the (0,2,0) combobox rule `.krt-combobox .krt-combobox__input`. No .form-group
-   checkbox/radio exists here today; the exclusion closes the latent trap that broke
-   admin/materials when its flag checkboxes were added later. */
     .form-group input:where(:not([type='checkbox']):not([type='radio'])),
     .form-group select,
     .form-group textarea {
@@ -31,9 +21,6 @@
         font-family: var(--font-body);
         box-sizing: border-box;
     }
-    /* Active state for the segmented override buttons (UEX / Yes / No).
-   Strong orange fill plus an inset bright-orange ring makes the currently
-   selected variant unmistakable next to its muted gray siblings. */
     .btn-active {
         background-color: var(--color-primary);
         color: var(--color-bg-black);
@@ -44,9 +31,6 @@
         background-color: var(--color-primary);
         color: var(--color-bg-black);
     }
-    /* UEX-source chip mirrors the terminals page: "UEX: yes/no/–" foot label
-   under the segmented control, with an amber tint when the on-screen
-   override disagrees with the most recent UEX sweep. */
     .uex-source-chip {
         display: flex;
         align-items: baseline;
@@ -75,9 +59,6 @@
         text-transform: none;
         letter-spacing: 0;
     }
-    /* Global "last UEX sweep" stamp + summary chips at the top. Visually
-   quiet (gray-1, small caps label) so they sit alongside the H1 without
-   competing with it. */
     .uex-sync-stamp {
         display: inline-flex;
         align-items: baseline;
@@ -113,10 +94,6 @@
         font-family: var(--font-body);
         margin-right: 0.3rem;
     }
-    /* Hierarchical disclosure styling. <details>/<summary> is the native
-   accessible disclosure widget — keyboard- and screen-reader-friendly
-   out of the box; we only restyle the marker and chrome to fit the
-   KRT HUD palette. */
     details.uex-system,
     details.uex-parent {
         border: 1px solid var(--color-gray-3);
@@ -198,11 +175,6 @@
         text-transform: none;
         font-size: 0.8rem;
     }
-    /* Parent-row summary lays out [name • planet] on the left and the
-   override-button cluster on the right so toggling the disclosure is
-   still a single click on the name. We stopPropagation on the form
-   submits in the script below to keep the disclosure state stable
-   when a button is clicked. */
     .uex-parent > summary .uex-parent-controls {
         margin-left: auto;
         display: flex;

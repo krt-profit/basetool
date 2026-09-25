@@ -42,12 +42,6 @@ import org.springframework.context.annotation.Configuration;
 public class OpenApiConfig {
 
   static {
-    // These parameters are resolved from the request out-of-band (the JWT principal for
-    // @CurrentUserId, the X-User-Time-Zone header for @UserZone), not from a
-    // request line SpringDoc can introspect — so tell SpringDoc to skip them entirely (S11, #917).
-    // Otherwise SpringDoc would try to expand the ZoneId parameter into bogus query parameters. The
-    // @UserZone endpoints re-declare the X-User-Time-Zone header via a method-level @Parameter, so
-    // the generated document still advertises the header exactly as before.
     SpringDocUtils.getConfig().addAnnotationsToIgnore(CurrentUserId.class, UserZone.class);
   }
 

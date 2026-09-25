@@ -189,10 +189,8 @@ public class HangarImportService {
 
     User user = Entities.require(userRepository.findPlainById(userId), "User not found");
 
-    // Phase 0: one query to build the tolerant lookup index covering all four match stages.
     ShipTypeMatcher.ShipTypeIndex index = ShipTypeMatcher.buildIndex(shipTypeRepository.findAll());
 
-    // Phase 1: resolve every entry and aggregate per-type counts.
     Set<String> seenSkipped = new HashSet<>();
     List<String> skippedShips = new ArrayList<>();
     Map<UUID, Integer> uploadCountByTypeId = new LinkedHashMap<>();
@@ -217,8 +215,6 @@ public class HangarImportService {
       firstEntryByTypeId.putIfAbsent(typeId, entry);
     }
 
-    // Phase 2: for each distinct ShipType, create only the missing ships. The member's current
-    // per-type counts come from one grouped query rather than one COUNT per type (REQ-DATA-003).
     int importedCount = 0;
     int alreadySufficientCount = 0;
     Map<UUID, Long> hangarCountByTypeId = new HashMap<>();
@@ -227,8 +223,6 @@ public class HangarImportService {
         hangarCountByTypeId.put(row.getShipTypeId(), row.getShipCount());
       }
     }
-    // The owning org unit depends only on the importer, so it is resolved once, on the first ship
-    // actually created (a multi-membership importer's 400 still surfaces only when one is).
     OrgUnit owningOrgUnit = null;
     boolean owningOrgUnitResolved = false;
 
@@ -250,13 +244,6 @@ public class HangarImportService {
         for (int i = 0; i < toCreate; i++) {
           Ship ship = new Ship();
           ship.setOwner(user);
-          // Stamp owning org-unit through the shared nullable picker resolver — same contract as
-          // HangarService.addShip's create path. The import flow has no picker UI; passing
-          // {@code null} for the picker output triggers the resolver's "auto-stamp the single
-          // membership" branch for a single-membership importer, yields an ownerless personal ship
-          // ({@code owningOrgUnit == null}) for a membershipless importer (V132 made the column
-          // nullable for exactly this), and surfaces a multi-membership importer as a clean 400
-          // until a per-import picker is added (post-SK §5.5 stamping wave).
           if (!owningOrgUnitResolved) {
             owningOrgUnit = ownerScopeService.resolveOrgUnitForPickerOutputNullable(user, null);
             owningOrgUnitResolved = true;

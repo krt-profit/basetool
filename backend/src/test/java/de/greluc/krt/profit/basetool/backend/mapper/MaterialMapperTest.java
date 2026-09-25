@@ -36,7 +36,6 @@ class MaterialMapperTest {
 
   @Test
   void toDto_shouldMapScalarFieldsAndConvertIntegerFlagsToBoolean() {
-    // Given
     UUID id = UUID.randomUUID();
     Material entity = new Material();
     entity.setId(id);
@@ -44,18 +43,16 @@ class MaterialMapperTest {
     entity.setType(MaterialType.RAW);
     entity.setQuantityType(QuantityType.SCU);
     entity.setDescription("Volatile mining commodity");
-    entity.setIsIllegal(1); // 1 → true
-    entity.setIsVolatileQt(1); // 1 → true
-    entity.setIsVolatileTime(0); // 0 → false
+    entity.setIsIllegal(1);
+    entity.setIsVolatileQt(1);
+    entity.setIsVolatileTime(0);
     entity.setIsManualRawMaterial(true);
     entity.setIsJobOrder(false);
-    entity.setIsVisible(false); // wiki-only invisible row → must surface on the DTO
+    entity.setIsVisible(false);
     entity.setVersion(4L);
 
-    // When
     MaterialDto dto = mapper.toDto(entity);
 
-    // Then
     assertNotNull(dto);
     assertEquals(id, dto.id());
     assertEquals("Quantanium", dto.name());
@@ -73,7 +70,6 @@ class MaterialMapperTest {
 
   @Test
   void toDto_withNullFlagIntegers_shouldMapToFalse() {
-    // Given
     Material entity = new Material();
     entity.setName("Iron");
     entity.setType(MaterialType.RAW);
@@ -81,10 +77,8 @@ class MaterialMapperTest {
     entity.setIsVolatileQt(null);
     entity.setIsVolatileTime(null);
 
-    // When
     MaterialDto dto = mapper.toDto(entity);
 
-    // Then — the mapper expression treats null as 0/false
     assertFalse(dto.isIllegal());
     assertFalse(dto.isVolatileQt());
     assertFalse(dto.isVolatileTime());
@@ -92,8 +86,6 @@ class MaterialMapperTest {
 
   @Test
   void toDto_derivesIsManualEntryTrue_whenSourceSystemsManual() {
-    // R9 Step 1: the isManualEntry wire field is derived from source_systems == MANUAL, not from
-    // the legacy is_manual_entry column.
     Material entity = new Material();
     entity.setName("Admin Special");
     entity.setSourceSystems(MaterialSourceSystem.MANUAL);
@@ -121,7 +113,6 @@ class MaterialMapperTest {
 
   @Test
   void toEntity_shouldConvertBooleanFlagsToInteger1or0() {
-    // Given
     UUID id = UUID.randomUUID();
     MaterialDto dto =
         new MaterialDto(
@@ -141,10 +132,8 @@ class MaterialMapperTest {
             false,
             1L);
 
-    // When
     Material entity = mapper.toEntity(dto);
 
-    // Then
     assertNotNull(entity);
     assertEquals(id, entity.getId());
     assertEquals("Laranite", entity.getName());
@@ -161,7 +150,6 @@ class MaterialMapperTest {
 
   @Test
   void toEntity_withNullBooleanFlags_shouldMapToInteger0() {
-    // Given
     MaterialDto dto =
         new MaterialDto(
             UUID.randomUUID(),
@@ -180,10 +168,8 @@ class MaterialMapperTest {
             null,
             1L);
 
-    // When
     Material entity = mapper.toEntity(dto);
 
-    // Then — null Boolean → 0
     assertEquals(0, entity.getIsIllegal());
     assertEquals(0, entity.getIsVolatileQt());
     assertEquals(0, entity.getIsVolatileTime());
@@ -206,7 +192,6 @@ class MaterialMapperTest {
 
   @Test
   void stripServerManaged_shouldClearIdVersionAndForeignKeyRefs() {
-    // Given
     Material entity = new Material();
     entity.setId(UUID.randomUUID());
     entity.setVersion(5L);
@@ -214,10 +199,8 @@ class MaterialMapperTest {
     entity.setRefinedMaterial(new Material());
     entity.setCategory(new MaterialCategory());
 
-    // When
     Material stripped = MaterialMapper.stripServerManaged(entity);
 
-    // Then
     assertSame(entity, stripped);
     assertNull(stripped.getId());
     assertNull(stripped.getVersion());

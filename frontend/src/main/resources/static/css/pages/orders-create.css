@@ -1,7 +1,3 @@
-/* Page stylesheet of templates/orders-create.html, moved out of its inline style block
- * (FE-PERF-02). Linked in the same place the block stood, so the cascade order is
- * unchanged. */
-
 @layer base, components, page, migration, utilities;
 
 @layer page {
@@ -15,12 +11,6 @@
         font-weight: 700;
         font-size: 0.9rem;
     }
-    /* Radios (the Material <-> Item order-kind toggle) and checkboxes are excluded: the
-   0.75rem padding + surface background would inflate the 1.2rem KRT controls
-   (styles.css) into oversized ovals/squares. The exclusions sit in :where() so they add
-   ZERO specificity — the rule stays at the plain `.form-group input` weight (0,1,1) and
-   keeps losing to the (0,2,0) combobox rule `.krt-combobox .krt-combobox__input`, whose
-   right padding reserves room for the dropdown chevron. */
     .form-group input:where(:not([type='checkbox']):not([type='radio'])),
     .form-group select,
     .form-group textarea {
@@ -41,16 +31,6 @@
         margin-bottom: 1rem;
         align-items: flex-end;
     }
-    /*
- * The item-line row is a flex container with align-items:flex-end and a
- * label-less "Entfernen" button next to label-bearing .form-group columns.
- * The global `.form-group { margin-bottom: 1.25rem }` (styles.css) overrides
- * the `.mb-0` utility on these columns (equal specificity, but `.form-group`
- * is declared later), so the columns' margin box extends 1.25rem below their
- * input. flex-end then aligns the margin boxes, dropping the zero-margin button
- * 1.25rem below the inputs. Zero the margin here (specificity 0/2/0 beats the
- * global 0/1/0) so the button's bottom edge lines up with the Anzahl field.
- */
     .item-line .form-group {
         margin-bottom: 0;
     }
@@ -77,13 +57,6 @@
     details.scmdb-import[open] summary::before {
         transform: rotate(90deg);
     }
-    /*
- * Classes for the item-line rows that orders-create.js builds via innerHTML. They replace
- * the former inline style="" attributes on those elements: an inline style inside a JS
- * innerHTML string is blocked by the CSP style-src-attr 'none' pin just like a template one
- * (ADR-0093). Flex-item widths reuse the global .flex-1 / .flex-2 utilities, nowrap reuses
- * .nowrap, and the SCU hint / unresolved box toggle the runtime .krtm-hidden class.
- */
     .oc-line-fields {
         display: flex;
         gap: 1rem;

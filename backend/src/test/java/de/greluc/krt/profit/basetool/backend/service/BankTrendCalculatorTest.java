@@ -103,7 +103,6 @@ class BankTrendCalculatorTest {
 
     List<BigDecimal> series = BankTrendCalculator.sparkline(balance, delta, slices);
 
-    // Day (today - k) sits at index WINDOW_DAYS - 1 - k; the day before it is one index lower.
     int dayIndex = BankTrendCalculator.WINDOW_DAYS - 1 - 3;
     BigDecimal step = series.get(dayIndex).subtract(series.get(dayIndex - 1));
     assertThat(step).isEqualByComparingTo("150");

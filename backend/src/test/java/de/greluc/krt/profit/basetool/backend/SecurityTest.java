@@ -81,8 +81,6 @@ class SecurityTest {
 
   @Test
   void testSecurityHeaders() throws Exception {
-    // Rides /v3/api-docs because it is a plain GET with a body; the path is admin-gated since
-    // REQ-SEC-052, and the headers under test are set by the filter chain for every response.
     mockMvc
         .perform(
             get("/v3/api-docs").with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
@@ -116,9 +114,6 @@ class SecurityTest {
 
   @Test
   void testRateLimiting() throws Exception {
-    // First request should pass. Admin-gated since REQ-SEC-052: the document enumerates every
-    // path, parameter and DTO field the API has, which is the most efficient description of the
-    // attack surface the project can produce.
     mockMvc
         .perform(
             get("/v3/api-docs")
@@ -228,12 +223,6 @@ class SecurityTest {
     mockMvc.perform(get("/api/v1/materials")).andExpect(status().isUnauthorized());
   }
 
-  // The anonymous page-size ceiling (A6, REQ-SEC-032) and its six cases stood here. The filter
-  // and the ceiling are gone with ADR-0159: it bounded what an unauthenticated caller could ask a
-  // paginated endpoint for, and no paginated endpoint answers one any more. The two reads that do
-  // are unpaginated. The per-subject limiter that used to be anchored behind the filter now hangs
-  // off TermsAcceptanceAccessFilter, pinned by SecurityFilterChainOrderTest.
-
   @Test
   void testAnonymousAccessToLocations() throws Exception {
     mockMvc.perform(get("/api/v1/locations")).andExpect(status().isUnauthorized());
@@ -260,26 +249,17 @@ class SecurityTest {
                     org.springframework.security.test.web.servlet.request
                         .SecurityMockMvcRequestPostProcessors.jwt()
                         .jwt(jwt)))
-        // 403, not 200: /api/v1/missions requires a member (REQ-SEC-052) and this token holds no
-        // application role. The refusal's own code is NOT pinned here — the `jwt()` post-processor
-        // installs authorities directly and never runs CustomJwtGrantedAuthoritiesConverter, so
-        // this harness cannot produce the NO_ROLE marker. That path is covered where the converter
-        // actually runs: CustomJwtGrantedAuthoritiesConverterTest and the sweep's role-less pass.
         .andExpect(status().isForbidden());
   }
 
   @Test
   void testAuthenticatedAccessWithNullSub() throws Exception {
-    // We create a JWT without a sub claim
     org.springframework.security.oauth2.jwt.Jwt jwt =
         org.springframework.security.oauth2.jwt.Jwt.withTokenValue("token")
             .header("alg", "none")
             .claim("preferred_username", "testuser")
             .build();
 
-    // Reaches a handler no longer: a token that resolves to no application role is refused with
-    // 403 NO_ROLE (REQ-SEC-053) before dispatch. It used to answer 200 because /api/v1/missions was
-    // permitAll and the odd sub only produced a WARN.
     mockMvc
         .perform(
             get("/api/v1/missions")
@@ -287,26 +267,17 @@ class SecurityTest {
                     org.springframework.security.test.web.servlet.request
                         .SecurityMockMvcRequestPostProcessors.jwt()
                         .jwt(jwt)))
-        // 403, not 200: /api/v1/missions requires a member (REQ-SEC-052) and this token holds no
-        // application role. The refusal's own code is NOT pinned here — the `jwt()` post-processor
-        // installs authorities directly and never runs CustomJwtGrantedAuthoritiesConverter, so
-        // this harness cannot produce the NO_ROLE marker. That path is covered where the converter
-        // actually runs: CustomJwtGrantedAuthoritiesConverterTest and the sweep's role-less pass.
         .andExpect(status().isForbidden());
   }
 
   @Test
   void testAuthenticatedAccessWithBothNullSubAndUsername() throws Exception {
-    // We create a JWT without sub and without preferred_username, but with some other claim to
-    // satisfy Jwt.Builder
     org.springframework.security.oauth2.jwt.Jwt jwt =
         org.springframework.security.oauth2.jwt.Jwt.withTokenValue("token")
             .header("alg", "none")
             .claim("foo", "bar")
             .build();
 
-    // Logs ERROR as before, and is then refused with 403 NO_ROLE (REQ-SEC-053) — it used to
-    // answer 200 because /api/v1/missions was permitAll.
     mockMvc
         .perform(
             get("/api/v1/missions")
@@ -314,11 +285,6 @@ class SecurityTest {
                     org.springframework.security.test.web.servlet.request
                         .SecurityMockMvcRequestPostProcessors.jwt()
                         .jwt(jwt)))
-        // 403, not 200: /api/v1/missions requires a member (REQ-SEC-052) and this token holds no
-        // application role. The refusal's own code is NOT pinned here — the `jwt()` post-processor
-        // installs authorities directly and never runs CustomJwtGrantedAuthoritiesConverter, so
-        // this harness cannot produce the NO_ROLE marker. That path is covered where the converter
-        // actually runs: CustomJwtGrantedAuthoritiesConverterTest and the sweep's role-less pass.
         .andExpect(status().isForbidden());
   }
 

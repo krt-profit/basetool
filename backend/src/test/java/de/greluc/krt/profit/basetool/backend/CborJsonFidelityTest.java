@@ -127,10 +127,6 @@ class CborJsonFidelityTest {
             .readTree(
                 encode(JacksonCborHttpMessageConverter.class, MediaType.APPLICATION_CBOR, sample));
 
-    // Compared as decoded trees, not as bytes: differing bytes are the entire point of a binary
-    // codec. What must not differ is the document those bytes mean. Numbers are compared by value
-    // rather than by node type -- see decimalsDifferInScaleButNotInValue for the one place that
-    // matters and why it is not a defect.
     assertThat(normalise(viaCbor))
         .as(
             "CBOR and JSON must decode to the same document. A UUID arriving as a binary node is"
@@ -142,15 +138,6 @@ class CborJsonFidelityTest {
   @Test
   @DisplayName("a decimal keeps its scale in CBOR and loses it in JSON, at equal value")
   void decimalsDifferInScaleButNotInValue() throws Exception {
-    // Written down rather than fixed, and the direction is what makes that defensible: CBOR is the
-    // MORE faithful of the two here. `1234.5600` survives the binary encoding intact, while the
-    // JSON reader has already widened it to a double and prints `1234.56`.
-    //
-    // It changes nothing for a caller, because every consumer binds a payload to a declared type
-    // rather than reading the tree -- a `BigDecimal` field arrives as a BigDecimal from both. If a
-    // consumer ever DID read the tree, this is the line that tells it what to expect. And if the
-    // day comes that money precision must be identical on the wire as well as in the object, this
-    // is the test that has to change, not a surprise in a ledger.
     BigDecimal money = new BigDecimal("1234.5600");
 
     JsonNode fromJson =
@@ -204,10 +191,6 @@ class CborJsonFidelityTest {
   @Test
   @DisplayName("a UUID is a string on the wire, in both encodings")
   void aUuidIsAStringInBothEncodings() throws Exception {
-    // Stated on its own as well as inside the document comparison, because this is the property the
-    // contract document promises: `type: string, format: uuid` on 209 properties. A tree comparison
-    // says the two agree; this says what they agree ON, so a future change that made BOTH binary
-    // would fail here rather than pass there.
     UUID id = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
     JsonNode node =
@@ -223,12 +206,6 @@ class CborJsonFidelityTest {
   @Test
   @DisplayName("the registered CBOR converter refuses to read, so only responses negotiate")
   void theCborConverterIsWriteOnly() {
-    // Stated at the converter rather than only through an endpoint, because "229 of 233 write
-    // mappings accept it" is a property of the converter and not of any one route. Adding the CBOR
-    // dependency made the backend a second PARSER as well as a second encoder, and that parser does
-    // not carry JacksonConfig's read-side rules -- they arrive through a
-    // JsonMapperBuilderCustomizer
-    // that by Boot's contract reaches the JsonMapper alone.
     HttpMessageConverter<?> cbor = converterOf(JacksonCborHttpMessageConverter.class);
 
     assertThat(cbor.canWrite(WireSample.class, MediaType.APPLICATION_CBOR))

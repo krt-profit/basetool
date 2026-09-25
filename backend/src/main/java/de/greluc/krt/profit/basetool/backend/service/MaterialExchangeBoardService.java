@@ -385,10 +385,6 @@ public class MaterialExchangeBoardService {
     Double amount = null;
     Double availableAmount = null;
     if (offer.getKind() == MaterialExchangeOfferKind.ITEM) {
-      // Item offer: the display name + quantity live on the offer itself (REQ-MARKET-012). A
-      // free-stated offer has no Lager row; a stock-backed one (REQ-MARKET-014) does, so its
-      // quantity is clamped to the row's current stock on read (mirroring the material clamp,
-      // ADR-0086) and the owner additionally sees the row's total stock to bound the edit dialog.
       itemName = offer.getItemName();
       itemQuantity = effectiveItemQuantity(offer);
       availableAmount =

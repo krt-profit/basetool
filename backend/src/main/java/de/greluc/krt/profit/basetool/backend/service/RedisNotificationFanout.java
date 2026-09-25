@@ -100,7 +100,6 @@ public class RedisNotificationFanout implements NotificationFanout, MessageListe
   @Override
   public void publish(
       @NotNull Collection<UUID> recipientUserIds, @NotNull NotificationSignal signal) {
-    // Deliver to this instance's emitters first — a Redis failure then only degrades peer delivery.
     notificationStreamService.publish(recipientUserIds, signal);
     transport.publish(
         root -> writePayload(root, recipientUserIds, signal),
@@ -124,9 +123,6 @@ public class RedisNotificationFanout implements NotificationFanout, MessageListe
     for (UUID sub : recipientUserIds) {
       recipients.add(sub.toString());
     }
-    // Optional by design, and the version stays at 1. A peer on an older build ignores the field
-    // and pushes the bare refresh it always did; this build receiving a message without one does
-    // the same. Neither direction of a rolling deploy needs the other to have landed first.
     if (signal.describesNotification()) {
       ObjectNode signalNode = root.putObject("signal");
       signalNode.put("type", String.valueOf(signal.type()));
@@ -157,7 +153,6 @@ public class RedisNotificationFanout implements NotificationFanout, MessageListe
     try {
       type = NotificationType.valueOf(node.path("type").asString(""));
     } catch (IllegalArgumentException e) {
-      // A type this build does not know: a peer running a newer version. The push still lands.
       log.debug("Skipping unknown notification type in fan-out message", e);
       return NotificationSignal.refreshOnly();
     }
@@ -204,9 +199,6 @@ public class RedisNotificationFanout implements NotificationFanout, MessageListe
     if (recipientsNode != null && recipientsNode.isArray()) {
       for (JsonNode element : recipientsNode) {
         if (element != null && element.isString()) {
-          // Skip a single malformed UUID rather than letting it abort the whole batch (F7): one
-          // bad entry from a future/older or tampered peer must not drop every other recipient's
-          // push. Matches the frontend consume path's per-element defensiveness.
           try {
             recipients.add(UUID.fromString(element.asString()));
           } catch (IllegalArgumentException e) {

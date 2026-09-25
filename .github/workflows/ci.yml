@@ -11,8 +11,6 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-# Read-only. `checks: write` and `pull-requests: read` were granted here and used by nothing: no
-# step publishes a check run or reads the pull request (audit item CI-SEC-05).
 permissions:
   contents: read
 
@@ -24,7 +22,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
 
@@ -33,30 +31,6 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
-      # The previous release's committed API document, for the half of REQ-API-009's schema diff
-      # that compares against a released artefact rather than against a recorded intent
-      # (ADR-0136, ADR-0161 8.4 -> ExternalContractTest#theContractTypesMatchThePreviousRelease).
-      #
-      # Deliberately NOT `fetch-depth: 0` on the checkout: one tag is wanted, not the history, and
-      # a full clone of this repository costs far more than the guard is worth. A single
-      # `--depth=1` tag fetch is enough to `git show` one file out of it.
-      #
-      # Every failure mode here is non-fatal on purpose. No release tag yet, a tag that predates
-      # the document, a network hiccup -- each leaves the file absent, and the test then SKIPS with
-      # a message saying so while the frozen record in the same class still runs. A guard that
-      # broke every CI run over a missing baseline would be removed within a week, and the frozen
-      # record is what covers a developer machine anyway.
-      #
-      # `set -u` and NOT `set -e`, plus an explicit `|| true` on every command that talks to the
-      # network: GitHub runs this shell with `-e` by default, so an unguarded `git fetch` failure
-      # aborted the STEP. That was survivable only because `continue-on-error` let the job carry on,
-      # and it left the "non-fatal" claim above resting on a second mechanism rather than on this
-      # script. Each command now fails into the same place: no file, and a line saying why.
-      #
-      # `versionsort.suffix=-` is what keeps a pre-release from outranking its own release. All 308
-      # tags are plain vX.Y.Z today, so `--sort=-v:refname` happens to be right; the first `v1.8.0-rc1`
-      # would sort ABOVE `v1.8.0` without it and silently become the baseline. The grep is the belt
-      # to that braces -- a baseline is only ever a finished release.
       - name: Fetch the previous release's API contract
         continue-on-error: true
         run: |
@@ -79,26 +53,9 @@ jobs:
                  rm -f backend/build/contract-baseline/openapi.json; }
           exit 0
 
-      # `--continue` keeps the build going past the first failing task so the lint reports still
-      # get generated when tests fail and vice versa -- the upload steps below exist for exactly
-      # that. It does NOT mask a failure: Gradle still exits non-zero and the job still fails.
-      #
-      # `--configuration-cache` (audit item BLD-PERF-04): CI is where the cache is switched on
-      # first, before gradle.properties makes it the default. It is STRICT here -- a task that is
-      # not compatible fails the build instead of degrading to a warning -- so an incompatibility
-      # reaches the PR that introduces it. setup-gradle carries the cache entry between runs.
       - name: Build, run tests and lint
         run: ./gradlew build --continue --stacktrace --configuration-cache
 
-      # The committed API documents must be the ones the build just generated (REQ-API-007,
-      # REQ-API-009; audit item BLD-CI-09). Each module's OpenApiGeneratorTest rewrites its
-      # document during `test` above, and `springdoc.writer-with-order-by-keys` in the test profile
-      # makes the output byte-stable, so any diff here is an API change whose document was not
-      # regenerated and committed -- which is exactly what ExternalContractTest and the frontend
-      # contract tests would otherwise be checking against. EOL-safe: `.gitattributes` pins
-      # `*.json` to LF, so git compares normalised content and a CRLF-writing generator cannot
-      # produce a diff on its own. It runs only after a green build (the default step condition):
-      # a red one may have stopped before the generator ran.
       - name: Fail if a committed openapi.json is stale
         run: |
           if ! git diff --exit-code --stat -- '*/src/main/resources/api/openapi.json'; then
@@ -106,13 +63,6 @@ jobs:
             exit 1
           fi
 
-      # Every shipped module's SBOM must list exactly its resolved runtime classpath, project
-      # dependencies included (REQ-OPS-025). Each `cyclonedxBom` is finalized by
-      # `verifyCyclonedxBom`, which fails on any difference in either direction, so this proves on
-      # the PR -- not first at release time -- that the plugin still sees every component, that a
-      # new `implementation(project(...))` reaches the BOM, and that the SBOM tasks stay
-      # configuration-cache compatible. The regenerated files are not committed from here; the
-      # committed BOMs are release artifacts and only release-prepare.yml refreshes them.
       - name: Check the SBOMs against the resolved runtime classpath
         run: >-
           ./gradlew :backend:cyclonedxBom :frontend:cyclonedxBom
@@ -121,7 +71,7 @@ jobs:
 
       - name: Upload JUnit test reports
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: test-reports
           path: |
@@ -132,20 +82,16 @@ jobs:
 
       - name: Upload JaCoCo coverage reports
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: jacoco-reports
           path: '**/build/reports/jacoco/**'
           retention-days: 14
           if-no-files-found: ignore
 
-      # The lint reports only on a red run (audit item CI-09): a green Checkstyle or SpotBugs report
-      # says "no findings" in the job log already, and uploading every module's HTML on every push
-      # cost an artifact nobody opened. The test and coverage reports above stay `always()` -- the
-      # JaCoCo numbers are read on green runs too.
       - name: Upload Checkstyle reports
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: checkstyle-reports
           path: '**/build/reports/checkstyle/**'
@@ -154,7 +100,7 @@ jobs:
 
       - name: Upload SpotBugs reports
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: spotbugs-reports
           path: '**/build/reports/spotbugs/**'

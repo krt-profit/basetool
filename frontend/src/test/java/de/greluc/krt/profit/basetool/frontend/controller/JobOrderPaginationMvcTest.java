@@ -75,7 +75,6 @@ class JobOrderPaginationMvcTest {
   @BeforeEach
   void setup() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-    // Pass the profit gate so viewOrders renders the list instead of redirecting to /orders/create.
     when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
         .thenReturn(LayoutResponses.capabilities(true, true, true));
   }
@@ -94,8 +93,6 @@ class JobOrderPaginationMvcTest {
     return new PageResponse<>(List.of(), pageIndex, pageSize, total, totalPages, List.of());
   }
 
-  // covers REQ-ORDERS-020 — a multi-page result renders the page-nav (prev/next) and the 50/100/200
-  // size picker; both keep the default status + scope filter, and size links jump back to page 0.
   @Test
   @WithMockUser
   void viewOrders_multiPageResult_rendersPaginationAndSizePicker() throws Exception {
@@ -106,19 +103,16 @@ class JobOrderPaginationMvcTest {
         .perform(get("/orders").param("page", "1"))
         .andExpect(status().isOk())
         .andExpect(view().name("orders-index"))
-        // page-nav: previous/first (page 0) and next/last (page 2), default filter preserved
         .andExpect(
             content()
                 .string(
                     containsString(
                         "/orders?status=OPEN&amp;status=IN_PROGRESS&amp;page=0&amp;size=100")))
         .andExpect(content().string(containsString("page=2&amp;size=100")))
-        // size picker: the two non-active sizes are links back to page 0
         .andExpect(content().string(containsString("page=0&amp;size=50")))
         .andExpect(content().string(containsString("page=0&amp;size=200")));
   }
 
-  // covers REQ-ORDERS-020 — paging and re-sizing keep the active status filter in every link.
   @Test
   @WithMockUser
   void viewOrders_withStatusFilter_keepsFilterInPaginationLinks() throws Exception {
@@ -134,9 +128,6 @@ class JobOrderPaginationMvcTest {
             content().string(containsString("/orders?status=COMPLETED&amp;page=0&amp;size=50")));
   }
 
-  // covers REQ-FE-005 — an AJAX swap request (fragment=results) renders only the inner table +
-  // pagination fragment: the data table and the page-nav are present, but the surrounding chrome
-  // (the swap-target wrapper div and the filter form, both outside the fragment) is not.
   @Test
   @WithMockUser
   void viewOrders_fragmentResults_rendersOnlyTableFragment() throws Exception {
@@ -152,7 +143,6 @@ class JobOrderPaginationMvcTest {
         .andExpect(content().string(not(containsString("id=\"orders-filter-form\""))));
   }
 
-  // covers REQ-ORDERS-020 — a single short page needs neither page-nav nor size picker.
   @Test
   @WithMockUser
   void viewOrders_singleShortPage_rendersNeitherPageNavNorSizePicker() throws Exception {

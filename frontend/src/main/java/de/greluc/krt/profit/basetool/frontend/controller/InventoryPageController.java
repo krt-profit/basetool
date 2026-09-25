@@ -243,8 +243,6 @@ public class InventoryPageController {
         uri.append("size=").append(size).append("&");
       }
       if (itemsView) {
-        // catalog=ITEM has its own backend sort whitelist (gameItem.name / amount) and default;
-        // the material sort spec would be rejected there, so it is simply not sent.
         uri.append("catalog=ITEM");
       } else {
         uri.append("sort=material.name,asc;quality,desc;amount,desc");
@@ -340,10 +338,6 @@ public class InventoryPageController {
     model.addAttribute("items", items);
     model.addAttribute("pageSizes", DRILLDOWN_PAGE_SIZES);
     model.addAttribute("selectedMaterialId", materialId);
-    // REQ-FE-005/REQ-FE-010 (#1309): the pager and the live-sync receiver re-fetch just the results
-    // fragment, which needs no catalog — the material switcher is full-render-only (the
-    // REQ-DATA-012
-    // fragment-gating rule), so the fragment path skips its cached material lookup.
     if (fragment != null && "results".equalsIgnoreCase(fragment)) {
       return "inventory-material :: inventoryMaterialResults";
     }
@@ -476,13 +470,6 @@ public class InventoryPageController {
   @org.springframework.web.bind.annotation.ResponseBody
   public List<de.greluc.krt.profit.basetool.frontend.model.dto.InventoryGameItemReferenceDto>
       itemSearch(@RequestParam(required = false) String q) {
-    // Build the URI with only the fixed (safe) paging params via UriComponentsBuilder so a crafted
-    // `&` in the term cannot inject extra query parameters (the L-1 hardening), and pass the
-    // free-text `q` as a WebClient URI-template variable ({q}) so it is percent-encoded exactly
-    // once across the frontend->backend hop. Baking the pre-encoded toUriString() value into
-    // get(String) would let the WebClient encode it a second time (space -> %2520), so a multi-word
-    // item search reached the backend mangled and matched nothing (the #371 re-encoding trap). A
-    // null/blank term is normalised to the empty match-all filter.
     String uri =
         org.springframework.web.util.UriComponentsBuilder.fromPath("/api/v1/inventory/item-catalog")
             .queryParam("size", PickerSearch.PAGE_SIZE)
@@ -626,14 +613,8 @@ public class InventoryPageController {
     }
 
     model.addAttribute("groupedItems", groupedItems);
-    // keeping empty items list to not break any existing template iteration if any
     model.addAttribute("items", new ArrayList<>());
     model.addAttribute("materials", fetchMaterials());
-    // The Umbuchen target-location picker (inventory-my.html) searches locations on demand
-    // (remote-locations combobox -> /catalog/location-search), so no locations catalog is
-    // preloaded here; the modal-opening JS seeds the row's current location itself. The filter
-    // multi-select below is a different thing: it offers only the locations that actually hold
-    // stock in the caller's scope (REQ-INV-040), taken from the grouped result's own stack keys.
     model.addAttribute(
         "locations",
         resolveLocationFilterOptions(
@@ -1130,15 +1111,8 @@ public class InventoryPageController {
     model.addAttribute("selectedMinQuality", minQuality);
     model.addAttribute("selectedJobOrderIds", jobOrderIds);
     model.addAttribute("selectedMissionIds", missionIds);
-    // The Umbuchen target-location picker (inventory-admin.html) searches locations on demand
-    // (remote-locations combobox -> /catalog/location-search), so no locations catalog is
-    // preloaded here; the modal-opening JS seeds the row's current location itself.
     model.addAttribute("jobOrders", fetchActiveJobOrders());
     model.addAttribute("missions", fetchMissions());
-    // #1193: the /all book-out/transfer target-user picker (inventory-admin.html) now searches
-    // users
-    // on demand (remote-users combobox -> /users/search), so the preloaded users list is no longer
-    // populated here. fetchUsers() is still used by the /my view's picker below.
     model.addAttribute("authUserId", currentAuthName());
     model.addAttribute("canEditForeignNotes", hasLogisticianOrAbove());
 
@@ -1417,10 +1391,6 @@ public class InventoryPageController {
         (p != null && p.content() != null) ? new ArrayList<>(p.content()) : new ArrayList<>();
     model.addAttribute("entries", entries);
     model.addAttribute("entriesPage", p);
-    // Both catalog modes label their allocation popover with the outstanding need (REQ-INV-039),
-    // so the needs are always requested here. `includeMissions` stays the material-mode gate for
-    // the mission dimension alone (an item row carries none, REQ-INV-031). Only one of the two
-    // lookups can produce a label for a given row; the other is an empty map rather than a branch.
     List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto> stackJobOrders =
         fetchActiveJobOrders(true);
     model.addAttribute("jobOrders", stackJobOrders);
@@ -1460,16 +1430,7 @@ public class InventoryPageController {
       form = (InventoryForm) model.getAttribute("inventoryForm");
     }
 
-    // The input form's catalog lookups are independent; fetch them concurrently (missions, job
-    // orders and the owner picker are uncached round-trips) and apply on the request thread. Each
-    // helper swallows its own failure and returns an empty list, so join() never throws and the
-    // page
-    // degrades exactly as the serial version did.
     final InventoryForm boundForm = form;
-    // #1193: the admin "assign to user" picker (inventory-input.html, shown when isGlobal) now
-    // searches users on demand (remote-users combobox -> /users/search), so the preloaded roster is
-    // no longer fetched here. Only the currently-chosen target user is seeded (edit-mode label), so
-    // a re-render after a validation/backend error still shows — and keeps — the picked user.
     var materialsFuture = parallelPageLoader.loadAsync(this::fetchMaterials);
     var locationsFuture = parallelPageLoader.loadAsync(this::fetchLocations);
     var missionsFuture = parallelPageLoader.loadAsync(this::fetchMissions);
@@ -1490,11 +1451,6 @@ public class InventoryPageController {
     List<de.greluc.krt.profit.basetool.frontend.model.dto.JobOrderReferenceDto> inputJobOrders =
         jobOrdersFuture.join();
     model.addAttribute("jobOrders", inputJobOrders);
-    // REQ-INV-039: the per-order need figures ride into the page as one JSON blob rather than as an
-    // attribute per <option>, because the allocation rows are CLONED from a <template> — a figure
-    // duplicated onto every clone would have to be rewritten on every clone when a peer's booking
-    // moves it. The live-sync refresh re-reads the identical shape from /inventory/order-needs, so
-    // the page script decodes one format and never has to reconcile two.
     model.addAttribute("jobOrderNeedsJson", writeOrderNeedsJson(orderNeeds(inputJobOrders)));
     model.addAttribute("ownerOptions", ownerFuture.join());
     model.addAttribute("selectedUser", selectedUserFuture.join());
@@ -1673,7 +1629,6 @@ public class InventoryPageController {
           "/api/v1/users/" + form.getUserId(),
           de.greluc.krt.profit.basetool.frontend.model.dto.UserDto.class);
     } catch (Exception e) {
-      // REQ-OBS-004: log the id only, never the resolved name.
       log.warn(
           "Failed to resolve selected user {} for inventory-input picker seed",
           form.getUserId(),
@@ -1701,8 +1656,6 @@ public class InventoryPageController {
    */
   private List<OrgUnitMembershipOptionDto> fetchOwnerPickerOptions(InventoryForm form) {
     if (form != null && Boolean.TRUE.equals(form.getIsGlobal()) && form.getUserId() != null) {
-      // Admin creating a global entry for ANOTHER user → that user's DIRECT memberships (their own
-      // stock). The create-on-behalf cascade is the caller's reach, not a third-party owner's.
       try {
         List<OrgUnitMembershipOptionDto> options =
             backendApiClient.get(
@@ -1714,9 +1667,6 @@ public class InventoryPageController {
         return List.of();
       }
     }
-    // Self-entry → the caller's pickable org units: direct memberships plus their cascading
-    // leadership reach (own Bereich/OL + overseen subordinate Staffeln/SKs), epic #692 Phase 5.
-    // Unchanged for an ordinary member. Resolved server-side for the caller.
     try {
       List<OrgUnitMembershipOptionDto> options =
           backendApiClient.get(

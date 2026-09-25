@@ -81,12 +81,6 @@ class BankBookingE2eTest {
 
     employeeId = seeder.getUserId(EMPLOYEE_USER, EMPLOYEE_PASSWORD);
     String mgmtId = seeder.getUserId(MGMT_USER, MGMT_PASSWORD);
-    // Give the employee a single org-unit (IRIDIUM) membership so the counterparty picker's
-    // dependent Einheit select has a membership to resolve and auto-select (REQ-BANK-044, #1193
-    // follow-up: the counterparty-picker E2E below). Assigned via an ADMIN token: the membership
-    // endpoint (PATCH /users/{id}/memberships) is ADMIN-gated, so the bank employee cannot
-    // self-assign — `ensureIridiumMembership(EMPLOYEE...)` would PATCH with the employee's own
-    // non-admin token and 403. Idempotent + harmless to the booking flows.
     seeder.assignStaffelMembership(
         ADMIN_USER, ADMIN_PASSWORD, employeeId, IRIDIUM_ID, false, false);
 
@@ -95,7 +89,6 @@ class BankBookingE2eTest {
     holderAId = seeder.registerBankHolder(MGMT_USER, MGMT_PASSWORD, employeeId);
     holderBId = seeder.registerBankHolder(MGMT_USER, MGMT_PASSWORD, mgmtId);
 
-    // A separate account the employee is granted on, for the UI deposit drive.
     uiAccountId = seeder.createBankAccount(MGMT_USER, MGMT_PASSWORD, "E2E Booking UI", "SPECIAL");
     seeder.createBankGrant(MGMT_USER, MGMT_PASSWORD, employeeId, uiAccountId, true, true, true);
     uiHolderId = holderAId;
@@ -122,8 +115,6 @@ class BankBookingE2eTest {
     assertEquals(201, seeder.bankDeposit(MGMT_USER, MGMT_PASSWORD, account, holderAId, 1000));
     assertEquals(
         0, balance(account).compareTo(new BigDecimal("1000")), "balance is 1000 after the deposit");
-    // The fee is added on top (ADR-0052): a 400 payout debits the account the gross 402 (400 + 2
-    // fee at 0.5%), leaving 1000 - 402 = 598.
     assertEquals(201, seeder.bankWithdraw(MGMT_USER, MGMT_PASSWORD, account, holderAId, 400));
     assertEquals(
         0,
@@ -168,7 +159,6 @@ class BankBookingE2eTest {
             + dest
             + "\",\"destinationHolderId\":\""
             + holderBId
-            // REQ-BANK-045: SPECIAL source account mandates a Begründung on a transfer.
             + "\",\"amount\":200,\"justification\":\"E2E transfer reason\"}";
     assertEquals(
         201,
@@ -247,8 +237,6 @@ class BankBookingE2eTest {
         E2eSupport.login(page, baseUrl, EMPLOYEE_USER, EMPLOYEE_PASSWORD);
         E2eSupport.navigate(page, baseUrl + "/bank/accounts/" + uiAccountId);
         page.waitForLoadState();
-        // Marker + drop the position:fixed footer (it can intercept the trusted submit click on
-        // WebKit). A full reload wipes the marker; an in-place swap leaves it intact.
         page.evaluate("window.__krtNoReload = true;");
         page.evaluate(
             "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
@@ -264,7 +252,6 @@ class BankBookingE2eTest {
             Boolean.TRUE,
             page.evaluate("window.__krtNoReload === true"),
             "the immediate second deposit must not reload either (no stale-version 409)");
-        // The facts strip is still present after the in-place swaps (never a full navigation).
         assertThat(page.locator("[data-testid='bank-balance']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
       } catch (RuntimeException | AssertionError failure) {
@@ -299,26 +286,16 @@ class BankBookingE2eTest {
         E2eSupport.login(page, baseUrl, EMPLOYEE_USER, EMPLOYEE_PASSWORD);
         E2eSupport.navigate(page, baseUrl + "/bank/accounts/" + uiAccountId);
         page.waitForLoadState();
-        // Open the unified Kontobewegung modal; Einzahlung is the default type, so its Einzahler
-        // counterparty block is the active one.
         page.locator("[data-testid='bank-movement-open']")
             .click(new Locator.ClickOptions().setTimeout(20_000));
 
-        // The counterparty user picker is a remote combobox: opening it fetches from
-        // /users/search-bank on demand, and picking the employee (seeded with a single IRIDIUM
-        // membership) commits the value via the enhancer's hidden input.
         Locator cpUser = page.locator("[data-testid='bank-mv-cp-deposit-user']");
         E2eSupport.selectComboboxByValue(cpUser, employeeId);
 
-        // (1) Org-unit dependency: the hidden input's bubbling `change` drives
-        // fillCounterpartyOrgUnits,
-        // which enables the Einheit select and auto-selects the user's single membership.
         Locator cpOrg = page.locator("[data-testid='bank-mv-cp-deposit-ou']");
         assertThat(cpOrg).isEnabled(new LocatorAssertions.IsEnabledOptions().setTimeout(20_000));
         assertThat(cpOrg).not().hasValue("");
 
-        // (2) External toggle: "kein Tool-Account" swaps to the free-text name input and hides the
-        // registered combobox, while the Einheit select stays usable (widened to all org units).
         page.locator("[data-testid='bank-mv-cp-deposit-external']").check();
         Locator cpName = page.locator("[data-testid='bank-mv-cp-deposit-name']");
         assertThat(cpName).isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
@@ -346,21 +323,13 @@ class BankBookingE2eTest {
     String balanceBefore = page.locator("[data-testid='bank-balance']").textContent().trim();
     page.locator("[data-testid='bank-movement-open']")
         .click(new com.microsoft.playwright.Locator.ClickOptions().setTimeout(20_000));
-    // The movement type defaults to DEPOSIT (first offered type); the deposit fields are shown.
     page.locator("[data-testid='bank-movement-amount']").fill(amount);
-    // The holder picker is a searchable combobox; pick the employee's holder by its value.
     E2eSupport.selectComboboxByValue(
         page.locator("[data-testid='bank-movement-deposit-holder']"), uiHolderId);
     page.waitForResponse(
         r -> r.url().contains("/api/proxy/bank/deposits") && "POST".equals(r.request().method()),
-        // 60 s (above the 30 s default): the deposit's proxied XHR round-trip can outrun 30 s on a
-        // contended CI runner (the Firefox-only flake window), timing out an otherwise-correct
-        // POST.
         new Page.WaitForResponseOptions().setTimeout(60_000),
         () -> page.locator("[data-testid='bank-movement-submit']").click());
-    // The accountBody swap repaints the facts strip; wait for the balance text to actually change
-    // so
-    // the proof is that the money region updated IN PLACE, not via a reload.
     page.waitForFunction(
         "old => { const el = document.querySelector('[data-testid=\"bank-balance\"]');"
             + " return el && el.textContent.trim() !== old; }",

@@ -176,8 +176,6 @@ public class PromotionEligibilityService {
       return List.of();
     }
     UUID scope = ownerScopeService.currentSquadronId().orElse(null);
-    // Evaluation set + category→topic index are (userId, scope)-constant: load once and share
-    // across every transition instead of re-querying 2× per transition (REQ-DATA-003).
     EvaluationIndex index = loadEvaluationIndex(userId, scope);
     List<Object[]> transitions = rankRequirementRepository.findDistinctRankTransitionsScoped(scope);
     List<PromotionEligibilityResponse> result = new ArrayList<>(transitions.size());

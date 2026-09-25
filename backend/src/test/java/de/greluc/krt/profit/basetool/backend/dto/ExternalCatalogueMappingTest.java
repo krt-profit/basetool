@@ -607,7 +607,6 @@ class ExternalCatalogueMappingTest {
   @DisplayName("SC Wiki item DTOs bind only names the /api/items payload carries")
   void scWikiItemDtos_bindOnlyServedNames() {
     assertMapsOnlyServedNames(ScWikiItemDto.class, SCWIKI_ITEM_KEYS);
-    // The regression this file exists for: x/y/z is not how the Wiki names a bounding box.
     assertMapsOnlyServedNames(ScWikiDimensionDto.class, SCWIKI_ITEM_DIMENSION_KEYS);
   }
 

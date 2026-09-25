@@ -97,19 +97,14 @@ public class PayloadSizeLimitFilter extends OncePerRequestFilter {
     long max = ingestProperties.maxPayloadBytes();
     long declared = request.getContentLengthLong();
 
-    // Fast path: an honestly-declared oversized body is rejected without reading it.
     if (declared > max) {
       reject(response, declared, max);
       return;
     }
 
-    // Chunked / unknown-length body: the declared check above cannot see its real size, so count
-    // it while reading and reject once it crosses the cap.
     if (declared < 0) {
       byte[] body = readWithinCap(request.getInputStream(), max);
       if (body == null) {
-        // The stream is abandoned the moment the cap is crossed, so the exact size is unknown by
-        // design — `declared` stays -1, which is itself the diagnostic (a chunked body).
         reject(response, declared, max);
         return;
       }
@@ -131,11 +126,6 @@ public class PayloadSizeLimitFilter extends OncePerRequestFilter {
    */
   private void reject(@NotNull HttpServletResponse response, long declaredBytes, long maxBytes)
       throws IOException {
-    // REQ-OBS-011: the DoS guard was silent (no log, no metric) unlike the sibling bot / rate-limit
-    // filters — count and DEBUG-log each 413 so a flood of oversized-body probes is detectable.
-    // Both sizes are logged because the reject alone does not say which of the two very different
-    // situations it is: a cap set below what a legitimate extract needs (declared just over max),
-    // or a hostile body (declared orders of magnitude over, or -1 for a chunked flood).
     meterRegistry.counter(MetricNames.INGEST_PAYLOAD_REJECTED).increment();
     log.debug(
         "Ingest payload rejected: declared={} bytes exceeds max={} bytes", declaredBytes, maxBytes);
@@ -228,8 +218,6 @@ public class PayloadSizeLimitFilter extends OncePerRequestFilter {
 
         @Override
         public int read(byte @NotNull [] buffer, int offset, int length) {
-          // Bulk read. The inherited InputStream#read(byte[], int, int) loops over read() one byte
-          // at a time, which is what Jackson hit for every byte of a buffered chunked body.
           return delegate.read(buffer, offset, length);
         }
 

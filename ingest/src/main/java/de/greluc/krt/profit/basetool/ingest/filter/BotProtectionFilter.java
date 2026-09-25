@@ -96,63 +96,48 @@ public class BotProtectionFilter extends OncePerRequestFilter {
    */
   static final Set<String> BOT_PATH_PREFIXES =
       Set.of(
-          // WordPress / CMS
           "/wp-",
           "/wordpress",
           "/xmlrpc",
-          // PHP / generic web-app scanners
           "/phpmyadmin",
-          // Feed / author / sitemap (WordPress-style)
           "/feed",
           "/author",
           "/sitemap",
-          // Dot-files and hidden config
           "/.env",
           "/.git",
           "/.svn",
           "/.htaccess",
           "/.htpasswd",
           "/.ds_store",
-          // Generic config / backup / shell paths
           "/config",
           "/backup",
           "/shell",
           "/cgi-bin",
           "/vendor",
-          // Spring Boot / Java management endpoints (only /actuator/health + /actuator/prometheus
-          // are whitelisted below; every other /actuator/... probe is scanner noise here)
           "/actuator",
           "/console",
           "/manager",
           "/jolokia",
           "/jmx",
-          // Well-known ACME challenge (scanner abuse)
           "/.well-known/acme-challenge",
-          // Laravel / PHP framework paths
           "/telescope",
           "/horizon",
           "/nova",
           "/laravel",
-          // Router / IoT exploits
           "/boaform",
           "/gponform",
           "/setup.cgi",
-          // Microsoft Exchange / Outlook Web Access
           "/owa",
           "/autodiscover",
           "/ecp",
           "/ews",
-          // Other known exploit targets
           "/solr",
           "/jenkins",
           "/hudson",
           "/jira",
           "/confluence",
-          // API discovery scans — the gateway serves no Swagger UI; its OpenAPI doc lives under
-          // /v3/api-docs (non-prod only), which does NOT match this prefix
           "/swagger-ui",
           "/api-docs",
-          // Debug / trace endpoints
           "/debug",
           "/trace");
 
@@ -207,21 +192,14 @@ public class BotProtectionFilter extends OncePerRequestFilter {
     String uri = request.getRequestURI();
     String method = request.getMethod();
 
-    // 0. Query-string syntax check — FIRST, because every later branch answers with sendError(),
-    // and a container error dispatch re-parses the very query string that cannot be parsed.
     if (isMalformedQueryString(request.getQueryString())) {
       log.debug("Blocked malformed query string: {} {}", method, uri);
       recordBlocked(MetricNames.BOT_RULE_QUERY_STRING);
-      // Deliberately setStatus() and not sendError(): sendError() hands the request to the
-      // container's error dispatch, whose first act is to read a request parameter again — the
-      // exact loop this branch exists to break. A bare 400 with no body is also the cheapest
-      // possible answer to a scanner.
       response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
       response.setContentLength(0);
       return;
     }
 
-    // 1. HTTP method check
     if (!ALLOWED_HTTP_METHODS.contains(method.toUpperCase())) {
       log.debug("Blocked disallowed HTTP method: {} {}", method, uri);
       recordBlocked(MetricNames.BOT_RULE_METHOD);
@@ -229,7 +207,6 @@ public class BotProtectionFilter extends OncePerRequestFilter {
       return;
     }
 
-    // 2. Path-prefix check
     if (isBotPath(uri)) {
       log.debug("Blocked bot/scanner path: {} {}", method, uri);
       recordBlocked(MetricNames.BOT_RULE_PATH_PREFIX);
@@ -237,7 +214,6 @@ public class BotProtectionFilter extends OncePerRequestFilter {
       return;
     }
 
-    // 3. File-extension check
     if (isBotFileExtension(uri)) {
       log.debug("Blocked bot/scanner file extension: {} {}", method, uri);
       recordBlocked(MetricNames.BOT_RULE_FILE_EXTENSION);
@@ -311,8 +287,6 @@ public class BotProtectionFilter extends OncePerRequestFilter {
    * @return {@code true} if the URI matches a bot path prefix and is not whitelisted
    */
   boolean isBotPath(@NotNull String uri) {
-    // Exact, case-sensitive whitelist first: mirrors the securityMatcher of the scrape chain, so
-    // only the one real endpoint path escapes the bot 404 (sub-paths/case variants do not).
     if (LEGITIMATE_EXACT_PATHS.contains(uri)) {
       return false;
     }

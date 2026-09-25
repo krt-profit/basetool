@@ -150,21 +150,12 @@ class PromotionManagePageControllerMvcTest {
             contains("/api/v1/promotion/eligibility/user/" + memberId), anyTypeRef()))
         .thenReturn(List.of(elig));
 
-    // Pin a squadron: the management matrix only renders for a single active squadron context.
-    // Without a pin an admin is in all-squadrons mode and the page shows a "pick a squadron"
-    // prompt instead of the cross-staffel merge, so the column headers under test are hidden.
     mockMvc
         .perform(get("/promotion/manage").sessionAttr("iridium.activeOrgUnitId", UUID.randomUUID()))
         .andExpect(status().isOk())
-        // The category-name <th> for each column must carry both the category name as text and
-        // the data-pm-category-name attribute the CSV exporter reads. Without the fix neither
-        // appears in the rendered HTML — the entire category row collapses to whitespace.
         .andExpect(
             content().string(containsString("data-pm-category-name=\"Trading\">Trading</th>")))
         .andExpect(content().string(containsString("data-pm-category-name=\"Mining\">Mining</th>")))
-        // The bulk-edit dropdown's <optgroup> must contain real <option> elements for every
-        // category. The pre-fix output had `<optgroup label="Profit">` followed by an immediate
-        // `</optgroup>` — the officer could pick a topic label but never a category to apply.
         .andExpect(content().string(containsString("<optgroup label=\"Profit\">")))
         .andExpect(
             content().string(containsString("<option value=\"" + catId1 + "\">Trading</option>")))
@@ -172,9 +163,6 @@ class PromotionManagePageControllerMvcTest {
             content().string(containsString("<option value=\"" + catId2 + "\">Mining</option>")));
   }
 
-  // covers REQ-PROMO-001 — the member axis is page-walked completely: members spread across two
-  // backend pages both land in the matrix (their per-member eligibility is fetched), so no row is
-  // silently dropped past the first page. A completed walk renders no truncation banner.
   @Test
   @WithMockUser(roles = "ADMIN")
   void manage_pageWalksEveryMemberPage_andRendersNoTruncationBanner() throws Exception {
@@ -192,10 +180,8 @@ class PromotionManagePageControllerMvcTest {
     when(backendApiClient.get(
             contains("/api/v1/promotion/categories/by-topic/" + topicId + "/all"), anyTypeRef()))
         .thenReturn(List.of(cat));
-    // Evaluations fit one page.
     when(backendApiClient.get(contains("/api/v1/promotion/evaluations/all"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 1000, 0, 1, List.of()));
-    // Members span TWO pages — the walk must fetch both and concatenate them.
     when(backendApiClient.get(
             contains("/api/v1/promotion/evaluations/members?size=1000&page=0"), anyTypeRef()))
         .thenReturn(
@@ -209,20 +195,14 @@ class PromotionManagePageControllerMvcTest {
     mockMvc
         .perform(get("/promotion/manage").sessionAttr("iridium.activeOrgUnitId", UUID.randomUUID()))
         .andExpect(status().isOk())
-        // A completed walk must not raise the truncation banner.
         .andExpect(content().string(not(containsString("alert-warning"))));
 
-    // Both members from both pages entered the matrix — their eligibility was queried, which the
-    // controller only does for members present in the concatenated list.
     verify(backendApiClient)
         .get(contains("/api/v1/promotion/eligibility/user/" + memberA), anyTypeRef());
     verify(backendApiClient)
         .get(contains("/api/v1/promotion/eligibility/user/" + memberB), anyTypeRef());
   }
 
-  // covers REQ-PROMO-001 — when a matrix axis page walk stops at CatalogPages.MAX_CATALOG_PAGES
-  // (the safety cap) the page must render the loud truncation banner instead of presenting a
-  // partial matrix as complete. Here the evaluations axis reports far more pages than the cap.
   @Test
   @WithMockUser(roles = "ADMIN")
   void manage_rendersTruncationBanner_whenAnAxisWalkHitsTheSafetyCap() throws Exception {
@@ -251,11 +231,8 @@ class PromotionManagePageControllerMvcTest {
     when(backendApiClient.get(
             contains("/api/v1/promotion/categories/by-topic/" + topicId + "/all"), anyTypeRef()))
         .thenReturn(List.of(cat));
-    // Evaluations report 200 pages (> MAX_CATALOG_PAGES): every page is non-empty, so the walk
-    // stops at the safety cap and flags truncation.
     when(backendApiClient.get(contains("/api/v1/promotion/evaluations/all"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(eval), 0, 1000, 200_000, 200, List.of()));
-    // One member so the matrix (and thus the in-fragment banner) renders.
     when(backendApiClient.get(contains("/api/v1/promotion/evaluations/members"), anyTypeRef()))
         .thenReturn(
             new PageResponse<>(List.of(member(memberId, "alice")), 0, 1000, 1, 1, List.of()));
@@ -265,8 +242,6 @@ class PromotionManagePageControllerMvcTest {
     mockMvc
         .perform(get("/promotion/manage").sessionAttr("iridium.activeOrgUnitId", UUID.randomUUID()))
         .andExpect(status().isOk())
-        // The shared warning alert (fragments/components :: alert('warning', …)) renders — the
-        // matrix is incomplete and the user is told so, never a silent partial matrix.
         .andExpect(content().string(containsString("alert-warning")));
   }
 

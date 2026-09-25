@@ -91,9 +91,6 @@ public class TermsVersionProvider {
               + "run the build through Gradle rather than compiling sources directly.");
     }
     Properties properties = new Properties();
-    // Reader inside the resource list, not just the stream it wraps: closing the stream alone does
-    // release the file descriptor, but leaving the reader out makes the ownership unclear to both
-    // readers and static analysis.
     try (Reader reader = new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8)) {
       properties.load(reader);
     } catch (IOException e) {

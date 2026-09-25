@@ -108,9 +108,6 @@ class IngestHandoffE2eTest {
     if (STACK.managesStack()) {
       BackendSeeder seeder = new BackendSeeder();
       seeder.ensureIridiumMembership(USERNAME, PASSWORD);
-      // The fixture's first row "E2E IMPORT MATERIAL" folds onto this RAW material; its
-      // misspelled second row stays unmatched. E2eStackExtension seeds the material before any page
-      // renders (the picker's catalogue is cached from the first render on); this looks its id up.
       materialId =
           seeder.ensureRefineryMaterial(
               USERNAME, PASSWORD, E2eStackExtension.PICKER_MATERIAL_IMPORT);
@@ -119,7 +116,6 @@ class IngestHandoffE2eTest {
           Files.readString(
               Path.of(
                   IngestHandoffE2eTest.class.getResource("/refinery-extract-e2e.json").toURI()));
-      // Exactly what the gateway forwards + stages: the backend's verbatim draft for this extract.
       draftJson = seeder.importRefineryExtractDraft(USERNAME, PASSWORD, extract);
     }
   }
@@ -157,8 +153,6 @@ class IngestHandoffE2eTest {
       try {
         E2eSupport.navigate(page, baseUrl + "/refinery-orders/create?handoff=" + handoffId);
 
-        // The staged draft pre-fills the form and shows the review banner — same as a manual
-        // upload.
         assertThat(page.getByTestId("refinery-import-banner"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
         assertThat(page.locator("#inputMaterialId_0")).hasValue(materialId);
@@ -166,14 +160,11 @@ class IngestHandoffE2eTest {
         assertThat(page.locator("#outputQuantity_0")).hasValue("120");
         assertThat(page.locator("#quality_0")).hasValue("618");
         assertThat(page.locator("#startedAt")).hasValue("2026-06-01T19:39:01Z");
-        // The misspelled second row stays unmatched, exactly as in the manual import flow.
         assertThat(page.locator("#inputMaterialId_1")).hasValue("");
 
-        // The pickup is single-use: Redis no longer holds the entry...
         assertNull(
             get(key(sub, handoffId)), "the handoff must be consumed (GETDEL) on first pickup");
 
-        // ...so replaying the same id renders the fresh form plus the friendly not-found notice.
         E2eSupport.navigate(page, baseUrl + "/refinery-orders/create?handoff=" + handoffId);
         assertThat(page.getByTestId("refinery-import-error").first())
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
@@ -208,18 +199,14 @@ class IngestHandoffE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        // Our session's sub does not own this id, so the lookup misses → friendly notice, no
-        // banner.
         E2eSupport.navigate(page, baseUrl + "/refinery-orders/create?handoff=" + foreignId);
         assertThat(page.getByTestId("refinery-import-error").first())
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
         assertThat(page.getByTestId("refinery-import-banner")).hasCount(0);
         assertThat(page.locator("#inputMaterialId_0")).hasValue("");
 
-        // The foreign user's draft is untouched — our read never reached their sub-scoped key.
         assertNotNull(get(foreignKey), "a foreign handoff must not be consumable by another user");
 
-        // A wholly unknown id behaves identically (no leak, friendly notice).
         E2eSupport.navigate(page, baseUrl + "/refinery-orders/create?handoff=" + newHandoffId());
         assertThat(page.getByTestId("refinery-import-error").first())
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));

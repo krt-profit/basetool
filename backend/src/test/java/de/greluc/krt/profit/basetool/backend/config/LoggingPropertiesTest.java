@@ -43,9 +43,6 @@ class LoggingPropertiesTest {
           .withUserConfiguration(Config.class);
 
   @Configuration
-  // Registers LoggingProperties alone. A @ConfigurationPropertiesScan here would also bind every
-  // other properties record of the package — KeycloakSyncProperties among them, whose required
-  // credentials this context does not configure.
   @EnableConfigurationProperties(LoggingProperties.class)
   static class Config {}
 
@@ -55,8 +52,6 @@ class LoggingPropertiesTest {
         context -> {
           LoggingProperties props = context.getBean(LoggingProperties.class);
 
-          // Given/When: defaults loaded
-          // Then: match the %X{correlationId}/%X{userId} placeholders in logback-spring.xml
           assertThat(props.correlationIdHeader()).isEqualTo("X-Correlation-Id");
           assertThat(props.correlationIdMdcKey()).isEqualTo("correlationId");
           assertThat(props.userIdMdcKey()).isEqualTo("userId");
@@ -98,9 +93,7 @@ class LoggingPropertiesTest {
   @Test
   void toString_ShouldNotLeakSensitiveInformation() {
     LoggingProperties p = BoundProperties.defaults(LoggingProperties.class);
-    // Given/When
     String s = p.toString();
-    // Then: deterministic content, no password/token-like fields
     assertThat(s).contains("correlationIdHeader", "slowRequestThresholdMs");
     assertThat(s).doesNotContain("password", "token", "secret");
   }

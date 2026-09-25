@@ -76,9 +76,6 @@ class JobOrderListRenderTest {
   @BeforeEach
   void setup() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-    // The default @WithMockUser is a non-admin, so the orders view's profit gate would otherwise
-    // redirect to /orders/create. Stub the capability as a profit-eligible viewer so the list path
-    // renders.
     when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
         .thenReturn(LayoutResponses.capabilities(true, true, true));
   }
@@ -105,9 +102,6 @@ class JobOrderListRenderTest {
   @Test
   @WithMockUser
   void viewOrders_ItemOrder_RendersAggregatedMaterialsWithCollectionProgress() throws Exception {
-    // Given: an ITEM order whose aggregated material (10 SCU required, 4 SCU gathered = 40 %) must
-    // surface in the Materialien column; the ordered item carries a distinctive name that must NOT
-    // appear, proving the column no longer renders items.
     UUID orderId = UUID.randomUUID();
     MaterialDto quantanium = material("Quantanium", "SCU");
 
@@ -152,10 +146,8 @@ class JobOrderListRenderTest {
             anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(order), 0, 1000, 1L, 1, List.of()));
 
-    // When
     MvcResult result = mockMvc.perform(get("/orders")).andExpect(status().isOk()).andReturn();
 
-    // Then
     String html = result.getResponse().getContentAsString();
     assertThat(html).contains("Quantanium");
     assertThat(html).contains("40 %");
@@ -167,9 +159,6 @@ class JobOrderListRenderTest {
   @Test
   @WithMockUser
   void viewOrders_RendersResponsibleOrgUnitUnderIdAndType() throws Exception {
-    // Given: a MATERIAL order whose responsible (processing) unit — Iridium Squadron, shorthand
-    // "IRI" — must surface under the id + kind badge in the overview's first cell (#1188). The
-    // requesting unit is left null so "IRI" uniquely identifies the responsible badge.
     JobOrderDto order =
         new JobOrderDto(
             UUID.randomUUID(),
@@ -198,11 +187,8 @@ class JobOrderListRenderTest {
             anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(order), 0, 1000, 1L, 1, List.of()));
 
-    // When
     MvcResult result = mockMvc.perform(get("/orders")).andExpect(status().isOk()).andReturn();
 
-    // Then: the responsible unit's shorthand renders as its badge text, its full name as the badge
-    // title, beneath the localized caption element.
     String html = result.getResponse().getContentAsString();
     assertThat(html)
         .as("the responsible unit's shorthand renders as a squadron badge in the overview")

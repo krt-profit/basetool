@@ -56,9 +56,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class JobOrderHandoverReportService {
 
-  // Patterns are intentionally NOT bound to a fixed zone here. The persisted-handover path
-  // binds the zone per request (from the X-User-Time-Zone header), and the preview path
-  // formats LocalDateTime directly without any zone conversion.
   private static final DateTimeFormatter DATE_PATTERN = DateTimeFormatter.ofPattern("dd.MM.yyyy");
   private static final DateTimeFormatter TIME_PATTERN = DateTimeFormatter.ofPattern("HH:mm");
 
@@ -130,8 +127,6 @@ public class JobOrderHandoverReportService {
       @NotNull HandoverReportPreviewRequestDto dto) {
     log.debug("Generating handover report preview for jobOrderNumber={}", dto.jobOrderNumber());
 
-    // dto.handoverTime() is a LocalDateTime — exactly what the user typed in the modal.
-    // No zone conversion is applied so the PDF shows the same date/time the user entered.
     String handoverDate = DATE_PATTERN.format(dto.handoverTime());
     String handoverTime = TIME_PATTERN.format(dto.handoverTime());
 
@@ -171,9 +166,6 @@ public class JobOrderHandoverReportService {
       KrtPdfSupport.addMetaRow(metaTable, "AUFTRAGSNUMMER", jobOrderNumber);
       KrtPdfSupport.addMetaRow(metaTable, "DATUM DER ÜBERGABE", handoverDate);
       KrtPdfSupport.addMetaRow(metaTable, "UHRZEIT DER ÜBERGABE", handoverTime + " (Lokalzeit)");
-      // A recipient whose handle an Art. 17 request erased renders as the
-      // placeholder rather than as the raw sentinel (REQ-SEC-062). The handover
-      // itself is untouched; only the name is gone.
       KrtPdfSupport.addMetaRow(
           metaTable,
           "EMPFÄNGER (HANDLE)",
@@ -213,11 +205,6 @@ public class JobOrderHandoverReportService {
       krt.document().close();
       return baos.toByteArray();
     } catch (Exception e) {
-      // Caught by GlobalExceptionHandler.handleReportGeneration which produces a 500
-      // RFC 7807 response with the stable code REPORT_GENERATION_FAILED and a localised
-      // generic detail. The cause is preserved on the exception so the ERROR log line
-      // emitted by the handler carries the full PDF-library stacktrace; the exception
-      // message itself is server-internal and never leaks to the API client.
       throw new ReportGenerationException("PDF generation failed", e);
     }
   }

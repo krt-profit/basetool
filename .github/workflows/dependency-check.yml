@@ -1,28 +1,5 @@
 name: Dependency Check
 
-# OWASP Dependency-Check scans every transitive dependency for known CVEs and
-# emits SARIF that GitHub aggregates under the repository's Security tab.
-#
-# Trigger model:
-#   - weekly cron (Monday, scheduled 05:23 UTC -- GitHub starts it hours later; the September
-#     2026 runs of the old 06:00 began 11:28-12:35 UTC) catches CVEs published after the last PR
-#   - workflow_dispatch lets a maintainer force a fresh scan on demand
-#   - push to main that touches dependency declarations triggers an
-#     immediate scan so newly-introduced libraries get a same-day verdict
-#   - pull_request that touches dependency declarations scans the proposed
-#     change BEFORE merge, so a vulnerable bump is caught on the PR instead of
-#     only by the next weekly run. The scan restores the weekly-warmed NVD DB
-#     read-only; the gate is the gradle `failBuildOnCVSS = 7.0` build failure
-#     (the SARIF upload is skipped on PRs). Kept NON-required on purpose: it is
-#     path-filtered, and a required path-filtered check never reports on PRs
-#     that don't touch the filtered paths (see flyway-migrations.yml).
-#
-# The plugin's first run downloads the NVD feed (~500 MB) and takes 5-15
-# minutes; subsequent runs reuse the cache and finish in seconds. Set the
-# `NVD_API_KEY` repository secret (free, register at
-# https://nvd.nist.gov/developers/request-an-api-key) to bypass the public
-# NVD rate limit — without it github-hosted runners frequently get 429s
-# because they share an IP pool with every other CI job on github.com.
 on:
   schedule:
     - cron: '23 5 * * 1'
@@ -35,15 +12,7 @@ on:
       - 'settings.gradle.kts'
       - 'gradle/libs.versions.toml'
       - 'gradle/wrapper/gradle-wrapper.properties'
-      # The suppression file decides what the scan reports and whether it fails, so editing it has
-      # to re-run the scan. Without this the gate was blind to its own configuration: adding or
-      # removing a suppression changed the verdict and triggered nothing, so the change was first
-      # exercised by the next weekly cron — on `main`, after the merge.
       - 'config/owasp/dependency-check-suppressions.xml'
-      # The scan resolves every dependency's POM, and each must match gradle/verification-metadata.xml
-      # (ADR-0208). A change to that file changes what the scan can resolve, so it re-runs the scan:
-      # from 2026-09-23 a missing POM entry failed this gate on main while the PR adding it could
-      # not show the fix.
       - 'gradle/verification-metadata.xml'
   pull_request:
     branches: [main]
@@ -53,15 +22,7 @@ on:
       - 'settings.gradle.kts'
       - 'gradle/libs.versions.toml'
       - 'gradle/wrapper/gradle-wrapper.properties'
-      # The suppression file decides what the scan reports and whether it fails, so editing it has
-      # to re-run the scan. Without this the gate was blind to its own configuration: adding or
-      # removing a suppression changed the verdict and triggered nothing, so the change was first
-      # exercised by the next weekly cron — on `main`, after the merge.
       - 'config/owasp/dependency-check-suppressions.xml'
-      # The scan resolves every dependency's POM, and each must match gradle/verification-metadata.xml
-      # (ADR-0208). A change to that file changes what the scan can resolve, so it re-runs the scan:
-      # from 2026-09-23 a missing POM entry failed this gate on main while the PR adding it could
-      # not show the fix.
       - 'gradle/verification-metadata.xml'
 
 concurrency:
@@ -76,132 +37,35 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      security-events: write   # the SARIF upload
-      issues: write            # the rolling issue a failed scheduled run opens or updates
-    # 75 since 2026-09-22, and the Gradle step inside carries its own 60 (audit item CI-02). The
-    # split is the fix, not the number: with the ceiling on the JOB, a scan that ran out of time was
-    # cancelled, and a cancelled job runs no later step -- so no SARIF check, no report artifact, no
-    # cache save, nothing that said why. With the ceiling on the STEP, the Gradle step fails at 60,
-    # every step after it still runs, and the job's own 75 is only the backstop for those. The cold
-    # rebuild measured 31-38 minutes (below), so 60 is headroom for it, not a budget.
-    #
-    # The history, because this number has been wrong in both directions. 150 from 2026-09-14 to
-    # 2026-09-22 bought nothing: the 2026-09-21 weekly run was still cancelled at exactly 150
-    # minutes, with no verdict and nothing saved.
-    #
-    # Before that: it was raised to 120 on 2026-09-04 on a WRONG diagnosis - runs dying at the
-    # ceiling were read as slow cold starts when they were stalled on unbounded outbound HTTP reads
-    # - and returned to 60 the next day once those reads were bounded (see `setReadTimeout` /
-    # `setConnectionTimeout` in the root `build.gradle.kts`). That reasoning was right at the time.
-    #
-    # What changed is the COLD path itself. The 8-14 minutes this comment used to claim (run
-    # 31309086034 on `main`, 8m29s; run 33845554721 on a PR, 13m48s, both 2026-09-04) no longer
-    # holds: NVD passed 389 984 CVEs, and the measured cold rebuild is now 31-38 minutes - run
-    # 34472560988 reached its verdict in 38m25s, and five runs on 2026-09-10/11 were killed at 60
-    # with no verdict at all. The ceiling had become a budget, which is what it is not supposed to
-    # be.
-    #
-    # A cold rebuild should be rare: it only happens when the NVD cache is missing, which on
-    # 2026-09-10 was caused by CodeQL's per-run dependency caches evicting it under GitHub's 10 GB
-    # cap (corrected 2026-09-22: this said "fixed in `codeql.yml`", but that file's setting never
-    # took effect while CodeQL ran as default setup; `cache-janitor.yml` now prunes those caches,
-    # and the NVD cache is saved by its own step below). A WARM run is still under a minute, so
-    # this number is only ever reached by the once-per-eviction rebuild. If warm runs start approaching it, that is a real
-    # signal and not something to raise again.
-    #
-    # This comment claimed "150 since 2026-09-11" for three days while the value below still read
-    # 60, because `3c6c94cb4` rewrote the prose and never touched the number - in a commit titled
-    # "two settings fought their own comments". The decision above was made then; only the edit is
-    # from 2026-09-14. It was not cosmetic: every cold run in between was killed at 60 with no
-    # verdict, including the `main` push and both dependency PRs open on 2026-09-14. When this
-    # number is changed, change it here AND on the `timeout-minutes` line.
-    #
-    # The stalls were unbounded outbound HTTP reads inside dependency-check; they are fixed where
-    # they belong, by `setReadTimeout` / `setConnectionTimeout` in the root `build.gradle.kts` (see
-    # the block there for the evidence). If runs start hitting this ceiling again, that is the thing
-    # to re-check - raising the number again would only repeat the mistake.
-    #
-    # Separately and still true: GitHub scopes Actions caches BY REF, so a cache written on a PR ref
-    # (`refs/pull/N/merge`) is readable from that PR but NOT from `refs/heads/main`, while one
-    # written on the default branch is readable everywhere. On 2026-09-04 the repository's only NVD
-    # cache sat on `refs/pull/1780/merge` and every `main` run reported "Cache not found for input
-    # keys" and rebuilt from zero. That is a real cost - it is the difference between a ~1-minute
-    # and a ~14-minute scan - but it is a nuisance, not the reason runs were dying, and it resolves
-    # itself as soon as one `main` run completes and saves the dataset under the default branch.
+      security-events: write
+      issues: write
     timeout-minutes: 75
 
     steps:
       - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
 
-      # Governs the GRADLE caches only (wrapper, dependencies). The NVD dataset has its own
-      # restore/save pair below, and that pair is where the "PRs never write it" rule lives -- this
-      # comment used to sit here and describe the NVD cache, which this input never touched.
       - name: Set up JDK 25 and Gradle
         uses: ./.github/actions/setup-jdk-gradle
         with:
           cache-read-only: ${{ github.event_name == 'pull_request' }}
 
-      # The cache key rotates weekly to match the Monday cron and the
-      # `nvd.validForHours = 168` configured on the gradle plugin (see
-      # `build.gradle.kts`): within a week we restore the exact same key
-      # and the plugin treats the local DB as fresh, so no NVD API calls
-      # happen at all. On the first run of a new ISO week, the broader
-      # `restore-keys` fallback restores the previous week's DB and the
-      # plugin only has to incrementally pull the new CVEs — that's what
-      # keeps us inside the public NVD rate limit when `NVD_API_KEY` is
-      # unset. Previously the key embedded `github.run_id` which never
-      # collided and silently rebuilt the on-disk H2 DB from scratch on
-      # every workflow_dispatch — that triggered 429s mid-transaction and
-      # left the cached DB corrupt for the next run (see run 25933803540).
       - name: Compute ISO week (cache rotation key)
         id: cache-key
         shell: bash
         run: echo "week=$(date -u +'%G-W%V')" >> "$GITHUB_OUTPUT"
 
-      # RESTORE and SAVE are two steps since 2026-09-22 (audit item CI-02). The single
-      # `actions/cache` step saved in its post-step, which runs only when the job is not cancelled
-      # and saves whatever is on disk -- so a scan killed at the ceiling saved nothing, and the next
-      # run started cold into the same ceiling: eight of nine weekly runs from 2026-07-27 to
-      # 2026-09-21 ended without a verdict that way. The save below runs only when the scan got as
-      # far as writing its SARIF, i.e. when the H2 database it would store is complete; a partial
-      # database is never cached, because a corrupt cache is worse than none (run 25933803540).
       - name: Restore NVD feed
         id: nvd-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: ~/.gradle/dependency-check-data
           key: nvd-feed-v1-${{ runner.os }}-${{ steps.cache-key.outputs.week }}
           restore-keys: |
             nvd-feed-v1-${{ runner.os }}-
 
-      # `--no-parallel` is REQUIRED for this one Gradle invocation — do not
-      # remove it. Gradle 9 enforces an exclusive lock on every Configuration
-      # resolution, and the dependency-check plugin's aggregate task resolves
-      # the configurations of ALL subprojects cross-project from its own task
-      # action. Under the repo-wide `org.gradle.parallel=true`
-      # (gradle.properties) that cross-project resolution runs without the
-      # exclusive lock and Gradle aborts the scan ("Resolution of the
-      # configuration ':backend:annotationProcessor' was attempted without an
-      # exclusive lock") before any analyser stage runs. The AsciidoctorJ
-      # plugin previously blamed for this (runs 26516932803+) was merely the
-      # first configuration the race tripped over; its removal in #414 did not
-      # fix it. Upstream tracks the bug as
-      # dependency-check/dependency-check-gradle#462 (open); #415 tracks
-      # dropping this flag once a release fixes it. Last verified 2026-09-03
-      # against plugin 13.0.0 on Gradle 9.7.1 — still red; earlier evidence
-      # was a parallel workflow_dispatch run on 2026-06-11 (run 27354476376,
-      # plugin 12.2.2).
-      #
-      # Re-checking costs seconds and needs no CI run: the abort happens while
-      # the task scans the subprojects, BEFORE the engine touches NVD, so
-      # `./gradlew dependencyCheckAggregate --parallel` reproduces it locally
-      # with no dataset download. The flag scopes the workaround to this CI
-      # step only, so day-to-day developer builds keep their parallel speedup.
-      #
-      # The step's own ceiling is what lets everything after it run; see the job's comment.
       - name: Run dependencyCheckAggregate
         timeout-minutes: 60
         env:
@@ -213,11 +77,6 @@ jobs:
             ./gradlew dependencyCheckAggregate --no-parallel --stacktrace
           fi
 
-      # Guard the SARIF upload against a missing report file. If the gradle
-      # task aborts (e.g. NVD rate-limit blow-up corrupts the H2 DB before
-      # any analyser stage runs), no SARIF is produced, and the unguarded
-      # `upload-sarif` step otherwise fails with `Path does not exist`, which
-      # is noise on top of the real gradle failure that's already red above.
       - name: Check SARIF report exists
         id: sarif
         if: always()
@@ -230,44 +89,32 @@ jobs:
             echo "::warning::SARIF report missing - dependency-check did not finish; skipping the GitHub Security upload."
           fi
 
-      # Skipped on PRs: a PR branch (and especially a fork) may lack
-      # security-events:write, and the PR gate is the CVSS>=7 build failure
-      # above, not the Security-tab upload. Scheduled / main runs publish it.
       - name: Upload SARIF report to GitHub Security
         if: always() && steps.sarif.outputs.exists == 'true' && github.event_name != 'pull_request'
-        uses: github/codeql-action/upload-sarif@1c5b675653bb5c22dbe9b12b556ec555138e09fd # v4.38.1
+        uses: github/codeql-action/upload-sarif@1c5b675653bb5c22dbe9b12b556ec555138e09fd
         with:
           sarif_file: build/reports/dependency-check/dependency-check-report.sarif
           category: owasp-dependency-check
 
       - name: Upload dependency-check reports as artifact
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: dependency-check-reports
           path: build/reports/dependency-check/
           retention-days: 30
           if-no-files-found: ignore
 
-      # Saved only when (1) the scan got far enough to write its SARIF -- the H2 database is then
-      # complete, whether or not the verdict was a failure at CVSS >= 7 -- (2) this is not a pull
-      # request, whose cache would be scoped to its own ref and read by nothing else, and (3) the
-      # exact week key was not already restored, since a key is immutable once written.
       - name: Save NVD feed
         if: >-
           always() && steps.sarif.outputs.exists == 'true' &&
           github.event_name != 'pull_request' &&
           steps.nvd-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: ~/.gradle/dependency-check-data
           key: nvd-feed-v1-${{ runner.os }}-${{ steps.cache-key.outputs.week }}
 
-      # A failed WEEKLY run used to be a red X on a scheduled run nobody watches: the last verdict
-      # before 2026-09-22 was from 2026-07-20. It now opens -- or, if one is already open, comments
-      # on -- a single rolling issue, and says which of the two failures it was: a finding (the
-      # scan finished and failed the CVSS gate) or no verdict at all (it did not finish). Pull
-      # request and push runs report on their own run page; only the unattended one needs this.
       - name: Open or update the failed-scan issue
         if: (failure() || cancelled()) && github.event_name == 'schedule'
         env:

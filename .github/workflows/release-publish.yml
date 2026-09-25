@@ -1,43 +1,18 @@
 name: Release · Publish
 
-# Phase 2 of the two-phase release flow (see release-prepare.yml for phase 1).
-#
-# Trigger: a `release/vX.Y.Z` PR (opened by release-prepare.yml) being MERGED
-# into main. On merge this job:
-#   1. Derives the version from the release branch name.
-#   2. Creates the `vX.Y.Z` tag at the merge commit -- ONCE, on a commit that
-#      already carries the tidied changelog + fresh SBOM, so the tag never has to
-#      be moved.
-#   3. Attests SLSA build provenance for the eight SBOM files, binding their
-#      hashes to this run and the release commit in GitHub's attestation store
-#      (REQ-OPS-023, ADR-0145) -- before they are uploaded, so there is no
-#      window in which a published asset has no provenance.
-#   4. Publishes the GitHub Release: body = the freshly cut CHANGELOG section in
-#      the release-notes skill's German rubric style, plus links to the signed
-#      multi-arch GHCR images and the eight SBOM files attached as assets.
-#
-# The tag push is what drives release-images.yml to build/sign/push the images.
-# The tag is created with a token of the `basetool-release` GitHub App (ADR-0201):
-# the tag ruleset "Version" lets only @greluc and that App create `v*` tags, and
-# an App token -- unlike GITHUB_TOKEN -- causes events that trigger other
-# workflows, so release-images.yml fires on its own. There is no fallback any
-# more: GITHUB_TOKEN is refused by the ruleset, so a run without the App's key
-# stops with an error instead of half-publishing a release nobody can build.
-
 on:
   pull_request:
     types: [closed]
     branches: [main]
 
-# Serialise per release branch; never cancel a half-published release.
 concurrency:
   group: release-publish-${{ github.event.pull_request.head.ref }}
   cancel-in-progress: false
 
 permissions:
-  contents: write      # create the GitHub Release (tag is created via the API below)
-  id-token: write      # OIDC token for the Sigstore-backed provenance attestation
-  attestations: write  # SLSA build provenance for the published release assets
+  contents: write
+  id-token: write
+  attestations: write
 
 env:
   REGISTRY: ghcr.io
@@ -46,8 +21,6 @@ env:
 jobs:
   publish:
     name: Tag merge commit & publish release
-    # Only merged release/vX.Y.Z PRs reach the release machinery; every other
-    # closed PR skips this job.
     if: >-
       github.event.pull_request.merged == true &&
       startsWith(github.event.pull_request.head.ref, 'release/v')
@@ -61,7 +34,7 @@ jobs:
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
           set -euo pipefail
-          tag="${HEAD_REF#release/}"          # release/v0.3.55 -> v0.3.55
+          tag="${HEAD_REF#release/}"
           if ! printf '%s' "$tag" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
             echo "::error::unexpected release branch name '${HEAD_REF}'"; exit 1
           fi
@@ -69,18 +42,12 @@ jobs:
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout the merge commit (changelog + SBOM assets)
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ github.event.pull_request.merge_commit_sha }}
           fetch-depth: 0
           persist-credentials: false
 
-      # The release identity is the `basetool-release` GitHub App (ADR-0201), and nothing else can
-      # do this step. The tag ruleset "Version" restricts creating and updating `v*` tags to two
-      # bypass actors -- @greluc and this App -- so GITHUB_TOKEN is refused, and so is the PAT that
-      # RELEASE_TOKEN held until 2026-09-22 (measured: `Resource not accessible by personal access
-      # token`, HTTP 403, on the v1.10.0 release). An App token also does what GITHUB_TOKEN cannot:
-      # the events it causes trigger other workflows.
       - name: Refuse to start without the release App's key
         env:
           HAS_KEY: ${{ secrets.RELEASE_APP_PRIVATE_KEY != '' }}
@@ -92,15 +59,10 @@ jobs:
 
       - name: Mint a basetool-release App token
         id: app
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
         with:
-          # The App's CLIENT ID, and a literal on purpose: it is public (GET /apps/basetool-release
-          # returns it), so a variable would hide nothing, and it is the same App the tag ruleset
-          # names as a bypass actor -- rotating one without the other is a change worth reviewing.
-          # Not `app-id`: that input is deprecated in v3 and is the one a v4 bump will remove.
           client-id: Iv23liHT1h5peKsDnrUD
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
-          # Scoped to what this step needs, not to everything the installation allows.
           permission-contents: write
 
       - name: Create the release tag at the merge commit
@@ -130,33 +92,8 @@ jobs:
             --version "${VERSION}" --registry "${REGISTRY}" --owner "${IMAGE_OWNER}" > "$body"
           echo "path=${body}" >> "$GITHUB_OUTPUT"
 
-      # Build provenance for the files this job is about to publish.
-      #
-      # The container images have carried provenance for a while; the
-      # CycloneDX SBOMs attached to the GitHub Release carried none. That is the
-      # asymmetry this closes. A release asset is a bare file on a URL: someone
-      # downloading `backend-bom.json` to audit what the release ships has no
-      # way to tell it apart from a file uploaded by anyone who ever held
-      # `contents: write` on the repository, and an SBOM is precisely the
-      # artifact an attacker would want to doctor -- it is what a consumer reads
-      # INSTEAD of unpacking the image.
-      #
-      # The attestation binds each file's sha256 to this workflow, this run and
-      # the release commit, in GitHub's attestation store. Note what it does and
-      # does not claim: the SBOMs are generated and committed by
-      # release-prepare.yml, not here, so the statement says "these bytes were
-      # published as assets of this release, from this commit, by this workflow"
-      # -- which is the question a downloader actually has -- and not "this
-      # workflow ran cyclonedxBom".
-      #
-      # Attested BEFORE the upload so the assets are never downloadable in an
-      # unattested window, and so a failure here fails the release rather than
-      # leaving published assets that quietly have no provenance.
-      #
-      # Verify a downloaded asset with:
-      #   gh attestation verify backend-bom.json --repo krt-profit/basetool
       - name: Attest the release assets
-        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8
         with:
           subject-path: |
             backend/docs/backend-bom.json
@@ -175,17 +112,12 @@ jobs:
           NOTES: ${{ steps.notes.outputs.path }}
         run: |
           set -euo pipefail
-          # One pair per shipped artifact. A release whose asset list is shorter
-          # than this reads as "these are the components" while silently omitting
-          # a deployed one, so the set is asserted by
-          # .github/scripts/check_sbom_coverage.py on every PR.
           assets=(
             backend/docs/backend-bom.json backend/docs/backend-bom.xml
             frontend/docs/frontend-bom.json frontend/docs/frontend-bom.xml
             ingest/docs/ingest-bom.json ingest/docs/ingest-bom.xml
             keycloak-spi/docs/keycloak-spi-bom.json keycloak-spi/docs/keycloak-spi-bom.xml
           )
-          # Idempotent: re-running on the same tag updates the release in place.
           if gh release view "${TAG}" >/dev/null 2>&1; then
             gh release edit "${TAG}" --title "${TAG}" --notes-file "${NOTES}"
             gh release upload "${TAG}" "${assets[@]}" --clobber

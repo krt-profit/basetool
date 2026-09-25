@@ -39,9 +39,7 @@ public final class ActiveSquadronContext {
 
   private static final ThreadLocal<UUID> HOLDER = new ThreadLocal<>();
 
-  private ActiveSquadronContext() {
-    // utility
-  }
+  private ActiveSquadronContext() {}
 
   /**
    * Stores the given squadron id in the calling thread; a {@code null} value clears the slot.

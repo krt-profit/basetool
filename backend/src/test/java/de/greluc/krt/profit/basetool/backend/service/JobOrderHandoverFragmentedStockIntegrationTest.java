@@ -145,10 +145,6 @@ class JobOrderHandoverFragmentedStockIntegrationTest {
           jobOrder.addMaterial(m2);
           jobOrder = jobOrderRepository.save(jobOrder);
 
-          // Split each required amount across STACKS_PER_MATERIAL inventory rows
-          // so the per-item handover loop iterates multiple times over the SAME
-          // JobOrderMaterial — exactly the production constellation that triggered
-          // the original 409.
           List<Double> aslariteAmounts = splitEvenly(ASLARITE_REQUIRED, STACKS_PER_MATERIAL);
           List<Double> ouratiteAmounts = splitEvenly(OURATITE_REQUIRED, STACKS_PER_MATERIAL);
 
@@ -164,10 +160,6 @@ class JobOrderHandoverFragmentedStockIntegrationTest {
             inv.setMaterial(aslarite);
             inv.setQuality(800);
             inv.setAmount(a);
-            // Variante C (REQ-INV-027): earmark the entry's full amount to the order via a
-            // job-order allocation slice (the scalar jobOrder column + soak mirror were dropped in
-            // V218). The handover's pre-write guard requires the item to carry a slice for this
-            // order.
             InventoryAllocations.addJobOrder(inv, jobOrder, a, false);
             inv = inventoryItemRepository.save(inv);
             aslariteIds.add(inv.getId());
@@ -185,10 +177,6 @@ class JobOrderHandoverFragmentedStockIntegrationTest {
             inv.setMaterial(ouratite);
             inv.setQuality(900);
             inv.setAmount(a);
-            // Variante C (REQ-INV-027): earmark the entry's full amount to the order via a
-            // job-order allocation slice (the scalar jobOrder column + soak mirror were dropped in
-            // V218). The handover's pre-write guard requires the item to carry a slice for this
-            // order.
             InventoryAllocations.addJobOrder(inv, jobOrder, a, false);
             inv = inventoryItemRepository.save(inv);
             ouratiteIds.add(inv.getId());
@@ -209,7 +197,6 @@ class JobOrderHandoverFragmentedStockIntegrationTest {
     List<Double> result = new ArrayList<>(n);
     double remaining = total;
     for (int i = 0; i < n - 1; i++) {
-      // alternating chunk sizes around total/n
       double chunk = (total / n) * (1.0 + (i % 2 == 0 ? -0.2 : 0.2));
       chunk = Math.round(chunk * 1000.0) / 1000.0;
       if (chunk <= 0) chunk = total / n;
@@ -250,11 +237,8 @@ class JobOrderHandoverFragmentedStockIntegrationTest {
     JobOrderHandoverCreateDto dto =
         new JobOrderHandoverCreateDto(Instant.now(), "swing-by", "KARTELL", items);
 
-    // When — must NOT throw ObjectOptimisticLockingFailureException even though
-    // the same JobOrderMaterial is touched STACKS_PER_MATERIAL times in this request.
     jobOrderHandoverService.createHandover(f.jobOrderId(), dto);
 
-    // Then — JobOrder COMPLETED, all materials at zero, all inventory rows fully consumed.
     transactionTemplate.executeWithoutResult(
         status -> {
           JobOrder reloaded = jobOrderRepository.findById(f.jobOrderId()).orElseThrow();

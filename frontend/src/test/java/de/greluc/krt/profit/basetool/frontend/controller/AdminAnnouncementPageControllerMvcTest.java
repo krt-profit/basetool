@@ -69,8 +69,6 @@ class AdminAnnouncementPageControllerMvcTest {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   }
 
-  // covers #582 — the update twin (X-Requested-With + JSON body) persists, then re-reads the admin
-  // record and returns the bumped version so the page can write it back into the hidden input.
   @Test
   @WithMockUser(roles = "ADMIN")
   void updateAjax_withHeader_returns200AndEchoesVersion() throws Exception {
@@ -90,8 +88,6 @@ class AdminAnnouncementPageControllerMvcTest {
         .andExpect(content().string(containsString("7")));
   }
 
-  // covers #582 — the delete twin (X-Requested-With) returns 200 so the page clears the form in
-  // place rather than reloading.
   @Test
   @WithMockUser(roles = "ADMIN")
   void deleteAjax_withHeader_returns200() throws Exception {
@@ -105,8 +101,6 @@ class AdminAnnouncementPageControllerMvcTest {
         .andExpect(status().isOk());
   }
 
-  // covers #582 — header routing: the same update URL WITHOUT the header still hits the classic
-  // form handler and redirects (no-JS fallback preserved).
   @Test
   @WithMockUser(roles = "ADMIN")
   void update_withoutHeader_redirects() throws Exception {

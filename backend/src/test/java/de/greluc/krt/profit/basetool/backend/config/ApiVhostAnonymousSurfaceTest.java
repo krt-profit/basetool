@@ -738,27 +738,9 @@ class ApiVhostAnonymousSurfaceTest {
   @Test
   @WithAnonymousUser
   void shouldRefuseAnonymousPickerReadsWithUnauthorized() throws Exception {
-    // Pinned one at a time, because the four do NOT answer alike and grouping them hid that.
-    // `/api/v1/orders/**` and `/api/v1/operations/**` are authenticated in the filter chain, so the
-    // entry point turns them away before dispatch and writes 401.
     mockMvc.perform(get("/api/v1/orders/lookup")).andExpect(status().isUnauthorized());
     mockMvc.perform(get("/api/v1/operations/lookup")).andExpect(status().isUnauthorized());
-    // `GET /api/v1/missions/**` is permitAll — the whole Einsatz read surface is, so a guest can
-    // see the board — so this one is dispatched and refused at the method seam: 403.
-    // 403, not 401, and the difference is structural: `/api/v1/job-types` is `permitAll` in the
-    // filter chain (it sits in the catalogue block beside /locations and /refining-methods), so
-    // the request is DISPATCHED and the method-level guard refuses it — which
-    // GlobalExceptionHandler
-    // renders as 403, with nothing upgrading it to 401 because the MVC advice has already handled
-    // it. Identical in shape to /locations/home-locations, which phase M spent three red probe
-    // nights learning.
     mockMvc.perform(get("/api/v1/missions/lookup")).andExpect(status().isUnauthorized());
-    // 200, and DELIBERATELY so (REQ-SEC-037). `JobTypeController`'s own Javadoc states the rule —
-    // "Read is public; mutations are OFFICER/ADMIN" — and the list carries role names and nothing
-    // else: no member, no org unit, no Einsatz is reachable through it. It sits in the same
-    // permitAll catalogue block as /ship-types, /materials/search and /refining-methods, all of
-    // which this class already records as anonymous. Admitting it at the edge therefore publishes
-    // a catalogue that was already public, and this assertion is what keeps that a decision.
     mockMvc.perform(get("/api/v1/job-types")).andExpect(status().isUnauthorized());
   }
 
@@ -846,8 +828,6 @@ class ApiVhostAnonymousSurfaceTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
         .andExpect(status().isUnauthorized());
-    // Anonymous BY DESIGN, and pinned so it stays a decision: two integers in the same permitAll
-    // catalogue block as /locations and /job-types.
     mockMvc
         .perform(get("/api/v1/settings/job_order.age_yellow_days"))
         .andExpect(status().isUnauthorized());
@@ -872,11 +852,6 @@ class ApiVhostAnonymousSurfaceTest {
   @Test
   @WithAnonymousUser
   void shouldRefuseAnonymousTradeFamily() throws Exception {
-    // The four price reads are authenticated, and three of them only became so with this phase:
-    // measured anonymously first, `prices-overview` answered 200, `*/prices` answered 200 and
-    // `profit-calculation` answered 500 — dispatched and crashing, which is not a gate. They carry
-    // the UEX trade data REQ-SEC-032 exists to keep off the public vhost, so they joined the
-    // `matrix` carve-out rather than being admitted as they stood.
     mockMvc.perform(get("/api/v1/materials/prices-overview")).andExpect(status().isUnauthorized());
     mockMvc.perform(get("/api/v1/materials/matrix")).andExpect(status().isUnauthorized());
     mockMvc
@@ -885,11 +860,6 @@ class ApiVhostAnonymousSurfaceTest {
     mockMvc
         .perform(get("/api/v1/materials/" + ABSENT_MISSION + "/prices"))
         .andExpect(status().isUnauthorized());
-    // `GET /materials/{id}` was the last anonymous read on this family, kept because MaterialDto
-    // is catalogue only — name, quantity type, category, flags, no price — and `/materials/search`
-    // had published those same fields anonymously since phase 2. REQ-SEC-052 closed both: the
-    // public surface is an enumerated list of four backend paths and no catalogue is on it. A 401
-    // here where a 404 used to stand is the whole change in one line.
     mockMvc
         .perform(get("/api/v1/materials/" + ABSENT_MISSION))
         .andExpect(status().isUnauthorized());
@@ -943,8 +913,6 @@ class ApiVhostAnonymousSurfaceTest {
   @WithAnonymousUser
   void shouldRefuseAnonymousMissionPlanningWrites() throws Exception {
     String mission = "/api/v1/missions/" + ABSENT_MISSION;
-    // The three section patches and the party lead. Each carries its own section counter, which is
-    // the reason they are separate endpoints at all.
     for (String leaf : new String[] {"/core", "/schedule", "/flags"}) {
       mockMvc
           .perform(
@@ -961,8 +929,6 @@ class ApiVhostAnonymousSurfaceTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"version\":0}"))
         .andExpect(status().isUnauthorized());
-    // The manager-only add-by-id (REQ-MISSION-020, ADR-0170 amendment) that replaced the deleted
-    // `POST …/participants` on 2026-09-22.
     mockMvc
         .perform(
             post(mission + "/participants/by-id/slim")
@@ -970,8 +936,6 @@ class ApiVhostAnonymousSurfaceTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"userId\":\"" + ABSENT_OPERATION + "\"}"))
         .andExpect(status().isUnauthorized());
-    // Einheiten, crew, Frequenzen and Verwalter — slim only: the full-DTO twins were deleted on
-    // 2026-09-22 (BE-SIMP-02) after their deprecation, and the app had been moved off them.
     for (String leaf :
         new String[] {
           "/units/slim",
@@ -1113,7 +1077,6 @@ class ApiVhostAnonymousSurfaceTest {
   @Test
   @WithAnonymousUser
   void shouldRefuseAnonymousJobOrderFamilyWithUnauthorized() throws Exception {
-    // The four reads.
     mockMvc.perform(get("/api/v1/orders/material-demand")).andExpect(status().isUnauthorized());
     mockMvc
         .perform(get("/api/v1/orders/" + ABSENT_OPERATION + "/item-stock"))
@@ -1130,8 +1093,6 @@ class ApiVhostAnonymousSurfaceTest {
                     + ABSENT_MISSION
                     + "/inventory"))
         .andExpect(status().isUnauthorized());
-    // The five writes. Bodies are shaped enough to reach the security gate and no further — an
-    // anonymous request never gets as far as validation.
     mockMvc
         .perform(
             post("/api/v1/orders/" + ABSENT_OPERATION + "/claims")
@@ -1174,8 +1135,6 @@ class ApiVhostAnonymousSurfaceTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"items\":[]}"))
         .andExpect(status().isUnauthorized());
-    // A query parameter, not a body, and no version: the service reorders the whole queue under a
-    // pessimistic write lock, so there is nothing for an optimistic version to guard.
     mockMvc
         .perform(put("/api/v1/orders/" + ABSENT_OPERATION + "/priority?priority=1").with(csrf()))
         .andExpect(status().isUnauthorized());

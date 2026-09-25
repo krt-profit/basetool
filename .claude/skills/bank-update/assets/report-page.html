@@ -331,9 +331,6 @@
       toastTimer = setTimeout(function () { toast.classList.remove('show'); }, 2400);
     }
 
-    // Fallback for browsers that refuse the async clipboard inside a frame: put the
-    // clean markup in an offscreen node, select it, and let execCommand copy it as
-    // rich text. The node carries no styles, so the paste stays forum-safe.
     function copyViaSelection(markup, asPlainText) {
       var holder = document.createElement(asPlainText ? 'textarea' : 'div');
       holder.style.position = 'fixed';

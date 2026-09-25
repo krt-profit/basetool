@@ -25,14 +25,11 @@
 </header>
 
 <main>
-    <!--/* ===================== page head + primary CTA ===================== */-->
     <div class="greeting hud-box mb-head">
         <div class="mb-head-title">
             <h1 th:text="#{materialboerse.title}">Materialbörse</h1>
         </div>
         <div class="mb-head-cta">
-            <!--/* Offer CTAs (Angebote mode) and request CTAs (Gesuche mode) both render; the active
-                 pair is shown per activeMode and toggled by materialboerse.js on a tab switch. */-->
             <div class="mb-cta-group" data-mb-cta-group="offers"
                  th:hidden="${activeMode == 'requests'}">
                 <button type="button" class="btn btn--cta" data-mb-open-release="new">
@@ -58,23 +55,13 @@
         </div>
     </div>
 
-    <!--/* ===================== board (swappable region) ===================== */-->
     <div id="mb-board">
-        <!--/* Full-page render shows the board of the active mode; a fragment swap targets
-             `materialboerse :: board` (offers) or `fragments/materialgesuch-board :: requestBoard`
-             directly, so these mode guards never interfere with an in-place swap. The requestBoard
-             include sits inside its own th:if wrapper (NOT th:if + th:replace on one element): th:replace
-             has higher precedence than th:if, so combined on one tag the fragment would be included
-             unconditionally and both boards would render at once on the offers view (until a swap). */-->
         <th:block th:if="${activeMode == 'requests'}">
             <th:block th:replace="~{fragments/materialgesuch-board :: requestBoard}"></th:block>
         </th:block>
         <th:block th:unless="${activeMode == 'requests'}">
         <th:block th:fragment="board">
             <div class="mb-toolbar">
-                <!--/* Shared four-tab bar (Angebote + Gesuche); defined here and re-used by the
-                     Gesuche board fragment via ~{materialboerse :: mbtabs}. Each tab carries its
-                     (mode, tab) pair; the active one is (activeMode, activeTab). */-->
                 <div class="mb-tabrow" th:fragment="mbtabs">
                     <div class="tab-nav" role="tablist" aria-label="Materialbörse">
                         <button type="button" class="tab"
@@ -142,7 +129,6 @@
             <div id="mb-listwrap">
             <th:block th:fragment="list">
             <div class="master-detail mb-md" th:classappend="${selectedOffer != null} ? 'has-sel' : ''">
-                <!--/* master list */-->
                 <div class="master-list mb-mlist">
                     <div th:if="${#lists.isEmpty(offers)}" class="empty-state">
                         <div class="empty-title" th:text="#{materialboerse.empty.title}">Keine Angebote</div>
@@ -192,7 +178,6 @@
                     </button>
                 </div>
 
-                <!--/* detail pane */-->
                 <div class="detail-pane mb-detailpane" id="mb-detail">
                     <div th:fragment="detail" class="mb-detail-inner">
                         <div th:if="${selectedOffer == null}" class="empty-state mb-detail-empty">
@@ -245,7 +230,6 @@
                                     </p>
                                 </div>
                                 <div class="mb-dp-side">
-                                    <!--/* interessenten: names only for the owner */-->
                                     <div th:if="${offer.mine()}" class="mb-int-owner">
                                         <p class="mb-dp-label" th:text="#{materialboerse.interest.label} + ' (' + ${offer.interestCount()} + ')'">Interessenten (0)</p>
                                         <div th:if="${!#lists.isEmpty(offer.interestedHandles())}" class="mb-int-names">
@@ -270,15 +254,8 @@
                                         </p>
                                     </div>
 
-                                    <!--/* actions */-->
                                     <div class="mb-dp-actions" th:data-offer-id="${offer.id()}" th:data-version="${offer.version()}">
                                         <th:block th:if="${offer.mine()}">
-                                            <!--/* Edit CTA: material offers always; ITEM offers only when stock-backed
-                                                 (availableAmount != null gives the amount editor its stock ceiling).
-                                                 A free-stated item offer has no ceiling and the shared amount editor
-                                                 disables the input without one, so it stays quantity-locked in the UI
-                                                 (managed via deactivate + re-list); the backend edit path still exists
-                                                 for it (REQ-MARKET-012/014). */-->
                                             <button type="button" class="btn btn-ghost btn-xs" data-mb-edit
                                                     th:if="${offer.kind() != 'ITEM' or offer.availableAmount() != null}"
                                                     th:data-offer-id="${offer.id()}" th:data-version="${offer.version()}"
@@ -317,9 +294,7 @@
         </th:block>
     </div>
 
-    <!--/* ===================== release / edit modal (shared fragment) ===================== */-->
     <th:block th:replace="~{fragments/materialboerse-modal :: releaseModal}"/>
-    <!--/* ===================== request create / edit modal (Gesuche) ===================== */-->
     <th:block th:replace="~{fragments/materialgesuch-modal :: requestModal}"/>
 </main>
 
@@ -356,8 +331,6 @@
             reloadQuestion: /*[[#{frontend.ajax.conflict.question}]]*/ 'Neu laden?'
         }
     });
-    // Gesuche (requests) board strings — used by the request branches of materialboerse.js and the
-    // request modal (materialgesuch-modal.js merges its own modal strings into this object).
     window.materialgesuchI18n = Object.assign(window.materialgesuchI18n || {}, {
         created: /*[[#{materialgesuch.toast.created}]]*/ 'Gesuch veröffentlicht.',
         updated: /*[[#{materialgesuch.toast.updated}]]*/ 'Gesuch aktualisiert.',

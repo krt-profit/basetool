@@ -110,13 +110,9 @@ class RefineryImportControllerTest {
 
   @Test
   void importExtract_authenticatedMember_returnsDraft() throws Exception {
-    // Given
     when(refineryImportService.buildDraft(any(), any()))
         .thenReturn(new RefineryImportDraftDto(null, List.of(), 1, 1, 0));
 
-    // When / Then — plain membership suffices, no elevated role required.
-    // The subject must be a real UUID: @CurrentUserId parses it and is fail-closed on anything
-    // else. MockMvc's default `user` subject only ever passed here while the parse was mocked away.
     mockMvc
         .perform(
             post(ENDPOINT)
@@ -135,11 +131,9 @@ class RefineryImportControllerTest {
 
   @Test
   void importExtract_unsupportedSchemaVersion_returns400WithLocalizedDetail() throws Exception {
-    // Given — the service rejects the envelope with the i18n key
     when(refineryImportService.buildDraft(any(), any()))
         .thenThrow(new BadRequestException("error.refineryImport.unsupportedSchemaVersion"));
 
-    // When / Then — GlobalExceptionHandler resolves the key to a human-readable detail
     mockMvc
         .perform(
             post(ENDPOINT)
@@ -157,11 +151,9 @@ class RefineryImportControllerTest {
 
   @Test
   void importExtract_processingPanel_returns400WithLocalizedDetail() throws Exception {
-    // Given
     when(refineryImportService.buildDraft(any(), any()))
         .thenThrow(new BadRequestException("error.refineryImport.unsupportedPanelType"));
 
-    // When / Then
     mockMvc
         .perform(
             post(ENDPOINT)
@@ -178,10 +170,8 @@ class RefineryImportControllerTest {
 
   @Test
   void importExtract_missingOrders_returns400FromBeanValidation() throws Exception {
-    // Given — @NotEmpty on orders fires before the service is reached
     String emptyOrders = "{\"schemaVersion\": 1, \"orders\": []}";
 
-    // When / Then
     mockMvc
         .perform(
             post(ENDPOINT)
@@ -197,11 +187,8 @@ class RefineryImportControllerTest {
 
   @Test
   void importExtract_nullOrderElement_returns400FromBeanValidation() throws Exception {
-    // Given — Hibernate Validator skips null list elements unless the container element carries
-    // @NotNull; without it this payload would NPE in the service and surface as a 500
     String nullElement = "{\"schemaVersion\": 1, \"orders\": [null]}";
 
-    // When / Then
     mockMvc
         .perform(
             post(ENDPOINT)
@@ -217,13 +204,11 @@ class RefineryImportControllerTest {
 
   @Test
   void importExtract_nullGoodElement_returns400FromBeanValidation() throws Exception {
-    // Given — same guard on the goods list
     String body =
         "{\"schemaVersion\":1,\"orders\":[{\"panelType\":\"SETUP\",\"quoted\":true,"
             + "\"goods\":[{\"rawMaterialName\":\"STILERON (ORE)\",\"quality\":618,"
             + "\"inputQuantity\":957,\"outputQuantity\":448,\"refine\":true},null]}]}";
 
-    // When / Then
     mockMvc
         .perform(
             post(ENDPOINT)
@@ -239,7 +224,6 @@ class RefineryImportControllerTest {
 
   @Test
   void importExtract_tooManyOrders_returns400FromSizeCap() throws Exception {
-    // Given — the defensive @Size(max = 5) cap on orders
     String order =
         """
         { "panelType": "SETUP", "quoted": true, "goods": [] }\
@@ -249,7 +233,6 @@ class RefineryImportControllerTest {
             + String.join(",", Collections.nCopies(6, order))
             + "]}";
 
-    // When / Then
     mockMvc
         .perform(
             post(ENDPOINT)
@@ -265,10 +248,8 @@ class RefineryImportControllerTest {
 
   @Test
   void importExtract_missingRawMaterialName_returns400FromBeanValidation() throws Exception {
-    // Given — per-good @NotNull cascades through orders/goods via @Valid
     String body = VALID_BODY.replace("\"rawMaterialName\": \"STILERON (ORE)\",", "");
 
-    // When / Then
     mockMvc
         .perform(
             post(ENDPOINT)

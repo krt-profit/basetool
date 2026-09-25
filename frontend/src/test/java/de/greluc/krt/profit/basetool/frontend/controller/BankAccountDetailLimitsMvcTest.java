@@ -163,7 +163,6 @@ class BankAccountDetailLimitsMvcTest {
             .perform(get("/bank/accounts/" + accountId))
             .andExpect(status().isOk())
             .andExpect(content().string(Matchers.containsString(LIMITS_BOX)))
-            // The tier labels resolve (a missing bundle entry would render as ??key_de??).
             .andExpect(content().string(Matchers.containsString("Alle Mitglieder der Org-Einheit")))
             .andReturn()
             .getResponse()
@@ -193,7 +192,6 @@ class BankAccountDetailLimitsMvcTest {
         .perform(get("/bank/accounts/" + accountId))
         .andExpect(status().isOk())
         .andExpect(content().string(Matchers.containsString(LIMITS_BOX)))
-        // Read-only on this surface: no set/clear editor, whoever is looking (REQ-BANK-041).
         .andExpect(
             content()
                 .string(

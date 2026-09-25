@@ -103,7 +103,6 @@ class UexSyncNotModifiedTest {
   @Test
   void starSystems_unchangedFeed_logsInfoNotWarn_andTouchesNoRepository() {
     when(uexClient.getStarSystems()).thenReturn(unchanged());
-    // Null repository: any local read or write on the 304 path would NPE instead of passing.
     UexStarSystemService service = new UexStarSystemService(uexClient, null, writer);
 
     service.fetchAndProcessStarSystems();
@@ -113,8 +112,6 @@ class UexSyncNotModifiedTest {
 
   @Test
   void vehicles_unchangedFeed_logsInfoAndSkipsTheOrphanSweep() {
-    // The load-bearing case: syncVehicles() ends in a ship_type orphan sweep. Returning early on a
-    // 304 is what keeps an unchanged catalogue from tombstoning rows it never re-enumerated.
     when(uexClient.getVehicles()).thenReturn(unchanged());
     UexVehicleService service = new UexVehicleService(uexClient, null, null, null, writer);
 
@@ -125,8 +122,6 @@ class UexSyncNotModifiedTest {
 
   @Test
   void commodities_unchangedFeed_reportsBothCatalogueAndPriceMatrixAtInfo() {
-    // Two fetches in one method, and the commodity 304 deliberately falls through to the price
-    // fetch instead of returning — so both branches have to be exercised together.
     when(uexClient.getCommodities()).thenReturn(unchanged());
     when(uexClient.getCommoditiesPricesAll()).thenReturn(unchanged());
     UexCommodityService service = new UexCommodityService(uexClient, null, null, null, writer);
@@ -149,8 +144,6 @@ class UexSyncNotModifiedTest {
 
   @Test
   void categories_unchangedFeed_returnsThePersistedRowsWithoutReimporting() {
-    // The one 304 branch that must NOT be a bare early return: the item sync consumes the returned
-    // categories, so an unchanged catalogue still has to hand back the persisted rows.
     UexCategory persisted = new UexCategory();
     when(uexClient.getCategories()).thenReturn(unchanged());
     when(uexCategoryRepository.findAll()).thenReturn(List.of(persisted));
@@ -165,8 +158,6 @@ class UexSyncNotModifiedTest {
 
   @Test
   void itemPrices_unchangedFeed_logsInfoAndSkipsTheStaleSweep() {
-    // Real properties rather than a mock, matching UexItemPriceSyncServiceTest: the flag is a
-    // Lombok getter on a plain config bean, and the sync is gated off unless it is on.
     UexProperties properties =
         BoundProperties.bind(UexProperties.class, Map.of("item-price-sync-enabled", true));
     when(uexClient.getItemPrices()).thenReturn(unchanged());
@@ -180,8 +171,6 @@ class UexSyncNotModifiedTest {
 
   @Test
   void universeSync_everyUnchangedCatalogue_logsInfoNotWarn() {
-    // All ten universe catalogues share one shape, so they are pinned in one sweep rather than ten
-    // near-identical tests. Every repository is null: reaching any of them would NPE.
     UexUniverseSyncService service =
         new UexUniverseSyncService(
             uexClient, null, null, null, null, null, null, null, null, null, null, null, writer);
@@ -230,7 +219,6 @@ class UexSyncNotModifiedTest {
                 service::syncTerminals));
 
     for (UniverseCase testCase : cases) {
-      // Clear first so the ten catalogues never see each other's log lines.
       appender.list.clear();
       testCase.stub().run();
       testCase.run().run();
@@ -240,8 +228,6 @@ class UexSyncNotModifiedTest {
 
   @Test
   void genuinelyEmptyFeed_stillWarns() {
-    // The counterweight to every case above: the WARN must not have been softened away. An
-    // empty-200 is a real outage signal and still has to read like one.
     when(uexClient.getStarSystems()).thenReturn(fetched(List.of()));
     UexStarSystemService service = new UexStarSystemService(uexClient, null, writer);
 
@@ -254,8 +240,6 @@ class UexSyncNotModifiedTest {
 
   @Test
   void unchangedRunNeverTouchesTheCategoryRepository_whenItIsNotTheCategorySync() {
-    // Guards the "a 304 changes nothing" half of the contract with an explicit mock as well, so a
-    // future refactor that hands the services a real repository cannot quietly lose it.
     when(uexClient.getVehicles()).thenReturn(unchanged());
     new UexVehicleService(uexClient, null, null, null, writer).syncVehicles();
 

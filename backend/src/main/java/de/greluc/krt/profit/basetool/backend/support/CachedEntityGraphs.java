@@ -49,9 +49,7 @@ import org.jetbrains.annotations.Nullable;
  */
 public final class CachedEntityGraphs {
 
-  private CachedEntityGraphs() {
-    // Static helpers — not instantiable.
-  }
+  private CachedEntityGraphs() {}
 
   /**
    * Initialises a material's category and its whole {@code refinedMaterial} chain, each link with

@@ -52,7 +52,6 @@ class RedisSessionImportFlashRoundTripTest {
 
   @Test
   void importFlashPayloadSurvivesTheJsonSessionRoundTripWithStringKeys() {
-    // Given — the exact flash shape RefineryImportProxyController produces
     UUID suggestionId = UUID.randomUUID();
     ImportIssueDto issue =
         new ImportIssueDto(
@@ -68,10 +67,8 @@ class RedisSessionImportFlashRoundTripTest {
     flashShape.put("importRowIssues", rowIssues);
     flashShape.put("importIssues", List.of(issue));
 
-    // When — one session write + read, as between the import POST and the create-page GET
     Object back = serializer.deserialize(serializer.serialize(flashShape));
 
-    // Then — string keys match again and the records keep every template-rendered accessor
     assertThat(back).isInstanceOf(Map.class);
     Map<?, ?> backFlash = (Map<?, ?>) back;
     Map<?, ?> backRows = (Map<?, ?>) backFlash.get("importRowIssues");
@@ -92,14 +89,11 @@ class RedisSessionImportFlashRoundTripTest {
 
   @Test
   void integerKeyedMapComesBackStringKeyed() {
-    // Given — the broken pre-fix shape: an Integer-keyed flash map
     Map<Integer, String> intKeyed = new LinkedHashMap<>();
     intKeyed.put(1, "flagged");
 
-    // When
     Object back = serializer.deserialize(serializer.serialize(intKeyed));
 
-    // Then — the serializer stringifies the keys; this is WHY the contract uses string keys
     assertThat(new ArrayList<Object>(((Map<?, ?>) back).keySet()))
         .as("JSON map keys are strings — Integer keys cannot survive the session round trip")
         .containsExactly("1");

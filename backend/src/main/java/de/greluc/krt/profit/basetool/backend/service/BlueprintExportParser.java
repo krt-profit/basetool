@@ -115,8 +115,6 @@ public final class BlueprintExportParser {
     if (file.isEmpty()) {
       throw new BadRequestException("The uploaded file is empty.");
     }
-    // Reject an oversized upload BEFORE readTree builds the in-memory tree (security audit
-    // gap-fill). getSize() reflects the buffered multipart length, so this never reads the body.
     if (file.getSize() > MAX_IMPORT_BYTES) {
       throw new BadRequestException(
           "The uploaded blueprint file is too large (limit "
@@ -146,15 +144,6 @@ public final class BlueprintExportParser {
               + " Blueprint Extractor, or scmdb.net export).");
     }
 
-    // Collapse duplicates, keeping the earliest acquisition time per group. The de-dup key is the
-    // structural tag (lower-cased) when present, else the trimmed product name. Keying on the tag
-    // is what stops two DISTINCT DataForge blueprints that scmdb.net happens to display under the
-    // same name — e.g. a genuine piece and a CIG-mislabeled one both shown as "Antium Core Jet"
-    // (REQ-INV-047) — from collapsing into one (which would drop one tag and import only one of the
-    // two owned products). Tag-less entries (watcher / extractor / bare array) key on the name, so
-    // their de-dup behaviour is unchanged. scmdb.net checklist entries the user has not unlocked
-    // yet
-    // (completed == false) are skipped.
     LinkedHashMap<String, Instant> earliestByKey = new LinkedHashMap<>();
     LinkedHashMap<String, String> nameByKey = new LinkedHashMap<>();
     LinkedHashMap<String, String> tagByKey = new LinkedHashMap<>();

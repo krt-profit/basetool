@@ -90,25 +90,20 @@ class AdminAuditLogModalRenderMvcTest {
             .getResponse()
             .getContentAsString();
 
-    // Fragment shell: overlay id + head + the single standardized close trigger on the close-X.
     assertThat(html).contains("id=\"audit-export-modal\"");
     assertThat(html).contains("class=\"krt-modal-head\"");
     assertThat(html)
         .contains("class=\"krt-modal-close\"")
         .contains("data-trigger=\"close-modal-display\"")
         .contains("data-modal-id=\"audit-export-modal\"");
-    // Projected body present (the PDF submit lives inside the bespoke form).
     assertThat(html).contains("data-testid=\"audit-export-submit\"");
-    // No double-render: the projected form's class occurs exactly once.
     assertThat(StringUtils.countOccurrencesOf(html, "audit-download-form")).isEqualTo(1);
 
-    // The purge modal on the same page uses the fragment too — shell + single projection.
     assertThat(html).contains("id=\"audit-purge-modal\"");
     assertThat(html).contains("data-modal-id=\"audit-purge-modal\"");
     assertThat(html).contains("data-testid=\"audit-purge-submit\"");
     assertThat(StringUtils.countOccurrencesOf(html, "audit-purge-form")).isEqualTo(1);
 
-    // No leftover of the former hand-rolled close convention on this page.
     assertThat(html).doesNotContain("data-modal-dismiss");
   }
 
@@ -138,11 +133,9 @@ class AdminAuditLogModalRenderMvcTest {
             .getResponse()
             .getContentAsString();
 
-    // The filter renders with its options resolved through the bundle, not as raw keys.
     assertThat(html).contains("data-testid=\"audit-filter-client\"");
     assertThat(html).contains("value=\"basetool-android\"");
     assertThat(html).doesNotContain("??admin.audit.client.");
-    // The row's client renders as its label, so the column is readable and not a raw id.
     assertThat(html).contains("data-testid=\"audit-row-client\"");
     assertThat(html).contains("Android-App");
   }
@@ -150,8 +143,6 @@ class AdminAuditLogModalRenderMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void bankTab_rendersTheClientFilterAndColumnToo() {
-    // The bank trail records the client since V238 (REQ-AUDIT-005), so the tab is no longer the
-    // exception it was when the column shipped for audit_event alone.
     when(backendApiClient.get(anyString(), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(), 0, 50, 0, 0, List.of()));
 

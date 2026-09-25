@@ -109,18 +109,13 @@ class LoginSmokeE2eTest {
               new Tracing.StartOptions().setScreenshots(true).setSnapshots(true).setSources(true));
       Page page = context.newPage();
       try {
-        // Hitting the Spring authorization endpoint directly starts the OIDC code flow and
-        // redirects the browser to the Keycloak login page for the `keycloak` client registration.
         E2eSupport.navigate(page, baseUrl + "/oauth2/authorization/keycloak");
 
-        // Keycloak default login theme: stable element ids #username / #password / #kc-login.
         page.waitForSelector("#username");
         page.fill("#username", USERNAME);
         page.fill("#password", PASSWORD);
         page.click("#kc-login");
 
-        // After a successful login Keycloak redirects to /login/oauth2/code/keycloak and Spring
-        // establishes the session, then redirects somewhere on the frontend origin.
         page.waitForURL(
             url -> url.startsWith(baseUrl), new Page.WaitForURLOptions().setTimeout(30_000));
 
@@ -128,8 +123,6 @@ class LoginSmokeE2eTest {
 
         List<Cookie> cookies = context.cookies();
         boolean hasSessionCookie =
-            // `__Host-` prefixed since FE-SEC-06: the browser accepts it only as Secure, Path=/ and
-            // host-only, so its mere presence proves those three attributes held.
             cookies.stream().anyMatch(cookie -> "__Host-SESSION".equals(cookie.name));
 
         Path storageState = Path.of("build", "e2e", "storageState.json");

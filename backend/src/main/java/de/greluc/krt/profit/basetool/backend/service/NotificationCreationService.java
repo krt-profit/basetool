@@ -145,8 +145,6 @@ public class NotificationCreationService {
     if (supersededTypes.isEmpty() || event.entityType() == null || event.entityId() == null) {
       return Set.of();
     }
-    // Snapshot the affected recipients BEFORE the delete (the delete clears the persistence
-    // context) so their badge/inbox can be refreshed live after commit.
     Set<UUID> affected =
         new HashSet<>(
             notificationRepository.findRecipientUserIdsByTypeInAndEntity(

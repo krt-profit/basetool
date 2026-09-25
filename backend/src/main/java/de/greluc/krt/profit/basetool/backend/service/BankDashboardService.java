@@ -96,9 +96,6 @@ public class BankDashboardService {
             : postingRepository.postingSlicesSince(ids, cutoff).stream()
                 .collect(Collectors.groupingBy(BankPostingSlice::accountId));
 
-    // Owning org units (with parent pre-loaded) for the by-Bereich grouping (REQ-BANK-016): one
-    // bounded query, not one lazy load per account, so the dashboard stays N+1-free (REQ-DATA-003).
-    // This is an owner-label read, never an org-unit scope decision (REQ-BANK-008).
     Set<UUID> ownerIds =
         accounts.stream()
             .map(BankAccount::getOrgUnit)

@@ -139,30 +139,24 @@ class InventoryMultiSelectLabelE2eTest {
         header.click();
         assertThat(page.locator("#materialOptions")).hasClass(Pattern.compile("open"));
 
-        // Select-all ticks every option: that is "no filter", so it reads "all".
         page.locator("#matAll").check();
         assertThat(text).hasText(all);
 
-        // One option short of all: a count.
         options.nth(0).uncheck();
         assertThat(text).hasText((total - 1) + " " + selected);
         assertThat(page.locator("#matAll")).not().isChecked();
 
-        // Every option ticked one by one reads "all" again, and re-ticks the select-all box.
         options.nth(0).check();
         assertThat(text).hasText(all);
         assertThat(page.locator("#matAll")).isChecked();
 
-        // Nothing ticked is "no filter" too.
         page.locator("#matAll").uncheck();
         assertThat(text).hasText(all);
 
-        // Exactly one reads that option's own name.
         options.nth(1).check();
         String name = options.nth(1).locator("xpath=preceding-sibling::span[1]").innerText();
         assertThat(text).hasText(name);
 
-        // Two: a count.
         options.nth(2).check();
         assertThat(text).hasText("2 " + selected);
       } catch (RuntimeException | AssertionError failure) {

@@ -86,14 +86,10 @@ class OrgChartServiceTest {
         positionRepository, orgUnitRepository, userRepository, new OrgChartPositionMapperImpl());
   }
 
-  // Read/write split (#14): the chart assembly moved to OrgChartReadService, built from the same
-  // mocked repositories + the real generated mapper so the nested-tree assertions stay unchanged.
   private OrgChartReadService readService() {
     return new OrgChartReadService(
         positionRepository, orgUnitRepository, new OrgChartPositionMapperImpl());
   }
-
-  // ------------------------------------------------------------------ read assembly --
 
   @Test
   void getOrgChart_assemblesAreaSquadronAndSkIntoNestedTree() {
@@ -166,10 +162,6 @@ class OrgChartServiceTest {
 
   @Test
   void getOrgChart_freeTextCommandLeader_carriesLeaderDisplayName() {
-    // A Kommandoleiter named on the chart with no Basetool account yet (REQ-ORG-020): the
-    // COMMAND_LEAD row carries a free-text display_name and no user. buildCommand must surface it
-    // as leaderDisplayName (not leaderUserId/leaderUserName) so the template renders the typed
-    // name with the no-account marker rather than the vacant placeholder.
     Squadron squadron = squadron(UUID.randomUUID(), "IRIDIUM", "IRI");
     when(orgUnitRepository.findActiveSquadronsAndSpecialCommands()).thenReturn(List.of(squadron));
     when(positionRepository.findAllByOrgUnitIsNullOrderBySortIndexAscCreatedAtAsc())
@@ -192,10 +184,6 @@ class OrgChartServiceTest {
 
   @Test
   void getOrgChart_groupLinkedCommand_projectsKommandoGroupId() {
-    // A Kommando that mirrors a kommando_group (epic #800, REQ-ROLE-006): buildCommand must surface
-    // the link so the chart editor can render the whole subtree read-only (managed under Leitung).
-    // A
-    // legacy chart-only Kommando carries a null link.
     Squadron squadron = squadron(UUID.randomUUID(), "IRIDIUM", "IRI");
     when(orgUnitRepository.findActiveSquadronsAndSpecialCommands()).thenReturn(List.of(squadron));
     when(positionRepository.findAllByOrgUnitIsNullOrderBySortIndexAscCreatedAtAsc())
@@ -233,7 +221,6 @@ class OrgChartServiceTest {
     assertNull(chart.areaLeadership().lead());
     assertTrue(chart.squadrons().isEmpty());
     assertTrue(chart.specialCommands().isEmpty());
-    // The empty-IN guard must avoid the dialect-fragile IN () query entirely.
     verify(positionRepository, never()).findAllByOrgUnitIdInOrderBySortIndexAscCreatedAtAsc(any());
   }
 
@@ -269,7 +256,7 @@ class OrgChartServiceTest {
     bereich.setDepartment(Department.PROFIT);
     Squadron grouped = squadron(UUID.randomUUID(), "Alpha", "ALF");
     grouped.setParent(bereich);
-    Squadron ungrouped = squadron(UUID.randomUUID(), "Orphan", "ORP"); // parent == null
+    Squadron ungrouped = squadron(UUID.randomUUID(), "Orphan", "ORP");
     UUID olId = UUID.randomUUID();
     Organisationsleitung ol = organisationsleitung(olId, "Organisationsleitung", "OL");
 
@@ -286,25 +273,20 @@ class OrgChartServiceTest {
 
     OrgChartDto chart = readService().getOrgChart();
 
-    // OL members surface at the top, carried by the OL tier (id + name + members).
     assertEquals(olId, chart.organisationsleitung().orgUnitId());
     assertEquals(1, chart.organisationsleitung().members().size());
-    // One Bereich tier carrying its department, its Bereichsleiter and its grouped Staffel.
     assertEquals(1, chart.bereiche().size());
     BereichChartDto b = chart.bereiche().getFirst();
     assertEquals(Department.PROFIT, b.department());
     assertNotNull(b.leadership().lead());
     assertEquals(1, b.squadrons().size());
     assertEquals("Alpha", b.squadrons().getFirst().name());
-    // The parentless Staffel stays in the ungrouped/legacy tier, NOT under the Bereich.
     assertEquals(1, chart.squadrons().size());
     assertEquals("Orphan", chart.squadrons().getFirst().name());
   }
 
   @Test
   void getOrgChart_includesNonProfitEligibleUnitsUnderBereich() {
-    // ADR-0029: chart visibility is independent of is_profit_eligible. A non-Profit Staffel wired
-    // under a Bereich still renders under that Bereich (previously it was filtered out entirely).
     UUID bereichId = UUID.randomUUID();
     Bereich bereich = bereich(bereichId, "Forschung", "FOR");
     bereich.setDepartment(Department.FORSCHUNG);
@@ -330,11 +312,8 @@ class OrgChartServiceTest {
         chart.squadrons().isEmpty(), "it is grouped under the Bereich, not in the ungrouped tier");
   }
 
-  // ----------------------------------------------------------------- create guards --
-
   @Test
   void createPosition_areaCoordinatorFreeText_persistsAndReturnsDto() {
-    // Chart creates place a free-text holder; account holders are mirror-only now (REQ-ROLE-006).
     when(positionRepository.save(any()))
         .thenAnswer(
             inv -> {
@@ -471,11 +450,6 @@ class OrgChartServiceTest {
 
   @Test
   void createPosition_childUnderGroupLinkedKommando_isRejected() {
-    // A kommando_group-linked Kommando mirrors a functional rank (epic #800, REQ-ROLE-006): its
-    // Stv.
-    // / Ensigns are appointed under Organisation -> Leitung, so the chart editor may not bolt a
-    // child onto it — even a free-text one. The mirror itself writes through OrgChartService, not
-    // this admin-facing create.
     UUID unitId = UUID.randomUUID();
     UUID parentId = UUID.randomUUID();
     Squadron squadron = squadron(unitId, "IRIDIUM", "IRI");
@@ -576,7 +550,6 @@ class OrgChartServiceTest {
     UUID userId = UUID.randomUUID();
     UUID unitId = UUID.randomUUID();
     when(userRepository.findById(userId)).thenReturn(Optional.of(user(userId, "lead")));
-    // SQUADRON_LEAD pointed at an SK row.
     when(orgUnitRepository.findById(unitId))
         .thenReturn(Optional.of(specialCommand(unitId, "Alpha SK", "ASK")));
 
@@ -600,8 +573,6 @@ class OrgChartServiceTest {
 
   @Test
   void createPosition_nonProfitEligibleUnit_isStaffed() {
-    // Chart visibility is decoupled from is_profit_eligible (ADR-0029): a non-Profit but active
-    // Staffel may hold functional ranks, so staffing it (free-text) succeeds rather than 400-ing.
     UUID unitId = UUID.randomUUID();
     Squadron squadron = squadron(unitId, "ORION", "ORI");
     squadron.setProfitEligible(false);
@@ -621,7 +592,6 @@ class OrgChartServiceTest {
 
   @Test
   void createPosition_inactiveUnit_isRejected() {
-    // Active is still the gate (ADR-0029): a soft-deleted Staffel cannot be staffed.
     UUID userId = UUID.randomUUID();
     UUID unitId = UUID.randomUUID();
     Squadron squadron = squadron(unitId, "ORION", "ORI");
@@ -883,12 +853,8 @@ class OrgChartServiceTest {
                         null)));
   }
 
-  // -------------------------------------------- Bereich / OL scopes (REQ-ORG-026) --
-
   @Test
   void createPosition_bereichsleiterFreeText_persists() {
-    // Account-linked seats are mirror-only now (REQ-ROLE-006); the chart create only places a
-    // free-text holder (a member without a Basetool account).
     UUID bereichId = UUID.randomUUID();
     when(orgUnitRepository.findById(bereichId))
         .thenReturn(Optional.of(bereich(bereichId, "Profit", "PRF")));
@@ -915,7 +881,6 @@ class OrgChartServiceTest {
 
   @Test
   void createPosition_withAccount_isRejected() {
-    // The chart editor may not place an account holder — appoint it under Leitung (REQ-ROLE-006).
     UUID userId = UUID.randomUUID();
     UUID bereichId = UUID.randomUUID();
     when(userRepository.findById(userId)).thenReturn(Optional.of(user(userId, "blead")));
@@ -1003,10 +968,8 @@ class OrgChartServiceTest {
 
   @Test
   void createPosition_bereichDoesNotRequireProfitEligible() {
-    // A Bereich is never profit-eligible; the org-chart create must NOT reject it for that
-    // (unlike a Staffel/SK). Only its active flag is checked.
     UUID bereichId = UUID.randomUUID();
-    Bereich notProfit = bereich(bereichId, "Sub-Radar", "SUB"); // isProfitEligible() == false
+    Bereich notProfit = bereich(bereichId, "Sub-Radar", "SUB");
     when(orgUnitRepository.findById(bereichId)).thenReturn(Optional.of(notProfit));
     when(positionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -1027,8 +990,6 @@ class OrgChartServiceTest {
 
   @Test
   void createPosition_inactiveBereich_throwsUnitInactive() {
-    // An inactive Bereich is rejected, but with the precise "inactive" error rather than the
-    // (irrelevant) "not profit-eligible" one a Bereich would never satisfy anyway.
     UUID userId = UUID.randomUUID();
     UUID bereichId = UUID.randomUUID();
     Bereich inactive = bereich(bereichId, "Sub-Radar", "SUB");
@@ -1078,8 +1039,6 @@ class OrgChartServiceTest {
     assertEquals(olId, dto.orgUnitId());
   }
 
-  // ----------------------------------------------------------------- update / delete --
-
   @Test
   void updatePosition_staleVersion_throwsOptimisticLock() {
     UUID id = UUID.randomUUID();
@@ -1098,7 +1057,6 @@ class OrgChartServiceTest {
 
   @Test
   void updatePosition_reassignToAccount_isRejected() {
-    // The chart editor may not assign an account holder — that moved to Leitung (REQ-ROLE-006).
     UUID id = UUID.randomUUID();
     UUID newUserId = UUID.randomUUID();
     OrgChartPosition position = pos(OrgChartPositionType.AREA_COORDINATOR, null, null, null);
@@ -1121,7 +1079,6 @@ class OrgChartServiceTest {
 
   @Test
   void updatePosition_reassignFreeTextHolder_persists() {
-    // Renaming a free-text holder to another free-text name stays a chart function.
     UUID id = UUID.randomUUID();
     OrgChartPosition position = pos(OrgChartPositionType.AREA_COORDINATOR, null, null, null);
     position.setDisplayName("Old Name");
@@ -1140,7 +1097,6 @@ class OrgChartServiceTest {
 
   @Test
   void updatePosition_mirrorManagedAccountSeat_isRejected() {
-    // An account-held seat reflects a functional rank and is read-only in the chart (REQ-ROLE-006).
     UUID id = UUID.randomUUID();
     OrgChartPosition position =
         pos(OrgChartPositionType.AREA_COORDINATOR, null, null, user(UUID.randomUUID(), "acct"));
@@ -1227,8 +1183,6 @@ class OrgChartServiceTest {
                 .updatePosition(id, new OrgChartPositionUpdateRequest(null, null, null, 0L, null)));
   }
 
-  // ------------------------------------------- free-text holder names (REQ-ORG-020) --
-
   @Test
   void createPosition_freeTextHolder_persistsDisplayNameAndNullUser() {
     UUID bereichId = UUID.randomUUID();
@@ -1280,8 +1234,6 @@ class OrgChartServiceTest {
 
   @Test
   void updatePosition_replaceFreeTextWithAccount_isRejected() {
-    // The free-text -> account swap moved to Leitung (REQ-ROLE-006); the chart no longer assigns an
-    // account, so a free-text holder is never swapped for an account here.
     UUID id = UUID.randomUUID();
     UUID newUserId = UUID.randomUUID();
     OrgChartPosition position = pos(OrgChartPositionType.AREA_COORDINATOR, null, null, null);
@@ -1345,9 +1297,6 @@ class OrgChartServiceTest {
 
   @Test
   void updatePosition_bothAccountAndFreeText_isRejected() {
-    // Mirror of createPosition_bothAccountAndFreeText_isRejected on the update path: an account
-    // and a free-text name are mutually exclusive, so a single edit may not set both at once. It
-    // fails fast, before resolving the user or saving.
     UUID id = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     OrgChartPosition position = pos(OrgChartPositionType.AREA_COORDINATOR, null, null, null);
@@ -1364,8 +1313,6 @@ class OrgChartServiceTest {
                     .updatePosition(
                         id, new OrgChartPositionUpdateRequest(userId, null, null, 0L, "Max")));
 
-    // A userId on a chart update is now rejected outright (account assignment moved to Leitung),
-    // before the holder-ambiguity check is even reached.
     assertTrue(ex.getMessage().contains("account_managed_in_leitung"), ex.getMessage());
     verify(positionRepository, never()).save(any());
     verify(userRepository, never()).findById(any());
@@ -1373,7 +1320,6 @@ class OrgChartServiceTest {
 
   @Test
   void deletePosition_present_deletes() {
-    // A leaderless / free-text position (no account, no group link) stays removable from the chart.
     UUID id = UUID.randomUUID();
     OrgChartPosition position = pos(OrgChartPositionType.COMMAND_LEAD, null, null, null);
     position.setId(id);
@@ -1386,8 +1332,6 @@ class OrgChartServiceTest {
 
   @Test
   void deletePosition_accountHeld_isRejected() {
-    // A mirror-managed seat (account holder) is removed by clearing the rank under Leitung, not
-    // here.
     UUID id = UUID.randomUUID();
     OrgChartPosition position =
         pos(OrgChartPositionType.BEREICHSKOORDINATOR, null, null, user(UUID.randomUUID(), "acct"));
@@ -1409,8 +1353,6 @@ class OrgChartServiceTest {
     assertThrows(NotFoundException.class, () -> service().deletePosition(id));
     verify(positionRepository, never()).delete(any());
   }
-
-  // ----------------------------------------------------------------- vacate leader --
 
   @Test
   void vacateCommandLeader_clearsHolderButKeepsKommando() {
@@ -1474,8 +1416,6 @@ class OrgChartServiceTest {
 
   @Test
   void vacateCommandLeader_groupLinked_isRejected() {
-    // A kommando_group-linked Kommando mirrors a functional rank — its Kommandoleiter is vacated by
-    // removing the rank under Leitung (REQ-ROLE-006), not from the chart.
     UUID id = UUID.randomUUID();
     Squadron squadron = squadron(UUID.randomUUID(), "IRIDIUM", "IRI");
     OrgChartPosition kommando =
@@ -1491,8 +1431,6 @@ class OrgChartServiceTest {
     assertTrue(ex.getMessage().contains("account_managed_in_leitung"), ex.getMessage());
     verify(positionRepository, never()).save(any());
   }
-
-  // ----------------------------------------------- role-model mirror (REQ-ROLE-006) --
 
   @Test
   void mirrorBereichRole_leiter_reassignsExistingSingletonWithoutSave() {
@@ -1512,7 +1450,6 @@ class OrgChartServiceTest {
 
     assertSame(newUser, existing.getUser(), "the single Bereichsleiter seat is reassigned");
     assertNull(existing.getDisplayName(), "a free-text holder is cleared on reassign");
-    // Reassign mutates the managed entity; no save() (so no second @Version bump).
     verify(positionRepository, never()).save(any());
   }
 
@@ -1561,8 +1498,6 @@ class OrgChartServiceTest {
 
     service().mirrorBereichRole(bereichId, userId, BereichLeadershipRole.KOORDINATOR);
 
-    // The free-text placeholder for the same name is filled in place — no duplicate seat, no manual
-    // cleanup needed (REQ-ROLE-006).
     assertSame(u, placeholder.getUser());
     assertNull(placeholder.getDisplayName());
     verify(positionRepository, never()).save(any());
@@ -1859,8 +1794,6 @@ class OrgChartServiceTest {
     verify(positionRepository).save(captor.capture());
     return captor.getValue();
   }
-
-  // --------------------------------------------------------------------- fixtures --
 
   private static KommandoGroup group(Squadron squadron, String name, int sortIndex) {
     KommandoGroup group =

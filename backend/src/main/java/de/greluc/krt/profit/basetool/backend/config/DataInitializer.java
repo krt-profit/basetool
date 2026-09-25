@@ -57,8 +57,6 @@ public class DataInitializer {
   @Bean
   public CommandLineRunner initRoles() {
     return args -> {
-      // Lookup is by `code`, not by `name`: an admin renaming a role no longer
-      // triggers a silent re-create with default permissions on the next boot.
       createRoleIfNotFound(
           Roles.KRT_MEMBER,
           "KRT Member",
@@ -84,8 +82,6 @@ public class DataInitializer {
               Permissions.MISSION_MANAGE,
               Permissions.USER_MANAGE,
               Permissions.ROLE_MANAGE));
-      // Kartell bank (epic #556, REQ-BANK-007): two coarse roles; the fine-grained per-account
-      // capabilities are app-managed grant rows (bank_account_grant), not permission strings.
       createRoleIfNotFound(Roles.BANK_EMPLOYEE, "Bank Employee", Set.of());
       createRoleIfNotFound(Roles.BANK_MANAGEMENT, "Bank Management", Set.of());
 
@@ -108,9 +104,6 @@ public class DataInitializer {
       return;
     }
     if (squadronRepository.findByShorthand("IRI").isPresent()) {
-      // Pre-V80 install: a row with shorthand "IRI" exists at a non-canonical UUID. We do not
-      // rewrite it here — V80 covers that case in every profile. We simply skip to keep the
-      // seeder side-effect-free.
       return;
     }
     Squadron iridium = new Squadron();
@@ -128,7 +121,7 @@ public class DataInitializer {
     Role role = new Role();
     role.setCode(code);
     role.setName(displayName);
-    role.setPermissions(new HashSet<>(permissions)); // Ensure mutable
+    role.setPermissions(new HashSet<>(permissions));
     roleRepository.save(role);
   }
 }

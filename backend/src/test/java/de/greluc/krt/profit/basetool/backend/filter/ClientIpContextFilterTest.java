@@ -53,7 +53,6 @@ class ClientIpContextFilterTest {
 
     @Test
     void untrustedPeer_ignoresTheHeaderEntirely() {
-      // Reaching the container around the proxy must never let the caller name itself.
       assertEquals(
           "198.51.100.10",
           ClientIpContextFilter.resolveClientIp("198.51.100.10", "1.1.1.1", TRUSTED));
@@ -74,8 +73,6 @@ class ClientIpContextFilterTest {
     @Test
     @DisplayName("a spoofed leading entry loses to the proxy-appended truth")
     void spoofedLeadingEntry_isNeverReached() {
-      // nginx-proxy-manager appends with $proxy_add_x_forwarded_for, so everything left of the
-      // last hop is client-supplied. This single assertion is the whole point of the change.
       assertEquals(
           "203.0.113.7",
           ClientIpContextFilter.resolveClientIp("10.0.0.1", "9.9.9.9, 203.0.113.7", TRUSTED));
@@ -91,7 +88,6 @@ class ClientIpContextFilterTest {
 
     @Test
     void everyHopTrusted_fallsBackToThePeer() {
-      // No client address in the chain at all; keying on one of our own hops would be a lie.
       assertEquals(
           "10.0.0.1",
           ClientIpContextFilter.resolveClientIp("10.0.0.1", "10.0.0.9, 172.28.0.5", TRUSTED));
@@ -107,8 +103,6 @@ class ClientIpContextFilterTest {
     @Test
     @DisplayName("a non-IP token such as \"unknown\" is untrusted, not a crash")
     void nonIpTokenIsTreatedAsTheClient() {
-      // Some proxies emit "unknown". IpAddressMatcher throws on it, so the walk must guard: the
-      // token cannot be one of ours, therefore it terminates the walk like any untrusted hop.
       assertEquals(
           "unknown", ClientIpContextFilter.resolveClientIp("10.0.0.1", "unknown", TRUSTED));
     }
@@ -152,8 +146,6 @@ class ClientIpContextFilterTest {
 
     @Test
     void marksAPeerFallbackAsNotForwarded() throws Exception {
-      // The key_source tag is the only signal that per-client bucketing has collapsed, so a
-      // fallback must never be dressed up as a resolved client.
       MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/missions");
       request.setRemoteAddr("198.51.100.10");
       request.addHeader("X-Forwarded-For", "1.1.1.1");
@@ -169,8 +161,6 @@ class ClientIpContextFilterTest {
 
     @Test
     void aRepeatedHeaderLineIsFoldedIntoOneChain() throws Exception {
-      // Add-header proxies emit a second line instead of appending. getHeader() would return only
-      // the client-supplied first one, and the walk would hand back exactly the spoof.
       MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/missions");
       request.setRemoteAddr("10.0.0.1");
       request.addHeader("X-Forwarded-For", "9.9.9.9");
@@ -187,8 +177,6 @@ class ClientIpContextFilterTest {
 
     @Test
     void aPeerlessRequestPublishesNoAttributeRatherThanRemovingIt() throws Exception {
-      // setAttribute(name, null) is defined as removeAttribute, so publishing a null would leave
-      // consumers unable to tell "did not run" from "ran and found nothing".
       MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/missions");
       request.setRemoteAddr(null);
 
@@ -201,7 +189,6 @@ class ClientIpContextFilterTest {
 
     @Test
     void wildcardEntryIsDroppedWithoutDroppingTheRestOfTheList() throws Exception {
-      // "*" would restore blanket trust; the rest of a misconfigured list must still work.
       MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/missions");
       request.setRemoteAddr("10.0.0.1");
       request.addHeader("X-Forwarded-For", "203.0.113.7");

@@ -80,9 +80,6 @@ class OrgUnitMembershipQueryServiceTest {
   @Mock private OrgUnitCascadeService orgUnitCascadeService;
   @Mock private StaffelMembershipResolver staffelMembershipResolver;
 
-  // Real MapStruct implementation (not a mock): the …Dto projection tests assert the actual
-  // entity→DTO mapping the controllers ship, incl. the user.effectiveName read (L4, #923,
-  // ADR-0067).
   @Spy
   private OrgUnitMembershipMapper orgUnitMembershipMapper =
       Mappers.getMapper(OrgUnitMembershipMapper.class);
@@ -111,10 +108,6 @@ class OrgUnitMembershipQueryServiceTest {
 
     id = new OrgUnitMembershipId(userId, scId);
 
-    // findStaffelMembershipOrgUnitIds delegates the "name-sorted primary" rule to
-    // StaffelMembershipResolver (tested independently in StaffelMembershipResolverTest). Delegate
-    // the mock to a real instance backed by the squadron-repo mock so the single-Staffel fast path
-    // stays load-free and the two-Staffel name-sort runs through the real resolver.
     StaffelMembershipResolver realResolver =
         new StaffelMembershipResolver(squadronRepository, orgUnitRepository);
     lenient()
@@ -122,8 +115,6 @@ class OrgUnitMembershipQueryServiceTest {
         .thenAnswer(
             invocation -> realResolver.resolveNameSortedStaffelIds(invocation.getArgument(0)));
   }
-
-  // --- findStaffelMembershipOrgUnitIds (name-sorted primary, REQ-ORG-017) -------------------
 
   @Test
   void findStaffelMembershipOrgUnitIds_noStaffel_returnsEmpty() {
@@ -141,7 +132,6 @@ class OrgUnitMembershipQueryServiceTest {
     when(squadronRepository.existsById(squadronId)).thenReturn(true);
 
     assertEquals(List.of(squadronId), queryService.findStaffelMembershipOrgUnitIds(userId));
-    // The single-Staffel fast path does only a cheap existsById, never a full entity load/sort.
     verify(squadronRepository, never()).findAllById(any());
   }
 
@@ -181,7 +171,6 @@ class OrgUnitMembershipQueryServiceTest {
 
     Set<UUID> ids = queryService.findDirectMembershipOrgUnitIds(userId);
 
-    // Kind-agnostic: Bereich and OL ids are included, and no cascade expansion is applied.
     assertEquals(Set.of(staffelId, skId, bereichId, olId), ids);
   }
 
@@ -207,8 +196,6 @@ class OrgUnitMembershipQueryServiceTest {
     s.setName(name);
     return s;
   }
-
-  // --- listMembers ----------------------------------------------------------
 
   @Test
   void listMembers_existingSc_returnsMembers() {
@@ -269,8 +256,6 @@ class OrgUnitMembershipQueryServiceTest {
     assertEquals(OrgUnitKind.SPECIAL_COMMAND, dtos.get(1).kind());
     assertEquals("Alice", dtos.get(0).userDisplayName());
   }
-
-  // --- listOptionsForUser ---------------------------------------------------
 
   @Test
   void listOptionsForUser_noMemberships_returnsEmptyListWithoutOrgUnitLookup() {
@@ -366,8 +351,6 @@ class OrgUnitMembershipQueryServiceTest {
         "membership row pointing at a deleted Squadron must not crash the picker");
   }
 
-  // --- listPickerOptionsWithDescendants (epic #692 Phase 5 drill-down) -------
-
   @Test
   void listPickerOptionsWithDescendants_bereichLeader_includesBereichAndDescendantsTopDown() {
     UUID bereichId = UUID.randomUUID();
@@ -387,14 +370,12 @@ class OrgUnitMembershipQueryServiceTest {
     staffel.setId(staffelId);
     staffel.setName("Alpha");
     staffel.setShorthand("ALF");
-    // Return unordered to prove the service applies the top-down hierarchy sort itself.
     when(orgUnitRepository.findAllById(any())).thenReturn(List.of(staffel, bereich));
 
     List<OrgUnitMembershipOptionDto> options =
         queryService.listPickerOptionsWithDescendants(userId);
 
     assertEquals(2, options.size());
-    // Top-down hierarchy order: Bereich (1) before Staffel (2).
     assertEquals(OrgUnitKind.BEREICH, options.get(0).kind());
     assertEquals(bereichId, options.get(0).orgUnitId());
     assertEquals(OrgUnitKind.SQUADRON, options.get(1).kind());
@@ -403,10 +384,6 @@ class OrgUnitMembershipQueryServiceTest {
 
   @Test
   void listPickerOptionsWithDescendants_plainBereichMember_stillGetsTheirBereich() {
-    // The owner's case: a member may belong to a Bereich and to nothing else. A plain MEMBER seat
-    // is not an area rank, so nothing cascades and the reach is the Bereich alone — which is a
-    // real option, because a Bereich owns aggregates in its own right (REQ-ORG-016). While the
-    // switcher listed Staffeln and SKs only, this member was offered nothing at all.
     UUID bereichId = UUID.randomUUID();
     OrgUnitMembership seat = new OrgUnitMembership();
     seat.setId(new OrgUnitMembershipId(userId, bereichId));
@@ -431,10 +408,6 @@ class OrgUnitMembershipQueryServiceTest {
 
   @Test
   void listPickerOptionsWithDescendants_olSeat_reachesEveryUnitTheCascadeNames() {
-    // An OL member holds one row, on the Organisationsleitung, and V165 forbids them a Staffel row
-    // — so the belonging-based list is not merely short for them, it is empty, and the switcher
-    // disappeared entirely. The reach itself is the cascade's answer (a materialised id set, never
-    // an admin-all marker — REQ-ORG-015); this pins that the picker renders all of it.
     UUID olId = UUID.randomUUID();
     UUID staffelId = UUID.randomUUID();
     UUID skId = UUID.randomUUID();
@@ -478,9 +451,6 @@ class OrgUnitMembershipQueryServiceTest {
 
   @Test
   void listAllPinnableOptions_coversAllFourKindsTopDown() {
-    // An admin must reach at least as far as an OL member, whose cascade names every unit. The
-    // Job-Order form's own list stays Staffel/SK-only, which is why this is a separate method
-    // rather than a widening of listAllActiveOptions().
     Squadron staffel = new Squadron();
     staffel.setId(UUID.randomUUID());
     staffel.setName("IRIDIUM");
@@ -506,8 +476,6 @@ class OrgUnitMembershipQueryServiceTest {
     assertEquals(OrgUnitKind.SQUADRON, options.get(2).kind());
     assertEquals(OrgUnitKind.SPECIAL_COMMAND, options.get(3).kind());
   }
-
-  // --- listAllActiveOptions (R5.d.c Job Order picker) -----------------------
 
   @Test
   void listAllActiveOptions_emptyCatalog_returnsEmptyList() {
@@ -542,7 +510,6 @@ class OrgUnitMembershipQueryServiceTest {
     List<OrgUnitMembershipOptionDto> result = queryService.listAllActiveOptions();
 
     assertEquals(4, result.size());
-    // Staffeln first (alphabetical), then SKs (alphabetical).
     assertEquals(OrgUnitKind.SQUADRON, result.get(0).kind());
     assertEquals("IRIDIUM", result.get(0).orgUnitName());
     assertEquals(OrgUnitKind.SQUADRON, result.get(1).kind());
@@ -555,10 +522,6 @@ class OrgUnitMembershipQueryServiceTest {
 
   @Test
   void listAllActiveOptions_carriesProfitEligibleFlagPerOrgUnit() {
-    // The flag lets the anonymous-reachable create form fill both pickers from one fetch:
-    // requesting
-    // = all options, responsible = the profit-eligible subset. Pin that each option mirrors its own
-    // org unit's flag (a profit Squadron and a non-profit SK here).
     Squadron profitSquadron = new Squadron();
     profitSquadron.setId(UUID.randomUUID());
     profitSquadron.setName("IRIDIUM");
@@ -584,9 +547,6 @@ class OrgUnitMembershipQueryServiceTest {
 
   @Test
   void listDirectMembershipOptions_includesBereichNotJustStaffelAndSk() {
-    // REQ-BANK-044: unlike listOptionsForUser (Staffel/SK only), the bank counterparty picker must
-    // surface a direct Bereich (or OL) membership too. Ordered top-down by kind (Bereich before
-    // Staffel), so the first option is the user's primary unit.
     UUID squadronId = UUID.randomUUID();
     UUID bereichId = UUID.randomUUID();
     OrgUnitMembership squadronRow = new OrgUnitMembership();
@@ -615,10 +575,6 @@ class OrgUnitMembershipQueryServiceTest {
 
   @Test
   void listDirectMembershipOptions_surfacesAllFourKindsIncludingOl() {
-    // #1328 (mirrors REQ-BANK-044): the inventory Umbuchen owning-org-unit picker requests
-    // ?allKinds=true, which routes here. Assert the option/wire path surfaces a direct
-    // Organisationsleitung (OL) membership — not just Bereich — and that all four kinds sort
-    // top-down (OL -> Bereich -> Staffel -> SK), so the first option is the owner's primary unit.
     UUID olId = UUID.randomUUID();
     UUID bereichId = UUID.randomUUID();
     UUID squadronId = UUID.randomUUID();
@@ -649,7 +605,6 @@ class OrgUnitMembershipQueryServiceTest {
     sk.setId(skId);
     sk.setName("Spezialkommando Alpha");
     sk.setShorthand("ALF");
-    // Return in an unsorted order to prove the service imposes the top-down kind order.
     when(orgUnitRepository.findAllById(any())).thenReturn(List.of(squadron, sk, ol, bereich));
 
     List<OrgUnitMembershipOptionDto> options = queryService.listDirectMembershipOptions(userId);
@@ -665,8 +620,6 @@ class OrgUnitMembershipQueryServiceTest {
 
   @Test
   void findPrimaryDirectMembershipOrgUnitId_returnsTopOfKindOrder_orEmpty() {
-    // REQ-BANK-044: the requester's recorded org unit at request confirmation is the deterministic
-    // primary — the first by the top-down kind order (here the Bereich over the Staffel).
     UUID squadronId = UUID.randomUUID();
     UUID bereichId = UUID.randomUUID();
     OrgUnitMembership squadronRow = new OrgUnitMembership();
@@ -692,8 +645,6 @@ class OrgUnitMembershipQueryServiceTest {
 
     assertEquals(Optional.empty(), queryService.findPrimaryDirectMembershipOrgUnitId(userId));
   }
-
-  // --- assign/remove squadron rank (epic #800 Phase 3) ----------------------
 
   /** A Staffel membership row for {@link #userId} on the given squadron with the given rank. */
   private OrgUnitMembership squadronMember(UUID squadronId, MembershipRole role) {

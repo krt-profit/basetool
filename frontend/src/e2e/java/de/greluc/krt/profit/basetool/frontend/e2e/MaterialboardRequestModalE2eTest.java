@@ -102,28 +102,20 @@ class MaterialboardRequestModalE2eTest {
         page.waitForLoadState();
         page.waitForFunction("() => typeof window.krtMaterialRequest === 'object'");
 
-        // The request modal is hidden on load (the .krt-modal-overlay global default is
-        // display:none).
         assertThat(page.locator("#mg-modal"))
             .isHidden(new LocatorAssertions.IsHiddenOptions().setTimeout(10_000));
 
-        // Switch to the Gesuche board via the shared tab bar.
         page.locator("[data-mb-mode='requests'][data-mb-tab='alle']").first().click();
 
-        // The CTAs relabel: the request CTAs appear, the offer CTAs hide.
         assertThat(page.locator("[data-mg-open-request]"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
         assertThat(page.locator("[data-mb-open-release]"))
             .isHidden(new LocatorAssertions.IsHiddenOptions().setTimeout(10_000));
 
-        // Open the request create modal — it must be genuinely visible, not just un-hidden.
         page.locator("[data-mg-open-request]").first().click();
         assertThat(page.locator("#mg-modal"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
 
-        // MATERIAL kind (default): the material combobox shows, the item combobox is hidden, and
-        // the
-        // picker dropdown stays closed on open.
         assertThat(page.locator("#mg-modal [data-mg-material-block]"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
         assertThat(page.locator("#mg-modal [data-mg-item-block]"))
@@ -134,21 +126,17 @@ class MaterialboardRequestModalE2eTest {
         assertThat(page.locator("#mg-modal [data-mg-picker-list]"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
 
-        // The optional min-quality and the desired-quantity fields are present for a material
-        // request.
         assertThat(page.locator("#mg-modal [data-mg-min-quality]"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
         assertThat(page.locator("#mg-modal [data-mg-qty]"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
 
-        // Switching the kind radio to Item toggles the combobox to the blueprint-product picker.
         page.locator("#mg-modal [data-mg-kind-radio][value='ITEM']").check();
         assertThat(page.locator("#mg-modal [data-mg-item-block]"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
         assertThat(page.locator("#mg-modal [data-mg-material-block]"))
             .isHidden(new LocatorAssertions.IsHiddenOptions().setTimeout(10_000));
 
-        // Dismiss and confirm it hides again.
         page.locator("#mg-modal [data-mg-modal-close]").first().click();
         assertThat(page.locator("#mg-modal"))
             .isHidden(new LocatorAssertions.IsHiddenOptions().setTimeout(10_000));

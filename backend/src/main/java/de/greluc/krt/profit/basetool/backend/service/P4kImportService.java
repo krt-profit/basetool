@@ -208,8 +208,6 @@ public class P4kImportService {
     return result;
   }
 
-  // ────────────────────────────────────────────────────────── reconciliation ──
-
   /**
    * Runs the full reconciliation across all five types. Manufacturers are processed first to build
    * the GUID→entity index that item and ship linking consults (including any seeded this run).
@@ -293,7 +291,6 @@ public class P4kImportService {
         byGuid.put(dto.guid(), target);
       }
 
-      // Canonical UUID backfill (scwiki_uuid), guarded against UNIQUE collisions.
       backfillCanonicalUuid(
           counts,
           guid,
@@ -735,8 +732,6 @@ public class P4kImportService {
     return resolved;
   }
 
-  // ───────────────────────────────────────────────────────────────── seeding ──
-
   /**
    * Seeds a brand-new {@code game_item} for an unmatched item record when seeding is on and the
    * record looks like real player content. Requires a parseable GUID (the cross-source join key), a
@@ -866,7 +861,6 @@ public class P4kImportService {
     manufacturer.setDescription(StringNormalization.blankToNull(dto.desc()));
     manufacturer.setP4kUuid(guid);
     manufacturer.setP4kSyncedAt(now);
-    // Indexed for in-run linking on preview and apply (count parity); persisted only on apply.
     byGuid.put(dto.guid(), manufacturer);
     if (apply) {
       manufacturerRepository.save(manufacturer);
@@ -949,8 +943,6 @@ public class P4kImportService {
       GameItem produced = resolveProducedItem(dto.producedItemGuid());
       blueprint.setOutputItem(produced);
       if (produced != null) {
-        // #327: apply the same guarded CIG-mislabel correction the SC Wiki sync uses, for
-        // consistency on seeded rows (a no-op unless the produced name matches a known wrong name).
         blueprint.setOutputName(outputNameOverrides.correct(dto.key(), produced.getName()));
       }
       blueprint.setCraftTimeSeconds(dto.craftTimeSeconds());
@@ -1102,8 +1094,6 @@ public class P4kImportService {
     }
     return false;
   }
-
-  // ──────────────────────────────────────────────────────────── shared steps ──
 
   /**
    * Resolves an inbound row to a single local entity through the standard chain: canonical UUID
@@ -1267,7 +1257,6 @@ public class P4kImportService {
     }
     if (existingUuid == null) {
       if (alreadyClaimed.getAsBoolean()) {
-        // Another row already owns this GUID — skip the backfill to avoid a UNIQUE collision.
         log.debug(
             "P4K import: {} GUID {} already held by another row; skipping backfill of '{}'.",
             aggregate,
@@ -1383,8 +1372,6 @@ public class P4kImportService {
     return true;
   }
 
-  // ───────────────────────────────────────────────────────────────── parsing ──
-
   /**
    * Binds the uploaded catalog bytes straight to a {@link P4kCatalogDto} in one pass, with no
    * intermediate {@code JsonNode} tree, so a large catalog costs roughly the bound object rather
@@ -1483,8 +1470,6 @@ public class P4kImportService {
         + c.unmatched()
         + "]";
   }
-
-  // ───────────────────────────────────────────────────────────── value types ──
 
   /**
    * Mutable per-type counter accumulator used while scanning a type's records, converted to the

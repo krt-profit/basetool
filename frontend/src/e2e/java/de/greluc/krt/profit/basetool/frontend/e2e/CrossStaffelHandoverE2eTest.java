@@ -138,19 +138,12 @@ class CrossStaffelHandoverE2eTest {
         page.locator("#handover-modal .date-part").fill(LocalDate.now().toString());
         page.locator("#handover-modal .time-part").fill("12:00");
         page.locator("#recipientHandle").fill("E2E CrossStaffel Recipient");
-        // recipientSquadron is an optional name dropdown; name Staffel B as the recipient when it
-        // is
-        // offered (the cross-Staffel recipient case), otherwise leave it blank.
         Locator bRecipientOption =
             page.locator("#recipientSquadron option[value='" + STAFFEL_B_NAME + "']");
         if (bRecipientOption.count() > 0) {
           page.locator("#recipientSquadron").selectOption(STAFFEL_B_NAME);
         }
 
-        // Submit in place (#575): the material handover swaps sections via AJAX and closes the
-        // modal — no Post/Redirect/Get navigation to await. Mark the window to prove no full reload
-        // happened, submit, then web-first-wait for the handover row carrying the recipient to
-        // appear in the re-rendered history (which also proves persistence), and assert the marker.
         page.evaluate("window.__krtNoReload = true;");
         page.getByTestId("order-handover-submit").click();
         assertThat(

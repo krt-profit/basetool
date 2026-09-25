@@ -82,13 +82,6 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
     } finally {
       long durationMs = (System.nanoTime() - start) / 1_000_000L;
       String method = request.getMethod();
-      // The request URI is the only client-supplied value this module logs, and it was the only one
-      // logged raw and unbounded. This filter sits at HIGHEST_PRECEDENCE + 15 - ahead of the rate
-      // limiter and the whole security chain - and logs from a finally block, so it writes a line
-      // for a 401 and even for a request already refused with 429. An 8 KB request line therefore
-      // reached every appender and was run through PiiMasker three times per request, on the
-      // request thread (the console appender is synchronous by design). LogSafe.text is what every
-      // other client-supplied value in this module already goes through.
       String path = LogSafe.text(request.getRequestURI(), 256);
       int status = response.getStatus();
       if (durationMs >= loggingProperties.slowRequestThresholdMs()) {

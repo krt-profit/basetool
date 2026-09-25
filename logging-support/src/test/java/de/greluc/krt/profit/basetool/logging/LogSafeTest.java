@@ -65,27 +65,22 @@ class LogSafeTest {
    */
   static Stream<Arguments> sanitisationTable() {
     return Stream.of(
-        // Ordinary text survives verbatim — umlauts and punctuation are not line-breaking, and a
-        // term that no longer matches what was typed is useless in a log.
         Arguments.of("Quantanium (Lager Süd)", 60, "Quantanium (Lager Süd)"),
         Arguments.of("1234567890", 10, "1234567890"),
-        // Line-breaking characters become '?' so a second log line cannot be forged.
         Arguments.of("a\nb", 60, "a?b"),
         Arguments.of("a\r\nb\tc", 60, "a??b?c"),
-        Arguments.of("a\u0000b", 60, "a?b"), // NUL
-        Arguments.of("a\u0085b", 60, "a?b"), // U+0085 NEXT LINE — an ISO control
-        Arguments.of("a\u007fb", 60, "a?b"), // DEL
-        Arguments.of("a\u2028b", 60, "a?b"), // U+2028 LINE SEPARATOR — not an ISO control
-        Arguments.of("a\u2029b", 60, "a?b"), // U+2029 PARAGRAPH SEPARATOR — not an ISO control
+        Arguments.of("a\u0000b", 60, "a?b"),
+        Arguments.of("a\u0085b", 60, "a?b"),
+        Arguments.of("a\u007fb", 60, "a?b"),
+        Arguments.of("a\u2028b", 60, "a?b"),
+        Arguments.of("a\u2029b", 60, "a?b"),
         Arguments.of("a\u2028\u2029\nb", 60, "a???b"),
-        // Overlong values are cut and the cut is marked, sanitisation and cap composing.
         Arguments.of("12345678901", 10, "1234567890…"),
         Arguments.of("a\nb-cdefghijklmnop", 8, "a?b-cdef…"),
-        // Nothing to log at all collapses to the stable token, keeping the field count constant.
         Arguments.of(null, 10, LogSafe.NONE),
         Arguments.of("", 10, LogSafe.NONE),
         Arguments.of("   ", 10, LogSafe.NONE),
-        Arguments.of("\u2028\u2029", 10, LogSafe.NONE)); // both separators are whitespace
+        Arguments.of("\u2028\u2029", 10, LogSafe.NONE));
   }
 
   @Test
@@ -105,9 +100,6 @@ class LogSafeTest {
 
   @Test
   void replacesTheTwoUnicodeSeparatorsThatAreNotIsoControls() {
-    // U+2028 and U+2029 are the blind spot of Character.isISOControl: it returns false for both,
-    // yet several log viewers and JSON consumers end a line on them, so a value carrying one could
-    // forge a second line for exactly those readers.
     assertThat(Character.isISOControl('\u2028')).isFalse();
     assertThat(Character.isISOControl('\u2029')).isFalse();
 
@@ -132,7 +124,6 @@ class LogSafeTest {
 
   @Test
   void rendersNullAndBlankAsAStableToken() {
-    // A stable token keeps the field count of the log line constant, so a line stays greppable.
     assertThat(LogSafe.text(null, 10)).isEqualTo(LogSafe.NONE);
     assertThat(LogSafe.text("", 10)).isEqualTo(LogSafe.NONE);
     assertThat(LogSafe.text("   ", 10)).isEqualTo(LogSafe.NONE);
@@ -140,15 +131,11 @@ class LogSafeTest {
 
   @Test
   void leavesAnOrdinarySearchTermUntouched() {
-    // German umlauts and punctuation are not control characters and must survive verbatim,
-    // otherwise a sanitised term no longer matches what the member actually typed.
     assertThat(LogSafe.text("Quantanium (Lager Süd)", 60)).isEqualTo("Quantanium (Lager Süd)");
   }
 
   @Test
   void leavesOrdinaryProvenanceTextUntouched() {
-    // The ingest gateway's case: version punctuation is not control text and must survive
-    // verbatim, otherwise the logged provenance no longer matches what the extractor sent.
     assertThat(LogSafe.text("krt-extractor 1.4.2-beta+build.7", 60))
         .isEqualTo("krt-extractor 1.4.2-beta+build.7");
   }

@@ -58,12 +58,10 @@ class PersonalInventoryItemRequestValidationTest {
 
   @Test
   void validCreateRequestShouldHaveNoViolations() {
-    // Given
     PersonalInventoryItemCreateRequest req =
         new PersonalInventoryItemCreateRequest(
             "Medkit", "first aid", 42, PersonalInventoryLocationType.CITY, 3);
 
-    // When / Then
     assertTrue(validator.validate(req).isEmpty());
   }
 

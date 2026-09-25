@@ -67,7 +67,6 @@ class RedisNotificationFanoutTest {
   void publish_deliversLocallyFirst_thenPublishesToRedis_andCounts() {
     fanout.publish(List.of(USER), NotificationSignal.refreshOnly());
 
-    // Local delivery happens before (and independent of) the cross-replica publish.
     verify(streamService).publish(List.of(USER), NotificationSignal.refreshOnly());
     verify(redisTemplate).convertAndSend(anyString(), anyString());
     assertThat(publishedCount()).isEqualTo(1.0);
@@ -81,7 +80,6 @@ class RedisNotificationFanoutTest {
 
     fanout.publish(List.of(USER), NotificationSignal.refreshOnly());
 
-    // The local delivery already happened; the failed cross-replica publish is swallowed + counted.
     verify(streamService).publish(List.of(USER), NotificationSignal.refreshOnly());
     assertThat(errorCount(MetricNames.OP_PUBLISH)).isEqualTo(1.0);
     assertThat(publishedCount()).isZero();
@@ -117,9 +115,6 @@ class RedisNotificationFanoutTest {
 
   @Test
   void onMessage_skipsAMalformedRecipient_butStillDeliversTheValidOnes() {
-    // F7: one bad UUID in the recipients array must not abort the whole batch (as it would if the
-    // per-element parse threw to the outer catch) — the valid recipients are still delivered, and
-    // it is not counted as a consume error.
     UUID other = UUID.fromString("5f1d2c3b-0000-0000-0000-000000000002");
     String body =
         "{\"v\":1,\"origin\":\"backend-B\",\"recipients\":[\"not-a-uuid\",\""

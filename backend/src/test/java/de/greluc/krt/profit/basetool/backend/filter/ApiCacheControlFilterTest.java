@@ -56,18 +56,12 @@ class ApiCacheControlFilterTest {
 
   @Test
   void apiGet_getsRevalidationHeaders() throws Exception {
-    // An ordinary family: storable by an intermediary as long as it revalidates first.
     assertEquals(
         "no-cache, must-revalidate", run("GET", "/api/v1/missions").getHeader(CACHE_CONTROL));
   }
 
   @Test
   void apiGet_variesOnAcceptAsWellAsEncoding() throws Exception {
-    // ADR-0161 8.5 gave every /api path a second representation: the same URL answers CBOR or JSON
-    // depending on Accept. `no-cache, must-revalidate` permits an intermediary to STORE the body,
-    // so a cache keyed on the URL alone could hand a CBOR body to a JSON client -- which is a
-    // parse failure on a client that did nothing wrong. Accept-Encoding was already named; Accept
-    // had to join it in the same change that introduced the second representation.
     org.junit.jupiter.api.Assertions.assertIterableEquals(
         java.util.List.of("Accept", "Accept-Encoding"),
         run("GET", "/api/v1/missions").getHeaders("Vary"));
@@ -97,8 +91,6 @@ class ApiCacheControlFilterTest {
         "/api/v1/notifications/stream"
       })
   void sensitiveFamilies_areNeverStored(String uri) throws Exception {
-    // Balances, member records and one person's feed must not sit in a proxy or a disk cache at
-    // all — revalidation is not enough, because it still permits the copy to exist.
     assertEquals("private, no-store", run("GET", uri).getHeader(CACHE_CONTROL));
   }
 
@@ -133,8 +125,6 @@ class ApiCacheControlFilterTest {
         "/api/v1/inventory/aggregated",
         "/api/v1/hangar/my-ships",
         "/api/v1/refinery-orders/my-orders",
-        // Admitted 2026-09-08. Somebody else's refinery run is exactly as private as your own, so
-        // it belongs in the never-stored family and not merely in the allow-list.
         "/api/v1/refinery-orders/all",
         "/api/v1/promotion/eligibility/my"
       })
@@ -158,17 +148,12 @@ class ApiCacheControlFilterTest {
 
   @Test
   void percentEncodedSensitivePath_doesNotEscapeIntoTheWeakerDirective() throws Exception {
-    // Same trap as the /api scope itself (REQ-SEC-029): the match runs on the decoded path, so an
-    // encoded spelling cannot downgrade a bank response to merely revalidatable.
     assertEquals(
         "private, no-store", run("GET", "/api/v1/%62ank/accounts").getHeader(CACHE_CONTROL));
   }
 
   @Test
   void sensitiveFamiliesStillCarryTheVaryHeader() throws Exception {
-    // Both names, on the stricter family too. `no-store` already keeps these bodies out of every
-    // store, so Vary buys nothing here -- it is asserted anyway because a filter that emitted the
-    // header on one bucket and not the other would be a difference nobody chose.
     org.junit.jupiter.api.Assertions.assertIterableEquals(
         java.util.List.of("Accept", "Accept-Encoding"),
         run("GET", "/api/v1/bank/accounts").getHeaders("Vary"));
@@ -181,7 +166,6 @@ class ApiCacheControlFilterTest {
 
   @Test
   void apiWrite_isUntouched() throws Exception {
-    // Only idempotent GETs are revalidatable; a POST response carries no cache semantics here.
     assertNull(run("POST", "/api/v1/users").getHeader(CACHE_CONTROL));
   }
 }

@@ -199,10 +199,6 @@ public class HangarPageController {
                       List.of(), effectivePage, effectiveSize, 0L, 0, List.of());
                 });
 
-    // The three sortable reference catalogs share one degrade-to-empty loader
-    // (CachedCatalogListLoader); each fetch still runs on its own virtual thread and is sorted
-    // below
-    // after the join, so a single dead catalog never blanks the whole page.
     CompletableFuture<List<ShipTypeDto>> shipTypesFuture =
         parallelPageLoader.loadAsync(
             () ->
@@ -236,10 +232,6 @@ public class HangarPageController {
                   return new ArrayList<>();
                 });
 
-    // join() blocks until every parallel fetch finishes; each call ran on its own virtual thread
-    // with the full request-scoped context (SecurityContext / RequestAttributes / squadron /
-    // correlation id) restored, so OAuth2 bearer relay and squadron-header propagation behave
-    // identically to the previous sequential implementation.
     CompletableFuture.allOf(
             shipsFuture, shipTypesFuture, locationsFuture, manufacturersFuture, homeLocationsFuture)
         .join();
@@ -253,13 +245,8 @@ public class HangarPageController {
     List<ManufacturerDto> manufacturers = manufacturersFuture.join();
     manufacturers.sort(Comparator.comparing(ManufacturerDto::name, String.CASE_INSENSITIVE_ORDER));
 
-    // Curated home locations for the bulk "set home location" picker. The backend already returns
-    // them alphabetically descending (Z->A); preserve that order (do not re-sort).
     List<LocationDto> homeLocations = homeLocationsFuture.join();
 
-    // Page links must keep the active filter, so the fragment's base URL carries the search term
-    // percent-encoded (toUriString() encodes — a raw term could otherwise smuggle extra query
-    // params into every pagination link); page/size are appended by the shared pagination fragment.
     String paginationBaseUrl =
         effectiveSearch == null
             ? "/hangar"
@@ -267,14 +254,10 @@ public class HangarPageController {
                 .queryParam("search", effectiveSearch)
                 .toUriString();
 
-    // The page is already ordered + filtered by the backend (REQ-HANGAR-002); render its content
-    // verbatim. No client-side SHIP_SORT — that would only reorder the rows of the current page.
     PageResponse<ShipDto> myShipsPage = shipsFuture.join();
     model.addAttribute(
         "myShips", myShipsPage.content() != null ? myShipsPage.content() : List.of());
     model.addAttribute("myShipsPage", myShipsPage);
-    // Home-location / delete-all act on ALL the user's ships (not the current page), so their count
-    // reflects the page envelope's total, not the size of the rendered page.
     model.addAttribute("totalShipCount", myShipsPage.totalElements());
     model.addAttribute("pageSizes", HANGAR_PAGE_SIZES);
     model.addAttribute("pageSize", effectiveSize);
@@ -302,10 +285,6 @@ public class HangarPageController {
    */
   private List<OrgUnitMembershipOptionDto> fetchCallerMembershipOptions() {
     try {
-      // Epic #692 Phase 5: the owner picker offers the caller's pickable org units — their direct
-      // memberships plus their cascading leadership reach (a Bereichsleitung/OL leader's own
-      // Bereich/OL + the subordinate Staffeln/SKs they oversee). For an ordinary member this equals
-      // their direct memberships, so the picker is unchanged. Resolved server-side for the caller.
       List<OrgUnitMembershipOptionDto> options =
           backendApiClient.get("/api/v1/users/me/pickable-org-units", PICKABLE_ORG_UNIT_LIST_TYPE);
       return options != null ? options : List.of();
@@ -426,9 +405,6 @@ public class HangarPageController {
       model.addAttribute("error", "error.hangar.squadron.load");
     }
 
-    // Page links must keep the active filter, so the fragment's base URL carries the search term
-    // percent-encoded (toUriString() encodes — a raw term could otherwise smuggle extra query
-    // params into every pagination link); page/size are appended by the fragment itself.
     String paginationBaseUrl =
         effectiveSearch == null
             ? "/hangar/squadron"
@@ -467,8 +443,6 @@ public class HangarPageController {
       Model model,
       RedirectAttributes redirectAttributes) {
     if (bindingResult.hasErrors()) {
-      // Render directly; the BindingResult stays request-scoped so it never goes
-      // through a Redis-serialised FlashMap (see RedisSessionConfig).
       model.addAttribute("showShipModal", true);
       model.addAttribute("modalAction", "/hangar/add");
       return viewHangar(null, null, null, null, model);
@@ -534,7 +508,6 @@ public class HangarPageController {
               form.getLocationId(),
               form.isFitted(),
               form.getVersion(),
-              // Update path: owningOrgUnitId is not editable, the existing stamp survives.
               null);
       backendApiClient.put("/api/v1/hangar/ships/" + id, request, ShipDto.class);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.ship_update");
@@ -598,8 +571,6 @@ public class HangarPageController {
     }
     return "redirect:/hangar";
   }
-
-  // ----------------------------------------------------- AJAX twins (epic #571 / REQ-FE-005)
 
   /**
    * Header-gated AJAX twin of {@link #addShip}: adds a ship and returns {@code 204} so {@code

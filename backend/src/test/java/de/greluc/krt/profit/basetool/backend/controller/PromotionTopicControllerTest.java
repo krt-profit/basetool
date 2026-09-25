@@ -70,17 +70,14 @@ class PromotionTopicControllerTest {
 
   @Test
   void list_wrapsServicePageIntoPageResponse_andForwardsPageable() {
-    // Given — a service that returns a single-element page on page 0 of size 20.
     PromotionTopicResponse t = topic("Combat");
     Page<PromotionTopicResponse> page =
         new PageImpl<>(
             List.of(t), PageRequest.of(0, 20, Sort.by(Sort.Direction.ASC, "sortOrder")), 1);
     when(service.list(any(Pageable.class))).thenReturn(page);
 
-    // When
     PageResponse<PromotionTopicResponse> result = controller.list(0, 20, "sortOrder,asc");
 
-    // Then — the PageResponse mirrors the page exactly so the frontend sees content+meta unchanged.
     assertThat(result.content()).containsExactly(t);
     assertThat(result.page()).isZero();
     assertThat(result.size()).isEqualTo(20);
@@ -101,9 +98,6 @@ class PromotionTopicControllerTest {
 
     PageResponse<PromotionTopicResponse> result = controller.list(null, null, null);
 
-    // PaginationUtil applies defaults; the wrapped response carries the resolved page metadata
-    // back unchanged. We assert non-null because the exact defaults are PaginationUtil's contract,
-    // not the controller's.
     assertThat(result).isNotNull();
     assertThat(result.content()).isEmpty();
     verify(service).list(any(Pageable.class));

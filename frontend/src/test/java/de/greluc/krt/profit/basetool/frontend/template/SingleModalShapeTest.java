@@ -131,8 +131,6 @@ class SingleModalShapeTest {
    */
   @Test
   void noStylesheetDeclaresALegacyDialogRule() throws IOException, URISyntaxException {
-    // Selectors only: the rule bodies and the comments above them may name a legacy shape, and
-    // styles.css deliberately does so to record why .krt-modal-close now carries its own rule.
     Pattern selectorLine = Pattern.compile("^([^{}/*\\n][^{}\\n]*)\\{", Pattern.MULTILINE);
     List<String> offenders = new ArrayList<>();
     for (Path sheet : stylesheets()) {

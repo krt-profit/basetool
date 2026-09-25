@@ -1,5 +1,3 @@
-# Application (JVM / Spring Boot) alerts for the three modules. Micrometer standard meters.
-# Epic #936 alert catalog. Thresholds are initial; Phase 3 tunes them from the baseline week.
 groups:
   - name: apps-warning
     rules:
@@ -14,20 +12,6 @@ groups:
           summary: "5xx rate >1% ({{ $labels.application }})"
           description: "More than 1% of requests to {{ $labels.application }} returned 5xx over the last 5 minutes."
 
-      # Kept on basetool_http_error_total rather than moved to the newer
-      # basetool_auth_failures_total (A8): the two count the same rejections, and re-pointing a
-      # proven alert at a fresh series buys nothing but a gap in its history. What the new metric
-      # adds is the CAUSE, which the description sends the operator to — a spike of invalid_token is
-      # a client with a stale/rotated key, a spike of invalid_request is a malformed Authorization
-      # header, and until A8 those were one number (REQ-OBS-018).
-      # Watches REJECTED TOKENS, not 401 volume. Retargeted 2026-09-13 after measuring production:
-      # the old expression counted every UNAUTHENTICATED, and ~75% of that threshold was consumed by
-      # this deployment's OWN blackbox probes, which assert liveness by expecting a 401 on an
-      # authenticated path (REQ-OBS-018). A "possible JWT brute force" page whose baseline is the
-      # monitoring plane is not a security signal. reason="invalid_token" means a token WAS presented
-      # and rejected - bad signature, wrong issuer, expired, failed audience - which is exactly what
-      # credential guessing looks like and what a probe can never produce, so the series sits at a
-      # true zero and a low threshold is meaningful rather than noisy.
       - alert: BackendAuthFailureSpike
         expr: rate(basetool_auth_failures_total{application="basetool-backend",reason="invalid_token"}[5m]) > 0.05
         for: 10m
@@ -37,10 +21,6 @@ groups:
           summary: "Rejected-token spike on backend (possible JWT brute force)"
           description: "The backend is rejecting presented tokens at an elevated rate - possible credential/JWT guessing. This series is normally zero: a caller with no token at all counts as reason=no_credentials, not here. Split the whole picture with sum by (reason) (rate(basetool_auth_failures_total{application=\"basetool-backend\"}[5m])): invalid_token is a rejected token (expired, wrong issuer/audience, bad signature), invalid_request a malformed Authorization header, insufficient_scope a valid token missing a scope, no_credentials a request that presented nothing (the ordinary background - probes, scanners, pre-login navigation), other an unenumerated failure worth reading the DEBUG line for."
 
-      # The volume half the retarget above would otherwise drop. Deliberately far above the probe
-      # floor (~0.1/s on this surface, three blackbox jobs at a 30s interval) so it means a flood
-      # rather than a Tuesday - the baseline is documented in REQ-OBS-018 and must be re-checked
-      # whenever a probe target is added.
       - alert: BackendUnauthenticatedFlood
         expr: rate(basetool_auth_failures_total{application="basetool-backend",reason="no_credentials"}[5m]) > 1
         for: 15m
@@ -50,11 +30,6 @@ groups:
           summary: "Sustained flood of credential-less requests on backend"
           description: "The backend is refusing more than 60 requests/minute that carry no Authorization header at all, for 15 minutes. That is an order of magnitude above the blackbox-probe floor, so it is scanning or a misconfigured client looping - not credential guessing, which would show on BackendAuthFailureSpike. Check basetool_ratelimit_rejections_total for whether the rate limiter is already absorbing it."
 
-      # Same retarget as the backend, and moved onto the dedicated counter: the old expression read
-      # http_server_requests_seconds_count{status="401"}, whose uri label is UNKNOWN for every
-      # filter-chain rejection, so it could not be narrowed either. The gateway's own root is probed
-      # with the http_2xx_or_401 module, which is why its 401 volume is likewise a monitoring
-      # baseline rather than a threat.
       - alert: IngestAuthFailureSpike
         expr: rate(basetool_ingest_auth_failures_total{application="basetool-ingest",reason="invalid_token"}[5m]) > 0.05
         for: 10m
@@ -64,9 +39,6 @@ groups:
           summary: "Rejected-token spike on ingest (possible JWT brute force)"
           description: "The ingest gateway is rejecting presented tokens at an elevated rate. Normally zero - a credential-less request counts as reason=no_credentials. Split with sum by (reason) (rate(basetool_ingest_auth_failures_total[5m]))."
 
-      # The gateway's volume half, kept for the same reason as the backend's: retargeting the spike
-      # alert onto invalid_token would otherwise drop 401-flood coverage on the more exposed surface
-      # entirely. Threshold matches the backend's - well above the probe floor either way.
       - alert: IngestUnauthenticatedFlood
         expr: rate(basetool_ingest_auth_failures_total{application="basetool-ingest",reason="no_credentials"}[5m]) > 1
         for: 15m
@@ -96,11 +68,6 @@ groups:
           summary: "HikariCP has pending connection requests ({{ $labels.application }})"
           description: "Threads are waiting for a DB connection in {{ $labels.application }} — the pool may be undersized or a query is slow."
 
-      # (#1041 item 12) Depth on the JVM/Hikari internals — all metrics already exported by Actuator.
-      # Connection-acquire timeout: every increment is a user request that waited the full
-      # connectionTimeout (~30s) for a pool slot and then threw. That can hide entirely below
-      # HikariPoolPending's `for: 5m` window (a burst clears the pending gauge between scrapes), so
-      # alert on the timeout counter directly.
       - alert: HikariConnectionTimeouts
         expr: sum by (application) (increase(hikaricp_connections_timeout_total[10m])) > 0
         for: 5m
@@ -110,9 +77,6 @@ groups:
           summary: "HikariCP connection-acquire timeouts ({{ $labels.application }})"
           description: "{{ $labels.application }} had connection-acquire timeouts in the last 10 minutes — each is a request that waited ~30s for a pool slot and then failed. Check for slow queries holding connections or an undersized pool."
 
-      # File-descriptor exhaustion: an FD leak (unclosed sockets/files) kills a JVM with confusing
-      # symptoms ("Too many open files" surfacing far from the leak). > 85% of the ulimit is the
-      # early warning. process_files_max_files is the positive Linux ulimit here.
       - alert: JvmFileDescriptorsHigh
         expr: process_files_open_files / process_files_max_files > 0.85
         for: 10m
@@ -122,18 +86,6 @@ groups:
           summary: "JVM file descriptors >85% ({{ $labels.application }})"
           description: "{{ $labels.application }} is using more than 85% of its file-descriptor limit for 10 minutes — likely an FD leak (unclosed sockets/files). Investigate before it hits the limit and the JVM starts failing to open files/sockets."
 
-      # Native-thread exhaustion: the JVM cannot create a new OS thread once the container's cgroup
-      # `pids` cap (2048 for backend/frontend/ingest — docker-compose.yml) is reached, surfacing as
-      # `OutOfMemoryError: unable to create native thread` REGARDLESS of heap/RAM headroom. This is the
-      # leading indicator that was missing on 2026-07-09: the backend hit the pids cap (readiness +
-      # Keycloak token calls failed at ~55% memory) and the deploy loop thrashed against the resulting
-      # `unhealthy` container for ~2h. No JVM/Micrometer metric exports the cgroup pids limit, so the
-      # 2048 cap is hardcoded; >80% (=1638) is the early warning and a steady climb is a thread leak.
-      # This gauge counts only JVM-managed threads: the cgroup-level companion ContainerPidsHigh
-      # (infrastructure.yml, cAdvisor container_threads) catches the tasks this cannot see — unreaped
-      # child-process zombies and the OS carrier threads behind virtual threads (the 2026-07-12 ingest
-      # native-thread OOM, where the pids cap was exhausted while this gauge stayed flat) — and also
-      # covers keycloak, which shares the 2048 cap but exports no basetool-* Micrometer series here.
       - alert: JvmThreadsHigh
         expr: jvm_threads_live_threads > 1638
         for: 10m
@@ -143,9 +95,6 @@ groups:
           summary: "JVM live threads >80% of the pids cap ({{ $labels.application }})"
           description: "{{ $labels.application }} holds more than 1638 live threads (>80% of the container's 2048 pids cap). At the cap the JVM throws 'unable to create native thread' and readiness/Keycloak calls fail (the 2026-07-09 native-thread exhaustion incident). A steady climb is a thread leak — investigate before it reaches 2048."
 
-      # GC overhead: fraction of wall time spent in stop-the-world GC pauses. > 20% degrades latency
-      # well before JvmHeapHigh's 90% trips (a JVM can thrash the collector while staying under the
-      # heap ceiling). No metaspace rule — nonheap max is often -1, so a used/max ratio is NaN.
       - alert: JvmGcOverheadHigh
         expr: sum by (application) (rate(jvm_gc_pause_seconds_sum[5m])) > 0.2
         for: 10m
@@ -173,11 +122,6 @@ groups:
           summary: "Circuit breaker OPEN ({{ $labels.application }}/{{ $labels.name }})"
           description: "Resilience4j circuit breaker {{ $labels.name }} in {{ $labels.application }} is open — a downstream dependency is failing."
 
-      # (#1041 item 11) Leading indicators on the frontend→backend seam, before circuit_open /
-      # bulkhead_full (i.e. before users fail). Meters already exported by resilience4j-micrometer.
-      # Bulkhead near saturation: the frontend backendApi bulkhead has 50 slots; < 5 free means a
-      # page render's parallel fan-out is about to queue behind maxWaitDuration and surface as a slow
-      # page. Frontend-only (the backend declares no bulkhead), so no application filter needed.
       - alert: BulkheadNearSaturation
         expr: resilience4j_bulkhead_available_concurrent_calls < 5
         for: 10m
@@ -187,9 +131,6 @@ groups:
           summary: "Bulkhead near saturation ({{ $labels.application }}/{{ $labels.name }})"
           description: "The {{ $labels.name }} bulkhead in {{ $labels.application }} has had fewer than 5 free concurrent-call slots for 10 minutes — the parallel backend fan-out is about to queue and slow page renders. Check backend latency and concurrent load."
 
-      # Retry rate elevated: a sustained stream of calls that only succeeded ON a retry means the
-      # backend hop is flaky (transient resets / packet loss) even though the circuit is still closed
-      # — the early warning the circuit-open alert misses. successful_with_retry is the bounded kind.
       - alert: RetryRateElevated
         expr: sum by (application) (rate(resilience4j_retry_calls_total{kind="successful_with_retry"}[5m])) > 0.2
         for: 10m
@@ -200,10 +141,6 @@ groups:
           description: "{{ $labels.application }} has been succeeding only after a retry at more than 0.2/s for 10 minutes — the frontend→backend hop is flaky (transient resets) even though the circuit breaker is still closed. Check backend health and the network path."
 
       - alert: HttpLatencyP95High
-        # The notification SSE endpoints (/…/notifications/stream) are excluded at the source —
-        # each module's NotificationStreamObservationPredicate drops them from http.server.requests
-        # so their ~30-minute lifetime never enters this histogram (REQ-OBS-009). Do NOT re-add a
-        # per-URI filter here; the metric is already clean.
         expr: |
           histogram_quantile(0.95, sum by (application, le) (rate(http_server_requests_seconds_bucket[5m]))) > 2
         for: 10m
@@ -213,14 +150,6 @@ groups:
           summary: "p95 request latency >2s ({{ $labels.application }})"
           description: "The 95th-percentile request latency for {{ $labels.application }} exceeded 2 seconds for 10 minutes."
 
-      # (#1128) Frontend->backend read-amplification: outbound backend client calls per inbound
-      # frontend request. A per-render fan-out regression (a page/fragment that lost its read-gating
-      # and fans out into N backend GETs, like the pre-ADR-0078 mission page) inflates this ratio
-      # well before the late HikariPoolPending / HttpLatencyP95High signals fire. Frontend-scoped: the
-      # backend's client calls are to Keycloak/UEX, a different ratio. Coarse by design (the frontend
-      # also serves static assets / polls that make no backend call, diluting the average down), so
-      # the threshold is a generous INITIAL baseline tuned from the baseline week — a real regression
-      # is a step change, not a slow drift. Backs the "Backend fan-out ratio" panel on dashboard 03.
       - alert: FrontendBackendFanoutHigh
         expr: |
           sum(rate(http_client_requests_seconds_count{application="basetool-frontend"}[5m]))
@@ -233,10 +162,6 @@ groups:
           description: "The frontend issued more than 10 backend calls per inbound request (5m avg) for 15 minutes — a per-render read-amplification regression (a page/fragment that lost its read-gating) inflates this well before HikariPoolPending / HttpLatencyP95High fire. Check recent frontend controller changes for an un-gated backend fan-out."
 
   - name: caches
-    # Caffeine cache health. recordStats() is enabled on every cache (backend + frontend
-    # CacheConfig, plus the backend's hand-built `jwt-authorities` cache in
-    # CustomJwtGrantedAuthoritiesConverter, ADR-0174 amendment 1), so Micrometer exports cache_gets_total{result}, cache_evictions_total{cause}
-    # and cache_size with a bounded (application, cache) label set (REQ-OBS-005/-006, CACHE-OBS-1).
     rules:
       - alert: CacheSizeEvictionsHigh
         expr: sum by (application, cache) (rate(cache_evictions_total{cause="SIZE"}[10m])) > 0

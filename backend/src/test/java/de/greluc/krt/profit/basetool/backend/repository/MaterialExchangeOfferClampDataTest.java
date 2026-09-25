@@ -84,7 +84,6 @@ class MaterialExchangeOfferClampDataTest {
     UUID itemId = offer.getInventoryItem().getId();
     entityManager.flush();
 
-    // Stock is still >= the offered amount (e.g. after an increase): the offer must not change.
     int changed = offerRepository.clampOfferedAmountToStock(itemId, 90.0);
 
     assertThat(changed).isZero();
@@ -104,12 +103,8 @@ class MaterialExchangeOfferClampDataTest {
     assertThat(reloadOfferedAmount(offer.getId())).isEqualTo(80.0);
   }
 
-  // ---- stock-backed item offers (REQ-MARKET-014, ADR-0108) ----
-
   @Test
   void clampItem_reducesActiveStockBackedItemOfferWhenStockDropsBelowQuantity() {
-    // covers REQ-MARKET-014 — the item sibling of the material ratchet; this also proves V221
-    // lets an ITEM offer carry an inventory_item_id (a stock-backed item offer persists).
     MaterialExchangeOffer offer = activeItemStockOffer(8);
     UUID itemId = offer.getInventoryItem().getId();
     entityManager.flush();
@@ -122,7 +117,6 @@ class MaterialExchangeOfferClampDataTest {
 
   @Test
   void clampItem_isNoOpWhenStockDidNotDropBelowQuantity() {
-    // covers REQ-MARKET-014
     MaterialExchangeOffer offer = activeItemStockOffer(8);
     UUID itemId = offer.getInventoryItem().getId();
     entityManager.flush();
@@ -135,8 +129,6 @@ class MaterialExchangeOfferClampDataTest {
 
   @Test
   void clampItem_leavesMaterialOffersUntouched() {
-    // covers REQ-MARKET-014 — the item clamp keys kind=ITEM/item_quantity, so a material offer
-    // (offered_amount, item_quantity NULL) never matches even under the same item id.
     MaterialExchangeOffer material = activeOffer(80.0);
     UUID itemId = material.getInventoryItem().getId();
     entityManager.flush();

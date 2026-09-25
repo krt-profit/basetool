@@ -97,8 +97,6 @@ class ListSearchRelayParamsTest {
     server.shutdown();
   }
 
-  // ── exact template + variables ─────────────────────────────────────────
-
   @Test
   void missionListRelaysEveryCallerValueAsATemplateVariable() throws Exception {
     when(mockedBackend.get(anyString(), anyTypeRef(), any(Object[].class))).thenReturn(emptyPage());
@@ -175,8 +173,6 @@ class ListSearchRelayParamsTest {
             eq(Instant.parse(END)));
   }
 
-  // ── what the backend actually receives ─────────────────────────────────
-
   @Test
   void theBackendReceivesTheMissionFiltersAsSingleDecodedParameters() throws Exception {
     server.enqueue(jsonPage());
@@ -217,8 +213,6 @@ class ListSearchRelayParamsTest {
     assertEquals(List.of(END), url.queryParameterValues("end"));
     assertEquals(List.of("20"), url.queryParameterValues("size"));
   }
-
-  // ── helpers ────────────────────────────────────────────────────────────
 
   private MockMvc missionsMvc(BackendApiClient backend) {
     return standalone(

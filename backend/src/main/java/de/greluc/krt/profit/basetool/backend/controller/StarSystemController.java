@@ -99,8 +99,6 @@ public class StarSystemController {
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public StarSystemDto createStarSystem(@RequestBody @NotNull StarSystemDto starSystem) {
     var toCreate = starSystemMapper.toEntity(starSystem);
-    // L-7: never honour a client-supplied id/version on create — a non-null id routes save() to
-    // merge() (UPSERT) and could overwrite another row (same mass-assignment class as H-2).
     toCreate.setId(null);
     toCreate.setVersion(null);
     return starSystemMapper.toDto(starSystemService.createStarSystem(toCreate));

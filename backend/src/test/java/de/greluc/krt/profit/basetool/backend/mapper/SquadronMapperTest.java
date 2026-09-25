@@ -63,16 +63,13 @@ class SquadronMapperTest {
 
   @Test
   void orgUnitToReferenceDto_shouldProjectSquadronOwner() {
-    // Given a Squadron-typed owner
     Squadron squadron = new Squadron();
     squadron.setId(UUID.randomUUID());
     squadron.setName("IRIDIUM");
     squadron.setShorthand("IRI");
 
-    // When projected to the slim owner reference
     SquadronReferenceDto ref = mapper.orgUnitToReferenceDto(squadron);
 
-    // Then the id / name / shorthand triplet is carried over
     assertNotNull(ref);
     assertEquals(squadron.getId(), ref.id());
     assertEquals("IRIDIUM", ref.name());
@@ -81,16 +78,13 @@ class SquadronMapperTest {
 
   @Test
   void orgUnitToReferenceDto_shouldProjectSpecialCommandOwner() {
-    // Given a Spezialkommando-typed owner (the case that previously surfaced as null)
     SpecialCommand sk = new SpecialCommand();
     sk.setId(UUID.randomUUID());
     sk.setName("Special Command Alpha");
     sk.setShorthand("SKA");
 
-    // When projected to the slim owner reference
     SquadronReferenceDto ref = mapper.orgUnitToReferenceDto(sk);
 
-    // Then the SK surfaces its own id / name / shorthand instead of null
     assertNotNull(ref);
     assertEquals(sk.getId(), ref.id());
     assertEquals("Special Command Alpha", ref.name());

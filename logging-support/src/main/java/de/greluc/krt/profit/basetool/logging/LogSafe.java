@@ -63,18 +63,16 @@ public final class LogSafe {
    * and JavaScript-based log consumers treat it as a line terminator, so leaving it in would reopen
    * the very forging vector this class exists to close — just against a different reader.
    */
-  private static final char LINE_SEPARATOR = '\u2028'; // U+2028 LINE SEPARATOR
+  private static final char LINE_SEPARATOR = '\u2028';
 
   /**
    * Unicode PARAGRAPH SEPARATOR (U+2029). Same blind spot as {@link #LINE_SEPARATOR}: not an ISO
    * control, so {@link Character#isISOControl(char)} misses it, yet a line break for the same
    * consumers.
    */
-  private static final char PARAGRAPH_SEPARATOR = '\u2029'; // U+2029 PARAGRAPH SEPARATOR
+  private static final char PARAGRAPH_SEPARATOR = '\u2029';
 
-  private LogSafe() {
-    // Utility holder — not instantiable.
-  }
+  private LogSafe() {}
 
   /**
    * Returns {@code value} with every line-breaking character replaced by {@code '?'} and the result

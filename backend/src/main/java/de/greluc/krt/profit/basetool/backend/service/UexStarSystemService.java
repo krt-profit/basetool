@@ -79,8 +79,6 @@ public class UexStarSystemService {
       return;
     }
 
-    // BE-PERF-09 / REQ-DATA-005: written after the fetch in chunk transactions of their own; a
-    // refused chunk is replayed row by row, so one bad row costs only itself.
     SyncChunkWriter.Outcome<UexStarSystemDto> outcome =
         chunkWriter.write(
             dtos,

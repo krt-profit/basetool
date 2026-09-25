@@ -89,13 +89,10 @@ class MissionSectionLockDbEnforcementTest {
   void conditionalBump_incrementsOnMatchingEcho_andIsNoOpOnStaleEcho() {
     UUID id = persistPlannedMission("Bump Guard").getId();
 
-    // A matching echo (0) increments the counter and reports one affected row.
     assertEquals(1, missionRepository.bumpCoreVersionIfMatches(id, 0L));
     entityManager.clear();
     assertEquals(1L, missionRepository.findById(id).orElseThrow().getCoreVersion());
 
-    // A now-stale echo (0, but the DB is at 1) matches no rows and leaves the counter untouched —
-    // this zero is what enforceSectionVersion maps to the 409.
     assertEquals(0, missionRepository.bumpCoreVersionIfMatches(id, 0L));
     entityManager.clear();
     assertEquals(1L, missionRepository.findById(id).orElseThrow().getCoreVersion());
@@ -161,12 +158,6 @@ class MissionSectionLockDbEnforcementTest {
     UUID first = ordered.get(0).getId();
     UUID second = ordered.get(1).getId();
 
-    // Swap: second -> index 0, first -> index 1. Whichever order Hibernate flushes the two UPDATEs,
-    // the intermediate state momentarily has two rows on the same order_index; an
-    // immediately-checked
-    // unique index would reject it. The flush must succeed because the V208 constraint is
-    // DEFERRABLE
-    // INITIALLY DEFERRED.
     missionTimelineService.reorderSteps(id, List.of(second, first), 2L);
     assertDoesNotThrow(() -> entityManager.flush());
     entityManager.clear();
@@ -183,9 +174,8 @@ class MissionSectionLockDbEnforcementTest {
   void duplicateStepOrderIndex_isRejectedOnceTheDeferredConstraintIsCheckedImmediately() {
     Mission mission = persistPlannedMission("Dup Step Order");
     persistStep(mission, "A", 0);
-    persistStep(mission, "B", 0); // same (mission_id, order_index) — tolerated while deferred
+    persistStep(mission, "B", 0);
 
-    // Forcing the deferred check surfaces the unique_violation the V208 backstop exists to catch.
     RuntimeException thrown =
         assertThrows(RuntimeException.class, this::forceImmediateConstraintCheck);
     assertTrue(
@@ -197,7 +187,7 @@ class MissionSectionLockDbEnforcementTest {
   void duplicateObjectiveOrderIndex_isRejectedOnceTheDeferredConstraintIsCheckedImmediately() {
     Mission mission = persistPlannedMission("Dup Goal Order");
     persistObjective(mission, "Primary", 0);
-    persistObjective(mission, "Secondary", 0); // duplicate ordinal
+    persistObjective(mission, "Secondary", 0);
 
     RuntimeException thrown =
         assertThrows(RuntimeException.class, this::forceImmediateConstraintCheck);

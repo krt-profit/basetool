@@ -77,7 +77,6 @@ class PromotionCategoryServiceTest {
 
   @Test
   void listAllByTopic_shouldReturnCategoriesScopedToSquadron() {
-    // Given
     UUID topicId = UUID.randomUUID();
     UUID scopeId = UUID.randomUUID();
     PromotionTopic topic = PromotionTopic.builder().name("Grundlagen").sortOrder(0).build();
@@ -90,10 +89,8 @@ class PromotionCategoryServiceTest {
     when(repository.findAllByTopicIdScopedOrdered(topicId, scopeId)).thenReturn(List.of(category));
     when(mapper.toResponse(category)).thenReturn(response);
 
-    // When
     List<PromotionCategoryResponse> result = service.listAllByTopic(topicId);
 
-    // Then: the active squadron is forwarded to the scoped finder.
     assertEquals(1, result.size());
     assertEquals("Flug Kenntnisse", result.get(0).name());
     verify(repository).findAllByTopicIdScopedOrdered(topicId, scopeId);
@@ -101,17 +98,14 @@ class PromotionCategoryServiceTest {
 
   @Test
   void get_shouldThrow_whenNotFound() {
-    // Given
     UUID id = UUID.randomUUID();
     when(repository.findById(id)).thenReturn(Optional.empty());
 
-    // When / Then
     assertThrows(NotFoundException.class, () -> service.get(id));
   }
 
   @Test
   void get_shouldRejectCrossSquadron() {
-    // Given: a category whose topic is owned by a squadron the caller may not see.
     UUID id = UUID.randomUUID();
     UUID squadronId = UUID.randomUUID();
     Squadron owner = new Squadron();
@@ -123,25 +117,21 @@ class PromotionCategoryServiceTest {
     when(repository.findById(id)).thenReturn(Optional.of(entity));
     when(ownerScopeService.canSeeSquadron(squadronId)).thenReturn(false);
 
-    // When / Then
     assertThrows(AccessDeniedException.class, () -> service.get(id));
   }
 
   @Test
   void create_shouldThrow_whenTopicNotFound() {
-    // Given
     UUID topicId = UUID.randomUUID();
     PromotionCategoryWriteRequest request =
         new PromotionCategoryWriteRequest(topicId, "Flug Kenntnisse", null, 0, null);
     when(topicRepository.findById(topicId)).thenReturn(Optional.empty());
 
-    // When / Then
     assertThrows(NotFoundException.class, () -> service.create(request));
   }
 
   @Test
   void create_shouldSaveAndReturnCategory() {
-    // Given
     UUID topicId = UUID.randomUUID();
     PromotionTopic topic = PromotionTopic.builder().name("Grundlagen").sortOrder(0).build();
     PromotionCategoryWriteRequest request =
@@ -156,10 +146,8 @@ class PromotionCategoryServiceTest {
     when(repository.save(entity)).thenReturn(entity);
     when(mapper.toResponse(entity)).thenReturn(response);
 
-    // When
     PromotionCategoryResponse result = service.create(request);
 
-    // Then
     assertEquals("Flug Kenntnisse", result.name());
     verify(repository).save(entity);
     verify(auditService)
@@ -214,7 +202,6 @@ class PromotionCategoryServiceTest {
 
   @Test
   void update_shouldThrow_whenVersionMismatch() {
-    // Given
     UUID id = UUID.randomUUID();
     UUID topicId = UUID.randomUUID();
     PromotionCategory entity =
@@ -224,22 +211,18 @@ class PromotionCategoryServiceTest {
         new PromotionCategoryWriteRequest(topicId, "Flug Kenntnisse neu", null, 1, 0L);
     when(repository.findById(id)).thenReturn(Optional.of(entity));
 
-    // When / Then
     assertThrows(ObjectOptimisticLockingFailureException.class, () -> service.update(id, request));
   }
 
   @Test
   void delete_shouldCallRepositoryDelete() {
-    // Given
     UUID id = UUID.randomUUID();
     PromotionCategory entity =
         PromotionCategory.builder().name("Flug Kenntnisse").sortOrder(0).build();
     when(repository.findById(id)).thenReturn(Optional.of(entity));
 
-    // When
     service.delete(id);
 
-    // Then
     verify(repository).delete(entity);
     verify(auditService)
         .record(

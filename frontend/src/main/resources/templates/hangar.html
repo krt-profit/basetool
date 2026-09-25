@@ -31,11 +31,6 @@
 
     <div class="hud-box mt-2">
 
-        <!--/* In-place AJAX swap target (epic #571 / REQ-FE-005): ship create/edit/delete, the
-             home-location bulk set and the Fleetview import all re-render this fragment via
-             GET /hangar?fragment=results instead of reloading the page. The action buttons + the
-             per-row edit buttons use data-trigger so the krtEvents delegation survives each swap;
-             the modals live outside the fragment and persist. */-->
         <div class="data-section" id="hangar-results">
         <th:block th:fragment="hangarResults">
             <div class="flex-between-mb">
@@ -50,10 +45,6 @@
                 </div>
             </div>
 
-            <!--/* Server-side filter (REQ-HANGAR-002): the form GETs back to /hangar; a new search
-                 resets to page 0 by omitting the page param. It stays visible while a search yields
-                 nothing so the filter can always be cleared. The hidden size keeps the active page
-                 size on the no-JS submit; the .page-btn pagination links below carry it too. */-->
             <form th:if="${totalShipCount > 0 or search != null}"
                   id="hangar-filter-form" class="hangar-filter-form" role="search"
                   method="get" th:action="@{/hangar}">
@@ -133,9 +124,6 @@
             </table>
             </div>
 
-            <!--/* Footer bar: size picker left, page-nav right (same pattern as the squadron overview
-                 and the blueprint overview). The base URL keeps the active search so paging and
-                 re-sizing never drop the filter. */-->
             <div class="pagination-controls" th:if="${myShipsPage != null}">
                 <nav th:replace="~{fragments/pagination :: pageSizePicker(pageResponse=${myShipsPage}, baseUrl=${paginationBaseUrl}, sizes=${pageSizes})}"></nav>
                 <nav th:replace="~{fragments/pagination :: pagination(pageResponse=${myShipsPage}, baseUrl=${paginationBaseUrl})}"></nav>
@@ -144,7 +132,6 @@
         </div>
     </div>
 
-    <!--/* Ship Modal */-->
     <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='ship-modal', titleKey='hangar.ship.modal_title', variant='krt-modal--wide', titleId='modal-title', closeTrigger='', closeClass='close-ship-modal', body=~{::ship-modal-body})}">
         <th:block th:ref="ship-modal-body">
             <form id="ship-form" data-testid="hangar-ship-form" th:data-title-add="#{hangar.ship.add}" th:data-title-edit="#{hangar.ship.edit}" method="post" th:object="${shipForm}" th:action="${modalAction != null} ? ${modalAction} : @{/hangar}">
@@ -192,7 +179,6 @@
                     <input type="checkbox" id="ship-fitted" name="fitted" th:field="*{fitted}">
                     <label for="ship-fitted" class="krtm-margin-bottom-0-5043" th:text="#{hangar.ship.fitted.label}">Fitted (Einsatzbereit)</label>
                 </div>
-                <!--/* R5.d.f owner-picker: hidden when the caller has ≤1 OrgUnit membership. */-->
                 <th:block th:replace="~{fragments/owner-picker :: ownerPicker(options=${ownerOptions}, name='owningOrgUnitId', selected=*{owningOrgUnitId}, required=false)}"></th:block>
                 </div>
                 <div class="krt-modal-foot">
@@ -203,7 +189,6 @@
         </th:block>
     </th:block>
 
-    <!--/* Fleetview Import Section */-->
     <div class="hud-box mt-2 import-section">
         <h2 th:text="#{hangar.import.title}">Fleetview-Import</h2>
         <p th:text="#{hangar.import.description}">Importiere deine Schiffe aus einer CCU Game Fleetview-JSON-Exportdatei.</p>
@@ -222,7 +207,6 @@
         </div>
         <p id="fleetview-status" class="import-status-msg krtm-display-none-5790"></p>
 
-        <!--/* Delete All Ships Section */-->
         <div class="delete-all-section">
             <h3 th:text="#{hangar.delete_all.section_title}">Hangar leeren</h3>
             <div class="delete-all-row">
@@ -234,7 +218,6 @@
         </div>
     </div>
 
-    <!--/* Fleetview Import Result Modal */-->
     <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='import-result-modal', titleKey='hangar.import.result.title', variant='krt-modal--wide', titleId='import-result-title', closeId='import-result-close-x', closeTrigger='', body=~{::import-result-modal-body})}">
         <th:block th:ref="import-result-modal-body">
             <div class="krt-modal-body">
@@ -265,7 +248,6 @@
         </th:block>
     </th:block>
 
-    <!--/* Delete All Ships Confirmation Modal */-->
     <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='delete-all-confirm-modal', titleKey='hangar.delete_all.modal.title', variant='krt-modal--danger', body=~{::delete-all-confirm-modal-body})}">
         <th:block th:ref="delete-all-confirm-modal-body">
             <div class="krt-modal-body">
@@ -278,7 +260,6 @@
         </th:block>
     </th:block>
 
-    <!--/* Set Home Location Modal */-->
     <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='home-location-modal', titleKey='hangar.home_location.modal.title', variant='krt-modal--wide', closeTrigger='', closeClass='close-modal-home', body=~{::home-location-modal-body})}">
         <th:block th:ref="home-location-modal-body">
 
@@ -311,7 +292,6 @@
         </th:block>
     </th:block>
 
-    <!--/* Delete Confirmation Modal */-->
     <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='delete-confirm-modal', titleKey='info.delete.confirm.title', variant='krt-modal--danger', closeTrigger='', closeClass='close-delete-modal', body=~{::delete-confirm-modal-body})}">
         <th:block th:ref="delete-confirm-modal-body">
             <div class="krt-modal-body">
@@ -328,10 +308,6 @@
 </main>
 
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
-    /*<![CDATA[*/
-    // In-place AJAX (epic #571 / REQ-FE-005): ship create/edit/delete, the home-location bulk
-    // set and the Fleetview import all go through krtFetch and re-render the #hangar-results
-    // fragment instead of reloading. Localized toast + conflict strings come from the bundle.
     var hangarI18n = {
         addSuccess:    /*[[#{notification.success.ship_add}]]*/ 'Schiff hinzugefuegt.',
         updateSuccess: /*[[#{notification.success.ship_update}]]*/ 'Schiff aktualisiert.',
@@ -341,9 +317,6 @@
         updateError:   /*[[#{error.hangar.ship.update}]]*/ 'Aktualisieren fehlgeschlagen.',
         deleteError:   /*[[#{error.hangar.ship.delete}]]*/ 'Loeschen fehlgeschlagen.',
         homeError:     /*[[#{error.hangar.home_location.set}]]*/ 'Setzen fehlgeschlagen.',
-        // Raw message template (inlined with no argument so the {0} placeholder is preserved);
-        // re-rendered client-side with the live ship count when the home-location modal opens,
-        // because the modal lives outside the swapped #hangar-results fragment.
         homeBodyTemplate: /*[[#{hangar.home_location.modal.body}]]*/ 'Setzt den Ort von {0} Schiff(en) auf die gewaehlte Home-Location.'
     };
     var hangarConflict = {
@@ -353,7 +326,6 @@
         dismissLabel:         /*[[#{frontend.ajax.conflict.dismiss}]]*/ 'Schliessen',
         reloadQuestion:       /*[[#{frontend.ajax.conflict.question}]]*/ 'Aktuelle Werte laden?'
     };
-    /*]]>*/
 </script>
 <script th:src="@{/js/hangar.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>

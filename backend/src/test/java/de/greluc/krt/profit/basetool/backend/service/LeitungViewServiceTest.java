@@ -156,7 +156,6 @@ class LeitungViewServiceTest {
     assertEquals(1, view.specialCommands().size());
     assertTrue(view.specialCommands().getFirst().canAppointLead());
     assertTrue(view.specialCommands().getFirst().canManageRoster());
-    // The admin short-circuit decides every cap; the delegated authoriser is never consulted.
     verifyNoInteractions(roleSecurity);
     verifyNoInteractions(specialCommandSecurity);
   }
@@ -216,7 +215,6 @@ class LeitungViewServiceTest {
     assertTrue(sq.canManageRoster());
     assertFalse(sq.canAppointLead());
     assertEquals(2, sq.members().size());
-    // Leadership ranks float to the top of the roster.
     assertEquals(MembershipRole.STAFFELLEITER, sq.members().getFirst().role());
   }
 

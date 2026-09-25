@@ -86,7 +86,6 @@ class BankAdminResetE2eTest {
   /** The type-to-confirm wipe modal zeroes the seeded balance and shows the success toast. */
   @Test
   void adminWipeResetZeroesBalancesAndIsAudited() {
-    // Precondition: the seeded account holds money.
     assertEquals(
         0,
         balance(accountId).compareTo(new BigDecimal("5000")),
@@ -101,22 +100,12 @@ class BankAdminResetE2eTest {
         E2eSupport.login(page, baseUrl, ADMIN_USER, ADMIN_PASSWORD);
         E2eSupport.navigate(page, baseUrl + "/admin/bank");
         page.waitForLoadState();
-        // A full reload would wipe this marker; the #582 in-place wipe leaves it intact.
         page.evaluate("window.__krtNoReload = true;");
         page.locator("[data-testid='bank-wipe-open']")
             .click(new com.microsoft.playwright.Locator.ClickOptions().setTimeout(20_000));
-        // The submit button stays disabled until the exact token is typed.
         page.locator("[data-testid='bank-wipe-confirm']").fill("WIPE");
-        // #582: the wipe posts via the AJAX twin and reports success as a toast — no PRG reload, so
-        // wait on the write's XHR response rather than a post-submit document navigation.
         page.waitForResponse(
             r -> r.url().contains("/admin/bank/wipe-reset") && "POST".equals(r.request().method()),
-            // 60 s (above the 30 s default): the wipe's proxied XHR round-trip can outrun 30 s on a
-            // contended CI runner, timing out an otherwise-correct POST. The HTTP/2 stream-reset
-            // flake that used to hang this wait (Firefox, then WebKit) is now fixed at the source —
-            // the E2E stack serves HTTP/1.1 (SERVER_HTTP2_ENABLED=false, see docker-compose.e2e.yml
-            // and E2eSupport#launchFirefox). The headroom stays as belt-and-suspenders without
-            // masking a genuinely stuck request.
             new Page.WaitForResponseOptions().setTimeout(60_000),
             () -> page.locator("[data-testid='bank-wipe-submit']").click());
         assertThat(page.locator(".notification-toast").first())

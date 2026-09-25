@@ -111,9 +111,6 @@ class GlobalExceptionHandlerCorrelationIdTest {
     when(authHelperService.isAuthenticated()).thenReturn(false);
     when(ownerScopeService.currentSquadronId()).thenReturn(Optional.empty());
 
-    // Production order: CorrelationIdFilter (LOWEST_PRECEDENCE - 100) wraps RequestLoggingFilter
-    // (LOWEST_PRECEDENCE - 50), so the access line is written while the correlation filter still
-    // owns the MDC key — which is exactly the window the handler's removal used to empty.
     mockMvc =
         MockMvcBuilders.standaloneSetup(new ThrowingController())
             .setControllerAdvice(handler)
@@ -200,8 +197,6 @@ class GlobalExceptionHandlerCorrelationIdTest {
 
   @Test
   void unexpectedException_withBlankPriorValue_restoresItAfterLoggingAMintedId() {
-    // A blank value is not a usable id, so the handler mints one for the line and the body — but
-    // the key belongs to whoever set it, and is handed back unchanged.
     MDC.put(MDC_KEY, " ");
     HttpServletRequest request = mock(HttpServletRequest.class);
     when(request.getRequestURI()).thenReturn("/blank");

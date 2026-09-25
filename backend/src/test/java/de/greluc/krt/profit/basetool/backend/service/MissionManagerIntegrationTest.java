@@ -43,7 +43,6 @@ class MissionManagerIntegrationTest {
 
   @Test
   void addManager_ShouldSuccessfullyAddUserToManagers() {
-    // Given
     User user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername("testmanager");
@@ -60,15 +59,12 @@ class MissionManagerIntegrationTest {
     UUID missionId = mission.getId();
     UUID userId = user.getId();
 
-    // When
     Mission updatedMission = missionService.addManager(missionId, userId);
 
-    // Then
     assertNotNull(updatedMission);
     assertEquals(1, updatedMission.getManagers().size());
     assertTrue(updatedMission.getManagers().stream().anyMatch(u -> u.getId().equals(userId)));
 
-    // Reload from DB to verify persistence
     Mission reloaded = missionRepository.findById(missionId).orElseThrow();
     assertEquals(1, reloaded.getManagers().size());
     assertTrue(reloaded.getManagers().stream().anyMatch(u -> u.getId().equals(userId)));

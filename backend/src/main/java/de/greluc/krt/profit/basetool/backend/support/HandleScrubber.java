@@ -248,8 +248,6 @@ public final class HandleScrubber {
       if (hit.replaced()) {
         out.append(REPLACEMENT);
       } else {
-        // The subject's own name, in the casing the author typed. Emitting it rather than skipping
-        // past it is what makes it a competitor in the longest-match above.
         out.append(text, at, at + hit.text().length());
       }
       at += hit.text().length();

@@ -320,19 +320,9 @@ public class JobOrderService {
     }
 
     if (isTerminal && !wasTerminal) {
-      // R2 (REQ-INV-027): drop the order's allocation slices, so the entries stay in the Lager
-      // as (partially) unassigned stock rather than keeping a phantom link.
       inventoryItemRepository.deleteJobOrderAllocationsByJobOrder(jobOrder.getId());
     }
 
-    // COMPLETED is funneled to one event type whether reached manually here or auto via a handover
-    // (completeJobOrderWithinTransaction). A manual completion via this endpoint does NOT go
-    // through
-    // that funnel, so it is recorded here; emitting only one event per call avoids a STATUS_CHANGED
-    // +
-    // COMPLETED duplicate. Gate on the actual transition EDGE (not status alone), mirroring the
-    // auto-completion funnel: a no-op PUT status=COMPLETED on an already-completed order is a plain
-    // STATUS_CHANGED, not a spurious second JOB_ORDER_COMPLETED.
     if (status == JobOrderStatus.COMPLETED && previousStatus != JobOrderStatus.COMPLETED) {
       auditService.record(
           AuditEventType.JOB_ORDER_COMPLETED,
@@ -403,16 +393,10 @@ public class JobOrderService {
     OptimisticLock.checkOptionalClient(jobOrder.getVersion(), version, JobOrder.class, id);
 
     if (jobOrder.isCountBlueprintsWithVariants() == countWithVariants) {
-      // No change: skip the @Version bump (which would needlessly 409 a concurrent edit) and the
-      // audit entry. The caller still gets the current state back.
       return jobOrderStockProjectionService.mapToDtoWithStock(jobOrder);
     }
 
     jobOrder.setCountBlueprintsWithVariants(countWithVariants);
-    // saveAndFlush so the bumped @Version reaches the response DTO: the order-detail panel re-reads
-    // the order @Version on its in-place swap, so a stale pre-flush version would 409 the next
-    // write.
-    // Mirrors updateJobOrder.
     jobOrder = jobOrderRepository.saveAndFlush(jobOrder);
 
     auditService.record(
@@ -443,12 +427,6 @@ public class JobOrderService {
     OptimisticLock.checkOptionalClient(
         jobOrder.getVersion(), updateDto.version(), JobOrder.class, id);
 
-    // The responsible org unit is NOT changed on the regular update path — it is only mutated
-    // through
-    // the dedicated reassignment endpoint (reassignResponsibleOrgUnit) so its permission rules and
-    // (Phase 3) visibility consequences stay in one place. updateDto.responsibleOrgUnitId() is
-    // therefore ignored here. The requesting (customer) org unit is freely editable by any
-    // Logistician+; a null id on update means "leave it unchanged" (minimal-payload contract).
     if (updateDto.requestingOrgUnitId() != null) {
       jobOrder.setRequestingOrgUnit(
           jobOrderOrgUnitResolver.resolveRequestingOrgUnit(updateDto.requestingOrgUnitId()));
@@ -520,18 +498,12 @@ public class JobOrderService {
               .amount(matDto.amount())
               .build());
     }
-    // Persist the rebuilt aggregate FIRST (still managed), so the returned @Version is fresh and no
-    // later merge can collide.
     jobOrderRepository.saveAndFlush(managed);
 
-    // THEN run the clearAutomatically inventory unlinks — once per removed material, after the
-    // persist. Each detaches the context, so `managed` must not be touched afterwards.
     for (UUID removedId : removedMaterialIds) {
-      // R2 (REQ-INV-027): drop the order's allocation slices for the removed material.
       inventoryItemRepository.deleteJobOrderAllocationsByJobOrderAndMaterial(id, removedId);
     }
 
-    // Re-fetch a managed instance for the post-clear reads (claim reconciliation, audit, DTO).
     JobOrder refreshed =
         Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
     int orphanedClaimsWithdrawn =
@@ -594,8 +566,6 @@ public class JobOrderService {
           "Item order " + id + " already has handovers and can no longer be edited.");
     }
 
-    // The requesting (customer) org unit is freely editable; a null id leaves it unchanged. The
-    // responsible org unit stays put (reassignment endpoint owns it).
     if (updateDto.requestingOrgUnitId() != null) {
       jobOrder.setRequestingOrgUnit(
           jobOrderOrgUnitResolver.resolveRequestingOrgUnit(updateDto.requestingOrgUnitId()));
@@ -603,16 +573,11 @@ public class JobOrderService {
     jobOrder.setHandle(updateDto.handle());
     jobOrder.setComment(StringNormalization.trimToNull(updateDto.comment()));
 
-    // Reconcile the ordered-item lines: matched lines are re-derived + re-snapshotted in place so
-    // their booked manufacturedAmount survives (REQ-ORDERS-032); only lines the payload dropped are
-    // orphan-removed, and only when nothing has been produced on them.
     reconcileItemLines(jobOrder, updateDto.items());
 
     jobOrder = jobOrderRepository.save(jobOrder);
     jobOrderRepository.flush();
 
-    // Reconciliation (Phase 4 / #344, decision #6): withdraw claims whose bucket the re-derived
-    // lines no longer require.
     int orphanedClaimsWithdrawn =
         materialClaimService.withdrawOrphanedClaimsWithinTransaction(jobOrder);
     auditService.record(
@@ -659,8 +624,6 @@ public class JobOrderService {
     for (CreateJobOrderItemLineDto line : lines) {
       JobOrderItem match = line.id() == null ? null : existingById.get(line.id());
       if (match != null) {
-        // Two payload lines claiming the same persisted line would silently collapse into one (the
-        // last derivation winning) — reject instead, the payload is malformed.
         if (!keptIds.add(match.getId())) {
           throw new BadRequestException(
               "Item line " + match.getId() + " appears more than once in the update payload.");
@@ -677,8 +640,6 @@ public class JobOrderService {
       }
     }
 
-    // Drop the persisted lines the payload no longer carries — orphanRemoval deletes them and their
-    // snapshotted materials. A line with booked production is never silently dropped.
     List<JobOrderItem> removed =
         jobOrder.getItems().stream()
             .filter(item -> item.getId() != null && !keptIds.contains(item.getId()))
@@ -687,8 +648,6 @@ public class JobOrderService {
       assertLineRemovable(gone, jobOrder.getId());
     }
 
-    // Reset provenance before rewiring so a link into a removed line cannot survive, then resolve
-    // it once every line exists, ignoring dangling or self references.
     resolved.forEach(item -> item.setParentItem(null));
     for (int i = 0; i < lines.size(); i++) {
       Integer parentClientId = lines.get(i).parentClientLineId();
@@ -801,9 +760,6 @@ public class JobOrderService {
         jobOrder.getVersion(), updateDto.version(), JobOrder.class, id);
     assertRequesterEditable(jobOrder);
 
-    // Requester edits are limited to the comment and the material lines. The handle, the
-    // requesting/responsible org units, the status and the priority are NOT touched (their DTO
-    // inputs are ignored) — those stay processing-side concerns.
     jobOrder.setComment(StringNormalization.trimToNull(updateDto.comment()));
 
     MaterialReplaceOutcome outcome =
@@ -859,8 +815,6 @@ public class JobOrderService {
 
     jobOrder.setComment(StringNormalization.trimToNull(updateDto.comment()));
 
-    // Snapshot the required materials and requested game items before the rebuild so we can unlink
-    // the inventory of anything the new line set no longer requires.
     final Set<UUID> requiredBefore =
         new LinkedHashSet<>(jobOrderItemService.requiredMaterialIds(jobOrder));
     final Set<UUID> requiredGameItemsBefore =
@@ -868,29 +822,19 @@ public class JobOrderService {
 
     reconcileItemLines(jobOrder, updateDto.items());
 
-    // Persist the rebuilt aggregate FIRST (still managed), then run the clearAutomatically unlinks
-    // —
-    // canonical createHandover ordering (CLAUDE.md "Bulk updates inside loops").
     jobOrderRepository.saveAndFlush(jobOrder);
 
-    // Compute BOTH diff sets before the first clearing bulk update runs — each unlink detaches the
-    // persistence context, so the managed aggregate must not be walked afterwards.
     Set<UUID> noLongerRequired = new LinkedHashSet<>(requiredBefore);
     noLongerRequired.removeAll(jobOrderItemService.requiredMaterialIds(jobOrder));
     Set<UUID> noLongerRequestedGameItems = new LinkedHashSet<>(requiredGameItemsBefore);
     noLongerRequestedGameItems.removeAll(jobOrderItemService.requiredGameItemIds(jobOrder));
     for (UUID removedMaterialId : noLongerRequired) {
-      // R2 (REQ-INV-027): drop the order's allocation slices for the no-longer-required material.
       inventoryItemRepository.deleteJobOrderAllocationsByJobOrderAndMaterial(id, removedMaterialId);
     }
     for (UUID removedGameItemId : noLongerRequestedGameItems) {
-      // Game-item sibling (REQ-INV-031): drop the order's allocation slices on item stock whose
-      // game item the rebuilt line set no longer requests — otherwise the earmark would linger as
-      // a permanent orphan-link warning (REQ-ORDERS-019).
       inventoryItemRepository.deleteJobOrderAllocationsByJobOrderAndGameItem(id, removedGameItemId);
     }
 
-    // Re-fetch a managed instance for the post-clear reads (claim reconciliation, audit, DTO).
     JobOrder refreshed =
         Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
     int orphanedClaimsWithdrawn =
@@ -943,11 +887,8 @@ public class JobOrderService {
         Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
 
     final Integer priority = jobOrder.getPriority();
-    // Snapshot the order's identity BEFORE the hard delete so the audit row stays readable
-    // afterwards (the audit table keeps a plain UUID, no FK to job_order).
     final UUID deletedId = jobOrder.getId();
     final String deletedLabel = orderLabel(jobOrder);
-    // The order's allocation slices vanish with it via the job_order_id ON DELETE CASCADE (V217).
     jobOrderRepository.delete(jobOrder);
     jobOrderRepository.flush();
     if (priority != null) {
@@ -996,10 +937,7 @@ public class JobOrderService {
       throw new NotFoundException("Material not linked to job order: " + materialId);
     }
 
-    // Snapshot the label before the @Modifying(clearAutomatically) bulk unlink detaches the
-    // context.
     final String label = orderLabel(jobOrder);
-    // R2 (REQ-INV-027): drop the order's allocation slices for the unlinked material.
     inventoryItemRepository.deleteJobOrderAllocationsByJobOrderAndMaterial(jobOrderId, materialId);
 
     jobOrder.getMaterials().removeIf(m -> m.getMaterial().getId().equals(materialId));
@@ -1035,8 +973,6 @@ public class JobOrderService {
       throw new NotFoundException("InventoryItem not linked to job order: " + inventoryItemId);
     }
 
-    // R2 (REQ-INV-027): drop this order's allocation slice on the managed entry (orphan-removal
-    // deletes it on flush); the entry stays in the Lager as (partially) unassigned stock.
     item.getJobOrderAllocations()
         .removeIf(a -> a.getJobOrder() != null && a.getJobOrder().getId().equals(jobOrderId));
     auditService.record(
@@ -1119,18 +1055,9 @@ public class JobOrderService {
     jobOrder.setStatus(JobOrderStatus.COMPLETED);
 
     if (!wasTerminal) {
-      // Flush the current state (including the incremented @Version) to the database
-      // BEFORE normalizePriorities() issues a PESSIMISTIC_WRITE lock query that re-reads
-      // all JobOrder rows. Without this flush, the lock query would read the old version
-      // from the DB while Hibernate already holds a newer in-memory version, causing an
-      // ObjectOptimisticLockingFailureException on the subsequent flush at transaction end.
       jobOrderRepository.flush();
       jobOrderPriorityService.normalizePriorities();
-      // R2 (REQ-INV-027): release the completed order's allocation slices, leaving the entries as
-      // (partially) unassigned stock.
       inventoryItemRepository.deleteJobOrderAllocationsByJobOrder(jobOrder.getId());
-      // Single funnel for auto-completion (every handover path completes through here): one
-      // JOB_ORDER_COMPLETED event, recorded only on the actual OPEN/IN_PROGRESS → COMPLETED edge.
       auditService.record(
           AuditEventType.JOB_ORDER_COMPLETED,
           jobOrder.getId(),
@@ -1197,7 +1124,6 @@ public class JobOrderService {
     OrgUnit previous = jobOrder.getResponsibleOrgUnit();
     jobOrder.setResponsibleOrgUnit(target);
     jobOrder = jobOrderRepository.save(jobOrder);
-    // Audit (Phase 7, #347): identifiers + kinds only — no PII. MDC is attached per request.
     log.info(
         "Job order {} responsible org unit reassigned: {} ({}) → {} ({})",
         jobOrder.getId(),
@@ -1206,11 +1132,6 @@ public class JobOrderService {
         target.getId(),
         target.getKind());
 
-    // Reconciliation (Phase 4 / #344, decision #10): an SK→Squadron de-escalation makes the order
-    // private, so its public material claims are withdrawn. SK→SK keeps them (still public);
-    // Squadron→SK escalation never had any. Claims are an independent aggregate, so this delete
-    // does
-    // not touch the order's @Version.
     int claimsWithdrawn = 0;
     if (target.getKind() == OrgUnitKind.SQUADRON) {
       claimsWithdrawn = materialClaimService.withdrawAllForOrderWithinTransaction(jobOrder);

@@ -121,7 +121,6 @@ class RefineryOrderPageControllerNoReloadMvcTest {
   void storeOrderAjax_EmptyItems_Returns400() throws Exception {
     UUID id = UUID.randomUUID();
 
-    // RefineryOrderStoreForm.items is @NotEmpty, so a no-items submit fails validation -> 400.
     mockMvc
         .perform(
             post("/refinery-orders/" + id + "/store")
@@ -181,10 +180,6 @@ class RefineryOrderPageControllerNoReloadMvcTest {
   @WithMockUser(roles = {"KRT_MEMBER"})
   void updateOrderAjax_backendConflict_propagatesProblemJsonWithCode() throws Exception {
     UUID id = UUID.randomUUID();
-    // A concurrent edit bumps the refinery order's optimistic-lock version -> backend 409
-    // OPTIMISTIC_LOCK. propagateBackendError must relay it as application/problem+json with the
-    // RFC 7807 code intact so krt-fetch.js keeps its reload-vs-toast distinction on this financial
-    // editing surface instead of degrading to a plain error toast.
     when(backendApiClient.put(
             eq("/api/v1/refinery-orders/" + id), any(), eq(RefineryOrderDto.class)))
         .thenThrow(
@@ -208,8 +203,6 @@ class RefineryOrderPageControllerNoReloadMvcTest {
   @WithMockUser(roles = {"KRT_MEMBER"})
   void storeOrderAjax_backendConflict_propagatesProblemJsonWithCode() throws Exception {
     UUID id = UUID.randomUUID();
-    // Twin of the update case for the store/complete twin: a 409 from the store call must also flow
-    // through propagateBackendError as problem+json with the code preserved.
     when(backendApiClient.post(
             eq("/api/v1/refinery-orders/" + id + "/store"), any(), eq(Void.class)))
         .thenThrow(

@@ -85,16 +85,12 @@ class SessionAttributeRepairFilterTest {
   void aRequestThatDroppedNothingNeverTouchesTheSession() throws Exception {
     filter.doFilter(request, response, (req, res) -> {});
 
-    // Not even getSession(false): a repair pass must not be a reason to materialise a session
-    // reference on requests that had no failure, which is every request in steady state.
     verify(request, never()).getSession(false);
     verify(session, never()).removeAttribute(anyString());
   }
 
   @Test
   void aNameLeftBehindByAnEarlierRequestIsDiscardedRatherThanApplied() throws Exception {
-    // Tomcat pools request threads. Applying a leftover name would remove an attribute from a
-    // DIFFERENT member's session, so the queue is cleared on entry as well as drained on exit.
     SessionAttributeRepairQueue.record("stale.attribute.from.a.previous.request");
     when(request.getSession(false)).thenReturn(session);
 
@@ -106,7 +102,6 @@ class SessionAttributeRepairFilterTest {
 
   @Test
   void aSessionInvalidatedDuringTheRequestIsNotAnError() throws Exception {
-    // Logout invalidates the session inside the chain; the poisoned hash is deleted with it.
     when(request.getSession(false)).thenReturn(null);
 
     assertThatCode(() -> filter.doFilter(request, response, droppingChain()))
@@ -137,15 +132,11 @@ class SessionAttributeRepairFilterTest {
     assertThatCode(() -> filter.doFilter(request, response, failing))
         .isInstanceOf(IllegalArgumentException.class);
 
-    // A request that ends in a 500 is exactly a request whose session was read, so skipping the
-    // repair there would leave the poison in place for the next one.
     verify(session).removeAttribute(ATTRIBUTE);
   }
 
   @Test
   void theFilterSitsImmediatelyInsideSpringSessionsOwnFilter() {
-    // Must be greater than SessionRepositoryFilter's order, or the session is not wrapped yet when
-    // the repair runs — and small enough that everything downstream is still inside the finally.
     assertThat(filter.getOrder()).isGreaterThan(SessionRepositoryFilter.DEFAULT_ORDER);
     assertThat(filter.getOrder()).isEqualTo(SessionRepositoryFilter.DEFAULT_ORDER + 10);
   }

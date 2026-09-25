@@ -90,22 +90,17 @@ class AdminPersonalInventoryPageControllerMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void view_shouldRenderAdminView_whenUserIsAdmin() throws Exception {
-    // Given
     PageResponse<UserDto> users = new PageResponse<>(List.of(), 0, 1000, 0, 1, List.of());
     PageResponse<PersonalInventoryItemDto> empty =
         new PageResponse<>(List.of(), 0, 50, 0, 0, List.of());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(users).thenReturn(empty);
 
-    // When & Then
     mockMvc
         .perform(get("/admin/personal-inventory"))
         .andExpect(status().isOk())
         .andExpect(view().name("admin/personal-inventory"));
   }
 
-  // covers REQ-FE-002 — an AJAX swap (fragment=results) for a selected member renders only the
-  // item-list fragment (the member <select> and admin banner live outside it) and skips the
-  // (up to 1000-row) user-list fetch the full page does.
   @Test
   @WithMockUser(roles = "ADMIN")
   void view_fragmentResults_rendersOnlyResultsFragment_andSkipsUserListFetch() throws Exception {
@@ -121,21 +116,13 @@ class AdminPersonalInventoryPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("admin/personal-inventory :: results"))
         .andExpect(content().string(containsString("krt-pi-table")))
-        // Member dropdown, banner and the swap-target wrapper are outside the fragment.
         .andExpect(content().string(not(containsString("krt-pi-userform"))))
         .andExpect(content().string(not(containsString("id=\"pi-results\""))))
         .andExpect(content().string(not(containsString("krt-admin-banner"))));
 
-    // The fragment path must not query the user list.
     verify(backendApiClient, never()).get(eq("/api/v1/users?size=1000"), anyTypeRef());
   }
 
-  // Regression guard for the frontend-proxy double-encoding sub-class: the admin personal-inventory
-  // item filter must forward a multi-word free-text term as a WebClient URI-template variable
-  // ({q}),
-  // not URLEncoder it into the URI string, so the backend @RequestParam decodes the exact typed
-  // term. URLEncoder form-encoding (space -> '+') double-encodes across the frontend->backend hop
-  // and yields zero matches. fragment=results skips the selected-member lookup, leaving one read.
   @Test
   @WithMockUser(roles = "ADMIN")
   void view_passesMultiWordQueryAsUriVariable() throws Exception {
@@ -159,10 +146,6 @@ class AdminPersonalInventoryPageControllerMvcTest {
     assertEquals("Widget Alpha", qCaptor.getValue());
   }
 
-  // Same guard with an umlaut term: "Röhre Größe" encodes to R%C3%B6hre… under URLEncoder, which
-  // the
-  // hop would re-encode to a literal zero-match. As a URI variable the raw term reaches the
-  // backend.
   @Test
   @WithMockUser(roles = "ADMIN")
   void view_passesUmlautQueryAsUriVariable_notFormEncoded() throws Exception {
@@ -187,11 +170,6 @@ class AdminPersonalInventoryPageControllerMvcTest {
     assertEquals(term, qCaptor.getValue());
   }
 
-  // Regression (2026-09-23): an invalid create used to flash its BindingResult through the
-  // redirect.
-  // The session serializer writes a BindingResult but cannot read one back, so the redirect's GET
-  // dropped the whole flash map and the admin saw a closed modal with no errors. It now re-renders
-  // inline, with nothing flashed and nothing sent to the backend.
   @Test
   @WithMockUser(roles = "ADMIN")
   void add_withValidationErrors_reRendersInlineWithTheModalOpen_andFlashesNothing()
@@ -215,7 +193,6 @@ class AdminPersonalInventoryPageControllerMvcTest {
     verify(backendApiClient, never()).post(anyString(), any(), any());
   }
 
-  // Same for an invalid update: inline, modal re-opened on the update action, nothing flashed.
   @Test
   @WithMockUser(roles = "ADMIN")
   void update_withValidationErrors_reRendersInlineWithTheModalOpen_andFlashesNothing()

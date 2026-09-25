@@ -193,9 +193,6 @@ public class StaffelMembershipResolver {
       return List.of();
     }
     if (squadronRows.size() == 1) {
-      // The common single-Staffel case needs no name sort and no entity hydration — but still
-      // confirms the squadron resolves (cheap existsById) so a dangling row is dropped consistently
-      // with the multi-row branch, rather than returned unchecked.
       UUID staffelId = squadronRows.getFirst().getId().getOrgUnitId();
       return squadronRepository.existsById(staffelId) ? List.of(staffelId) : List.of();
     }

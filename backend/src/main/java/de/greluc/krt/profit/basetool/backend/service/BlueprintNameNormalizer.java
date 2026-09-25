@@ -57,9 +57,7 @@ public class BlueprintNameNormalizer {
     if (s.isEmpty()) {
       return "";
     }
-    // Fold Unicode double-quote glyphs (" " „ ‟) to the ASCII double quote.
     s = s.replace('“', '"').replace('”', '"').replace('„', '"').replace('‟', '"');
-    // Fold Unicode single-quote / apostrophe / prime glyphs (' ' ‚ ‛ ′ `) to the ASCII apostrophe.
     s =
         s.replace('‘', '\'')
             .replace('’', '\'')

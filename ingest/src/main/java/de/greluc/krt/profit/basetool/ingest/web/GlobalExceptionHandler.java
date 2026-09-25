@@ -135,11 +135,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         ex.getBindingResult().getFieldErrors().stream()
             .map(fe -> fe.getField() + ": " + fe.getDefaultMessage())
             .toList();
-    // "Mein Extrakt wird abgelehnt" is the most common ingest support question, and until now the
-    // failing constraint existed only in the response body — so the operator had to ask the
-    // reporter to paste it back. Field paths and Jakarta constraint messages are schema text, not
-    // request content; the REJECTED VALUE is deliberately never touched (REQ-OBS-004), and the
-    // joined string is sanitised because a field path can carry a client-supplied map key.
     log.warn(
         "Ingest payload rejected by validation: {}",
         LogSafe.text(String.join("; ", fieldErrors), MAX_LOGGED_FIELD_ERRORS));
@@ -155,8 +150,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
       @NotNull HttpHeaders headers,
       @NotNull HttpStatusCode status,
       @NotNull WebRequest request) {
-    // Class name only. Jackson's message quotes the offending part of the BODY, which on this
-    // module is a user's extract — it must never reach an appender (REQ-OBS-004).
     log.warn("Ingest body could not be parsed as JSON ({})", ex.getClass().getSimpleName());
     ProblemDetail problem =
         problem(
@@ -248,10 +241,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
               + " again shortly and report it if it persists.");
     }
     if (status.is4xxClientError()) {
-      // DEBUG, not WARN: the backend already logged this reject at WARN with the full context, and
-      // REQ-OBS-001 allows exactly one line per failure. This is the gateway-side breadcrumb that
-      // says "the 400 the extractor saw came from the backend, not from our own validation" —
-      // without it the two are indistinguishable in the ingest log.
       log.debug("Backend relay rejected the import with {}", status.value());
       countHandoffError(MetricNames.REASON_BACKEND_REJECT);
       return problem(status, "Backend rejected the import", CODE_BAD_REQUEST, backendDetail(ex));
@@ -321,8 +310,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
    */
   @ExceptionHandler(CallNotPermittedException.class)
   public @NotNull ProblemDetail handleBackendCircuitOpen(@NotNull CallNotPermittedException ex) {
-    // Reference the exception (class name only — no stack trace at DEBUG for a routine
-    // short-circuit).
     log.debug("Backend circuit open ({}); rejecting relay", ex.getClass().getSimpleName());
     return backendUnavailable();
   }
@@ -364,7 +351,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   @ExceptionHandler(DataAccessException.class)
   public @NotNull ResponseEntity<ProblemDetail> handleStagingUnavailable(
       @NotNull DataAccessException ex) {
-    // Class name only — a Lettuce message can carry the configured Redis endpoint.
     log.warn("Handoff staging unavailable: {}", ex.getClass().getSimpleName());
     countHandoffError(MetricNames.REASON_STAGING_UNAVAILABLE);
     meterRegistry

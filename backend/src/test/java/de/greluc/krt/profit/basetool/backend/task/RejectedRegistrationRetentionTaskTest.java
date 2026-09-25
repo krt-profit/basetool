@@ -57,7 +57,6 @@ class RejectedRegistrationRetentionTaskTest {
         new RejectedRegistrationRetentionProperties(true, MAX_AGE, INTERVAL));
   }
 
-  // covers REQ-SEC-057 — the cutoff is "now - max-age"
   @Test
   void purgesRegistrationsRejectedBeforeTheCutoff() {
     when(retentionService.purgeRejectedOlderThan(any())).thenReturn(2);
@@ -74,7 +73,6 @@ class RejectedRegistrationRetentionTaskTest {
   void swallowsFailuresSoSchedulerSurvives() {
     when(retentionService.purgeRejectedOlderThan(any())).thenThrow(new RuntimeException("db down"));
 
-    // Must not propagate.
     task().purgeExpiredRejectedRegistrations();
   }
 }

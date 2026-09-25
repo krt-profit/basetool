@@ -78,7 +78,6 @@ public class LocationRepositoryRefineryTest {
     return locationRepository.save(location);
   }
 
-  // covers REQ-REFINERY-020 — a flagged city or station is offered, an unflagged one is not.
   @Test
   public void testFindLocationsWithRefinery() {
     City city = new City();
@@ -112,8 +111,6 @@ public class LocationRepositoryRefineryTest {
     assertFalse(refineries.contains(plainLocation));
   }
 
-  // covers REQ-REFINERY-020 — the reported bug: UEX claims has_refinery = 0 for MIC-L5 / ARC-L4 /
-  // Patch City, but a live refinery terminal sits there, so the derived flag wins.
   @Test
   public void testUexClaimFalseButRefineryTerminalPresentIsIncluded() {
     Location micL5 = saveStationLocation("MIC-L5 Modern Icarus Station", false, true);
@@ -122,8 +119,6 @@ public class LocationRepositoryRefineryTest {
     assertTrue(locationRepository.findLocationsWithRefinery().contains(micL5));
   }
 
-  // covers REQ-REFINERY-020 — the mirror image: UEX claims has_refinery = 1 for the People's
-  // Service Stations, but no refinery terminal exists, so they must NOT be offered.
   @Test
   public void testUexClaimTrueWithoutRefineryTerminalIsExcluded() {
     Location bogus = saveStationLocation("People's Service Station Alpha", true, false);
@@ -132,9 +127,6 @@ public class LocationRepositoryRefineryTest {
     assertFalse(locationRepository.findLocationsWithRefinery().contains(bogus));
   }
 
-  // covers REQ-REFINERY-020 — a hidden station-backed refinery is not offered. This also guards the
-  // query's parentheses: AND binds tighter than OR, so an unparenthesised predicate would apply the
-  // hidden filter to the city branch only and let this station leak straight back into the picker.
   @Test
   public void testHiddenStationBackedRefineryIsExcluded() {
     Location hidden = saveStationLocation("Hidden Refinery Station", false, true);
@@ -145,9 +137,6 @@ public class LocationRepositoryRefineryTest {
     assertFalse(locationRepository.findLocationsWithRefinery().contains(hidden));
   }
 
-  // covers REQ-REFINERY-020 — the city-backed half of the same rule: hiding a location removes it
-  // from the refinery picker exactly as it already removes it from every other location picker, so
-  // a user can no longer open an order at a location they cannot then book the yield into.
   @Test
   public void testHiddenCityBackedRefineryIsExcluded() {
     City city = new City();
@@ -165,8 +154,6 @@ public class LocationRepositoryRefineryTest {
     assertFalse(locationRepository.findLocationsWithRefinery().contains(hidden));
   }
 
-  // covers REQ-REFINERY-020 — the hidden filter must not swallow the visible ones alongside it: a
-  // refinery that is merely a sibling of a hidden one stays offered.
   @Test
   public void testVisibleRefineryIsStillOfferedAlongsideAHiddenOne() {
     Location visible = saveStationLocation("Visible Refinery Station", false, true);

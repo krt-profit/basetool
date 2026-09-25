@@ -100,8 +100,6 @@ public class GameItem extends AbstractEntity<UUID> {
   @Column(name = "source_systems", nullable = false, length = 16)
   private GameItemSourceSystem sourceSystems = GameItemSourceSystem.UEX_ONLY;
 
-  // ───── Wiki-sourced columns (R4 writes; R2 leaves NULL) ─────
-
   /** SC Wiki URL slug (e.g. {@code "venture-helmet-white-2"}). R4. */
   @Column(name = "scwiki_slug")
   private String scwikiSlug;
@@ -190,8 +188,6 @@ public class GameItem extends AbstractEntity<UUID> {
   @Column(name = "scwiki_game_version_seen")
   private String scwikiGameVersionSeen;
 
-  // ───── UEX-sourced columns (R2 writes) ─────
-
   /** UEX integer item id. Unique across the table; the fastest re-resolution key. */
   @Column(name = "uex_item_id", unique = true)
   private Integer uexItemId;
@@ -277,8 +273,6 @@ public class GameItem extends AbstractEntity<UUID> {
   /** Game version in which UEX last observed this row. */
   @Column(name = "uex_game_version_seen")
   private String uexGameVersionSeen;
-
-  // ───── KRT P4K Reader source lane (catalog import) ─────
 
   /**
    * DataForge {@code __ref} asset GUID observed by the KRT P4K Reader import for this item. Kept

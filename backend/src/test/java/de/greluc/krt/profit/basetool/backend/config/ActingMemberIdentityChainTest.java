@@ -157,14 +157,6 @@ class ActingMemberIdentityChainTest {
             .addFilters(context.getBean(FilterChainProxy.class))
             .build();
 
-    // An approved, live member — the state both gates are supposed to let through. Seeded rather
-    // than mocked because the liveness check and both gates read the real row.
-    //
-    // REQ-SEC-053: the row carries KRT Member. It did not until ADR-0159, and it did not have to,
-    // because a role-less account was mapped onto the authority-less GUEST role and admitted. The
-    // acting-member path reuses assembleFor (ADR-0129), so it refuses a role-less member with 403
-    // NO_ROLE exactly like the bearer path — which is the point of putting the check there and not
-    // on the JWT. A member with no role is not a shape production has any more.
     User member = new User();
     member.setId(MEMBER);
     member.setUsername("acting-member");
@@ -221,8 +213,6 @@ class ActingMemberIdentityChainTest {
   @Test
   void refusesAnActingMemberWhoHoldsNoRole() throws Exception {
     User roleLess = userRepository.findById(MEMBER).orElseThrow();
-    // A mutable set: the row is managed here, so Hibernate wraps whatever it is handed in a
-    // PersistentSet and writes through it.
     roleLess.setRoles(new java.util.HashSet<>());
     userRepository.saveAndFlush(roleLess);
     termsAcceptanceService.acceptCurrentTerms(MEMBER);
@@ -284,9 +274,6 @@ class ActingMemberIdentityChainTest {
    */
   @Test
   void refusesToRecordConsentForTheGatewayItself() throws Exception {
-    // The stray row, reproduced. Without it the insert would fail on the app_user foreign key and
-    // the test would go red for a reason that has nothing to do with the guard - which is exactly
-    // the false confidence to avoid, because production HAS this row.
     User strayGatewayRow = new User();
     strayGatewayRow.setId(UUID.fromString(GATEWAY));
     strayGatewayRow.setUsername("service-account-test-ingest-gateway");
@@ -413,8 +400,6 @@ class ActingMemberIdentityChainTest {
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value(ActingMemberFilter.CODE_ACTING_MEMBER_REFUSED));
 
-    // Still present and still ACTIVE locally: the refusal follows the identity provider's verdict,
-    // not anything this application changed about the row.
     assertThat(userRepository.findById(MEMBER)).isPresent();
   }
 

@@ -312,19 +312,6 @@ public interface MissionRepository
       """)
   boolean existsByOperationIdWithUnfinishedActualTime(@Param("operationId") UUID operationId);
 
-  // ---------------------------------------------------------------------------------------------
-  // DB-enforced section-counter bumps (#1112/#1114/#1147). Each mission edit section carries its
-  // own plain BIGINT *Version counter (NOT the row @Version). Before mutating a section, its
-  // service calls the matching bump below: an atomic conditional UPDATE that increments the
-  // counter iff the caller's echoed value still matches the persisted one. Zero rows affected
-  // means a concurrent same-section writer already moved it → the service maps that to a 409.
-  // Because the UPDATE also takes a row lock, two racing same-section writers are serialised (the
-  // loser blocks, re-reads the now-bumped counter and gets 0 rows), which closes the check-then-act
-  // window the in-memory guard alone could not (see MissionSectionVersions.enforceSectionVersion).
-  // These are bulk UPDATEs: they bypass Hibernate's dirty-checking and the row @Version, so the
-  // counter columns stay @OptimisticLock(excluded = true) and no cross-section 409 is produced.
-  // ---------------------------------------------------------------------------------------------
-
   /**
    * Atomically bumps {@code coreVersion} iff it still equals {@code expected}; the mission-core
    * section guard.

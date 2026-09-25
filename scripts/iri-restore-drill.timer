@@ -1,22 +1,10 @@
-; systemd timer that fires the restore drill weekly (Sunday 05:30, host-local).
-;
-; 05:30 Sunday sits well clear of the 04:15 nightly backup window, so the
-; throwaway Postgres container the drill spins up never contends with the
-; backup's brief writer-quiesce. The drill touches no production state, so the
-; exact time is not load-bearing — only that it runs regularly.
-
 [Unit]
 Description=Profit Basetool — weekly restore drill (Sun 05:30)
 Documentation=https://github.com/krt-profit/basetool/blob/main/docs/backup.md
-; No Requires= on the service: a timer only TRIGGERS it, through Unit= below. A Requires= also
-; starts the service whenever the timer itself starts -- at every boot, when timers.target pulls the
-; timer in -- whether or not a drill was due (docs/arc42/07-deployment-view.md §7.4b). Guarded by
-; scripts/container-runtime.test.sh.
 
 [Timer]
 OnCalendar=Sun *-*-* 05:30:00
 
-; Catch up a missed drill on the next boot rather than skipping a week.
 Persistent=true
 RandomizedDelaySec=5min
 

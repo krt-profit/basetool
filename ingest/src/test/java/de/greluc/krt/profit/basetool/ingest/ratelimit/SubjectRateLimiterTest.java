@@ -51,12 +51,11 @@ class SubjectRateLimiterTest {
   void allowsUpToCapacityThenThrowsWithRetryAfter() {
     SubjectRateLimiter limiter = new SubjectRateLimiter(props(1, true), meterRegistry);
 
-    limiter.requireWithinLimit("sub-a"); // consumes the only token
+    limiter.requireWithinLimit("sub-a");
 
     RateLimitedException ex =
         assertThrows(RateLimitedException.class, () -> limiter.requireWithinLimit("sub-a"));
     assertThat(ex.getRetryAfterSeconds()).isPositive();
-    // The rejection is counted once under the bounded `subject` bucket, never the JWT sub.
     assertThat(
             meterRegistry
                 .get(MetricNames.RATELIMIT_REJECTIONS)
@@ -64,8 +63,6 @@ class SubjectRateLimiterTest {
                 .counter()
                 .count())
         .isEqualTo(1.0d);
-    // (#1041 item 19) Both evaluations — the consumed one and the rejected one — are counted, so
-    // requests (2) > rejections (1); this is the rejection-ratio denominator.
     assertThat(
             meterRegistry
                 .get(MetricNames.RATELIMIT_REQUESTS)
@@ -77,9 +74,6 @@ class SubjectRateLimiterTest {
 
   @Test
   void rejectionIsWarnedWithTheBudgetAndRetryDelayButNeverTheSubject() {
-    // Until this line existed a per-subject 429 was invisible in the log — the operator saw only
-    // "-> 429" and could not tell it apart from the coarse per-IP limiter. The subject itself
-    // stays out of the message: it is already the `userId` MDC field (REQ-OBS-001/-004).
     SubjectRateLimiter limiter = new SubjectRateLimiter(props(1, true), meterRegistry);
     limiter.requireWithinLimit("2b9f1c3e-0000-4000-8000-abcdefabcdef");
 
@@ -91,7 +85,6 @@ class SubjectRateLimiterTest {
               try {
                 limiter.requireWithinLimit("2b9f1c3e-0000-4000-8000-abcdefabcdef");
               } catch (RateLimitedException expected) {
-                // The throw is the contract; the log line is what is under test.
               }
             });
 
@@ -105,7 +98,6 @@ class SubjectRateLimiterTest {
 
   @Test
   void anAcceptedCallLogsNothing() {
-    // The access log already records every request; a line per accepted call would only add noise.
     SubjectRateLimiter limiter = new SubjectRateLimiter(props(5, true), meterRegistry);
 
     List<ILoggingEvent> events =
@@ -119,9 +111,8 @@ class SubjectRateLimiterTest {
   void budgetsAreIndependentPerSubject() {
     SubjectRateLimiter limiter = new SubjectRateLimiter(props(1, true), meterRegistry);
 
-    limiter.requireWithinLimit("sub-a"); // exhausts sub-a only
+    limiter.requireWithinLimit("sub-a");
 
-    // A different subject still has a full budget — the limit is per-sub, not global.
     assertThatCode(() -> limiter.requireWithinLimit("sub-b")).doesNotThrowAnyException();
   }
 
@@ -135,7 +126,6 @@ class SubjectRateLimiterTest {
               limiter.requireWithinLimit("sub-a");
             })
         .doesNotThrowAnyException();
-    // A disabled limiter returns before evaluating a bucket, so nothing is counted (#1041 item 19).
     assertThat(meterRegistry.find(MetricNames.RATELIMIT_REQUESTS).counter()).isNull();
   }
 }

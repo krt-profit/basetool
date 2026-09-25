@@ -71,8 +71,6 @@ class AdminBankPageControllerMvcTest {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   }
 
-  // covers #582 — the wipe-reset twin (X-Requested-With + confirm=WIPE) returns the affected counts
-  // as JSON so the page shows a result toast in place.
   @Test
   @WithMockUser(roles = "ADMIN")
   void wipeResetAjax_withHeaderAndConfirm_returns200WithCounts() throws Exception {
@@ -90,8 +88,6 @@ class AdminBankPageControllerMvcTest {
         .andExpect(content().string(containsString("accountsReset")));
   }
 
-  // covers #582 — the server-side confirm-token backstop: a wrong token is rejected with 400 and no
-  // backend call (the type-to-confirm modal is bypassed by a crafted POST).
   @Test
   @WithMockUser(roles = "ADMIN")
   void wipeResetAjax_withHeaderWrongConfirm_returns400() throws Exception {
@@ -104,10 +100,6 @@ class AdminBankPageControllerMvcTest {
         .andExpect(status().isBadRequest());
   }
 
-  // covers #582 — a backend lock conflict (the all-account wipe lock racing a concurrent booking)
-  // is
-  // relayed as the backend status (409) with the problem code so krtFetch offers the reload-confirm
-  // rather than collapsing it to a bare 500 with a generic toast.
   @Test
   @WithMockUser(roles = "ADMIN")
   void wipeResetAjax_backendConflict_relays409() throws Exception {
@@ -127,8 +119,6 @@ class AdminBankPageControllerMvcTest {
         .andExpect(content().string(containsString("PESSIMISTIC_LOCK")));
   }
 
-  // covers #582 — header routing: the same URL WITHOUT the header still hits the classic form
-  // handler and redirects (no-JS fallback preserved).
   @Test
   @WithMockUser(roles = "ADMIN")
   void wipeReset_withoutHeader_redirects() throws Exception {

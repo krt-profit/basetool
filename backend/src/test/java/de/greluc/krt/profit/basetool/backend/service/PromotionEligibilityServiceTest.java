@@ -72,8 +72,6 @@ class PromotionEligibilityServiceTest {
   void enablePromotionFeatureFlag() {
     lenient().when(ownerScopeService.isPromotionFeatureEnabledForCurrentScope()).thenReturn(true);
     lenient().when(ownerScopeService.hasPromotionReadAccess()).thenReturn(true);
-    // No active pin in these unit tests → null scope → the scoped finders behave like the old
-    // unscoped ones, which keeps every eligibility scenario below focused on the matching logic.
     lenient().when(ownerScopeService.currentSquadronId()).thenReturn(Optional.empty());
   }
 
@@ -100,7 +98,6 @@ class PromotionEligibilityServiceTest {
 
   @Test
   void evaluateForRanks_shouldSatisfyCategoryRequirement_whenMemberHasMatchingLevel() {
-    // Given – "Anwesenheit must be at least LEVEL_A" rule for 20 -> 19
     PromotionTopic grundlagen = topic("Grundlagen");
     PromotionCategory anwesenheit = category(grundlagen, "Anwesenheit");
     RankRequirement req = categoryRule(anwesenheit, PromotionLevel.LEVEL_A, "Anwesenheit A");
@@ -110,10 +107,8 @@ class PromotionEligibilityServiceTest {
     when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopicScoped(USER, null))
         .thenReturn(List.of(evaluation(USER, anwesenheit, PromotionLevel.LEVEL_A)));
 
-    // When
     PromotionEligibilityResponse result = service.evaluateForRanks(USER, 20, 19);
 
-    // Then
     assertTrue(result.eligible());
     assertTrue(result.hasConfiguredRules());
     assertEquals(1, result.checks().size());
@@ -128,7 +123,6 @@ class PromotionEligibilityServiceTest {
   void evaluateForRanks_shouldFailCategoryRequirement_whenLevelTooLow() {
     PromotionTopic grundlagen = topic("Grundlagen");
     PromotionCategory anwesenheit = category(grundlagen, "Anwesenheit");
-    // Demand LEVEL_B but member has LEVEL_A
     RankRequirement req = categoryRule(anwesenheit, PromotionLevel.LEVEL_B, "Anwesenheit B");
 
     when(rankRequirementRepository.findAllForRankTransitionWithRelationsScoped(19, 18, null))
@@ -145,7 +139,6 @@ class PromotionEligibilityServiceTest {
 
   @Test
   void evaluateForRanks_shouldCountCategoriesInTopic_whenTopicScopedRequirement() {
-    // Given – 2× LEVEL_A in topic "Grundlagen"
     PromotionTopic grundlagen = topic("Grundlagen");
     PromotionCategory flug = category(grundlagen, "Flug Kenntnisse");
     PromotionCategory schiff = category(grundlagen, "Schiffsbetrieb");
@@ -163,9 +156,6 @@ class PromotionEligibilityServiceTest {
 
     PromotionEligibilityResponse result = service.evaluateForRanks(USER, 20, 19);
 
-    // Disjoint matching reserves exactly `requiredCount` categories and stops – achievedCount
-    // therefore caps at requiredCount. The third A-category remains unreserved (no other rule
-    // claims it). Aggregate eligibility is still satisfied.
     assertTrue(result.eligible());
     PromotionRequirementCheckResponse check = result.checks().get(0);
     assertEquals(2, check.achievedCount());
@@ -178,7 +168,6 @@ class PromotionEligibilityServiceTest {
   void evaluateForRanks_shouldFailTopicRequirement_whenNotEnoughCategoriesReachLevel() {
     PromotionTopic grundlagen = topic("Grundlagen");
     PromotionCategory flug = category(grundlagen, "Flug Kenntnisse");
-    // Want 3× LEVEL_B but only one category reaches it.
     RankRequirement req = topicRule(grundlagen, PromotionLevel.LEVEL_B, 3, "3B in Grundlagen");
 
     when(rankRequirementRepository.findAllForRankTransitionWithRelationsScoped(19, 18, null))
@@ -195,9 +184,6 @@ class PromotionEligibilityServiceTest {
 
   @Test
   void evaluateForRanks_shouldCountAnwesenheitAIntoTopicAggregate() {
-    // The motivating scenario from the requirements:
-    // "Grundlagen mindestens 2A und die darin befindliche Kategorie Anwesenheit muss
-    // mindestens A sein – Anwesenheit-A zählt in die 2A hinein."
     PromotionTopic grundlagen = topic("Grundlagen");
     PromotionCategory flug = category(grundlagen, "Flug Kenntnisse");
     PromotionCategory anwesenheit = category(grundlagen, "Anwesenheit");
@@ -209,7 +195,6 @@ class PromotionEligibilityServiceTest {
 
     when(rankRequirementRepository.findAllForRankTransitionWithRelationsScoped(20, 19, null))
         .thenReturn(List.of(topicRule, categoryRule));
-    // Member has exactly 2 A-level entries: one for Flug, one for Anwesenheit
     when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopicScoped(USER, null))
         .thenReturn(
             List.of(
@@ -218,8 +203,6 @@ class PromotionEligibilityServiceTest {
 
     PromotionEligibilityResponse result = service.evaluateForRanks(USER, 20, 19);
 
-    // Both rules must succeed – Anwesenheit-A satisfies the category rule AND counts
-    // towards the topic-aggregate "2A in Grundlagen".
     assertTrue(result.eligible(), "Anwesenheit A counts towards the 2A topic aggregate");
     assertEquals(2, result.checks().size());
     for (PromotionRequirementCheckResponse check : result.checks()) {
@@ -229,7 +212,6 @@ class PromotionEligibilityServiceTest {
 
   @Test
   void evaluateForRanks_shouldFailWhenCategoryRuleMissesEvenIfTopicAggregateMet() {
-    // The category rule binds Anwesenheit specifically. Two A's elsewhere don't help.
     PromotionTopic grundlagen = topic("Grundlagen");
     PromotionCategory flug = category(grundlagen, "Flug Kenntnisse");
     PromotionCategory schiff = category(grundlagen, "Schiffsbetrieb");
@@ -246,9 +228,7 @@ class PromotionEligibilityServiceTest {
         .thenReturn(
             List.of(
                 evaluation(USER, flug, PromotionLevel.LEVEL_A),
-                evaluation(USER, schiff, PromotionLevel.LEVEL_A)
-                // Anwesenheit unset
-                ));
+                evaluation(USER, schiff, PromotionLevel.LEVEL_A)));
 
     PromotionEligibilityResponse result = service.evaluateForRanks(USER, 20, 19);
 
@@ -263,7 +243,6 @@ class PromotionEligibilityServiceTest {
 
   @Test
   void evaluateForRanks_shouldRespectLevelOrdering_AisLowestCisHighest() {
-    // A member with LEVEL_C should satisfy a "minimum LEVEL_A" rule (higher counts for lower).
     PromotionTopic grundlagen = topic("Grundlagen");
     PromotionCategory flug = category(grundlagen, "Flug Kenntnisse");
     RankRequirement req = categoryRule(flug, PromotionLevel.LEVEL_A, "Flug A");
@@ -280,11 +259,6 @@ class PromotionEligibilityServiceTest {
 
   @Test
   void evaluateForRanks_shouldEnforceDisjointMatching_betweenTopicScopedRulesInSameTopic() {
-    // The squadron's promotion concept demands: "3× B in Grundlagen-Kategorien plus 1× A in
-    // einer ANDEREN Grundlagen-Kategorie" — i.e. the A-rule's category must be distinct from
-    // the three B-categories. With only three B-rated categories available, the A-rule must
-    // fail (no fourth distinct category) even though all three categories trivially satisfy
-    // the "at least A" check on their own.
     PromotionTopic grundlagen = topic("Grundlagen");
     PromotionCategory katA = category(grundlagen, "KatA");
     PromotionCategory katB = category(grundlagen, "KatB");
@@ -316,8 +290,6 @@ class PromotionEligibilityServiceTest {
 
   @Test
   void evaluateForRanks_shouldSatisfyDisjointTopicRules_whenFourDistinctCategoriesProvided() {
-    // Same setup as the previous test but with a fourth A-rated category. Now the disjoint
-    // matching succeeds: 3B consumes the three B-categories, 1A picks up the fourth.
     PromotionTopic grundlagen = topic("Grundlagen");
     PromotionCategory katA = category(grundlagen, "KatA");
     PromotionCategory katB = category(grundlagen, "KatB");
@@ -349,10 +321,6 @@ class PromotionEligibilityServiceTest {
 
   @Test
   void evaluateForRanks_shouldReserveHigherLevelForStricterRule_inDisjointMatching() {
-    // Strictest-first ordering: with two C-rated and one A-rated category in the topic, the
-    // "2× C" rule must take both C-categories first; the "1× A" rule then picks up the A-cat.
-    // Even if the repository returns the rules in (A-rule, C-rule) order, the algorithm sorts
-    // by strictness so C wins the C-categories.
     PromotionTopic grundlagen = topic("Grundlagen");
     PromotionCategory katA = category(grundlagen, "KatA");
     PromotionCategory katB = category(grundlagen, "KatB");
@@ -379,8 +347,6 @@ class PromotionEligibilityServiceTest {
 
   @Test
   void evaluateForRanks_shouldStillSatisfyLooserRule_whenStricterRuleNotFullyMet() {
-    // The stricter rule runs out of high-level categories; the looser rule can still claim
-    // the remaining ones. Independent evaluation – not "either both or neither".
     PromotionTopic grundlagen = topic("Grundlagen");
     PromotionCategory katA = category(grundlagen, "KatA");
     PromotionCategory katB = category(grundlagen, "KatB");
@@ -409,10 +375,6 @@ class PromotionEligibilityServiceTest {
 
   @Test
   void evaluateForRanks_shouldAllowCategoryRuleToOverlapWithTopicAggregate_underDisjointMatching() {
-    // The squadron's full canonical scenario: "3B in Grundlagen + 1A in another Grundlagen
-    // category + Anwesenheit (a Grundlagen category) must be B". The category-scoped
-    // Anwesenheit rule must NOT consume the Anwesenheit-cat from the topic-scoped pool –
-    // otherwise satisfying Anwesenheit-B would reduce the available B-cats for "3B".
     PromotionTopic grundlagen = topic("Grundlagen");
     PromotionCategory anwesenheit = category(grundlagen, "Anwesenheit");
     PromotionCategory katA = category(grundlagen, "KatA");
@@ -427,8 +389,6 @@ class PromotionEligibilityServiceTest {
 
     when(rankRequirementRepository.findAllForRankTransitionWithRelationsScoped(20, 19, null))
         .thenReturn(List.of(threeBRule, oneARule, anwesenheitRule));
-    // Four distinct categories: Anwesenheit (B) + two more B's + one A. The Anwesenheit cat
-    // satisfies BOTH the category rule AND counts as one of the three B-cats for "3B".
     when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopicScoped(USER, null))
         .thenReturn(
             List.of(
@@ -447,9 +407,6 @@ class PromotionEligibilityServiceTest {
 
   @Test
   void evaluateForRanks_shouldKeepDisjointMatchingPerTopic_notAcrossTopics() {
-    // Disjointness is a within-topic property. A B-cat in Grundlagen and a B-cat in
-    // Spezialisierungen each satisfy their own topic's "1× B" rule – they don't compete
-    // because they live in different topics.
     PromotionTopic grundlagen = topic("Grundlagen");
     PromotionTopic spez = topic("Spezialisierungen");
     PromotionCategory grundlagenKat = category(grundlagen, "G-Kat");
@@ -479,7 +436,6 @@ class PromotionEligibilityServiceTest {
   void evaluateAllForUser_shouldReturnOneEntryPerConfiguredTransition() {
     when(rankRequirementRepository.findDistinctRankTransitionsScoped(null))
         .thenReturn(List.of(new Object[] {20, 19}, new Object[] {19, 18}));
-    // Both transitions resolve to empty rules => not eligible / hasConfiguredRules=false
     when(rankRequirementRepository.findAllForRankTransitionWithRelationsScoped(
             anyInt(), anyInt(), isNull()))
         .thenReturn(List.of());
@@ -493,15 +449,12 @@ class PromotionEligibilityServiceTest {
     assertEquals(19, result.get(0).toRank());
     assertEquals(19, result.get(1).fromRank());
     assertEquals(18, result.get(1).toRank());
-    // REQ-DATA-003: the member's evaluation set is loaded once for the whole user, not 2× per
-    // transition (was 2×T = 4 reads for these two transitions before the dedup).
     verify(memberEvaluationRepository, times(1))
         .findAllByUserIdWithCategoryAndTopicScoped(USER, null);
   }
 
   @Test
   void evaluateForRanks_shouldScopeRequirementAndEvaluationLoadsToActiveSquadron() {
-    // Given: the caller is pinned to a specific squadron.
     UUID scopeId = UUID.randomUUID();
     when(ownerScopeService.currentSquadronId()).thenReturn(Optional.of(scopeId));
     when(rankRequirementRepository.findAllForRankTransitionWithRelationsScoped(20, 19, scopeId))
@@ -509,19 +462,12 @@ class PromotionEligibilityServiceTest {
     when(memberEvaluationRepository.findAllByUserIdWithCategoryAndTopicScoped(USER, scopeId))
         .thenReturn(List.of());
 
-    // When
     service.evaluateForRanks(USER, 20, 19);
 
-    // Then: both the requirement load and the member's grade load are filtered by that squadron,
-    // so neither another squadron's rules nor the member's grades there bleed into the result.
     verify(rankRequirementRepository).findAllForRankTransitionWithRelationsScoped(20, 19, scopeId);
     verify(memberEvaluationRepository, atLeastOnce())
         .findAllByUserIdWithCategoryAndTopicScoped(USER, scopeId);
   }
-
-  // ---------------------------------------------------------------------------------
-  // Helpers
-  // ---------------------------------------------------------------------------------
 
   private PromotionRequirementCheckResponse checkForRequirement(
       PromotionEligibilityResponse result, RankRequirement req) {

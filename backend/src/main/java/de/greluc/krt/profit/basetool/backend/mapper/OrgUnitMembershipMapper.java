@@ -61,8 +61,6 @@ public interface OrgUnitMembershipMapper {
   @Mapping(target = "userDisplayName", source = "user.effectiveName")
   @Mapping(target = "isLogistician", source = "logistician")
   @Mapping(target = "isMissionManager", source = "missionManager")
-  // is_lead was dropped in the epic #800 Phase 5 cleanup (V187); the wire flag is now derived from
-  // the unified rank (role == SK_LEAD), keeping role the single source of truth.
   @Mapping(target = "isLead", expression = "java(entity.getRole() == MembershipRole.SK_LEAD)")
   OrgUnitMembershipDto toDto(OrgUnitMembership entity);
 }

@@ -69,9 +69,6 @@ public class P4kImportJobRunner {
   @Async(AsyncConfig.IMPORT_EXECUTOR)
   public void run(@NotNull UUID jobId, @NotNull P4kImportJobKind kind, boolean seedNew) {
     log.info("P4K import job {} ({}) starting.", jobId, kind);
-    // Whether the APPLY reconcile transaction actually committed (its own @Transactional; a normal
-    // return means committed). Gates the cache eviction below so it fires iff master data changed —
-    // never for a PREVIEW and never for an apply that rolled back.
     boolean appliedMasterData = false;
     try {
       jobService.markRunning(jobId);
@@ -86,26 +83,18 @@ public class P4kImportJobRunner {
       jobService.markSucceeded(jobId, objectMapper.writeValueAsString(result));
       log.info("P4K import job {} ({}) succeeded.", jobId, kind);
     } catch (BadRequestException e) {
-      // Expected bad-catalog input — the message is enough; a stacktrace would just be noise.
       log.warn("P4K import job {} ({}) failed: {}", jobId, kind, e.getMessage());
       jobService.markFailed(jobId, describe(e));
     } catch (Exception e) {
-      // Genuinely unexpected (parse NPE, DB constraint, ...): keep the stacktrace for root-causing.
       log.warn("P4K import job {} ({}) failed", jobId, kind, e);
       jobService.markFailed(jobId, describe(e));
     } finally {
       if (kind == P4kImportJobKind.APPLY) {
         if (appliedMasterData) {
-          // The apply runs on the import executor, outside the UEX / SC Wiki scheduler sweeps, so
-          // it
-          // has no @CacheEvict of its own — evict the master-data caches it rewrote (materials,
-          // manufacturers, ship types, blueprint family index) so the changes are visible on the
-          // next read instead of after the 12 h TTL (REQ-DATA-011, CACHE-SYNC-EVICT-001).
           safely(
               cacheEvictionService::evictP4kSyncedMasterData,
               "evict P4K-synced master-data caches");
         }
-        // The apply ran against its own payload copy and is terminal — reclaim the bytes now.
         safely(() -> jobService.deletePayload(jobId), "delete payload");
       }
       safely(jobService::pruneOldJobs, "prune old jobs");

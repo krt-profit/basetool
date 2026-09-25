@@ -1,39 +1,12 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <body>
-<!--/*
-  Lazily-loaded per-stack entry rows for the append-only Lager (ADR-0003, REQ-INV-002).
 
-  The grouped Lager view (inventory-my / inventory-admin) renders only the collapsed
-  Material -> Stack rows. A stack's individual append-only entries are NOT inlined — a
-  stack grows unboundedly — so the browser fetches them on expand from
-  /inventory/{my,all}/stack/entries, which renders one of these fragments into the
-  stack's `.stack-entries-content` container. Every per-entry action (book-out, note,
-  association change, bulk select) is wired through the page's existing delegated
-  `data-trigger` handlers (krtEvents), so the injected rows need no re-binding.
-
-  Model contract:
-    - entries     : List<InventoryItemDto>  one page of the stack's entries, oldest-first
-    - entriesPage : PageResponse<InventoryItemDto>  page metadata (page(), totalPages())
-    - jobOrders   : active job orders, candidates for a per-entry job-order allocation chip
-    - missions    : missions, candidates for a per-entry mission allocation chip
-    - error       : optional i18n key set when the backend fetch failed
-*/-->
-
-<!--/* ======================= personal Lager (/inventory/my) ======================= */-->
 <th:block th:fragment="stackEntriesMy">
     <div th:if="${error}" class="hud-box hud-box-error krtm-margin-0-5rem-2-5rem-25ef">
         <p th:text="#{__${error}__}">Fehler</p>
     </div>
-    <!--/* Tree-table leaf rows injected into the stack's .stack-entries-content. No repeated
-         column header; the per-entry bulk checkbox + Auftrag/Einsatz selects sit in
-         .tree-leaf-main, amount + actions stay column-aligned, and a note renders only when
-         present as its own indented .tree-note row. All data-* hooks (bulk select, version
-         sync, book-out, note) are preserved verbatim. */-->
     <th:block th:each="entry : ${entries}">
-        <!--/* Catalog-discriminated leaf rows (REQ-INV-029/030): a material entry renders the
-             historical quality/mission-carrying row, a game-item entry the quality-less,
-             whole-unit item row further below. */-->
         <th:block th:if="${entry.gameItem == null}">
         <div class="tree-row tree-row--leaf" th:data-item-id="${entry.id}">
             <div class="tree-leaf-main">
@@ -42,10 +15,6 @@
                        th:data-material-id="${entry.material.id}"
                        data-trigger="inv-my-update-bulk-state">
                 <div class="tree-fieldset">
-                    <!--/* Auftrag split (Variante C, REQ-INV-027): chips per job-order allocation with
-                         its amount, a "+ Zuordnen" combobox of eligible orders (material required,
-                         not yet allocated), and a rest chip. All editing routes through the
-                         delegated inv-my-assoc-* handlers, which call the per-allocation endpoints. */-->
                     <div class="tree-field">
                         <span class="tree-field-cap" th:text="#{inventory.order}">Auftrag</span>
                         <div class="assoc-split"
@@ -77,10 +46,6 @@
                                                 data-trigger="inv-my-assoc-pick"
                                                 th:data-combobox-placeholder="#{inventory.assoc.add.order}">
                                             <option value=""></option>
-                                            <!--/* REQ-INV-039: the option carries what this order still needs of THIS entry's
-                                                 material, so choosing a target does not mean opening the order first. The
-                                                 lookup is keyed orderId|materialId (orderNeedAmounts); an order that needs
-                                                 nothing more has no entry and keeps its plain label. */-->
                                             <option th:each="order : ${jobOrders}"
                                                     th:if="${order.requiredMaterialIds != null and #lists.contains(order.requiredMaterialIds, entry.material.id) and not #lists.contains(entry.jobOrderAllocations.![jobOrderId], order.id)}"
                                                     th:with="orderNeed=${orderNeedAmounts != null ? orderNeedAmounts.get(order.id + '|' + entry.material.id) : null}"
@@ -109,8 +74,6 @@
                                   th:text="${entry.jobOrderRest == null or (entry.jobOrderRest &gt;= -0.0005 and entry.jobOrderRest &lt;= 0.0005)} ? #{inventory.assoc.rest.zero} : (${entry.jobOrderRest &lt; 0} ? #{inventory.assoc.rest.over(${(entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(-entry.jobOrderRest, 1, 'NONE') : #numbers.formatDecimal(-entry.jobOrderRest, 1, 'NONE', 3, 'DEFAULT'))})} : #{inventory.assoc.rest.free(${entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(entry.jobOrderRest, 1, 'NONE') : #numbers.formatDecimal(entry.jobOrderRest, 1, 'NONE', 3, 'DEFAULT')})})">Rest 0</span>
                         </div>
                     </div>
-                    <!--/* Einsatz split: same shape, no material-required filter (any mission is
-                         eligible) and no delivered marker. */-->
                     <div class="tree-field">
                         <span class="tree-field-cap" th:text="#{inventory.tree.field.mission}">Einsatz</span>
                         <div class="assoc-split"
@@ -241,13 +204,6 @@
             </div>
         </div>
         </th:block>
-        <!--/* Game-item leaf row (REQ-INV-030/031): no quality cell, no mission split, whole
-             amounts (items are PIECE-like units). Carries the "Für Börse freigeben" toggle as a
-             stock-backed item offer (REQ-MARKET-002/014), the item sibling of the material leaf
-             toggle. The Auftrag split offers only ITEM orders that request this gameItem
-             (requiredGameItemIds — the REQ-ORDERS-018 sibling gate). Action buttons carry a PIECE
-             quantity type and no material id, so the shared modals use whole-number steps and keep
-             SELL disabled (no terminal market data for items). */-->
         <th:block th:if="${entry.gameItem != null}">
         <div class="tree-row tree-row--leaf" th:data-item-id="${entry.id}">
             <div class="tree-leaf-main">
@@ -287,10 +243,6 @@
                                                 data-trigger="inv-my-assoc-pick"
                                                 th:data-combobox-placeholder="#{inventory.assoc.add.order}">
                                             <option value=""></option>
-                                            <!--/* REQ-INV-039 (#1742): the option carries what this order still needs of THIS
-                                                 entry's game item - ordered minus delivered minus already earmarked, in whole
-                                                 pieces. Keyed orderId|gameItemId (orderGameItemNeedAmounts), a separate lookup
-                                                 from the material one because it is a different calculation. */-->
                                             <option th:each="order : ${jobOrders}"
                                                     th:if="${order.requiredGameItemIds != null and #lists.contains(order.requiredGameItemIds, entry.gameItem.id) and not #lists.contains(entry.jobOrderAllocations.![jobOrderId], order.id)}"
                                                     th:with="orderNeed=${orderGameItemNeedAmounts != null ? orderGameItemNeedAmounts.get(order.id + '|' + entry.gameItem.id) : null}"
@@ -325,11 +277,6 @@
                 <span><span th:text="${entry.amount != null ? #numbers.formatInteger(entry.amount, 1) : '0'}">10</span> <span class="tree-unit" th:text="#{material.quantity.piece}">Stück</span></span>
             </div>
             <div class="tree-cell tree-cell--actions">
-                <!--/* "Für Börse freigeben" toggle for a game-item row: a stock-backed item offer
-                     (REQ-MARKET-002/014), the item sibling of the material leaf toggle. It carries
-                     no quality (data-kind="ITEM" makes the shared release modal hide the quality
-                     fact) and a literal PIECE unit; the inv-boerse-toggle handler + release modal
-                     otherwise treat it exactly like a material row. */-->
                 <label class="inv-boerse-toggle"
                        th:with="released=${releasedItemIds != null and releasedItemIds.contains(entry.id)}"
                        th:title="#{materialboerse.inventory.forExchange}">
@@ -414,30 +361,15 @@
     </div>
 </th:block>
 
-<!--/* ======================= global Lager (/inventory/all) ======================= */-->
 <th:block th:fragment="stackEntriesAdmin">
     <div th:if="${error}" class="hud-box hud-box-error krtm-margin-0-5rem-2-5rem-25ef">
         <p th:text="#{__${error}__}">Fehler</p>
     </div>
-    <!--/* Tree-table leaf rows injected into the stack's .stack-entries-content. No repeated
-         column header (the page's single .tree-head covers all depths); Auftrag/Einsatz are
-         Variante-C .assoc-split chip groups in .tree-leaf-main (editable for association-capable
-         roles, read-only chips otherwise via sec:authorize), amount + actions stay column-aligned,
-         and a note renders only when present as its own indented .tree-note row. All data-* hooks
-         (book-out, note, inv-admin-assoc-*) are preserved. */-->
     <th:block th:each="entry : ${entries}">
-        <!--/* Catalog-discriminated leaf rows (REQ-INV-029/030): a material entry renders the
-             historical quality/mission-carrying row, a game-item entry the quality-less,
-             whole-unit item row further below. */-->
         <th:block th:if="${entry.gameItem == null}">
         <div class="tree-row tree-row--leaf" th:data-item-id="${entry.id}">
             <div class="tree-leaf-main">
                 <div class="tree-fieldset">
-                    <!--/* Auftrag split (Variante C, REQ-INV-027): chips per job-order allocation with
-                         its amount. A logistician/officer/admin edits the chips and a "+ Zuordnen"
-                         combobox of eligible orders (material required, not yet allocated); every
-                         other viewer sees the same chips read-only. Editing routes through the
-                         delegated inv-admin-assoc-* handlers, which call the per-allocation endpoints. */-->
                     <div class="tree-field">
                         <span class="tree-field-cap" th:text="#{inventory.order}">Auftrag</span>
                         <div class="assoc-split"
@@ -446,7 +378,6 @@
                              th:data-amount="${entry.amount}"
                              th:data-version="${entry.version}"
                              th:data-piece="${entry.material.quantityType == 'PIECE'}">
-                            <!--/* Editable chips + add popover for association-capable roles. */-->
                             <th:block sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
                                 <span th:each="a : ${entry.jobOrderAllocations}"
                                       class="assoc-chip assoc-chip--order"
@@ -471,8 +402,6 @@
                                                     data-trigger="inv-admin-assoc-pick"
                                                     th:data-combobox-placeholder="#{inventory.assoc.add.order}">
                                                 <option value=""></option>
-                                                <!--/* REQ-INV-039: see the sibling picker above — the option states what this
-                                                     order still needs of the entry's material. */-->
                                                 <option th:each="order : ${jobOrders}"
                                                         th:if="${order.requiredMaterialIds != null and #lists.contains(order.requiredMaterialIds, entry.material.id) and not #lists.contains(entry.jobOrderAllocations.![jobOrderId], order.id)}"
                                                         th:with="orderNeed=${orderNeedAmounts != null ? orderNeedAmounts.get(order.id + '|' + entry.material.id) : null}"
@@ -497,7 +426,6 @@
                                     </div>
                                 </span>
                             </th:block>
-                            <!--/* Read-only chips for viewers without association rights. */-->
                             <th:block sec:authorize="!hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
                                 <span th:each="a : ${entry.jobOrderAllocations}"
                                       class="assoc-chip assoc-chip--order">
@@ -511,8 +439,6 @@
                                   th:text="${entry.jobOrderRest == null or (entry.jobOrderRest &gt;= -0.0005 and entry.jobOrderRest &lt;= 0.0005)} ? #{inventory.assoc.rest.zero} : (${entry.jobOrderRest &lt; 0} ? #{inventory.assoc.rest.over(${(entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(-entry.jobOrderRest, 1, 'NONE') : #numbers.formatDecimal(-entry.jobOrderRest, 1, 'NONE', 3, 'DEFAULT'))})} : #{inventory.assoc.rest.free(${entry.material.quantityType == 'PIECE' ? #numbers.formatInteger(entry.jobOrderRest, 1, 'NONE') : #numbers.formatDecimal(entry.jobOrderRest, 1, 'NONE', 3, 'DEFAULT')})})">Rest 0</span>
                         </div>
                     </div>
-                    <!--/* Einsatz split: same shape, no material-required filter (any mission is
-                         eligible) and no delivered marker. */-->
                     <div class="tree-field">
                         <span class="tree-field-cap" th:text="#{inventory.tree.field.mission}">Einsatz</span>
                         <div class="assoc-split"
@@ -521,7 +447,6 @@
                              th:data-amount="${entry.amount}"
                              th:data-version="${entry.version}"
                              th:data-piece="${entry.material.quantityType == 'PIECE'}">
-                            <!--/* Editable chips + add popover for association-capable roles. */-->
                             <th:block sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
                                 <span th:each="a : ${entry.missionAllocations}"
                                       class="assoc-chip assoc-chip--mission"
@@ -569,7 +494,6 @@
                                     </div>
                                 </span>
                             </th:block>
-                            <!--/* Read-only chips for viewers without association rights. */-->
                             <th:block sec:authorize="!hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
                                 <span th:each="a : ${entry.missionAllocations}"
                                       class="assoc-chip assoc-chip--mission">
@@ -637,13 +561,6 @@
             </div>
         </div>
         </th:block>
-        <!--/* Game-item leaf row (REQ-INV-030/031): no quality cell, no mission split, whole
-             amounts, no Materialbörse toggle (the global view has none for any kind — releasing to
-             the Börse is a personal-Lager, owner-only action, same as the material leaf here). The
-             Auftrag split offers only ITEM orders that request this gameItem
-             (requiredGameItemIds); chips stay read-only for non-association roles. Action
-             buttons carry a PIECE quantity type and no material id, so the shared
-             modals use whole-number steps and keep SELL disabled. */-->
         <th:block th:if="${entry.gameItem != null}">
         <div class="tree-row tree-row--leaf" th:data-item-id="${entry.id}">
             <div class="tree-leaf-main">
@@ -656,7 +573,6 @@
                              th:data-amount="${entry.amount}"
                              th:data-version="${entry.version}"
                              data-piece="true">
-                            <!--/* Editable chips + add popover for association-capable roles. */-->
                             <th:block sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
                                 <span th:each="a : ${entry.jobOrderAllocations}"
                                       class="assoc-chip assoc-chip--order"
@@ -681,8 +597,6 @@
                                                     data-trigger="inv-admin-assoc-pick"
                                                     th:data-combobox-placeholder="#{inventory.assoc.add.order}">
                                                 <option value=""></option>
-                                                <!--/* REQ-INV-039 (#1742): see the sibling picker above - the option states what
-                                                     this order still needs of the entry's game item, in whole pieces. */-->
                                                 <option th:each="order : ${jobOrders}"
                                                         th:if="${order.requiredGameItemIds != null and #lists.contains(order.requiredGameItemIds, entry.gameItem.id) and not #lists.contains(entry.jobOrderAllocations.![jobOrderId], order.id)}"
                                                         th:with="orderNeed=${orderGameItemNeedAmounts != null ? orderGameItemNeedAmounts.get(order.id + '|' + entry.gameItem.id) : null}"
@@ -707,7 +621,6 @@
                                     </div>
                                 </span>
                             </th:block>
-                            <!--/* Read-only chips for viewers without association rights. */-->
                             <th:block sec:authorize="!hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN, T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER, T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN)">
                                 <span th:each="a : ${entry.jobOrderAllocations}"
                                       class="assoc-chip assoc-chip--order">

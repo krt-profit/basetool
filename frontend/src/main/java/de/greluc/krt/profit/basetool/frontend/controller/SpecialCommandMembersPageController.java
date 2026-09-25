@@ -276,12 +276,6 @@ public class SpecialCommandMembersPageController {
     return "redirect:" + PAGE_BASE + id;
   }
 
-  // In-place (AJAX) twins (#582). Routed ahead of their classic POST->redirect siblings by the
-  // X-Requested-With header (no-JS forms keep their redirect fallback). They return 200 on success
-  // and the page re-swaps the member-roster fragment, which re-renders the role badges and fresh
-  // @Version data so the next action does not 409. Failures are relayed as
-  // application/problem+json (already-member toast, OPTIMISTIC_LOCK reload-confirm, 403).
-
   /**
    * In-place twin of {@link #addMember}.
    *

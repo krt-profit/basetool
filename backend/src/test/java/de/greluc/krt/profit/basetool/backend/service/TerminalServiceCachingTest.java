@@ -157,7 +157,6 @@ class TerminalServiceCachingTest {
     try {
       terminalService.getTerminal(unknownId);
     } catch (Exception ignored) {
-      // expected — the service throws NotFoundException for the unknown id
     }
 
     assertNull(

@@ -125,22 +125,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
  * the rows the destructive CRUD flows create, which is more than the non-destructive smoke contract
  * allows.
  */
-// LAST in the suite, and that is a dependency rather than a preference: this class measures
-// against the rows the destructive CRUD flows create, and a fresh stack hides what it exists to
-// find. `junit-platform.properties` selects ClassOrderer.OrderAnnotation, under which every class
-// without @Order sorts at Integer.MAX_VALUE / 2 — so this one value is the whole mechanism.
 @Order(Integer.MAX_VALUE)
-// Deliberately NOT @Tag("smoke") (owner decision 2026-09-13).
-//
-// e2e-smoke.yml has a 15-minute ceiling and passes no `-Pe2e.device`, so with the smoke tag
-// this class walked all FIVE device classes over all 65 routes in one job — the exact shape
-// that had just blown a 45-minute budget in the e2e gate and forced the browser x device
-// fan-out. It is dormant only because `vars.E2E_BASE_URL` is empty.
-//
-// The e2e gate already measures all five classes on three engines, which is what REQ-UI-009
-// needs. Smoke asks a different question — is this deployment alive — against a REAL
-// environment, and the suite is documented as non-destructive and safe to run there; this
-// class opens every modal on every route, which is more than that contract allows.
 @Tag("e2e")
 class TouchClassLayoutE2eTest {
 
@@ -151,11 +136,6 @@ class TouchClassLayoutE2eTest {
   private static final String PASSWORD = System.getProperty("e2e.password", "test-admin-pw");
 
   /** Where the screenshots go; one PNG per page and device class. */
-  // `build/e2e/...`, which is what e2e.yml's upload step globs — `build/e2e-artifacts/`
-  // matched none of its three patterns, so every capture this class took was discarded
-  // with the runner. Every other e2e class writes under `build/e2e` for exactly that
-  // reason. Sharper since screenshots were confined to one shard so a reviewer would have
-  // one good set to open: the set existed and never left the machine.
   private static final Path ARTIFACTS = Path.of("build", "e2e", "touch-layout");
 
   /**
@@ -410,32 +390,10 @@ class TouchClassLayoutE2eTest {
   private static final List<int[]> DEVICE_CLASSES =
       List.of(
           new int[] {375, 812},
-          // 810x1080, NOT 768x1024. `PHONE_MAX_WIDTH`, the `setIsMobile` gate and the
-          // stylesheet's `@media (width <= 768px)` are all INCLUSIVE, so a 768px-wide entry renders
-          // and is asserted as the phone class — static footer, `--krt-footer-height: 0px`, mobile
-          // emulation — while being documented as tablet portrait. That left REQ-UI-009's
-          // 769-1023px band covered by no class at all, and a regression confined to it invisible:
-          // the header's bell-clearance reserve is scoped `<= 768px` while the bell itself stays a
-          // 44px fixed overlay up to 1024px, which is exactly that shape.
           new int[] {810, 1080},
           new int[] {1024, 768},
           new int[] {1280, 800},
           new int[] {1600, 900});
-
-  // THE ROUTE LIST USED TO LIVE HERE, hand-maintained, and it was wrong once: seventeen page routes
-  // were absent until 2026-09-13 while the Javadoc in this place and REQ-UI-009's "Enforced by"
-  // clause both said every route was covered. CorePagesSmokeE2eTest and AdminPagesSmokeE2eTest kept
-  // their own copies of the same information, so three lists had to agree by hand, and did not.
-  //
-  // It is now `FrontendPageRoutes.PAGES` in the `test-support` module, and PageRouteCatalogueTest
-  // fails the build when the dispatcher answers a variable-free GET route that is in no list at
-  // all — so what was "somebody remembered" is a gate. The catalogue lives there rather than on
-  // E2eSupport because that gate has to run in `check`, which does not compile this source set.
-  //
-  // What has NOT changed is how a page is recognised: at runtime, by its app shell. An entry that
-  // turns out not to be a page is skipped by the sweep below, never filtered out of the catalogue —
-  // which is how a route that quietly stops rendering its shell surfaces here, instead of vanishing
-  // from a curated list.
 
   private static Playwright playwright;
   private static Browser browser;
@@ -475,12 +433,6 @@ class TouchClassLayoutE2eTest {
     List<String> findings = new ArrayList<>();
     String baseUrl = STACK.baseUrl();
 
-    // Coverage is ASSERTED, not merely printed. Two silent-pass modes were possible without this
-    // and both were found in review: a list with no rows yields no detail link and dropped out of
-    // the audit, and a page without an app shell returns no findings — so a session that expired
-    // part-way through would SKIP every remaining combination and the suite would pass having
-    // measured almost nothing. `assertTrue(findings.isEmpty())` cannot tell "clean" from "never
-    // looked".
     Map<String, Set<String>> measuredByDevice = new LinkedHashMap<>();
     Map<String, Set<String>> detailsByDevice = new LinkedHashMap<>();
     List<String> uncoveredLists = new ArrayList<>();
@@ -499,43 +451,21 @@ class TouchClassLayoutE2eTest {
                   .setIgnoreHTTPSErrors(true)
                   .setStorageStatePath(storageState)
                   .setViewportSize(width, height)
-                  // Reported as a touch device, because REQ-UI-009's floors are touch-class rules
-                  // and some of them sit behind hover/pointer media queries.
                   .setHasTouch(true)
                   .setIsMobile(width <= PHONE_MAX_WIDTH && ENGINE_SUPPORTS_IS_MOBILE))) {
         Page page = context.newPage();
-        // Two collectors, because they answer different questions. `measured` is about the ROUTE
-        // LIST — the floor and the cross-class comparison are only meaningful against something of
-        // known size. Detail views are reached by following whatever link a list happens to render,
-        // so their paths vary per run and per device and cannot be compared to anything; counting
-        // them in the same set produced lines like "66 of 65 routes measured".
         Set<String> measured = new LinkedHashSet<>();
         Set<String> measuredDetails = new LinkedHashSet<>();
         measuredByDevice.put(deviceLabel, measured);
         detailsByDevice.put(deviceLabel, measuredDetails);
         for (String path : FrontendPageRoutes.PAGES) {
-          // One page that hangs must not end the audit: the whole point is to name every offender,
-          // so a failure to measure is itself a finding and the sweep carries on.
           findings.addAll(measureSafely(page, baseUrl, path, deviceLabel, width, height, measured));
 
-          // Detail views are reached by FOLLOWING A LINK from their list, not by seeding an entity.
-          // 33 of the frontend's routes carry a path variable and none of them can be visited by
-          // name; seeding one of each would also make this suite destructive, and it is tagged
-          // `smoke` precisely so it can run against a shared deployment. Taking the first detail
-          // link the list actually renders keeps it read-only and measures whatever data is really
-          // there. A list with no rows yields no link and is reported as uncovered rather than
-          // silently passing. The link is looked for under the list's own path, except where
-          // FrontendPageRoutes.DETAIL_PREFIX_OVERRIDES says the list links out of it (the admin SK
-          // list links to the SK member page under /organisation/special-commands).
           String detail = firstDetailLink(page, FrontendPageRoutes.detailPrefixOf(path));
           if (detail != null) {
             findings.addAll(
                 measureSafely(page, baseUrl, detail, deviceLabel, width, height, measuredDetails));
           } else if (FrontendPageRoutes.DETAIL_LIST_PAGES.contains(path)) {
-            // Named, not silently skipped - this is the half the comment above promised and the
-            // code did not do. It is reported rather than failed because an empty list is a
-            // legitimate state of a fresh or shared stack, which is exactly what the `smoke` tag
-            // exists to let this run against.
             uncoveredLists.add(
                 deviceLabel
                     + " "
@@ -601,12 +531,6 @@ class TouchClassLayoutE2eTest {
                   + " classes, so this runner measured nothing");
       return;
     }
-    // The UNION of every class, not the first one. `entrySet().iterator().next()` is always
-    // 375x812, and `missing = first - measured` can only ever report a LATER class going quiet: if
-    // the phone class is the one that dies, every wider class measures a superset and nothing is
-    // missing anywhere. The floor was the only backstop, and 30 of 64 is met by a session that
-    // expires halfway — which is the phone class, the one this guard exists for, reporting clean
-    // on 35 routes. Against the union, a class that stops short is named whichever class it is.
     Set<String> union = new LinkedHashSet<>();
     measuredByDevice.values().forEach(union::addAll);
     int widest = measuredByDevice.values().stream().mapToInt(Set::size).max().orElse(0);
@@ -656,20 +580,6 @@ class TouchClassLayoutE2eTest {
     try {
       return measure(page, baseUrl, path, deviceLabel, width, height, measured);
     } catch (RuntimeException e) {
-      // The WHOLE message, newlines folded — not its first line.
-      //
-      // The pattern is `\\s+` and the SECOND BACKSLASH IS LOAD-BEARING: since Java 15 `\s` is
-      // a valid string escape for a space, so the single-backslash form compiles without
-      // complaint to the pattern " +" and folds runs of SPACES while leaving every newline in
-      // place — the exact character this exists to fold. It shipped that way and was caught in
-      // review; the page-side JS in this same file had it right, which is what gave it away.
-      //
-      // Taking `.lines().findFirst()`
-      // threw
-      // away the only useful half: Playwright formats a page-side error as a multi-line `Error {`
-      // block whose first line is literally "Error {", so five findings on /ship-data named the
-      // brace and nothing else. A diagnostic that cannot say what went wrong costs a CI round trip
-      // per attempt.
       String reason =
           e.getClass().getSimpleName()
               + ": "
@@ -735,9 +645,6 @@ class TouchClassLayoutE2eTest {
           page.evaluate(
               """
               (prefix) => {
-                // Plain string work rather than a built RegExp: escaping a path into a pattern
-                // inside a Java text block inside a JS string is three layers of backslash and
-                // exactly the kind of cleverness that fails to compile for an hour.
                 for (const a of document.querySelectorAll('a[href]')) {
                   const path = new URL(a.getAttribute('href'), location.origin).pathname;
                   if (!path.startsWith(prefix + '/')) continue;
@@ -749,20 +656,6 @@ class TouchClassLayoutE2eTest {
               """,
               listPath);
     } catch (RuntimeException e) {
-      // A page-side evaluate outside `measureSafely` ends the WHOLE sweep, which is the one thing
-      // the loop that calls this says must not happen ("one page that hangs must not end the
-      // audit"). It did: a run aborted with `Execution context was destroyed, most likely because
-      // of a navigation` — the page had navigated under the audit (live sync, a redirect) between
-      // the measurement and this lookup — and every remaining route and device class went
-      // unmeasured, reported as one Playwright stack trace rather than as findings.
-      //
-      // Widening the modal sweep from 42 dialogs to all 96 made this far likelier without being its
-      // cause: the phone class now reveals and photographs ~138 dialogs per page instead of ~24, so
-      // the window between landing on a list and asking it for a detail link grew several-fold.
-      //
-      // A detail link that cannot be read is not a layout defect, so it is NOT pushed as a finding
-      // here — it is a gap in coverage, which `reportCoverage` already names by comparing each
-      // device class against the union. Returning null routes it there.
       System.out.printf(
           "[touch-layout] %-22s detail link unreadable (%s) — its detail view is not measured%n",
           listPath, e.getClass().getSimpleName());
@@ -793,54 +686,11 @@ class TouchClassLayoutE2eTest {
       int height,
       Set<String> measured) {
     List<String> findings = new ArrayList<>();
-    // Re-assert the viewport before every page, and force it to actually take.
-    //
-    // A full-page capture resizes the viewport to the content size to take its picture. Playwright
-    // does not consider that its own viewport change, so a plain `setViewportSize(width, height)`
-    // afterwards is a no-op — the size it tracks already equals the one being asked for — and the
-    // page stays as wide as the previous screenshot left it. Measured: six pages reported viewports
-    // of 401-526px on the 375px class, and every width comparison on them was against that wrong
-    // reference. Going through a different height first makes it a real resize.
-    // Only where a screenshot can actually have happened. A full-page capture resizes the
-    // viewport and Playwright's own `setViewportSize` back to the same numbers is then a no-op, so
-    // this goes through a different height to force a real resize. But `screenshotSafely` returns
-    // early unless the engine is the screenshot one, so on the other ten jobs of the matrix this
-    // was
-    // 130 real relayouts each, undoing a state they cannot enter.
     if (SCREENSHOT_ENGINE.equals(ENGINE)) {
       page.setViewportSize(width, height + 1);
       page.setViewportSize(width, height);
     }
     E2eSupport.navigate(page, baseUrl + path);
-    // NOT `NETWORKIDLE`: this app never goes idle. The notification badge polls, the live-sync
-    // WebSocket stays open, and the P4K import page polls its job list — so waiting for a quiet
-    // network times out after 30s and takes the whole sweep down with it, which is exactly how the
-    // first modal run died 43 measurements in.
-    //
-    // What the measurement actually needs is a settled LAYOUT: the document parsed, the webfont
-    // applied (Lato changes every text box, and the header height is text-driven), and one beat for
-    // the ResizeObserver that publishes --krt-footer-height.
-    //
-    // The THIRD condition is the real one, and it replaced a flat `waitForTimeout(150)`. That sleep
-    // was a guess at the ResizeObserver beat that publishes `--krt-footer-height`: ~50 seconds of
-    // dead wall clock per shard across ~350 measurements, and still a guess — a slow runner can
-    // miss the beat, so it bought no flakiness resistance either. Waiting for the property to exist
-    // waits for exactly what the measurement needs, and returns as soon as it does.
-    //
-    // It is CONDITIONAL on the page having a footer, and that guard is load-bearing. `sidebar.js`
-    // publishes the property inside `if (footerEl)`, and eight templates render no
-    // `fragments/sidebar` at all — the five error pages, `terms-accept.html` and
-    // `pending-approval.html`. On any of them an unconditional wait runs to Playwright's full 30s
-    // default, `measureSafely` turns the TimeoutError into a FINDING, and the documented
-    // "SKIPPED — no app shell" line ten lines below is never reached. Two ways that bites: a route
-    // that answers 403/404/500 during a run — exactly what this sweep exists to report — costs 30s
-    // per device class and reports a timeout instead of the status; and `/terms/accept`, which the
-    // consent gate makes mandatory reading, would hang five classes on a page that renders
-    // perfectly. That one is no longer hypothetical: `FrontendPageRoutes.PAGES` carries the route,
-    // and `PageRouteCatalogueTest` fails the build if it stops carrying it, so this guard is what
-    // keeps it cheap. The catalogue promises the opposite of a hang — an entry that is not a page
-    // is skipped at runtime, never filtered out of the list — and the sleep this replaced did have
-    // that property.
     page.waitForFunction(
         "() => document.readyState === 'complete'"
             + " && (!document.fonts || document.fonts.status === 'loaded')"
@@ -848,28 +698,9 @@ class TouchClassLayoutE2eTest {
             + "     || getComputedStyle(document.documentElement)"
             + "         .getPropertyValue('--krt-footer-height').trim() !== '')");
 
-    // Did the route actually SERVE this path, or send us somewhere else?
-    //
-    // Without this, a redirect is counted as a measurement of the page it landed on.
-    // `/pending-approval` is the case that proved it: `PendingApprovalPageController` answers
-    // `redirect:/` for an ACTIVE role-bearing session, which is the only kind this suite has, so
-    // the
-    // browser sat on the dashboard, the shell check passed, and the route joined `measured` having
-    // never been looked at — every class measured the dashboard twice and the coverage line
-    // over-reported by one. The comment on that entry claimed it "skips at every class and cancels
-    // out of the coverage comparison"; it did neither.
-    //
-    // Reported rather than silently dropped, because a route that has started redirecting is worth
-    // seeing. Query and fragment are ignored: a redirect that only adds `?foo` is still this page.
-    // The base URL is normalised before stripping, because it is operator-supplied on staging
-    // (`E2E_BASE_URL` / `-Pe2e.baseUrl`, which is how the smoke workflow points at a deployment).
-    // A trailing slash there would leave every landed path without its leading one, every route
-    // would look redirected, and the sweep would skip all 66 and fail on the coverage floor —
-    // loud, but for entirely the wrong reason. The ephemeral stack's own URL carries no slash.
     String origin = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
     String landedPath = page.url().replace(origin, "").replaceAll("[?#].*$", "");
     if (landedPath.isEmpty()) {
-      // The dashboard strips to the empty string, since the origin has no trailing slash.
       landedPath = "/";
     }
     if (!landedPath.equals(path) && !landedPath.equals(path + "/")) {
@@ -879,17 +710,6 @@ class TouchClassLayoutE2eTest {
       return findings;
     }
 
-    // Is this a page at all? The route list is taken from the controllers rather than curated, so
-    // it contains fragment and JSON endpoints too. A Basetool page is recognised by its app shell;
-    // anything without one is skipped and said so, which is also how a page that quietly stops
-    // rendering the shell would surface.
-    //
-    // `main` OR `.page-wrapper`, because two pages have no `<main>` and were being skipped as if
-    // they were not pages: `operation-detail.html` has none at all, and `mission-detail.html`'s is
-    // gated on `th:if="${isNew}"`, so an existing mission has none either. Those are the two
-    // densest views in the app and the ones the phone-class contract most needs measured, and the
-    // guard was silently declining both. The brand check still keeps fragments and JSON endpoints
-    // out, which is what this test is for.
     boolean hasAppShell =
         Boolean.TRUE.equals(
             page.evaluate(
@@ -905,24 +725,12 @@ class TouchClassLayoutE2eTest {
     }
     measured.add(path);
 
-    // MEASURE FIRST, screenshot second — the order is load-bearing. A full-page capture widens the
-    // viewport to the content size to take the picture, and a measurement taken afterwards can
-    // still see that widened state: `window.innerWidth` grows with it, the overflow comparison
-    // becomes 534 > 534 and the page reports clean. That is exactly what happened on the second
-    // run of this guard — every check passed while the PNGs it had just written were 10-159px
-    // wider than the viewport.
     @SuppressWarnings("unchecked")
     Map<String, Object> probe =
         (Map<String, Object>)
             page.evaluate(PROBE_JS, Map.of("slack", SLACK_PX, "deviceWidth", width));
 
     String slug = path.equals("/") ? "dashboard" : path.replaceAll("^/", "").replace('/', '-');
-    // The screenshot is EVIDENCE, the measurement above is the assertion — so a screenshot that
-    // cannot be taken may not discard a measurement that already succeeded. It did exactly that:
-    // `probe` is computed first, then this call threw, and `measureSafely` turned the whole page
-    // into "could not be measured" with every finding it had just computed thrown away. A browser
-    // refusing to rasterise a very long page (WebKit caps its surface where Chromium stitches) is
-    // not an app defect and must not read like one, but it must not be silent either.
     screenshotSafely(
         page,
         new Page.ScreenshotOptions()
@@ -930,15 +738,6 @@ class TouchClassLayoutE2eTest {
             .setFullPage(true),
         deviceLabel + " " + path);
 
-    // Photograph every modal too, on the touch classes.
-    //
-    // The measurement above already covers them, but a modal is `display: none` in the page
-    // screenshot — so an audit that is supposed to be looked at would contain no picture of the 96
-    // surfaces where the tool asks for input. Showing one at a time and capturing the viewport
-    // gives a reviewer the same evidence for a dialog as for a page, and the touch classes are
-    // where a dialog gets tight. The device label belongs in the FILENAME: without it the 768px
-    // pass silently overwrote the 375px pictures, and the directory looked complete while holding
-    // only the wider half.
     if (width <= PHONE_MAX_WIDTH && SCREENSHOT_ENGINE.equals(ENGINE)) {
       int count = (int) number(probe.get("modalCount"));
       for (int i = 0; i < count; i++) {
@@ -991,11 +790,6 @@ class TouchClassLayoutE2eTest {
 
     String where = deviceLabel + " " + path;
 
-    // The rules themselves live in their own methods. This one was 282 lines that navigated,
-    // resized, skipped non-pages, ran the probe, wrote page and modal screenshots, printed two
-    // diagnostics and evaluated twelve assertions — so a reviewer had to read all of it to see
-    // whether a change to the footer branch could reach the chrome-budget branch. Each part now
-    // takes the already-computed `probe` map and answers one question.
     printDiagnostics(where, probe);
     findings.addAll(checkGeometry(where, probe, width, height));
     findings.addAll(collectOffenders(where, probe, width));
@@ -1014,10 +808,6 @@ class TouchClassLayoutE2eTest {
    * @param probe the page-side measurement
    */
   private static void printDiagnostics(String where, Map<String, Object> probe) {
-    // Printed for every page, pass or fail. The first version of this guard reported clean on five
-    // pages whose screenshots were 10-159px wider than the viewport, and the only reason that was
-    // caught is that somebody measured the PNGs. A guard whose measurements are invisible until it
-    // fails cannot be sanity-checked against the artifacts it writes beside them.
     System.out.printf(
         "[touch-layout] %-22s viewport=%.0f pageScrollWidth=%.0f (html=%s body=%s"
             + " overflow-x html/body=%s/%s) footer=%s header=%.0f footerH=%.0f reserve=%.0f"
@@ -1058,14 +848,6 @@ class TouchClassLayoutE2eTest {
     double docScrollWidth = number(probe.get("docScrollWidth"));
     double innerWidth = number(probe.get("innerWidth"));
 
-    // On the touch classes the browser runs in MOBILE EMULATION, and there `innerWidth` is the
-    // LAYOUT viewport — which the viewport meta lets content widen. So a page whose content does
-    // not fit reports an innerWidth larger than the device width, and that is not a measurement
-    // artefact but the overflow itself, expressed the way a phone expresses it: the page zooms out
-    // and the member reads everything smaller. It is reported separately from the scrollWidth check
-    // because the two catch it on different classes — and because every width comparison further
-    // down is against `innerWidth`, so when this fires those comparisons are measuring a page that
-    // has already given up fitting.
     if (innerWidth > width + SLACK_PX) {
       findings.add(
           String.format(
@@ -1088,9 +870,6 @@ class TouchClassLayoutE2eTest {
               + "px. REQ-UI-009 lets wide tables scroll, not the document.");
     }
 
-    // The footer's behaviour is the device class's, not the page's — but it is asserted per page
-    // because it is published by a script that runs per page, and a template that forgets the
-    // shared layout would take its footer with it.
     String footerPosition = String.valueOf(probe.get("footerPosition"));
     double headerH = number(probe.get("headerHeight"));
     double footerH = number(probe.get("footerHeight"));
@@ -1099,17 +878,12 @@ class TouchClassLayoutE2eTest {
     boolean phone = width <= PHONE_MAX_WIDTH;
 
     if (phone) {
-      // Owner decision 2026-09-13: on a phone the footer scrolls away with the page, so it is
-      // only in the way when the member has actually reached the end of it.
       if ("fixed".equals(footerPosition)) {
         findings.add(
             where
                 + ": the footer is still position:fixed on the phone class — it must scroll with"
                 + " the page there, so the viewport belongs to the content.");
       }
-      // The eight consumers of --krt-footer-height all mean "how much of the viewport bottom is
-      // covered". A footer that scrolls covers nothing, and a leftover non-zero value would have
-      // every one of them reserve space for a footer that is not there.
       if (!"0px".equals(heightVar)) {
         findings.add(
             where
@@ -1120,8 +894,6 @@ class TouchClassLayoutE2eTest {
                 + " reserve space twice.");
       }
     } else {
-      // Above the phone class the footer stays pinned, and then the reserve is what keeps the
-      // last line of a long page reachable.
       if (!"fixed".equals(footerPosition)) {
         findings.add(
             where
@@ -1137,8 +909,6 @@ class TouchClassLayoutE2eTest {
       }
     }
 
-    // Only chrome that actually holds viewport space counts against the budget: a footer that
-    // scrolls with the page is content, not chrome.
     double chrome = headerH + ("fixed".equals(footerPosition) ? footerH : 0);
     double sharePercent = chrome * 100.0 / height;
     if (sharePercent > MAX_CHROME_SHARE_PERCENT) {
@@ -1149,8 +919,6 @@ class TouchClassLayoutE2eTest {
               where, headerH, footerH, sharePercent, height, MAX_CHROME_SHARE_PERCENT));
     }
 
-    // The header's own height, bounded rather than merely measured. See the constant's Javadoc for
-    // why the share ceiling above cannot stand in for this.
     if (phone && headerH > MAX_PHONE_HEADER_HEIGHT_PX) {
       findings.add(
           String.format(
@@ -1182,10 +950,6 @@ class TouchClassLayoutE2eTest {
    */
   private static List<String> collectOffenders(String where, Map<String, Object> probe, int width) {
     List<String> findings = new ArrayList<>();
-    // REQ-UI-009 puts the 44px floor on the TOUCH classes, not on every class: it is a fat-finger
-    // rule, and the app's own touch block is scoped `width <= 1024px` for exactly that reason. The
-    // first full sweep applied it everywhere and produced 490 findings at 1280px and 1600px that
-    // were not defects at all — a dense desktop table is allowed to be dense.
     if (width <= TOUCH_CLASS_MAX_WIDTH) {
       for (Object offender : list(probe.get("badControls"))) {
         findings.add(where + ": form control — " + offender);
@@ -1194,10 +958,6 @@ class TouchClassLayoutE2eTest {
         findings.add(where + ": modal — " + offender);
       }
     } else {
-      // Above the touch classes only GEOMETRY matters, never hit areas — for a page control as
-      // much as for a modal's. `badControls` used to be discarded wholesale here, so a 1700px
-      // <select> with no scrollable ancestor at 1600x900 was measured, pushed and thrown away,
-      // while its sibling list was already filtered entry-by-entry to keep exactly that half.
       for (Object offender : list(probe.get("badControls"))) {
         if (!offender.toString().startsWith(HIT_AREA_MARK)) {
           findings.add(where + ": form control — " + offender);
@@ -1244,13 +1004,6 @@ class TouchClassLayoutE2eTest {
   private static final String PROBE_JS =
       """
       ({ slack, deviceWidth }) => {
-        // Compare against the DEVICE width, not the layout viewport.
-        //
-        // Under mobile emulation a page whose content does not fit widens the layout viewport
-        // instead of scrolling, so `innerWidth` becomes the overflowed width — and every check that
-        // compares against it then finds nothing wrong, because everything fits the widened page by
-        // definition. That is how three pages reported "does not fit the device" and produced no
-        // offender at all. `ref` is the screen the member actually holds.
         const vw = Math.min(window.innerWidth, deviceWidth);
         const layoutWidth = window.innerWidth;
         const vh = window.innerHeight;
@@ -1261,11 +1014,6 @@ class TouchClassLayoutE2eTest {
           const text = (el.textContent || '').trim().replace(/\\s+/g, ' ').slice(0, 40);
           return el.tagName.toLowerCase() + id + cls + (text ? ' "' + text + '"' : '');
         };
-        // An element is excused only by an ancestor that BOTH scrolls horizontally AND fits on
-        // screen. The first version of this asked only the first half, which excused everything
-        // inside a .table-responsive that was itself wider than the phone — so five pages that
-        // overflowed by 10-159px reported clean while their full-page screenshots came out wider
-        // than the viewport. A scroll container that does not fit is not a solution, it is the bug.
         const scrollsHorizontally = (el) => {
           for (let n = el.parentElement; n; n = n.parentElement) {
             const ox = getComputedStyle(n).overflowX;
@@ -1276,138 +1024,30 @@ class TouchClassLayoutE2eTest {
           return false;
         };
 
-        // The EFFECTIVE hit area, not the element's own border box.
-        //
-        // REQ-UI-009's floor is a rule about how big a target a finger has to find, and a border
-        // box is only one of the three ways this app produces one. The CI sweep proved it the
-        // expensive way: `.oc-collapse` reported 26px on 15 org-chart nodes and is not a defect at
-        // all — org-chart.css deliberately keeps the chevron 1.6rem and stretches the target to
-        // `var(--touch-target)` with a transparent centred `::after`, the standard "small glyph,
-        // fat-finger target" pattern, and a border-box measurement cannot see it. Reporting those
-        // as findings would have pushed the app to grow a control that is already compliant.
-        //
-        // Three candidate boxes, largest dimension wins:
-        //   1. the element itself;
-        //   2. a positioned `::before`/`::after` overlay it generates — skipped for form controls,
-        //      because a replaced element renders no pseudo-element, so believing a declared one
-        //      there would MASK a real defect rather than excuse a false one;
-        //   3. a `<label>` that activates it — either wrapping it (and wrapping nothing else
-        //      interactive, or the label is shared and cannot be claimed as this control's target)
-        //      or pointing at it by `for`. Clicking a label activates its control, which is what
-        //      makes the whole label row the target; /inventory/my's filter checkboxes are 20px
-        //      squares inside 44px label rows.
-        //
-        // Deliberately NOT done with elementFromPoint sampling: a point outside the viewport or
-        // under a sticky header returns null or the wrong element, which would invent findings.
-        // This can only ever widen a measurement, so it removes false positives without hiding
-        // anything.
-        // The dense exemption of REQ-UI-009, as ONE helper: a repeated IN-ROW control may stop at
-        // the dense floor, because raising every one of them would turn a scannable table into a
-        // list of cards. `.master-row` joined by owner decision 2026-09-13 (the blueprint list rows
-        // are a scan-and-tap list where density is the point); `item-checkbox`, `matrix-flag` and
-        // `bank-row-toggle` joined on the same reading once seeded data first exposed them. Never a
-        // form button or a standalone control: `.btn-xs2` was refused this exemption for that
-        // reason.
-        //
-        // Since ADR-0176 the stylesheet's floor is a zero-specificity DEFAULT rather than a list of
-        // selectors, which makes consuming `--touch-target-dense` the declared way to opt out of it
-        // — the same token this set is already built from. So the inversion needed no new mechanism
-        // on this side, and deliberately did not get one: an opt-out marker that the guard had to be
-        // told about separately would be a hand-kept list again, wearing a different name.
-        //
-        // It did surface one thing the old shape had hidden. `.master-row` is exempt per REQ-UI-009
-        // and consumed the token NOWHERE, so it was never in this set and was being measured against
-        // the full 44px — the exemption lived only in the requirement's prose. personal-inventory.css
-        // now declares it, which is what both honours the exemption and puts the class in here.
-        //
-        // It was two byte-identical copies, one for page controls and one for controls inside a
-        // dialog, and the list has taken four separate additions — so update one copy and the same
-        // control is a defect in a dialog and compliant on a page, or the reverse. `hitBox` in this
-        // same script is already one shared helper; this is the matching extraction.
-        //
-        // The SET IS READ FROM THE STYLESHEET, not written here. A hand-kept copy had already
-        // drifted from the CSS in both directions at once: the list knew six classes while the
-        // stylesheets declared eight `--touch-target-dense` consumers, so `.bank-chart-range-btn`
-        // and `.krt-bp-imp-suggestion` — a real <button> — would be reported as 32px against a 44px
-        // floor the design system does not put on them, the false-positive class the ::after
-        // hit-area handling exists to avoid. The reverse is worse: a class added here and forgotten
-        // in the CSS is silently exempt forever. The design system declares the exemption, so the
-        // design system is asked.
-        //        // The selectors are kept WHOLE and matched with `Element.matches`, rather than picked
-        // apart into class names. Harvesting classes cannot express a compound: the design system
-        // writes the dense override as `.btn.btn-xs` (deliberately — REQ-UI-009 records that the
-        // extra specificity is what stops a page's inline rule winning), and lifting each class out
-        // of it puts a bare `btn` in the exempt set. That would drop EVERY button in the app to the
-        // 32px floor while the requirement says `.btn` itself keeps 44px on every class — a guard
-        // that passes by measuring against the wrong number, which is the one failure mode worse
-        // than a red build. Matching also gets `.pa-sort-controls .pa-sort-btn` and
-        // `input.item-checkbox` exactly right for free, where the old "subject compound only"
-        // approximation had to be reasoned about.
         const DENSE_SELECTORS = (() => {
           const out = new Set();
           const walk = (list) => {
             for (const rule of Array.from(list || [])) {
-              // NOT `if (rule.cssRules)`. Since CSS Nesting shipped, a plain CSSStyleRule carries
-              // an EMPTY CSSRuleList — an object, therefore truthy — so that test treated every
-              // style rule as a container, skipped it, and returned an EMPTY SET in all three
-              // engines. Verified against Chromium 151: `.btn-xs` reports
-              // `cssRules=CSSRuleList(len=0), truthy=true`. Length is what distinguishes a
-              // container from a leaf.
               if (rule.cssRules && rule.cssRules.length) { walk(rule.cssRules); }
-              // `rule.style.cssText` is THIS rule's own declarations; `rule.cssText` would also
-              // carry a nested child's, so a parent that merely CONTAINS a dense rule would be
-              // exempted along with it.
               const own = rule.style ? rule.style.cssText : '';
               if (!rule.selectorText || !own.includes('--touch-target-dense')) continue;
               for (const one of rule.selectorText.split(',')) {
                 const sel = one.trim();
-                // `:root` declares the token and matches no control; it is harmless to keep and
-                // cheaper than special-casing.
                 if (sel) out.add(sel);
               }
               if (rule.cssRules) walk(rule.cssRules);
             }
           };
           for (const sheet of Array.from(document.styleSheets)) {
-            // A cross-origin sheet throws on .cssRules; there are none today, and skipping one
-            // would under-populate the set, which fails loud below rather than exempting silently.
-            try { walk(sheet.cssRules); } catch (e) { /* not readable */ }
+            try { walk(sheet.cssRules); } catch (e) {}
           }
           return Array.from(out);
         })();
         const floorFor = (c) =>
           DENSE_SELECTORS.some((sel) => {
-            // A selector out of the CSSOM is always valid, but `matches` is the only thing here
-            // that can throw on one, and a throw would be read as "page unmeasurable".
             try { return c.matches(sel); } catch (e) { return false; }
           }) ? %d : %d;
-        // An empty set means no stylesheet declaring the token was readable, which would put the
-        // full 44px floor on every dense control at once. Reported rather than assumed: silence
-        // here used to mean "compliant", and it would now mean "measured against the wrong floor".
-        //
-        // RECORDED here, REPORTED where `badControls` exists. This used to push straight into
-        // `badControls`, which is declared ~100 lines further down — so the first time the guard
-        // actually fired it threw `ReferenceError: Cannot access 'badControls' before
-        // initialization` from inside the probe, `measureSafely` turned that into "could not be
-        // measured", and EVERY page of the class came back unmeasurable. A guard that cannot run
-        // is worse than no guard: it converted a precise diagnosis into a blanket failure.
         const DENSE_SET_EMPTY = DENSE_SELECTORS.length === 0;
-        // The control vocabulary, as ONE constant, for the same reason `floorFor` is one helper.
-        // The page sweep and the modal sweep below kept their own copies, and they had already
-        // drifted: the modal list carried `.krt-modal-close` and the page list did not, so a
-        // dismiss button was measured in a dialog and not on a page.
-        //
-        // It mirrors styles.css's inverted floor (ADR-0176), which is the point rather than a
-        // coincidence: anything that selector styles is something this sweep has to measure.
-        // `summary` and `[role="button"]` arrived with that mirroring — a <summary> is a click
-        // target on 26 templates and neither sweep had ever measured one, nor had either looked at
-        // a div carrying a button role. It found a real defect immediately: six
-        // `<summary class="btn btn-ghost">` disclosures at 29px, because a migrated inline style in
-        // `inline-migration.css` cancelled the floor with `min-height: unset`.
-        //
-        // The three dismiss classes are here by NAME rather than by element, because `.close-modal`
-        // is a `<span>` in admin/mission-data.html's three dialogs — a control no element selector
-        // reaches, on either side.
         const CONTROLS = 'input, select, textarea, button, a.btn, summary, [role="button"],'
           + ' .krt-modal-close, .close-modal, .btn-close';
         const REPLACED = new Set(['input', 'select', 'textarea']);
@@ -1445,21 +1085,9 @@ class TouchClassLayoutE2eTest {
         };
         const header = document.querySelector('header');
         const footer = document.querySelector('.krt-footer');
-        // `main` OR `.page-wrapper`, the same pair the readiness gate above accepts:
-        // operation-detail.html renders no `<main>` at all and mission-detail.html gates its own on
-        // `th:if="${isNew}"`, so on an existing mission there is none either. Starting the walk at a
-        // null `main` runs it zero times and reports a 0px reserve, which reads exactly like the
-        // defect it is not — the reserve on those pages sits on the outer `.page-wrapper`. Letting
-        // the two pages BE measured without teaching the measurement where they keep their reserve
-        // is what turned both into standing findings on every wide device class.
         const main = document.querySelector('main') || document.querySelector('.page-wrapper');
         const headerHeight = header ? header.getBoundingClientRect().height : 0;
         const footerHeight = footer ? footer.getBoundingClientRect().height : 0;
-        // The bottom reserve is not always on <main>. mission-detail.html (which also serves
-        // /missions/new) puts it on an outer `.page-wrapper` and zeroes <main>'s own padding so the
-        // two do not add up — a perfectly good arrangement that an assertion reading only <main>
-        // calls a defect. Summing the chain UP from the content root to <body> measures what
-        // actually keeps content off the footer, wherever the page chose to put it.
         let mainPaddingBottom = 0;
         for (let n = main; n && n !== document.body; n = n.parentElement) {
           mainPaddingBottom += parseFloat(getComputedStyle(n).paddingBottom) || 0;
@@ -1467,21 +1095,6 @@ class TouchClassLayoutE2eTest {
         const footerHeightVar = getComputedStyle(document.documentElement)
           .getPropertyValue('--krt-footer-height').trim() || '(unset)';
 
-        // NOTE: there is deliberately no "is this element under the footer right now" check.
-        // A fixed footer overlays whatever happens to be beneath it at the current scroll
-        // position — that is what fixed means, and the reserve above is what guarantees the
-        // content can still be scrolled clear of it. The first version of this file flagged 60
-        // such overlaps and every one was noise: sidebar drawer links (z-index 2000, painted
-        // ABOVE the footer's 999) and ordinary content sitting below the fold at scroll 0.
-        // The invariant worth testing is the reserve, not an instantaneous rectangle.
-        // ONE walk of the document, not two. The widest-box diagnostic below used to repeat this
-        // exact sweep — same selector, same getComputedStyle, same getBoundingClientRect — purely
-        // to fill a printf, and its own comment called it "DIAGNOSTIC ONLY, never an assertion".
-        // Style resolution plus forced layout per element is the dominant in-page cost, and on the
-        // pages this file calls out as large (the materials matrix, /hangar, the Lager tables) it
-        // was thousands of elements walked twice, ~350 times per shard. This loop's filter is a
-        // superset of the old one — it additionally skips `position: fixed`, which for a "widest
-        // laid-out box" line is at worst worth knowing.
         const cutOff = [];
         let maxRight = 0;
         let widest = '(none)';
@@ -1491,10 +1104,6 @@ class TouchClassLayoutE2eTest {
           const r = el.getBoundingClientRect();
           if (r.width === 0 || r.height === 0) continue;
           if (r.right > maxRight) { maxRight = r.right; widest = label(el); }
-          // Cap FIRST. `scrollsHorizontally` walks every ancestor to the root, so with the cap
-          // last it ran for every remaining element on precisely the overflowing pages where this
-          // probe is already slowest — and threw the answer away. The page-control loop below
-          // already reads this way round.
           if (cutOff.length < 6 && r.right > vw + slack && !scrollsHorizontally(el)) {
             cutOff.push(label(el) + ' right=' + Math.round(r.right) + 'px');
           }
@@ -1510,7 +1119,6 @@ class TouchClassLayoutE2eTest {
         }
 
         const badControls = [];
-        // The dense-floor diagnosis from above, reported now that there is a list to report into.
         if (DENSE_SET_EMPTY) {
           badControls.push('the dense-floor set is EMPTY — no stylesheet declaring'
             + ' --touch-target-dense was readable, so every floor below is the full 44px and'
@@ -1522,12 +1130,6 @@ class TouchClassLayoutE2eTest {
           if (c.type === 'hidden') continue;
           const r = c.getBoundingClientRect();
           if (r.width === 0 || r.height === 0) continue;
-          // Two INDEPENDENT properties, so both are pushed. They used to be an if/else, and a
-          // <select> that was 427px wide in a 375px viewport AND 22px tall reported only its width
-          // — the developer fixed that, re-ran a five-minute sweep across three shards, and only
-          // then learned about the height. The cap is checked once, up front, so `hitBox` (two
-          // getComputedStyle calls plus a document-wide querySelector) is not evaluated for every
-          // remaining control on precisely the overflowing pages where this is already slowest.
           if (badControls.length < 6) {
             const floor = floorFor(c);
             if (r.width > vw + slack && !scrollsHorizontally(c)) {
@@ -1542,34 +1144,6 @@ class TouchClassLayoutE2eTest {
           }
         }
 
-        // EVERY modal on this page, measured without knowing how any of them opens.
-        //
-        // 96 modal instances live across the templates, all of them `.krt-modal-overlay` since
-        // #1891 (they were 42 canonical and 54 legacy before the port), and each has its own
-        // trigger: a row action, a menu entry, a server-rendered flag. Driving all of them would
-        // mean encoding 96 click paths and would still miss the ones a fixture cannot reach. Every
-        // one is instead in the DOM already and hidden by the shape's default `display`. Revealing
-        // one, taking its geometry and putting the previous state back measures it in its real
-        // layout context. One at a time, so two overlays never stack.
-        //
-        // Revealing it is an inline `display: flex`, which outranks every class. That is enough for
-        // this shape; MODAL_SHAPES still carries an `openClass` for a future shape that opens by a
-        // class instead, which is how the deleted `.modal-overlay` had to be revealed — it took its
-        // centring from `.active` alone, so display by itself stretched the box and measured a
-        // dialog no user is ever shown.
-        //
-        // What this can NOT see, stated rather than implied: a modal whose body is filled by script
-        // when it opens is measured empty, so its content height is understated. The structural
-        // properties below — does the frame fit, do the footer buttons fit, does the body scroll,
-        // are the controls hittable — hold regardless of what is poured into it.
-        // The one overlap worth asserting: the notification bell floats over the header.
-        //
-        // `.notification-bell` is `position: fixed; top: 1rem; right: 1rem`, so it is not part of
-        // the header's flex row and the header cannot reserve space for it. On a narrow screen the
-        // wordmark then truncates at the header's own padding edge and its last characters —
-        // ellipsis included — are painted underneath the bell. A general "does any fixed thing
-        // cover any text" rule was tried first and produced 60 findings and no defects; this one
-        // names the exact pair that actually collides.
         const overlaps = [];
         const bell = document.querySelector('.notification-bell');
         const logoText = document.querySelector('nav .logo-text');
@@ -1623,8 +1197,6 @@ class TouchClassLayoutE2eTest {
               if (cs.display === 'none' || cs.visibility === 'hidden' || c.type === 'hidden') continue;
               const cr = c.getBoundingClientRect();
               if (cr.width === 0 || cr.height === 0) continue;
-              // Cap first, for the same reason: `hitBox` makes two getComputedStyle calls per
-              // control, and a modal with thirty controls paid all of them after the list was full.
               if (modalIssues.length < 12) {
                 const floor = floorFor(c);
                 const chit = hitBox(c);
@@ -1639,12 +1211,6 @@ class TouchClassLayoutE2eTest {
           if (opened) ov.classList.remove(opened);
         }
 
-        // Widest right edge of any laid-out box — DIAGNOSTIC ONLY, never an assertion. It routinely
-        // and legitimately exceeds the viewport: /hangar measured 838px and the materials matrix
-        // 15759px, both of them content living inside a scroll container, which is precisely what
-        // REQ-UI-009 asks for. What decides whether the PAGE scrolls sideways is scrollWidth, and
-        // the two disagreeing is the normal, healthy case. Printed so a reader can tell the two
-        // apart at a glance instead of re-deriving it from a screenshot.
         const docScrollWidth = Math.max(
           document.documentElement.scrollWidth, document.body.scrollWidth);
 

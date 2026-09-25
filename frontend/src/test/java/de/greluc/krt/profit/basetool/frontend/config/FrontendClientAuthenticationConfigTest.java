@@ -98,8 +98,6 @@ class FrontendClientAuthenticationConfigTest {
 
   @Test
   void aBlankSecretIsNoSecret() {
-    // `${KEYCLOAK_FRONTEND_CLIENT_SECRET:}` resolves to "" when the variable is unset, and the
-    // compose default is empty too: that must be the public client, never "basic with no password".
     contextRunner
         .withPropertyValues("spring.security.oauth2.client.registration.keycloak.client-secret=  ")
         .run(

@@ -102,8 +102,6 @@ class UexRefineryFlagCommitTest {
 
     service.reconcileRefineryTerminalFlags();
 
-    // Re-read in a fresh transaction: a read-only reconciliation would have dropped this write on
-    // the floor and the flag would still be false.
     assertTrue(
         spaceStationRepository.findByName(STATION_NAME).orElseThrow().getHasRefineryTerminal(),
         "reconcileRefineryTerminalFlags() must commit the derived flag outside an ambient"

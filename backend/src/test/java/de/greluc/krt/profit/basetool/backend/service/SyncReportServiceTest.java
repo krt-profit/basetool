@@ -51,7 +51,6 @@ class SyncReportServiceTest {
 
   @Mock private ExternalSyncReportRepository repository;
 
-  // A real registry (spied) so the per-source/event sync-event counter is genuinely recorded.
   @Spy private MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
   @InjectMocks private SyncReportService service;
@@ -83,7 +82,6 @@ class SyncReportServiceTest {
     assertEquals("Bluemoon Fungus", row.getExternalName());
     assertEquals("no UEX match", row.getDetail());
     assertNotNull(row.getRanAt());
-    // The finding is counted once under the bounded source + event_type (REQ-OBS-011).
     assertEquals(
         1.0d,
         meterRegistry

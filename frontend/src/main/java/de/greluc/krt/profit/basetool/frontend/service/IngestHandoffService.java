@@ -94,18 +94,6 @@ public class IngestHandoffService {
     try {
       String raw = redisTemplate.opsForValue().getAndDelete(KEY_PREFIX + sub + ":" + handoffId);
       if (raw == null) {
-        // Diagnostic correlator (REQ-OBS-004): the key the gateway staged was not here. Log the
-        // same
-        // non-reversible hashes of the subject and handoff id the gateway's stage logs (never the
-        // raw
-        // subject — pseudonymous PII — or the secret id), so a stage/consume pair can be lined up:
-        // a
-        // MATCHING sub hash with an absent key means an expired or already-consumed handoff (the
-        // 5→30m TTL fix), while a DIFFERENT sub hash means a subject mismatch between the
-        // device-grant
-        // token and this browser session. This is what disambiguates the "Import-Link abgelaufen
-        // oder
-        // ungültig" notice.
         log.info(
             "Ingest handoff not found (sub=u-{}, hid=h-{}, kind={}) — expired, already consumed, or"
                 + " subject mismatch",

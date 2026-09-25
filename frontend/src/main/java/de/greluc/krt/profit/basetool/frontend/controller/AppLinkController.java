@@ -91,8 +91,6 @@ public class AppLinkController {
   public RedirectView callback() {
     RedirectView redirect = new RedirectView(HELP_PATH);
     redirect.setStatusCode(HttpStatus.SEE_OTHER);
-    // Model attributes would be appended to the target as query parameters. There are none today,
-    // and a layout advice adding one later must not be able to put it in the URL.
     redirect.setExposeModelAttributes(false);
     return redirect;
   }

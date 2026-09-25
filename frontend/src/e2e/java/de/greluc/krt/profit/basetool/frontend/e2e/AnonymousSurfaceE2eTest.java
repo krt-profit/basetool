@@ -140,10 +140,6 @@ class AnonymousSurfaceE2eTest {
               0,
               page.locator("table tbody tr").count(),
               "no row of " + path + " may reach an anonymous visitor");
-          // Scoped to our own origin on purpose: the page a refused visitor is sent to IS a
-          // login form, and it is Keycloak's, served from Keycloak's host. The landing page —
-          // the other place the visitor can end up — carries no form at all, so the check
-          // still bites wherever it can mean anything.
           if (page.url().startsWith(baseUrl)) {
             assertEquals(
                 0,
@@ -286,7 +282,6 @@ class AnonymousSurfaceE2eTest {
     assumeTrue(STACK.managesStack(), "needs the seeded test-member of the ephemeral stack");
     String baseUrl = STACK.baseUrl();
 
-    // Consent, once, so the gate below is a no-op and cannot eat the saved request.
     E2eSupport.authenticatedStorageState(browser, baseUrl, MEMBER_USER, MEMBER_PASSWORD);
 
     for (Map.Entry<String, String> deepLink :
@@ -299,10 +294,6 @@ class AnonymousSurfaceE2eTest {
           E2eSupport.navigate(page, baseUrl + deepLink.getKey());
           E2eSupport.login(page, baseUrl, MEMBER_USER, MEMBER_PASSWORD);
 
-          // Spring Security replays the saved request with its own `continue` marker appended:
-          // the request cache only hands the saved request back to a URL carrying it, which is
-          // how it tells a replay apart from a fresh navigation to the same path. That marker is
-          // its bookkeeping, not part of the deep link the member asked for.
           String url = page.url();
           int query = url.indexOf('?');
           String replayed = query < 0 ? url : url.substring(0, query);

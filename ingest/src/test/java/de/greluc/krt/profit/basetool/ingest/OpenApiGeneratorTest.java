@@ -82,12 +82,10 @@ class OpenApiGeneratorTest {
     assertThat(document.path("info").path("title").asString())
         .isEqualTo("KRT Basetool Ingest Gateway API");
     assertThat(document.path("components").path("securitySchemes").has("bearer-jwt")).isTrue();
-    // The gateway's entire public surface (REQ-INGEST-001): exactly these two forward-only POSTs.
     assertThat(document.path("paths").propertyNames())
         .containsExactlyInAnyOrder("/v1/refinery-extract", "/v1/blueprint-preview");
     assertThat(document.path("paths").path("/v1/refinery-extract").has("post")).isTrue();
     assertThat(document.path("paths").path("/v1/blueprint-preview").has("post")).isTrue();
-    // A stale spec that lost the request schema would still have the paths — pin the DTO too.
     assertThat(document.path("components").path("schemas").has("RefineryExtractDto")).isTrue();
     assertThat(document.path("components").path("schemas").has("IngestResponseDto")).isTrue();
 
@@ -123,7 +121,6 @@ class OpenApiGeneratorTest {
         Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
       }
     } finally {
-      // A successful move already consumed the temporary file; this only cleans up after a failure.
       Files.deleteIfExists(temporary);
     }
   }

@@ -77,8 +77,6 @@ public class ShipType extends AbstractEntity<UUID> {
 
   private boolean hidden = false;
 
-  // ───── joint cross-source keys (R2 writes) ─────
-
   /** In-game RSI asset UUID. Shared with SC Wiki; the cross-source join key. */
   @Column(name = "external_uuid", unique = true)
   private UUID externalUuid;
@@ -94,8 +92,6 @@ public class ShipType extends AbstractEntity<UUID> {
   /** SC Wiki kebab-case slug (e.g. {@code "orig-100i"}). R4 writes. */
   @Column(name = "scwiki_slug")
   private String scwikiSlug;
-
-  // ───── canonical specs (last writer wins by field per §6.3.3) ─────
 
   /** Full marketing name (e.g. {@code "Origin 100i"}). */
   @Column(name = "name_full")
@@ -174,8 +170,6 @@ public class ShipType extends AbstractEntity<UUID> {
   /** Shield health points. */
   @Column(name = "shield_hp")
   private Integer shieldHp;
-
-  // ───── 36 UEX capability flags ─────
 
   /** Add-on module to a parent ship (not a stand-alone vehicle). */
   @Column(name = "is_addon")
@@ -321,8 +315,6 @@ public class ShipType extends AbstractEntity<UUID> {
   @Column(name = "is_tractor_beam")
   private Boolean isTractorBeam;
 
-  // ───── URLs ─────
-
   /** RSI pledge store URL. */
   @Column(name = "url_store", length = 512)
   private String urlStore;
@@ -347,8 +339,6 @@ public class ShipType extends AbstractEntity<UUID> {
   @Column(name = "url_wiki", length = 512)
   private String urlWiki;
 
-  // ───── multi-language descriptions ─────
-
   /**
    * English description. Replaces the legacy synthesized {@code description} column, which V125
    * dropped on 2026-06-01 together with its JPA field — no {@code description} member exists on
@@ -360,8 +350,6 @@ public class ShipType extends AbstractEntity<UUID> {
   /** German description (filled by R4 Wiki sync; UEX does not expose a DE field today). */
   @Column(name = "description_de", columnDefinition = "TEXT")
   private String descriptionDe;
-
-  // ───── provenance ─────
 
   /** Last successful UEX sync touch. */
   @Column(name = "uex_synced_at")
@@ -383,8 +371,6 @@ public class ShipType extends AbstractEntity<UUID> {
   @Enumerated(EnumType.STRING)
   @Column(name = "source_systems", nullable = false, length = 16)
   private GameItemSourceSystem sourceSystems = GameItemSourceSystem.UEX_ONLY;
-
-  // ───── KRT P4K Reader source lane (catalog import) ─────
 
   /**
    * DataForge {@code __ref} asset GUID observed by the KRT P4K Reader import for this ship. Kept

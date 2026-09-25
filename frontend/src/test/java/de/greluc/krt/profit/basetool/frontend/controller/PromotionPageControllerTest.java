@@ -75,10 +75,6 @@ class PromotionPageControllerTest {
 
   @InjectMocks private PromotionPageController controller;
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Test fixtures
-  // ─────────────────────────────────────────────────────────────────────────
-
   private static PromotionTopicDto topic(UUID id, String name, int sortOrder) {
     return new PromotionTopicDto(id, 0L, name, null, sortOrder, null, null);
   }
@@ -134,15 +130,8 @@ class PromotionPageControllerTest {
         false);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // overview()
-  // ─────────────────────────────────────────────────────────────────────────
-
   @Test
   void overview_emptyBackend_populatesEmptyModel() {
-    // Backend down for every call → all attributes default to empty/null. The
-    // page must still resolve to the overview template so the user sees the
-    // empty state instead of a 500.
     when(backendApiClient.get(any(String.class), anyTypeRef())).thenReturn(null);
     Model model = new ConcurrentModel();
 
@@ -159,9 +148,6 @@ class PromotionPageControllerTest {
 
   @Test
   void overview_groupsRankRequirementsByFromToPair_andSortsAscending() {
-    // Three requirements: two share the 20→19 step, one is 19→18. The page
-    // expects the grouped map keyed by `from_to` and ordered ascending so the
-    // template can render rank-groups in a stable, predictable order.
     UUID catA = UUID.randomUUID();
     UUID catB = UUID.randomUUID();
     RankRequirementDto r1 = requirement(20, 19, catA, "LEVEL_A", 1);
@@ -182,8 +168,6 @@ class PromotionPageControllerTest {
         (Map<String, List<RankRequirementDto>>) model.getAttribute("groupedRankRequirements");
     assertNotNull(grouped);
     assertEquals(2, grouped.size(), "two distinct (from,to) pairs");
-    // Sort order: 19_18 comes before 20_19 because the comparator sorts by
-    // fromRank ascending. The 20_19 bucket holds both r1 and r2 in insertion order.
     List<String> keys = List.copyOf(grouped.keySet());
     assertEquals("19_18", keys.get(0));
     assertEquals("20_19", keys.get(1));
@@ -204,9 +188,6 @@ class PromotionPageControllerTest {
 
   @Test
   void overview_currentUserRankIsNull_whenMeEndpointThrows() {
-    // The /me call is wrapped in a try/catch so the page degrades cleanly
-    // when the backend is unreachable. We piggy-back this on the empty-state
-    // setup to also assert that no other call is needed to land at null.
     when(backendApiClient.get(any(String.class), anyTypeRef())).thenReturn(null);
     when(backendApiClient.get(eq("/api/v1/users/me"), anyTypeRef()))
         .thenThrow(new RuntimeException("backend down"));
@@ -216,10 +197,6 @@ class PromotionPageControllerTest {
 
     assertNull(model.getAttribute("currentUserRank"));
   }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // myEvaluations()
-  // ─────────────────────────────────────────────────────────────────────────
 
   @Test
   void myEvaluations_assemblesAllExpectedAttributes() {
@@ -255,9 +232,6 @@ class PromotionPageControllerTest {
 
   @Test
   void myEvaluations_requiredLevelByCategory_picksHighestLevelAcrossRules() {
-    // Two rank requirements target the same category: LEVEL_A (minor step) and
-    // LEVEL_C (major step). The strongest demand wins so the template can
-    // highlight a weak category against the toughest expectation.
     UUID catId = UUID.randomUUID();
     RankRequirementDto r1 = requirement(20, 19, catId, "LEVEL_A", 1);
     RankRequirementDto r2 = requirement(19, 18, catId, "LEVEL_C", 1);
@@ -283,10 +257,6 @@ class PromotionPageControllerTest {
 
   @Test
   void myEvaluations_requiredLevelByCategory_skipsTopicWideRules() {
-    // A rank requirement without a categoryId is a topic-wide or global rule
-    // and must not pollute the per-category required-level map; the template
-    // applies the weak-category highlight only when there is a category-
-    // specific expectation to compare against.
     UUID catId = UUID.randomUUID();
     RankRequirementDto specific = requirement(20, 19, catId, "LEVEL_B", 1);
     RankRequirementDto topicWide = requirement(20, 19, null, "LEVEL_C", 1);
@@ -309,10 +279,6 @@ class PromotionPageControllerTest {
     assertEquals(1, required.size(), "only the category-specific rule contributes");
     assertEquals("LEVEL_B", required.get(catId.toString()));
   }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // manage()
-  // ─────────────────────────────────────────────────────────────────────────
 
   @Test
   void manage_buildsAllCategoriesInTopicOrder_andCategoryCountByTopic() {
@@ -367,10 +333,6 @@ class PromotionPageControllerTest {
 
   @Test
   void manage_lastEvaluatedByUser_picksMostRecentUpdatedAtPerUser() {
-    // Three evaluations for the same user across two categories with
-    // ascending timestamps. The map must surface the maximum so the template's
-    // "letzte Aenderung am" tooltip is reliable even when an officer edits
-    // older categories last.
     UUID catA = UUID.randomUUID();
     UUID catB = UUID.randomUUID();
     Instant t1 = Instant.parse("2026-01-01T10:00:00Z");
@@ -405,9 +367,6 @@ class PromotionPageControllerTest {
         new PromotionEligibilityDto(id1.toString(), 20, 19, true, true, List.of());
     PromotionEligibilityDto elig2 =
         new PromotionEligibilityDto(id2.toString(), 19, 18, false, true, List.of());
-    // The null-id member exists only as a defensive fallback for malformed
-    // backend payloads. The controller must skip it entirely rather than
-    // crashing with NullPointerException when stringifying the id.
     UserDto nullIdMember = member(null, "phantom", null);
 
     when(backendApiClient.get(contains("/api/v1/promotion/topics/all"), anyTypeRef()))
@@ -436,8 +395,6 @@ class PromotionPageControllerTest {
     assertEquals(2, byUser.size(), "null-id member is skipped");
     assertEquals(List.of(elig1), byUser.get(id1.toString()));
     assertEquals(List.of(elig2), byUser.get(id2.toString()));
-    // Verify there is no eligibility call for the null-id member: we only
-    // expect two per-user eligibility GETs in total.
     verify(backendApiClient, times(2))
         .get(contains("/api/v1/promotion/eligibility/user/"), anyTypeRef());
   }
@@ -459,10 +416,6 @@ class PromotionPageControllerTest {
         ((Map<?, ?>) model.getAttribute("hasEvaluationsByUser")).isEmpty(),
         "should remain empty when there are no evaluations");
   }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // adminTopics()
-  // ─────────────────────────────────────────────────────────────────────────
 
   @Test
   void adminTopics_buildsTopicCategoryAndCategoryContentMaps() {
@@ -492,10 +445,6 @@ class PromotionPageControllerTest {
         (Map<String, List<PromotionLevelContentDto>>) model.getAttribute("categoryContentMap");
     assertEquals(List.of(lc), catContents.get(catId.toString()));
   }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // adminRankRequirements()
-  // ─────────────────────────────────────────────────────────────────────────
 
   @Test
   void adminRankRequirements_groupsAndProvidesCascadingMap() {
@@ -528,15 +477,8 @@ class PromotionPageControllerTest {
     assertEquals(List.of(c), byTopic.get(topicId.toString()));
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Defensive: every fetch helper swallows backend failures
-  // ─────────────────────────────────────────────────────────────────────────
-
   @Test
   void overview_degradesGracefully_whenEveryBackendCallThrows() {
-    // The page must never propagate an exception from the backend. A 500
-    // would be worse UX than rendering an empty page with the corner badges
-    // and toolbar still in place — the user has a path forward (retry).
     when(backendApiClient.get(any(String.class), anyTypeRef()))
         .thenThrow(new RuntimeException("backend explosion"));
     Model model = new ConcurrentModel();

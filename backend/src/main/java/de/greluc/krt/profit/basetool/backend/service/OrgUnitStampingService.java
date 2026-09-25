@@ -123,8 +123,6 @@ public class OrgUnitStampingService {
    */
   public Squadron resolveSquadronForPickerOutput(@NotNull User targetUser, UUID owningOrgUnitId) {
     Set<UUID> memberOrgUnitIds = new LinkedHashSet<>();
-    // Post-D3: every membership (Staffel + SK) is sourced from org_unit_membership — the legacy
-    // User.squadron column was dropped in R9 Step 5 / V101.
     List<OrgUnitMembership> allMemberships =
         orgUnitMembershipRepository.findAllByIdUserId(targetUser.getId());
     for (OrgUnitMembership m : allMemberships) {
@@ -141,17 +139,10 @@ public class OrgUnitStampingService {
       if (memberOrgUnitIds.size() == 1) {
         stampedOrgUnitId = memberOrgUnitIds.iterator().next();
       } else {
-        // REQ-ORG-017 "pin, else choose": honour an active-context pin onto one of the target's own
-        // org units (self-service create) so a pinned member need not re-pick; otherwise force a
-        // choice.
         Optional<UUID> pinned = requestScopeResolver.readActiveSquadronFromHeader();
         if (pinned.isPresent() && memberOrgUnitIds.contains(pinned.get())) {
           stampedOrgUnitId = pinned.get();
         } else {
-          // Its own type, and therefore its own stable problem code: this is the one rejection on
-          // the stamping path the member can actually fix, and the frontend needs something to
-          // branch on to say so in their own language (REQ-ORG-023). Under the generic BAD_REQUEST
-          // the picker surfaces echoed this very English sentence into a German toast.
           throw new OwnerOrgUnitRequiredException(
               "User belongs to multiple org units; owningOrgUnitId is required");
         }
@@ -164,10 +155,6 @@ public class OrgUnitStampingService {
       stampedOrgUnitId = owningOrgUnitId;
     }
 
-    // Polymorphic load + unproxy instead of a Squadron-typed findById: the stamped id often equals
-    // an org unit this transaction already holds as a base-typed OrgUnit proxy (the aggregate's
-    // owning unit), and a subclass-typed load would force Hibernate to narrow that proxy
-    // (HHH000179, breaks ==). The kind check moves from the SQL discriminator filter into Java.
     return orgUnitRepository
         .findById(stampedOrgUnitId)
         .map(ou -> Hibernate.unproxy(ou, OrgUnit.class))
@@ -300,17 +287,12 @@ public class OrgUnitStampingService {
   public OrgUnit resolveReassignTargetOrgUnit(@Nullable UUID targetOrgUnitId) {
     boolean admin = authHelper.isAdmin();
     if (targetOrgUnitId == null) {
-      // Ownerless target: an admin always, otherwise only a membershipless leadership caller. The
-      // member lookup is short-circuited for admins.
       if (admin || requestScopeResolver.currentMemberOrgUnitIds().isEmpty()) {
         return null;
       }
       throw new AccessDeniedException(
           "Only an admin or a membershipless leadership user may make an aggregate ownerless");
     }
-    // Non-null target: an admin may assign anywhere; a non-admin only to a direct membership or a
-    // unit within their editable (cascade-aware) scope. The `!admin` short-circuit keeps the admin
-    // path off the member lookup entirely.
     if (!admin
         && !requestScopeResolver.currentMemberOrgUnitIds().contains(targetOrgUnitId)
         && !accessGateService.canEditOrgUnit(targetOrgUnitId)) {
@@ -373,45 +355,15 @@ public class OrgUnitStampingService {
       if (memberOrgUnitIds.size() == 1) {
         stampedOrgUnitId = memberOrgUnitIds.iterator().next();
       } else {
-        // REQ-ORG-017 "pin, else choose": honour an active-context pin onto one of the TARGET
-        // user's
-        // own org units (the self-service create path where caller == target) so a member who has
-        // already pinned a Staffel via the switcher need not re-pick it on the create form;
-        // otherwise force an explicit choice. The pin is only honoured when it is one of the
-        // target's
-        // memberships, so an admin's foreign pin on an on-behalf create still falls through to 400.
         Optional<UUID> pinned = requestScopeResolver.readActiveSquadronFromHeader();
         if (pinned.isPresent() && memberOrgUnitIds.contains(pinned.get())) {
           stampedOrgUnitId = pinned.get();
         } else {
-          // Its own type, and therefore its own stable problem code: this is the one rejection on
-          // the stamping path the member can actually fix, and the frontend needs something to
-          // branch on to say so in their own language (REQ-ORG-023). Under the generic BAD_REQUEST
-          // the picker surfaces echoed this very English sentence into a German toast.
           throw new OwnerOrgUnitRequiredException(
               "User belongs to multiple org units; owningOrgUnitId is required");
         }
       }
     } else {
-      // Epic #692 Phase 4 (REQ-ORG-016): a picker choice is valid when it is one of the TARGET
-      // user's DIRECT memberships (the historical contract) OR an org unit the CURRENT CALLER may
-      // edit ({@link AccessGateService#canEditOrgUnit(UUID)}, cascade-aware since Phase 3). The
-      // create-on-behalf widening: a Bereichsleitung/OL leader may stamp a subordinate Staffel/SK
-      // (or its own Bereich/OL) they oversee.
-      //
-      // Note the gate keys canEditOrgUnit on the CALLER, while memberOrgUnitIds is the TARGET
-      // user's
-      // set. When caller == targetUser (every self-service create path) the two coincide, so an
-      // ordinary member's accepted set is exactly their own memberships and stamping is
-      // byte-identical
-      // to the pre-Phase-4 gate. They DIVERGE only on the two create-on-behalf paths where a caller
-      // stamps another user's row — inventory book-out/transfer and refinery store — and there the
-      // accepted set is the union of (target's memberships) and (caller's editable scope), by
-      // design:
-      // a leader may place the recipient's row in any unit the leader already controls. This never
-      // widens what the CALLER can see (canEditOrgUnit only admits units already in the caller's
-      // scope)
-      // and REQ-ORG-011 owner-escape keeps the recipient's own visibility of the row.
       if (!memberOrgUnitIds.contains(owningOrgUnitId)
           && !accessGateService.canEditOrgUnit(owningOrgUnitId)) {
         throw new BadRequestException(
@@ -421,16 +373,6 @@ public class OrgUnitStampingService {
       stampedOrgUnitId = owningOrgUnitId;
     }
 
-    // Resolve to the concrete subtype in ONE polymorphic load. Every OrgUnitKind may own an
-    // aggregate here (Staffel, SK, and — epic #692 Phase 4 / REQ-ORG-016 — Bereich / OL), so no
-    // kind filter applies; the picker output was validated above, so a miss is a hard contract
-    // violation (400). Deliberately NOT a subclass-typed
-    // SquadronRepository/SpecialCommandRepository
-    // probe: the stamped id often equals an org unit this transaction already holds as a base-typed
-    // OrgUnit proxy (e.g. the source aggregate's owning unit on a same-unit transfer), and a
-    // subclass-typed load would force Hibernate to narrow that proxy (HHH000179, breaks ==). The
-    // base-typed find reuses the persistence-context instance; unproxy yields the concrete subtype
-    // for callers that pattern-match on it.
     return orgUnitRepository
         .findById(stampedOrgUnitId)
         .map(ou -> Hibernate.unproxy(ou, OrgUnit.class))

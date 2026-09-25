@@ -1,25 +1,11 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="de">
 <body>
-<!--/*
-  Shared Materialbörse release / edit modal (REQ-MARKET-002/007). Included on the
-  Materialbörse board page and the Mein-Lager page. The logic lives in
-  materialboerse-release.js (window.krtMaterialRelease); strings come from
-  window.materialboerseI18n (bootstrapped below, merged so a host page can add its own).
-*/-->
 <th:block th:fragment="releaseModal">
-    <!--/* Opened and closed by materialboerse-release.js through window.krtModal. Its ✕ carries
-         `mb-modal-close` next to the footer's data-mb-modal-close, both handled by the same
-         cancel(). */-->
     <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='mb-modal', titleKey='materialboerse.modal.release.title', variant='krt-modal--wide', titleId='mb-modal-title', closeTrigger='', closeClass='mb-modal-close', body=~{fragments/materialboerse-modal :: mb-modal-body})}">
         <th:block th:ref="mb-modal-body">
             <div class="krt-modal-body">
                 <div class="mb-modal-picker" data-mb-picker hidden>
-                    <!--/* Material/Item kind radio (REQ-MARKET-002): the releasable-items picker lists
-                         BOTH the caller's material rows and their stock-backed game-item rows; this
-                         radio narrows the combobox below to one kind. The chosen kind rides the
-                         picker's /releasable-items?kind=… query (server-side filter, so a row past
-                         the picker's row cap is never hidden), driven by materialboerse-release.js. */-->
                     <div class="mb-modal-kind" data-mb-kind role="radiogroup"
                          th:aria-label="#{materialboerse.modal.kind.label}">
                         <label class="mb-modal-kind__opt">

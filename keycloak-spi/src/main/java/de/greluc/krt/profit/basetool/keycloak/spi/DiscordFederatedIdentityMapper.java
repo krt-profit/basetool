@@ -117,8 +117,6 @@ public class DiscordFederatedIdentityMapper extends AbstractOIDCProtocolMapper
     OIDCAttributeMapperHelper.addIncludeInTokensConfig(
         properties, DiscordFederatedIdentityMapper.class);
 
-    // Pre-fill the claim name with the value the backend expects, so a hand-added mapper that is
-    // saved without editing the field still emits the right claim.
     for (ProviderConfigProperty property : properties) {
       if (OIDCAttributeMapperHelper.TOKEN_CLAIM_NAME.equals(property.getName())) {
         property.setDefaultValue(DEFAULT_CLAIM_NAME);

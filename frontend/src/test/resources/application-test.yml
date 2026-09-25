@@ -1,5 +1,3 @@
-# Test profile. Lives in `src/test/resources` so it is on the test classpath only and never ships in
-# the production jar (audit item SEC-17; it sat in `src/main/resources` until 2026-09-23).
 server:
   ssl:
     enabled: false
@@ -29,23 +27,6 @@ resilience4j:
       verifier:
         enabled: false
 
-# Disable the custom HealthIndicators under @SpringBootTest. The test profile
-# pins placeholder URLs for both Keycloak (`http://keycloak.example.com/...`)
-# and the backend (`http://backend:11261`) — neither is resolvable from the
-# test JVM, so leaving the probes enabled would slow every context-loading
-# test by their respective connect timeouts. Unit tests for the indicators
-# themselves instantiate them directly against a MockWebServer URL and do
-# not consult these properties.
-#
-# The readiness group is also redefined here: Spring Boot 4 ships a
-# HealthEndpointGroupMembershipValidator that rejects a group `include` list
-# referencing a non-registered contributor (`NoSuchHealthContributorException`
-# at context startup). Under this profile `backend` and `keycloak` are disabled
-# (above), `redis` is absent because `spring.session.store-type: none`, and
-# `ssl` is absent because `server.ssl.enabled: false` — so we narrow the group
-# to the contributors that DO exist in tests. Production retains the full
-# `readinessState, backend, keycloak, redis, diskSpace, ssl` set from
-# application.yml.
 management:
   health:
     backend:

@@ -88,8 +88,6 @@ class V106MigrationTest {
         "UNIQUE constraint uk_material_scwiki_uuid must exist on material(scwiki_uuid)");
   }
 
-  // ─── helpers shared with the other V*MigrationTest classes ──────────────
-
   private Map<String, ColumnInfo> columnsOf(String tableName) {
     List<Map<String, Object>> rows =
         jdbcTemplate.queryForList(

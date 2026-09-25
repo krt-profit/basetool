@@ -148,12 +148,6 @@ class JobOrderPageControllerClaimMvcTest {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void upsertClaim_Conflict_PreservesRfc7807Code() throws Exception {
-    // A same-squadron first-claim race that outlasted the backend's bounded upsert retry surfaces a
-    // truthful 409 whose RFC 7807 code (OPTIMISTIC_LOCK) must reach krt-fetch verbatim so it drives
-    // the "stale data, reload?" confirm rather than a plain toast. If propagateBackendError ever
-    // regressed to ResponseEntity.status(409).build(), status().isConflict() would still pass but
-    // the code would be lost — this asserts the content-type AND the code, closing that gap (#1111
-    // collapse-to-500 / lost-code guard).
     UUID orderId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
     UUID squadronId = UUID.randomUUID();

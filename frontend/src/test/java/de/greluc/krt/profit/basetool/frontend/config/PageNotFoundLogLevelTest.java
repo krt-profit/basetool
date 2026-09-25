@@ -80,18 +80,11 @@ class PageNotFoundLogLevelTest {
 
   @Test
   void itIsStillReachableAtError() {
-    // ERROR rather than OFF, so the logger can still say something if Spring ever writes a genuine
-    // failure through it, and so /actuator/loggers still shows a level rather than a disabled
-    // logger.
     assertThat(LoggerFactory.getLogger(PAGE_NOT_FOUND_LOGGER).isErrorEnabled()).isTrue();
   }
 
   @Test
   void theRestOfTheWebLoggerTreeIsUntouched() {
-    // The over-broad fix, pinned out: silencing org.springframework.web would also silence this,
-    // and
-    // a build that stayed green while the whole web tree went quiet is precisely the failure this
-    // class exists to prevent.
     assertThat(LoggerFactory.getLogger("org.springframework.web").isInfoEnabled())
         .as("the pin must sit on the leaf logger, never on its parent")
         .isTrue();

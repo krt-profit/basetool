@@ -83,9 +83,6 @@ class PromotionFeatureFlagPageGateTest {
         new SquadronDto(squadronId, "IRIDIUM", "IRI", null, true, promotionEnabled, false, 0L);
     when(backendApiClient.get(contains("/api/v1/squadrons"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(squadron), 0, 1000, 1, 1, List.of()));
-    // OrgUnitContextAdvice.availableSquadrons() now reads the catalogue from the SQUADRON cache
-    // (getCached) rather than a plain get (REQ-DATA-007), so the promotion gate's flag lookup goes
-    // through getCached — stub it too or the squadron list is empty and the gate misreads the flag.
     when(backendApiClient.getCached(eq(CachedCatalog.SQUADRONS), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(squadron), 0, 1000, 1, 1, List.of()));
     when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
@@ -130,10 +127,6 @@ class PromotionFeatureFlagPageGateTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void adminPinnedToFlagOffSquadron_overviewIsForbidden() throws Exception {
-    // Regression: previously the admin bypass on OrgUnitContextAdvice.promotionFeatureEnabled
-    // returned true unconditionally for admins, so an admin pinned to a flag-off squadron still
-    // saw the menu. After fix/promotion-gate-honor-admin-pin the pinned squadron's flag drives
-    // visibility for admins too.
     UUID pinnedId = UUID.randomUUID();
     stubSquadronContext(pinnedId, false);
     mockMvc
@@ -144,8 +137,6 @@ class PromotionFeatureFlagPageGateTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void adminPinnedToFlagOnSquadron_overviewIsAccessible() throws Exception {
-    // Counterpart to the regression test above — an admin pinned to a squadron with the flag ON
-    // still sees the menu (pinned view consistent with what a member of that squadron sees).
     UUID pinnedId = UUID.randomUUID();
     stubSquadronContext(pinnedId, true);
     mockMvc
@@ -156,9 +147,6 @@ class PromotionFeatureFlagPageGateTest {
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void squadronlessNonAdmin_overviewIsForbidden() throws Exception {
-    // A non-admin whose home squadron does not resolve (active-org-unit endpoint returns null) has
-    // no promotion system of their own: the menu is hidden and direct page access is blocked, so a
-    // squadron-less caller never sees the cross-staffel union.
     when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
         .thenReturn(LayoutResponses.activeOrgUnit(null));
     mockMvc.perform(get("/promotion/overview")).andExpect(status().isForbidden());
@@ -167,9 +155,6 @@ class PromotionFeatureFlagPageGateTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void adminAllSquadronsMode_overviewIsAccessible() throws Exception {
-    // An admin without an active pin (all-scopes mode) keeps access: the page renders and shows a
-    // "pick a squadron" prompt instead of a merged cross-staffel catalog. No session pin is set, so
-    // the admin branch resolves activeSquadronId to null → isAllSquadronsMode.
     stubSquadronContext(UUID.randomUUID(), true);
     mockMvc.perform(get("/promotion/overview")).andExpect(status().is2xxSuccessful());
   }

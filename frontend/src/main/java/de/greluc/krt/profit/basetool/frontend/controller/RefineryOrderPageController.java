@@ -195,8 +195,6 @@ public class RefineryOrderPageController {
     PageResponse<RefineryOrderListDto> p = null;
     try {
       String statusParam = String.join(",", status);
-      // Everyone sees all orders (read-only for normal members); the per-user endpoint backs the
-      // "Meine Auftraege" toggle. Both are paginated server-side now (REQ-REFINERY-019).
       String endpoint =
           Boolean.TRUE.equals(onlyMine)
               ? "/api/v1/refinery-orders/my-orders"
@@ -272,7 +270,6 @@ public class RefineryOrderPageController {
       @AuthenticationPrincipal OidcUser principal) {
     RefineryOrderForm form;
     if (model.containsAttribute("refineryOrderForm")) {
-      // A flashed form (the classic upload redirect) wins over a fresh / handoff form.
       form = (RefineryOrderForm) model.getAttribute("refineryOrderForm");
       if (form != null && form.getSource() == null) {
         form.setSource(source);
@@ -284,15 +281,6 @@ public class RefineryOrderPageController {
       if (currentUserId != null) {
         form.setOwnerId(currentUserId);
       }
-      // One-click ingest (epic #639, REQ-INGEST-004): a `?handoff=<id>` from the desktop extractor.
-      // This navigational GET is a SAFE request and must NOT consume the single-use handoff: a
-      // speculative browser prefetch or a duplicate top-level load of this URL would otherwise burn
-      // the token on the first (often invisible) request and leave the real navigation showing the
-      // ingest.handoff.notFound notice on every send (the 2026-07-19 Firefox double-GET incident).
-      // Instead of consuming here, expose the id so the create page's JS can POST it to
-      // importHandoff below -- a script-initiated request a page prefetch never issues -- which
-      // performs the one-time consume and swaps the pre-filled fragment in place, exactly like the
-      // manual upload. Consuming stays off every navigational GET.
       if (handoff != null && !handoff.isBlank()) {
         model.addAttribute("pendingHandoffId", handoff);
       }
@@ -360,10 +348,6 @@ public class RefineryOrderPageController {
         form.setOwnerId(currentUserId);
       }
     }
-    // isLogistician reads the SecurityContext on the request thread; do it here, then fetch the
-    // catalog lookups concurrently (missions, users, rounding mode, yields and the owner picker are
-    // uncached round-trips). Each helper swallows its own failure and returns an empty list/map, so
-    // join() never throws and the form degrades exactly as the serial version did.
     model.addAttribute("isLogistician", isLogistician(principal));
     model.addAttribute("refineryOrderForm", form);
     final RefineryOrderForm boundForm = form;
@@ -372,9 +356,6 @@ public class RefineryOrderPageController {
     var methodsFuture = parallelPageLoader.loadAsync(this::fetchMethods);
     var locationsFuture = parallelPageLoader.loadAsync(this::fetchLocations);
     var missionsFuture = parallelPageLoader.loadAsync(this::fetchMissions);
-    // Owner picker is a server-side searchable combobox (remote-users, #1193): seed only the
-    // current
-    // owner's display name (the caller by default), not the whole roster.
     var seedNamesFuture =
         parallelPageLoader.loadAsync(
             () ->
@@ -468,8 +449,6 @@ public class RefineryOrderPageController {
         model.addAttribute("importRowsSkipped", draft.rowsSkipped());
       }
     } catch (BackendServiceException e) {
-      // Envelope-level reject (e.g. unsupported schemaVersion): the backend's problem detail is
-      // already localized — show it verbatim; otherwise a generic failure message.
       String detail = e.getProblemDetail();
       if (detail != null && !detail.isBlank()) {
         model.addAttribute("importErrorText", detail);
@@ -568,11 +547,6 @@ public class RefineryOrderPageController {
       return "refinery-orders-details :: fragmentError";
     }
     boolean isLogistician = isLogistician(principal);
-    // Set unconditionally, not only on the fresh-load branch below: the store dialog's receiver
-    // picker is gated on this flag (REQ-SEC-039), and on the flash-attribute re-render after a
-    // validation error the branch is skipped — which would silently demote a logistician to the
-    // read-only receiver field. A missing flag renders as "not a logistician", so the failure mode
-    // is safe but wrong, and only visible after a failed submit.
     model.addAttribute("isLogistician", isLogistician);
 
     if (!model.containsAttribute("refineryOrderForm") || !model.containsAttribute("storeForm")) {
@@ -591,11 +565,6 @@ public class RefineryOrderPageController {
         model.addAttribute("canEdit", canEdit);
         model.addAttribute("order", orderDto);
 
-        // Store-dialog owning-org-unit picker (#596): options for the default receiver (the caller)
-        // are server-rendered; the JS rebuilds them per row when the receiver dropdown changes. The
-        // inherited default pre-selects the order's own owning OrgUnit so a same-OrgUnit self-store
-        // needs no manual choice. A receiver who is not a member of that OrgUnit simply gets no
-        // pre-selection and must pick — the §5.5.1 "force choice" fallback.
         model.addAttribute("storeOrgUnitOptions", fetchUserOrgUnitOptions(currentUserId));
         model.addAttribute("orderOwningOrgUnitId", orderDto.owningOrgUnitId());
 
@@ -660,15 +629,6 @@ public class RefineryOrderPageController {
                 storeItem.setMaterialId(good.outputMaterial().id());
                 storeItem.setMaterialName(good.outputMaterial().name());
 
-                // The output quantity from the refinery good is stored as units (centi-SCU)
-                // when the material is SCU-measured: 100 units == 1 SCU. We divide by 100 to
-                // get the SCU value the user will enter in the store dialog. Default to the
-                // SCU branch whenever the material's quantityType is anything other than the
-                // explicit string "PIECE": UEX-imported materials historically have a NULL
-                // quantity_type (the UEX sync never set the field — see issue #230), and a
-                // refinery never produces piece-counted goods anyway, so treating "unknown"
-                // as SCU here is both safer (avoids 100x over-booking) and matches the
-                // domain. Backed by the V95 migration that backfills NULL -> 'SCU'.
                 double amount = 0.0;
                 String materialQuantityType = good.outputMaterial().quantityType();
                 if (good.outputQuantity() != null) {
@@ -691,8 +651,6 @@ public class RefineryOrderPageController {
                   storeItem.setAmountFixed(false);
                 }
                 storeItem.setAmount(amount);
-                // Normalize the per-row quantityType the template sees so the unit label
-                // ("(SCU)" / "(Stück)") matches the converted amount above.
                 storeItem.setQuantityType("PIECE".equals(materialQuantityType) ? "PIECE" : "SCU");
 
                 storeItem.setQuality(good.quality() != null ? good.quality() : 0);
@@ -702,10 +660,6 @@ public class RefineryOrderPageController {
                 if (currentUserId != null) {
                   storeItem.setUserId(currentUserId);
                 }
-                // Inherit the order's own owning OrgUnit as the picker's default selection (#596).
-                // Valid only when the default receiver (the caller) is a member of it; if not, the
-                // option is absent from storeOrgUnitOptions and the picker renders unselected,
-                // forcing an explicit choice per the §5.5.1 matrix.
                 storeItem.setOwningOrgUnitId(orderDto.owningOrgUnitId());
                 storeForm.getItems().add(storeItem);
               }
@@ -715,9 +669,6 @@ public class RefineryOrderPageController {
         }
       } catch (Exception e) {
         log.error("Failed to fetch refinery order details", e);
-        // A fragment request must never answer with a redirect: krtFetch.swap would bail silently
-        // and leave the section stale. Answer section-sized instead (the full page still
-        // redirects).
         if (section != null) {
           return "refinery-orders-details :: fragmentError";
         }
@@ -728,10 +679,6 @@ public class RefineryOrderPageController {
     model.addAttribute("orderId", id);
     model.addAttribute("materials", fetchMaterials());
     model.addAttribute("methods", fetchMethods());
-    // Keep this order's own refinery in the dropdown even after an admin hides that location:
-    // the picker source excludes hidden entries, and the location <select> is `required`, so a
-    // dropped option would leave the field on "-- please choose --" and block every subsequent
-    // save of an order that was perfectly valid when it was created.
     LocationDto preserveLocation =
         model.getAttribute("order") instanceof RefineryOrderDto orderForPicker
             ? orderForPicker.location()
@@ -739,17 +686,10 @@ public class RefineryOrderPageController {
     model.addAttribute("locations", fetchLocations(preserveLocation));
     model.addAttribute("allLocations", fetchAllLocations());
     RefineryOrderForm formInModel = (RefineryOrderForm) model.getAttribute("refineryOrderForm");
-    // The missions catalog is a size=1000 uncached read and is referenced only by the `order`
-    // section's "Einsatz" picker, so a `store` fragment refresh skips it entirely.
     if (!FRAGMENT_STORE.equals(section)) {
       UUID preserveMissionId = formInModel != null ? formInModel.getMissionId() : null;
       model.addAttribute("missions", fetchMissions(preserveMissionId));
     }
-    // The owner + per-item receiver pickers are now server-side searchable comboboxes
-    // (remote-users,
-    // #1193): instead of preloading the whole roster, seed only the display names of the users the
-    // form actually references (the owner and each store item's receiver — all default to the
-    // caller). Bounded by the distinct referenced ids, not the roster size.
     Set<UUID> seedIds = new LinkedHashSet<>();
     if (formInModel != null && formInModel.getOwnerId() != null) {
       seedIds.add(formInModel.getOwnerId());
@@ -762,17 +702,11 @@ public class RefineryOrderPageController {
       }
     }
     model.addAttribute("seedUserNames", resolveSeedUserNames(seedIds));
-    // The active-job-order lookup backs only the store dialog's per-row "Auftrag" picker, so an
-    // `order` fragment refresh skips it.
     if (!FRAGMENT_ORDER.equals(section)) {
       model.addAttribute("jobOrders", fetchActiveJobOrders());
     }
     model.addAttribute("roundingMode", fetchRoundingMode());
 
-    // Pre-load the UEX yield map for the order's current location so the detail page can render
-    // the bonus badge for every input material in the dropdown on first paint, without an extra
-    // network round-trip. The same map is then refreshed client-side via the AJAX endpoint below
-    // whenever the user picks a different refinery from the location dropdown.
     UUID currentLocationId = null;
     Object orderAttr = model.getAttribute("order");
     if (orderAttr instanceof RefineryOrderDto orderForLookup && orderForLookup.location() != null) {
@@ -963,10 +897,6 @@ public class RefineryOrderPageController {
   @NotNull
   private List<MissionListDto> fetchMissions(UUID preserveMissionId) {
     try {
-      // The explicit newest-first sort is load-bearing: without it the backend's default is
-      // plannedStartTime ASCENDING, so once more than 1000 missions exist the single fetched page
-      // holds the 1000 OLDEST rows and the three-month window below silently empties — the recent
-      // missions the dropdown is for would sit beyond the page boundary.
       PageResponse<MissionListDto> p =
           backendApiClient.get(
               "/api/v1/missions?size=1000&sort=plannedStartTime,desc", MISSION_LIST_PAGE);
@@ -1037,16 +967,11 @@ public class RefineryOrderPageController {
       RefineryOrderForm form, OidcUser principal) {
     UUID explicitOwnerId = form != null ? form.getOwnerId() : null;
     if (explicitOwnerId == null) {
-      // Self-entry → the caller's pickable org units: direct memberships plus their cascading
-      // leadership reach (own Bereich/OL + overseen subordinate Staffeln/SKs), epic #692 Phase 5.
-      // Unchanged for an ordinary member. Resolved server-side for the caller.
       if (principal == null) {
         return List.of();
       }
       return fetchMyPickableOrgUnits();
     }
-    // A logistician explicitly picking another owner → that user's DIRECT memberships (their own
-    // stock); the create-on-behalf cascade applies to the caller, not to a third-party owner.
     return fetchUserOrgUnitOptions(explicitOwnerId);
   }
 
@@ -1119,7 +1044,6 @@ public class RefineryOrderPageController {
           names.put(id, user.effectiveName() != null ? user.effectiveName() : user.username());
         }
       } catch (Exception e) {
-        // REQ-OBS-004: log the id only, never the resolved name.
         log.warn("Failed to resolve seed user name for refinery picker (id {})", id, e);
       }
     }
@@ -1171,10 +1095,8 @@ public class RefineryOrderPageController {
       return null;
     }
     try {
-      // Try the subject directly (fastest path)
       return CurrentUser.userId(principal);
     } catch (Exception e) {
-      // Fallback: ask the backend for our id
       try {
         UserDto me = backendApiClient.get("/api/v1/users/me", UserDto.class);
         return me != null ? me.id() : null;
@@ -1196,9 +1118,6 @@ public class RefineryOrderPageController {
     Collection<? extends GrantedAuthority> authorities =
         (auth != null) ? auth.getAuthorities() : principal.getAuthorities();
 
-    // REQ-OBS-004: never log principal.getName() (the Keycloak preferred_username handle — PII the
-    // appender PiiMasker does not scrub). Log the same stable short pseudonym used for the
-    // backend-flag grant below (BackendRoleSyncFilter.maskPrincipal shape).
     log.debug(
         "Checking logistician status for user u-{}, authorities: {}",
         Integer.toHexString(java.util.Objects.hashCode(principal.getName())),
@@ -1215,15 +1134,10 @@ public class RefineryOrderPageController {
                         || a.getAuthority().equals(Roles.authority(Roles.OFFICER)));
     if (!result) {
       try {
-        // Fallback: check the DB flag from the backend
         de.greluc.krt.profit.basetool.frontend.model.dto.UserDto me =
             backendApiClient.get(
                 "/api/v1/users/me", de.greluc.krt.profit.basetool.frontend.model.dto.UserDto.class);
         if (me != null && Boolean.TRUE.equals(me.isLogistician())) {
-          // M-16: do NOT log {@code principal.getName()} (the Keycloak username — PII). Log only
-          // a stable short pseudonym derived from the principal name's hashCode, in the same
-          // shape as {@code BackendRoleSyncFilter.maskPrincipal}. The narrower {@code log.debug}
-          // a few lines down does not carry the principal at all.
           log.info(
               "Granting logistician by backend flag for user: u-{}",
               Integer.toHexString(java.util.Objects.hashCode(principal.getName())));

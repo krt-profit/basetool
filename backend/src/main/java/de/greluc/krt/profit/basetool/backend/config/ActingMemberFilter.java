@@ -145,24 +145,11 @@ public class ActingMemberFilter extends OncePerRequestFilter {
       @NotNull FilterChain filterChain)
       throws ServletException, IOException {
     String onBehalfOf = request.getHeader(ActingMemberHeader.ON_BEHALF_OF_HEADER);
-    // No header, no acting member: the request continues under the caller's OWN identity, which
-    // every later filter and @PreAuthorize still checks. One named predicate rather than an inline
-    // `== null || isBlank()`: the early exit is a single guard, and CodeQL's
-    // java/user-controlled-bypass could not see that the `null` half of a short-circuit OR also
-    // returns here, so it read the lookup below as skippable (alert #1125).
     if (isAbsent(onBehalfOf)) {
       filterChain.doFilter(request, response);
       return;
     }
 
-    // ENDPOINT BOUND FIRST, and the order is load-bearing rather than cosmetic. This filter sits
-    // on the unmatched chain, so it sees every path; when the caller check came first, ANY
-    // unauthenticated request to ANY path that carried this header was counted as
-    // "no_authenticated_caller" — a reason documented as structurally impossible and alerted on as
-    // evidence of a filter-ordering bug. The header ships in the extractor and is documented
-    // publicly, so a single internet probe produced an hour-long page pointing at the wrong thing.
-    // Checking the bound first confines every reason below to the two endpoints that accept the
-    // header at all.
     if (!matchesActingPath(request)) {
       refuse(
           request,
@@ -174,8 +161,6 @@ public class ActingMemberFilter extends OncePerRequestFilter {
 
     Authentication caller = SecurityContextHolder.getContext().getAuthentication();
     if (!(caller instanceof JwtAuthenticationToken jwtCaller)) {
-      // Never "ignore and continue": that is precisely how the first version failed — filters
-      // running before authentication saw an empty context and silently skipped their check.
       refuse(
           request,
           response,
@@ -204,10 +189,6 @@ public class ActingMemberFilter extends OncePerRequestFilter {
     try {
       authorities = actingMemberAuthorities.authoritiesFor(member);
     } catch (AccessDeniedException notLive) {
-      // Unknown here, or no longer in the identity provider. Both fail closed, and the answer is
-      // byte-identical to every other refusal so it cannot be used to enumerate subjects. The
-      // distinction lives in that class's log line and in this counter -- see
-      // MetricNames.ON_BEHALF_OF_MEMBER_NOT_LIVE for why this one is worth alerting on.
       refuse(
           request,
           response,
@@ -223,8 +204,6 @@ public class ActingMemberFilter extends OncePerRequestFilter {
       SecurityContextHolder.setContext(acting);
       filterChain.doFilter(request, response);
     } finally {
-      // Restored rather than cleared: this thread is pooled, and leaving the acting member behind
-      // would attribute the NEXT request on it to them.
       SecurityContextHolder.setContext(original);
     }
   }
@@ -292,8 +271,6 @@ public class ActingMemberFilter extends OncePerRequestFilter {
         .counter(MetricNames.ON_BEHALF_OF_REFUSED, MetricNames.TAG_REASON, metricReason)
         .increment();
 
-    // LocaleContextHolder is not populated this early in the filter chain, so the request's own
-    // Accept-Language is the authoritative source -- same reasoning as the neighbouring gates.
     Locale locale = request.getLocale();
     String title =
         messageSource.getMessage("problem.acting_member_refused.title", null, "Forbidden", locale);

@@ -1,29 +1,14 @@
 ---
-# Copy to hosts.yml and fill in. hosts.yml itself is gitignored: an inventory names real machines,
-# and this repository is public.
-#
-# The testing host is built FIRST and production is built from the same role afterwards -- that
-# sequence is the safety argument of the whole migration (PODMAN_MIGRATION_PLAN.md section 11), and
-# it only means anything if both entries below use the same role with the same variables.
 basetool_hosts:
   hosts:
     testing:
       ansible_host: 10.0.0.0          # the Rocky Linux 10 testing guest (ADR-0163)
       ansible_user: sysadm
-      # Every rootless host needs this, production included -- see the long note in
-      # roles/basetool_host/defaults/main.yml. A container here cannot reach the machine through
-      # its own public address at all, so each public name a container dials needs an entry.
-      # `host-gateway` is the better value than a literal address: podman resolves it.
-      #
-      # The FIRST entry must match IRI_KEYCLOAK_HOST_ALIAS in that host's .env; the rest exist
-      # because blackbox-exporter probes every vhost.
       basetool_host_public_name_aliases:
         - "basetool.example.test:host-gateway"
         - "api.basetool.example.test:host-gateway"
         - "ingest.basetool.example.test:host-gateway"
         - "grafana.basetool.example.test:host-gateway"
-      # Only where the edge holds a certificate from a private CA -- production's is publicly
-      # signed and sets nothing.
       basetool_host_jvm_truststore_path: /var/iri/secrets/truststore.p12
     production:
       ansible_host: 203.0.113.0       # the new Hetzner CPX42
@@ -34,7 +19,4 @@ basetool_hosts:
         - "ingest.basetool.example.com:host-gateway"
         - "grafana.basetool.example.com:host-gateway"
   vars:
-    # Everything else comes from roles/basetool_host/defaults/main.yml. Override here only what
-    # genuinely differs between the two hosts -- every override is a way for the rehearsal to stop
-    # rehearsing the real thing.
     basetool_host_report_uid_map: true

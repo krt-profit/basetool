@@ -47,7 +47,6 @@ class MissionServiceUnassignedParticipantsTest {
 
   @Test
   void getUnassignedParticipants_shouldReturnAllWhenNoneAssigned() {
-    // Given
     UUID missionId = UUID.randomUUID();
     Mission mission = new Mission();
     mission.setId(missionId);
@@ -61,11 +60,9 @@ class MissionServiceUnassignedParticipantsTest {
 
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
 
-    // When
     List<MissionParticipant> result =
         missionParticipantService.getUnassignedParticipants(missionId);
 
-    // Then
     assertEquals(2, result.size());
     assertTrue(result.contains(p1));
     assertTrue(result.contains(p2));
@@ -73,7 +70,6 @@ class MissionServiceUnassignedParticipantsTest {
 
   @Test
   void getUnassignedParticipants_shouldExcludeAssignedParticipants() {
-    // Given
     UUID missionId = UUID.randomUUID();
     Mission mission = new Mission();
     mission.setId(missionId);
@@ -95,11 +91,9 @@ class MissionServiceUnassignedParticipantsTest {
 
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
 
-    // When
     List<MissionParticipant> result =
         missionParticipantService.getUnassignedParticipants(missionId);
 
-    // Then
     assertEquals(1, result.size());
     assertTrue(result.contains(unassigned));
     assertFalse(result.contains(assigned));
@@ -107,7 +101,6 @@ class MissionServiceUnassignedParticipantsTest {
 
   @Test
   void getUnassignedParticipants_shouldReturnEmptyWhenAllAssigned() {
-    // Given
     UUID missionId = UUID.randomUUID();
     Mission mission = new Mission();
     mission.setId(missionId);
@@ -126,21 +119,17 @@ class MissionServiceUnassignedParticipantsTest {
 
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
 
-    // When
     List<MissionParticipant> result =
         missionParticipantService.getUnassignedParticipants(missionId);
 
-    // Then
     assertTrue(result.isEmpty());
   }
 
   @Test
   void getUnassignedParticipants_shouldThrowWhenMissionNotFound() {
-    // Given
     UUID missionId = UUID.randomUUID();
     when(missionRepository.findById(missionId)).thenReturn(Optional.empty());
 
-    // When / Then
     assertThrows(
         RuntimeException.class,
         () -> missionParticipantService.getUnassignedParticipants(missionId));

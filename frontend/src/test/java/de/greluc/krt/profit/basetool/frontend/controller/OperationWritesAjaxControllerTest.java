@@ -94,10 +94,6 @@ class OperationWritesAjaxControllerTest {
   @Test
   @WithMockUser(roles = "MISSION_MANAGER")
   void updateOperationAjax_valid_returnsFreshVersionNameStatusFromPut() throws Exception {
-    // The backend PUT returns the persisted operation in-transaction, so the twin hands its fresh
-    // version (writeback prevents a 409 on a second save) and possibly-renamed title straight back.
-    // No second round-trip that could observe a concurrent write or mask an already-committed
-    // write.
     OperationDto refreshed =
         new OperationDto(OPERATION_ID, "Renamed Op", "desc", "ACTIVE", null, 7L, null, null, null);
     when(backendApiClient.put(
@@ -158,8 +154,6 @@ class OperationWritesAjaxControllerTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void deleteOperation_withoutHeader_fallsBackToClassicRedirect() throws Exception {
-    // No X-Requested-With → Spring routes to the classic form-post handler (the no-JS fallback),
-    // which redirects to the list instead of returning JSON.
     mockMvc
         .perform(post("/operations/" + OPERATION_ID + "/delete").with(csrf()))
         .andExpect(status().is3xxRedirection())

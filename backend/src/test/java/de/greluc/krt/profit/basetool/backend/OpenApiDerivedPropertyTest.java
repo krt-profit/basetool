@@ -108,8 +108,6 @@ class OpenApiDerivedPropertyTest {
             .sorted(java.util.Comparator.comparing(JavaMethod::getFullName))
             .toList();
 
-    // A scan that silently matches nothing would let this test pass forever without checking
-    // anything — which is precisely how the original churn survived unnoticed for months.
     assertFalse(
         validators.isEmpty(),
         "found no @AssertTrue validators on published types at all — the classpath scan or the"

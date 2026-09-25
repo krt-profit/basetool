@@ -145,16 +145,11 @@ public class BankStatementReportService {
     BigDecimal opening = bankPostingRepository.accountBalanceBefore(accountId, from);
     List<BankBookingRow> rows = bankPostingRepository.findBookingsInPeriod(accountId, from, to);
     List<UUID> txIds = rows.stream().map(BankBookingRow::transactionId).distinct().toList();
-    // The holder column is redacted for org-unit viewers, so the holder-leg query is skipped too.
     Map<UUID, List<BankHolderLeg>> holderLegsByTx =
         (redactHolders || txIds.isEmpty())
             ? Map.of()
             : bankHolderPostingRepository.findHolderLegsByTransactionIds(txIds).stream()
                 .collect(Collectors.groupingBy(BankHolderLeg::transactionId));
-    // Account legs back the "Quell-/Zielkonto" column's transfer counter-account (REQ-BANK-044).
-    // Fetched for both variants: the member-facing redacted statement keeps that column too — only
-    // the aUEC-custody Halter is redacted now (REQ-BANK-038 amended), not the
-    // counter-account/party.
     Map<UUID, List<BankCounterLeg>> accountLegsByTx =
         txIds.isEmpty()
             ? Map.of()
@@ -224,13 +219,6 @@ public class BankStatementReportService {
 
       KrtPdfSupport.addSectionHeader(krt, label("pdf.bank.statement.bookings"));
 
-      // Org-unit viewers get the same history without the player-custody "Halter" column
-      // (REQ-BANK-038): only the aUEC-custody holder is redacted. The "Quell-/Zielkonto" column
-      // (the
-      // transfer counter-account, or the Einzahler/Empfänger of a deposit/withdrawal, REQ-BANK-044)
-      // is kept for them too (owner decision). The Begründung + Notiz of each booking move into an
-      // indented sub-row beneath the row (REQ-BANK-045), reason first, so the main row stays
-      // narrow.
       int columns = redactHolders ? 5 : 6;
       PdfPTable table = new PdfPTable(columns);
       table.setWidthPercentage(100);
@@ -264,11 +252,6 @@ public class BankStatementReportService {
                   : matchHolderHandle(
                       holderLegsByTx.getOrDefault(row.transactionId(), List.of()),
                       row.amount().signum());
-          // Humanised like the Gegenpartei column four lines below, and for the same reason.
-          // bank_holder.user_id is ON DELETE SET NULL, so after a deletion the display name falls
-          // back to the handle snapshot -- which a granted erasure has rewritten. Rendering it raw
-          // put #ANONYMISED# in the Halter column while the next column on the same row already
-          // read "Anonymisiert" (REQ-SEC-062).
           KrtPdfSupport.addTableCell(
               table,
               HandleAnonymisation.humanise(holder, label("general.anonymisedHandle")),
@@ -284,9 +267,6 @@ public class BankStatementReportService {
         KrtPdfSupport.addTableCell(table, BankPdfFormat.amount(running), bg, true);
         String reason = row.justification() != null ? row.justification() : "";
         String note = row.note() != null ? row.note() : "";
-        // REQ-BANK-054: the employee's own note is internal. The Halter-redacted member statement
-        // (REQ-BANK-038) is the same generator with redactHolders=true, so it is dropped there for
-        // the same reason the Halter column is.
         String staffNote = redactHolders || row.staffNote() == null ? "" : row.staffNote();
         if (!reason.isEmpty() || !note.isEmpty() || !staffNote.isEmpty()) {
           KrtPdfSupport.addDetailSubRow(
@@ -331,9 +311,6 @@ public class BankStatementReportService {
         if (row.counterpartyHandle() == null) {
           yield "";
         }
-        // A counterparty whose handle an Art. 17 request erased renders as the placeholder rather
-        // than as the raw sentinel (REQ-SEC-062). The booking itself is untouched -- amount, date
-        // and account all stand; only the name is gone.
         String handle = HandleAnonymisation.humanise(row.counterpartyHandle(), anonymisedLabel);
         yield row.counterpartyOrgUnitName() == null
             ? handle

@@ -124,10 +124,6 @@ class RefineryStoreScuHintRenderTest {
 
   @Test
   void storeDialog_ScuHint_RendersOnlyForScuRows_NotPieceRows() throws Exception {
-    // Given: a refinery order with two output goods — one SCU-measured, one PIECE-measured. The
-    // detail controller builds one store-dialog row per good, each carrying a quantityType derived
-    // from its output material (RefineryOrderPageController#viewOrderDetail, "PIECE" -> PIECE else
-    // SCU). The PIECE branch is live code, so a PIECE store row is a real, reachable case.
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
 
@@ -172,7 +168,6 @@ class RefineryStoreScuHintRenderTest {
     when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), eq(RefineryOrderDto.class)))
         .thenReturn(order);
 
-    // When
     String html =
         mockMvc
             .perform(
@@ -182,12 +177,9 @@ class RefineryStoreScuHintRenderTest {
             .getResponse()
             .getContentAsString();
 
-    // Then: both store rows render (proves the loop produced a PIECE row alongside the SCU row)...
     assertThat(html).as("SCU output store row present").contains("Refined Quantanium");
     assertThat(html).as("PIECE output store row present").contains("Salvaged Component");
 
-    // ...but the SCU decimal-scale hint renders exactly once — on the SCU row only. With the
-    // same-element th:if/th:replace precedence bug the hint rendered unconditionally (count == 2).
     int scuHintCount = html.split("class=\"scu-hint\"", -1).length - 1;
     assertThat(scuHintCount)
         .as("scu-hint disc renders once (SCU row only), not on the PIECE row")

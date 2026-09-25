@@ -87,9 +87,6 @@ class GlobalExceptionHandlerTest {
   @BeforeEach
   void setUp() {
     AppProblemProperties props = new AppProblemProperties("https://profit-base.online/problems/");
-    // Use the real messages bundle so the test catches missing or wrong i18n keys.
-    // Locale is forced to English to keep these assertions stable regardless of the
-    // JVM default locale on the developer / CI machine.
     ResourceBundleMessageSource messageSource = new ResourceBundleMessageSource();
     messageSource.setBasename("messages");
     messageSource.setDefaultEncoding("UTF-8");
@@ -316,7 +313,6 @@ class GlobalExceptionHandlerTest {
 
   @Test
   void handleValidationExceptions_returns400WithFieldErrors() throws NoSuchMethodException {
-    // Build a BindingResult with a single field error.
     BindingResult bindingResult = new BeanPropertyBindingResult(new Object(), "target");
     bindingResult.addError(new FieldError("target", "name", "must not be blank"));
     MethodParameter parameter =
@@ -339,16 +335,11 @@ class GlobalExceptionHandlerTest {
   }
 
   @SuppressWarnings("unused")
-  private void dummy(String s) {
-    /* test target */
-  }
+  private void dummy(String s) {}
 
   @Test
   void handleValidationExceptions_logsWarn_withMethodUriAndFieldErrors_butWithoutRejectedValue()
       throws NoSuchMethodException {
-    // Given: a binding result containing a field error whose rejected value would normally
-    // contain user input / PII (e.g. recipientHandle). The improved logging MUST log the
-    // field name and constraint message but MUST NOT log the rejected value itself.
     BindingResult bindingResult = new BeanPropertyBindingResult(new Object(), "handover");
     bindingResult.addError(
         new FieldError(
@@ -373,10 +364,8 @@ class GlobalExceptionHandlerTest {
     appender.start();
     logger.addAppender(appender);
     try {
-      // When
       handler.handleValidationExceptions(ex, request);
 
-      // Then
       ILoggingEvent warn =
           appender.list.stream()
               .filter(e -> e.getLevel() == Level.WARN)
@@ -462,13 +451,8 @@ class GlobalExceptionHandlerTest {
     assertCommon(resp, HttpStatus.NOT_FOUND, GlobalExceptionHandler.CODE_NOT_FOUND);
   }
 
-  // --- §3.9: GlobalExceptionHandler#resolveDetail i18n key resolution -------------------
-
   @Test
   void handleBadRequest_passesLiteralEnglishMessageThrough() {
-    // Backwards-compat: existing throw sites that pass a literal English string keep
-    // working byte-identically on the wire. The resolver only translates when the
-    // message looks up as a key in the bundle.
     ResponseEntity<ProblemDetail> resp =
         handler.handleAppException(
             new BadRequestException("Some literal message that is not a key"), request);
@@ -479,7 +463,6 @@ class GlobalExceptionHandlerTest {
 
   @Test
   void handleBadRequest_resolvesI18nKeyToEnglish() {
-    // setUp() forces Locale.ENGLISH so the key resolves against messages_en.properties.
     ResponseEntity<ProblemDetail> resp =
         handler.handleAppException(
             new BadRequestException("error.refinery_order.location_required"), request);
@@ -496,7 +479,6 @@ class GlobalExceptionHandlerTest {
             new BadRequestException("error.refinery_order.location_required"), request);
 
     assertCommon(resp, HttpStatus.BAD_REQUEST, GlobalExceptionHandler.CODE_BAD_REQUEST);
-    // Equivalent to the messages_de.properties entry "Für einen Raffinerieauftrag ...".
     assertEquals(
         "Für einen Raffinerieauftrag muss ein Lagerort angegeben werden.",
         resp.getBody().getDetail());
@@ -504,10 +486,6 @@ class GlobalExceptionHandlerTest {
 
   @Test
   void handleBadRequest_resolvesTheAllocationDuplicateKeysInBothLocales() {
-    // The Lager allocation popover shows `detail` verbatim on a 400 since the duplicate-target
-    // refusal stopped being a generic "Fehler beim Aktualisieren des Lagers." toast. That makes an
-    // unresolved key a USER-VISIBLE string, so both keys are asserted against both bundles here
-    // rather than trusted to exist.
     assertEquals(
         "This job order is already allocated on this stock entry.",
         handler
@@ -571,9 +549,6 @@ class GlobalExceptionHandlerTest {
 
   @Test
   void handleDuplicateEntity_resolvesI18nKey() {
-    // Even though no dedicated key for duplicate scenarios exists yet, the same
-    // resolveDetail() seam is wired up - a future key would Just Work without
-    // touching the handler.
     ResponseEntity<ProblemDetail> resp =
         handler.handleAppException(new DuplicateEntityException("error.user.not_found"), request);
 
@@ -588,7 +563,6 @@ class GlobalExceptionHandlerTest {
 
     assertCommon(
         resp, HttpStatus.INTERNAL_SERVER_ERROR, GlobalExceptionHandler.CODE_INTERNAL_ERROR);
-    // Must NOT leak the internal exception message to the client.
     String detail = resp.getBody().getDetail();
     assertNotNull(detail);
     assertTrue(
@@ -671,10 +645,6 @@ class GlobalExceptionHandlerTest {
             .getDetail());
   }
 
-  // ---------------------------------------------------------------------
-  // EntityInUseException — 409 with i18n-aware detail
-  // ---------------------------------------------------------------------
-
   @Test
   void handleEntityInUse_messageIsPassedThroughWhenPresent() {
     EntityInUseException ex =
@@ -697,10 +667,6 @@ class GlobalExceptionHandlerTest {
         "The entry cannot be deleted because it is still in use.", resp.getBody().getDetail());
   }
 
-  // ---------------------------------------------------------------------
-  // BusinessConflictException — 409 with i18n-aware detail
-  // ---------------------------------------------------------------------
-
   @Test
   void handleBusinessConflict_messageIsPassedThroughWhenPresent() {
     BusinessConflictException ex =
@@ -722,10 +688,6 @@ class GlobalExceptionHandlerTest {
     assertNotNull(resp.getBody().getDetail());
   }
 
-  // ---------------------------------------------------------------------
-  // ResponseStatusException — adapt status code, derive `code`
-  // ---------------------------------------------------------------------
-
   @Test
   void handleResponseStatus_400_mapsToBadRequestCode() {
     org.springframework.web.server.ResponseStatusException ex =
@@ -746,7 +708,6 @@ class GlobalExceptionHandlerTest {
     ResponseEntity<ProblemDetail> resp = handler.handleResponseStatus(ex, request);
 
     assertCommon(resp, HttpStatus.UNAUTHORIZED, GlobalExceptionHandler.CODE_UNAUTHENTICATED);
-    // Reason was null -> title falls back to the status reason phrase.
     assertEquals(HttpStatus.UNAUTHORIZED.getReasonPhrase(), resp.getBody().getTitle());
   }
 
@@ -806,10 +767,6 @@ class GlobalExceptionHandlerTest {
     assertCommon(resp, HttpStatus.FORBIDDEN, GlobalExceptionHandler.CODE_ACCESS_DENIED);
   }
 
-  // ---------------------------------------------------------------------
-  // ErrorResponseException — preserves provided body, fills in missing props
-  // ---------------------------------------------------------------------
-
   @Test
   void handleErrorResponseException_preservesProblemDetailBody() {
     ProblemDetail body = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "preset detail");
@@ -823,10 +780,8 @@ class GlobalExceptionHandlerTest {
     assertEquals(HttpStatus.BAD_REQUEST.value(), resp.getStatusCode().value());
     assertEquals("Preset Title", resp.getBody().getTitle());
     assertEquals("preset detail", resp.getBody().getDetail());
-    // Handler must fill in code + correlationId if they weren't on the body already.
     assertNotNull(resp.getBody().getProperties().get("code"));
     assertNotNull(resp.getBody().getProperties().get("correlationId"));
-    // Instance must be overridden to the request URI.
     assertEquals(request.getRequestURI(), resp.getBody().getInstance().toString());
   }
 
@@ -851,13 +806,8 @@ class GlobalExceptionHandlerTest {
         "pre-existing correlationId must NOT be overwritten");
   }
 
-  // ---------------------------------------------------------------------
-  // HttpMessageNotReadableException — unreadable body / JSON parse error
-  // ---------------------------------------------------------------------
-
   @Test
   void handleHttpMessageNotReadable_returns400WithGenericDetail() {
-    // The handler must NOT leak the raw exception message to the client.
     org.springframework.http.converter.HttpMessageNotReadableException ex =
         new org.springframework.http.converter.HttpMessageNotReadableException(
             "broken json with sensitive payload",
@@ -876,15 +826,10 @@ class GlobalExceptionHandlerTest {
     ResponseEntity<ProblemDetail> resp = handler.handleHttpMessageNotReadable(ex, request);
 
     assertCommon(resp, HttpStatus.BAD_REQUEST, GlobalExceptionHandler.CODE_BAD_REQUEST);
-    // The detail must come from the localized bundle, NOT contain the raw message.
     assertTrue(
         !resp.getBody().getDetail().contains("sensitive payload"),
         "raw exception message must NOT leak through the detail");
   }
-
-  // ---------------------------------------------------------------------
-  // DataIntegrityViolationException — constraint-name regex extraction
-  // ---------------------------------------------------------------------
 
   @Test
   void handleDataIntegrityViolation_returns409WithGenericDetail() {
@@ -898,7 +843,6 @@ class GlobalExceptionHandlerTest {
     ResponseEntity<ProblemDetail> resp = handler.handleDataIntegrityViolation(ex, request);
 
     assertCommon(resp, HttpStatus.CONFLICT, GlobalExceptionHandler.CODE_DATA_INTEGRITY);
-    // Generic detail; constraint-name extraction lives in the log only, NOT in the response.
     assertTrue(
         !resp.getBody().getDetail().contains("fk_mission_owner"),
         "constraint name must NOT leak through the detail");
@@ -917,10 +861,6 @@ class GlobalExceptionHandlerTest {
     assertCommon(resp, HttpStatus.CONFLICT, GlobalExceptionHandler.CODE_DATA_INTEGRITY);
   }
 
-  // ---------------------------------------------------------------------
-  // ExternalServiceException — 502 with generic localized detail
-  // ---------------------------------------------------------------------
-
   @Test
   void handleExternalService_returns502_andDoesNotLeakUpstreamMessage() {
     de.greluc.krt.profit.basetool.backend.exception.ExternalServiceException ex =
@@ -933,15 +873,10 @@ class GlobalExceptionHandlerTest {
     assertTrue(
         !resp.getBody().getDetail().contains("realm offline"),
         "raw upstream response must NOT leak through the client-visible detail");
-    // The correlationId in the body must be a real UUID.
     String cid = (String) resp.getBody().getProperties().get("correlationId");
     assertNotNull(cid);
     assertTrue(cid.length() > 0);
   }
-
-  // ---------------------------------------------------------------------
-  // RestClientException — an upstream call is 502, never an unexplained 500
-  // ---------------------------------------------------------------------
 
   /**
    * A 403 from an upstream admin API is a 502, not a 500, and its body stays server-side.
@@ -1022,10 +957,6 @@ class GlobalExceptionHandlerTest {
         "the transport-level message must NOT reach the client-visible detail");
   }
 
-  // ---------------------------------------------------------------------
-  // A 4xx names the line that refused it
-  // ---------------------------------------------------------------------
-
   /**
    * A production {@code 400} on {@code POST /api/v1/missions/{id}/participants/slim} could not be
    * diagnosed: the log line carried method, URI, status, code and correlation id, and nothing about
@@ -1044,13 +975,11 @@ class GlobalExceptionHandlerTest {
 
     ResponseEntity<ProblemDetail> resp = handler.handleAppException(ex, request);
 
-    // The response is unchanged — this is a logging fix, and the client keeps the reason it had.
     assertCommon(resp, HttpStatus.BAD_REQUEST, "BAD_REQUEST");
     assertTrue(
         resp.getBody().getDetail().contains("at most two Staffeln"),
         "the caller must still be told why");
 
-    // The frame is this test's own, which is the point: it is wherever the throw happened.
     java.lang.reflect.Method origin =
         java.util.Arrays.stream(GlobalExceptionHandler.class.getDeclaredMethods())
             .filter(m -> "originOf".equals(m.getName()))
@@ -1068,10 +997,6 @@ class GlobalExceptionHandlerTest {
         frame,
         "the innermost frame belonging to this application is the one worth logging");
   }
-
-  // ---------------------------------------------------------------------
-  // Disconnected SSE clients — handled, silent, and no response body
-  // ---------------------------------------------------------------------
 
   /**
    * The routing half. Without a dedicated handler this lands on {@code handleAllExceptions}, which
@@ -1111,17 +1036,12 @@ class GlobalExceptionHandlerTest {
         "a body cannot be written to a closed connection, and writing one is what produced the"
             + " HttpMessageNotWritableException warning this handler exists to stop");
 
-    // Must not throw, and must not touch the response.
     handler.handleDisconnectedClient(
         new org.springframework.web.context.request.async.AsyncRequestNotUsableException(
             "Servlet container error notification for disconnected client",
             new java.io.IOException("Broken pipe")),
         request);
   }
-
-  // ---------------------------------------------------------------------
-  // ReportGenerationException — 500 with generic localized detail
-  // ---------------------------------------------------------------------
 
   @Test
   void handleReportGeneration_returns500_andDoesNotLeakLibraryError() {
@@ -1136,10 +1056,6 @@ class GlobalExceptionHandlerTest {
         !resp.getBody().getDetail().contains("/usr/share/fonts"),
         "internal file paths must NOT leak through the client-visible detail");
   }
-
-  // ---------------------------------------------------------------------
-  // BankConflictException — 409 with the bank-specific stable code (S4, #910)
-  // ---------------------------------------------------------------------
 
   @Test
   void handleBankConflict_returns409WithBankSpecificCodeAndProperties() {

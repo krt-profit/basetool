@@ -100,21 +100,17 @@ class MissionListFilterInPlaceE2eTest {
                 .setStorageStatePath(storageState))) {
       Page page = context.newPage();
       try {
-        // showPast=true so a seeded mission whose planned start is not in the future still lists.
         E2eSupport.navigate(page, baseUrl + "/missions?showPast=true");
         page.waitForLoadState();
         E2eSupport.openFilterPanel(page);
 
-        // Mark the live document: a full navigation/reload wipes it.
         page.evaluate("() => { window.__krtNoReload = true; }");
 
         page.locator("#mission-search").fill(MATCH);
 
-        // The matching mission stays, the other is filtered out — an in-place fragment swap ran.
         assertThat(page.getByText(MATCH + " Mission")).isVisible();
         assertThat(page.getByText(OTHER + " Mission")).hasCount(0);
 
-        // No navigation happened, and the URL reflects the filter (history sync).
         assertEquals(
             Boolean.TRUE,
             page.evaluate("() => window.__krtNoReload === true"),

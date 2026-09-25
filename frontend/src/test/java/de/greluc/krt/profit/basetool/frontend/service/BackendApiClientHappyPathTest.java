@@ -86,12 +86,8 @@ class BackendApiClientHappyPathTest {
     server.shutdown();
   }
 
-  // ── GET ─────────────────────────────────────────────────────────────────
-
   @Test
   void get_withClassResponseType_parsesBody() {
-    // WebClient's String.class binding is plain-text (not JSON-deserialised),
-    // so the body comes through verbatim.
     server.enqueue(jsonOk("hello"));
 
     String result = client.get("/api/v1/greeting", String.class);
@@ -122,22 +118,8 @@ class BackendApiClientHappyPathTest {
     assertEquals(List.of("a", "b", "c"), result);
   }
 
-  // Eight cases stood across this class, one per verb, each proving that passing
-  // `isPublic = true` selected the public WebClient. The flag, every `isPublic` overload
-  // and `getPublic` are gone (ADR-0159): there is no anonymous backend call left to make
-  // except the terms document, which has its own client and its own named method. What
-  // those cases were really protecting — that a caller cannot pick the unauthenticated
-  // transport by accident — is now a property of the API's shape, and is pinned once by
-  // everyVerbUsesTheAuthenticatedClient() and
-  // getTermsDocumentAnonymously_isTheOnlyCallOnTheAnonymousClient() below.
-
   @Test
   void get_withUriVariables_percentEncodesSpacesAndQuotes_notFormEncoding() throws Exception {
-    // #371 regression guard: the blueprint owner drill-down passes a normalized product key
-    // (spaces plus a literal quote) as a query value. The WebClient must percent-encode it
-    // (space -> %20, '"' -> %22), never form-encode it (space -> '+'), so the backend
-    // @RequestParam decodes the exact stored key. The previous URLEncoder.encode path produced
-    // '+' for spaces and was mangled across the frontend->backend hop, yielding zero owners.
     server.enqueue(jsonOk("[]"));
 
     client.get(
@@ -208,12 +190,6 @@ class BackendApiClientHappyPathTest {
     assertEquals("/api/v1/terms/document", req.getPath());
   }
 
-  // ── getCached ───────────────────────────────────────────────────────────
-  // The @Cacheable annotation is a no-op outside a Spring application
-  // context, so the body executes normally — that's all we need to cover.
-  // Plain (single-fetch) paths use ORG_UNITS_ACTIVE, a Fetch.SINGLE catalogue;
-  // page-walked catalogues are covered by the dedicated section below.
-
   @Test
   void getCached_withClassResponseType_parsesBody() {
     server.enqueue(jsonOk("cached"));
@@ -232,8 +208,6 @@ class BackendApiClientHappyPathTest {
 
     assertEquals(List.of(1, 2, 3), result);
   }
-
-  // ── getCached page walk (REQ-ADMIN-003) ─────────────────────────────────
 
   @Test
   void getCached_pageWalkedCatalog_mergesAllPagesInOrder() throws Exception {
@@ -278,8 +252,6 @@ class BackendApiClientHappyPathTest {
 
   @Test
   void getCached_pageWalkedCatalog_capHit_stopsAndLogsWarning() {
-    // A backend reporting more pages than the safety cap: the walk must stop at
-    // MAX_CATALOG_PAGES and say so in the log (there is no banner surface for cached pulls).
     for (int i = 0; i < CatalogPages.MAX_CATALOG_PAGES; i++) {
       server.enqueue(jsonOk(pageJson(List.of("row" + i), i, 1, 1000, 1000)));
     }
@@ -339,12 +311,8 @@ class BackendApiClientHappyPathTest {
 
   @Test
   void clearStaticDataCache_doesNotThrow() {
-    // @CacheEvict is a no-op without Spring context; method body only logs.
-    // The smallest reachable assertion: it doesn't blow up.
     assertDoesNotThrow(() -> client.clearStaticDataCache());
   }
-
-  // ── POST ────────────────────────────────────────────────────────────────
 
   @Test
   void post_withBody_sendsBodyAndParsesResponse() throws Exception {
@@ -361,7 +329,6 @@ class BackendApiClientHappyPathTest {
 
   @Test
   void post_withNullBody_sendsEmptyBody() throws Exception {
-    // The {@code body != null} branch in withOptionalBody is otherwise uncovered for POST.
     server.enqueue(jsonOk("ok"));
 
     String result = client.post("/api/v1/trigger", null, String.class);
@@ -371,8 +338,6 @@ class BackendApiClientHappyPathTest {
     assertEquals("POST", req.getMethod());
     assertEquals(0L, req.getBodySize(), "null body must not be serialised");
   }
-
-  // ── PUT ─────────────────────────────────────────────────────────────────
 
   @Test
   void put_withBody_sendsBodyAndParsesResponse() throws Exception {
@@ -397,8 +362,6 @@ class BackendApiClientHappyPathTest {
     assertEquals(0L, req.getBodySize());
   }
 
-  // ── PATCH ───────────────────────────────────────────────────────────────
-
   @Test
   void patch_withBody_sendsBodyAndParsesResponse() throws Exception {
     server.enqueue(jsonOk("patched"));
@@ -421,8 +384,6 @@ class BackendApiClientHappyPathTest {
     assertEquals(0L, req.getBodySize());
   }
 
-  // ── DELETE ──────────────────────────────────────────────────────────────
-
   @Test
   void delete_returnsParsedResponse() throws Exception {
     server.enqueue(jsonOk("deleted"));
@@ -437,7 +398,6 @@ class BackendApiClientHappyPathTest {
 
   @Test
   void delete_void_returnsNull() throws Exception {
-    // 204 No Content scenario — frontend code uses Void.class
     server.enqueue(new MockResponse().setResponseCode(204));
 
     Void result = client.delete("/api/v1/things/1", Void.class);
@@ -446,8 +406,6 @@ class BackendApiClientHappyPathTest {
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
     assertEquals("DELETE", req.getMethod());
   }
-
-  // ── helpers ─────────────────────────────────────────────────────────────
 
   private static MockResponse jsonOk(String body) {
     return new MockResponse()

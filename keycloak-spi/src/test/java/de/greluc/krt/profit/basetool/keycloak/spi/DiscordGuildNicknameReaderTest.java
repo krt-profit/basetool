@@ -123,7 +123,6 @@ class DiscordGuildNicknameReaderTest {
               writeResponse(exchange, 200, "{\"nick\":\"too slow\"}");
             });
     try {
-      // 300 ms request timeout against a 2 s server => fail open (empty), never throws.
       assertTrue(read(server, Duration.ofMillis(300)).isEmpty());
     } finally {
       server.stop(0);
@@ -142,7 +141,6 @@ class DiscordGuildNicknameReaderTest {
 
   @Test
   void readGuildDisplayName_fallsBackToGlobalNameWhenNickAbsent() throws IOException {
-    // The reported case: no per-guild nick, server name is the global name.
     HttpServer server =
         start(respond(200, "{\"nick\":null,\"user\":{\"global_name\":\"ExamplePilot\"}}"));
     try {
@@ -165,8 +163,6 @@ class DiscordGuildNicknameReaderTest {
 
   @Test
   void extractNick_ignoresGlobalName_soThePrecheckStaysConservative() {
-    // extractNick (the precheck candidate) must NOT fall back to the global name — otherwise a
-    // common display name could trigger a false account-collision denial at first-broker login.
     assertTrue(
         DiscordGuildNicknameReader.extractNick(
                 "{\"nick\":null,\"user\":{\"global_name\":\"ExamplePilot\"}}")

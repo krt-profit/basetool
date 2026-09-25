@@ -71,9 +71,6 @@ public class ForwardedHeaderConfig {
   @Bean
   public FilterRegistrationBean<ClientIpContextFilter> clientIpContextFilter(
       @NotNull RateLimitProperties properties) {
-    // The filter takes the raw list, not the properties bean: resolution is a cross-cutting
-    // primitive and which key supplies the allowlist is a wiring detail that belongs here. The
-    // deployed key stays app.rate-limit.trusted-proxies for continuity (REQ-SEC-011).
     FilterRegistrationBean<ClientIpContextFilter> registration =
         new FilterRegistrationBean<>(new ClientIpContextFilter(properties.trustedProxies()));
     registration.setDispatcherTypes(

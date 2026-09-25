@@ -73,9 +73,6 @@ class StreamAwareShallowEtagHeaderFilterTest {
       })
   @DisplayName("everything else keeps its ETag, the large catalogues included")
   void ordinaryEndpointsAreStillFiltered(String path) {
-    // The catalogues are the biggest buffers in the system and the most tempting thing to exempt.
-    // They are deliberately still filtered: their ETag is inert only because no client sends
-    // If-None-Match today, which is a fact about the clients and not about the response.
     assertThat(filter.shouldNotFilter(get(path))).isFalse();
   }
 
@@ -97,21 +94,12 @@ class StreamAwareShallowEtagHeaderFilterTest {
       })
   @DisplayName("a no-store family is not filtered either — its buffer could never pay for itself")
   void noStoreFamiliesBypassTheFilter(String path) {
-    // Not the same reason as the streams. These responses are buffered today and then denied an
-    // ETag by Spring, because ApiCacheControlFilter has already written `no-store` from
-    // HIGHEST_PRECEDENCE + 20. Skipping them removes the buffer and nothing else -- see
-    // springItselfEmitsNoEtagOnANoStoreResponse for the half of that sentence worth proving.
     assertThat(filter.shouldNotFilter(get(path))).isTrue();
   }
 
   @Test
   @DisplayName("Spring itself emits no ETag on a no-store response, which is what makes this safe")
   void springItselfEmitsNoEtagOnANoStoreResponse() throws Exception {
-    // The premise of the second exemption, asserted against the framework rather than read out of
-    // its source: with `no-store` on the response, isEligibleForEtag returns false and the header
-    // is never written. So the families skipped above lose a buffer, not a header. If a future
-    // Spring changed this, THIS test fails -- and the exemption would need re-arguing rather than
-    // silently starting to cost 304s.
     ShallowEtagHeaderFilter plain = new ShallowEtagHeaderFilter();
     MockHttpServletRequest request = get("/api/v1/users/me");
     MockHttpServletResponse response = new MockHttpServletResponse();
@@ -158,10 +146,6 @@ class StreamAwareShallowEtagHeaderFilterTest {
       })
   @DisplayName("both filters answer from the same list, so neither can drift alone")
   void theTwoFiltersAgreeOnEveryFamily(String path) throws Exception {
-    // The invariant a second copy of the list would break, and the reason NoStoreApiScopes is its
-    // own type: `no-store` written here MUST mean "skip the buffer" there, in both directions.
-    // A family added to one and forgotten in the other fails silently otherwise -- either paying
-    // for a buffer that can never yield a header, or being downgraded out of `no-store` entirely.
     MockHttpServletRequest request = get(path);
     MockHttpServletResponse response = new MockHttpServletResponse();
     new ApiCacheControlFilter().doFilter(request, response, new MockFilterChain());
@@ -177,12 +161,6 @@ class StreamAwareShallowEtagHeaderFilterTest {
   @ValueSource(strings = {"POST", "PUT", "PATCH", "DELETE"})
   @DisplayName("a write to a no-store family is still filtered, matching the directive's own scope")
   void writesToNoStoreFamiliesAreStillFiltered(String method) {
-    // The invariant `theTwoFiltersAgreeOnEveryFamily` certifies is GET-scoped, because
-    // ApiCacheControlFilter writes `no-store` on GET alone -- and until this case existed every
-    // agreement case used a GET, so a bypass that answered for ALL methods could not have failed
-    // one. Bypassing a write was harmless for the ETag (isEligibleForEtag is GET-gated) and still
-    // wrong: it made the exemption wider than the reason for it, and it took Content-Length off
-    // write responses nobody had reasoned about.
     MockHttpServletRequest request = new MockHttpServletRequest(method, "/api/v1/bank/accounts");
     request.setRequestURI("/api/v1/bank/accounts");
 
@@ -192,9 +170,6 @@ class StreamAwareShallowEtagHeaderFilterTest {
   @Test
   @DisplayName("a non-API path never pays the fourteen-pattern scan")
   void nonApiPathsAreNotScanned() {
-    // This filter is registered on `/*`, so actuator probes, /v3/api-docs and swagger-ui reach it.
-    // The /api scope is checked before the families for that reason; the assertion is the same
-    // either way, and the case exists so the guard is not deleted as redundant.
     assertThat(filter.shouldNotFilter(get("/actuator/health"))).isFalse();
     assertThat(filter.shouldNotFilter(get("/v3/api-docs"))).isFalse();
   }
@@ -202,10 +177,6 @@ class StreamAwareShallowEtagHeaderFilterTest {
   @Test
   @DisplayName("the exempt list is the shared one, not a copy that can drift")
   void theExemptListIsTheSharedOne() {
-    // A floor, not a count. The exact size is asserted once, in NoStoreApiScopesTest, where the
-    // failure message can say what to do about it -- adding a fifteenth family is a one-line change
-    // the class Javadoc explicitly encourages, and it should redden ONE test that names itself,
-    // not two in two packages that name neither.
     assertThat(NoStoreApiScopes.size())
         .as("the shared list must not be empty, or the agreement above is vacuous")
         .isGreaterThanOrEqualTo(14);
@@ -214,24 +185,12 @@ class StreamAwareShallowEtagHeaderFilterTest {
   @Test
   @DisplayName("an unnormalised stream spelling is still NOT recognised, and that is bounded")
   void unnormalisedPathsAreNotRecognised() {
-    // Written down rather than fixed, because the consequence is bounded and the fix is not free:
-    // the streaming match runs on the parsed request URI against two EXACT patterns, which does
-    // not collapse dot segments, so `/api/v1/live-sync/./stream` is buffered like any other
-    // response. What that costs is one broken stream for a client that addressed the endpoint in
-    // a way no client of ours does -- it exposes nothing and swallows nothing that would otherwise
-    // have been served. The same idiom guards the per-subject rate limiter, so a stricter
-    // normalisation belongs there and here together, not in one of them.
     assertThat(filter.shouldNotFilter(get("/api/v1/live-sync/./stream"))).isFalse();
   }
 
   @Test
   @DisplayName("the notification stream's unnormalised spelling is now covered, by the other list")
   void theNoStoreListNarrowsTheUnnormalisedHole() {
-    // Not a second fix, a side effect worth recording: `/api/v1/notifications/**` ends in `/**`
-    // and therefore matches a literal `.` segment, where the exact streaming pattern above does
-    // not. So all fourteen families -- notifications among them -- lost the hole the
-    // case above still documents, and the two live-sync endpoints did not. If the two lists are
-    // ever reconciled, this is the asymmetry to reconcile.
     assertThat(filter.shouldNotFilter(get("/api/v1/notifications/./stream"))).isTrue();
   }
 
@@ -256,7 +215,6 @@ class StreamAwareShallowEtagHeaderFilterTest {
   @Test
   @DisplayName("a stream's bytes reach the response untouched")
   void streamBytesAreNotSwallowed() throws Exception {
-    // The regression itself: with the plain filter and async started, this body never arrived.
     MockHttpServletRequest request = get("/api/v1/live-sync/stream");
     request.setAsyncSupported(true);
     MockHttpServletResponse response = new MockHttpServletResponse();

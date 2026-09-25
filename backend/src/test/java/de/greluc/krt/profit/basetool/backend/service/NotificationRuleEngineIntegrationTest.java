@@ -96,7 +96,6 @@ class NotificationRuleEngineIntegrationTest {
   @Test
   void recipientResolutionQueriesExecuteAgainstPostgres() {
     UUID randomOrgUnit = UUID.randomUUID();
-    // Each call exercises a distinct JPQL query; a clean execution (even when empty) is the point.
     assertThat(recipientResolutionService.resolveByRole("OFFICER")).isNotNull();
     assertThat(recipientResolutionService.resolveByRole("ADMIN")).isNotNull();
     assertThat(
@@ -120,8 +119,6 @@ class NotificationRuleEngineIntegrationTest {
     NotificationRule extraRule =
         transactionTemplate.execute(
             status -> {
-              // notification_rule_selector.user_id is a foreign key to app_user(id) since V235
-              // (REQ-DATA-008): a selector pointing at an invented member no longer inserts.
               User target = new User();
               target.setId(recipient);
               target.setUsername("specific-user-" + recipient);
@@ -159,9 +156,6 @@ class NotificationRuleEngineIntegrationTest {
       transactionTemplate.executeWithoutResult(
           status -> {
             notificationRuleRepository.deleteById(extraRule.getId());
-            // The seeded target must go too: the test database is shared across the suite, and a
-            // leftover login-capable user shifts the counts other classes assert over. Deleting it
-            // takes its notifications with it (V235, ON DELETE CASCADE).
             userRepository.deleteById(recipient);
           });
     }
@@ -169,10 +163,6 @@ class NotificationRuleEngineIntegrationTest {
 
   @Test
   void discordRegistrationPendingRuleNotifiesEveryAdmin() {
-    // REQ-NOTIF-012 end-to-end (the previously-unverified "exactly one notification per admin"
-    // acceptance): the V174 seed rule resolves a DISCORD_REGISTRATION_PENDING event to every ADMIN
-    // via its ROLE selector and persists exactly one unread notification per admin. Seeds one admin
-    // holding the DataInitializer-seeded ADMIN role, fires the event, and cleans up afterwards.
     UUID adminSub = UUID.randomUUID();
     UUID newUserId = UUID.randomUUID();
     transactionTemplate.executeWithoutResult(

@@ -110,10 +110,7 @@ public class CorrelationIdFilter extends OncePerRequestFilter implements Ordered
     MDC.put(loggingProperties.correlationIdMdcKey(), correlationId);
     MDC.put(loggingProperties.userIdMdcKey(), userId);
     response.setHeader(loggingProperties.correlationIdHeader(), correlationId);
-    // Expose correlation id to the current thread so WebClient filters / downstream code
-    // can propagate it towards the backend without re-reading the request.
     CorrelationContext.set(correlationId);
-    // Stashed for a later async dispatch of this same request, which runs on another thread.
     request.setAttribute(CORRELATION_ID_ATTRIBUTE, correlationId);
     request.setAttribute(USER_ID_ATTRIBUTE, userId);
     try {

@@ -205,10 +205,6 @@ class AnonymousSurfaceSweepMvcTest {
     try {
       return mockMvc.perform(request).andReturn().getResponse().getStatus();
     } catch (Exception renderFailure) {
-      // A template that threw is a template that RAN, which means the security chain did not
-      // refuse the request — so this counts as served, not as an incidental test failure. Reported
-      // as 200 so it lands in the violation list with its path rather than aborting the sweep at
-      // the first one and hiding every path after it.
       return 200;
     }
   }
@@ -230,18 +226,6 @@ class AnonymousSurfaceSweepMvcTest {
         continue;
       }
       if (PUBLIC_RESOURCES.contains(call.path())) {
-        // An ASSERTION, not a skip — which is what this set's own Javadoc, SecurityConfig:249 and
-        // WebAppManifestController all say it is. It was a bare `continue`, so adding a path here
-        // REMOVED it from the sweep instead of covering it, and the `permitAll` entry those
-        // comments
-        // point at could have been deleted with every test still green.
-        //
-        // Asked for with `*/*` rather than `text/html`, which is why it could not simply go through
-        // `issue()`: both of these mappings declare `produces`, so an HTML Accept header fails
-        // content negotiation and returns a status that means "I cannot represent this" — read, in
-        // the shape this sweep uses, as "the gate refused you". `*/*` matches any `produces`, so a
-        // 200 here means served, and a 3xx means the gate redirected a resource that must never
-        // redirect.
         int rendered =
             mockMvc
                 .perform(
@@ -262,9 +246,6 @@ class AnonymousSurfaceSweepMvcTest {
         continue;
       }
       if (APP_LINK_CALLBACK.equals(call.path())) {
-        // An ASSERTION, not a skip, for the same reason the PUBLIC_RESOURCES branch above is one:
-        // listing the path without checking it would remove it from the sweep, and the permitAll
-        // entry it depends on could then be deleted with every test still green.
         String target =
             mockMvc
                 .perform(
@@ -286,11 +267,6 @@ class AnonymousSurfaceSweepMvcTest {
         continue;
       }
       if (PUBLIC_PAGES.contains(call.path())) {
-        // NOT through issue(): that reports a render failure as 200 so a template which threw
-        // still counts as "served" for the refusal check below. Applied to a public page it turns
-        // the assertion inside out - the page that could not render passes as the page that must.
-        // Four of them did, because BackendApiClient is a @MockitoBean and terms.html evaluated
-        // ${terms.title} on the null it returned. Here the exception is the failure.
         try {
           int rendered =
               mockMvc
@@ -314,10 +290,6 @@ class AnonymousSurfaceSweepMvcTest {
         continue;
       }
       int status = issue(call, MediaType.TEXT_HTML);
-      // 3xx is the redirect into the OAuth2 entry point; 4xx is any refusal. A 2xx is a page
-      // rendered for somebody with no session, which is what this whole change removes. The second
-      // clause carries no lower bound: `||` short-circuits, so it is only evaluated once the status
-      // is already >= 300, and spelling that out again reads as a condition doing work it is not.
       if (status < 300 || (status < 400 && !isLoginRedirect(call))) {
         served.add(call + " -> " + status);
       }
@@ -356,20 +328,10 @@ class AnonymousSurfaceSweepMvcTest {
       if (call.method() == HttpMethod.GET
           && (PUBLIC_PAGES.contains(call.path())
               || PUBLIC_RESOURCES.contains(call.path())
-              // Same exclusion, same reason: this one must NOT be refused either. That it
-              // redirects anonymously to the help page — and nowhere else — is asserted in
-              // navigationIsSentToTheLogin above, so it is covered once rather than nowhere.
               || APP_LINK_CALLBACK.equals(call.path()))) {
-        // A genuine exclusion here, unlike the one in `navigationIsSentToTheLogin` above: this test
-        // asserts that a background call is REFUSED, and a public path is the one kind that must
-        // not
-        // be. That it is served anonymously is asserted there, so the entry is covered once rather
-        // than nowhere.
         continue;
       }
       int status = issue(call, MediaType.APPLICATION_JSON);
-      // 403 fails too: a CSRF token rides on every request here, so a 403 would mean the
-      // authorisation decision was never reached — and a refusal nobody made is not a refusal.
       if (status < 400 || status == 403) {
         served.add(call + " -> " + status);
       }

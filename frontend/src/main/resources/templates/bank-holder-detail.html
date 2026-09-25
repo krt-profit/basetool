@@ -24,9 +24,6 @@
 </header>
 
 <main th:if="${holder != null}">
-    <!--/* Holder header: handle + status pill + auto/manual source chip; the global custody total and
-         the back link to the holder menu (REQ-BANK-032). The page is read-only — a holder sees only
-         their own history, bank management sees everyone's (gated server-side via canSeeHolder). */-->
     <div class="greeting hud-box flex-between">
         <div>
             <h1 th:text="${@handles.display(holder.handle())}" data-testid="bank-holder-handle">greluc</h1>
@@ -45,7 +42,6 @@
         </div>
     </div>
 
-    <!--/* Facts strip: global custody total + total booking count. */-->
     <div class="bank-facts mt-2">
         <div class="kpi-total">
             <div class="kpi-label" th:text="#{bank.manage.holder.total}">H&auml;lt gesamt</div>
@@ -59,11 +55,6 @@
         </div>
     </div>
 
-    <!--/* Balance-split calculator (REQ-BANK-032): the holder enters their current in-game account
-         balance and the page works out — purely client-side, nothing stored — how much of it is
-         reserved for the bank (= their global custody total, server-rendered below) and how much is
-         their own private money (balance − reserved). A negative result means they physically hold
-         less than the bank's records say (a shortfall); a negative reserved means the bank owes them. */-->
     <div class="bank-panel mt-2" data-testid="bank-holder-balance-calc"
          th:attr="data-reserved=${holder.totalHeld()}">
         <div class="bank-panel-head">
@@ -97,10 +88,6 @@
             <h2 th:text="#{bank.holder.detail.history}">Halter-Buchungen</h2>
         </div>
         <div class="bank-panel-body">
-            <!--/* AJAX swap target (REQ-FE-002): the history pager re-renders only this block via
-                 krtFetch (fragment=holderBookings). The .utc-time cells are re-localised on
-                 krt:swapped, so swapped-in rows stay live. The no-JS page-btn links still reload
-                 the whole page. */-->
             <div id="bank-holder-bookings-results">
             <th:block th:fragment="holderBookings">
             <div class="table-responsive" th:if="${bookings != null and !#lists.isEmpty(bookings.content())}">
@@ -128,8 +115,6 @@
                             <span th:case="*" class="chip" th:text="${b.type()}">?</span>
                         </td>
                         <td>
-                            <!--/* Umbuchung: the counter holder with a direction arrow (paid out vs received);
-                                 every account-touching type: the account this leg moved on. */-->
                             <span th:if="${b.type() == 'HOLDER_TRANSFER' and b.counterHolderHandle() != null}"
                                   th:text="(${b.amount().signum() < 0} ? '&#8594; ' : '&#8592; ') + ${@handles.display(b.counterHolderHandle())}">&#8594; carol</span>
                             <span th:if="${b.type() != 'HOLDER_TRANSFER' and b.counterAccountNo() != null}"
@@ -142,8 +127,6 @@
                             <span class="bank-amount"
                                   th:classappend="${b.amount().signum() > 0} ? ' bank-amount--pos' : (${b.amount().signum() < 0} ? ' bank-amount--neg' : ' bank-amount--zero')"
                                   th:text="${b.amount().signum() > 0 ? '+' : ''} + ${#numbers.formatInteger(@moneyFormat.round(b.amount()), 1, 'POINT')}">+250.000</span>
-                            <!--/* In-game fee added on top (REQ-BANK-033, ADR-0052): the outgoing leg
-                                 is the gross debited, so the destination received |amount| - fee. */-->
                             <span class="bank-fee-note text-muted" data-testid="bank-holder-booking-fee"
                                   th:if="${b.transferFee() != null and b.transferFee().signum() > 0 and b.amount().signum() < 0}"
                                   th:text="#{bank.fee.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.transferFee()), 1, 'POINT')} + ' &middot; ' + #{bank.fee.net.label} + ' ' + ${#numbers.formatInteger(@moneyFormat.round(b.amount().abs().subtract(b.transferFee())), 1, 'POINT')}">Geb&uuml;hr 25 &middot; kommt an 4.975.000</span>
@@ -164,11 +147,6 @@
 <th:block th:replace="~{fragments/toast :: toast}" />
 <script th:src="@{/js/bank.js}" defer th:attr="nonce=${cspNonce}"></script>
 <script th:attr="nonce=${cspNonce}">
-    // History pager -> in-place swap (REQ-FE-002), same pattern as the account-detail bookings
-    // pager: the page-btn links inside #bank-holder-bookings-results point at
-    // /bank/holders/{id}?page=N; krtFetch intercepts them and re-renders only that block via
-    // fragment=holderBookings. The .utc-time cells re-localise on krt:swapped. No-JS fallback
-    // reloads the page.
     function bindBankHolderBookingsPager() {
         if (window.krtFetch) {
             window.krtFetch.bindSwap({
@@ -178,8 +156,6 @@
             });
         }
     }
-    // Bound on DOMContentLoaded, not at parse time: krt-fetch.js is deferred (FE-PERF-05), so
-    // window.krtFetch does not exist yet while this inline script runs.
     document.addEventListener('DOMContentLoaded', bindBankHolderBookingsPager);
     document.addEventListener('krt:swapped', bindBankHolderBookingsPager);
 </script>

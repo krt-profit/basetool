@@ -102,10 +102,6 @@ public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolve
    */
   @NotNull
   private static String requireSubject(@NotNull NativeWebRequest webRequest) {
-    // Asked of AuthenticatedSubject, not of the type. A request the ingest gateway makes on behalf
-    // of a member carries that member's identity with NO token behind it (ADR-0129), so demanding a
-    // JwtAuthenticationToken here threw before the handler body ran — every gateway call 403'd at
-    // argument resolution, one layer past the gate that used to fail it.
     Principal principal = webRequest.getUserPrincipal();
     return AuthenticatedSubject.of(principal instanceof Authentication auth ? auth : null)
         .orElseThrow(() -> new AccessDeniedException("No authenticated subject."));

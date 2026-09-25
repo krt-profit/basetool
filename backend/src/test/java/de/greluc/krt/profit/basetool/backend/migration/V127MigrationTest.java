@@ -108,8 +108,6 @@ class V127MigrationTest {
 
   @Test
   void v176Index_rejectsCaseVariantExternalName() {
-    // covers REQ-INV-020 — the V176 functional unique index folds case, so a differently-cased
-    // external name collides with an existing row and is rejected at the DB level.
     insertAlias("Gallant Rifle Battery", "gallant rifle battery");
     assertThrows(
         DataAccessException.class,

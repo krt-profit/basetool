@@ -80,17 +80,10 @@ class MissionsLiveFilterPageTest {
     mockMvc
         .perform(get("/missions"))
         .andExpect(status().isOk())
-        // Legacy filter submit button must be gone. The generic "<button type=submit>" backstop was
-        // removed because the global sidebar logout is now a CSRF-protected POST form/button (audit
-        // L-3), so a submit button legitimately renders on every page.
         .andExpect(content().string(not(containsString("id=\"missions-filter-submit\""))))
-        // AJAX results container must be present.
         .andExpect(content().string(containsString("id=\"missions-results\"")))
-        // Live-filter JS must be wired in.
         .andExpect(content().string(containsString("/js/missions.js")))
-        // KRT loading indicator present.
         .andExpect(content().string(containsString("missions-loading-indicator")))
-        // Reset control replaces the old filter submit.
         .andExpect(content().string(containsString("id=\"missions-filter-reset\"")));
   }
 
@@ -100,7 +93,6 @@ class MissionsLiveFilterPageTest {
     mockMvc
         .perform(get("/missions").param("fragment", "results"))
         .andExpect(status().isOk())
-        // The AJAX fragment must not include the outer page chrome.
         .andExpect(content().string(not(containsString("id=\"missions-filter-form\""))))
         .andExpect(content().string(not(containsString("id=\"missions-results\""))))
         .andExpect(content().string(not(containsString("<html"))));

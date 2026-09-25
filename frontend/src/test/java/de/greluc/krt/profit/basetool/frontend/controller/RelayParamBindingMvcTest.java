@@ -115,8 +115,6 @@ class RelayParamBindingMvcTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void adminPersonalInventoryPage_ignoresAMemberIdThatIsNotAUuid() throws Exception {
-    // The page degrades instead of erroring — an unparseable member selects nobody, which is the
-    // empty page the picker starts on — but the raw value must not reach the backend either.
     mockMvc
         .perform(get("/admin/personal-inventory").param("userSub", "../../etc/passwd"))
         .andExpect(status().isOk());

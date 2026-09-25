@@ -195,7 +195,6 @@ class MissionUserAutocompleteOverflowE2eTest {
         assertThat(page.locator("#party-lead-search-results > div:not(.autocomplete-notice)"))
             .hasCount(RENDER_CAP);
 
-        // A result that fits renders whole, with no hint.
         context.unrouteAll();
         stubUserSearch(context, 3);
         page.locator("#party-lead-search-input").fill("Overflow P");

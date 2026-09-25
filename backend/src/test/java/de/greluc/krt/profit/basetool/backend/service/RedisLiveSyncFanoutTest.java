@@ -74,8 +74,6 @@ class RedisLiveSyncFanoutTest {
 
     ArgumentCaptor<String> payload = ArgumentCaptor.forClass(String.class);
     verify(redisTemplate).convertAndSend(eq(CHANNEL), payload.capture());
-    // The whole bridge rests on this being byte-compatible with what a frontend instance sends:
-    // v, topic, origin, sections.
     assertThat(payload.getValue())
         .contains("\"v\":1")
         .contains("\"topic\":\"inventory\"")
@@ -92,7 +90,6 @@ class RedisLiveSyncFanoutTest {
 
     fanout.publish(LiveSyncTopic.parse("inventory"), List.of("stock"));
 
-    // Local delivery already happened in the relay; a fan-out failure must not fail the request.
     assertThat(errors(MetricNames.OP_PUBLISH)).isEqualTo(1.0);
   }
 
@@ -116,20 +113,15 @@ class RedisLiveSyncFanoutTest {
   void ownFramesAreSkipped() {
     fanout.onMessage(message(payload(INSTANCE, "inventory", "\"stock\"")), null);
 
-    // It was already delivered locally before it was published; delivering again would double
-    // every app-originated refresh.
     verify(streamService, never()).deliver(any(), any());
   }
 
   @Test
   @DisplayName("a frame naming a room this backend does not serve is dropped, not fatal")
   void unknownRoomsAreDropped() {
-    // The frontend's staff rooms ride the same channel. Seeing them is normal, not an error.
     fanout.onMessage(message(payload("frontend-instance", "bank", "\"grid\"")), null);
 
     verify(streamService, never()).deliver(any(), any());
-    // Under "skipped", not "errors": a permanent non-zero rate beneath the alert that watches the
-    // error series would teach everyone to ignore it.
     assertThat(
             meterRegistry
                 .counter(

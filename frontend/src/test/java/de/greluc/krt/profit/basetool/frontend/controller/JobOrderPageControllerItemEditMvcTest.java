@@ -226,8 +226,6 @@ class JobOrderPageControllerItemEditMvcTest {
             false);
     doReturn(order).when(backendApiClient).get(eq("/api/v1/orders/" + id), eq(JobOrderDto.class));
 
-    // The saved item's name must reach the page (inlined into window.EDIT_ITEMS) so the now
-    // load-on-demand item picker shows it as the selected option without a search round-trip.
     mockMvc
         .perform(get("/orders/" + id + "/items/edit"))
         .andExpect(status().isOk())

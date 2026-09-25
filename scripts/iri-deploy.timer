@@ -1,51 +1,14 @@
-; systemd timer that fires the Profit Basetool deploy check every 5 minutes.
-;
-; The deploy script itself is idempotent — if the resolved digests of
-; `:stable` match the last successfully deployed pair, it exits 0 without
-; restarting anything. So in steady state the timer costs one HEAD request
-; against GHCR per tick. Only when promote.yml has flipped `:stable` to a new
-; digest does an actual apply happen (the changed services' Quadlet units are
-; restarted and waited on until healthy -- scripts/lib/container-runtime.sh).
-;
-; Installed and enabled (not started) by the Ansible role
-; (ansible/roles/basetool_host/tasks/25-scripts.yml); see iri-deploy.service.
-;
-; If you prefer a maintenance-window-only roll-out instead of continuous
-; polling, replace the `OnUnitActiveSec` line with one or more `OnCalendar`
-; entries, e.g.:
-;     OnCalendar=*-*-* 02:00,06:00,14:00,22:00:00
-; Four ticks per day is still well within the ratio that keeps :stable
-; promotions visible the same workday they happen.
-
 [Unit]
 Description=Profit Basetool — periodic deploy check (every 5 minutes)
 Documentation=https://github.com/krt-profit/basetool/blob/main/docs/deployment.md
-; No Requires= on the service, on purpose: a timer only TRIGGERS its unit, through Unit= below.
-; A Requires= also starts the service whenever the timer itself starts -- at every boot, when
-; timers.target pulls the timer in -- without the timer elapsing and without LastTrigger moving.
-; That is what ran all four deploy-account jobs one second into the 2026-09-25 reboot, where each
-; failed (docs/arc42/07-deployment-view.md §7.4b); it also made the OnBootSec below a fiction.
-; Reproduced in a systemd container the same day: service start 3 ms after its timer's, timer never
-; elapsed. Guarded by scripts/container-runtime.test.sh.
 
 [Timer]
-; First run 5 minutes after boot — gives the container units + the network stack time to
-; settle before we hit GHCR. (True only since the Requires= above went.) Started by hand on a host
-; that has been up longer, the timer fires at once: OnBootSec has already passed.
 OnBootSec=5min
 
-; Repeat every 5 minutes thereafter. Idempotent: no-op when nothing changed
-; in GHCR.
 OnUnitActiveSec=5min
 
-; Spread the tick by up to 30 s so several hosts in the same fleet do not
-; hammer GHCR simultaneously. No effect for the single-server setup today,
-; but cheap insurance for when the topology grows.
 RandomizedDelaySec=30s
 
-; Make missed ticks (e.g. host was rebooting) catch up on the next boot,
-; instead of waiting until the next regular interval. Critical for a fleet
-; that may be powered off during off-hours.
 Persistent=true
 
 Unit=iri-deploy.service

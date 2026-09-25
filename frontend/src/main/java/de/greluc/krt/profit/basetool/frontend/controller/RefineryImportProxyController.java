@@ -134,8 +134,6 @@ public class RefineryImportProxyController {
       redirectAttributes.addFlashAttribute("importRowsSkipped", draft.rowsSkipped());
       return "redirect:/refinery-orders/create";
     } catch (BackendServiceException e) {
-      // Envelope-level reject (e.g. unsupported schemaVersion / panel type): the backend's
-      // problem detail is already localized — show it verbatim instead of a generic failure.
       String detail = e.getProblemDetail();
       if (detail != null && !detail.isBlank()) {
         redirectAttributes.addFlashAttribute("importErrorText", detail);

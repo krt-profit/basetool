@@ -34,9 +34,6 @@
     </div>
 
     <div class="hud-box mt-2">
-        <!--/* AJAX swap target (REQ-FE-002): search, reset and the prev/next pager re-render only
-             this block via the page script + krtFetch; the live total count rides along inside
-             the fragment. The no-JS GET fallback still reloads the whole page. */-->
         <div id="admin-bp-results">
         <th:block th:fragment="results">
         <div class="bp-toolbar">
@@ -60,9 +57,6 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <!--/* One <tr> per requirement group (slot). Column 3 carries, per stat, a slider
-                         spanning the ingredient's quality band (min..max) whose state computes the
-                         final stat value live - linearly, or segment-by-segment for stepped stats. */-->
                     <th:block th:each="bp : ${blueprints}">
                         <tr th:each="g, gStat : ${bp.requirementGroups()}">
                             <td class="bp-cell-blueprint" th:if="${gStat.first}"
@@ -91,10 +85,6 @@
                                     <span class="bp-stat-bw" th:if="${m.betterWhen() == 'lower'}" th:text="'(' + #{admin.blueprint.betterWhen.lower} + ')'">(niedriger ist besser)</span>
                                     <span class="bp-stat-bw" th:if="${m.betterWhen() == 'neutral'}" th:text="'(' + #{admin.blueprint.betterWhen.neutral} + ')'">(neutral)</span>
 
-                                    <!--/* Interactive slider when a usable quality band is present.
-                                         Extents use the effective band (union of segment bounds for a
-                                         stepped modifier) so the track spans the full covered range -
-                                         the raw qualityMin/Max only reflect the first segment. */-->
                                     <span class="bp-slider"
                                           th:if="${m.effectiveQualityMin() != null and m.effectiveQualityMax() != null and m.effectiveQualityMax() > m.effectiveQualityMin()}"
                                           th:attr="data-qmin=${m.effectiveQualityMin()},data-qmax=${m.effectiveQualityMax()},data-vmin=${m.modifierAtMinQuality()},data-vmax=${m.modifierAtMaxQuality()},data-vrt=${m.valueRangeType()}">
@@ -112,7 +102,6 @@
                                             <output class="bp-out">&times;?</output>
                                         </span>
                                     </span>
-                                    <!--/* Fallback when there is no usable quality band to slide over. */-->
                                     <span class="bp-dep"
                                           th:unless="${m.effectiveQualityMin() != null and m.effectiveQualityMax() != null and m.effectiveQualityMax() > m.effectiveQualityMin()}">
                                         <span class="bp-dep-val" th:if="${m.modifierAtMaxQuality() != null}"
@@ -123,7 +112,6 @@
                                 <span class="bp-empty-hint" th:if="${#lists.isEmpty(g.modifiers())}">&ndash;</span>
                             </td>
                         </tr>
-                        <!--/* Blueprint synced without requirement groups (legacy flat list). */-->
                         <tr th:if="${#lists.isEmpty(bp.requirementGroups())}">
                             <td class="bp-cell-blueprint">
                                 <span class="bp-name" th:text="${bp.outputName() != null ? bp.outputName() : bp.scwikiKey()}">Output</span>

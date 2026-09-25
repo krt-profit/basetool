@@ -78,7 +78,6 @@ class JobTypeFilteringTest {
     jobTypeRepository.save(crewJob);
     jobTypeRepository.flush();
 
-    // Test filtering MISSION
     mockMvc
         .perform(get("/api/v1/job-types?archetype=MISSION"))
         .andDo(org.springframework.test.web.servlet.result.MockMvcResultHandlers.print())
@@ -86,14 +85,12 @@ class JobTypeFilteringTest {
         .andExpect(jsonPath("$.content.length()").value(1))
         .andExpect(jsonPath("$.content[0].name").value("Pilot"));
 
-    // Test filtering CREW
     mockMvc
         .perform(get("/api/v1/job-types?archetype=CREW"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content.length()").value(1))
         .andExpect(jsonPath("$.content[0].name").value("Gunner"));
 
-    // Test no filter
     mockMvc
         .perform(get("/api/v1/job-types"))
         .andExpect(status().isOk())

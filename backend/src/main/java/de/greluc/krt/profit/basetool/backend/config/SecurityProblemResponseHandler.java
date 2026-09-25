@@ -130,11 +130,6 @@ public class SecurityProblemResponseHandler
       HttpServletResponse response,
       AuthenticationException authException)
       throws IOException {
-    // Counted here rather than derived from basetool_http_error_total{code="UNAUTHENTICATED"}: that
-    // counter has the volume but not the cause, and the cause is what an operator needs at 3 a.m.
-    // The RFC 6750 code separates a malformed header from a rejected token — the distinction that
-    // cost the ingest gateway an afternoon on 2026-08-03 — without raising a log level on a surface
-    // anonymous scanners can reach (REQ-OBS-018).
     meterRegistry
         .counter(MetricNames.AUTH_FAILURES, MetricNames.TAG_REASON, bearerErrorCode(authException))
         .increment();
@@ -168,7 +163,6 @@ public class SecurityProblemResponseHandler
    */
   private static @NotNull String bearerErrorCode(@NotNull AuthenticationException authException) {
     if (!(authException instanceof OAuth2AuthenticationException oauth2Exception)) {
-      // Both spellings of "nothing was presented"; anything else genuinely is unclassified.
       return authException instanceof InsufficientAuthenticationException
               || authException instanceof AuthenticationCredentialsNotFoundException
           ? MetricNames.AUTH_NO_CREDENTIALS
@@ -181,7 +175,6 @@ public class SecurityProblemResponseHandler
         || MetricNames.AUTH_INSUFFICIENT_SCOPE.equals(code)) {
       return code;
     }
-    // Anything outside the RFC set collapses to the bounded literal rather than becoming a label.
     return MetricNames.AUTH_OTHER;
   }
 
@@ -227,9 +220,6 @@ public class SecurityProblemResponseHandler
     if (response.isCommitted()) {
       return;
     }
-    // Security runs before CorrelationIdFilter, so no request-scoped id exists yet. Mint one into
-    // the MDC so GlobalExceptionHandler reuses the SAME id for the body and the log line, and echo
-    // it as the response header (that filter never runs to echo it on a rejected request).
     boolean mdcOwned = false;
     String correlationId = MDC.get(MDC_CORRELATION_ID);
     if (correlationId == null || correlationId.isBlank()) {
@@ -237,9 +227,6 @@ public class SecurityProblemResponseHandler
       MDC.put(MDC_CORRELATION_ID, correlationId);
       mdcOwned = true;
     }
-    // Same reasoning, same discipline for userId: CorrelationIdFilter is its only other writer and
-    // it never runs on a rejected request, so without this the rejection line claims 'anonymous'
-    // for a caller whose sub the SecurityContextHolder is holding right now.
     boolean userIdOwned = stampAuthenticatedSub();
     try {
       response.setHeader(CORRELATION_ID_HEADER, correlationId);
@@ -285,8 +272,6 @@ public class SecurityProblemResponseHandler
     if (existing != null && !existing.isBlank()) {
       return false;
     }
-    // Asked of AuthenticatedSubject, not of the type — an acting member (ADR-0129) is a named
-    // caller with no token, and a refusal logged as anonymous is the one line forensics would need.
     String sub =
         AuthenticatedSubject.of(SecurityContextHolder.getContext().getAuthentication())
             .orElse(null);

@@ -347,8 +347,6 @@ public class MaterialService {
     material.setQuantityType(materialDetails.getQuantityType());
     material.setIsManualRawMaterial(materialDetails.getIsManualRawMaterial());
     material.setIsJobOrder(materialDetails.getIsJobOrder());
-    // Visibility is admin-toggleable (§4.3 review of wiki-only commodities). Null-guarded so a DTO
-    // that omits the field cannot null the NOT NULL column on an unrelated edit.
     if (materialDetails.getIsVisible() != null) {
       material.setIsVisible(materialDetails.getIsVisible());
     }

@@ -93,8 +93,6 @@ class RefineryExtractDtoValidationTest {
 
   @Test
   void exposesTheImageProvenanceItCarries() {
-    // Image bytes never leave the user's machine (ADR-0007) — only this metadata travels, and the
-    // backend derives the order start time from capturedAt.
     RefineryExtractImageDto image = image();
 
     assertThat(image.name()).isEqualTo("capture.png");
@@ -136,7 +134,6 @@ class RefineryExtractDtoValidationTest {
 
   @Test
   void cascadesIntoNestedGoods() {
-    // Without the @Valid on the list element the nested constraint would silently not run.
     RefineryExtractGoodDto invalid =
         new RefineryExtractGoodDto(0, null, 100, 500, 420, Boolean.TRUE, 0.95d, null);
 

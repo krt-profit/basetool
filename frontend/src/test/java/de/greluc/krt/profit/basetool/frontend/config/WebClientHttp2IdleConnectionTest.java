@@ -112,8 +112,6 @@ class WebClientHttp2IdleConnectionTest {
     assertThat(get()).isEqualTo("ok");
     assertThat(peers).as("the first call opened exactly one connection").hasSize(1);
 
-    // The idle window the bug needed. Nothing is in flight; with a channel-level ReadTimeoutHandler
-    // armed this is where the connection was closed underneath the pool.
     Thread.sleep(IDLE.toMillis());
 
     assertThat(get()).as("the second call must still be served").isEqualTo("ok");

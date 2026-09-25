@@ -71,9 +71,6 @@ public class AnnouncementService {
    * @return the admin-view announcement record, never {@code null}
    */
   public Announcement getAdminAnnouncement() {
-    // Try the latest active announcement first; fall back to the latest entry
-    // overall (even if its content is empty/null) so admins reuse the existing
-    // row instead of accumulating duplicates. As a last resort create one.
     return getPublicAnnouncement()
         .orElseGet(
             () ->

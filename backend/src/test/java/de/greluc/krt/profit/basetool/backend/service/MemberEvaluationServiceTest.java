@@ -83,7 +83,6 @@ class MemberEvaluationServiceTest {
 
   @Test
   void listForUser_shouldOnlyReturnOwnEvaluationsScopedToSquadron() {
-    // Given – data isolation: only evaluations for "user-A" in the active squadron are returned
     UUID userA = USER_A;
     UUID userB = USER_B;
     UUID scopeId = UUID.randomUUID();
@@ -105,11 +104,8 @@ class MemberEvaluationServiceTest {
     when(repository.findAllByUserIdScoped(userA, scopeId)).thenReturn(List.of(evalA));
     when(mapper.toResponse(evalA)).thenReturn(responseA);
 
-    // When
     List<MemberEvaluationResponse> result = service.listForUser(userA);
 
-    // Then – only user-A's evaluations are returned, scoped to the active squadron; user-B's are
-    // never fetched.
     assertEquals(1, result.size());
     assertEquals(userA, result.get(0).userId());
     verify(repository).findAllByUserIdScoped(userA, scopeId);
@@ -118,7 +114,6 @@ class MemberEvaluationServiceTest {
 
   @Test
   void upsert_shouldCreateNewEvaluation_whenNoneExists() {
-    // Given
     UUID userId = USER_A;
     UUID categoryId = UUID.randomUUID();
     PromotionCategory category =
@@ -149,16 +144,10 @@ class MemberEvaluationServiceTest {
     when(mapper.toResponse(saved)).thenReturn(response);
     when(authHelperService.isAdmin()).thenReturn(true);
 
-    // When
     MemberEvaluationResponse result = service.upsert(userId, categoryId, request);
 
-    // Then
     assertEquals(PromotionLevel.LEVEL_B, result.assignedLevel());
     verify(repository).save(any(MemberEvaluation.class));
-    // A brand-new (user, category) grading records a CREATED event; the id-less fixture category
-    // leaves the subject id null, while the target now always carries the evaluated member's id --
-    // it used to be null here because the fixture's sub was an unparseable string and the service
-    // swallowed that (V235 / ADR-0142 made the column a UUID, so there is nothing left to fail).
     verify(auditService)
         .record(
             eq(AuditEventType.PROMOTION_EVALUATION_CREATED),
@@ -170,8 +159,6 @@ class MemberEvaluationServiceTest {
 
   @Test
   void upsert_shouldRecordUpdated_whenExistingEvaluationVersionMatches() {
-    // Given: an existing grading for a member with a parseable sub; the version matches so the
-    // upsert overwrites the level and records an UPDATED event carrying the member as target.
     UUID userId = UUID.randomUUID();
     UUID categoryId = UUID.randomUUID();
     UUID evalId = UUID.randomUUID();
@@ -206,10 +193,8 @@ class MemberEvaluationServiceTest {
     when(repository.save(existing)).thenReturn(existing);
     when(mapper.toResponse(existing)).thenReturn(response);
 
-    // When
     service.upsert(userId, categoryId, request);
 
-    // Then
     verify(auditService)
         .record(
             eq(AuditEventType.PROMOTION_EVALUATION_UPDATED),
@@ -221,7 +206,6 @@ class MemberEvaluationServiceTest {
 
   @Test
   void upsert_shouldThrow_whenVersionMismatch() {
-    // Given
     UUID userId = USER_A;
     UUID categoryId = UUID.randomUUID();
     UUID evalId = UUID.randomUUID();
@@ -242,7 +226,6 @@ class MemberEvaluationServiceTest {
         .thenReturn(Optional.of(existing));
     when(authHelperService.isAdmin()).thenReturn(true);
 
-    // When / Then
     assertThrows(
         ObjectOptimisticLockingFailureException.class,
         () -> service.upsert(userId, categoryId, request));
@@ -250,11 +233,9 @@ class MemberEvaluationServiceTest {
 
   @Test
   void upsert_shouldThrow_whenCategoryNotFound() {
-    // Given
     UUID categoryId = UUID.randomUUID();
     when(categoryRepository.findById(categoryId)).thenReturn(Optional.empty());
 
-    // When / Then
     assertThrows(
         NotFoundException.class,
         () ->
@@ -266,9 +247,6 @@ class MemberEvaluationServiceTest {
 
   @Test
   void upsert_shouldDenyOfficer_evaluatingForeignSquadronMember() {
-    // Gap-fill security audit: an OFFICER may not write an evaluation for a member whose home
-    // Staffel is outside the caller's editable scope, even when the category belongs to the
-    // officer's own squadron. Without the target-member scope check this was a cross-tenant write.
     UUID foreignMemberId = UUID.randomUUID();
     UUID categoryId = UUID.randomUUID();
     UUID foreignStaffelId = UUID.randomUUID();
@@ -283,7 +261,6 @@ class MemberEvaluationServiceTest {
         .thenReturn(java.util.List.of(foreignStaffelId));
     when(ownerScopeService.canEditSquadron(foreignStaffelId)).thenReturn(false);
 
-    // When / Then
     assertThrows(
         AccessDeniedException.class, () -> service.upsert(foreignMemberId, categoryId, request));
     verify(repository, never()).save(any(MemberEvaluation.class));
@@ -291,7 +268,6 @@ class MemberEvaluationServiceTest {
 
   @Test
   void upsert_shouldAllowOfficer_evaluatingOwnSquadronMember() {
-    // The legitimate path: an OFFICER evaluating a member of a Staffel within their editable scope.
     UUID memberId = UUID.randomUUID();
     UUID categoryId = UUID.randomUUID();
     UUID ownStaffelId = UUID.randomUUID();
@@ -327,27 +303,22 @@ class MemberEvaluationServiceTest {
     when(repository.save(any(MemberEvaluation.class))).thenReturn(saved);
     when(mapper.toResponse(saved)).thenReturn(response);
 
-    // When
     MemberEvaluationResponse result = service.upsert(memberId, categoryId, request);
 
-    // Then
     assertEquals(PromotionLevel.LEVEL_B, result.assignedLevel());
     verify(repository).save(any(MemberEvaluation.class));
   }
 
   @Test
   void delete_shouldCallRepositoryDelete() {
-    // Given
     UUID id = UUID.randomUUID();
     MemberEvaluation entity =
         MemberEvaluation.builder().userId(USER_A).assignedLevel(PromotionLevel.LEVEL_A).build();
     when(repository.findById(id)).thenReturn(Optional.of(entity));
     when(authHelperService.isAdmin()).thenReturn(true);
 
-    // When
     service.delete(id);
 
-    // Then
     verify(repository).delete(entity);
     verify(auditService)
         .record(eq(AuditEventType.PROMOTION_EVALUATION_DELETED), any(), any(), any(), isNull());

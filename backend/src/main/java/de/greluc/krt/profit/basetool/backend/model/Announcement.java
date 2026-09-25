@@ -45,9 +45,6 @@ import lombok.Setter;
 @AllArgsConstructor
 public class Announcement extends AbstractEntity<UUID> {
 
-  // {@code onMethod_ = @__(@Override)} tells Lombok to attach a real {@code @Override} to the
-  // generated {@code getId()} — required because the method implements {@code Persistable.getId()}
-  // and CodeQL flags missing override annotations on interface implementations.
   @Getter(onMethod_ = @__(@Override))
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)

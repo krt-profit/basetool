@@ -52,15 +52,11 @@ class SpecialCommandAdminProxyControllerTest {
 
   @Test
   void setProfitEligible_forwardsPatch_thenEvictsStaticDataCache() {
-    // Given
     UUID id = UUID.randomUUID();
     Map<String, Object> body = Map.of("eligible", true);
 
-    // When
     ResponseEntity<Void> response = controller.setProfitEligible(id, body);
 
-    // Then — 204. Eviction runs AFTER the write so the cleared cache repopulates from the
-    // already-mutated backend state, never the reverse.
     assertEquals(204, response.getStatusCode().value());
     InOrder inOrder = inOrder(backendApiClient);
     inOrder

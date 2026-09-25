@@ -92,10 +92,8 @@ class RoleAppointmentMatrixE2eTest {
     }
     seeder = new BackendSeeder();
 
-    blUserId = seeder.getUserId(BL_USER, BL_PASSWORD); // Staffel-less; becomes BL of A below
-    tgtUserId = seeder.getUserId(TGT_USER, TGT_PASSWORD); // Staffel-less appointment target
-    // test-member must hold a Staffel membership so the REQ-ORG-017 silo guard has something to
-    // reject; the appointment that targets it is denied, so its shape is never actually mutated.
+    blUserId = seeder.getUserId(BL_USER, BL_PASSWORD);
+    tgtUserId = seeder.getUserId(TGT_USER, TGT_PASSWORD);
     seeder.ensureIridiumMembership(MEMBER_USER, MEMBER_PASSWORD);
     memberUserId = seeder.getUserId(MEMBER_USER, MEMBER_PASSWORD);
 

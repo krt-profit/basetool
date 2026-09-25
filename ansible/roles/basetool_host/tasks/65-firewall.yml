@@ -1,19 +1,4 @@
 ---
-# A host firewall, on purpose.
-#
-# This host had none until the CIS remediation dragged firewalld in as a dependency, enabled it, and
-# left its `public` zone allowing `ssh`, `cockpit` and `dhcpv6-client`. The edge then listened on
-# :80 and :443 and timed out from every other machine, while every check ON the host stayed green --
-# because every check on the host is on the host.
-#
-# The answer to that is not to avoid the firewall. A default-deny packet filter in front of a host
-# that publishes two ports to the internet is straightforwardly right, and getting one for free is a
-# gain. The answer is to STOP GETTING IT BY ACCIDENT: install it deliberately, state the policy, and
-# open exactly what the stack needs, next to the thing that needs it.
-#
-# So this file owns the firewall's existence and its baseline. The front end's own ports are opened
-# in 70-frontend.yml, beside the service that binds them, because a port list that lives away from
-# the service it serves drifts from it.
 
 - name: Read the service state without shelling out to systemctl
   ansible.builtin.service_facts:
@@ -33,19 +18,6 @@
   check_mode: false
   when: basetool_host_manage_firewall | bool
 
-# cockpit is a root-privileged administration web UI. The default zone permits it whether or not it
-# is installed, so the rule is an open door waiting for someone to install the thing behind it --
-# and on a host reachable from the internet that is not a door this deployment wants. Nothing here
-# uses it; operations go through SSH.
-#
-# dhcpv6-client is deliberately LEFT ALONE. This host takes its IPv6 by SLAAC today, so the rule is
-# probably unnecessary -- but "probably" is doing the work in that sentence, and the failure mode of
-# being wrong is a host that silently loses its IPv6 address at the next lease event. The cost of
-# closing UDP 546 does not buy enough to risk that.
-#
-# The module, not `firewall-cmd`: it queries before it writes, so it reports `changed` from what it
-# actually did rather than from a `changed_when` somebody guessed, and `permanent` + `immediate`
-# together remove the separate `--reload` task this file used to need.
 - name: Close the administration UI nobody here uses
   ansible.posix.firewalld:
     service: cockpit
@@ -54,12 +26,6 @@
     immediate: true
   when: basetool_host_manage_firewall | bool
 
-# CIS asks for loopback to be trusted explicitly, and here that is not box-ticking: this
-# deployment's whole front end routes through it. haproxy binds the public ports and forwards to
-# 127.0.0.1, where the edge container publishes -- which is what makes the PROXY header unforgeable
-# (ADR-0187). Measured on the testing host: `lo` was in NO zone at all, which happens to work
-# because firewalld's filter does not sit on it, and "happens to work" is the state this whole
-# migration keeps finding underneath things.
 - name: Put loopback in the trusted zone
   ansible.posix.firewalld:
     interface: lo
@@ -69,22 +35,7 @@
     immediate: true
   when: basetool_host_manage_firewall | bool
 
-
-# --- fail2ban -----------------------------------------------------------------------------------
-#
-# WHY IT IS HERE and not in 60-hardening.yml: it bans by writing rich rules into firewalld, so it
-# has to be configured after the firewall is, and this is the file that owns the firewall.
-#
-# WHY IT EXISTS AT ALL. config.alloy tails /hostlog/fail2ban.log for the `host-fail2ban` stream and
-# observability.md describes it as one of the three host security streams -- and on 2026-09-20 the
-# new host had no fail2ban at all, so that stream had no producer and its LogStreamSilent rule
-# would have fired forever. A monitored stream with nothing behind it is worse than no stream: it
-# reads as a defence that is present.
-
 - name: Install fail2ban
-  # From EPEL, which 27-observability.yml already enables for node_exporter and the podman exporter.
-  # `fail2ban-firewalld` is what supplies the firewallcmd-rich-rules action the jail is configured
-  # to use; without it fail2ban starts, detects, and then fails to ban -- silently, per jail.
   ansible.builtin.dnf:
     name:
       - fail2ban
@@ -96,9 +47,6 @@
     - basetool_host_manage_firewall | bool
 
 - name: Refuse an ignore list that would lock the host out or ban nobody
-  # Both failure modes are silent and both are expensive. An empty list means the host can ban its
-  # own administrators out of SSH; a `0.0.0.0/0` in it means the jail is configured, running,
-  # reporting healthy and banning nothing at all.
   ansible.builtin.assert:
     that:
       - basetool_host_fail2ban_ignoreip | length > 0
@@ -111,7 +59,6 @@
   when: basetool_host_fail2ban_enabled | bool
 
 - name: Configure the jail
-  # jail.local, not jail.conf: the package owns jail.conf and replaces it on upgrade.
   ansible.builtin.template:
     src: fail2ban-jail.local.j2
     dest: /etc/fail2ban/jail.local
@@ -124,10 +71,6 @@
     - basetool_host_manage_firewall | bool
 
 - name: Ask fail2ban whether that configuration parses
-  # `fail2ban-client -t` takes a config DIRECTORY and resolves jail.local inside it, so there is no
-  # validating a candidate copy elsewhere -- which is why this is a task after the template rather
-  # than a `validate:` on it. It runs before the restart handler flushes, so a broken jail.local
-  # fails the play instead of bouncing the service into a state with no jails.
   ansible.builtin.command: fail2ban-client -t
   register: basetool_host_fail2ban_test
   changed_when: false
@@ -148,11 +91,6 @@
     - not ansible_check_mode
 
 - name: Let the shipper read the ban log
-  # AFTER the start, and that ordering is the whole task. fail2ban creates /var/log/fail2ban.log
-  # itself, as root:root 0600, when it first starts -- so a permission task placed before the start
-  # runs against a file that does not exist yet, changes nothing, and reports success. Measured on
-  # the testing host on 2026-09-20: the play was green, the jail was up, and the log was still
-  # root:root 0600 with the shipper unable to open it.
   ansible.builtin.file:
     path: /var/log/fail2ban.log
     group: adm
@@ -164,10 +102,6 @@
     - not ansible_check_mode
 
 - name: Keep it readable across rotation
-  # The package's own logrotate entry recreates the file after each rotation, so whatever owner and
-  # mode it names is what the file has from then on -- a group set once above would last exactly
-  # until the first rotation. A second entry for the same path is a logrotate error rather than an
-  # override, so the package's own `create` line is rewritten in place.
   ansible.builtin.lineinfile:
     path: /etc/logrotate.d/fail2ban
     regexp: '^(\s*)create\s'
@@ -179,9 +113,6 @@
     - not ansible_check_mode
 
 - name: Ask whether alloy can actually open it
-  # The same question the observability role asks about /var/log/secure and the audit log, asked
-  # here because this file is created later than that role runs. A stream whose producer exists and
-  # whose reader cannot open it is the exact failure fail2ban was installed to stop reproducing.
   ansible.builtin.command: runuser -u alloy -- test -r /var/log/fail2ban.log
   register: basetool_host_fail2ban_readable
   changed_when: false
@@ -204,10 +135,6 @@
     - not ansible_check_mode
 
 - name: Give alloy the ban log it did not have at its last start
-  # The bind for this file is declared with a `-` prefix, so a host where fail2ban had not yet run
-  # started alloy with no mount for it at all -- and a bind is resolved at unit start, not when the
-  # source appears. Without this, a fresh host ships every other stream and silently not this one
-  # until something else happens to restart the service.
   ansible.builtin.debug:
     msg: "The ban log is new to this host; alloy is restarted so its bind picks it up."
   changed_when: true
@@ -219,9 +146,6 @@
     - basetool_host_fail2ban_log_perms is changed
 
 - name: Ask fail2ban whether the jail is actually up
-  # `systemctl is-active` says the daemon runs; it does not say a jail was loaded. A typo in
-  # jail.local, a missing backend, a missing firewalld action -- each leaves the service `active`
-  # with zero jails, which is the failure this whole section exists to avoid reproducing.
   ansible.builtin.command: fail2ban-client status sshd
   register: basetool_host_fail2ban_status
   changed_when: false

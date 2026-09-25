@@ -87,7 +87,6 @@ class RedisNotificationFanoutIntegrationTest {
     template.afterPropertiesSet();
     UUID user = UUID.fromString("5f1d2c3b-0000-0000-0000-000000000042");
 
-    // Peer instance B records what its emitters are asked to deliver.
     CountDownLatch peerDelivered = new CountDownLatch(1);
     List<Collection<UUID>> peerRecipients = new CopyOnWriteArrayList<>();
     NotificationStreamService streamB = mock(NotificationStreamService.class);
@@ -103,7 +102,6 @@ class RedisNotificationFanoutIntegrationTest {
         new RedisNotificationFanout(
             streamB, template, new SimpleMeterRegistry(), CHANNEL, "backend-B");
 
-    // Origin instance A: its emitters get the local delivery (once), never the looped-back consume.
     NotificationStreamService streamA = mock(NotificationStreamService.class);
     RedisNotificationFanout instanceA =
         new RedisNotificationFanout(
@@ -111,7 +109,7 @@ class RedisNotificationFanoutIntegrationTest {
 
     listenerContainer.addMessageListener(instanceB, new ChannelTopic(CHANNEL));
     listenerContainer.addMessageListener(instanceA, new ChannelTopic(CHANNEL));
-    Thread.sleep(300); // let the subscriptions register before publishing
+    Thread.sleep(300);
 
     instanceA.publish(List.of(user), NotificationSignal.refreshOnly());
 
@@ -119,9 +117,6 @@ class RedisNotificationFanoutIntegrationTest {
         .as("peer instance B delivered the signal to its emitters")
         .isTrue();
     assertThat(peerRecipients).containsExactly(List.of(user));
-    // B has delivered, so A's own message has crossed Redis too; give A's listener a moment to
-    // consume-and-skip it, then assert A delivered locally EXACTLY once (the own-origin skip means
-    // the looped-back consume never triggers a second local publish).
     Thread.sleep(300);
     verify(streamA, times(1)).publish(List.of(user), NotificationSignal.refreshOnly());
   }

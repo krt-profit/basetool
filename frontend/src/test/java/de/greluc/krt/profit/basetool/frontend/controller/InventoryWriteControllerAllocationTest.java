@@ -109,7 +109,6 @@ class InventoryWriteControllerAllocationTest {
 
     ResponseEntity<Object> result = controller().addAllocation(id, dto);
 
-    // propagateBackendError relays the backend status so krt-fetch.js can toast (not reload).
     assertEquals(422, result.getStatusCode().value());
   }
 

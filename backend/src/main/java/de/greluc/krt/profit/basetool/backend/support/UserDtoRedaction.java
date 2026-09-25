@@ -72,21 +72,20 @@ public final class UserDtoRedaction {
         dto.username(),
         dto.displayName(),
         dto.effectiveName(),
-        null, // email
+        null,
         dto.rank(),
-        null, // description
-        null, // roles
-        null, // permissions
-        null, // lastReadAnnouncementId
-        false, // isLogistician
-        false, // isMissionManager
+        null,
+        null,
+        null,
+        null,
+        false,
+        false,
         dto.inKeycloak(),
         dto.squadron(),
         dto.squadrons(),
         dto.version(),
-        null, // joinDate
-        null // discordLinked - the Discord-link status is an admin-only column
-        );
+        null,
+        null);
   }
 
   /**

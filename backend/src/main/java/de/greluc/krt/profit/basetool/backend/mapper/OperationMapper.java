@@ -45,10 +45,7 @@ public interface OperationMapper {
    * @return the populated operation DTO.
    */
   @Mapping(target = "owningSquadron", source = "owningOrgUnit")
-  // Stamped by the read path through OperationDto#withPayoutPreliminary, not an entity column.
   @Mapping(target = "payoutPreliminary", ignore = true)
-  // MapStruct reads a record's wither as a fluent setter of a property named after it; there
-  // is no such property, so it is ignored.
   @Mapping(target = "withPayoutPreliminary", ignore = true)
   OperationDto toDto(Operation entity);
 
@@ -61,7 +58,6 @@ public interface OperationMapper {
   @Mapping(target = "createdAt", ignore = true)
   @Mapping(target = "updatedAt", ignore = true)
   @Mapping(target = "missions", ignore = true)
-  // A new row starts unversioned; the owning org unit is stamped by the service at create.
   @Mapping(target = "version", ignore = true)
   @Mapping(target = "owningOrgUnit", ignore = true)
   Operation toEntity(OperationCreateDto dto);

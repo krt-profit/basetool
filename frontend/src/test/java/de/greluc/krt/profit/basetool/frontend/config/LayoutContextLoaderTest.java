@@ -65,8 +65,6 @@ class LayoutContextLoaderTest {
 
   @Test
   void theThreeLayoutAdvicesShareOneBackendReadPerRequest() {
-    // The whole point: OrgUnitContextAdvice, CapabilityFlagsAdvice and LayoutMiscAdvice each ask,
-    // and the backend is asked once. Before FE-PERF-01 this request cost four reads.
     UUID home = UUID.randomUUID();
     when(authHelper.isAuthenticated()).thenReturn(true);
     when(authHelper.isAdmin()).thenReturn(false);
@@ -94,8 +92,6 @@ class LayoutContextLoaderTest {
 
   @Test
   void aSecondRequestReadsAgain() {
-    // The memo is per request, never per session or per bean: a stale badge or a stale capability
-    // after a role change would be the price of a longer-lived one.
     when(authHelper.isAuthenticated()).thenReturn(true);
     when(backendApiClient.get(LayoutResponses.PATH, MeLayoutResponse.class))
         .thenReturn(LayoutResponses.capabilities(true, false, false));
@@ -164,15 +160,11 @@ class LayoutContextLoaderTest {
 
   @Test
   void aResponseBodyHandlerThatReadsAModelAttributeStillGetsTheModel() throws Exception {
-    // JobOrderWriteController's AJAX create handlers are @ResponseBody and read canViewJobOrders
-    // as a parameter. Skipping them would hand them a fail-closed false and break order creation.
     assertThat(LayoutContextLoader.needsLayoutModel(requestFor("jsonReadingAFlag"))).isTrue();
   }
 
   @Test
   void aRequestWithNoMatchedHandlerMethodBuildsTheModel() {
-    // When in doubt the model is built: a missing attribute renders a wrong page, a surplus one
-    // only costs a call.
     assertThat(LayoutContextLoader.needsLayoutModel(new MockHttpServletRequest())).isTrue();
   }
 

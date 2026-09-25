@@ -55,7 +55,6 @@ class CorrelationIdFilterTest {
 
     String cid = res.getHeader("X-Correlation-Id");
     assertThat(cid).isNotBlank();
-    // UUID length including hyphens
     assertThat(cid).matches("[0-9a-fA-F-]{36}");
     assertThat(MDC.get("correlationId")).isNull();
     assertThat(MDC.get("userId")).isNull();

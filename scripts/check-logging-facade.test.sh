@@ -4,20 +4,6 @@
 # Copyright (C) 2026 Lucas Greuloch
 #
 # SPDX-License-Identifier: GPL-3.0-only
-#
-# Regression tests for scripts/check-logging-facade.sh.
-#
-# Builds throwaway git repositories carrying the exact shapes the gate is meant to flag and -- more
-# importantly -- the shapes it must NOT flag, then asserts its exit status and its report. No
-# network, no Gradle: pure git + bash, runs in under a second.
-#
-# The false-positive cases are the ones that matter. A gate that also flagged the 33 log-CAPTURE
-# tests, or the Playwright suite's deliberate console output, would be red on a clean tree from the
-# day it was merged, and the first contributor to meet it would (correctly) delete it.
-#
-# Usage:
-#   scripts/check-logging-facade.test.sh
-#
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -33,7 +19,6 @@ tests_failed=0
 LAST_OUTPUT=""
 LAST_STATUS=0
 
-# A throwaway git repo containing the given files, passed as alternating path/body arguments.
 make_repo() {
   local dir rel body
   dir="$(mktemp -d)"
@@ -116,11 +101,9 @@ class SmokeE2eTest {
   void go() { System.out.println("driving the browser"); }
 }'
 
-# --- the green case -------------------------------------------------------------------------
 expect "a Lombok-derived logger passes" 0 \
   "$(make_repo backend/src/main/java/p/Clean.java "$CLEAN_MAIN")" "Logging facade OK"
 
-# --- the red cases --------------------------------------------------------------------------
 expect "a hand-rolled SLF4J logger in main is flagged" 1 \
   "$(make_repo backend/src/main/java/p/Manual.java "$MANUAL_SLF4J")" "Hand-rolled logger"
 
@@ -130,9 +113,6 @@ expect "a hand-rolled JBoss logger in main is flagged" 1 \
 expect "a console write in main is flagged" 1 \
   "$(make_repo frontend/src/main/java/p/Noisy.java "$CONSOLE")" "Console write"
 
-# --- the false-positive guards, which are the point ------------------------------------------
-# Each guard sits beside a real production source, so the checker genuinely scans `src/main` and
-# still passes -- rather than passing because it found nothing to scan at all.
 expect "a log-CAPTURE handle in a test is NOT flagged" 0 \
   "$(make_repo backend/src/main/java/p/Clean.java "$CLEAN_MAIN" \
       backend/src/test/java/p/SomethingTest.java "$CAPTURE_TEST")" "Logging facade OK"
@@ -141,7 +121,6 @@ expect "deliberate console output in the e2e suite is NOT flagged" 0 \
   "$(make_repo frontend/src/main/java/p/Clean.java "$CLEAN_MAIN" \
       frontend/src/e2e/java/p/SmokeE2eTest.java "$E2E_PRINT")" "Logging facade OK"
 
-# --- the empty tree must not be a silent pass-by-accident -------------------------------------
 expect "a tree with no production sources says so" 0 \
   "$(make_repo docs/notes.md 'not java')" "nothing to check"
 

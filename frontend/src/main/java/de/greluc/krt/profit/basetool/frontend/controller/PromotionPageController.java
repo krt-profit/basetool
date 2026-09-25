@@ -208,7 +208,6 @@ public class PromotionPageController {
     List<PromotionTopicDto> topics = fetchTopics();
     List<MemberEvaluationDto> myEvaluations = fetchMyEvaluations();
 
-    // Build a map: categoryId -> evaluation for quick lookup
     Map<String, MemberEvaluationDto> evaluationByCategoryId = new LinkedHashMap<>();
     for (MemberEvaluationDto eval : myEvaluations) {
       evaluationByCategoryId.put(eval.categoryId().toString(), eval);
@@ -220,9 +219,6 @@ public class PromotionPageController {
       topicCategoryMap.put(topic.id().toString(), categories);
     }
 
-    // Per category the strictest minimum level any rank requirement demands. Used by the
-    // template to highlight categories where the user's assigned level falls below the
-    // highest expectation across all promotion steps. PromotionLevel ordering is A < B < C.
     Map<String, String> requiredLevelByCategory = new LinkedHashMap<>();
     for (RankRequirementDto req : fetchAllRankRequirements()) {
       if (req.categoryId() == null || req.minimumLevel() == null) {
@@ -293,20 +289,12 @@ public class PromotionPageController {
       Model model) {
     requirePromotionFeature(promotionFeatureEnabled);
 
-    // Cheap single-member eligibility re-render for the in-place evaluation save flow
-    // (REQ-FE-005): after a grade is stored the member's promotability may have flipped,
-    // so the client re-fetches just this one eligibility cell instead of reloading the
-    // whole matrix. Only this member's eligibility is queried, keeping the call lightweight
-    // even when the squadron has hundreds of evaluations.
     if ("eligibilityCell".equals(fragment) && userId != null && !userId.isBlank()) {
       model.addAttribute("eligList", fetchEligibilityForUser(userId));
       return "promotion-manage :: eligibilityCell";
     }
 
     List<PromotionTopicDto> topics = fetchTopics();
-    // Flat list of all categories in topic-then-sortOrder order. Built in lock-step with the
-    // per-topic map so the template can iterate row cells against the flat list and header
-    // cells against the grouped map without re-sorting on the view layer.
     List<PromotionCategoryDto> allCategories = new ArrayList<>();
     Map<String, List<PromotionCategoryDto>> categoriesByTopic = new LinkedHashMap<>();
     Map<String, Integer> categoryCountByTopic = new LinkedHashMap<>();
@@ -317,18 +305,10 @@ public class PromotionPageController {
       allCategories.addAll(topicCategories);
     }
 
-    // Fetch all evaluations for admin view — the COMPLETE set via a page walk (REQ-PROMO-001), not
-    // one capped chunk, so no member/category cell is silently missing from the matrix.
     CompleteCatalog<MemberEvaluationDto> evaluationsCatalog = fetchAllEvaluations();
     List<MemberEvaluationDto> allEvaluations = evaluationsCatalog.items();
-    // Build map: userId+categoryId -> evaluation
     Map<String, MemberEvaluationDto> evaluationMap = new LinkedHashMap<>();
-    // Per-user latest updatedAt across all categories. Used by the template to render a
-    // "letzte Aenderung am" tooltip on the member cell so officers can spot members whose
-    // assessment has gone stale without having to scan every column.
     Map<String, java.time.Instant> lastEvaluatedByUser = new LinkedHashMap<>();
-    // Per-user "has at least one stored evaluation" flag. Used by the client-side filter
-    // "nur Mitglieder ohne Bewertung" so it does not have to inspect every cell in the row.
     Map<String, Boolean> hasEvaluationsByUser = new LinkedHashMap<>();
     for (MemberEvaluationDto eval : allEvaluations) {
       evaluationMap.put(eval.userId() + "_" + eval.categoryId(), eval);
@@ -341,13 +321,10 @@ public class PromotionPageController {
       }
     }
 
-    // Fetch all members — likewise the COMPLETE, page-walked axis (REQ-PROMO-001).
     CompleteCatalog<de.greluc.krt.profit.basetool.frontend.model.dto.UserDto> membersCatalog =
         fetchMembers();
     List<de.greluc.krt.profit.basetool.frontend.model.dto.UserDto> members = membersCatalog.items();
 
-    // Eligibility per member, keyed by member.id (stringified UUID) so the template can
-    // look it up cheaply. Failures for a single member don't break the whole page.
     Map<String, List<PromotionEligibilityDto>> eligibilityByUser = new LinkedHashMap<>();
     for (de.greluc.krt.profit.basetool.frontend.model.dto.UserDto member : members) {
       if (member.id() != null) {
@@ -365,15 +342,8 @@ public class PromotionPageController {
     model.addAttribute("eligibilityByUser", eligibilityByUser);
     model.addAttribute("lastEvaluatedByUser", lastEvaluatedByUser);
     model.addAttribute("hasEvaluationsByUser", hasEvaluationsByUser);
-    // Either matrix axis stopping at the page-walk safety cap means the rendered matrix is
-    // incomplete — surface it with a loud banner rather than showing silent holes that read as
-    // "not yet evaluated" (REQ-PROMO-001, mirrors REQ-ADMIN-002). The flag lives inside the
-    // matrixBody fragment so it is present on both the full render and the in-place re-render.
     model.addAttribute(
         "matrixTruncated", evaluationsCatalog.truncated() || membersCatalog.truncated());
-    // matrixBody is the authoritative full re-render used to recover from an optimistic-lock
-    // conflict in place: it rebuilds every row with fresh @Version, level, eligibility and
-    // last-evaluated state — exactly what the old full-page reload produced, minus the navigation.
     if ("matrixBody".equals(fragment)) {
       return "promotion-manage :: matrixBody";
     }
@@ -443,10 +413,6 @@ public class PromotionPageController {
               groupedRequirements.computeIfAbsent(key, k -> new ArrayList<>()).add(req);
             });
 
-    // categoriesByTopic powers the cascading Topic -> Category dropdown in the
-    // create/edit modals: when the admin picks a topic, the client filters the
-    // category dropdown to that topic's categories only, so a category from a
-    // different topic can no longer be combined with a topic accidentally.
     List<PromotionTopicDto> topics = fetchTopics();
     Map<String, List<PromotionCategoryDto>> categoriesByTopic = new LinkedHashMap<>();
     for (PromotionTopicDto topic : topics) {
@@ -463,10 +429,6 @@ public class PromotionPageController {
     }
     return "promotion-admin-rank-requirements";
   }
-
-  // ---------------------------------------------------------------------------------
-  // Private helper methods
-  // ---------------------------------------------------------------------------------
 
   private List<PromotionTopicDto> fetchTopics() {
     try {

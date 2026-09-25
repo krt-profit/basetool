@@ -132,8 +132,6 @@ public class DeletionRequestService {
       try {
         return selfProvider.getObject().raiseWithinNewTransaction(userId, eraseHistoryRequested);
       } catch (DataIntegrityViolationException e) {
-        // The partial unique index fired: a concurrent click won. Its row is the answer, and the
-        // next attempt's pre-read will find it now that this transaction is gone.
         last = e;
         log.debug(
             "Concurrent deletion request for {} (attempt {} of {}); retrying to read the winner's"
@@ -172,19 +170,10 @@ public class DeletionRequestService {
     auditService.record(
         AuditEventType.ACCOUNT_DELETION_REQUESTED,
         userId,
-        // No subject label. REQ-AUDIT-001 limits it to a non-personal display label, and this
-        // one is a person by definition -- who the row is about is in actor_user_id and
-        // target_user_id, which the viewer resolves against the live roster and the erasure
-        // reaches. A name here outlived the erasure for the full 24-month retention:
-        // anonymise() rewrites actor_handle, and subject_label sat on the same row intact.
         null,
         userId,
         AuditDetails.of("eraseHistoryRequested", eraseHistoryRequested));
 
-    // Published inside the transaction on purpose: the listener is AFTER_COMMIT, so the admins'
-    // notification cannot describe a request that then rolls back (REQ-NOTIF-002). Publishing from
-    // the non-transactional orchestrator instead would leave no transaction for it to bind to and
-    // the event would never be delivered.
     eventPublisher.publishEvent(new AccountDeletionRequestedEvent(userId, handleOf(userId)));
     log.info("Member {} raised an account-deletion request", userId);
     return saved;
@@ -215,14 +204,10 @@ public class DeletionRequestService {
     auditService.record(
         AuditEventType.ACCOUNT_DELETION_REQUEST_WITHDRAWN,
         userId,
-        // See the note in raise(): the subject is identified by id, never by name.
         null,
         userId,
         AuditDetails.of("requestId", request.getId()));
 
-    // Clears the administrators' "member requests erasure" items, which carry the member's handle
-    // in their render parameters (REQ-NOTIF-018). Withdrawal used to publish nothing, so the
-    // request kept showing in every admin's bell after the member took it back.
     eventPublisher.publishEvent(new AccountDeletionRequestResolvedEvent(userId));
     log.info("Member {} withdrew their account-deletion request", userId);
     return Optional.of(request);
@@ -246,11 +231,6 @@ public class DeletionRequestService {
   @Transactional
   public @NotNull DeletionRequest decline(
       @NotNull UUID requestId, @Nullable String note, @Nullable Long clientVersion) {
-    // A refusal is the one decision whose reasoning survives -- the row stays, in DECLINED, and
-    // the member reads the reason on their profile page. An execution has nowhere to put one: the
-    // row cascades away with the account it was about, and REQ-AUDIT-001 keeps free text out of
-    // the audit payload. So execute() takes no note at all rather than accepting one and dropping
-    // it, which is what it used to do.
     if (note == null || note.isBlank()) {
       throw new IllegalArgumentException("A declined deletion request must carry a reason");
     }
@@ -264,7 +244,6 @@ public class DeletionRequestService {
     auditService.record(
         AuditEventType.ACCOUNT_DELETION_REQUEST_DECLINED,
         request.getUserId(),
-        // See the note in raise(): the subject is identified by id, never by name.
         null,
         request.getUserId(),
         AuditDetails.of("requestId", request.getId()));
@@ -341,22 +320,9 @@ public class DeletionRequestService {
       @NotNull UUID requestId, boolean grantHistoryErasure, @Nullable Long clientVersion) {
     UUID userId =
         selfProvider.getObject().executeDatabaseHalf(requestId, grantHistoryErasure, clientVersion);
-    // Only after the database half has committed.
     try {
       keycloakService.deleteUser(userId);
     } catch (RuntimeException e) {
-      // The local data is gone, which is what the member asked for -- unlike the reverse failure,
-      // this one leaves no personal data behind. What it does leave is a Keycloak account that can
-      // still log in, and it needs a human in the Keycloak console. It cannot be found by the
-      // REQ-SEC-059 orphan gauge: that counts a local row whose Keycloak account has gone, the
-      // opposite direction, and this account has no local row left at all.
-      //
-      // Nor is the recreated row a reliable backstop. On the next login or roster sync the
-      // reconciliation inserts a fresh one, PENDING and refusable for an ordinary member -- but
-      // UserRegistrationService#stampNewPendingRegistration carves ADMIN-realm-role holders out
-      // for bootstrap safety, so an admin's row lands on the ACTIVE entity default with full
-      // authority. So this path leaves a counter an alert watches and an audit row that outlives
-      // the request, rather than a log line nothing reads.
       selfProvider.getObject().recordKeycloakDeleteFailure(requestId, userId, e);
       log.warn(
           "Deletion request {} executed locally, but the Keycloak user remains: {}",
@@ -391,7 +357,6 @@ public class DeletionRequestService {
     auditService.record(
         AuditEventType.ACCOUNT_DELETION_KEYCLOAK_DELETE_FAILED,
         userId,
-        // See the note in raise(): the subject is identified by id, never by name.
         null,
         null,
         AuditDetails.of("requestId", requestId).with("error", failure.getClass().getSimpleName()));
@@ -418,16 +383,6 @@ public class DeletionRequestService {
         Entities.require(userRepository.findById(userId), () -> "User not found: " + userId);
 
     if (grantHistoryErasure) {
-      // Before the delete: the id-matched updates only reach rows while the FK still points at the
-      // account, and the text-matched ones need the names the account still carries.
-      //
-      // Every spelling, not the effective name alone. A handover or a job-order contact is typed
-      // by hand, and whoever typed it wrote what they call the person -- as likely the Discord
-      // nickname as the display name. Passing one spelling left the others standing.
-      //
-      // The list comes from HandleSpellings so this and the Art. 15 export cannot disagree about
-      // what a member's names are; HandleSpellingCoverageTest holds it against the person-search
-      // registry, which is itself swept against information_schema.
       handleAnonymisationService.anonymise(
           userId, HandleSpellings.of(user).filter(Objects::nonNull).toList());
     }
@@ -435,27 +390,18 @@ public class DeletionRequestService {
     auditService.record(
         AuditEventType.ACCOUNT_DELETION_REQUEST_EXECUTED,
         userId,
-        // See the note in raise(). This was the worst of the four: on a granted erasure the name
-        // went back in six lines after being removed, into a row the erasure had just rewritten.
         null,
         userId,
         AuditDetails.of("requestId", request.getId())
             .with("historyErasureGranted", grantHistoryErasure)
             .with("historyErasureRequested", request.isEraseHistoryRequested()));
 
-    // Same clearing as withdraw and decline, and on this path it is also the erasure: the request
-    // notification names the member, one row per administrator, and UserDeletionService removes
-    // notifications by RECIPIENT -- which these are not. Superseding them here means the name is
-    // gone when the account is, on every path, rather than only when the history checkbox was
-    // ticked and granted.
     eventPublisher.publishEvent(new AccountDeletionRequestResolvedEvent(userId));
 
     user.setInKeycloak(false);
     userRepository.saveAndFlush(user);
     userDeletionService.deleteUser(
         userId, UserDeletionService.KeycloakPresenceCheck.WAIVED_CALLER_REMOVES_THE_KEYCLOAK_USER);
-    // The request row cascades away with the account (V242); there is deliberately no EXECUTED
-    // state to read afterwards, because the request is itself personal data about the member.
     return userId;
   }
 

@@ -61,8 +61,6 @@ class StaticResourcesCachingTest {
   void setup() {
     mockMvc =
         MockMvcBuilders.webAppContextSetup(context)
-            // The application's own registration, with its own URL patterns — not a hand-added
-            // filter on /*, which would pass however EtagConfig were scoped (FE-PERF-03).
             .addFilter(
                 shallowEtagHeaderFilter.getFilter(),
                 shallowEtagHeaderFilter.getUrlPatterns().toArray(String[]::new))

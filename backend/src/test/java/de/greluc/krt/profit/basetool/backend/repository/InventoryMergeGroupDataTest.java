@@ -128,14 +128,11 @@ class InventoryMergeGroupDataTest {
     InventoryItem orgStampedRow = persistRow(4.0, QUALITY, false, orgUnit);
     entityManager.flush();
 
-    // Query with owningOrgUnitId = null must return ONLY the null-org row (NULL-as-equal branch),
-    // never the org-stamped sibling.
     List<InventoryItem> nullGroup =
         inventoryItemRepository.findMergeGroupForUpdate(
             user.getId(), material.getId(), location.getId(), QUALITY, false, null);
     assertThat(nullGroup).extracting(InventoryItem::getId).containsExactly(nullOrgRow.getId());
 
-    // Query with the org id must return ONLY the org-stamped row.
     List<InventoryItem> orgGroup =
         inventoryItemRepository.findMergeGroupForUpdate(
             user.getId(), material.getId(), location.getId(), QUALITY, false, orgUnit.getId());
@@ -145,8 +142,8 @@ class InventoryMergeGroupDataTest {
   @Test
   void excludesRowsDifferingInAScalarDimension() {
     InventoryItem match = persistRow(5.0, QUALITY, false, null);
-    persistRow(2.0, QUALITY - 100, false, null); // different quality
-    persistRow(1.0, QUALITY, true, null); // personal = true
+    persistRow(2.0, QUALITY - 100, false, null);
+    persistRow(1.0, QUALITY, true, null);
     entityManager.flush();
 
     List<InventoryItem> group =
@@ -176,26 +173,17 @@ class InventoryMergeGroupDataTest {
         inventoryItemRepository.findMergeGroupForUpdate(
             user.getId(), material.getId(), location.getId(), QUALITY, false, null);
 
-    // The offer-backed sibling is excluded by the NOT EXISTS, so a merge never folds (and deletes)
-    // a row the Materialbörse still references (ON DELETE CASCADE, V210).
     assertThat(group).extracting(InventoryItem::getId).containsExactly(plain.getId());
   }
 
-  // --- game-item merge groups (V220, REQ-INV-029) ---------------------------
-
-  // covers REQ-INV-029 (item merge key: NULL material AND NULL quality branches must match)
   @Test
   void gameItemGroup_matchesNullMaterialAndNullQualityRows_only() {
-    // Given two item rows of the same game item, one of a different game item, and a material
-    // sibling at the same location — the NULL-branches must group exactly the same-item rows.
-    // Without them the former plain equalities matched nothing for item rows, silently
-    // degenerating the item merge to a permanent no-op (the REQ-INV-029 regression).
     GameItem drive = persistGameItem("Quantum Drive");
     GameItem cooler = persistGameItem("Cooler");
     InventoryItem a = persistItemRow(drive, 3.0, false);
     InventoryItem b = persistItemRow(drive, 2.0, false);
     persistItemRow(cooler, 1.0, false);
-    persistRow(5.0, QUALITY, false, null); // material sibling, same user/location
+    persistRow(5.0, QUALITY, false, null);
     entityManager.flush();
 
     List<InventoryItem> group =
@@ -207,27 +195,21 @@ class InventoryMergeGroupDataTest {
         .containsExactlyInAnyOrder(a.getId(), b.getId());
   }
 
-  // covers REQ-INV-029 (the material overload keeps excluding item rows — pre-V220 behaviour)
   @Test
   void materialGroup_excludesGameItemRows() {
-    // Given a material row and an item row sharing user/location
     InventoryItem materialRow = persistRow(5.0, QUALITY, false, null);
     persistItemRow(persistGameItem("Quantum Drive"), 3.0, false);
     entityManager.flush();
 
-    // When querying through the six-argument material overload (gameItemId = null)
     List<InventoryItem> group =
         inventoryItemRepository.findMergeGroupForUpdate(
             user.getId(), material.getId(), location.getId(), QUALITY, false, null);
 
-    // Then the item row never joins a material merge group
     assertThat(group).extracting(InventoryItem::getId).containsExactly(materialRow.getId());
   }
 
-  // covers REQ-INV-029 (item stack identity: personal is a key dimension for item rows too)
   @Test
   void gameItemGroup_excludesRowsDifferingInPersonalFlag() {
-    // Given a shared and a personal item row of the same game item
     GameItem drive = persistGameItem("Quantum Drive");
     InventoryItem shared = persistItemRow(drive, 3.0, false);
     persistItemRow(drive, 2.0, true);

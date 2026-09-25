@@ -465,34 +465,10 @@ public class InventoryItemService {
       @NotNull InventoryItemCreateDto dto, UUID currentUserId) {
     UUID targetUserId = dto.userId() != null ? dto.userId() : currentUserId;
     final boolean onBehalfOfSomeoneElse = !targetUserId.equals(currentUserId);
-    // REQ-SEC-005 / REQ-ORG-016: the receiver decides whose ledger this row lands in, so it is an
-    // AUTHORIZATION input and has to be answered against THIS target - not against a role.
-    //
-    // This used to be a flat `isLogisticianOrAbove()` boolean handed down from the controller (into
-    // a parameter this method still called `isAdmin`, which is how it survived review). That
-    // authority is the OR-union over all of the caller's memberships and carries no org-unit
-    // context, so a logistician of any Staffel could fabricate stock for a member of any other one.
-    // The sibling endpoint POST /api/v1/refinery-orders/users/{userId} had already closed exactly
-    // this with canManageUserRefineryOrders; this is the same gate for the same kind of write.
-    //
-    // Checked on the REQUESTED id and BEFORE the user lookup below, so an unauthorised caller
-    // cannot tell "user does not exist" from "access denied" and use the endpoint as an existence
-    // oracle.
     if (onBehalfOfSomeoneElse && !ownerScopeService.canManageUserInventory(targetUserId)) {
       throw new AccessDeniedException(
           "You are not allowed to create inventory items for other users");
     }
-    // A foreign member's PRIVATE pool is not an on-behalf target on this endpoint. The scope check
-    // above already bounds WHO may be booked for; this bounds WHERE. It matters because the
-    // write-time stock merge (REQ-INV-026) keys on the physical stack identity INCLUDING `personal`
-    // and returns the surviving row: a personal on-behalf create therefore folds the target's own
-    // private rows - amounts, free-text notes, earmarks - into the response, which is stock the
-    // `personal = true` flag exists to keep out of every shared view.
-    //
-    // Deliberately narrow, and it removes no documented flow: the ordinary on-behalf Einbuchen is a
-    // SHARED booking (the dialog's "isGlobal" branch) and is untouched, and the one specified
-    // personal-for-someone-else capability lives in the refinery store dialog (REQ-INV-035), which
-    // goes through storeRefineryOrder and keeps it.
     if (onBehalfOfSomeoneElse && Boolean.TRUE.equals(dto.personal())) {
       throw new AccessDeniedException(
           "You are not allowed to create personal inventory items for other users");
@@ -510,9 +486,6 @@ public class InventoryItemService {
     final Location location =
         Entities.require(locationRepository.findById(dto.locationId()), "Location not found");
 
-    // Service-level belts behind the DTO's @AssertTrue guards: a crafted payload that bypassed
-    // bean validation must 400 here rather than surface the V220 DB CHECKs (catalog XOR,
-    // quality-by-kind) as an opaque 500 at flush time.
     if ((material == null) == (gameItem == null)) {
       throw new BadRequestException("Exactly one of materialId and gameItemId must be set");
     }
@@ -522,7 +495,6 @@ public class InventoryItemService {
     if (gameItem != null && dto.quality() != null) {
       throw new BadRequestException("Game-item stock carries no quality");
     }
-    // Same belt for REQ-INV-031: a game-item row carries no mission dimension.
     if (gameItem != null
         && (dto.missionId() != null
             || (dto.missionAllocations() != null && !dto.missionAllocations().isEmpty()))) {
@@ -531,14 +503,6 @@ public class InventoryItemService {
 
     Boolean isPersonal = dto.personal() != null ? dto.personal() : false;
 
-    // The owning org unit is the eighth dimension of an inventory stack's identity. Resolve it up
-    // front (validating the picker output) so the new row is stamped with the correct org-unit
-    // pool. Inventory is append-only by default: every create inserts its own row and rows that
-    // share the stack identity are grouped only for display (group-on-read, see
-    // aggregateInventoryItems). The scoped exception is the write-time stock merge below
-    // (REQ-INV-026, ADR-0097): a PIECE row (or an SCU row with the per-action opt-in) is folded
-    // into
-    // a matching stack, re-introducing the pessimistic merge lock only on that one path.
     final OrgUnit owningOrgUnit =
         ownerScopeService.resolveOrgUnitForPickerOutputNullable(user, dto.owningOrgUnitId());
 
@@ -551,12 +515,6 @@ public class InventoryItemService {
     item.setQuality(dto.quality());
     item.setAmount(InventoryItem.roundToScuScale(dto.amount()));
     item.setPersonal(isPersonal);
-    // Variante C (REQ-INV-027, R4): split at check-in. The explicit per-dimension allocation lists
-    // take precedence; otherwise the single jobOrderId / missionId writes one full-amount slice
-    // (backward compatible). Guards mirror the per-allocation write endpoints: a personal entry
-    // carries no assignment, a job-order target's material must be one the order needs, no target
-    // twice, PIECE amounts are whole, and per dimension the Σ of the slices must stay within the
-    // entry amount (R5) — else 422.
     List<InventoryAllocationInput> jobAllocations =
         effectiveAllocations(dto.jobOrderAllocations(), dto.jobOrderId(), item.getAmount());
     List<InventoryAllocationInput> missionAllocations =
@@ -565,8 +523,6 @@ public class InventoryItemService {
         && (!jobAllocations.isEmpty() || !missionAllocations.isEmpty())) {
       throw new BadRequestException("Personal items cannot be assigned to a mission or job order");
     }
-    // Whole-unit semantics: PIECE materials and game-item rows (which behave like PIECE,
-    // REQ-INV-029) both restrict allocation slices to whole numbers.
     boolean wholeUnits =
         gameItem != null || (material != null && material.getQuantityType() == QuantityType.PIECE);
     Set<UUID> seenOrders = new HashSet<>();
@@ -578,8 +534,6 @@ public class InventoryItemService {
       JobOrder order =
           Entities.require(
               jobOrderRepository.findById(allocation.targetId()), "JobOrder not found");
-      // Kind dispatch (REQ-ORDERS-018 / REQ-INV-031): a material row is gated on the order's
-      // required materials, a game-item row on the ITEM order's requested game items.
       if (gameItem != null) {
         assertGameItemRequiredByJobOrder(gameItem, order);
       } else {
@@ -614,8 +568,6 @@ public class InventoryItemService {
             .with("personal", item.getPersonal())
             .with("jobOrder", InventoryAuditLabels.jobOrderRef(item))
             .with("mission", InventoryAuditLabels.missionName(item)));
-    // Stock merge (REQ-INV-026): a PIECE row is folded into a matching stack unconditionally; an
-    // SCU row only when the caller ticked the per-action opt-in. Returns the surviving row.
     InventoryItem merged =
         inventoryCheckoutService.mergeStockIfRequested(
             saved, Boolean.TRUE.equals(dto.mergeStock()));
@@ -659,7 +611,6 @@ public class InventoryItemService {
       case JOB_ORDER -> {
         JobOrder jobOrder =
             Entities.require(jobOrderRepository.findById(dto.targetId()), "JobOrder not found");
-        // Kind dispatch (REQ-ORDERS-018 / REQ-INV-031): the gate matches the row's catalog kind.
         if (item.getGameItem() != null) {
           assertGameItemRequiredByJobOrder(item.getGameItem(), jobOrder);
         } else {
@@ -1137,10 +1088,7 @@ public class InventoryItemService {
     String normalizedNote = StringNormalization.trimToNull(request.note());
     item.setNote(normalizedNote);
 
-    // saveAndFlush so the response carries the post-increment @Version —
-    // otherwise editing a note right after an association change 409s.
     InventoryItem saved = inventoryItemRepository.saveAndFlush(item);
-    // PII: the note body is user free text — record only its presence/length, never the content.
     auditService.record(
         AuditEventType.INVENTORY_ITEM_NOTE_UPDATED,
         item.getId(),

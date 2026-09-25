@@ -63,7 +63,6 @@ class BackendErrorLoggingTest {
 
   @Test
   void shouldLogStructuredWarnWithoutLeakingRejectedValue() {
-    // Given
     UUID jobOrderId = UUID.fromString("087c5b6e-c143-4358-a5e6-149aa6b02ba7");
     String correlationId = "57410a34-650a-4b9f-a139-aaa02ed8400a";
     BackendServiceException ex =
@@ -76,10 +75,8 @@ class BackendErrorLoggingTest {
             List.of(new BackendServiceException.FieldError("recipientHandle", "must not be blank")),
             "One or more fields have invalid values.");
 
-    // When
     BackendErrorLogging.warn(logger, "POST /api/v1/orders/{id}/handovers", jobOrderId, ex);
 
-    // Then
     assertEquals(1, appender.list.size());
     ILoggingEvent event = appender.list.get(0);
     assertEquals(Level.WARN, event.getLevel());
@@ -91,13 +88,11 @@ class BackendErrorLoggingTest {
     assertTrue(formatted.contains("correlationId=" + correlationId), formatted);
     assertTrue(formatted.contains("recipientHandle"), formatted);
     assertTrue(formatted.contains("must not be blank"), formatted);
-    // PII guard: no raw rejected user value (handles, mails) must ever appear in the log line.
     assertFalse(formatted.contains("secret-pii-handle"), formatted);
   }
 
   @Test
   void shouldOmitContextIdWhenNullOverloadIsUsed() {
-    // Given
     BackendServiceException ex =
         new BackendServiceException(
             "Backend returned 503",
@@ -108,10 +103,8 @@ class BackendErrorLoggingTest {
             List.of(),
             null);
 
-    // When
     BackendErrorLogging.warn(logger, "GET /api/v1/orders", ex);
 
-    // Then
     assertEquals(1, appender.list.size());
     String formatted = appender.list.get(0).getFormattedMessage();
     assertFalse(formatted.contains("contextId="), formatted);

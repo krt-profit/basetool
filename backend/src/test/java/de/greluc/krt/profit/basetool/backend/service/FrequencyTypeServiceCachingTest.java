@@ -197,7 +197,6 @@ class FrequencyTypeServiceCachingTest {
     frequencyTypeService.getFrequencyType(uhf.getId());
     frequencyTypeService.getFrequencyType(vhf.getId());
 
-    // sanity — three distinct entries
     assertNotNull(cache().get(new SimpleKey(null, pageable)));
     assertNotNull(cache().get(new SimpleKey(Boolean.TRUE, pageable)));
     assertNotNull(cache().get(uhf.getId()));

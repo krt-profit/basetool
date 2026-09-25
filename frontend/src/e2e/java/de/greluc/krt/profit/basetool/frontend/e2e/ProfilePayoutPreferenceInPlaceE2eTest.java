@@ -112,9 +112,6 @@ class ProfilePayoutPreferenceInPlaceE2eTest {
         E2eSupport.navigate(page, baseUrl + "/profile");
         page.waitForLoadState();
 
-        // Marker on the live document: a full navigation/reload wipes it, so its survival proves
-        // both saves stayed in place. The position:fixed footer can cover the bottom submit button,
-        // so it is dropped out of the way before the (non-navigating) AJAX clicks.
         page.evaluate("() => { window.__krtNoReload = true; }");
         page.evaluate(
             "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
@@ -124,14 +121,10 @@ class ProfilePayoutPreferenceInPlaceE2eTest {
             page.locator("#profile-payout-form select[name='defaultPayoutPreference']");
         Locator submit = page.locator("#profile-payout-form button[type='submit']");
 
-        // Pick the two distinct values: start from whatever is selected, flip to the other, then
-        // back. The enum has exactly two members (PAYOUT, DONATE), so alternating them guarantees a
-        // real change — and therefore a real @Version bump — on each of the two saves.
         String initial = select.inputValue();
         String firstTarget = "PAYOUT".equals(initial) ? "DONATE" : "PAYOUT";
         String secondTarget = initial.isBlank() ? "PAYOUT" : initial;
 
-        // First in-place save: a genuinely different value.
         select.selectOption(new SelectOption().setValue(firstTarget));
         saveInPlace(page, submit);
         assertEquals(
@@ -141,9 +134,6 @@ class ProfilePayoutPreferenceInPlaceE2eTest {
         assertEquals(
             firstTarget, persistedPayoutPreference(), "the first in-place save must persist");
 
-        // Second consecutive in-place save WITHOUT a reload, to the other value: only succeeds if
-        // the twin wrote the fresh @Version back (otherwise the stale version 409s
-        // OPTIMISTIC_LOCK).
         select.selectOption(new SelectOption().setValue(secondTarget));
         saveInPlace(page, submit);
         assertEquals(

@@ -108,27 +108,15 @@ public class AuditService {
             .domain(eventType.domain())
             .eventType(eventType)
             .actorUserId(actorId.orElse(null))
-            // Clamp to the actor_handle column width (255), symmetric with subjectLabel — an
-            // over-long effective name must never throw and roll back the business mutation.
             .actorHandle(truncate(actorHandle))
             .subjectId(subjectId)
             .subjectLabel(truncate(subjectLabel))
             .targetUserId(targetUserId)
-            // Persist the rendered payload; a null stays null (no details), any other CharSequence
-            // (an AuditDetails composer or a raw String) is stringified byte-identically.
             .details(details == null ? null : details.toString())
-            // Read at write time from the SAME authentication the actor came from, so the two
-            // halves of "who, through what" can never describe different requests. Always a
-            // value, never null: a caller with no token records `none`, which the row's `system`
-            // actor handle then distinguishes from the token-with-no-azp case (REQ-AUDIT-005).
             .clientId(
                 clientAttribution.labelOf(authHelperService.currentAuthentication().orElse(null)))
             .build();
     AuditEvent saved = auditEventRepository.save(event);
-    // Per-domain audited-mutation counter (REQ-OBS-011). The domain is the bounded AuditDomain
-    // derived from the event type — never subjectLabel/details, which can carry free text/PII.
-    // Incremented after a successful save; a later rollback in the same transaction is not undone
-    // (standard for a non-transactional counter), an accepted minor drift.
     meterRegistry
         .counter(MetricNames.AUDIT_EVENTS, MetricNames.TAG_DOMAIN, eventType.domain().name())
         .increment();

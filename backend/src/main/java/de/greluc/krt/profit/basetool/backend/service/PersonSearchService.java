@@ -139,29 +139,13 @@ public class PersonSearchService {
     }
 
     Query query = entityManager.createNativeQuery(buildSql());
-    // The term is a bound parameter; only the identifiers are interpolated, and those are validated
-    // against SAFE_IDENTIFIER while the SQL is assembled.
-    // LikePatterns.contains is exactly "%" + escape(x) + "%", and it is what every other
-    // substring search in this codebase already binds (BlueprintService, HangarService,
-    // LocationService, MaterialService, MissionService, OperationService, UserService). A private
-    // copy of the escape chain here would be one more place for the set of escaped characters to
-    // drift from the rest.
     query.setParameter("term", LikePatterns.contains(trimmed));
-    // The same term unwrapped, for `position` in the snippet window. Bound separately rather than
-    // trimming the wildcards off in SQL: the escaped form is what ILIKE needs and the literal form
-    // is what position needs, and deriving one from the other in SQL would be the kind of
-    // cleverness
-    // that stops being obviously correct.
     query.setParameter("term_plain", trimmed);
-    // One past the overall cap, plus room for one probe row per target: the probes are consumed
-    // while counting and never shown, so they must not push a real hit out of the window.
     query.setMaxResults(TOTAL_LIMIT + 1 + PersonSearchTargets.TARGETS.size());
 
     List<?> rows = query.getResultList();
     boolean truncated = rows.size() > TOTAL_LIMIT;
     List<PersonSearchHitDto> hits = new ArrayList<>();
-    // Per column, because each branch asked for one row more than it is allowed to return: a
-    // branch that comes back with PER_TARGET_LIMIT + 1 rows has more the admin is not being shown.
     Map<String, Integer> perColumn = new LinkedHashMap<>();
     Set<String> capped = new LinkedHashSet<>();
 
@@ -170,7 +154,6 @@ public class PersonSearchService {
       String column = cells[1] + "." + cells[2];
       int seen = perColumn.merge(column, 1, Integer::sum);
       if (seen > PER_TARGET_LIMIT) {
-        // The probe row. Not shown, and its only job is to prove there is more.
         capped.add(column);
         continue;
       }
@@ -254,12 +237,6 @@ public class PersonSearchService {
           .append("CAST(")
           .append(t.idColumn())
           .append(" AS text) AS row_id, ")
-          // A window around the match rather than the value's first 200 characters. A prefix
-          // routinely did not contain the name the admin searched for -- the one part of a long
-          // note they need to see to decide whether the hit is the person they mean -- so they had
-          // to open the row to find out. `position` is computed on the lower-cased pair, matching
-          // the ILIKE, and greatest(1, ...) keeps substring's one-based start legal when the match
-          // sits near the beginning.
           .append("substring(")
           .append(t.column())
           .append(", greatest(1, position(lower(:term_plain) in lower(")
@@ -276,22 +253,12 @@ public class PersonSearchService {
           .append(" WHERE ")
           .append(t.column())
           .append(" ILIKE :term")
-          // Deterministic inside the branch, and one row past the cap. Without the ORDER BY it was
-          // unspecified WHICH 25 of 40 matches came back -- so the same search could return
-          // different rows on two runs, on a surface an admin uses to decide whether a name still
-          // appears anywhere. Without the extra row the cap was invisible: 25 hits look identical
-          // whether there were 25 matches or 400.
           .append(" ORDER BY ")
           .append(t.idColumn())
           .append(" LIMIT ")
           .append(PER_TARGET_LIMIT + 1)
           .append(')');
     }
-    // A deterministic order for the outer LIMIT. Without one, which hits survive the 300-row cap
-    // is whatever order the Append node happens to produce -- stable enough under a serial plan to
-    // look reliable, and not stable under a Parallel Append. An admin re-running the same search
-    // and seeing a different 300 rows has no way to tell a plan change from a data change, on a
-    // surface whose whole purpose is to be complete. The order is also the one the page groups by.
     sql.append(" ORDER BY area, src_table, src_column, row_id");
     return sql.toString();
   }

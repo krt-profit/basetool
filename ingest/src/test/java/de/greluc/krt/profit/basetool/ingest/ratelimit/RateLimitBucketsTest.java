@@ -54,13 +54,10 @@ class RateLimitBucketsTest {
 
   @Test
   void evictsTheLeastRecentlyUsedKeyRatherThanTheOldestInsert() {
-    // Access ordering is what keeps a steadily-active caller's bucket alive while a flood of
-    // one-shot keys churns through the map.
     Map<String, Bucket> buckets = RateLimitBuckets.boundedLru(2);
     buckets.computeIfAbsent("steady", key -> bucket());
     buckets.computeIfAbsent("other", key -> bucket());
 
-    // Touch "steady" so "other" becomes the eldest by access order, then force one eviction.
     buckets.get("steady");
     buckets.computeIfAbsent("newcomer", key -> bucket());
 

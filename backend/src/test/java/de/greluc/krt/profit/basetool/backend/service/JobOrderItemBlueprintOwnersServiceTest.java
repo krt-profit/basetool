@@ -78,8 +78,6 @@ class JobOrderItemBlueprintOwnersServiceTest {
 
   @BeforeEach
   void setUp() {
-    // Wire the service by hand (not @InjectMocks) so the real variant-family resolver drives the
-    // family matching end-to-end; constructed here, after Mockito has populated the mocks.
     service =
         new JobOrderItemBlueprintOwnersService(
             jobOrderRepository,
@@ -170,16 +168,11 @@ class JobOrderItemBlueprintOwnersServiceTest {
 
   @Test
   void groupsOwnersAndCountsCoverage_matchingByVariantFamily() {
-    // Two required items; the blueprint output names are deliberately messy (extra spacing, case)
-    // so
-    // the run exercises the normalizer. The required display label comes from the requested game
-    // item, while each owner's tag shows the concrete blueprint they actually own.
     JobOrder order =
         order(item("Aurora   MR", "Aurora MR Ship"), item("Cutlass Black", "Cutlass Black Ship"));
     when(jobOrderRepository.findByIdWithItemBlueprints(ORDER_ID)).thenReturn(Optional.of(order));
     when(orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_ID)))
         .thenReturn(Set.of(ALICE, BERND));
-    // Alice owns both required products; Bernd owns only Aurora.
     when(personalBlueprintRepository.findOwnerProductByOwnerUserIdIn(any()))
         .thenReturn(
             List.of(
@@ -191,7 +184,6 @@ class JobOrderItemBlueprintOwnersServiceTest {
 
     JobOrderItemBlueprintOwnersDto result = service.getBlueprintOwners(ORDER_ID);
 
-    // Coverage: Aurora owned by 2, Cutlass by 1. Sorted by display name (Aurora < Cutlass).
     List<JobOrderRequiredBlueprintDto> coverage = result.requiredBlueprints();
     assertEquals(2, coverage.size());
     assertEquals("Aurora MR Ship", coverage.get(0).productName());
@@ -201,8 +193,6 @@ class JobOrderItemBlueprintOwnersServiceTest {
     assertEquals("Cutlass Black Ship", coverage.get(1).productName());
     assertEquals(1, coverage.get(1).ownerCount());
 
-    // Owners: person-centric, sorted by name; the owned-product list uses the member's actual owned
-    // blueprint names.
     List<JobOrderBlueprintOwnerDto> owners = result.owners();
     assertEquals(2, owners.size());
     assertEquals("Alice", owners.get(0).ownerName());
@@ -213,7 +203,6 @@ class JobOrderItemBlueprintOwnersServiceTest {
 
   @Test
   void countsVariantsInBothDirections_andExcludesMagazines() {
-    // The order requires a BASE item (Fresnel Energy LMG) and a VARIANT item (Novian "Wildshot").
     JobOrder order =
         order(
             item("Fresnel Energy LMG", "Fresnel Energy LMG"),
@@ -224,13 +213,9 @@ class JobOrderItemBlueprintOwnersServiceTest {
     when(personalBlueprintRepository.findOwnerProductByOwnerUserIdIn(any()))
         .thenReturn(
             List.of(
-                // Alice owns a DIFFERENT variant of the required base -> counts toward Fresnel.
                 owned(ALICE, "Fresnel \"Molten\" Energy LMG"),
-                // Bernd owns the BASE of the required variant + that weapon's magazine -> counts
-                // toward Novian via the base, but the magazine must not appear in his tags.
                 owned(BERND, "Novian Crossbow"),
                 owned(BERND, "Novian Bolt Magazine (5 Cap)"),
-                // Carla owns only a magazine of the Fresnel -> must NOT be counted at all.
                 owned(CARLA, "Fresnel Energy LMG Magazine (200 cap)")));
     when(userRepository.findAllById(any()))
         .thenReturn(List.of(user(ALICE, "Alice"), user(BERND, "Bernd")));
@@ -246,7 +231,6 @@ class JobOrderItemBlueprintOwnersServiceTest {
     assertEquals("Novian \"Wildshot\" Crossbow", novian.productName(), "ordered name is preserved");
     assertEquals(1, novian.ownerCount(), "the base-owner Bernd counts toward the ordered variant");
 
-    // Carla (magazine only) is absent; Bernd's magazine is not surfaced.
     assertEquals(2, result.owners().size());
     JobOrderBlueprintOwnerDto bernd =
         result.owners().stream()
@@ -257,10 +241,6 @@ class JobOrderItemBlueprintOwnersServiceTest {
     assertTrue(result.owners().stream().noneMatch(o -> o.ownerName().equals("Carla")));
   }
 
-  // covers REQ-ORDERS-021 — with the per-order toggle OFF, coverage matches blueprints EXACTLY: a
-  // member owning a DIFFERENT variant of an ordered base, or the base of an ordered variant, is no
-  // longer counted; only owners of the exact ordered blueprint count, and no row is
-  // variant-inclusive.
   @Test
   void withoutVariants_countsOnlyTheExactOrderedBlueprint() {
     JobOrder order =
@@ -273,21 +253,14 @@ class JobOrderItemBlueprintOwnersServiceTest {
     when(personalBlueprintRepository.findOwnerProductByOwnerUserIdIn(any()))
         .thenReturn(
             List.of(
-                // Alice owns a DIFFERENT variant of the ordered base -> with variants OFF, excluded
-                // (in variant mode she WOULD count toward Fresnel).
                 owned(ALICE, "Fresnel \"Molten\" Energy LMG"),
-                // Bernd owns the EXACT ordered base -> counts.
                 owned(BERND, "Fresnel Energy LMG"),
-                // Carla owns the EXACT ordered variant -> counts (the base would NOT, in this
-                // mode).
                 owned(CARLA, "Novian \"Wildshot\" Crossbow")));
     when(userRepository.findAllById(any()))
         .thenReturn(List.of(user(BERND, "Bernd"), user(CARLA, "Carla")));
 
     JobOrderItemBlueprintOwnersDto result = service.getBlueprintOwners(ORDER_ID);
 
-    // The exact key keeps the variant quote, unlike the family key (which would be "novian
-    // crossbow").
     JobOrderRequiredBlueprintDto fresnel = coverageFor(result, "fresnel energy lmg");
     assertEquals(
         1, fresnel.ownerCount(), "only the exact-base owner counts, not the variant owner");
@@ -296,7 +269,6 @@ class JobOrderItemBlueprintOwnersServiceTest {
     assertEquals(1, novian.ownerCount(), "only the exact-variant owner counts");
     assertFalse(novian.variantInclusive());
 
-    // Alice (different variant) is not listed; only the two exact owners are.
     assertEquals(
         List.of("Bernd", "Carla"),
         result.owners().stream().map(JobOrderBlueprintOwnerDto::ownerName).toList());
@@ -310,10 +282,7 @@ class JobOrderItemBlueprintOwnersServiceTest {
         .thenReturn(Set.of(ALICE, BERND));
     when(personalBlueprintRepository.findOwnerProductByOwnerUserIdIn(any()))
         .thenReturn(
-            List.of(
-                owned(ALICE, "Karna Rifle Battery (35 cap)"),
-                // The weapon does NOT fulfil a magazine order.
-                owned(BERND, "Karna Rifle")));
+            List.of(owned(ALICE, "Karna Rifle Battery (35 cap)"), owned(BERND, "Karna Rifle")));
     when(userRepository.findAllById(any())).thenReturn(List.of(user(ALICE, "Alice")));
 
     JobOrderItemBlueprintOwnersDto result = service.getBlueprintOwners(ORDER_ID);
@@ -340,7 +309,6 @@ class JobOrderItemBlueprintOwnersServiceTest {
 
     JobOrderRequiredBlueprintDto idris = coverageFor(result, "idris");
     assertEquals(0, idris.ownerCount());
-    // Only Alice (who owns a required product) is listed; she does not own Idris.
     assertEquals(1, result.owners().size());
     assertEquals(List.of("Aurora MR"), result.owners().get(0).ownedProductNames());
   }
@@ -351,7 +319,6 @@ class JobOrderItemBlueprintOwnersServiceTest {
     when(jobOrderRepository.findByIdWithItemBlueprints(ORDER_ID)).thenReturn(Optional.of(order));
     when(orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_ID)))
         .thenReturn(Set.of(ALICE, BERND));
-    // Alice owns the required product; Bernd owns only something unrelated.
     when(personalBlueprintRepository.findOwnerProductByOwnerUserIdIn(any()))
         .thenReturn(List.of(owned(ALICE, "Aurora MR"), owned(BERND, "Gladius")));
     when(userRepository.findAllById(any())).thenReturn(List.of(user(ALICE, "Alice")));
@@ -393,16 +360,12 @@ class JobOrderItemBlueprintOwnersServiceTest {
     verify(personalBlueprintRepository, never()).findOwnerProductByOwnerUserIdIn(any());
   }
 
-  // covers REQ-INV-018 — a user who opted into global sharing is counted in the order's coverage
-  // and listed as an owner even when they are NOT a member of the responsible org unit; the service
-  // unions their sub into the owner-set passed to the blueprint lookup.
   @Test
   void globalSharerOutsideResponsibleOrgUnit_isCountedAndListed() {
     JobOrder order = order(item("Aurora MR", "Aurora MR Ship"));
     when(jobOrderRepository.findByIdWithItemBlueprints(ORDER_ID)).thenReturn(Optional.of(order));
     when(orgUnitMembershipRepository.findDistinctUserIdsByOrgUnitIdIn(Set.of(ORG_ID)))
         .thenReturn(Set.of(ALICE));
-    // CARLA is not a member of the responsible org unit but opted into global sharing.
     when(userRepository.findIdsBySharingBlueprintsGlobally()).thenReturn(Set.of(CARLA));
     ArgumentCaptor<Collection<UUID>> ownerUserIds = ArgumentCaptor.captor();
     when(personalBlueprintRepository.findOwnerProductByOwnerUserIdIn(ownerUserIds.capture()))
@@ -418,16 +381,12 @@ class JobOrderItemBlueprintOwnersServiceTest {
     assertEquals(
         List.of("Alice", "Carla"),
         result.owners().stream().map(JobOrderBlueprintOwnerDto::ownerName).toList());
-    // ALICE is a member of the responsible org unit; CARLA appears only via global sharing, so she
-    // is flagged not-a-member for the discreet UI hint.
     JobOrderBlueprintOwnerDto alice = ownerByName(result, "Alice");
     JobOrderBlueprintOwnerDto carla = ownerByName(result, "Carla");
     assertTrue(alice.orgUnitMember(), "the responsible-unit member is flagged a member");
     assertFalse(carla.orgUnitMember(), "the global sharer is flagged not-a-member");
   }
 
-  // covers REQ-INV-018 — a user who is neither a member of the responsible org unit nor a global
-  // sharer is never counted: the global-sharer union is empty, so the owner-set is members-only.
   @Test
   void nonMemberNonSharer_isNotCounted() {
     JobOrder order = order(item("Aurora MR", "Aurora MR Ship"));

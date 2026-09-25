@@ -90,7 +90,6 @@ class AuditReportServiceTest {
 
   @Test
   void export_rendersEventsAndRecordsExportEvent() throws IOException {
-    // Given
     lenient()
         .when(messageSource.getMessage(any(String.class), isNull(), eq(Locale.GERMAN)))
         .thenAnswer(invocation -> invocation.getArgument(0));
@@ -108,12 +107,8 @@ class AuditReportServiceTest {
     when(auditEventRepository.findForExport(AuditDomain.INVENTORY, from, to))
         .thenReturn(List.of(event));
 
-    // When
     byte[] pdf = auditReportService.generateAuditLogPdf(AuditDomain.INVENTORY, from, to, null);
 
-    // Then
-    // Strip whitespace: a narrow table cell wraps a long token across lines in the rendered PDF,
-    // so the raw extracted text breaks mid-word (e.g. "INVENTORY_ITEM_C\nREATED").
     String compact = extractText(pdf).replaceAll("\\s+", "");
     assertTrue(compact.contains("INVENTORY_ITEM_CREATED"), "raw event code present");
     assertTrue(compact.contains("logi_jo"), "actor handle present");
@@ -124,7 +119,6 @@ class AuditReportServiceTest {
 
   @Test
   void exportJson_mapsEventsAndRecordsExportEvent() {
-    // Given
     Instant from = Instant.now().minus(1, ChronoUnit.HOURS);
     Instant to = Instant.now().plus(1, ChronoUnit.HOURS);
     AuditEvent event =
@@ -148,11 +142,9 @@ class AuditReportServiceTest {
         .thenReturn(List.of(event));
     when(auditEventMapper.toDto(event)).thenReturn(dto);
 
-    // When
     List<AuditEventDto> result =
         auditReportService.generateAuditLogJson(AuditDomain.JOB_ORDER, from, to);
 
-    // Then
     org.junit.jupiter.api.Assertions.assertEquals(List.of(dto), result);
     verify(auditService)
         .record(eq(AuditEventType.JOB_ORDER_AUDIT_EXPORTED), isNull(), isNull(), isNull(), any());
@@ -172,11 +164,9 @@ class AuditReportServiceTest {
 
   @Test
   void export_rejectsOversizedPeriod() {
-    // Given a period that would load more than the export cap (100k) into memory.
     Instant from = Instant.now().minus(1, ChronoUnit.HOURS);
     Instant to = Instant.now().plus(1, ChronoUnit.HOURS);
 
-    // Then both formats reject it before the unpaged fetch (guards against OOM).
     when(auditEventRepository.countForExport(AuditDomain.INVENTORY, from, to)).thenReturn(100_001L);
     assertThrows(
         BadRequestException.class,
@@ -190,9 +180,6 @@ class AuditReportServiceTest {
 
   @Test
   void export_acceptsExactlyTheCapRowCount() {
-    // Boundary: the guard is count > MAX_EXPORT_ROWS, so EXACTLY the cap (100_000) must be
-    // ACCEPTED.
-    // A >→>= regression would reject it; this pins the inclusive edge.
     lenient()
         .when(messageSource.getMessage(any(String.class), isNull(), eq(Locale.GERMAN)))
         .thenAnswer(invocation -> invocation.getArgument(0));
@@ -201,7 +188,6 @@ class AuditReportServiceTest {
     when(auditEventRepository.countForExport(AuditDomain.REFINERY, from, to)).thenReturn(100_000L);
     when(auditEventRepository.findForExport(AuditDomain.REFINERY, from, to)).thenReturn(List.of());
 
-    // Does not throw — it renders the (empty) document and records the export.
     byte[] pdf = auditReportService.generateAuditLogPdf(AuditDomain.REFINERY, from, to, null);
     org.junit.jupiter.api.Assertions.assertNotNull(pdf);
     verify(auditService)
@@ -211,7 +197,6 @@ class AuditReportServiceTest {
   @ParameterizedTest
   @EnumSource(AuditDomain.class)
   void export_recordsDomainSpecificExportEventType(AuditDomain domain) {
-    // Given an empty period so every arm renders without needing per-domain fixtures.
     lenient()
         .when(messageSource.getMessage(any(String.class), isNull(), eq(Locale.GERMAN)))
         .thenAnswer(invocation -> invocation.getArgument(0));
@@ -220,11 +205,8 @@ class AuditReportServiceTest {
     when(auditEventRepository.countForExport(domain, from, to)).thenReturn(0L);
     when(auditEventRepository.findForExport(domain, from, to)).thenReturn(List.of());
 
-    // When
     auditReportService.generateAuditLogPdf(domain, from, to, null);
 
-    // Then the export is recorded under this domain's own *_AUDIT_EXPORTED type — pins all 9 arms
-    // and forces a new enum constant to gain both a production arm and a test mapping.
     AuditEventType expected = EXPECTED_EXPORT_TYPE.get(domain);
     org.junit.jupiter.api.Assertions.assertNotNull(
         expected, "no expected export event type mapped for domain " + domain);

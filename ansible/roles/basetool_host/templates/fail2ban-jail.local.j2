@@ -1,47 +1,23 @@
 {{ ansible_managed | comment }}
-#
-# Intrusion prevention for the one service this host exposes to the internet besides the edge: SSH.
-# Only the sshd jail is enabled. A web jail on the edge would read an access log whose client
-# addresses arrive through a PROXY header, and a jail that can be fed its own input is a jail that
-# can be made to ban someone else.
-#
-# The bans are written into firewalld, which 65-firewall.yml has already configured as default-deny
-# before this file is delivered.
 
 [DEFAULT]
-# firewalld is the packet filter on this host, so the ban has to go there rather than into raw
-# nftables -- two tools writing the same table is how a ban survives its unban.
 banaction = firewallcmd-rich-rules
 banaction_allports = firewallcmd-rich-rules
 
-# Read from the JOURNAL, not from a file. RHEL's sshd logs to the journal first and to
-# /var/log/secure through rsyslog, so the journal is the earlier and more complete source, and it
-# does not depend on rsyslog's own configuration staying the way we expect.
 backend = systemd
 
-# Never ban the machine itself or the networks this host is administered from. An SSH jail that can
-# lock out the only way in is a denial of service with extra steps; the list is a variable so a host
-# can add its management network without this template knowing anything about it.
 ignoreip = {{ basetool_host_fail2ban_ignoreip | join(' ') }}
 
 maxretry = {{ basetool_host_fail2ban_maxretry }}
 findtime = {{ basetool_host_fail2ban_findtime }}
 bantime  = {{ basetool_host_fail2ban_bantime }}
 
-# Escalating bans. A scanner that comes back after its first ban is not a mistyped password, and the
-# repeat is what the escalation is for: the ban time is multiplied on each recidive up to the
-# maximum below, and the record of who has been banned before survives a fail2ban restart.
 bantime.increment = true
 bantime.factor    = 2
 bantime.maxtime   = {{ basetool_host_fail2ban_maxtime }}
 
-# Both families. The host answers on IPv6 and a v6-only scanner would otherwise be unbannable.
 allowipv6 = auto
 
-# The log the shipper reads. config.alloy tails /hostlog/fail2ban.log for the `host-fail2ban`
-# stream -- the ban and unban lines, WITH the offending client IP, under the deliberate 31-day
-# retention of REQ-OBS-007/-010. SYSLOG would put them in /var/log/messages instead, where no stream
-# looks and where they would be mixed with everything else the host says.
 logtarget = /var/log/fail2ban.log
 loglevel  = INFO
 

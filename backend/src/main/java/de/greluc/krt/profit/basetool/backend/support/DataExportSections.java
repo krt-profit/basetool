@@ -117,9 +117,6 @@ public final class DataExportSections {
               SELECT terms_version, accepted_at
               FROM terms_acceptance WHERE user_id = :userId ORDER BY accepted_at
               """),
-          // The decision and its reason are an assessment OF the member, so Art. 15 covers them and
-          // they must be disclosed. The deciding admin is NOT selected: who decided is that admin's
-          // data, and the member's right is to their own.
           new Section(
               "registrationDecisions",
               ART_15,
@@ -232,8 +229,6 @@ public final class DataExportSections {
                      planned_end_time, created_at
               FROM mission WHERE owner_id = :userId ORDER BY created_at
               """),
-          // The mission's OTHER participants are not selected at all: this returns the requester's
-          // own row and the mission it belongs to, and nothing about who else was there.
           new Section(
               "missionParticipations",
               ART_15_20,
@@ -302,8 +297,6 @@ public final class DataExportSections {
                      posted_at, created_at
               FROM material_exchange_request WHERE owner_id = :userId ORDER BY created_at
               """),
-          // The OFFER's owner is deliberately not selected: an interest pairs the requester with a
-          // counterparty, and the counterparty is somebody else.
           new Section(
               "marketInterests",
               ART_15_20,
@@ -314,9 +307,6 @@ public final class DataExportSections {
               FROM material_exchange_interest i JOIN material_exchange_offer o ON o.id = i.offer_id
               WHERE i.interested_user_id = :userId ORDER BY i.created_at
               """),
-          // bank_holder is the bank's GLOBAL custodian registry -- one row per player, not one per
-          // account (V151). So this reports the member's registry entry; the per-account rights are
-          // the grants below.
           new Section(
               "bankHolderRegistration",
               ART_15,
@@ -334,8 +324,6 @@ public final class DataExportSections {
               FROM bank_account_view_grant g JOIN bank_account a ON a.id = g.account_id
               WHERE g.grantee_user_id = :userId ORDER BY g.created_at
               """),
-          // The member as the counterparty of a booking. `initiated_by` is NOT selected: the bank
-          // employee who booked it is a third party.
           new Section(
               "bankBookingsAsCounterparty",
               ART_15,
@@ -345,7 +333,6 @@ public final class DataExportSections {
               SELECT type, note, justification, transfer_fee, created_at
               FROM bank_transaction WHERE counterparty_user_id = :userId ORDER BY created_at
               """),
-          // Requests the member raised. The decider and the counterparty are not selected.
           new Section(
               "bankRequestsRaised",
               ART_15_20,
@@ -355,9 +342,6 @@ public final class DataExportSections {
               SELECT type, amount, note, justification, status, created_at, decided_at
               FROM bank_booking_request WHERE requested_by = :userId ORDER BY created_at
               """),
-          // Actions the member performed. actor_handle is the requester's own and redundant;
-          // subject_label is NOT the non-personal label REQ-AUDIT-001 advertises -- see the class
-          // note -- so it is not selected either.
           new Section(
               "auditActionsByMember",
               ART_15,
@@ -368,9 +352,6 @@ public final class DataExportSections {
               SELECT occurred_at, domain, event_type, client_id
               FROM audit_event WHERE actor_user_id = :userId ORDER BY occurred_at
               """),
-          // Actions performed ON the member. Neither actor_handle nor subject_label is selected
-          // -- the acting admin is another person, and this is the section where that distinction
-          // matters most.
           new Section(
               "auditActionsOnMember",
               ART_15,
@@ -435,41 +416,24 @@ public final class DataExportSections {
    */
   public static final Map<String, Set<String>> FREE_TEXT_COLUMNS =
       Map.ofEntries(
-          // The member's own prose about themselves. NOT username / display_name / email /
-          // discord_guild_nickname: those are the subject's own identity, the scrubber cannot
-          // improve them, and substituting inside them is the corruption this registry exists to
-          // stop.
           Map.entry("account", Set.of("description")),
-          // An administrator's written assessment of the member, which may name the admin's source.
           Map.entry("registrationDecisions", Set.of("reason")),
           Map.entry("deletionRequests", Set.of("decision_note")),
           Map.entry("warehouseContributions", Set.of("note")),
-          // ship.name, chosen by the member.
           Map.entry("hangar", Set.of("name")),
           Map.entry("personalInventory", Set.of("name", "note")),
           Map.entry("personalBlueprints", Set.of("note")),
-          // notification.params is a serialised key/value payload, and one of the keys is a handle:
-          // AccountDeletionRequestedEvent puts the requesting member's name in it. Replacing a name
-          // inside a JSON string value leaves the document parseable, so this one is safe to scrub
-          // and unsafe to leave.
           Map.entry("notifications", Set.of("params")),
-          // notification_rule.description, written by an administrator who may well describe a rule
-          // by the member it targets.
           Map.entry("notificationRuleTargets", Set.of("rule")),
           Map.entry("missionsOwned", Set.of("name", "description", "meeting_point")),
           Map.entry("missionParticipations", Set.of("mission", "comment")),
-          // The same mission.name column as its two siblings; leaving it unscrubbed here was an
-          // inconsistency rather than a decision.
           Map.entry("missionsManaged", Set.of("mission")),
           Map.entry("jobOrderAssignments", Set.of("note")),
           Map.entry("marketOffers", Set.of("remark")),
           Map.entry("marketRequests", Set.of("remark")),
-          // bank_account.name, chosen by the bank.
           Map.entry("bankAccountGrants", Set.of("account")),
           Map.entry("bankBookingsAsCounterparty", Set.of("note", "justification")),
           Map.entry("bankRequestsRaised", Set.of("note", "justification")),
-          // org_chart_position.name / display_name: a position the member holds, but a placeholder
-          // row can carry somebody else's name.
           Map.entry("orgChartPositions", Set.of("name", "display_name")));
 
   /**

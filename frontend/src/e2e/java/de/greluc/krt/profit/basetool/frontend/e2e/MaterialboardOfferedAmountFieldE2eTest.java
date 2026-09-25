@@ -105,8 +105,6 @@ class MaterialboardOfferedAmountFieldE2eTest {
         assertThat(page.locator("#mb-modal"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
 
-        // The offered-amount field is part of the modal and starts disabled until a picker row sets
-        // its ceiling — the partial-offer entry point (REQ-MARKET-002).
         assertThat(page.locator("#mb-modal [data-mb-amount]"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
         assertThat(page.locator("#mb-modal [data-mb-amount]"))

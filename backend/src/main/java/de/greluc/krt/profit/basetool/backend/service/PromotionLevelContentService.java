@@ -171,9 +171,6 @@ public class PromotionLevelContentService {
     assertCallerMayEditCategory(category);
     mapper.updateEntity(entity, request);
     entity.setCategory(category);
-    // saveAndFlush so the flushed @Version reaches the response — the level-content textarea writes
-    // the returned version back onto its data-lc-version attribute in place (no re-swap, unlike the
-    // category/topic paths), so a stale save() version 409s the next consecutive edit.
     PromotionLevelContent saved = repository.saveAndFlush(entity);
     auditService.record(
         AuditEventType.PROMOTION_LEVEL_CONTENT_UPDATED,

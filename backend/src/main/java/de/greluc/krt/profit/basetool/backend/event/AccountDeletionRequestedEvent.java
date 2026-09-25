@@ -54,9 +54,6 @@ public record AccountDeletionRequestedEvent(UUID userId, @Nullable String handle
 
   @Override
   public UUID actorSub() {
-    // The requesting member IS the actor, and excluding them is what the rule's exclude_actor flag
-    // is for. Returning the id lets that flag work; the seeded rule leaves it off, because the
-    // recipients are admins and the member is not among them anyway.
     return userId;
   }
 
@@ -64,7 +61,6 @@ public record AccountDeletionRequestedEvent(UUID userId, @Nullable String handle
   @Unmodifiable
   @Override
   public Map<NotificationContextRole, OrgUnitRef> contextOrgUnits() {
-    // Not org-unit scoped: an erasure request is answered by the controller, not by a squadron.
     return Map.of();
   }
 

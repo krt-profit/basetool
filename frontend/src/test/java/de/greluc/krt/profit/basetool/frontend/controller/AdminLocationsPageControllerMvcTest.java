@@ -110,10 +110,6 @@ class AdminLocationsPageControllerMvcTest {
         .andExpect(content().string(containsString("</html>")));
   }
 
-  // covers the .form-group checkbox regression class (PR #1405) — the page-scoped .form-group
-  // input rule ties the global KRT square-checkbox rule at (0,1,1) and, rendering after
-  // styles.css, would win and stretch any .form-group checkbox/radio into a full-width padded
-  // bar. Pins the :where() exclusion so the page rule can never capture checkbox/radio inputs.
   @Test
   @WithMockUser(roles = "ADMIN")
   void listData_ShouldExcludeCheckboxesFromFormGroupInputRule() throws Exception {
@@ -132,9 +128,6 @@ class AdminLocationsPageControllerMvcTest {
                     ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
   }
 
-  // covers #582 — the toggle-visibility twin (X-Requested-With) flips the hidden flag off a
-  // freshly-read record and returns the persisted LocationDto so the page re-renders the row in
-  // place. The second get() returns the toggled record.
   @Test
   @WithMockUser(roles = "ADMIN")
   void toggleLocationVisibilityAjax_withHeader_returns200WithLocation() throws Exception {
@@ -155,8 +148,6 @@ class AdminLocationsPageControllerMvcTest {
         .andExpect(content().string(containsString("ARC-L1")));
   }
 
-  // covers #582 — a backend optimistic-lock conflict on the PUT is relayed as the backend status
-  // (409) so krtFetch offers the reload-confirm instead of reloading.
   @Test
   @WithMockUser(roles = "ADMIN")
   void toggleLocationVisibilityAjax_backendConflict_relays409() throws Exception {
@@ -176,8 +167,6 @@ class AdminLocationsPageControllerMvcTest {
         .andExpect(status().isConflict());
   }
 
-  // covers #582 — header routing: the same URL WITHOUT the header still hits the classic form
-  // handler and redirects (no-JS fallback preserved).
   @Test
   @WithMockUser(roles = "ADMIN")
   void toggleLocationVisibility_withoutHeader_redirects() throws Exception {

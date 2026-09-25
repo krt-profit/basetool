@@ -524,8 +524,6 @@ public class UexClient {
               etagByEndpoint.put(endpoint, etag);
             }
             UexResponseDto<T> body = response.bodyTo(typeRef);
-            // An empty 2xx body decodes to null; the reactive pipeline completed empty there and
-            // fell through to the same uncounted empty result.
             return body == null
                 ? FetchResult.<T>partial(Collections.emptyList())
                 : unwrapEnvelope(body, resourceLabel);
@@ -573,9 +571,6 @@ public class UexClient {
    */
   private <T> FetchResult<T> unwrapEnvelope(@NotNull UexResponseDto<T> body, String resourceLabel) {
     String status = LogSafe.text(body.status(), MAX_STATUS_LOG_LENGTH);
-    // Absent data is UEX's empty result set, so it cannot carry the verdict — normalise it away and
-    // let `status`, the only field the upstream uses to self-report, decide whether this is a
-    // fault.
     List<T> rows = body.data() == null ? Collections.emptyList() : body.data();
     if (body.status() != null
         && !body.status().isBlank()
@@ -588,8 +583,6 @@ public class UexClient {
           ENVELOPE_STATUS_OK,
           rows.size());
       recordFetchError();
-      // Self-reported trouble: the rows are handed on so upserts still run, but the result cannot
-      // vouch for the endpoint's full contents, so no caller may sweep on it (REQ-DATA-014).
       return FetchResult.partial(rows);
     }
     if (body.data() == null) {
@@ -599,9 +592,6 @@ public class UexClient {
               + " left untouched.",
           resourceLabel,
           status);
-      // A `data: null` under an ok status is UEX saying "nothing matches" — an answer, so this is
-      // a COMPLETE result whose row list happens to be empty (two item categories are really
-      // empty). Only a failure to get an answer at all is incomplete.
       return FetchResult.of(rows);
     }
     log.info(

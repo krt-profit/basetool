@@ -119,9 +119,6 @@ class ActingMemberFilterChainTest {
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value(ActingMemberFilter.CODE_ACTING_MEMBER_REFUSED));
 
-    // Asserted on the code AND the reason, not on the status alone. Three filters in this chain
-    // answer 403 and the request would have been refused downstream anyway (this caller has no
-    // consent row either), so a bare status assertion passes even when THIS guard never ran.
     assertThat(refusals(MetricNames.ON_BEHALF_OF_NOT_A_GATEWAY)).isEqualTo(before + 1);
   }
 
@@ -149,11 +146,6 @@ class ActingMemberFilterChainTest {
     assertThat(refusals(MetricNames.ON_BEHALF_OF_ENDPOINT_NOT_BOUND)).isEqualTo(before + 1);
   }
 
-  // The percent-encoded-path case is NOT here on purpose: MockMvc normalises the path before any
-  // filter sees it, so this level cannot reproduce it — the same limitation TermsAcceptanceAccess-
-  // FilterTest documents for the identical guard. It is covered directly in
-  // ActingMemberFilterPathMatchingTest instead, which drives the filter with a raw request URI.
-
   /**
    * A member with no local account is refused, not created.
    *
@@ -177,8 +169,6 @@ class ActingMemberFilterChainTest {
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value(ActingMemberFilter.CODE_ACTING_MEMBER_REFUSED));
 
-    // Counted as "not live" rather than as its own reason: the answer must not distinguish an
-    // unknown subject from an offboarded one, or the endpoint becomes an enumeration oracle.
     assertThat(refusals(MetricNames.ON_BEHALF_OF_MEMBER_NOT_LIVE)).isEqualTo(before + 1);
   }
 

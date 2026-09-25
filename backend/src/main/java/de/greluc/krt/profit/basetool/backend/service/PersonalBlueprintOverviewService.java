@@ -106,11 +106,6 @@ public class PersonalBlueprintOverviewService {
     if (ownerUserIds.isEmpty()) {
       return new PageImpl<>(List.of(), pageable, 0);
     }
-    // Group owned rows by variant family (not raw product key), so a base item and its cosmetic
-    // variants collapse onto one availability row whose count spans the whole family; magazines
-    // stay
-    // atomic. The row's display label is the case-preserving base name derived from the first-seen
-    // member's blueprint, so a family owned only via a variant still reads as its base.
     Map<String, ProductAggregate> byKey = new LinkedHashMap<>();
     for (BlueprintOwnerProduct bp :
         personalBlueprintRepository.findOwnerProductByOwnerUserIdIn(ownerUserIds)) {
@@ -173,14 +168,9 @@ public class PersonalBlueprintOverviewService {
     List<PersonalBlueprint> owned;
     Set<UUID> memberSubs;
     if (adminAll) {
-      // Admin "all org units" has no single unit to be a member of, so no owner is flagged
-      // external (every owner is in scope by definition).
       memberSubs = Set.of();
       owned = personalBlueprintRepository.findAllByProductKeyIn(productKeys);
     } else {
-      // Union the global sharers (REQ-INV-018) into the oversight member set so an opted-in owner
-      // shows in the drill-down, keeping the owner names consistent with the bumped count. The
-      // oversight members are kept separate so each owner can be flagged member vs global sharer.
       memberSubs = oversightMemberSubs(scope);
       Set<UUID> ownerUserIds = new LinkedHashSet<>(memberSubs);
       ownerUserIds.addAll(globalSharerSubs());
@@ -224,12 +214,8 @@ public class PersonalBlueprintOverviewService {
   private Set<UUID> inScopeOwnerUserIds() {
     ScopePredicate scope = ownerScopeService.currentOversightScope();
     if (scope.adminAllScope()) {
-      // Admin all-scope already spans every owner, so the global-share opt-in adds nothing here.
       return personalBlueprintRepository.findAllDistinctOwnerUserIds();
     }
-    // Union the global sharers (REQ-INV-018) into the oversight member set so an opted-in user is
-    // counted even when no oversight org unit contains them — including the sharer-only case where
-    // the caller's oversight membership set is otherwise empty.
     Set<UUID> subs = new LinkedHashSet<>(oversightMemberSubs(scope));
     subs.addAll(globalSharerSubs());
     return subs;

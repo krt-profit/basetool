@@ -67,9 +67,6 @@ class OtelExporterLogLevelTest {
     LoggerContext context = (LoggerContext) LoggerFactory.getILoggerFactory();
     exporterLogger = context.getLogger(EXPORTER_LOGGER);
     originalLevel = exporterLogger.getLevel();
-    // The test profile does not load the production application.yml's logging levels, so the pin is
-    // applied here explicitly. What is under test is the SEMANTICS of the pin — that WARN is a
-    // threshold and not a demotion — not whether a particular YAML file was read.
     exporterLogger.setLevel(Level.WARN);
   }
 
@@ -80,14 +77,11 @@ class OtelExporterLogLevelTest {
 
   @Test
   void theWarnPinSuppressesInfoChatter() {
-    // The pin's real, residual effect, and the reason it is not dead configuration to be deleted.
     assertFalse(exporterLogger.isInfoEnabled());
   }
 
   @Test
   void theWarnPinDoesNotSuppressError() {
-    // The corrected claim. A threshold of WARN passes ERROR through unchanged — which is why the
-    // 07:24:04Z production line exists at all, and why REQ-OBS-013 no longer says otherwise.
     assertTrue(exporterLogger.isErrorEnabled());
   }
 

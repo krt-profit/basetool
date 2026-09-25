@@ -63,8 +63,6 @@ class ClientAttributionTest {
 
   @Test
   void label_keepsAConfiguredGatewayVerbatimWithoutListingItTwice() {
-    // The gateway list is the deployment's other statement of "a machine client I know". Requiring
-    // it in the metric allowlist as well is the drift that would make a gateway read as `other`.
     gatewayClientIds.add("basetool-ingest");
 
     assertEquals("basetool-ingest", attribution.label("basetool-ingest"));
@@ -77,8 +75,6 @@ class ClientAttributionTest {
 
   @Test
   void label_namesTheAbsentClaimSeparatelyFromTheUnknownOne() {
-    // `none` and `other` mean opposite things: nobody registered that client, versus every client
-    // at once lost its azp (a Keycloak mapper regression). Collapsing them would hide the second.
     assertEquals(MetricNames.CLIENT_ID_NONE, attribution.label(null));
     assertEquals(MetricNames.CLIENT_ID_NONE, attribution.label("   "));
   }
@@ -97,8 +93,6 @@ class ClientAttributionTest {
 
   @Test
   void labelOf_answersForTokenlessAndAbsentAuthenticationsInsteadOfThrowing() {
-    // Both reach this from inside a business transaction (an audit row is written there), so the
-    // only acceptable answer to "no token" is a value -- an exception would roll the mutation back.
     assertEquals(MetricNames.CLIENT_ID_NONE, attribution.labelOf(null));
     assertEquals(
         MetricNames.CLIENT_ID_NONE,

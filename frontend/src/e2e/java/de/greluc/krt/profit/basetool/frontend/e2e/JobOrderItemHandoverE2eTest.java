@@ -117,41 +117,24 @@ class JobOrderItemHandoverE2eTest {
       try {
         createItemOrderForTwoUnits(page, baseUrl, handle);
 
-        // The guest cannot read the queue, but this admin can resolve the new order's id by handle.
         BackendSeeder seeder = new BackendSeeder();
         JsonObject order = seeder.findOrderByHandle(USERNAME, PASSWORD, handle);
         assertNotNull(order, "the created ITEM order must be readable by the admin");
         String id = order.get("id").getAsString();
 
-        // Delivery is gated by manufacture (REQ-ORDERS-025): manufacture both ordered units first
-        // so
-        // the order becomes deliverable. Production consumes linked recipe-material stock, seeded
-        // here
-        // through the API before the item-handover UI flow.
         String locationId =
             seeder.createLocation(USERNAME, PASSWORD, "E2E Item HO Loc " + UUID.randomUUID());
         seeder.manufactureItemOrderLineFully(USERNAME, PASSWORD, id, locationId);
 
-        // REQ-ORDERS-030 baseline: full manufacture booked the two produced units in as game-item
-        // stock auto-earmarked to this order (REQ-INV-032), so the order now carries earmarked item
-        // stock the delivery below must draw down. Read the squadron-wide total of the produced
-        // game
-        // item (same grouped catalog=ITEM endpoint the /inventory/all item view renders from) so
-        // the
-        // before/after delta proves the consumption.
         String gameItemId = orderedGameItemId(seeder, id);
         double stockAfterManufacture = itemStockTotal(seeder, gameItemId);
 
         String detailUrl = baseUrl + "/orders/" + id;
-        // The item-handover controls live in a non-default tab pane (an item order defaults to the
-        // "items" tab), so deeplink straight to the item-handovers tab before asserting or driving
-        // them; the /items/edit route below is a separate page and keeps the bare detail URL.
         String itemHandoverUrl = detailUrl + "?tab=item-handovers";
 
         E2eSupport.navigate(page, itemHandoverUrl);
         assertThat(page.getByTestId("item-handover-open")).isVisible();
 
-        // Partial handover: deliver one of two units. The log-handover button must remain.
         recordItemHandover(page, "1", "E2E Item Recipient A");
         E2eSupport.navigate(page, itemHandoverUrl);
         assertThat(
@@ -160,31 +143,20 @@ class JobOrderItemHandoverE2eTest {
             .isVisible();
         assertThat(page.getByTestId("item-handover-open")).isVisible();
 
-        // REQ-ORDERS-030: the partial delivery of one unit drew exactly one unit out of the order's
-        // earmarked item stock (best-effort consumption), so the squadron-wide total dropped by
-        // one.
         assertEquals(
             stockAfterManufacture - 1.0,
             itemStockTotal(seeder, gameItemId),
             1e-6,
             "the partial item handover must consume one earmarked unit (REQ-ORDERS-030)");
 
-        // Edit freeze: with a handover on record, the item-edit route redirects to the detail page
-        // rather than rendering the editor, so its submit control is never shown.
         E2eSupport.navigate(page, detailUrl + "/items/edit");
         assertThat(page.getByTestId("order-item-submit")).hasCount(0);
 
-        // Completing handover: deliver the last unit; the order auto-completes and the log-handover
-        // button disappears once no line is outstanding.
         E2eSupport.navigate(page, itemHandoverUrl);
         recordItemHandover(page, "1", "E2E Item Recipient B");
         E2eSupport.navigate(page, itemHandoverUrl);
         assertThat(page.getByTestId("item-handover-open")).hasCount(0);
 
-        // REQ-ORDERS-030: the completing delivery drew the last earmarked unit, so the
-        // squadron-wide
-        // total dropped by both produced units and the fully delivered order retains no earmarked
-        // item stock at all — the phantom stock a delivery would leave behind has disappeared.
         assertEquals(
             stockAfterManufacture - 2.0,
             itemStockTotal(seeder, gameItemId),
@@ -216,16 +188,10 @@ class JobOrderItemHandoverE2eTest {
     page.locator("#item-requestingOrgUnitId").selectOption(IRIDIUM_ID);
     page.locator("#item-handle").fill(handle);
 
-    // The item picker is a searchable combobox; open it and take the first offered option, then
-    // wait
-    // until the blueprint auto-selects and the derivation renders the first material's quality
-    // control (the same gate the anonymous item-order flow relies on).
     page.getByTestId("order-item-combobox").first().click();
     page.locator("li[role='option']").first().click();
     page.locator("select[name='items[0].materials[0].quality']").waitFor();
 
-    // Order two units, then wait for the amount-triggered re-derivation to re-render the quality
-    // control before submitting.
     page.locator("input[name='items[0].amount']").fill("2");
     page.locator("select[name='items[0].materials[0].quality']").waitFor();
 
@@ -242,15 +208,11 @@ class JobOrderItemHandoverE2eTest {
    * @param recipient the recipient handle (bound to {@code #itemRecipientHandle})
    */
   private static void recordItemHandover(Page page, String amount, String recipient) {
-    // The button toggles the modal open via the global open-modal-display delegation (no fetch).
     page.getByTestId("item-handover-open").click();
     page.locator("#item-handover-modal .date-part").fill(LocalDate.now().toString());
     page.locator("#item-handover-modal .time-part").fill("12:00");
     page.locator("#itemRecipientHandle").fill(recipient);
     page.locator("input[name='entries[0].amount']").fill(amount);
-    // Submit in place (#575): the item handover swaps the items/handover sections via AJAX instead
-    // of a Post/Redirect/Get. Await the item-handover XHR POST (the delivery commit) rather than a
-    // document navigation that never comes; the caller re-navigates to assert the result.
     page.waitForResponse(
         response ->
             response.url().contains("/item-handovers")

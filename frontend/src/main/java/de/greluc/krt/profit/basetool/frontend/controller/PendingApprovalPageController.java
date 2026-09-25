@@ -124,14 +124,7 @@ public class PendingApprovalPageController {
   @NotNull
   public String pendingApproval(@NotNull Model model, @NotNull HttpServletRequest request) {
     String approvalStatus = readApprovalStatus();
-    // The role-less verdict never comes from approvalStatus — the backend does not send it there
-    // (REQ-SEC-053). It is derived from the 403 the role sync met, and BackendRoleSyncFilter caches
-    // it in the same session attribute the approval verdict uses, which is what routed the caller
-    // here in the first place.
     boolean noRole = BackendRoleSyncFilter.isRoleLess(request.getSession(false));
-    // ...and it must be read BEFORE the ACTIVE redirect, because a role-less account IS approved:
-    // the registration endpoint answers ACTIVE for it, so redirecting on that alone sends the one
-    // caller this page exists for straight back to a dashboard the filter will bounce here again.
     if (STATE_ACTIVE.equals(approvalStatus) && !noRole) {
       BackendRoleSyncFilter.forgetApprovalVerdict(request.getSession(false));
       return "redirect:/";
@@ -181,8 +174,6 @@ public class PendingApprovalPageController {
           backendApiClient.get(REGISTRATION_STATUS_URI, RegistrationStatusDto.class);
       return dto == null ? null : dto.approvalStatus();
     } catch (BackendServiceException e) {
-      // Already logged once at the BackendApiClient boundary (REQ-OBS-001); the poll repeats every
-      // few seconds, so re-logging it here would turn one backend outage into a log storm.
       log.debug("Approval status could not be read; reporting an unknown status.", e);
       return null;
     }

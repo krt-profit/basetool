@@ -71,7 +71,6 @@ class JobOrderItemProductionCreateDtoValidationTest {
     return new JobOrderItemProductionCreateDto(1, 1L, List.of(), List.of(), bookIn);
   }
 
-  // covers REQ-INV-032 (missing bookIn -> 400 validation, the flipped rollout contract)
   @Test
   void missingBookIn_isRejected() {
     Set<ConstraintViolation<JobOrderItemProductionCreateDto>> violations =
@@ -82,7 +81,6 @@ class JobOrderItemProductionCreateDtoValidationTest {
         "a payload without a bookIn block must violate the @NotNull bookIn contract");
   }
 
-  // covers REQ-INV-032 (bookIn.locationId stays required inside the cascaded block)
   @Test
   void bookInWithoutLocation_isRejected() {
     Set<ConstraintViolation<JobOrderItemProductionCreateDto>> violations =
@@ -97,7 +95,6 @@ class JobOrderItemProductionCreateDtoValidationTest {
         "a bookIn block without a locationId must violate the cascaded @NotNull contract");
   }
 
-  // covers REQ-INV-032 (a complete bookIn block passes the boundary validation)
   @Test
   void completeBookIn_isAccepted() {
     Set<ConstraintViolation<JobOrderItemProductionCreateDto>> violations =

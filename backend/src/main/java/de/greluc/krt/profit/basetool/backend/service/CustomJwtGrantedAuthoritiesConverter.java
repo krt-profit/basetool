@@ -285,7 +285,6 @@ public class CustomJwtGrantedAuthoritiesConverter
               .digest(canonical.toString().getBytes(StandardCharsets.UTF_8));
       return HexFormat.of().formatHex(digest);
     } catch (NoSuchAlgorithmException e) {
-      // Every Java platform is required to provide SHA-256 (MessageDigest Javadoc).
       throw new IllegalStateException("SHA-256 is unavailable", e);
     }
   }
@@ -336,26 +335,6 @@ public class CustomJwtGrantedAuthoritiesConverter
    * @return the freshly assembled authorities.
    */
   private Collection<GrantedAuthority> assembleAuthorities(@NonNull Jwt jwt) {
-    // A MACHINE IS NOT A MEMBER (ADR-0129). The ingest gateway authenticates as a Keycloak service
-    // account, which at token level is indistinguishable from a person: a real user with a UUID
-    // `sub` and realm roles. Without this the very first call from the gateway ran the whole
-    // registration flow on it — an app_user row, a PENDING stamp, the default personal blueprints,
-    // and an admin notification "Neue Registrierung wartet auf Freigabe" — and then 403'd the
-    // gateway on its own account. It locked itself out on its first authentication (2026-08-04).
-    //
-    // Keyed on `azp` against the SAME allowlist that already governs the far more dangerous
-    // on-behalf-of decision (ActingMemberFilter), so this adds no new trust: `azp` is a claim
-    // inside a Keycloak-signed token, not something a client can set. Empty allowlist means nobody.
-    //
-    // NOT a realm role: mapRolesTracked silently drops names absent from the local catalogue and
-    // falls back to Guest, so the marker would vanish and the row would be created anyway — and
-    // forgetting the grant in a new realm would fail OPEN. NOT a `service-account-` prefix either:
-    // the `sub` is a UUID, and that prefix lives on `preferred_username`, a renameable display
-    // convention.
-    //
-    // The scheduled Keycloak roster sync needs no equivalent carve-out: measured against Keycloak
-    // 26.7, `GET /admin/realms/{realm}/users` omits service-account users entirely, even though the
-    // user demonstrably exists.
     if (ingestGatewayProperties.isGatewayClient(jwt.getClaimAsString("azp"))) {
       return List.of(new SimpleGrantedAuthority(GATEWAY_AUTHORITY));
     }
@@ -365,15 +344,6 @@ public class CustomJwtGrantedAuthoritiesConverter
         UserReconciliationService.ReconciledUser reconciled =
             userReconciliationService.syncUser(jwt);
 
-        // Epic #720, Track 1 / REQ-SEC-017: a PENDING (or REJECTED) registration is granted NO
-        // authorities, and REQ-SEC-053 refuses an approved account that maps to no role at all.
-        // Both short-circuits live in assembleFor so the acting-member path shares them.
-        //
-        // Authorise with the roles the TOKEN presented, not with the row's. The two are the same
-        // set for every client whose claim is complete; they differ for a partial-scope client,
-        // which is exactly the point (REQ-SEC-036). Reading the row here instead would hand an
-        // administrator using the mobile app the ADMIN authority its token deliberately withheld
-        // -- the row still holds Admin precisely because that path no longer overwrites it.
         return assembleFor(reconciled.user(), reconciled.effectiveRoles());
       } catch (ObjectOptimisticLockingFailureException e) {
         lastLockingFailure = e;
@@ -446,10 +416,6 @@ public class CustomJwtGrantedAuthoritiesConverter
    */
   public Collection<GrantedAuthority> assembleFor(
       @NonNull User user, @NonNull Collection<Role> roles) {
-    // Epic #720, Track 1 / REQ-SEC-017: a PENDING (or REJECTED) registration is granted NO
-    // authorities. The ENTIRE assembly below — realm roles, permissions, membership-derived flat
-    // roles, contextual + cascaded authorities — is short-circuited to a single
-    // ROLE_PENDING_APPROVAL: a pending user is routed to the "waiting for approval" surface.
     if (!user.isApproved()) {
       return List.of(new SimpleGrantedAuthority("ROLE_PENDING_APPROVAL"));
     }
@@ -468,31 +434,8 @@ public class CustomJwtGrantedAuthoritiesConverter
                 })
             .collect(Collectors.toCollection(ArrayList::new));
 
-    // R6.d / Plan D3: source the per-role flags from the user's OrgUnit memberships. Any membership
-    // that carries `is_logistician = true` promotes the caller to the flat ROLE_LOGISTICIAN
-    // authority (same for ROLE_MISSION_MANAGER).
     addMembershipDerivedRoles(user, authorities);
 
-    // REQ-SEC-053 / ADR-0159: an approved account that ends up with NO authority at all is refused,
-    // not admitted with an empty set. Until V239 it was mapped onto the authority-less GUEST role,
-    // which the URL matrix's anonymous families then let through — so "no role" quietly meant "the
-    // guest surface". With that surface gone the empty set would mean something worse: an
-    // authenticated principal that passes every isAuthenticated() gate and fails only the ones that
-    // name a role, which is a per-endpoint accident rather than a decision. ROLE_NO_ROLE is a
-    // marker, not a permission; PendingApprovalAccessFilter turns it into 403 NO_ROLE before a
-    // handler runs.
-    //
-    // <b>The check is on the ASSEMBLED set, not on the incoming role list.</b> A member can hold no
-    // realm role and still be authorised: `addMembershipDerivedRoles` promotes anyone whose OrgUnit
-    // membership carries `is_logistician` or `is_mission_manager`, and those flags live on the
-    // membership rather than in Keycloak. Short-circuiting on `roles.isEmpty()` would have refused
-    // exactly those people — an SK lead with no realm role is a real shape, and the converter's own
-    // tests are full of it.
-    //
-    // It sits in assembleFor rather than on the JWT path so both callers get it: the
-    // resource-server
-    // conversion above, and DatabaseActingMemberAuthorities on the ingest gateway's acting-member
-    // path (ADR-0129), which installs an authentication without inspecting it.
     if (authorities.isEmpty()) {
       return List.of(new SimpleGrantedAuthority(Roles.NO_ROLE_MARKER));
     }
@@ -546,24 +489,9 @@ public class CustomJwtGrantedAuthoritiesConverter
         orgUnitMembershipRepository.findAllByIdUserId(user.getId());
 
     if (memberships.isEmpty()) {
-      // Memberless users (admins, guests) carry no Logistician / MissionManager flag — the V101
-      // column drop made org_unit_membership the single source of truth.
       return;
     }
 
-    // Any functional rank (MembershipRole != MEMBER) is automatically BOTH a logistician AND a
-    // mission manager of its org unit — the rank sits above both within that unit, mirroring how
-    // admin outranks every role and an Officer is logistician + mission manager of their own
-    // squadron (#344). The rank is kind-scoped by the V184 chk_org_unit_membership_role_kind CHECK,
-    // so a squadron rank only ever widens its own Staffel, an SK_LEAD its own SK, and so on.
-    //
-    // Epic #800 / REQ-ROLE-001/002 unifies the former five boolean leadership flags into the rank
-    // enum and extends the "leadership ⊇ logistician + mission manager" principle to the squadron
-    // ranks: a Staffelleiter / Kommandoleiter / stellv. Kommandoleiter / Ensign confers
-    // officer-equivalent reach over its own squadron — never admin — exactly as an SK_LEAD does for
-    // its SK and a Bereichsleitung / OL membership does for its subtree. The flat role is the
-    // back-compat surface for role-only @PreAuthorize gates; the per-unit scoping is applied
-    // separately (contextual authorities below + OwnerScopeService's scope predicate).
     boolean anyLogistician =
         memberships.stream().anyMatch(m -> m.isLogistician() || confersFlatOfficerRole(m));
     boolean anyMissionManager =
@@ -576,16 +504,6 @@ public class CustomJwtGrantedAuthoritiesConverter
       authorities.add(new SimpleGrantedAuthority("ROLE_MISSION_MANAGER"));
     }
 
-    // §6.1 — one contextual authority per (membership, own-unit-officer reach) pair. The per-row
-    // evaluation here is what differentiates this from the flat OR-union above: a user with the
-    // Logistician flag on Staffel A but not on SK B gets a contextual authority for A only,
-    // even though the flat ROLE_LOGISTICIAN was granted by either of them. That distinction is
-    // what callers using @ownerScopeService.hasRoleInOrgUnit(...) need to know about. An SK_LEAD —
-    // and, from epic #800, every squadron rank (Staffelleiter / Kommandoleiter / stellv. / Ensign)
-    // — gets its own unit's contextual LOGISTICIAN + MISSION_MANAGER authorities here too
-    // (own-unit officer ⊇ logistician + mission manager, no cascade). Bereich/OL seats are NOT
-    // minted here: their own-seat contextual authority comes from the cascade below, which already
-    // includes the seat itself.
     for (OrgUnitMembership m : memberships) {
       boolean ownUnitOfficer = confersOwnUnitOfficerReach(m);
       if (m.isLogistician() || ownUnitOfficer) {
@@ -597,13 +515,6 @@ public class CustomJwtGrantedAuthoritiesConverter
       }
     }
 
-    // Epic #692 / REQ-ORG-015 — cascade the contextual authorities down the hierarchy. A
-    // Bereichsleitung member acts as LOGISTICIAN + MISSION_MANAGER in every Staffel/SK below their
-    // Bereich (and in the Bereich itself); an OL member in every org unit. The reachable id set is
-    // resolved by the shared OrgUnitCascadeService so the scope resolver and this converter agree
-    // on exactly which units a leader reaches. Plain Staffel/SK memberships contribute nothing here
-    // (handled by the per-row loop above), so for a caller with no Bereich/OL leadership flag this
-    // set is empty and the authority list is unchanged from the pre-#692 behaviour.
     for (UUID cascadedOrgUnitId : orgUnitCascadeService.cascadedOfficerReach(memberships)) {
       authorities.add(new OrgUnitContextualAuthority("LOGISTICIAN", cascadedOrgUnitId));
       authorities.add(new OrgUnitContextualAuthority("MISSION_MANAGER", cascadedOrgUnitId));

@@ -99,19 +99,12 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("personal-inventory-blueprints"))
         .andExpect(model().attributeExists("blueprints"))
-        // Regression guard (#363): the per-row id placeholder must survive Thymeleaf rendering
-        // verbatim. The previous `__ID__` token was eaten by Thymeleaf preprocessing (`__...__`),
-        // rendering `/blueprints/ID/recipe` and 400-ing every expand/edit/delete. We assert the
-        // bare token (not the full path) because JS inlining escapes the slashes to `\/`.
         .andExpect(content().string(containsString("ID_PLACEHOLDER")));
   }
 
   @Test
   @WithMockUser
   void view_loadsEveryPage_whenOwnedSetExceedsOnePage() throws Exception {
-    // covers REQ-INV-008 / issue #823 — the list must show the caller's COMPLETE owned set, not a
-    // capped first page. The controller pages through the backend until the last page, so a user
-    // with more blueprints than one fetch chunk still sees (and can search/count) all of them.
     PersonalBlueprintDto first =
         new PersonalBlueprintDto(
             UUID.randomUUID(),
@@ -136,16 +129,10 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
             0L,
             Instant.parse("2026-01-01T00:00:00Z"),
             Instant.parse("2026-01-01T00:00:00Z"));
-    // Two pages of one entry each (totalPages = 2): the controller must request both and
-    // concatenate.
     PageResponse<PersonalBlueprintDto> page0 =
         new PageResponse<>(List.of(first), 0, 500, 2, 2, List.of());
     PageResponse<PersonalBlueprintDto> page1 =
         new PageResponse<>(List.of(second), 1, 500, 2, 2, List.of());
-    // Scoped to the page-walk's own URI. A bare anyString() stub hands its sequenced values to
-    // whichever call arrives first, so an unrelated request in the same exchange — the org-unit
-    // switcher advice runs for every controller test — would consume page0 and leave the walk
-    // reading page1 twice.
     when(backendApiClient.get(startsWith("/api/v1/personal-blueprints?"), anyTypeRef()))
         .thenReturn(page0, page1);
 
@@ -160,8 +147,6 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
   @Test
   @WithMockUser
   void view_rendersDeleteAllControl_whenOwnerHasRemovableBlueprints() throws Exception {
-    // covers REQ-INV-023 — the "delete all my blueprints" button (modal trigger) and its danger
-    // confirm modal render when the caller owns at least one removable blueprint.
     PersonalBlueprintDto bp =
         new PersonalBlueprintDto(
             UUID.randomUUID(),
@@ -189,8 +174,6 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
   @Test
   @WithMockUser
   void view_rendersScExtractorReleaseLink_besideTheJsonImportTrigger() throws Exception {
-    // covers REQ-INV-038 — the add bar carries a link to the desktop SC Extractor's latest release
-    // next to the JSON import trigger it feeds, opened in a new tab with a safe rel.
     PersonalBlueprintDto bp =
         new PersonalBlueprintDto(
             UUID.randomUUID(),
@@ -217,8 +200,6 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
                     containsString(
                         "href=\"https://github.com/krt-profit/basetool-sc-extractor/releases/latest\"")))
         .andExpect(content().string(containsString("rel=\"noopener noreferrer\"")))
-        // The link belongs to the page chrome, not the swapped collection fragment, so it must sit
-        // ahead of the swap target in the document.
         .andExpect(
             result -> {
               String html = result.getResponse().getContentAsString();
@@ -231,9 +212,6 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
   @Test
   @WithMockUser
   void view_rendersCraftableOnlyFilter_nextToRefineryToggle() throws Exception {
-    // covers REQ-INV-048 — the "show only craftable" view filter renders as a toggle inside the
-    // craftability toolbar, alongside the refinery fold-in toggle, so a user can narrow the list to
-    // the blueprints they can craft right now.
     PersonalBlueprintDto bp =
         new PersonalBlueprintDto(
             UUID.randomUUID(),
@@ -264,10 +242,6 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
   @Test
   @WithMockUser
   void view_fragmentList_rendersOnlyTheCollectionCardFragment() throws Exception {
-    // The in-place swap target: GET /personal-inventory/blueprints?fragment=list returns just the
-    // blueprintList fragment (the master/detail card) and NOT the surrounding page chrome (the add
-    // bar, the import/edit modals), so a batch add / import / remove can re-render the list without
-    // reloading (REQ-FE-005).
     PersonalBlueprintDto bp =
         new PersonalBlueprintDto(
             UUID.randomUUID(),
@@ -290,17 +264,11 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
         .andExpect(view().name("personal-inventory-blueprints :: blueprintList"))
         .andExpect(content().string(containsString("id=\"krt-bp-master-rows\"")))
         .andExpect(content().string(containsString("id=\"krt-bp-total-meta\"")))
-        // the import modal lives outside the fragment and must not be in the swap body
         .andExpect(
             content()
                 .string(org.hamcrest.Matchers.not(containsString("id=\"krt-bp-import-modal\""))));
   }
 
-  // Regression guard for the frontend-proxy double-encoding sub-class: the blueprint-product
-  // typeahead must forward a multi-word free-text term as a WebClient URI-template variable ({q}),
-  // not URLEncoder it into the URI string, so the backend @RequestParam decodes the exact typed
-  // term. URLEncoder form-encoding (space -> '+') double-encodes across the frontend->backend hop
-  // and yields zero matches.
   @Test
   @WithMockUser
   void search_passesMultiWordQueryAsUriVariable() throws Exception {
@@ -317,10 +285,6 @@ class PersonalInventoryBlueprintsPageControllerMvcTest {
     assertEquals("Arclight Pistol", qCaptor.getValue());
   }
 
-  // Same guard with an umlaut term: "Röhre Größe" encodes to R%C3%B6hre… under URLEncoder, which
-  // the
-  // hop would re-encode to a literal zero-match. As a URI variable the raw term reaches the
-  // backend.
   @Test
   @WithMockUser
   void search_passesUmlautQueryAsUriVariable_notFormEncoded() throws Exception {

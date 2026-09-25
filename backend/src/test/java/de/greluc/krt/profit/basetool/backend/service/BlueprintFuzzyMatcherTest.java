@@ -45,13 +45,11 @@ class BlueprintFuzzyMatcherTest {
             product("calico legs", "Calico Legs"),
             product("arclight pistol", "Arclight Pistol"));
 
-    // Query is a one-character typo of the first candidate.
     List<BlueprintImportSuggestionDto> out =
         matcher.topSuggestions("calico legs tacticl", candidates, 5, 0.5);
 
     assertFalse(out.isEmpty());
     assertEquals("calico legs tactical", out.get(0).productKey());
-    // Scores are sorted descending.
     for (int i = 1; i < out.size(); i++) {
       assertTrue(out.get(i - 1).score() >= out.get(i).score());
     }
@@ -65,18 +63,12 @@ class BlueprintFuzzyMatcherTest {
     List<BlueprintImportSuggestionDto> out =
         matcher.topSuggestions("calico legs tactical", candidates, 5, 0.5);
 
-    // Same word set, different order — Jaccard = 1.0 carries it despite high edit distance.
     assertEquals(1, out.size());
     assertEquals(1.0, out.get(0).score());
   }
 
   @Test
   void topSuggestions_stillCatchesAGermanCapacitySuffixTheV228SeedDidNotCover() {
-    // The safety net the V228 seed's documented known-limit relies on (#1485, REQ-INV-021): an ammo
-    // item added to the catalogue AFTER the one-shot seed gets no alias, so a German client's
-    // "(N Schuss)" spelling falls through to the fuzzy matcher. It must still put the right product
-    // at rank 1 — otherwise the seed's staleness would degrade into an unmatched row rather than
-    // into one manual confirmation.
     List<ResolvedProduct> candidates =
         List.of(
             product("s71 rifle magazine (30 cap)", "S71 Rifle Magazine (30 cap)"),
@@ -88,7 +80,6 @@ class BlueprintFuzzyMatcherTest {
 
     assertFalse(out.isEmpty());
     assertEquals("s71 rifle magazine (30 cap)", out.get(0).productKey());
-    // Comfortably above the 0.5 threshold, so the suggestion is offered rather than dropped.
     assertTrue(out.get(0).score() > 0.7);
   }
 

@@ -1,27 +1,8 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
-<!--/*
-  Shared balance-over-time chart body (REQ-BANK-049), reused by the bank-staff account detail
-  (bank-account-detail.html :: balanceChart) and the org-unit viewer detail
-  (org-unit-bank-account-detail.html :: orgUnitBalanceChart). The enclosing page fragment owns the
-  swap container (#bank-chart-results / #org-unit-bank-chart-results) and the AJAX wiring; this
-  fragment only renders the range selector + the inline SVG line chart from the pre-scaled geometry
-  BankBalanceChart.of(...) put on the model.
-
-  Model contract: `chart` (BankBalanceChart.Chart, may be null/empty), `chartRange` (active range
-  key), `chartRanges` (the ordered range keys), `chartBaseUrl` (the page URL the range links target).
-  Colours come from design-system tokens via the .bank-chart-* CSS classes (bank.css); the x-axis
-  period is conveyed by the range labels, so no SVG text needs the user's time zone.
-*/-->
 <th:block th:fragment="chartBody">
-    <!--/* Range selector (REQ-BANK-049): the active range is an inert span, the others are data-swap
-         links re-rendering only the enclosing chart container in place (bindSwap, history:false). The
-         no-JS fallback follows the link and reloads the page with ?chartRange=. */-->
     <div class="bank-chart-toolbar">
-        <!--/* data-range carries the raw range key for the per-user range persistence in bank.js
-             (REQ-UI-017): the active span is read back as the rendered range and the links are
-             the replay targets on load. */-->
         <div class="bank-chart-ranges" role="group" th:aria-label="#{bank.chart.range.label}">
             <th:block th:each="r : ${chartRanges}">
                 <span th:if="${r == chartRange}" class="bank-chart-range-btn is-active"

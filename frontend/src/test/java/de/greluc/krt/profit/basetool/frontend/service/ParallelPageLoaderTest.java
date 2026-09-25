@@ -52,25 +52,20 @@ class ParallelPageLoaderTest {
 
   @Test
   void loadAsyncPropagatesClientIpToTheWorkerThread() {
-    // Given a client IP bound on the calling (request) thread
     ClientIpContext.set("203.0.113.7");
 
-    // When the task runs on a virtual worker
     String seenOnWorker = loader.loadAsync(ClientIpContext::get).join();
 
-    // Then the worker sees the same client IP (so the X-Forwarded-For relay fires)
     assertThat(seenOnWorker).isEqualTo("203.0.113.7");
   }
 
   @Test
   void loadAsyncPropagatesEveryRelayThreadLocalTogether() {
-    // Given all three relay-driving thread-locals bound on the calling thread
     UUID squadron = UUID.randomUUID();
     ActiveSquadronContext.set(squadron);
     CorrelationContext.set("corr-123");
     ClientIpContext.set("198.51.100.9");
 
-    // When the task runs on a virtual worker and reads all three
     String[] seen =
         loader
             .loadAsync(
@@ -82,7 +77,6 @@ class ParallelPageLoaderTest {
                     })
             .join();
 
-    // Then none was dropped on the hop to the worker
     assertThat(seen[0]).isEqualTo(squadron.toString());
     assertThat(seen[1]).isEqualTo("corr-123");
     assertThat(seen[2]).isEqualTo("198.51.100.9");
@@ -90,25 +84,19 @@ class ParallelPageLoaderTest {
 
   @Test
   void loadAsyncWorkerSeesNullWhenCallerHasNoClientIp() {
-    // Given no client IP bound on the calling thread
     ClientIpContext.clear();
 
-    // When the task runs on a virtual worker
     String seenOnWorker = loader.loadAsync(ClientIpContext::get).join();
 
-    // Then the worker sees null (the null-guard never installs a stale value)
     assertThat(seenOnWorker).isNull();
   }
 
   @Test
   void loadAsyncLeavesTheCallingThreadClientIpUntouched() {
-    // Given a client IP bound on the calling thread
     ClientIpContext.set("192.0.2.42");
 
-    // When a task runs and completes on a worker
     loader.loadAsync(ClientIpContext::get).join();
 
-    // Then the calling thread still holds its own value (the worker cleared only its own copy)
     assertThat(ClientIpContext.get()).isEqualTo("192.0.2.42");
   }
 }

@@ -62,8 +62,6 @@ class OrgHierarchyServiceTest {
 
   @InjectMocks private OrgHierarchyService service;
 
-  // --- listAllOrgUnits ------------------------------------------------------
-
   @Test
   void listAllOrgUnits_delegatesToRepository() {
     Squadron staffel = new Squadron();
@@ -76,8 +74,6 @@ class OrgHierarchyServiceTest {
     assertSame(staffel, result.get(0));
     verify(orgUnitRepository).findAllActiveWithParent();
   }
-
-  // --- createBereich --------------------------------------------------------
 
   @Test
   void createBereich_unparented_persists() {
@@ -130,8 +126,6 @@ class OrgHierarchyServiceTest {
     assertSame(ol, result.getParent());
   }
 
-  // --- createOrganisationsleitung -------------------------------------------
-
   @Test
   void createOrganisationsleitung_first_persists() {
     when(organisationsleitungRepository.findAllByActiveTrue()).thenReturn(List.of());
@@ -153,8 +147,6 @@ class OrgHierarchyServiceTest {
         () -> service.createOrganisationsleitung("Leitung", "OL", null));
     verify(organisationsleitungRepository, never()).save(any());
   }
-
-  // --- setParent ------------------------------------------------------------
 
   @Test
   void setParent_squadronToBereich_persists() {

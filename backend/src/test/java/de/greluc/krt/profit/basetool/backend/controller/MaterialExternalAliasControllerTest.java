@@ -75,8 +75,6 @@ class MaterialExternalAliasControllerTest {
     when(service.findAll()).thenReturn(List.of());
   }
 
-  // ─── GET ─────────────────────────────────────────────────────────────────
-
   @Test
   void getList_forbiddenForNonAdmin() throws Exception {
     mockMvc
@@ -93,8 +91,6 @@ class MaterialExternalAliasControllerTest {
                 .accept(MediaType.APPLICATION_JSON))
         .andExpect(status().isOk());
   }
-
-  // ─── POST ────────────────────────────────────────────────────────────────
 
   @Test
   void create_forbiddenForNonAdmin() throws Exception {
@@ -120,7 +116,6 @@ class MaterialExternalAliasControllerTest {
 
   @Test
   void create_validationError_returns400_forAdmin() throws Exception {
-    // sourceSystem missing → @NotBlank fires before the service is called
     String invalidBody = "{\"materialId\":null}";
 
     mockMvc
@@ -170,7 +165,6 @@ class MaterialExternalAliasControllerTest {
 
   @Test
   void create_acceptsRefineryScreenSource() throws Exception {
-    // Given — #434 widened the source whitelist; the admin form offers REFINERY_SCREEN
     UUID materialId = UUID.randomUUID();
     String validBody =
         """
@@ -194,7 +188,6 @@ class MaterialExternalAliasControllerTest {
     persisted.setMaterial(material);
     when(service.create(any())).thenReturn(persisted);
 
-    // When / Then — the @Pattern whitelist must not reject the new source
     mockMvc
         .perform(
             post(BASE)
@@ -204,8 +197,6 @@ class MaterialExternalAliasControllerTest {
                 .content(validBody))
         .andExpect(status().isCreated());
   }
-
-  // ─── DELETE ──────────────────────────────────────────────────────────────
 
   @Test
   void delete_forbiddenForNonAdmin() throws Exception {

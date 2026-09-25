@@ -288,10 +288,6 @@ public class MissionStructureService {
       if (shipTypeId != null && !ship.getShipType().getId().equals(shipTypeId)) {
         throw new IllegalArgumentException("Ship does not match the specified ShipType");
       }
-      // A ship already pinned to any unit of this mission is grandfathered: unrelated edits (name,
-      // frequency, HVU) on a unit whose ship owner has since left the roster must not 400, and the
-      // edit picker keeps offering every already-assigned ship so it round-trips. Only a ship new
-      // to the mission must belong to a current participant.
       boolean alreadyAssignedInMission =
           mission.getAssignedUnits().stream()
               .map(MissionUnit::getShip)
@@ -309,8 +305,6 @@ public class MissionStructureService {
       missionUnit.setShip(null);
     }
 
-    // After ship / ship type resolution so a blank display name can derive from them (same rule
-    // as addUnitToMission).
     missionUnit.setName(resolveUnitName(name, missionUnit));
 
     if (frequency != null) {
@@ -458,7 +452,6 @@ public class MissionStructureService {
     crew.setMissionUnit(missionShip);
     crew.setParticipant(participant);
 
-    // Fetch and validate JobTypes
     Set<JobType> jobTypes = validateAndFetchJobTypes(jobTypeIds);
 
     crew.setJobTypes(jobTypes);

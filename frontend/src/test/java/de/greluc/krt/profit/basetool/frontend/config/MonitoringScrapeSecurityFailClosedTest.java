@@ -62,14 +62,11 @@ class MonitoringScrapeSecurityFailClosedTest {
 
   @Test
   void shouldDenyAnonymousRequestWhenNoCredentialsConfigured() throws Exception {
-    // Given / When / Then
     mockMvc.perform(get(PROMETHEUS)).andExpect(status().isForbidden());
   }
 
   @Test
   void shouldDenyEvenWellFormedBasicCredentialsWhenNoneConfigured() throws Exception {
-    // Given / When / Then: without configured credentials no authentication mechanism exists on
-    // the chain — presented basic credentials must not open the endpoint.
     mockMvc
         .perform(get(PROMETHEUS).with(httpBasic("metrics-scraper", "any-password")))
         .andExpect(status().isForbidden());
@@ -77,13 +74,8 @@ class MonitoringScrapeSecurityFailClosedTest {
 
   @Test
   void shouldKeepHealthEndpointReachableWithoutAuthentication() throws Exception {
-    // Given / When: the fail-closed scrape chain must not affect the Docker HEALTHCHECK. Under
-    // the test profile the auto-configured Redis health indicator has no Redis to talk to, so the
-    // aggregate may be 503 (DOWN) — the guard here is "no authentication gate", not
-    // "everything UP".
     int status = mockMvc.perform(get("/actuator/health")).andReturn().getResponse().getStatus();
 
-    // Then
     org.assertj.core.api.Assertions.assertThat(status)
         .as("health endpoint must be reachable anonymously (200 UP or 503 DOWN, never 401/403)")
         .isIn(200, 503);

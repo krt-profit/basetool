@@ -90,7 +90,6 @@ public class LeitungViewService {
 
     List<LeitungUnitDto> ols = new ArrayList<>();
     for (OrgUnit ol : sortedByName(orgUnitRepository.findActiveOrganisationsleitung())) {
-      // Appointing an OL member has no delegated rung — it is admin-only.
       if (admin) {
         ols.add(unit(ol, true, false));
       }
@@ -127,8 +126,6 @@ public class LeitungViewService {
       } else if (unit.getKind() == OrgUnitKind.SPECIAL_COMMAND) {
         boolean canAppointLead =
             admin || roleSecurity.canAppointSkLead(unit.getId(), authentication);
-        // The SK lead manages their own SK's roster (member list + Logistiker/Einsatzmanager
-        // flags) — the same verdict the /api/v1/special-commands/{id}/members endpoints gate on.
         boolean canManageRoster =
             admin || specialCommandSecurity.canManageMembers(unit.getId(), authentication);
         if (canAppointLead || canManageRoster) {

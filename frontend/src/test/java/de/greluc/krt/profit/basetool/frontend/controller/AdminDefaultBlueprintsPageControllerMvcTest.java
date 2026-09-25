@@ -92,11 +92,6 @@ class AdminDefaultBlueprintsPageControllerMvcTest {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   }
 
-  // Regression guard for the frontend-proxy double-encoding sub-class: the default-blueprint
-  // typeahead must forward a multi-word free-text term as a WebClient URI-template variable ({q}),
-  // not URLEncoder it into the URI string, so the backend @RequestParam decodes the exact typed
-  // term. URLEncoder form-encoding (space -> '+') double-encodes across the frontend->backend hop
-  // and yields zero matches.
   @Test
   @WithMockUser(roles = "ADMIN")
   void search_passesMultiWordQueryAsUriVariable() throws Exception {
@@ -113,9 +108,6 @@ class AdminDefaultBlueprintsPageControllerMvcTest {
     assertEquals("Arclight Pistol", qCaptor.getValue());
   }
 
-  // Same guard with an umlaut term: "Müller Röhre" encodes to M%C3%BCller… under URLEncoder, which
-  // the hop would re-encode to a literal zero-match. As a URI variable the raw term reaches the
-  // backend.
   @Test
   @WithMockUser(roles = "ADMIN")
   void search_passesUmlautQueryAsUriVariable_notFormEncoded() throws Exception {
@@ -133,9 +125,6 @@ class AdminDefaultBlueprintsPageControllerMvcTest {
     assertEquals(term, qCaptor.getValue());
   }
 
-  // REQ-FE-001: the in-place add answers with the per-key outcome instead of a redirect. One new
-  // default, one already-default (the backend's 409, skipped) and one other failure produce
-  // added=1, skipped=1 and the failed key alone — which is what the page keeps staged for a retry.
   @Test
   @WithMockUser(roles = "ADMIN")
   void addAjax_reportsAddedSkippedAndFailedKeys() throws Exception {
@@ -162,12 +151,9 @@ class AdminDefaultBlueprintsPageControllerMvcTest {
         .andExpect(jsonPath("$.failedKeys.length()").value(1))
         .andExpect(jsonPath("$.failedKeys[0]").value("bad_key"));
 
-    // The blank entry never reaches the backend; the padded one is trimmed before it does.
     verify(backendApiClient, times(3)).post(eq(BACKEND_BASE), any(), any());
   }
 
-  // Without the X-Requested-With header the same path is still the classic form handler, so a
-  // browser where krtFetch did not load keeps its POST -> redirect fallback.
   @Test
   @WithMockUser(roles = "ADMIN")
   void add_withoutXhrHeader_keepsTheRedirectFallback() throws Exception {
@@ -178,7 +164,6 @@ class AdminDefaultBlueprintsPageControllerMvcTest {
         .andExpect(flash().attribute("successToast", "admin.defaultBlueprints.toast.added"));
   }
 
-  // REQ-FE-001: the in-place remove answers 200 instead of a redirect.
   @Test
   @WithMockUser(roles = "ADMIN")
   void removeAjax_returnsOk() throws Exception {
@@ -194,8 +179,6 @@ class AdminDefaultBlueprintsPageControllerMvcTest {
     verify(backendApiClient).delete(BACKEND_BASE + "/" + id, Void.class);
   }
 
-  // A backend failure on the in-place remove (another admin removed the entry first) is relayed
-  // with its status, so krtFetch toasts it instead of the page pretending the remove worked.
   @Test
   @WithMockUser(roles = "ADMIN")
   void removeAjax_relaysBackendFailure() throws Exception {
@@ -211,8 +194,6 @@ class AdminDefaultBlueprintsPageControllerMvcTest {
         .andExpect(status().isNotFound());
   }
 
-  // The swap target: fragment=rows renders the table alone — no page chrome — with one keyed row
-  // per default, which is what the page re-reads its "already a default" set from.
   @Test
   @WithMockUser(roles = "ADMIN")
   void rowsFragment_rendersOnlyTheKeyedRows() throws Exception {
@@ -233,8 +214,6 @@ class AdminDefaultBlueprintsPageControllerMvcTest {
         .andExpect(content().string(not(containsString("krt-dbp-list-host"))));
   }
 
-  // The fragment read must not paint "no defaults" over a set that still exists: a backend failure
-  // is a non-2xx, so krtFetch.swap leaves the list on screen and toasts instead.
   @Test
   @WithMockUser(roles = "ADMIN")
   void rowsFragment_backendFailure_isNotAnEmptyList() throws Exception {

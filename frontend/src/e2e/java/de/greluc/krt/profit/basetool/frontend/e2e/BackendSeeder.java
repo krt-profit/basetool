@@ -115,11 +115,9 @@ public final class BackendSeeder {
       String token = passwordGrant(username, password);
       JsonObject me = getJson("/api/v1/users/me", token);
       if (me.has("squadron") && !me.get("squadron").isJsonNull()) {
-        return; // already a member — nothing to seed
+        return;
       }
       String userId = me.get("id").getAsString();
-      // REQ-ORG-017: assign via the membership-delta reconcile (the legacy /squadron endpoint was
-      // removed). The reconcile carries no user-row version, so there is no 409 retry loop.
       int status = patchSquadron(token, userId);
       if (status < 200 || status >= 300) {
         throw new IllegalStateException("Membership seeding PATCH failed: HTTP " + status);
@@ -270,7 +268,6 @@ public final class BackendSeeder {
    * @return the created location id
    */
   public String createLocation(String username, String password, String name) {
-    // LocationDto has a primitive `boolean hidden`; omitting it fails Jackson deserialization.
     return seedEntity(
         username, password, "/api/v1/locations", "{\"name\":\"" + name + "\",\"hidden\":false}");
   }
@@ -919,9 +916,6 @@ public final class BackendSeeder {
    * @return the created holder id (the existing one when the user is already a holder)
    */
   public String registerBankHolder(String username, String password, String userId) {
-    // Idempotent across e2e classes that share the stack: a user is a holder at most once
-    // (V151 UNIQUE user_id). GET the registry first and reuse an existing row rather than POSTing a
-    // duplicate (which a sibling class's earlier registration would 409) — and never double-POST.
     String existing = findHolderIdByUserId(username, password, userId);
     if (existing != null) {
       return existing;
@@ -1093,8 +1087,6 @@ public final class BackendSeeder {
    */
   public int bankWithdraw(
       String username, String password, String accountId, String holderId, long amount) {
-    // REQ-BANK-045: the e2e booking accounts are SPECIAL (justification-mandating), so a withdrawal
-    // must carry a non-blank Begründung.
     String body =
         "{\"accountId\":\""
             + accountId
@@ -2545,8 +2537,6 @@ public final class BackendSeeder {
     String form =
         "grant_type=password&client_id="
             + CLIENT_ID
-            // The client is confidential in the E2E realm (ADR-0001), so the grant carries its
-            // throwaway secret like the frontend does.
             + "&client_secret="
             + enc(E2eStackExtension.FRONTEND_CLIENT_SECRET)
             + "&username="
@@ -2603,9 +2593,6 @@ public final class BackendSeeder {
             .build();
     int status = http.send(request, BodyHandlers.ofString()).statusCode();
     if (status < 200 || status >= 300) {
-      // Do not fail here: leave the failure to the seeding call that actually needed consent, whose
-      // message names the fixture. Re-arm the cache so a transient blip is retried on the next
-      // grant rather than silently sticking for the whole run.
       termsAcceptedUsers.remove(username);
       System.out.printf("[E2E][seeder] terms acceptance returned HTTP %d%n", status);
     }
@@ -2694,8 +2681,6 @@ public final class BackendSeeder {
       try (InputStream in = Files.newInputStream(locateKeystore())) {
         keyStore.load(in, E2eStackExtension.KEYSTORE_PW.toCharArray());
       }
-      // Copied entry by entry rather than handed over as is, so a store that also carried a key
-      // entry would still contribute only certificates.
       KeyStore trustStore = KeyStore.getInstance("PKCS12");
       trustStore.load(null, null);
       for (String alias : Collections.list(keyStore.aliases())) {

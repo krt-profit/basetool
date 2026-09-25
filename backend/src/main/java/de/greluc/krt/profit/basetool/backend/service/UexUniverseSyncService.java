@@ -134,8 +134,6 @@ public class UexUniverseSyncService {
       log.warn("No cities received from UEX API. Aborting city synchronization.");
       return;
     }
-    // BE-PERF-09 / REQ-DATA-005: written after the fetch, in chunk transactions of their own;
-    // a chunk the database refuses is replayed row by row, so one bad row costs only itself.
     chunkWriter.write(
         dtos,
         SyncChunkWriter.DEFAULT_CHUNK_SIZE,
@@ -246,8 +244,6 @@ public class UexUniverseSyncService {
       log.warn("No factions received from UEX API. Aborting faction synchronization.");
       return;
     }
-    // BE-PERF-09 / REQ-DATA-005: written after the fetch, in chunk transactions of their own;
-    // a chunk the database refuses is replayed row by row, so one bad row costs only itself.
     chunkWriter.write(
         dtos,
         SyncChunkWriter.DEFAULT_CHUNK_SIZE,
@@ -276,12 +272,6 @@ public class UexUniverseSyncService {
                                       return factionRepository.save(n);
                                     }));
             entity.setName(dto.name());
-            // No code / is_available_live: UEX's /factions payload carries neither (REQ-DATA-015).
-            // The
-            // absent flag decoded to null, which checkIsAvailableLive() turned into a hard `false`
-            // — a
-            // value UEX never stated — so the column is now left to whatever a source that knows
-            // writes.
             entity.setWiki(dto.wiki());
             entity.setIsPiracy(dto.checkIsPiracy());
             entity.setIsBountyHunting(dto.checkIsBountyHunting());
@@ -312,8 +302,6 @@ public class UexUniverseSyncService {
       log.warn("No jurisdictions received from UEX API. Aborting jurisdiction synchronization.");
       return;
     }
-    // BE-PERF-09 / REQ-DATA-005: written after the fetch, in chunk transactions of their own;
-    // a chunk the database refuses is replayed row by row, so one bad row costs only itself.
     chunkWriter.write(
         dtos,
         SyncChunkWriter.DEFAULT_CHUNK_SIZE,
@@ -342,8 +330,6 @@ public class UexUniverseSyncService {
                                       return jurisdictionRepository.save(n);
                                     }));
             entity.setName(dto.name());
-            // No code: UEX's /jurisdictions payload has no `code` field (it carries `nickname`,
-            // which is mapped above), so writing one only cleared the column (REQ-DATA-015).
             entity.setIsAvailableLive(dto.checkIsAvailableLive());
 
             entity.setNickname(dto.nickname());
@@ -372,8 +358,6 @@ public class UexUniverseSyncService {
       log.warn("No moons received from UEX API. Aborting moon synchronization.");
       return;
     }
-    // BE-PERF-09 / REQ-DATA-005: written after the fetch, in chunk transactions of their own;
-    // a chunk the database refuses is replayed row by row, so one bad row costs only itself.
     chunkWriter.write(
         dtos,
         SyncChunkWriter.DEFAULT_CHUNK_SIZE,
@@ -435,8 +419,6 @@ public class UexUniverseSyncService {
       log.warn("No orbits received from UEX API. Aborting orbit synchronization.");
       return;
     }
-    // BE-PERF-09 / REQ-DATA-005: written after the fetch, in chunk transactions of their own;
-    // a chunk the database refuses is replayed row by row, so one bad row costs only itself.
     chunkWriter.write(
         dtos,
         SyncChunkWriter.DEFAULT_CHUNK_SIZE,
@@ -497,8 +479,6 @@ public class UexUniverseSyncService {
       log.warn("No outposts received from UEX API. Aborting outpost synchronization.");
       return;
     }
-    // BE-PERF-09 / REQ-DATA-005: written after the fetch, in chunk transactions of their own;
-    // a chunk the database refuses is replayed row by row, so one bad row costs only itself.
     chunkWriter.write(
         dtos,
         SyncChunkWriter.DEFAULT_CHUNK_SIZE,
@@ -527,8 +507,6 @@ public class UexUniverseSyncService {
                                       return outpostRepository.save(n);
                                     }));
             entity.setName(dto.name());
-            // No code: UEX's /outposts payload has no `code` field (it carries `nickname`,
-            // which is mapped above), so writing one only cleared the column (REQ-DATA-015).
             entity.setIsAvailableLive(dto.checkIsAvailableLive());
             entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
             entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
@@ -587,8 +565,6 @@ public class UexUniverseSyncService {
       log.warn("No planets received from UEX API. Aborting planet synchronization.");
       return;
     }
-    // BE-PERF-09 / REQ-DATA-005: written after the fetch, in chunk transactions of their own;
-    // a chunk the database refuses is replayed row by row, so one bad row costs only itself.
     chunkWriter.write(
         dtos,
         SyncChunkWriter.DEFAULT_CHUNK_SIZE,
@@ -653,8 +629,6 @@ public class UexUniverseSyncService {
       log.warn("No points of interest received from UEX API. Aborting POI synchronization.");
       return;
     }
-    // BE-PERF-09 / REQ-DATA-005: written after the fetch, in chunk transactions of their own;
-    // a chunk the database refuses is replayed row by row, so one bad row costs only itself.
     chunkWriter.write(
         dtos,
         SyncChunkWriter.DEFAULT_CHUNK_SIZE,
@@ -683,8 +657,6 @@ public class UexUniverseSyncService {
                                       return poiRepository.save(n);
                                     }));
             entity.setName(dto.name());
-            // No code: UEX's /poi payload has no `code` field (it carries `nickname`,
-            // which is mapped above), so writing one only cleared the column (REQ-DATA-015).
             entity.setIsAvailableLive(dto.checkIsAvailableLive());
             entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
             entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
@@ -747,8 +719,6 @@ public class UexUniverseSyncService {
       log.warn("No space stations received from UEX API. Aborting space station synchronization.");
       return;
     }
-    // BE-PERF-09 / REQ-DATA-005: written after the fetch, in chunk transactions of their own;
-    // a chunk the database refuses is replayed row by row, so one bad row costs only itself.
     chunkWriter.write(
         dtos,
         SyncChunkWriter.DEFAULT_CHUNK_SIZE,
@@ -777,8 +747,6 @@ public class UexUniverseSyncService {
                                       return spacestationRepository.save(n);
                                     }));
             entity.setName(dto.name());
-            // No code: UEX's /space_stations payload has no `code` field (it carries `nickname`,
-            // which is mapped above), so writing one only cleared the column (REQ-DATA-015).
             entity.setIsAvailableLive(dto.checkIsAvailableLive());
             entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
             entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
@@ -867,8 +835,6 @@ public class UexUniverseSyncService {
       return;
     }
     Instant syncedAt = Instant.now();
-    // BE-PERF-09 / REQ-DATA-005: written after the fetch, in chunk transactions of their own;
-    // a chunk the database refuses is replayed row by row, so one bad row costs only itself.
     chunkWriter.write(
         dtos,
         SyncChunkWriter.DEFAULT_CHUNK_SIZE,
@@ -898,16 +864,11 @@ public class UexUniverseSyncService {
                                     }));
             entity.setName(dto.name());
             entity.setCode(dto.code());
-            // The terminal kind is what actually proves a refinery exists at the parent location;
-            // the
-            // parent's own has_refinery flag is unreliable upstream (REQ-REFINERY-020).
             entity.setType(dto.type());
             entity.setIsAvailableLive(dto.checkIsAvailableLive());
             entity.setIsAvailable(UexValues.asBooleanOrFalse(dto.isAvailable()));
             entity.setIsVisible(UexValues.asBooleanOrFalse(dto.isVisible()));
             entity.setIsJumpPoint(UexValues.asBooleanOrFalse(dto.isJumpPoint()));
-            // The raw UEX state is recorded on every sweep, regardless of the override flags,
-            // so the admin UI can show what UEX currently claims even while a pin is active.
             Boolean uexLoadingDock =
                 dto.hasLoadingDock() == null ? null : dto.hasLoadingDock() == 1;
             Boolean uexAutoLoad = dto.isAutoLoad() == null ? null : dto.isAutoLoad() == 1;

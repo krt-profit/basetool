@@ -203,15 +203,11 @@ public class RestClientConfig {
       KeyStore truststore = trustStoreOrNull("backend-trust");
       if (truststore != null) {
         X509TrustManager pinned = x509From(truststore);
-        // The JDK client asks for HTTPS endpoint identification on every handshake, so the plain
-        // PKIX manager checks the name by itself; only the wrapper takes that check away.
         return sslContext(
             ingestProperties.verifyBackendHostname()
                 ? pinned
                 : withoutHostnameVerification(pinned));
       }
-      // No backend-trust bundle for this profile — the JVM trust store, hostname verification ON
-      // (a publicly-trusted or corporate-CA backend certificate).
       return SSLContext.getDefault();
     } catch (GeneralSecurityException e) {
       throw new IllegalStateException("Failed to build the backend relay SSL context", e);
@@ -332,8 +328,6 @@ public class RestClientConfig {
           try {
             pinnedAnchors.checkServerTrusted(chain, authType);
           } catch (CertificateException pinnedRejected) {
-            // Surface the PUBLIC failure: it is the one that names a real CA problem, and the
-            // pinned rejection is expected noise whenever the host is the public one.
             publicChainRejected.addSuppressed(pinnedRejected);
             throw publicChainRejected;
           }
@@ -424,14 +418,10 @@ public class RestClientConfig {
   private static @NotNull X509TrustManager acceptingEverything() {
     return new X509TrustManager() {
       @Override
-      public void checkClientTrusted(X509Certificate[] chain, String authType) {
-        // dev/test only: the local stack's ephemeral certificate has no anchor to check against.
-      }
+      public void checkClientTrusted(X509Certificate[] chain, String authType) {}
 
       @Override
-      public void checkServerTrusted(X509Certificate[] chain, String authType) {
-        // dev/test only: the local stack's ephemeral certificate has no anchor to check against.
-      }
+      public void checkServerTrusted(X509Certificate[] chain, String authType) {}
 
       @NotNull
       @Override

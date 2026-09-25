@@ -93,8 +93,6 @@ class OrgUnitSwitcherLabelMvcTest {
         .perform(get("/"))
         .andExpect(status().isOk())
         .andExpect(content().string(Matchers.containsString("Alle Org-Einheiten")))
-        // The narrower wording must not also be present: two rows with the same empty value would
-        // both post an empty selection, and the reader could not tell which scope they picked.
         .andExpect(content().string(Matchers.not(Matchers.containsString("Alle meine"))));
   }
 
@@ -110,9 +108,6 @@ class OrgUnitSwitcherLabelMvcTest {
   @Test
   @WithMockUser(roles = "OFFICER")
   void switcher_officerIsNotAnAdminHere() throws Exception {
-    // An officer reaches LOGISTICIAN and MISSION_MANAGER through the hierarchy but not ADMIN, and
-    // their unpinned read is their own reach like any other member's. Pinned as its own case
-    // because "anything above a member" is exactly the confusion REQ-SEC-047 was about.
     mockMvc
         .perform(get("/"))
         .andExpect(status().isOk())

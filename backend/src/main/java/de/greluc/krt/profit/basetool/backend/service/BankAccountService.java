@@ -282,12 +282,6 @@ public class BankAccountService {
         }
         OrgUnit orgUnit =
             Entities.require(orgUnitRepository.findById(request.orgUnitId()), "Org unit not found");
-        // Epic #692 Phase 6 (REQ-ORG-019): since Bereich/OL are first-class org_unit rows now, an
-        // ORG_UNIT account must reference a Staffel/SK — a Bereich is an AREA account and the OL
-        // the
-        // CARTEL account. Symmetric with the BEREICH/ORGANISATIONSLEITUNG kind guards below;
-        // without
-        // it an ORG_UNIT account on a Bereich/OL would consume that unit's one-account slot.
         if (orgUnit.getKind() != OrgUnitKind.SQUADRON
             && orgUnit.getKind() != OrgUnitKind.SPECIAL_COMMAND) {
           throw new BadRequestException(
@@ -299,8 +293,6 @@ public class BankAccountService {
         account.setOrgUnit(orgUnit);
       }
       case AREA -> {
-        // Epic #692 (REQ-ORG-019, V168): an AREA account is owned by its Bereich via the org_unit
-        // FK, not the legacy free-form area name. The Bereich is a first-class org unit now.
         if (request.orgUnitId() == null) {
           throw new BadRequestException("An AREA account requires its Bereich org unit");
         }
@@ -316,9 +308,6 @@ public class BankAccountService {
         account.setOrgUnit(bereich);
       }
       case CARTEL -> {
-        // Epic #692: the singleton CARTEL account is mapped to the Organisationsleitung via the
-        // org_unit FK so an OL member's oversight scope reaches it. The link is optional (a CARTEL
-        // may predate the OL); when supplied it must be the OL and uniqueness is enforced.
         requireNoAreaName(request);
         if (accountRepository.existsByType(request.type())) {
           throw new DuplicateEntityException(
@@ -361,8 +350,6 @@ public class BankAccountService {
         null,
         null,
         saved.getAccountNo() + " " + saved.getName() + " (" + saved.getType() + ")");
-    // An employee-created special account is auto-granted full capability to its creator so it is
-    // immediately usable (REQ-BANK-030, ADR-0040); management sees every account via its role.
     if (!management && creatorUserId != null) {
       bankGrantService.createGrant(
           new CreateBankGrantRequest(creatorUserId, saved.getId(), true, true, true));

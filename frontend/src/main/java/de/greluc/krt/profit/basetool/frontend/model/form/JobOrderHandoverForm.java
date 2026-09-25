@@ -28,7 +28,7 @@ import lombok.Data;
 /** Form-binding object for Job Order Handover input. */
 @Data
 public class JobOrderHandoverForm {
-  private String handoverTime; // We will parse it to Instant before sending
+  private String handoverTime;
   private String recipientHandle;
   private String recipientSquadron;
   private List<JobOrderHandoverItemForm> items = new ArrayList<>();

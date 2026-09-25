@@ -91,22 +91,19 @@ class RefineryOrderTenancyE2eTest {
   private static Browser browser;
   private static BackendSeeder seeder;
 
-  // Seeded org units (this suite's own, distinct from sibling suites' B/SK).
   private static String squadronBId;
   private static String skXId;
 
   private static String hubLocationId;
-  private static String materialId; // shared input material for the scope orders
-  private static String storeMaterialId; // dedicated output material for the store-stamping probe
+  private static String materialId;
+  private static String storeMaterialId;
 
-  // One order per owning scope (identified by id in the list payloads).
-  private static String orderA; // owned by IRIDIUM (Staffel A), owner test-admin
-  private static String orderB; // owned by Staffel B, owner test-both
-  private static String orderSk; // owned by SK X, owner test-both
-  private static String orderOwnerless; // ownerless (owningOrgUnit == null), owner test-none
-  private static String orderStore; // owned by Staffel B, used only by the store-stamping probe
+  private static String orderA;
+  private static String orderB;
+  private static String orderSk;
+  private static String orderOwnerless;
+  private static String orderStore;
 
-  // BAC-004 probe: a public A-mission with an A-owned refinery order linked to it.
   private static String bacMissionId;
   private static String bacOrderId;
 
@@ -124,15 +121,14 @@ class RefineryOrderTenancyE2eTest {
     }
     seeder = new BackendSeeder();
 
-    // --- Memberships -------------------------------------------------------------------------
-    seeder.ensureIridiumMembership(ADMIN_USER, ADMIN_PASSWORD); // admin in Staffel A
+    seeder.ensureIridiumMembership(ADMIN_USER, ADMIN_PASSWORD);
     seeder.assignStaffelMembership(
         ADMIN_USER,
         ADMIN_PASSWORD,
         seeder.getUserId(MEMBER_USER, MEMBER_PASSWORD),
         IRIDIUM_ID,
         false,
-        false); // test-member: Staffel A only
+        false);
 
     squadronBId =
         seeder.createSquadron(ADMIN_USER, ADMIN_PASSWORD, "E2E Refinery Tenancy B", "ERTB");
@@ -141,20 +137,15 @@ class RefineryOrderTenancyE2eTest {
 
     String bothId = seeder.getUserId(BOTH_USER, BOTH_PASSWORD);
     seeder.assignStaffelMembership(ADMIN_USER, ADMIN_PASSWORD, bothId, squadronBId, false, false);
-    seeder.addSpecialCommandMember(
-        ADMIN_USER, ADMIN_PASSWORD, skXId, bothId); // test-both: B + SK X
-    seeder.getUserId(NONE_USER, NONE_PASSWORD); // materialise test-none; leave it membershipless
+    seeder.addSpecialCommandMember(ADMIN_USER, ADMIN_PASSWORD, skXId, bothId);
+    seeder.getUserId(NONE_USER, NONE_PASSWORD);
 
-    // --- Reference data + one order per owning scope -----------------------------------------
     hubLocationId = seeder.findLocationIdByName(ADMIN_USER, ADMIN_PASSWORD, REFINERY_HUB);
     materialId =
         seeder.createRefineryMaterial(ADMIN_USER, ADMIN_PASSWORD, "E2E Refinery Tenancy Mat");
     storeMaterialId =
         seeder.createRefineryMaterial(ADMIN_USER, ADMIN_PASSWORD, "E2E Refinery Tenancy Store Mat");
 
-    // Explicit picks everywhere the caller's membership count could be ambiguous; null only for the
-    // intentionally membershipless owner (which yields an ownerless order). orderSk is created by
-    // test-both (a member of this suite's SK X) so SK X owns an order without touching test-sk.
     orderA =
         seeder.createRefineryOrder(
             ADMIN_USER, ADMIN_PASSWORD, hubLocationId, materialId, IRIDIUM_ID, null);
@@ -170,12 +161,8 @@ class RefineryOrderTenancyE2eTest {
         seeder.createRefineryOrder(
             BOTH_USER, BOTH_PASSWORD, hubLocationId, storeMaterialId, squadronBId, null);
 
-    // BAC-004: a public mission owned by Staffel A (test-member is single-membership A, so it
-    // auto-stamps and may create a non-internal mission) with an A-owned refinery order linked.
     bacMissionId =
         seeder.createMission(MEMBER_USER, MEMBER_PASSWORD, "E2E Refinery BAC Mission", false);
-    // REQ-SEC-042: an order may only be linked to a mission its owner takes part in, so the admin
-    // who owns the BAC order is signed up by the mission's creator first.
     seeder.addRegisteredParticipant(
         MEMBER_USER, MEMBER_PASSWORD, bacMissionId, seeder.getUserId(ADMIN_USER, ADMIN_PASSWORD));
     bacOrderId =
@@ -294,23 +281,18 @@ class RefineryOrderTenancyE2eTest {
    */
   @Test
   void createStampingFollowsTheMembershipMatrix() {
-    // Single membership → auto-stamp, no pick needed.
     assertCreated(
         attemptCreate(MEMBER_USER, MEMBER_PASSWORD, null), "A-only member auto-stamps Staffel A");
-    // Membershipless → ownerless order is allowed.
     assertCreated(
         attemptCreate(NONE_USER, NONE_PASSWORD, null),
         "membershipless user creates an ownerless order");
-    // Multi-membership without a pick → forced choice → 400.
     assertEquals(
         400,
         attemptCreate(BOTH_USER, BOTH_PASSWORD, null),
         "multi-membership user without a pick must be rejected");
-    // Valid pick of an own membership → stamped.
     assertCreated(
         attemptCreate(BOTH_USER, BOTH_PASSWORD, squadronBId),
         "multi-membership user picking an own unit succeeds");
-    // Foreign picks → 400.
     assertEquals(
         400,
         attemptCreate(MEMBER_USER, MEMBER_PASSWORD, skXId),
@@ -367,7 +349,6 @@ class RefineryOrderTenancyE2eTest {
    */
   @Test
   void storeStampsTheRowToTheAssigneesOrgUnit() {
-    // orderStore is owned by Staffel B; the admin stores it crediting test-member (IRIDIUM only).
     seeder.storeRefineryOrder(
         ADMIN_USER,
         ADMIN_PASSWORD,
@@ -450,10 +431,6 @@ class RefineryOrderTenancyE2eTest {
       }
     }
   }
-
-  // --------------------------------------------------------------------------------------------
-  // Helpers
-  // --------------------------------------------------------------------------------------------
 
   /**
    * Reports whether the given user's org-scoped refinery list ({@code /api/v1/refinery-orders/all})

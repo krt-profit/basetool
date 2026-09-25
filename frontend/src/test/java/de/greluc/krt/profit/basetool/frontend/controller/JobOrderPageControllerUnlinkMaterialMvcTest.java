@@ -76,7 +76,6 @@ class JobOrderPageControllerUnlinkMaterialMvcTest {
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void unlinkMaterial_AsLogistician_ShouldCallBackendAndRedirectWithSuccessToast()
       throws Exception {
-    // Given
     UUID orderId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
 
@@ -84,13 +83,11 @@ class JobOrderPageControllerUnlinkMaterialMvcTest {
         .when(backendApiClient)
         .delete(eq("/api/v1/orders/" + orderId + "/materials/" + materialId), eq(Void.class));
 
-    // When
     mockMvc
         .perform(
             post("/orders/" + orderId + "/materials/unlink")
                 .with(csrf())
                 .param("materialId", materialId.toString()))
-        // Then
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl("/orders/" + orderId))
         .andExpect(flash().attribute("successToast", "orders.detail.material.unlink.success"));
@@ -102,11 +99,9 @@ class JobOrderPageControllerUnlinkMaterialMvcTest {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER"})
   void unlinkMaterial_AsPlainMember_ShouldReturn403() throws Exception {
-    // Given
     UUID orderId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
 
-    // When / Then
     mockMvc
         .perform(
             post("/orders/" + orderId + "/materials/unlink")
@@ -118,7 +113,6 @@ class JobOrderPageControllerUnlinkMaterialMvcTest {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void unlinkMaterial_WhenBackendFails_ShouldRedirectWithErrorToast() throws Exception {
-    // Given
     UUID orderId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
 
@@ -126,13 +120,11 @@ class JobOrderPageControllerUnlinkMaterialMvcTest {
         .when(backendApiClient)
         .delete(eq("/api/v1/orders/" + orderId + "/materials/" + materialId), eq(Void.class));
 
-    // When
     mockMvc
         .perform(
             post("/orders/" + orderId + "/materials/unlink")
                 .with(csrf())
                 .param("materialId", materialId.toString()))
-        // Then
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl("/orders/" + orderId))
         .andExpect(flash().attribute("errorToast", "orders.detail.material.unlink.error"));

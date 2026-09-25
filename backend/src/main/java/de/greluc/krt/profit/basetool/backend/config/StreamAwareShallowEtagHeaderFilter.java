@@ -142,11 +142,6 @@ public class StreamAwareShallowEtagHeaderFilter extends ShallowEtagHeaderFilter 
     if (STREAMING_PATHS.stream().anyMatch(pattern -> pattern.matches(path))) {
       return true;
     }
-    // GET only, and the /api scope first. Both narrow this to exactly what the directive it follows
-    // covers: ApiCacheControlFilter writes `no-store` on GET alone, so answering for every method
-    // here made the bypass wider than the reason for it -- and this filter is registered on `/*`,
-    // so an actuator probe, /v3/api-docs and swagger-ui were paying a fourteen-pattern scan for a
-    // question that can only ever be about /api.
     return HttpMethod.GET.matches(request.getMethod())
         && API_SCOPE.matches(path)
         && NoStoreApiScopes.matches(path);

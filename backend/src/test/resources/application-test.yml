@@ -1,28 +1,3 @@
-# Test profile. Lives in `src/test/resources` so it is on the test classpath only and never ships in
-# the production jar (audit item SEC-17; it sat in `src/main/resources` until 2026-09-23).
-#
-# Spring-Boot integration tests run against a real Postgres container started on
-# demand by Testcontainers' JDBC-URL trick: when the URL starts with `jdbc:tc:...`
-# the Testcontainers' `ContainerDatabaseDriver` boots a `postgres:18-alpine`
-# container the first time a Spring context requests the DataSource.
-#
-# `TC_DAEMON=true` is what keeps it at ONE container per test JVM (audit item TST-19). Without it the
-# driver stops the container as soon as the last connection to it closes -- a pool with
-# `minimum-idle: 0` (below) retiring its idle connections, or Spring's test-context cache evicting a
-# context -- and the next context then pays for a fresh container and a full Flyway migration.
-# With it the container lives until the JVM exits (Ryuk removes it then). This is NOT Testcontainers'
-# cross-JVM "reuse" feature (`testcontainers.reuse.enable` in `~/.testcontainers.properties`), which
-# this build does not use: every `:backend:test` run still starts from a fresh, empty database.
-#
-# Why Postgres (not H2)? Production runs on Postgres, our Flyway migrations carry
-# Postgres-specific syntax (JSONB, GIN, pg_trgm, ON CONFLICT, gen_random_uuid),
-# and `ddl-auto: validate` only catches schema drift if the schema being validated
-# was produced by Flyway. Running tests on H2 reintroduced the exact "mock/prod
-# divergence" risk CLAUDE.md warns about.
-#
-# Tests that are pure Mockito unit tests (`@ExtendWith(MockitoExtension.class)`
-# without `@SpringBootTest`) do NOT load this YAML and start no container, so the
-# fast feedback loop for service-layer unit tests is unchanged.
 server:
   ssl:
     enabled: false
@@ -34,9 +9,6 @@ spring:
     username: test
     password: test
     hikari:
-      # Keep the test pool small — every @SpringBootTest spins up its own
-      # ApplicationContext, and we do not want to flood the shared Testcontainer
-      # with idle connections across parallel test classes.
       maximum-pool-size: 5
       minimum-idle: 0
   jpa:
@@ -44,14 +16,9 @@ spring:
     properties:
       hibernate:
         default_batch_fetch_size: 100
-        # Same as the base config (REQ-DATA-003): a paged query that fetch-joins a collection
-        # fails instead of silently paginating in memory (HHH90003004). Pinned here as well so the
-        # test profile keeps the gate even if the base value is ever relaxed.
         query:
           fail_on_pagination_over_collection_fetch: true
     hibernate:
-      # `validate` so the test schema produced by Flyway has to match the entity
-      # annotations exactly — the same contract as prod (application-prod.yml).
       ddl-auto: validate
   flyway:
     enabled: true
@@ -66,16 +33,11 @@ krt:
   uex:
     scheduler-enabled: false
   scwiki:
-    # The SC Wiki scheduler default flipped to true in R3; disable it under @SpringBootTest so the
-    # @Scheduled tick never fires against a MockWebServer-less context. commodity-sync-enabled is
-    # already false by default, but the scheduler bean itself is silenced here for determinism.
     scheduler-enabled: false
     commodity-sync-enabled: false
 
 app:
   cors:
-    # Test-only origin used by SecurityTest CORS assertions. Production deliberately
-    # leaves this empty (no direct browser-to-backend cross-origin calls allowed).
     allowed-origin-patterns: http://localhost:8080
   keycloak:
     sync:
@@ -86,54 +48,26 @@ app:
       client-secret: test-secret
   bank:
     integrity:
-      # The scheduled sweep is disabled under test; BankLedgerIntegrityServiceTest drives verify()
-      # directly so the schedule never races the synthetic-corruption assertions.
       enabled: false
   joborder:
     integrity:
-      # Same rationale as the bank sweep: JobOrderIntegrityServiceTest drives verify() directly.
       enabled: false
   audit:
     retention:
-      # Disabled under @SpringBootTest so the sweep can never delete audit rows an assertion is
-      # about; the purge itself is exercised directly by its own tests.
       enabled: false
   registrations:
     rejected-retention:
-      # The scheduled purge is disabled under @SpringBootTest so it can never delete a seeded
-      # app_user mid-assertion; the sweep is exercised directly by its own tests.
       enabled: false
   notifications:
     retention:
-      # The scheduled retention sweep is disabled under @SpringBootTest; the repository delete is
-      # exercised directly by NotificationRepositoryIntegrationTest.
       enabled: false
   default-blueprints:
     provisioning:
-      # The startup seed/backfill and the periodic sweep are disabled under @SpringBootTest so they
-      # never seed degraded rows or race assertions. Tests that exercise the feature re-enable it
-      # explicitly via @TestPropertySource / @DynamicPropertySource.
       enabled: false
   monitoring:
     business-metrics:
-      # The 60s queue-depth/oldest-age collector is disabled under @SpringBootTest so it never
-      # queries the DB mid-test; BusinessMetricsCollectorTest drives it directly with mocks.
       enabled: false
 
-# Disable the KeycloakHealthIndicator under @SpringBootTest. The test issuer URI
-# (http://keycloak.example.com) is a non-resolvable placeholder; leaving the
-# indicator enabled would slow every context-loading test by the
-# connect-timeout while the JDK HttpClient waits for the DNS lookup to fail.
-# Unit tests for the indicator itself instantiate it directly with a
-# MockWebServer URL and do not consult this property.
-#
-# The readiness group is also redefined here: Spring Boot 4 ships a
-# HealthEndpointGroupMembershipValidator that rejects a group `include` list
-# referencing a non-registered contributor (`NoSuchHealthContributorException`
-# at context startup). Under this profile `keycloak` is disabled (see above)
-# and `ssl` is absent because `server.ssl.enabled=false`, so we narrow the
-# group to the contributors that DO exist in tests. Production retains the
-# full `readinessState, db, keycloak, diskSpace, ssl` set from application.yml.
 management:
   health:
     keycloak:
@@ -144,9 +78,5 @@ management:
         readiness:
           include: readinessState, db, diskSpace
 
-# Alphabetical key order in the generated OpenAPI document (REQ-API-007, audit item BLD-CI-09), so
-# the committed `api/openapi.json` that OpenApiGeneratorTest writes is byte-stable and CI can fail a
-# pull request whose document is stale (`git diff --exit-code` in ci.yml). Test profile only: the
-# document is only ever generated here, and prod does not serve it at all.
 springdoc:
   writer-with-order-by-keys: true

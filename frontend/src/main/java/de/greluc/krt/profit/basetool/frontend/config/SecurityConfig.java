@@ -172,9 +172,6 @@ public class SecurityConfig {
             botProtectionFilter,
             org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter
                 .class);
-    // M-15: SessionDebugFilter is only registered in dev / test (see its {@code @Profile}). In
-    // prod the bean does not exist; we skip the addFilterBefore call entirely to keep the chain
-    // clean rather than wiring a no-op.
     sessionDebugFilter.ifAvailable(
         f ->
             http.addFilterBefore(
@@ -186,35 +183,13 @@ public class SecurityConfig {
             org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter
                 .class)
         .addFilterBefore(backendRoleSyncFilter, AuthorizationFilter.class)
-        // AFTER the role sync on purpose: a still-pending registration must meet the approval
-        // waiting page, not be bounced between two gates (REQ-SEC-028).
         .addFilterAfter(termsAcceptanceGateFilter, BackendRoleSyncFilter.class)
-        // Audit finding H-6: previously `/missions/**`, `/operations/**`, `/hangar/import/**`,
-        // `/hangar/ships/all` and `/inventory/**` were carved out of CSRF protection entirely.
-        // Those routes are session-cookie-authenticated frontend handlers — exactly the surface
-        // CSRF protects. `SameSite=Strict` on the session cookie mitigates classical cross-site
-        // form-POSTs, but defence-in-depth wants the token check enabled too. AJAX call sites
-        // attach the CSRF header via the shared `krtCsrf` reader (see `krt-fetch.js`), which a
-        // bare-403 self-heals by refetching `GET /csrf` and retrying once; Thymeleaf forms with
-        // `th:action` auto-include the `_csrf` hidden field through Spring Security's view
-        // integration. The default Spring Security CSRF setup is therefore left intact, no
-        // ignoringRequestMatchers needed.
         .requestCache(cache -> cache.requestCache(navigationRequestCache))
         .csrf(org.springframework.security.config.Customizer.withDefaults())
         .headers(SecurityHeaders.frontend(keycloakIssuerUri))
         .authorizeHttpRequests(
             auth ->
-                auth
-                    // The three manager-write entries that stood here are gone. They existed to
-                    // carve those writes back OUT of the /missions/** permitAll that used to sit
-                    // below them; with that block deleted (REQ-SEC-052) they said exactly what
-                    // anyRequest().authenticated() already says. A matrix in which most entries
-                    // restate the catch-all cannot be read against REQ-SEC-052's table, which is
-                    // why every other such entry went in this change too.
-                    // Actuator health endpoint reached by the Docker HEALTHCHECK / compose
-                    // service_healthy gating. Other actuator endpoints fall through to the
-                    // anyRequest().authenticated() catch-all below.
-                    .requestMatchers("/actuator/health", "/actuator/health/**")
+                auth.requestMatchers("/actuator/health", "/actuator/health/**")
                     .permitAll()
                     .requestMatchers(
                         "/",
@@ -228,98 +203,26 @@ public class SecurityConfig {
                         "/impressum",
                         "/privacy",
                         "/terms",
-                        // The third-party licence notice (REQ-UI-021, ADR-0197): owed to whoever
-                        // receives the software, and the landing page already serves the bundled
-                        // font to a visitor with no session. No backend call, no data.
                         "/licenses",
-                        // M-17: static robots.txt with "Disallow: /" so legitimate crawlers
-                        // (Google, Bing, archive.org) get an explicit no-index preference
-                        // instead of a custom-app-signal 404.
                         "/robots.txt",
-                        // Android fetches this to verify the app's claim on
-                        // https://profit-base.online/app/callback. It must answer 200 with
-                        // application/json and MUST NOT redirect: behind the catch-all it
-                        // answered 302 into the OAuth entry point, verification failed, and the
-                        // login callback opened in the browser instead of the app — the member
-                        // landed on the 404 page mid-login. Same class as the /sm/** entry below.
                         "/.well-known/assetlinks.json",
-                        // The web app manifest (REQ-UI-020, ADR-0164), same class as the entry
-                        // above it. A browser fetches this on the LANDING page, before anyone has
-                        // signed in, and WITHOUT credentials — the locale travels in ?locale=
-                        // instead, so nothing here depends on a session. Behind the catch-all it
-                        // would answer 302 into the OAuth entry point and the "manifest" would be
-                        // the login page — the install would then either fail or name the app
-                        // after whatever the redirect returned. It exposes no data: three strings,
-                        // two colours and the path of an icon already public under /logos/**.
-                        // Pinned by AnonymousSurfaceSweepMvcTest's PUBLIC_RESOURCES entry.
                         "/manifest.webmanifest",
-                        // The Android App Link's web-side fallback and the page it redirects to
-                        // (REQ-SEC-038). Reached only when the link did NOT resolve to the app —
-                        // a device whose domain verification is in the sticky failed state, or a
-                        // desktop browser, which has no app to hand it to. Serving a correct
-                        // assetlinks.json does not remove either case.
-                        //
-                        // Anonymous for two separate reasons, and both are load-bearing. The
-                        // member is mid-login and may have no session at all, so behind the
-                        // catch-all this page would redirect into the OAuth2 entry point — the
-                        // very loop it exists to break. And the catch-all would put the callback
-                        // URL, authorization code and all, into HttpSessionRequestCache, to be
-                        // replayed by SavedRequestAwareAuthenticationSuccessHandler after the next
-                        // login — landing the member back on a dead code.
                         "/app/callback",
                         "/app/link-help",
-                        // Browser-side asset paths that must never trigger an OAuth2 entry-point
-                        // (and therefore must never land in HttpSessionRequestCache as a saved
-                        // request). Background sourcemap lookups fired by DevTools and browser
-                        // extensions (Sentry Replay's /sm/<hash>.map, plus generic /**/*.map
-                        // probes against vendor bundles we ship without sourcemaps) used to fall
-                        // into the anyRequest().authenticated() catch-all — the saved URL was
-                        // then replayed by SavedRequestAwareAuthenticationSuccessHandler after a
-                        // user clicked Login, landing them on the custom 404 page instead of /.
-                        // Resource handler returns 404 for the missing files, which is the
-                        // correct contract for the browser. Defense-in-depth for any asset path
-                        // missed here lives in AssetAwareAuthenticationSuccessHandler.
                         "/favicon.ico",
                         "/sm/**",
                         "/**/*.map")
                     .permitAll()
-                    // Multiplexed tool-wide live-sync WebSocket (REQ-FE-015, ADR-0094): one
-                    // socket per tab carrying every peer-sync topic. Both publish and subscribe
-                    // require an authenticated principal; only opaque section keys cross it and
-                    // each fragment re-pull re-authorizes per viewer. Listed explicitly rather than
-                    // left to the catch-all because the handshake interceptor itself always returns
-                    // true — this rule is the whole gate.
                     .requestMatchers("/ws/sync")
                     .authenticated()
-                    // REQ-SEC-052 / ADR-0159: everything else requires a login. The five families
-                    // that used to sit here — /missions, /missions/**, /operations(/**),
-                    // /orders(/**) and /catalog/** — are gone, and with them the last surface an
-                    // unauthenticated visitor could read data from. They fall through to
-                    // anyRequest().authenticated() below, so a navigation is sent into the OAuth2
-                    // entry point and a background fetch answers 401 REAUTH_REQUIRED.
-                    //
-                    // The /orders/create block that preceded them is gone too: it carved the
-                    // creation paths back OUT of the /orders/** permitAll after ADR-0149 took the
-                    // public request form away, and with the wildcard removed it restates the
-                    // catch-all. Its history is in ADR-0149; its behaviour is pinned by
-                    // AnonymousSurfaceSweepMvcTest, which asserts the status of every mapping
-                    // rather than trusting this list to be complete.
                     .anyRequest()
                     .authenticated())
         .oauth2Login(
             oauth2 ->
                 oauth2
                     .loginPage("/oauth2/authorization/keycloak")
-                    // #1041 item 18: count each failed login (with a bounded, exception-type-mapped
-                    // reason) into basetool_login_total before the redirect to /?error. A
-                    // code-to-token / JWKS / state failure breaks all logins with no other frontend
-                    // signal — KeycloakLoginErrorSpike's event regex misses code-to-token errors.
                     .failureHandler(new LoginFailureMetricsHandler(meterRegistry, "/?error"))
                     .successHandler(oauth2LoginSuccessHandler)
-                    // ADR-0115: run the authorization_code token exchange on the pool-hardened
-                    // OAuth token client (idle-evicting frontend-oauth-pool) instead of
-                    // reactor-netty's un-evicting global pool, closing the Keycloak-hairpin
-                    // PrematureClose on the login path as well as the refresh path.
                     .tokenEndpoint(
                         token ->
                             token.accessTokenResponseClient(
@@ -334,10 +237,6 @@ public class SecurityConfig {
             logout ->
                 logout
                     .logoutRequestMatcher(
-                        // L-3: POST-only logout. A GET-triggerable /logout is CSRF-able (a
-                        // cross-site link could force-logout the victim); requiring POST means the
-                        // sidebar's Thymeleaf form must carry the _csrf token. SameSite=Strict
-                        // already mitigates this, so it is defense in depth.
                         request ->
                             "POST".equals(request.getMethod())
                                 && request
@@ -347,39 +246,7 @@ public class SecurityConfig {
         .exceptionHandling(
             ex ->
                 ex.authenticationEntryPoint(ssoReAuthenticationEntryPoint)
-                    // #1041 item 18: count CSRF-token rejections (basetool_csrf_rejections_total)
-                    // before the default 403. krtFetch's silent single-retry self-heal otherwise
-                    // masks a systematic CSRF-wiring regression as intermittent failed writes.
                     .accessDeniedHandler(new CsrfMetricsAccessDeniedHandler(meterRegistry)))
-        // M-14 (+ security audit gap-fill): explicit session-management policy.
-        //   * sessionFixation(changeSessionId) is Spring Security's default since 4.x; pinning it
-        //     here makes the contract explicit so a future regression that switches to {@code
-        //     none} or {@code migrateSession} is visible in code review.
-        //   * maximumSessions(MAX_CONCURRENT_SESSIONS) caps a single user to ten concurrent
-        //     sessions. The cap exists so a stolen cookie used in parallel eventually pushes the
-        //     legitimate session out, but the 30-day idle session TTL
-        //     (server.servlet.session.timeout=720h) means long-lived sessions accumulate: a low cap
-        //     (was 2) evicted real multi-device/-browser users and surfaced the "session expired
-        //     (concurrent logins)" message (2026-07). 10 accommodates realistic
-        //     multi-device/-browser use while still bounding parallel cookie abuse.
-        //     maxSessionsPreventsLogin(false) keeps the UX as "most recent login wins" rather than
-        //     "new login refused" — combined with the cookie SameSite=Strict this is the right
-        //     trade-off for a member-facing app.
-        //   * expiredSessionStrategy(...) makes the eviction observable. Until it was wired, an
-        //     eviction produced no signal at all: Spring's own trace is DEBUG-only on a logger the
-        //     app pins to INFO, and basetool_active_sessions cannot see it either because
-        //     expireNow() MARKS the SessionInformation rather than deleting the session, so the
-        //     gauge does not even dip. See SessionEvictionLoggingStrategy for what it logs/counts
-        //     and why the victim-facing response is byte-for-byte unchanged.
-        //   * Sessions are Redis-indexed (@EnableRedisIndexedHttpSession), so the default in-memory
-        //     SessionRegistryImpl (fed by HttpSessionEventPublisher) NEVER sees them — the cap was
-        // a
-        //     silent no-op. The Redis-backed SpringSessionBackedSessionRegistry (RedisSessionConfig
-        //     #sessionRegistry) is wired in below so the cap is actually enforced and survives a
-        //     restart. The bean is absent in the `test` profile (RedisSessionConfig is
-        //     @Profile("!test")); there maximumSessions falls back to the default registry, which
-        // is
-        //     harmless because the suite never exercises concurrent-session eviction.
         .sessionManagement(
             sm -> {
               var concurrency =
@@ -547,18 +414,10 @@ public class SecurityConfig {
   public AuthenticationSuccessHandler oauth2LoginSuccessHandler(
       @Value("${app.session.authenticated-timeout:720h}") Duration authenticatedSessionTimeout,
       RequestCache navigationRequestCache) {
-    // #1041 item 18: the outer metrics handler counts a success into
-    // basetool_login_total{outcome="success"} — the denominator FrontendLoginBroken checks against.
-    // REQ-SEC-025: the middle handler upgrades the just-authenticated session's idle window from
-    // the
-    // short anonymous default (which keeps orphan CSRF sessions from accreting) to the long login
-    // window, so real members keep the 30-day "stay logged in" behaviour.
     return new LoginSuccessMetricsHandler(
         meterRegistry,
         new SessionLifetimeUpgradeSuccessHandler(
             authenticatedSessionTimeout,
-            // WP-F 11: the SAME cache the chain saves into. A second instance here would read the
-            // same session attribute by luck and ignore the matcher above.
             new AssetAwareAuthenticationSuccessHandler(navigationRequestCache)));
   }
 
@@ -594,17 +453,10 @@ public class SecurityConfig {
         Map<String, Object> additionalParameters =
             new java.util.HashMap<>(req.getAdditionalParameters());
         additionalParameters.put("ui_locales", locale.getLanguage());
-        // Use Keycloak SSO session for silent re-authentication after service restarts.
-        // If the Keycloak SSO session is still active, the user is re-authenticated
-        // transparently without interaction. If not, Keycloak shows the login page.
         String prompt = request.getParameter("prompt");
         if ("none".equals(prompt)) {
           additionalParameters.put("prompt", "none");
         }
-        // Additive "Mit Discord anmelden" path: an `idp=discord` query param (set by the
-        // login link) is forwarded to Keycloak as kc_idp_hint so it jumps straight to the
-        // Discord identity provider. Only the known alias is honoured — never an arbitrary
-        // request value — so the param cannot be used to redirect to an unintended IdP.
         if ("discord".equals(request.getParameter("idp"))) {
           additionalParameters.put("kc_idp_hint", "discord");
         }
@@ -629,11 +481,6 @@ public class SecurityConfig {
           authority -> {
             mappedAuthorities.add(authority);
             if (authority instanceof OidcUserAuthority oidcUserAuthority) {
-              // Audit finding H-11: only log the attribute keys, never the values. The attribute
-              // map still carries `email` / `preferred_username` (and, on a Keycloak that has not
-              // yet had its name mappers removed, possibly `given_name` / `family_name`) — all of
-              // which the PiiMasker only partially scrubs and which this package's TRACE-by-default
-              // Logback config would emit on every login in production.
               log.debug(
                   "OidcUserAuthority attribute keys: {}",
                   oidcUserAuthority.getAttributes().keySet());

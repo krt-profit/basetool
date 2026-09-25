@@ -70,8 +70,6 @@ class OrgUnitStampingServiceOwnerRequiredTest {
 
   @BeforeEach
   void setUp() {
-    // Constructor-wired rather than @InjectMocks-with-reflection: a collaborator that arrives null
-    // fails here as a NullPointerException in a test that was meant to assert a 400.
     service =
         new OrgUnitStampingService(
             requestScopeResolver,
@@ -83,8 +81,6 @@ class OrgUnitStampingServiceOwnerRequiredTest {
     targetUser = new User();
     targetUser.setId(UUID.randomUUID());
 
-    // Two memberships is the whole precondition: with one the auto-stamp resolves it, with none a
-    // different (and correct) BadRequestException fires.
     lenient()
         .when(orgUnitMembershipRepository.findAllByIdUserId(targetUser.getId()))
         .thenReturn(List.of(membership(UUID.randomUUID()), membership(UUID.randomUUID())));
@@ -124,9 +120,6 @@ class OrgUnitStampingServiceOwnerRequiredTest {
 
   @Test
   void theRefusalStaysA400AndIsNotAConflictOrAPermissionFailure() {
-    // The code is new; the contract around it must not move. A member who did not choose has made a
-    // malformed request for their own account, not hit a conflict and not been refused access —
-    // and the frontend branches on status before it branches on code.
     when(requestScopeResolver.readActiveSquadronFromHeader()).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> service.resolveOrgUnitForPickerOutput(targetUser, null))
@@ -137,8 +130,6 @@ class OrgUnitStampingServiceOwnerRequiredTest {
 
   @Test
   void anHonourablePinStillStampsWithoutRefusing() {
-    // The negative that keeps the code honest: REQ-ORG-017 is "pin, ELSE choose". A pinned member
-    // must never see the new message, or it becomes noise on every create form they open.
     UUID pinned = UUID.randomUUID();
     when(orgUnitMembershipRepository.findAllByIdUserId(targetUser.getId()))
         .thenReturn(List.of(membership(pinned), membership(UUID.randomUUID())));

@@ -92,22 +92,17 @@ class BankOrgUnitRequestsE2eTest {
     }
     seeder = new BackendSeeder();
 
-    // The officer holds the Keycloak OFFICER role; making them a member of IRIDIUM gives them
-    // oversight of IRIDIUM (currentOversightScope → their own Staffel).
     String officerId = seeder.getUserId(OFFICER_USER, OFFICER_PASSWORD);
     seeder.assignStaffelMembership(
         ADMIN_USER, ADMIN_PASSWORD, officerId, IRIDIUM_SQUADRON_ID, false, false);
 
-    // The ORG_UNIT account IRIDIUM owns (get-or-create: at most one per org unit).
     accountId =
         seeder.ensureOrgUnitBankAccount(
             MGMT_USER, MGMT_PASSWORD, "E2E Org-Unit Bank", IRIDIUM_SQUADRON_ID);
 
-    // A registered holder the employee records on confirmation (a neutral player).
     String memberId = seeder.getUserId(MEMBER_USER, MEMBER_PASSWORD);
     holderId = seeder.registerBankHolder(MGMT_USER, MGMT_PASSWORD, memberId);
 
-    // The employee may deposit/withdraw on the account (so they can confirm requests on it).
     String employeeId = seeder.getUserId(EMPLOYEE_USER, EMPLOYEE_PASSWORD);
     seeder.createBankGrant(MGMT_USER, MGMT_PASSWORD, employeeId, accountId, true, true, false);
   }
@@ -152,8 +147,6 @@ class BankOrgUnitRequestsE2eTest {
         E2eSupport.login(page, baseUrl, MEMBER_USER, MEMBER_PASSWORD);
         E2eSupport.navigate(page, baseUrl + "/org-unit-bank");
         page.waitForLoadState();
-        // The page opened to every member (REQ-BANK-038), so the member reaches it and sees the
-        // nav entry; overseeing and granted no account, they still see no balance card.
         assertThat(page.locator("[data-testid='nav-org-unit-bank']")).isVisible();
         assertThat(page.locator("[data-testid='org-unit-bank-card']")).hasCount(0);
       } catch (RuntimeException | AssertionError failure) {
@@ -244,8 +237,6 @@ class BankOrgUnitRequestsE2eTest {
       try {
         E2eSupport.login(page, baseUrl, OFFICER_USER, OFFICER_PASSWORD);
         E2eSupport.navigate(page, baseUrl + "/org-unit-bank");
-        // The own-requests list now lives behind the "Meine Anträge" tab; activate it so the cancel
-        // control inside the (otherwise hidden) panel becomes clickable.
         page.locator("[data-testid='org-unit-bank-tab-requests']")
             .click(new Locator.ClickOptions().setTimeout(20_000));
         Locator cancelButton =
@@ -363,8 +354,6 @@ class BankOrgUnitRequestsE2eTest {
         E2eSupport.login(page, baseUrl, EMPLOYEE_USER, EMPLOYEE_PASSWORD);
         E2eSupport.navigate(page, baseUrl + "/org-unit-bank");
         page.waitForLoadState();
-        // The page renders nothing for a bank employee — that is the boundary. The nav LINK is a
-        // different rule (every member sees it) and is no longer asserted here; see the Javadoc.
         assertThat(page.locator("[data-testid='org-unit-bank-card']")).hasCount(0);
       } catch (RuntimeException | AssertionError failure) {
         E2eSupport.dump(page, "org-unit-bank-employee-page-forbidden");
@@ -397,20 +386,10 @@ class BankOrgUnitRequestsE2eTest {
         page.locator("[data-testid='org-unit-request-type']").selectOption("WITHDRAWAL");
         page.locator("[data-testid='org-unit-request-account']").selectOption(accountId);
         page.locator("[data-testid='org-unit-request-amount']").fill(Long.toString(amount));
-        // REQ-BANK-055: the Empfaenger picker is seeded server-side with the requester, so the
-        // common case needs no interaction at all. Asserting merely "not blank" is too weak - the
-        // regression that shipped seeded the USERNAME, which is also not blank and which the
-        // backend then rejected as a malformed UUID. Pin the SUBMITTED value to the officer's id.
-        //
-        // Target the hidden input by its id, not by data-testid: krt-searchable-select transplants
-        // the original select's `id` onto the hidden value input but moves `data-testid` to the
-        // VISIBLE textbox, which carries the human-readable label. Asserting on the testid compares
-        // the label against a UUID and always fails.
         assertThat(page.locator("#org-unit-request-cp-user"))
             .hasValue(
                 seeder.getUserId(OFFICER_USER, OFFICER_PASSWORD),
                 new LocatorAssertions.HasValueOptions().setTimeout(10_000));
-        // ... and the visible textbox shows a label, so the box does not merely look empty.
         assertThat(page.locator("[data-testid='org-unit-request-cp-user']"))
             .not()
             .hasValue("", new LocatorAssertions.HasValueOptions().setTimeout(10_000));
@@ -439,10 +418,6 @@ class BankOrgUnitRequestsE2eTest {
         E2eSupport.navigate(page, baseUrl + "/org-unit-bank");
         page.locator("[data-testid='org-unit-bank-tab-requests']")
             .click(new Locator.ClickOptions().setTimeout(20_000));
-        // Target this request's edit button by the modal id it opens. The `preceding::` axis would
-        // be wrong here: every edit modal is rendered AFTER the whole table, so the nearest
-        // preceding edit button is the LAST row's regardless of which modal it is measured from —
-        // and the shared stack carries pending requests from the sibling tests.
         Locator editButton =
             page.locator(
                 "[data-testid='org-unit-bank-edit-btn'][data-modal-id='ou-req-edit-"
@@ -486,10 +461,6 @@ class BankOrgUnitRequestsE2eTest {
         .first()
         .click(new Locator.ClickOptions().setTimeout(20_000));
     page.locator("[data-testid='org-unit-request-type']").selectOption(type);
-    // The deposit picker lists EVERY active account (REQ-BANK-042) and the stack may hold several,
-    // so pin the IRIDIUM org-unit account explicitly rather than relying on the first option (the
-    // selection is made after the type so the type-driven option filter does not reset it). For a
-    // withdrawal it is the debitable account the officer oversees.
     page.locator("[data-testid='org-unit-request-account']").selectOption(accountId);
     page.locator("[data-testid='org-unit-request-amount']").fill(amount);
     dropFooter(page);

@@ -114,7 +114,6 @@ class ItemsMockupCheckE2eTest {
               .setFullPage(true)
               .setPath(Paths.get("build", "e2e", "pi-items-initial.png")));
 
-      // Open the create modal and screenshot the KRT frame.
       page.locator(".krt-pi-create").click();
       page.waitForTimeout(300);
       Object modalProbe =
@@ -132,8 +131,6 @@ class ItemsMockupCheckE2eTest {
               .setFullPage(true)
               .setPath(Paths.get("build", "e2e", "pi-items-create-modal.png")));
 
-      // Submit name + quantity without a location: the server re-renders the page inline
-      // with the modal open (showItemModal) and the validation error box visible.
       page.locator("#krt-pi-name").fill("Mockup Check Item");
       page.locator("#krt-pi-quantity").fill("3");
       page.locator("#krt-pi-form button[type=submit]").click();

@@ -157,8 +157,6 @@ public class AdminSettingsPageController {
       SystemSettingDto feeSetting =
           backendApiClient.get(
               "/api/v1/settings/operation.transfer_fee_rate", SystemSettingDto.class);
-      // Convert DB fraction (e.g. "0.005") to display percent (e.g. "0.5"). Strip trailing
-      // zeros so "0.50" doesn't render as "0.5000" in the input.
       transferFeePercent =
           new BigDecimal(feeSetting.value()).multiply(ONE_HUNDRED).stripTrailingZeros();
       if (transferFeePercent.scale() < 0) {
@@ -267,7 +265,6 @@ public class AdminSettingsPageController {
         redirectAttributes.addFlashAttribute("errorToast", "error.settings.invalid.values");
         return "redirect:/admin/settings";
       }
-      // Convert human-friendly percent to DB-side decimal fraction (0.5% -> 0.005).
       BigDecimal transferFeeRate = transferFeePercent.divide(ONE_HUNDRED, 6, RoundingMode.HALF_UP);
 
       try {
@@ -289,10 +286,6 @@ public class AdminSettingsPageController {
                 transferFeeRate.stripTrailingZeros().toPlainString(), transferFeeVersion),
             SystemSettingDto.class);
       } finally {
-        // The job-order age thresholds are read via getCached on the orders pages, so evict in a
-        // finally: even a partial save (an early PUT lands, a later one throws) still drops the
-        // cache so the persisted value shows on the next render instead of waiting out the TTL.
-        // Clearing the whole static cache is safe — entries just reload on the next read.
         backendApiClient.clearStaticDataCache();
       }
 
@@ -372,10 +365,6 @@ public class AdminSettingsPageController {
         result.put("transferFeePercent", transferFeePercent.stripTrailingZeros().toPlainString());
         return ResponseEntity.ok(result);
       } finally {
-        // The job-order age thresholds are read via getCached on the orders pages, so evict in a
-        // finally: even a partial save (an early PUT lands, a later one throws) still drops the
-        // cache so the persisted value shows on the next render instead of waiting out the TTL.
-        // Clearing the whole static cache is safe — entries just reload on the next read.
         backendApiClient.clearStaticDataCache();
       }
     } catch (NumberFormatException e) {

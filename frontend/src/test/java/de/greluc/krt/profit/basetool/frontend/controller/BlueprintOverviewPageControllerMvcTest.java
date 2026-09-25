@@ -92,8 +92,6 @@ class BlueprintOverviewPageControllerMvcTest {
     return new PageResponse<>(content, pageIndex, pageSize, total, totalPages, List.of());
   }
 
-  // covers REQ-INV-013 — multi-page result renders the page-nav and the size picker; the size
-  // links jump back to page 0.
   @Test
   @WithMockUser
   void view_multiPageResult_rendersPaginationAndSizePicker() throws Exception {
@@ -103,15 +101,12 @@ class BlueprintOverviewPageControllerMvcTest {
         .perform(get("/blueprint-overview").param("page", "1"))
         .andExpect(status().isOk())
         .andExpect(view().name("blueprint-overview"))
-        // page-nav: previous-page link (page 0) and next-page link (page 2) both present
         .andExpect(content().string(containsString("/blueprint-overview?page=0&amp;size=50")))
         .andExpect(content().string(containsString("/blueprint-overview?page=2&amp;size=50")))
-        // size picker: the two non-active sizes are links back to page 0
         .andExpect(content().string(containsString("/blueprint-overview?page=0&amp;size=10")))
         .andExpect(content().string(containsString("/blueprint-overview?page=0&amp;size=100")));
   }
 
-  // covers REQ-INV-013 — paging and re-sizing keep the active search in every generated link.
   @Test
   @WithMockUser
   void view_withSearch_keepsSearchInPaginationLinks() throws Exception {
@@ -129,9 +124,6 @@ class BlueprintOverviewPageControllerMvcTest {
                     containsString("/blueprint-overview?search=Aurora&amp;page=0&amp;size=50")));
   }
 
-  // covers REQ-FE-002 — an AJAX swap request (fragment=results) renders only the inner table +
-  // pagination fragment: the data table is present, but the surrounding page chrome (the filter
-  // form and the swap-target wrapper div, both outside the fragment) is not.
   @Test
   @WithMockUser
   void view_fragmentResults_rendersOnlyTableFragment() throws Exception {
@@ -146,7 +138,6 @@ class BlueprintOverviewPageControllerMvcTest {
         .andExpect(content().string(not(containsString("class=\"bp-filter\""))));
   }
 
-  // covers REQ-INV-013 — a single short page needs neither page-nav nor size picker.
   @Test
   @WithMockUser
   void view_singleShortPage_rendersNeitherPageNavNorSizePicker() throws Exception {

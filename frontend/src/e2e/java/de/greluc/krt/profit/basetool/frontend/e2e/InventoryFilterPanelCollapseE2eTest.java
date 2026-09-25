@@ -108,9 +108,6 @@ class InventoryFilterPanelCollapseE2eTest {
         E2eSupport.navigate(page, baseUrl + "/inventory/my");
         page.waitForLoadState();
 
-        // Fresh context => no stored preference, so the default applies: collapsed (REQ-FE-021;
-        // it no longer depends on whether anything is filtered). The toggle itself must of course
-        // be visible, or the filters would be unreachable rather than merely tidied away.
         assertThat(page.locator("[data-testid='lager-filter-toggle']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(RENDER_TIMEOUT_MS));
         assertThat(page.locator("#myFilterPanel")).isHidden();
@@ -120,9 +117,6 @@ class InventoryFilterPanelCollapseE2eTest {
         assertThat(page.locator("[data-testid='lager-filter-toggle']"))
             .hasAttribute("aria-expanded", "true");
 
-        // The server always ships the panel expanded, so an "expanded after reload" assertion
-        // would pass even with persistence entirely broken. It is the collapsed leg below that
-        // carries the weight; this one only proves the reload did not throw the preference away.
         page.reload();
         page.waitForLoadState();
         assertThat(page.locator("#myFilterPanel"))
@@ -164,7 +158,6 @@ class InventoryFilterPanelCollapseE2eTest {
         assertThat(page.locator("[data-testid='lager-filter-toggle']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(RENDER_TIMEOUT_MS));
 
-        // Nothing filtered yet: the chip must be absent rather than showing a zero.
         assertThat(page.locator(".filter-toggle [data-filter-count]")).isHidden();
 
         page.locator("[data-testid='lager-filter-toggle']").click();
@@ -206,8 +199,6 @@ class InventoryFilterPanelCollapseE2eTest {
         E2eSupport.navigate(page, baseUrl + "/inventory/all");
         page.waitForLoadState();
 
-        // Fresh context => no stored preference, and an untouched Lager has no active filter, so
-        // the default applies: collapsed, with no chip rather than a zero.
         assertThat(page.locator("[data-testid='lager-filter-toggle']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(RENDER_TIMEOUT_MS));
         assertThat(page.locator("#globalFilterPanel")).isHidden();
@@ -218,8 +209,6 @@ class InventoryFilterPanelCollapseE2eTest {
         assertThat(page.locator("[data-testid='lager-filter-toggle']"))
             .hasAttribute("aria-expanded", "true");
 
-        // The collapsed leg is the one that carries the weight: the server always ships the panel
-        // expanded, so only a collapse surviving a reload proves the preference was persisted.
         page.locator("[data-testid='lager-filter-toggle']").click();
         assertThat(page.locator("#globalFilterPanel")).isHidden();
         page.reload();

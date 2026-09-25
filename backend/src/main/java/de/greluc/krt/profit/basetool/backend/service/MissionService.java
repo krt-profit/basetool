@@ -202,12 +202,6 @@ public class MissionService {
     if (status == null || status.isEmpty()) {
       status = List.of("PLANNED", "ACTIVE", "COMPLETED", "CANCELLED");
     }
-    // The M-1 override that stood here forced isInternal=false for an unauthenticated caller, as
-    // defence-in-depth against a controller forgetting to pass it. Removed with its audience
-    // (ADR-0159): there is no unauthenticated caller on this path, and `currentScopePredicate()`
-    // now throws for one rather than building an empty predicate — so the guard could only ever be
-    // reached by a request that has already failed. Internal-mission visibility among members is
-    // decided by the scope predicate below, which is where it always belonged.
     Boolean effectiveIsInternal = isInternal;
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
     return missionRepository.searchMissions(
@@ -274,21 +268,10 @@ public class MissionService {
     Optional<Mission> next;
     if (scope.adminAllScope()
         || (scope.activeOrgUnitId() == null && scope.memberOrgUnitIds().isEmpty())) {
-      // No org-unit scope: admin all-scope, or a member with no membership. Unchanged behaviour —
-      // the soonest PLANNED/ACTIVE mission across the whole organisation. REQ-MISSION-008.
       next = findNextMissionHead(now);
     } else {
-      // The caller has an org-unit scope: restrict the banner to missions owned by those org units.
-      // A Bereich/OL leader's scope already carries the cascaded descendants (REQ-ORG-015 via
-      // OwnerScopeService.currentMemberOrgUnitIds); a plain member sees only their own units.
       next = findNextScopedMissionHead(now, scope);
     }
-    // The limit-1 lookups above are intentionally not graphed — a collection fetch combined with
-    // the
-    // limit forces Hibernate into in-memory pagination (HHH90003004). Re-fetch the single hit by id
-    // through the graphed findById so participants / assignedUnits are eagerly loaded for the
-    // mapper
-    // (and the home-page peer redaction) without paginating the whole upcoming-mission set.
     return next.map(Mission::getId).flatMap(missionRepository::findById);
   }
 
@@ -347,28 +330,15 @@ public class MissionService {
     Mission mission = new Mission();
     applyCreatePayload(mission, request);
 
-    // Fail-fast on the time-window validation BEFORE the userService / ownerScopeService
-    // round-trips so a malformed payload does not waste a DB / security-context lookup.
     validateMissionTimes(mission);
 
     userService.getCurrentUser().ifPresent(mission::setOwner);
 
     if (mission.getOwner() != null) {
-      // R5.d.d: owner present → route through the shared picker resolver, which honours an
-      // explicit owningOrgUnitId from the form if the caller is a member of that org unit, and
-      // falls back to the owner's home Staffel when the field is null. The *nullable* resolver is
-      // used so a membershipless leadership user ("Bereichsleitung", who belongs to no Staffel/SK
-      // but may plan org-wide missions) resolves to a null owner instead of a 400 — the resulting
-      // ownerless mission is attributable through its owner and scoped by the mission visibility
-      // rules (public unless internal). See OwnerScopeService.resolveOrgUnitForPickerOutputNullable
-      // and V144.
       mission.setOwningOrgUnit(
           ownerScopeService.resolveOrgUnitForPickerOutputNullable(
               mission.getOwner(), request.owningOrgUnitId()));
     } else {
-      // No authenticated owner (admin in "all squadrons" mode or anonymous fallback) — the
-      // picker field, if supplied, cannot be membership-validated. Honour the historical
-      // behaviour: stamp from the active org-unit scope.
       ownerScopeService.currentOrgUnit().ifPresent(mission::setOwningOrgUnit);
     }
 
@@ -463,11 +433,6 @@ public class MissionService {
    */
   @Transactional
   public Mission updateMission(@NotNull UUID missionId, UpdateMissionRequest request) {
-    // Since #1114 every mutable mission scalar is @OptimisticLock(excluded = true), so a full
-    // overwrite no longer bumps the row @Version by itself. Load under OPTIMISTIC_FORCE_INCREMENT
-    // so the flush still increments+checks @Version (WHERE version = loaded) — that keeps this
-    // legacy whole-mission path's "two concurrent overwrites 409 against each other" guarantee. The
-    // client-echo check below additionally rejects a form that was already stale at load time.
     Mission mission =
         Entities.require(missionRepository.findByIdForFullReplace(missionId), "Mission not found");
 
@@ -475,10 +440,6 @@ public class MissionService {
       throw new ObjectOptimisticLockingFailureException(Mission.class, missionId);
     }
 
-    // Decide the effective actualStartTime UP FRONT, before mutating any setter on the managed
-    // entity — the auto-stamp branch reads the current (pre-mutation) status, so capturing it
-    // here keeps the decision honest and avoids a far-away usage of the snapshot variable that
-    // Checkstyle's VariableDeclarationUsageDistance would otherwise flag.
     Instant explicitActualStart = request.actualStartTime();
     boolean autoStampActualStart =
         "ACTIVE".equals(request.status())
@@ -568,9 +529,6 @@ public class MissionService {
     enforceSectionVersion(
         missionRepository, mission, MissionSection.CORE, expectedCoreVersion, missionId);
 
-    // Cross-section auto-stamp FIRST, before mutating mission.status — the condition reads the
-    // OLD status, so it must run before the setter below. Setting actualStartTime here is safe
-    // because it touches a different field; the later setters do not overwrite it.
     if ("ACTIVE".equals(status)
         && !"ACTIVE".equals(mission.getStatus())
         && mission.getActualStartTime() == null) {
@@ -593,10 +551,6 @@ public class MissionService {
       mission.setOperation(null);
     }
 
-    // coreVersion was already bumped atomically by enforceSectionVersion above; the flush writes
-    // the
-    // dirtied core scalars (+ the advanced counter) via @DynamicUpdate without touching other
-    // sections' columns.
     Mission saved = missionRepository.save(mission);
     auditService.record(
         AuditEventType.MISSION_UPDATED,
@@ -637,20 +591,10 @@ public class MissionService {
     mission.setActualStartTime(actualStartTime);
     mission.setActualEndTime(actualEndTime);
 
-    // A failed time-order validation rolls the transaction back, undoing the counter bump above.
     validateMissionTimes(mission);
     Mission saved = missionRepository.save(mission);
 
     if (actualEndTime != null) {
-      // Single set-based clamp instead of an O(roster) entity loop (#1146, CLAUDE.md bulk-update
-      // rule): the per-row loop gave every checked-in participant a versioned UPDATE at commit, so
-      // the whole schedule write 409'd if any of up-to-500 rows was concurrently modified, and
-      // every
-      // in-flight check-out racing this sweep 409'd at its own commit. One atomic UPDATE (row locks
-      // serialize it; flushAutomatically lands the schedule scalars first) cannot 409 against
-      // concurrent participant writes and shrinks the transaction from O(roster) to one statement.
-      // The slim schedule response carries scalars only, so the now-stale in-memory participant
-      // endTimes do not affect it.
       missionParticipantRepository.clampCheckedInEndTimes(missionId, actualEndTime);
     }
     auditService.record(
@@ -697,14 +641,6 @@ public class MissionService {
    */
   private void bumpActualStartTimeOnActivationWithinTransaction(@NotNull Mission mission) {
     mission.setActualStartTime(Instant.now());
-    // Deliberate in-memory (unconditional) schedule bump, NOT the DB-enforced
-    // enforceSectionVersion:
-    // the activation carries no client-echoed scheduleVersion, so there is nothing to check
-    // against.
-    // @DynamicUpdate flushes only actual_start_time + schedule_version; a concurrent schedule
-    // editor
-    // that echoed the pre-activation version still 409s (its conditional bump matches 0 rows once
-    // this commits first), which is the invalidation this cross-section poke exists to produce.
     bumpSectionVersion(mission, MissionSection.SCHEDULE);
   }
 
@@ -721,22 +657,14 @@ public class MissionService {
   public void deleteMission(@NotNull UUID missionId) {
     Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
 
-    // Snapshot the label/id BEFORE the delete so the audit row survives the removed aggregate.
     final UUID deletedMissionId = mission.getId();
     final String deletedMissionName = mission.getName();
 
-    // Variante C (REQ-INV-027): an inventory entry's mission earmark lives in the
-    // mission-allocation
-    // table with an ON DELETE CASCADE FK, so deleting the mission drops those slices automatically
-    // while the inventory rows survive as (partially) unassigned stock — no manual detach needed.
-
-    // Detach refinery orders
     if (mission.getRefineryOrders() != null) {
       mission.getRefineryOrders().forEach(order -> order.setMission(null));
       mission.getRefineryOrders().clear();
     }
 
-    // Detach sub-missions
     if (mission.getSubMissions() != null) {
       mission.getSubMissions().forEach(sub -> sub.setParent(null));
       mission.getSubMissions().clear();
@@ -1006,8 +934,6 @@ public class MissionService {
     return missionStructureService.removeMissionUnit(missionId, unitId);
   }
 
-  // --- Ablauf steps (procedure timeline) ---
-
   /**
    * Appends a step to the mission's Ablauf timeline. The new step lands at the end ({@code
    * orderIndex = max + 1}) and is initially not done. Validates and bumps the dedicated {@code
@@ -1095,8 +1021,6 @@ public class MissionService {
       @NotNull Long expectedStepsVersion) {
     return missionTimelineService.toggleStepDone(missionId, stepId, done, expectedStepsVersion);
   }
-
-  // --- Mission goals (Ziele) ---
 
   /**
    * Appends a goal (Ziel) to a mission at the end of the list (next {@code orderIndex}) and bumps
@@ -1289,8 +1213,6 @@ public class MissionService {
         missionName,
         null,
         AuditDetails.of("frequencyType", frequencyTypeId));
-    // The native upsert bypassed the persistence context (clearAutomatically), so re-load a fresh
-    // managed mission whose frequencies collection includes the upserted row for the response.
     return Entities.require(missionRepository.findById(missionId), "Mission not found");
   }
 
@@ -1322,8 +1244,6 @@ public class MissionService {
     mission.getFrequencies().add(freq);
     MissionFrequency saved = missionFrequencyRepository.save(freq);
 
-    // Audit finding parity with the typed path: the label is user free text, so log only the row id
-    // (never the name), per REQ-AUDIT-001's "no free text / no PII in the details payload" rule.
     auditService.record(
         AuditEventType.MISSION_FREQUENCY_CHANGED,
         mission.getId(),
@@ -1433,13 +1353,8 @@ public class MissionService {
       @NotNull UUID missionId, @NotNull UUID userId, @NotNull Long expectedOwnershipVersion) {
     Mission mission = Entities.require(missionRepository.findById(missionId), "Mission not found");
     User user = Entities.require(userRepository.findPlainById(userId), "User not found");
-    // Before mission.setOwner: a first change materialises the companion row with the owner it is
-    // replacing, which is read off the mission.
     long ownershipVersion = upsertMissionOwnership(mission, user, expectedOwnershipVersion);
-    // Mission.owner is @OptimisticLock(excluded=true), so this does NOT bump Mission.version.
     mission.setOwner(user);
-    // The formula column was read when the mission was loaded; hand the response the counter this
-    // change produced, or the client would echo a stale one and 409 itself on its next change.
     mission.setOwnershipVersion(ownershipVersion);
     auditService.record(
         AuditEventType.MISSION_OWNER_CHANGED, mission.getId(), mission.getName(), userId, null);
@@ -1537,8 +1452,6 @@ public class MissionService {
     OrgUnit target = ownerScopeService.resolveReassignTargetOrgUnit(targetOrgUnitId);
     mission.setOwningOrgUnit(target);
     Mission saved = missionRepository.save(mission);
-    // Audit detail carries org-unit identifiers + kinds only — no PII, no user free text (the
-    // mission name is the entity label, handled separately by the audit record).
     auditService.record(
         AuditEventType.MISSION_OWNING_ORG_UNIT_CHANGED,
         mission.getId(),

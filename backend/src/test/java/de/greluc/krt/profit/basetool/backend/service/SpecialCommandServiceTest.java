@@ -168,10 +168,6 @@ class SpecialCommandServiceTest {
 
   @Test
   void createSpecialCommand_enforcesPromotionDisabled() {
-    // Defense in depth: even if a caller hands the service a transient entity with the inherited
-    // OrgUnit default of isPromotionEnabled = true (which the SpecialCommand constructor should
-    // already have flipped to false), the V94 DB CHECK would reject the row. This test pins the
-    // expected post-condition on the in-memory entity before the save call hits the DB.
     SpecialCommand fresh = new SpecialCommand();
     fresh.setName("Bravo");
     fresh.setShorthand("BRV");
@@ -188,7 +184,6 @@ class SpecialCommandServiceTest {
         .thenReturn(false);
     when(specialCommandRepository.findById(alphaId)).thenReturn(Optional.of(alpha));
     when(specialCommandRepository.save(alpha)).thenReturn(alpha);
-    // alpha.getVersion() returns null from the @Mock-built entity unless we set it
     alpha.setVersion(0L);
 
     SpecialCommand updated = specialCommandService.updateSpecialCommand(alphaId, dto);
@@ -217,9 +212,8 @@ class SpecialCommandServiceTest {
 
   @Test
   void updateSpecialCommand_staleVersion_throwsOptimisticLock() {
-    SpecialCommandDto dto =
-        new SpecialCommandDto(alphaId, "Alpha", "ALF", null, true, false, 0L /* stale */);
-    alpha.setVersion(5L); // current DB version
+    SpecialCommandDto dto = new SpecialCommandDto(alphaId, "Alpha", "ALF", null, true, false, 0L);
+    alpha.setVersion(5L);
     when(specialCommandRepository.existsByNameIgnoreCaseAndIdNot("Alpha", alphaId))
         .thenReturn(false);
     when(specialCommandRepository.findById(alphaId)).thenReturn(Optional.of(alpha));

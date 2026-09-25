@@ -56,62 +56,42 @@ class FrontendAuthHelperServiceTest {
         .setAuthentication(new TestingAuthenticationToken("user", "pw", authorities));
   }
 
-  // The three isAnonymous() cases stood here. The method is gone with the caller it described
-  // (ADR-0159): nothing anonymous reaches a frontend handler any more, so every branch that asked
-  // the question was dead code. What the cases actually pinned — that Spring's anonymous token is
-  // authenticated and must not be mistaken for a member — survives in isAuthenticated()'s own
-  // tests below, which is where the distinction always lived.
-
   @Test
   void isMemberOrAbove_withSquadronMemberRole_returnsTrue() {
-    // Given
     authenticateWith("ROLE_KRT_MEMBER");
-    // When / Then
     assertTrue(service.isMemberOrAbove(), "a squadron member is a member or above");
   }
 
   @Test
   void isMemberOrAbove_withAdminRole_returnsTrue() {
-    // Given
     authenticateWith("ROLE_ADMIN");
-    // When / Then
     assertTrue(service.isMemberOrAbove(), "an admin is a member or above");
   }
 
   @Test
   void isMemberOrAbove_withOnlyTheNoRoleMarker_returnsFalse() {
-    // Given — the marker that replaced the deleted GUEST role (V239 / REQ-SEC-053) carries no
-    // member authority
     authenticateWith("ROLE_NO_ROLE");
-    // When / Then
     assertFalse(service.isMemberOrAbove(), "a role-less account is not a member");
   }
 
   @Test
   void isMemberOrAbove_withNoAuthentication_returnsFalse() {
-    // Given — empty security context (anonymous browser hitting a permitAll page)
     SecurityContextHolder.clearContext();
-    // When / Then
     assertFalse(service.isMemberOrAbove(), "missing authentication is not a member");
   }
 
   @Test
   void isMemberOrAbove_withAnonymousToken_returnsFalse() {
-    // Given
     SecurityContextHolder.getContext()
         .setAuthentication(
             new AnonymousAuthenticationToken(
                 "key", "anonymousUser", List.of(new SimpleGrantedAuthority("ROLE_ANONYMOUS"))));
-    // When / Then
     assertFalse(service.isMemberOrAbove(), "an anonymous token is not a member");
   }
 
   @Test
   void isMemberOrAbove_readsTokenAuthorities_notPrincipalObject() {
-    // Given — the exact regression shape: a member ROLE_* present on the Authentication token even
-    // though no OidcUser principal object is involved. Reading the token must still see it.
     authenticateWith("ROLE_OFFICER");
-    // When / Then
     assertTrue(service.isMemberOrAbove(), "officer authority on the token counts as member");
   }
 }

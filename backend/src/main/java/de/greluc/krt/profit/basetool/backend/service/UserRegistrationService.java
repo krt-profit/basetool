@@ -164,7 +164,6 @@ public class UserRegistrationService {
             .filter(Objects::nonNull)
             .map(name -> name.toLowerCase(Locale.ROOT))
             .collect(Collectors.toSet());
-    // JPQL rejects an empty IN list, and a page with no named rows has nothing to collide anyway.
     return names.isEmpty() ? Set.of() : userRepository.findUsernamesHeldByMoreThanOneAccount(names);
   }
 
@@ -250,7 +249,6 @@ public class UserRegistrationService {
     user.setApprovalStatus(ApprovalStatus.PENDING);
     user.setApprovedAt(null);
     user.setApprovedById(null);
-    // saveAndFlush so the bumped @Version reaches the response for the no-reload admin queue.
     User saved = userRepository.saveAndFlush(user);
     userApprovalEventRepository.save(
         new UserApprovalEvent(userId, ApprovalDecision.REOPENED, reason, adminId));
@@ -278,8 +276,6 @@ public class UserRegistrationService {
     User user = decide(userId, version, ApprovalStatus.ACTIVE, adminId);
     userApprovalEventRepository.save(
         new UserApprovalEvent(userId, ApprovalDecision.APPROVED, null, adminId));
-    // REQ-NOTIF-014: notify the user by e-mail after commit. Best-effort and off-thread — the
-    // after-commit listener swallows any mail failure so it never affects this approval.
     eventPublisher.publishEvent(
         new UserApprovalDecidedEvent(userId, true, user.getEmail(), user.getEffectiveName(), null));
     return user;
@@ -310,8 +306,6 @@ public class UserRegistrationService {
     User user = decide(userId, version, ApprovalStatus.REJECTED, adminId);
     userApprovalEventRepository.save(
         new UserApprovalEvent(userId, ApprovalDecision.REJECTED, reason, adminId));
-    // REQ-NOTIF-014: notify the user by e-mail after commit, including the admin's reason. Best-
-    // effort and off-thread — the after-commit listener swallows any mail failure.
     eventPublisher.publishEvent(
         new UserApprovalDecidedEvent(
             userId, false, user.getEmail(), user.getEffectiveName(), reason));
@@ -333,9 +327,6 @@ public class UserRegistrationService {
   private User decide(UUID userId, @Nullable Long version, ApprovalStatus newStatus, UUID adminId) {
     User user = Entities.require(userRepository.findById(userId), "User not found");
     OptimisticLock.checkOptionalClient(user.getVersion(), version, User.class, userId);
-    // State-transition guard (PR review #3): only a still-PENDING registration may be approved or
-    // rejected. Acting on an already-ACTIVE member would silently strip their authorities and trap
-    // them on the waiting page; an already-REJECTED row is a stale double-action. Either is a 409.
     if (user.getApprovalStatus() != ApprovalStatus.PENDING) {
       throw new BusinessConflictException(
           "Only a pending registration can be decided; current status is "
@@ -414,35 +405,9 @@ public class UserRegistrationService {
           "The target account is already linked to a Discord account");
     }
 
-    // Resolve the incoming Discord identity: authoritatively from Keycloak (works even when the
-    // discord_user_id claim mapper never persisted it onto app_user — the original motivation),
-    // falling back to the persisted local discord_user_id when Keycloak no longer knows the pending
-    // user. The fallback makes the flow recoverable after a partial failure that already removed
-    // the throwaway Keycloak user (the delete below is non-transactional and does not roll back),
-    // so a retry can still complete instead of stranding the registration on an empty Keycloak
-    // read.
     KeycloakService.DiscordLink link = resolveDiscordLink(pending);
     String guildNickname = pending.getDiscordGuildNickname();
 
-    // Move the identity onto the target (idempotent: a re-link of the same snowflake is a no-op),
-    // then commit the database merge, and only THEN drop the throwaway Keycloak user. Deleting the
-    // throwaway user LAST — after the DB is consistent — is what makes a retry safe: if the DB
-    // merge fails and rolls back, the pending Keycloak user still exists, so the next attempt reads
-    // its identity cleanly. The delete is itself idempotent (a 404 for an already-gone user = ok).
-    // Take the identity OFF the throwaway before putting it on the target. Keycloak permits one
-    // Discord snowflake on two users -- FEDERATED_IDENTITY is keyed on (user, provider), its index
-    // on FEDERATED_USER_ID is not unique, and the Admin API checks only the target -- and the state
-    // it permits is not benign: getUserByFederatedIdentity throws IllegalStateException with two
-    // holders, so every later Discord login of that member fails outright. Linking first and
-    // deleting the throwaway last created exactly that state for the duration of the two calls
-    // below, and permanently whenever the DB half rolled back.
-    //
-    // The retry safety the old order was written for is unaffected, because it never rested on the
-    // LINK surviving -- it rests on the throwaway USER surviving, which it still does, and on the
-    // local discord_user_id fallback in resolveDiscordLink, which the rolled-back DB half leaves
-    // intact. A failure between the two calls leaves the identity on nobody: the member's next
-    // Discord login lands as a fresh pending registration, which is visible and resolvable, rather
-    // than as a 500 nobody can read.
     keycloakService.unlinkDiscordIdentity(pendingId);
     keycloakService.linkDiscordIdentity(targetUserId, link.userId(), link.userName());
     User result =
@@ -532,15 +497,8 @@ public class UserRegistrationService {
         .findById(pendingId)
         .ifPresent(
             pending -> {
-              // Its Keycloak user is already deleted; clear the guard so the FK-safe delete runs,
-              // and flush so the row (and its unique discord_user_id) is gone before the target
-              // claims the snowflake below.
               pending.setInKeycloak(false);
               userRepository.saveAndFlush(pending);
-              // The throwaway Keycloak user is still there: the orchestrator removes it AFTER this
-              // transaction commits, which is what makes a retry safe. So the deletion service's
-              // live presence probe would refuse -- it is asking about a user this very operation
-              // is disposing of. Waived explicitly rather than reordered (#1827).
               userDeletionService.deleteUser(
                   pendingId,
                   UserDeletionService.KeycloakPresenceCheck

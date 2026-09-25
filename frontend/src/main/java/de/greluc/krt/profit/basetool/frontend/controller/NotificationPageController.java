@@ -162,8 +162,6 @@ public class NotificationPageController {
       model.addAttribute("notifTotal", firstPage == null ? 0L : firstPage.totalElements());
       model.addAttribute("notifHasMore", hasMore(firstPage));
     } catch (ReauthenticationRequiredException e) {
-      // Let GlobalExceptionHandler bounce the user through a fresh Keycloak login (302) rather than
-      // rendering an empty inbox on a dead session.
       throw e;
     } catch (Exception e) {
       log.debug("Failed to load notifications page", e);
@@ -231,40 +229,19 @@ public class NotificationPageController {
     OAuth2AuthorizedClient authorizedClient =
         authorizedClientRepository.loadAuthorizedClient(REGISTRATION_ID, authentication, request);
     if (authorizedClient == null || authorizedClient.getAccessToken() == null) {
-      // No usable token snapshot (e.g. a freshly-lost session): fail soft. The 60s unread-count
-      // poll runs the same backend call through BackendApiClient and drives re-authentication.
       emitter.complete();
       return emitter;
     }
     String bearerToken = authorizedClient.getAccessToken().getTokenValue();
-    // Commit the SSE response NOW, on the request thread, with an initial keep-alive comment.
-    // Load-bearing (ADR-0113) — do NOT remove as "redundant" next to the forwarded backend
-    // `connected`: this relay's first real write is forward() below, invoked on a reactor-netty
-    // event-loop thread, and Spring Web 7 + Tomcat 11 do NOT commit an async SSE response whose
-    // first write lands on a non-container thread (spring-ai #6169) — without this the status line
-    // + headers never reach the browser/NPM and every stream 60s-header-times-out (the
-    // 100%-dead-SSE
-    // incident of 2026-07-20). Spring replays this pre-initialize send on the request (dispatch)
-    // thread when it initializes the emitter, committing the response there, on a container thread
-    // —
-    // the same request-thread-first-write pattern the backend's
-    // NotificationStreamService.subscribe()
-    // already uses. A comment (not a named event) is invisible to EventSource, so it only flushes
-    // the
-    // headers; the forwarded backend events (incl. the backend's own `connected`) follow normally.
     try {
       emitter.send(SseEmitter.event().comment("ready"));
     } catch (IOException | RuntimeException e) {
-      // Browser already gone before we could commit: fail soft, do not wire the relay.
       log.debug(
           "Notification stream initial commit failed ({}); completing",
           e.getClass().getSimpleName());
       emitter.complete();
       return emitter;
     }
-    // Count this relay for the whole lifetime of the upstream subscription. doFinally fires exactly
-    // once on any terminal signal — upstream complete/error, or a cancel when the browser
-    // disconnects and onCompletion/onTimeout dispose the subscription below — so it stays balanced.
     relayConnections.incrementAndGet();
     Disposable subscription =
         sseWebClient
@@ -478,8 +455,6 @@ public class NotificationPageController {
           backendApiClient.get(BACKEND_BASE + "/unread-count", NotificationCountResponse.class);
       return response != null && response.count() != null ? response.count() : 0L;
     } catch (ReauthenticationRequiredException e) {
-      // Surface a 401 + X-Reauthenticate (via GlobalExceptionHandler) so the always-on badge poll
-      // re-logs the user in instead of silently reporting zero on a dead session.
       throw e;
     } catch (Exception e) {
       log.debug("Failed to load unread count", e);
@@ -526,9 +501,6 @@ public class NotificationPageController {
       }
       return;
     }
-    // Best-effort SSE: complete cleanly (browser reconnects, poll keeps the badge fresh) instead of
-    // completeWithError(), which re-dispatches through the MVC exception handler and logs an ERROR
-    // for every transient backend-stream drop (REQ-NOTIF-010). DEBUG only.
     log.debug(
         "Notification stream dropped ({}); completing cleanly, poll fallback keeps the badge fresh",
         error.getClass().getSimpleName());
@@ -556,10 +528,6 @@ public class NotificationPageController {
    */
   private static boolean isTermsGateSignal(Throwable error) {
     Throwable current = error;
-    // Depth-capped rather than cycle-detecting, mirroring
-    // ReauthenticationRequiredException.isReauthSignal: a self-referential cause chain must not
-    // spin
-    // a Reactor worker thread.
     for (int depth = 0; current != null && depth < MAX_CAUSE_DEPTH; depth++) {
       if (current instanceof WebClientResponseException response
           && response.getStatusCode() == HttpStatus.FORBIDDEN
@@ -587,12 +555,6 @@ public class NotificationPageController {
       }
       emitter.send(builder);
     } catch (IOException | RuntimeException e) {
-      // REQ-OBS-001 / REQ-NOTIF-010: a send failure here is almost always a routine client
-      // disconnect (broken pipe when the viewer closes the tab mid-event). completeWithError()
-      // re-dispatches through the MVC @ExceptionHandler and logs a spurious ERROR per dropped
-      // stream — the dominant source of frontend ERROR-log noise during a backend/Keycloak blip.
-      // Complete cleanly instead (onCompletion disposes the upstream subscription), mirroring
-      // handleStreamError(); the poll fallback keeps the badge fresh.
       log.debug(
           "Notification stream send failed ({}); completing cleanly", e.getClass().getSimpleName());
       emitter.complete();

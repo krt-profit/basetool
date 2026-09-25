@@ -59,11 +59,6 @@ class UserMapperTest {
 
   @BeforeEach
   void setUp() {
-    // Post-R9 D3 (V101): the mapper derives squadron + flag fields from the membership table. Wire
-    // the membership repository plus a real StaffelMembershipResolver (backed by the repo mocks —
-    // the polymorphic OrgUnitRepository serves the multi-row batch, the SquadronRepository the
-    // single-row existsById fast path) so the name-sort path is exercised end-to-end; we are not
-    // running inside a Spring context.
     mapper = Mappers.getMapper(UserMapper.class);
     membershipRepository = mock(OrgUnitMembershipRepository.class);
     squadronRepository = mock(SquadronRepository.class);
@@ -110,8 +105,6 @@ class UserMapperTest {
     user.setDescription("desc");
     user.getRoles().add(admin);
     user.getRoles().add(officer);
-    // No membership rows wired — the mapper projects squadron / isLogistician / isMissionManager
-    // as null / false respectively for this fixture.
     when(membershipRepository.findAllByIdUserIdAndKind(user.getId(), OrgUnitKind.SQUADRON))
         .thenReturn(List.of());
 
@@ -119,21 +112,16 @@ class UserMapperTest {
     assertNotNull(dto);
     assertEquals(user.getId(), dto.id());
     assertEquals("jdoe", dto.username());
-    // PII: toDto deliberately omits email (it is re-added only on the /me self path via
-    // UserController.withSelfEmail). It must be null on every projection this mapper produces.
     assertNull(dto.email());
     assertEquals(5, dto.rank());
     assertEquals("desc", dto.description());
     assertEquals(Set.of("ADMIN", "OFFICER"), dto.roles());
     assertEquals(Set.of("USER_MANAGE", "ROLE_ASSIGN", "MISSION_MANAGE"), dto.permissions());
-    // No Discord id wired on the fixture -> the link indicator is false (REQ-SEC-019).
     assertEquals(Boolean.FALSE, dto.discordLinked());
   }
 
   @Test
   void toDto_withDiscordUserId_setsDiscordLinkedTrue() {
-    // covers REQ-SEC-019 / REQ-DATA-006 — a federated Discord account surfaces as discordLinked,
-    // while the raw snowflake itself is never copied onto the DTO.
     User user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername("linked");
@@ -148,7 +136,6 @@ class UserMapperTest {
 
   @Test
   void toDto_withBlankDiscordUserId_setsDiscordLinkedFalse() {
-    // A blank (whitespace-only) Discord id is treated as "not linked" — no symbol shown.
     User user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername("blank");
@@ -188,16 +175,12 @@ class UserMapperTest {
 
   @Test
   void toDto_twoStaffeln_mapsNameSortedSquadronsAndPrimary() {
-    // REQ-ORG-017: a member may hold up to two Staffeln. The mapper projects them name-sorted via
-    // the shared StaffelMembershipResolver, with squadron == the name-sorted primary (first).
     User user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername("dual");
 
     UUID alphaId = UUID.randomUUID();
     UUID bravoId = UUID.randomUUID();
-    // Rows + squadron entities returned in non-alphabetical order to prove the sort — not the
-    // repository/input order — decides the primary.
     when(membershipRepository.findAllByIdUserIdAndKind(user.getId(), OrgUnitKind.SQUADRON))
         .thenReturn(List.of(staffelRow(user.getId(), bravoId), staffelRow(user.getId(), alphaId)));
     when(orgUnitRepository.findAllById(any()))
@@ -216,9 +199,6 @@ class UserMapperTest {
 
   @Test
   void toDto_withinRequest_loadsStaffelMembershipOncePerUser() {
-    // The three derived-field resolvers (squadron / isLogistician / isMissionManager) each need the
-    // user's Staffel membership. Within an HTTP request the lookup is memoised per user, so the
-    // derived JPQL query runs once instead of three times per toDto.
     User user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername("memo");
@@ -239,9 +219,6 @@ class UserMapperTest {
 
   @Test
   void toDto_withoutRequestScope_fallsBackToDirectQuery() {
-    // Outside an HTTP request (e.g. a scheduled task) there is no request scope to memoise on, so
-    // each of the four membership-derived resolvers (squadron, squadrons, isLogistician,
-    // isMissionManager) issues its own lookup — the fallback must not throw.
     User user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername("noRequest");
@@ -257,8 +234,6 @@ class UserMapperTest {
 
   @Test
   void toDto_withinRequest_resolvesSquadronEntitiesOncePerUser() {
-    // BE-PERF-01 (a): squadron and squadrons both read the resolved Staffeln; within a request the
-    // second read comes from the memo, so the Staffel entities are loaded once, not twice.
     User user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername("dualMemo");
@@ -287,9 +262,6 @@ class UserMapperTest {
 
   @Test
   void primeStaffelMemberships_seedsWholePageInTwoQueries() {
-    // BE-PERF-01 (b): the primer loads every user's Staffel rows in one batch query and every
-    // referenced Staffel in one findAllById; the per-user toDto calls then issue no query at all,
-    // and a user without any Staffel is seeded as such rather than re-queried.
     User dual = new User();
     dual.setId(UUID.randomUUID());
     dual.setUsername("dual");
@@ -313,7 +285,7 @@ class UserMapperTest {
     UserDto noneDto;
     try {
       mapper.primeStaffelMemberships(List.of(dual, none));
-      mapper.primeStaffelMemberships(List.of(dual, none)); // idempotent: no second batch
+      mapper.primeStaffelMemberships(List.of(dual, none));
       dualDto = mapper.toDto(dual);
       noneDto = mapper.toDto(none);
     } finally {
@@ -332,7 +304,6 @@ class UserMapperTest {
 
   @Test
   void primeStaffelMemberships_outsideRequest_isNoOp() {
-    // Without a request scope there is no memo to seed; the primer must not query at all.
     User user = new User();
     user.setId(UUID.randomUUID());
 

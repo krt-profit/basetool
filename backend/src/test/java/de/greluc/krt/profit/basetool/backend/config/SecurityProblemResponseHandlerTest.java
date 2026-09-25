@@ -175,8 +175,6 @@ class SecurityProblemResponseHandlerTest {
 
   @Test
   void handle_leavesUserIdUnsetForANonJwtAuthentication() throws Exception {
-    // Nothing to stamp: the sub only exists on a bearer token, and REQ-OBS-004 forbids falling
-    // back to the principal name (which is the callsign).
     SecurityContextHolder.getContext()
         .setAuthentication(new UsernamePasswordAuthenticationToken("callsign", "n/a", List.of()));
     AtomicReference<String> seen = new AtomicReference<>("sentinel");
@@ -283,8 +281,6 @@ class SecurityProblemResponseHandlerTest {
 
   @Test
   void anErrorCodeOutsideTheRfcSetCollapsesToTheBoundedLiteral() throws Exception {
-    // The code is a string on the wire: a custom authorization server (or a future Spring release)
-    // can put anything there, and an unbounded label is a cardinality bomb (REQ-OBS-006).
     HandlerExceptionResolver resolver = mock(HandlerExceptionResolver.class);
     when(resolver.resolveException(any(), any(), isNull(), any())).thenReturn(new ModelAndView());
 
@@ -305,9 +301,6 @@ class SecurityProblemResponseHandlerTest {
 
   @Test
   void aNonBearerAuthenticationFailureIsStillCounted() throws Exception {
-    // A failure that is not an OAuth2AuthenticationException carries no code at all; dropping it
-    // would make the counter disagree with basetool_http_error_total{code="UNAUTHENTICATED"} and
-    // leave the difference unexplained.
     HandlerExceptionResolver resolver = mock(HandlerExceptionResolver.class);
     when(resolver.resolveException(any(), any(), isNull(), any())).thenReturn(new ModelAndView());
 
@@ -323,10 +316,6 @@ class SecurityProblemResponseHandlerTest {
   @Test
   @DisplayName("a request with no Authorization header at all reads as no_credentials, not other")
   void aCredentiallessRequestIsCountedUnderItsOwnReason() throws Exception {
-    // The production case, and the one the counter was blind to. ExceptionTranslationFilter raises
-    // this — never an OAuth2AuthenticationException — for every caller that presents no token, so
-    // before the split it swallowed 100% of real traffic: 6 618 of 6 618 backend 401s on
-    // 2026-09-13 read `other`, and the metric built to answer "why" answered nothing (REQ-OBS-018).
     HandlerExceptionResolver resolver = mock(HandlerExceptionResolver.class);
     when(resolver.resolveException(any(), any(), isNull(), any())).thenReturn(new ModelAndView());
 
@@ -346,8 +335,6 @@ class SecurityProblemResponseHandlerTest {
   @Test
   @DisplayName("the method-security spelling of 'nothing was presented' maps the same way")
   void aMissingCredentialFromMethodSecurityIsAlsoNoCredentials() throws Exception {
-    // Same meaning, different filter: method security throws this one. Mapping only the
-    // ExceptionTranslationFilter spelling would split one cause across two series.
     HandlerExceptionResolver resolver = mock(HandlerExceptionResolver.class);
     when(resolver.resolveException(any(), any(), isNull(), any())).thenReturn(new ModelAndView());
 
@@ -364,9 +351,6 @@ class SecurityProblemResponseHandlerTest {
   @Test
   @DisplayName("a rejected token never lands on no_credentials — the alert depends on the split")
   void aRejectedTokenDoesNotLandOnTheNoCredentialSeries() throws Exception {
-    // BackendAuthFailureSpike now watches invalid_token alone, precisely because probe traffic and
-    // scanners can only ever produce no_credentials. If these two ever merged, the alert would be
-    // measuring the monitoring plane again (ADR-0173).
     HandlerExceptionResolver resolver = mock(HandlerExceptionResolver.class);
     when(resolver.resolveException(any(), any(), isNull(), any())).thenReturn(new ModelAndView());
 
@@ -383,9 +367,6 @@ class SecurityProblemResponseHandlerTest {
 
   @Test
   void anAccessDeniedVerdictIsNotAnAuthenticationFailure() throws Exception {
-    // 403 means the caller authenticated fine and lacks an authority. Counting it here would
-    // inflate
-    // the spike alert with ordinary authorization outcomes.
     HandlerExceptionResolver resolver = mock(HandlerExceptionResolver.class);
     when(resolver.resolveException(any(), any(), isNull(), any())).thenReturn(new ModelAndView());
 

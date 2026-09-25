@@ -1,116 +1,34 @@
 #!/bin/bash
-# =============================================================================
-# Profit Basetool — consistent, encrypted, off-site backup
-#
-# Captures the full-restore backup surface and pushes it CLIENT-SIDE ENCRYPTED
-# to a Nextcloud WebDAV target via restic (over an rclone remote). Runs nightly
-# at 04:15 from iri-backup.timer, or manually:
-#   sudo -u deploy /var/iri/code/scripts/backup.sh                # full run
-#   sudo -u deploy /var/iri/code/scripts/backup.sh --no-quiesce   # online dump, zero downtime
-#   sudo -u deploy /var/iri/code/scripts/backup.sh --skip-upload  # dump only, no restic push
-#   sudo -u deploy /var/iri/code/scripts/backup.sh --dry-run      # show plan + snapshots, change nothing
-#
-# WHAT IS CAPTURED (the full-restore surface — docs/specs/backup-recovery.md,
-# REQ-OPS-008/009):
-#   * pg_dump -Fc of the backend database          (krt_basetool)
-#   * pg_dump -Fc of the Keycloak database          (keycloak — the live source
-#     of truth for realm/users/clients, NOT the sanitized realm-export.json)
-#   * the edge's TLS material and ACME account      (the edge-certs,
-#     edge-acme-state and edge-acme-webroot volumes) — without these a restored
-#     host cannot serve HTTPS, and re-issuing runs into Let's Encrypt's limit of
-#     five duplicate certificates per week for this SAN set
-#   * host secrets and configuration needed to stand the stack up
-#     (.env, keystore.p12, the per-service internal TLS material under
-#     /var/iri/secrets/tls once rolled out, realm-export.json, keycloak/providers, and the redis
-#     users.acl — which is ACCESS CONTROL, not session data: redis refuses to
-#     start without the file its --aclfile names, ADR-0088)
-#   * the monitoring plane (epic #936, ADR-0072)     — Grafana SQLite (consistent
-#     copy), the rendered monitoring secrets/certs, the Alertmanager state, and a
-#     WEEKLY Prometheus TSDB snapshot (admin API) protecting the 180-day archive
-#   NOT captured by design: Redis session data (sessions just re-login), logs,
-#     and — a DELIBERATE data-protection decision (ADR-0072) — the Loki log store, whose
-#     GFS retention would silently extend the approved 31-day IP retention; Tempo
-#     traces and exporter/textfile data (regenerable) are excluded too.
-#
-# CONSISTENCY (REQ-OPS-009): pg_dump alone is already a transactionally
-# consistent snapshot, but to obtain one globally quiescent instant we briefly
-# STOP the writer services (frontend, backend, ingest) for the DUMP only — the
-# edge serves the existing maintenance page meanwhile — then restart them BEFORE the
-# slow restic upload. The user-facing window is therefore the dump duration
-# (seconds), never the upload. A trap guarantees the stack is restarted even if
-# a dump step fails, so production is never left down.
-#
-# COORDINATION: acquires the SAME flock deploy.sh uses (/var/lock/iri-deploy.lock)
-# so a 5-minute deploy tick cannot recreate containers mid-backup, and vice
-# versa. The lock is released as soon as the writers are back up, so the slow
-# upload never blocks a deploy.
-#
-# SECRETS: the restic repo password + rclone/Nextcloud app-password live in
-# /etc/iri/backup.env (root-only), never in git and never in the .env config
-# bundle (REQ-OPS-005, REQ-OPS-012). The staged plaintext dumps live under
-# /var/iri/backup/staging and are removed on every exit.
-# =============================================================================
 
 set -euo pipefail
 
-# The shared helpers (log, fail, read_env, write_textfile) and the container-runtime seam (ADR-0163).
 IRI_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source-path=SCRIPTDIR
 # shellcheck source=lib/common.sh
 # shellcheck disable=SC1091
-# repo-lint.yml runs shellcheck without -x, so it cannot follow a sourced file.
 . "${IRI_SCRIPT_DIR}/lib/common.sh"
 # shellcheck source=lib/container-runtime.sh
 # shellcheck disable=SC1091
 . "${IRI_SCRIPT_DIR}/lib/container-runtime.sh"
 
-# --- Defaults / paths -------------------------------------------------------
 COMPOSE_DIR="${IRI_COMPOSE_DIR:-/var/iri/code}"
 STATE_DIR="${IRI_STATE_DIR:-/var/lib/iri}"
 BACKUP_DIR="${IRI_BACKUP_DIR:-/var/iri/backup}"
 STAGING_BASE="${BACKUP_DIR}/staging"
 LOCKFILE="${IRI_LOCKFILE:-/var/lock/iri-deploy.lock}"
 BACKUP_ENV="${IRI_BACKUP_ENV:-/etc/iri/backup.env}"
-# The Redis ACL is CONFIGURATION, not session data -- see the capture below.
 REDIS_ACL_PATH="${IRI_REDIS_ACL_HOST_PATH:-/var/iri/redis/users.acl}"
 
-# Writer services quiesced for the dump. Keycloak + the two Postgres DBs + Redis
-# + the edge stay up (the edge must, to serve the maintenance page). An array so
-# each name is passed as its own argument (no word-splitting landmines). Each stop
-# waits the unit's own StopTimeout= (30 s for the application modules).
 WRITER_SERVICES=(frontend backend ingest)
 LOCK_WAIT="${IRI_BACKUP_LOCK_WAIT:-300}"
 
-# GFS retention (REQ-OPS-008). Overridable from backup.env.
 KEEP_DAILY="${IRI_KEEP_DAILY:-7}"
 KEEP_WEEKLY="${IRI_KEEP_WEEKLY:-4}"
 KEEP_MONTHLY="${IRI_KEEP_MONTHLY:-6}"
 
-# Image used for the throwaway helper that reads root-owned paths and named
-# volumes (the deploy user cannot open them directly; a container running as root
-# can).
-# Defaults to the Postgres image, which is always present on the host.
-# FULLY QUALIFIED, and it has to be: podman on Rocky enforces short-name resolution and refuses
-# without a TTY:
-#
-#     Error: short-name resolution enforced but cannot prompt without a TTY
-#
-# Measured on the testing host 2026-09-20. Every helper read failed that way -- the edge certificate
-# volumes, the redis ACL and the keystore -- and each failure is a best-effort WARN by design, so
-# the backup went on to report success over a snapshot that was missing all of them. Precisely the
-# class the certificate-capture work was about, arriving through the registry instead.
-#
-# And PINNED BY DIGEST, since 2026-09-22 (OPS-SEC-03): the reference is read at runtime from
-# db-backend's own unit (`rt_unit_image`, below, after rt_detect has found the unit directory), so
-# the helper runs byte-for-byte the PostgreSQL image the database runs -- already on disk, never a
-# fresh pull of whatever the tag points at that night, and never a second pin for Dependabot to
-# miss. The tag is only the last resort, and it says so in the log.
 HELPER_IMAGE_FALLBACK="docker.io/library/postgres:18-alpine"
 HELPER_IMAGE="${IRI_BACKUP_HELPER_IMAGE:-}"
 
-# Monitoring-plane backup (epic #936, ADR-0072). Best-effort and fully guarded so a host WITHOUT the
-# monitoring stack is unaffected. Loki data is deliberately EXCLUDED (its GFS retention would silently
-# extend the approved 31-day IP retention); Tempo + exporter/textfile data are excluded too (ADR-0072).
 MON_DATA="${IRI_MONITORING_DIR:-/var/iri/monitoring}"
 START_EPOCH="$(date +%s)"
 
@@ -118,7 +36,6 @@ QUIESCE=true
 SKIP_UPLOAD=false
 DRY_RUN=false
 
-# --- CLI args ---------------------------------------------------------------
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --no-quiesce) QUIESCE=false; shift ;;
@@ -129,8 +46,8 @@ while [[ $# -gt 0 ]]; do
 Usage: backup.sh [--no-quiesce] [--skip-upload] [--dry-run]
 
 Captures a consistent full-restore backup set and pushes it client-side
-encrypted to Nextcloud via restic. See the header of this file and
-docs/backup.md for the operator runbook.
+encrypted to Nextcloud via restic. See docs/backup.md for the operator
+runbook.
 
 Options:
   --no-quiesce   Do NOT stop the writer services; rely on pg_dump's own MVCC
@@ -152,12 +69,6 @@ USAGE
   esac
 done
 
-# --- Helpers ----------------------------------------------------------------
-# log, fail, read_env and write_textfile are lib/common.sh's.
-
-# Writes the backup outcome textfile metric (node_exporter textfile collector; epic #936). Only
-# called after a fully successful upload + restic check, so age>26h or absent() reliably means the
-# backup missed or failed (ADR-0072 alert wiring).
 write_backup_metrics() {
   local now dur
   now="$(date +%s)"; dur=$(( now - START_EPOCH ))
@@ -171,15 +82,10 @@ write_backup_metrics() {
   } | write_textfile backup.prom || true
 }
 
-# --- Pre-flight -------------------------------------------------------------
 [[ -f "${COMPOSE_DIR}/.env" ]] || fail "missing ${COMPOSE_DIR}/.env"
 [[ -f "${BACKUP_ENV}" ]] || fail "missing ${BACKUP_ENV} (restic repo + rclone config; see docs/backup.md)"
 rt_detect
-# Before the quiesce can stop anything: a catch-up run fires seconds after boot, and stopping the
-# writers while their units are still starting is a race with the stack's own startup.
 rt_wait_for_startup
-# The application services, so rt_monitoring_services can tell the monitoring units apart by
-# elimination -- the same list deploy.sh names.
 export RT_STACK_SERVICES="db-backend db-keycloak redis keycloak backend ingest frontend edge acme"
 log "container runtime: ${RT_BACKEND}"
 if [[ -z "${HELPER_IMAGE}" ]]; then
@@ -193,14 +99,11 @@ fi
 command -v restic >/dev/null 2>&1 || fail "restic not found (dnf install restic; ansible role: 10-packages.yml)"
 command -v rclone >/dev/null 2>&1 || fail "rclone not found (dnf install rclone; ansible role: 10-packages.yml)"
 
-# The deploy user has no usable $HOME; pin restic's cache into STATE_DIR (in the systemd unit's
-# ReadWritePaths) so it does not try to write under an unreachable home.
 export RESTIC_CACHE_DIR="${RESTIC_CACHE_DIR:-${STATE_DIR}/restic-cache}"
 mkdir -p "${RESTIC_CACHE_DIR}" "${STAGING_BASE}"
 
-# Load the backup secrets/config (RESTIC_REPOSITORY, RESTIC_PASSWORD, RCLONE_CONFIG, …).
 set -a
-# shellcheck source=/dev/null  # operator-provided host file, not in the repo
+# shellcheck source=/dev/null
 . "${BACKUP_ENV}"
 set +a
 [[ -n "${RESTIC_REPOSITORY:-}" ]] || fail "RESTIC_REPOSITORY not set in ${BACKUP_ENV}"
@@ -208,13 +111,10 @@ set +a
 
 KEYSTORE_PATH="$(read_env IRI_KEYSTORE_HOST_PATH)"
 KEYSTORE_PATH="${KEYSTORE_PATH:-/var/iri/secrets/keystore.p12}"
-# Where scripts/mint-internal-tls.sh put the per-service material (docs/deployment.md, "Internal
-# TLS"). Overridable for a host that keeps it elsewhere; absent until the rollout.
 INTERNAL_TLS_DIR="${IRI_INTERNAL_TLS_DIR:-/var/iri/secrets/tls}"
 
 cd "${COMPOSE_DIR}"
 
-# --- Dry run ----------------------------------------------------------------
 if [[ "${DRY_RUN}" == "true" ]]; then
   log "DRY RUN — would back up: krt_basetool + keycloak dumps, the edge-certs/edge-acme-state/edge-acme-webroot volumes, .env, ${KEYSTORE_PATH}, ${INTERNAL_TLS_DIR} (if present), ${REDIS_ACL_PATH}, realm-export.json, keycloak/providers"
   log "DRY RUN — quiesce=${QUIESCE} (stop: ${WRITER_SERVICES[*]}); repo=${RESTIC_REPOSITORY}; retention ${KEEP_DAILY}/${KEEP_WEEKLY}/${KEEP_MONTHLY}"
@@ -223,30 +123,25 @@ if [[ "${DRY_RUN}" == "true" ]]; then
   exit 0
 fi
 
-# --- Lock (shared with deploy.sh) -------------------------------------------
 exec 200>"${LOCKFILE}"
 if ! flock -w "${LOCK_WAIT}" 200; then
   fail "could not acquire deploy lock within ${LOCK_WAIT}s (a deploy may be running) — skipping this backup"
 fi
 
-# --- Staging + restart safety net -------------------------------------------
 TS="$(date -u +%Y%m%dT%H%M%SZ)"
 STAGING="${STAGING_BASE}/${TS}"
 mkdir -p "${STAGING}/config"
 chmod 700 "${STAGING}"
 
 QUIESCED=false
-# shellcheck disable=SC2317  # cleanup runs indirectly via the EXIT trap set below
+# shellcheck disable=SC2317
 cleanup() {
   local rc=$?
-  # Safety net: if we stopped the writers and never restarted them (a dump
-  # failed), bring them back so production is not left down.
   if [[ "${QUIESCED}" == "true" ]]; then
     log "cleanup: writers still stopped — restarting ${WRITER_SERVICES[*]}"
     rt_service_start "${WRITER_SERVICES[@]}" >/dev/null 2>&1 || log "WARN: failed to restart writers during cleanup"
     QUIESCED=false
   fi
-  # The staged dumps contain plaintext secrets + PII — never leave them around.
   if [[ -n "${STAGING:-}" && -d "${STAGING}" ]]; then
     rm -rf "${STAGING}"
   fi
@@ -254,7 +149,6 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# --- Quiesce writers (REQ-OPS-009) ------------------------------------------
 if [[ "${QUIESCE}" == "true" ]]; then
   log "quiescing writers for the dump: stop ${WRITER_SERVICES[*]} (the edge serves the maintenance page)"
   rt_service_stop "${WRITER_SERVICES[@]}"
@@ -263,39 +157,18 @@ else
   log "running ONLINE (no quiesce): relying on pg_dump MVCC snapshot consistency"
 fi
 
-# --- Dump the databases (creds stay inside the containers) ------------------
 log "dumping backend database (krt_basetool)"
-# SC2016: the $VARs are intentionally single-quoted — they must expand inside the
-# container from its own env, not on the host (keeps the password off the host arg list).
 # shellcheck disable=SC2016
 rt_exec db-backend sh -c \
   'PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -U "$POSTGRES_USER" -h 127.0.0.1 -p 15432 -Fc "$POSTGRES_DB"' \
   > "${STAGING}/krt_basetool.dump"
 
 log "dumping Keycloak database (keycloak)"
-# shellcheck disable=SC2016  # see the note above — expand inside the container, not the host
+# shellcheck disable=SC2016
 rt_exec db-keycloak sh -c \
   'PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -U "$POSTGRES_USER" -h 127.0.0.1 -p 15433 -Fc "$POSTGRES_DB"' \
   > "${STAGING}/keycloak.dump"
 
-# --- Capture the edge's TLS material and ACME account state -----------------
-#
-# The edge (docker/edge, ADR-0162) and its ACME client keep this material in
-# three NAMED VOLUMES, not in a host directory, so it has to be captured through
-# the helper rather than copied. REQ-OPS-010 says the set is "exactly what a full
-# restore needs", and without these a restore cannot serve HTTPS:
-#
-#   edge-certs        the issued certificates and their private keys
-#   edge-acme-state   the ACME account key and the issuance history
-#   edge-acme-webroot the http-01 challenge root
-#
-# Losing the ACME state is not merely inconvenient. Let's Encrypt allows five
-# duplicate certificates per week for a SAN set, so a host rebuilt without them
-# re-issues into a rate limit — which is why a host rebuild seeds the
-# certificates from a snapshot rather than re-issuing.
-#
-# Each volume is optional and reported: a host that does not run the edge has
-# none of them, and that must read differently from one where the read failed.
 for _vol in edge-certs edge-acme-state edge-acme-webroot; do
   if ! rt_volume_exists "${_vol}"; then
     log "  ${_vol}: not present on this host — skipped"
@@ -311,17 +184,6 @@ for _vol in edge-certs edge-acme-state edge-acme-webroot; do
   fi
 done
 
-# --- Capture the Redis ACL, which is configuration and not session data -----
-#
-# /var/iri/redis holds two different things: the append-only files and dump.rdb,
-# which are sessions and are deliberately excluded, and users.acl, which is the
-# access control. ADR-0088: redis-server is started with --aclfile, refuses to
-# start without the file that names, and an ACL file missing a `default` entry
-# makes redis reset that user to `nopass ~* &* +@all` at load.
-#
-# Nothing generates it — it is host-provisioned — so a restore without it
-# produces a redis that does not come up, and a hand-written replacement that
-# omits one line produces one that is wide open.
 if [[ -f "${REDIS_ACL_PATH}" ]]; then
   if rt_read_mount "$(dirname "${REDIS_ACL_PATH}")" "${HELPER_IMAGE}" \
        cat "/src/$(basename "${REDIS_ACL_PATH}")" > "${STAGING}/config/users.acl" 2>/dev/null \
@@ -335,20 +197,9 @@ else
   log "WARN: no redis ACL at ${REDIS_ACL_PATH} — redis will NOT start from this snapshot"
 fi
 
-# --- Capture host secrets / config needed for a full restore ----------------
 log "capturing host config (.env, keystore, realm-export, providers)"
 cp -p "${COMPOSE_DIR}/.env" "${STAGING}/config/dotenv"
 if [[ -f "${KEYSTORE_PATH}" ]]; then
-  # The keystore is a root-owned 0640 secret (REQ-OPS-016, #1018): readable only by
-  # root, group 10001 (the JVM containers) and uid 1000 via a POSIX ACL (Keycloak).
-  # The deploy user that runs this backup is none of those and CANNOT read it
-  # directly — a plain `cp` here is what broke the 2026-07-06 run. Capture it the
-  # same way as the other artifacts it cannot open (the edge volumes, grafana.db):
-  # stream the bytes out through a throwaway helper container (rt_read_mount). This
-  # uses the container access the deploy user already has (on the Podman host, its
-  # sudo grant to the service user), so it needs no extra host ACL and leaves the keystore's
-  # 0640 hardening untouched. Best-effort + loud: a read failure must never abort the
-  # whole backup and lose the irreplaceable DB dumps (the original set -e landmine).
   if rt_read_mount "$(dirname "${KEYSTORE_PATH}")" "${HELPER_IMAGE}" \
        cat "/src/$(basename "${KEYSTORE_PATH}")" > "${STAGING}/config/keystore.p12" 2>/dev/null \
      && [[ -s "${STAGING}/config/keystore.p12" ]]; then
@@ -360,12 +211,6 @@ if [[ -f "${KEYSTORE_PATH}" ]]; then
 else
   log "WARN: keystore not found at ${KEYSTORE_PATH} — skipped"
 fi
-# The per-service internal TLS material (REQ-SEC-070): one keystore per service, the CA-only
-# truststore and the CA certificate, minted into one directory. Its CA key no longer exists, so a
-# lost file cannot be re-issued -- only the whole set re-minted, with every consumer restarted.
-# Captured as one tar through the helper, like the keystore above and for the same reason (the
-# keystores are 0640 and the deploy user cannot read them). A host that has not rolled out the
-# per-service material yet has no such directory; that is not a failure.
 if [[ -d "${INTERNAL_TLS_DIR}" ]]; then
   if rt_read_mount "${INTERNAL_TLS_DIR}" "${HELPER_IMAGE}" tar -C /src -cf - . \
        > "${STAGING}/config/internal-tls.tar" 2>/dev/null \
@@ -377,11 +222,6 @@ if [[ -d "${INTERNAL_TLS_DIR}" ]]; then
   fi
 fi
 if [[ -f "${COMPOSE_DIR}/realm-export.json" ]]; then
-  # Through the helper, like the keystore, and for the same reason: this is an operator-provided
-  # file whose ownership the deployer does not control. On the Podman host it arrived iri-owned
-  # 0640 and the plain `cp` that used to be here failed with "Permission denied" -- as a hard
-  # error, because unlike the keystore it had no fallback, so it aborted the host-config capture
-  # and took the providers archive with it.
   if rt_read_mount "${COMPOSE_DIR}" "${HELPER_IMAGE}" cat /src/realm-export.json        > "${STAGING}/config/realm-export.json" 2>/dev/null      && [[ -s "${STAGING}/config/realm-export.json" ]]; then
     :
   else
@@ -394,16 +234,6 @@ if [[ -d "${COMPOSE_DIR}/keycloak/providers" ]]; then
     || log "WARN: could not archive keycloak/providers — skipped"
 fi
 
-# --- Restart writers BEFORE the slow upload -------------------------------
-#
-# LOUD BUT NOT FATAL, and that distinction is the difference between a nightly snapshot and none.
-# `systemctl start` waits for `Notify=healthy` and returns non-zero if it does not arrive. So a writer that is merely SLOW -- the frontend's unit
-# allows itself 4m15s -- made this bare command abort the whole run under `set -e`, with both
-# database dumps already on disk and never uploaded.
-#
-# Measured on the testing host 2026-09-20: the backup captured everything, failed here, and the
-# restore drill then reported `no snapshot found`. Losing the irreplaceable dumps because a service
-# was slow to come back is the same landmine the capture blocks above are all guarded against.
 if [[ "${QUIESCED}" == "true" ]]; then
   log "dumps captured — restarting writers (${WRITER_SERVICES[*]})"
   if ! rt_service_start "${WRITER_SERVICES[@]}"; then
@@ -412,12 +242,6 @@ if [[ "${QUIESCED}" == "true" ]]; then
   QUIESCED=false
 fi
 
-# --- Capture the monitoring plane (epic #936, ADR-0072) ---------------------
-# Grafana SQLite (consistent copy via a brief graceful stop — a clean shutdown checkpoints the WAL,
-# so a plain copy of grafana.db is complete), the rendered secrets/certs (host-rebuild = restore, not
-# re-provisioning), and the Alertmanager state (silences + notification log). Done while still holding
-# the deploy lock so a concurrent deploy tick cannot restart Grafana mid-copy. Fully guarded
-# and best-effort: a monitoring failure never fails the DB backup.
 if rt_monitoring_configured && rt_is_running grafana; then
   mkdir -p "${STAGING}/monitoring"
   log "capturing Grafana SQLite (brief grafana stop for a consistent copy)"
@@ -447,21 +271,9 @@ else
   log "monitoring stack not present/running — skipping monitoring artifact capture"
 fi
 
-# --- Release the deploy lock; the slow upload runs while fully live ----------
 flock -u 200 || true
 log "deploy lock released; the rest runs while fully live"
 
-# --- Weekly (Sunday) Prometheus TSDB snapshot into the backup ---------------
-# Protects the 180-day metric archive + the #937 baseline against host/disk loss (ADR-0072). Uses the
-# admin API (enabled ONLY together with basic auth), asked from INSIDE the prometheus container with
-# the password read there from its own mounted secret (rt_prometheus_snapshot) -- no helper image, and
-# no password on any command line. Best-effort; the snapshot dir is removed after staging, again from
-# inside the container that owns it, so the prometheus volume does not grow unbounded.
-#
-# The existence test that used to guard the archive (`-d` on the snapshot's host path) is gone on
-# purpose: the TSDB directory belongs to the container's `nobody` under rootless Podman, so the
-# deploy account could not see into it and the test was false every week. The archive's own result is
-# the answer instead.
 if [[ "$(date -u +%u)" == "7" ]] && rt_monitoring_configured && rt_is_running prometheus; then
   mkdir -p "${STAGING}/monitoring"
   log "weekly Prometheus TSDB snapshot via admin API"
@@ -488,7 +300,6 @@ if [[ "${SKIP_UPLOAD}" == "true" ]]; then
   exit 0
 fi
 
-# --- Push to Nextcloud via restic (client-side encrypted) -------------------
 if ! restic snapshots >/dev/null 2>&1; then
   log "restic repository not reachable yet — attempting one-time init"
   restic init || fail "restic init failed — check ${BACKUP_ENV} (repo URL, password, rclone remote)"
@@ -505,7 +316,6 @@ restic forget --tag basetool \
 log "verifying repository integrity (restic check)"
 restic check
 
-# Monitoring signal: record the successful backup for the "backup >26h or absent" alert (epic #936).
 write_backup_metrics
 
 log "backup complete"

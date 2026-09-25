@@ -32,7 +32,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-// covers REQ-INV-003 (server-side validation) - see docs/specs/inv-material-quantities.md
 @ExtendWith(MockitoExtension.class)
 class ValidQuantityAmountValidatorTest {
 
@@ -117,37 +116,24 @@ class ValidQuantityAmountValidatorTest {
 
   @Test
   void shouldBeValidWhenScuHasMoreThanThreeDecimals() {
-    // SCU precision is no longer rejected: an amount with more than three decimals is rounded
-    // HALF_UP to three places at the persistence boundary (the entity @PrePersist/@PreUpdate
-    // hooks), mirroring the frontend, so the validator must accept it rather than refuse it.
     when(materialPieceTypeLookup.isPieceQuantity(materialId)).thenReturn(false);
 
     assertTrue(validator.isValid(new TestDto(materialId, 10.1234), context));
   }
 
-  // --- game-item payloads (REQ-INV-029) -------------------------------------
-
-  // covers REQ-INV-029 (gameItem amounts: positive whole units, no catalog lookup)
   @Test
   void gameItemPayload_wholePositiveAmount_isValid_withoutMaterialLookup() {
-    // Given a gameItem-only payload with a positive whole amount
     QuantityAware dto = new TestItemDto(UUID.randomUUID(), 5.0);
 
-    // When / Then — valid, and the PIECE lookup seam is never consulted (item amounts are
-    // unconditionally whole units, no catalog metadata needed).
     assertTrue(validator.isValid(dto, context));
     verifyNoInteractions(materialPieceTypeLookup);
   }
 
-  // covers REQ-INV-029 (the closed validator hole: a gameItemId-only payload IS validated)
   @Test
   void gameItemPayload_zeroOrNegativeAmount_isInvalid() {
-    // Given the violation-builder plumbing
     when(context.buildConstraintViolationWithTemplate(anyString())).thenReturn(builder);
     when(builder.addPropertyNode("amount")).thenReturn(nodeBuilder);
 
-    // When / Then — with materialId == null the pre-V220 validator silently skipped ALL amount
-    // rules; the closed hole now rejects zero and negative amounts on the gameItem branch.
     assertFalse(validator.isValid(new TestItemDto(UUID.randomUUID(), 0.0), context));
     assertFalse(validator.isValid(new TestItemDto(UUID.randomUUID(), -3.0), context));
 
@@ -157,15 +143,11 @@ class ValidQuantityAmountValidatorTest {
     verifyNoInteractions(materialPieceTypeLookup);
   }
 
-  // covers REQ-INV-029 (gameItem amounts are whole units)
   @Test
   void gameItemPayload_fractionalAmount_isInvalid() {
-    // Given the violation-builder plumbing
     when(context.buildConstraintViolationWithTemplate(anyString())).thenReturn(builder);
     when(builder.addPropertyNode("amount")).thenReturn(nodeBuilder);
 
-    // When / Then — fractional item amounts are rejected like PIECE materials, but without any
-    // MaterialPieceTypeLookup interaction.
     assertFalse(validator.isValid(new TestItemDto(UUID.randomUUID(), 2.5), context));
 
     verify(context).disableDefaultConstraintViolation();
@@ -174,16 +156,11 @@ class ValidQuantityAmountValidatorTest {
     verifyNoInteractions(materialPieceTypeLookup);
   }
 
-  // covers REQ-INV-029 (catalog precedence: the gameItem branch wins over the material branch)
   @Test
   void dualCatalogPayload_gameItemBranchWins_withoutMaterialLookup() {
-    // Given the violation-builder plumbing and a payload carrying BOTH catalog references (a
-    // crafted shape the DTO's @AssertTrue XOR guard rejects separately)
     when(context.buildConstraintViolationWithTemplate(anyString())).thenReturn(builder);
     when(builder.addPropertyNode("amount")).thenReturn(nodeBuilder);
 
-    // When / Then — the fractional amount is rejected under the item rule: the gameItem branch
-    // runs first, so the material/PIECE lookup is never consulted even though materialId is set.
     assertFalse(validator.isValid(new TestDualDto(materialId, UUID.randomUUID(), 2.5), context));
 
     verify(context).disableDefaultConstraintViolation();

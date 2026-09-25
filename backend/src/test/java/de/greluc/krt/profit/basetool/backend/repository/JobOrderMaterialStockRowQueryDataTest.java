@@ -113,8 +113,6 @@ class JobOrderMaterialStockRowQueryDataTest {
     saveLinkedItem(user, location, material, iridium, order, 300, 10.0);
     saveLinkedItem(user, location, material, iridium, order, 600, 20.0);
     saveLinkedItem(user, location, material, iridium, order, 900, 5.0);
-    // An unallocated item (no job-order slice) at the same material must be dropped by the
-    // allocation filter — it never surfaces in the InventoryJobOrderAllocation projection.
     InventoryItem unlinked = new InventoryItem();
     unlinked.setUser(user);
     unlinked.setLocation(location);
@@ -141,7 +139,6 @@ class JobOrderMaterialStockRowQueryDataTest {
         .extracting(JobOrderMaterialStockRow::amount)
         .containsExactlyInAnyOrder(10.0, 20.0, 5.0);
 
-    // null floor -> 35 (all), 600 -> 25 (600 + 900), 1000 -> 0 (none qualifies).
     for (Integer floor : new Integer[] {null, 600, 1000}) {
       double inMemorySum =
           rows.stream()
@@ -184,9 +181,6 @@ class JobOrderMaterialStockRowQueryDataTest {
     inv.setAmount(amount);
     inv.setPersonal(false);
     inv.setOwningOrgUnit(owner);
-    // Variante C (REQ-INV-027): the scalar jobOrder column is gone, so the fulfilment queries read
-    // the per-entry job-order allocation. The fixture earmarks the full amount into one allocation
-    // (cascade-persisted with the entry) exactly as the service create path does.
     InventoryAllocations.addJobOrder(inv, order, amount, false);
     inventoryItemRepository.save(inv);
   }

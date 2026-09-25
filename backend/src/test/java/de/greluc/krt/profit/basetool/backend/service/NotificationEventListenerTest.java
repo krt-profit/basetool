@@ -62,7 +62,6 @@ class NotificationEventListenerTest {
 
     listener.onNotificationEvent(event);
 
-    // The push is the recipients createFromEvent returned — fired after it (its tx) has committed.
     verify(notificationFanout).publish(recipients, NotificationSignal.refreshOnly());
   }
 
@@ -82,7 +81,6 @@ class NotificationEventListenerTest {
     when(notificationCreationService.createFromEvent(event))
         .thenThrow(new RuntimeException("db down"));
 
-    // The business transaction has already committed; a notification hiccup must not surface.
     listener.onNotificationEvent(event);
 
     verify(notificationFanout, never()).publish(any(), any());
@@ -90,8 +88,6 @@ class NotificationEventListenerTest {
 
   @Test
   void onNotificationEvent_publishesOncePerSignal_soEachAudienceIsToldItsOwnKind() {
-    // Given one event that raised two different notification types for two different audiences --
-    // the case a single flattened recipient set cannot express.
     NotificationEvent event = event();
     Set<UUID> officers = Set.of(UUID.randomUUID());
     Set<UUID> members = Set.of(UUID.randomUUID(), UUID.randomUUID());
@@ -102,10 +98,8 @@ class NotificationEventListenerTest {
     when(notificationCreationService.createFromEvent(event))
         .thenReturn(Map.of(toOfficers, officers, toMembers, members));
 
-    // When the event is handled
     listener.onNotificationEvent(event);
 
-    // Then each audience is pushed what IT was told, rather than one push describing the event.
     verify(notificationFanout).publish(officers, toOfficers);
     verify(notificationFanout).publish(members, toMembers);
   }

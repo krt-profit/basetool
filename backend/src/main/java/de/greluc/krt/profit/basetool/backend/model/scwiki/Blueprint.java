@@ -142,8 +142,6 @@ public class Blueprint extends AbstractEntity<UUID> {
   @Column(name = "scwiki_deleted_at")
   private Instant scwikiDeletedAt;
 
-  // ───── KRT P4K Reader source lane (catalog import) ─────
-
   /**
    * DataForge {@code __ref} blueprint GUID observed by the KRT P4K Reader import. Kept alongside
    * (not in place of) {@link #scwikiUuid}: the importer backfills {@code scwiki_uuid} only when it

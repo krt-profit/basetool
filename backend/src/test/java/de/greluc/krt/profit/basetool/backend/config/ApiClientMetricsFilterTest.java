@@ -145,8 +145,6 @@ class ApiClientMetricsFilterTest {
 
   @Test
   void aTokenWithoutAnAzpReadsAsNoneRatherThanOther() throws Exception {
-    // The two mean opposite things: 'other' is a foreign client, 'none' is a Keycloak mapper
-    // regression that would blind the attribution for every client at once.
     authenticateWithAzp(null);
 
     send("/api/v1/missions");
@@ -157,8 +155,6 @@ class ApiClientMetricsFilterTest {
 
   @Test
   void aConfiguredIngestGatewayCountsAsKnownWithoutBeingListedTwice() throws Exception {
-    // Otherwise the two lists drift and the gateway silently starts reading as 'other', which is
-    // exactly the series the unknown-client alert watches.
     gatewayClientIds.add("basetool-ingest");
     authenticateWithAzp("basetool-ingest");
 
@@ -187,8 +183,6 @@ class ApiClientMetricsFilterTest {
 
   @Test
   void anEncodedSpellingCannotEscapeTheCount() throws Exception {
-    // REQ-SEC-029: the scope is decided on the decoded path. A client that can spell its way out of
-    // the counter defeats the counter.
     authenticateWithAzp("basetool-android");
 
     send("/%61pi/v1/missions");

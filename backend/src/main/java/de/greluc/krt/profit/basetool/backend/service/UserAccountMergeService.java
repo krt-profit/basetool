@@ -117,19 +117,14 @@ public class UserAccountMergeService {
    */
   private static final List<OwnedRows> FOLLOWS_THE_MEMBER =
       List.of(
-          // --- What they hold -------------------------------------------------------------
           OwnedRows.of("inventory_item", "user_id"),
           OwnedRows.of("ship", "owner_id"),
           OwnedRows.of("refinery_order", "owner_id"),
           OwnedRows.of("personal_inventory_item", "owner_user_id"),
           OwnedRows.deduped("personal_blueprint", "owner_user_id", "product_key"),
-
-          // --- Where they belong ----------------------------------------------------------
           OwnedRows.deduped("org_unit_membership", "user_id", "org_unit_id"),
           OwnedRows.deduped("org_chart_position", "user_id", "org_unit_id"),
           OwnedRows.of("org_unit", "grand_admiral_user_id"),
-
-          // --- What they run and are signed up for ----------------------------------------
           OwnedRows.of("mission", "owner_id"),
           OwnedRows.of("mission_ownership", "owner_id"),
           OwnedRows.of("mission", "party_lead_user_id"),
@@ -137,24 +132,17 @@ public class UserAccountMergeService {
           OwnedRows.deduped("mission_managers", "user_id", "mission_id"),
           OwnedRows.deduped("mission_participant", "user_id", "mission_id"),
           OwnedRows.deduped("job_order_assignees", "user_id", "job_order_id"),
-
-          // --- The exchange ---------------------------------------------------------------
           OwnedRows.of("material_exchange_offer", "owner_id"),
           OwnedRows.of("material_exchange_request", "owner_id"),
           OwnedRows.deduped("material_exchange_interest", "interested_user_id", "offer_id"),
           OwnedRows.deduped(
               "material_exchange_request_interest", "interested_user_id", "request_id"),
-
-          // --- What the bank lets them do -------------------------------------------------
-          // The grants are current permissions, so they follow. Who granted them does not.
           OwnedRows.deduped("bank_account_grant", "user_id", "account_id"),
           OwnedRows.deduped(
               "bank_account_view_grant", "grantee_user_id", "account_id", "grantee_kind"),
           OwnedRows.deduped(
               "bank_account_approval_limit", "grantee_user_id", "account_id", "grantee_kind"),
           OwnedRows.of("bank_holder", "user_id"),
-
-          // --- What has been said about them ----------------------------------------------
           OwnedRows.of("notification", "recipient_user_id"),
           OwnedRows.of("notification_rule_selector", "user_id"),
           OwnedRows.deduped("member_evaluation", "user_id", "category_id"));
@@ -184,12 +172,10 @@ public class UserAccountMergeService {
    */
   public static final List<String> STAYS_WITH_THE_ACT =
       List.of(
-          // The audit trail, in both its forms. Never moves; must outlive even a deletion.
           "audit_event.actor_user_id",
           "audit_event.target_user_id",
           "bank_audit_event.actor_user_id",
           "bank_audit_event.target_user_id",
-          // Who decided, granted, requested, initiated, executed, paid out.
           "app_user.approved_by_id",
           "bank_account_grant.granted_by",
           "bank_booking_request.requested_by",
@@ -202,19 +188,10 @@ public class UserAccountMergeService {
           "job_order_item_handover.executing_user_id",
           "material_claim.claimed_by_user_id",
           "operation_payout_status.paid_out_by_user_id",
-          // The approval history OF an account, and who decided it.
           "user_approval_event.user_id",
           "user_approval_event.decided_by_id",
-          // An erasure request and its decision, on exactly the same reasoning (REQ-SEC-061):
-          // the row says "THIS account asked to be erased, and here is what was decided", and
-          // re-pointing it would rewrite which account asked. A partial unique index also permits
-          // only one pending request per account, so moving one onto a target that already has one
-          // would fail. The merge deletes the emptied source, so a pending request on it cascades
-          // away with the account; the member raises a new one on the surviving account -- the same
-          // trade terms_acceptance makes just below.
           "deletion_request.user_id",
           "deletion_request.decided_by_id",
-          // Not owned: re-derived from Keycloak, and recorded per account.
           "user_roles.user_id",
           "terms_acceptance.user_id");
 
@@ -259,8 +236,6 @@ public class UserAccountMergeService {
 
     assertLedgersDoNotCollide(sourceUserId, targetUserId);
 
-    // Flush first: the merge is set-based native SQL, so any pending change to these rows must
-    // already be in the database or it would be written back over the move afterwards.
     entityManager.flush();
 
     Map<String, Integer> moved = new LinkedHashMap<>();
@@ -273,9 +248,6 @@ public class UserAccountMergeService {
         total += repointed;
       }
     }
-    // The moved rows are in the database, not in the persistence context; anything already loaded
-    // still carries the old owner. Clearing is what stops a later read in this transaction from
-    // serving a stale row (the bulk-update landmine of REQ-DATA-008).
     entityManager.clear();
 
     AuditDetails details = AuditDetails.of("fromUser", sourceUserId).with("rows", total);
@@ -342,7 +314,6 @@ public class UserAccountMergeService {
     for (String key : owned.conflictKeys()) {
       keyMatch.append(" AND tgt.").append(key).append(" IS NOT DISTINCT FROM src.").append(key);
     }
-    // Table and column names come from FOLLOWS_THE_MEMBER's own literals, never from a request.
     String sql =
         "DELETE FROM %1$s src WHERE src.%2$s = :source AND EXISTS (SELECT 1 FROM %1$s tgt WHERE"
                 .formatted(owned.table(), owned.column())
@@ -364,7 +335,6 @@ public class UserAccountMergeService {
    */
   private int repoint(
       @NotNull OwnedRows owned, @NotNull UUID sourceUserId, @NotNull UUID targetUserId) {
-    // Table and column names come from FOLLOWS_THE_MEMBER's own literals, never from a request.
     String sql =
         "UPDATE %s SET %s = :target WHERE %s = :source"
             .formatted(owned.table(), owned.column(), owned.column());

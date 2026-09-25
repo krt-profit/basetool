@@ -69,13 +69,6 @@ public class AdminNotificationRulePageController {
   /** The {@code fragment} value that renders only the rules table, for the in-place swap. */
   static final String RULES_FRAGMENT = "rules";
 
-  // The option lists the editor offers, in the backend enums' declaration order. The frontend holds
-  // no copy of the backend enums (its DTOs carry them as @BackendEnumAsString strings), so these
-  // lists are the single source the template renders every <option> from, each labelled through
-  // `<prefix>.<CODE>`. AdminNotificationRulePageControllerTest pins them against the enum values
-  // in the committed openapi.json, so a backend enum that gains a value fails the build here
-  // instead of leaving a rule the editor cannot represent.
-
   /**
    * {@code NotificationEventType} codes, labelled via {@code admin.notificationRules.eventType}.
    */
@@ -179,9 +172,6 @@ public class AdminNotificationRulePageController {
     model.addAttribute("orgRelativeRoles", ORG_RELATIVE_ROLES);
     model.addAttribute("contextRoles", CONTEXT_ROLES);
     model.addAttribute("roleCodes", ROLE_CODES);
-    // The SPECIFIC_USER selector is a server-side searchable combobox (remote-users, #1193): the
-    // roster is searched on demand via /users/search, and notification-rules.js seeds an existing
-    // rule's chosen user in edit mode by resolving its name through /users/{id}. No roster preload.
     return RULES_FRAGMENT.equals(fragment)
         ? "admin/notification-rules :: " + RULES_FRAGMENT
         : "admin/notification-rules";

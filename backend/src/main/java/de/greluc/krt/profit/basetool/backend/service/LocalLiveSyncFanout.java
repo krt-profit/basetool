@@ -46,7 +46,5 @@ public class LocalLiveSyncFanout implements LiveSyncFanout {
    * @param sections ignored, for the same reason
    */
   @Override
-  public void publish(@NotNull LiveSyncTopic topic, @NotNull List<String> sections) {
-    // Intentionally empty: without the Redis bridge there is no peer to carry the frame to.
-  }
+  public void publish(@NotNull LiveSyncTopic topic, @NotNull List<String> sections) {}
 }

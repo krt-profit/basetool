@@ -130,8 +130,6 @@ public class HangarImportProxyController {
    */
   private @NotNull ResponseEntity<Map<?, ?>> forwardImport(
       @NotNull MultipartFile file, @NotNull String backendPath) {
-    // The size comes from the multipart part header the container already parsed; comparing it
-    // reads nothing. WARN, not ERROR: an oversized file is client input, not a server fault.
     if (file.getSize() > MAX_IMPORT_BYTES) {
       log.warn(
           "Hangar import proxy: upload of {} bytes refused, the cap is {} bytes",

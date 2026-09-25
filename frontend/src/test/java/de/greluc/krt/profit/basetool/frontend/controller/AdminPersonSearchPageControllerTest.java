@@ -82,8 +82,6 @@ class AdminPersonSearchPageControllerTest {
 
   @Test
   void anEmptyTermIsTheInitialStateAndNotAnError() {
-    // The page is reachable from the admin menu with no term at all; that is not a mistake the
-    // admin made, so it must not render an error.
     BackendApiClient client = mock(BackendApiClient.class);
     AdminPersonSearchPageController controller = new AdminPersonSearchPageController(client);
     Model model = new ConcurrentModel();
@@ -110,8 +108,6 @@ class AdminPersonSearchPageControllerTest {
 
   @Test
   void theTermIsBoundAsAUriVariableAndNeverEncodedByHand() {
-    // Encoded exactly once, by the WebClient, because it is a template variable. See the class
-    // note: hand-encoding it was double-encoding it on the wire and every umlaut found nothing.
     BackendApiClient client = mock(BackendApiClient.class);
     stubOneHit(client);
     AdminPersonSearchPageController controller = new AdminPersonSearchPageController(client);
@@ -123,9 +119,6 @@ class AdminPersonSearchPageControllerTest {
 
   @Test
   void theTypedCasingIsRelayedUntouched() {
-    // The case-insensitive match is the backend's ILIKE. Normalising the term here would look
-    // harmless and would move the guarantee into a second place, where the next reader has to check
-    // both to know whether it still holds.
     BackendApiClient client = mock(BackendApiClient.class);
     stubOneHit(client);
     AdminPersonSearchPageController controller = new AdminPersonSearchPageController(client);
@@ -153,8 +146,6 @@ class AdminPersonSearchPageControllerTest {
 
     assertEquals(true, model.getAttribute("searched"));
     assertEquals(true, model.getAttribute("truncated"));
-    // The per-column cap is carried separately, because it is reached far more often than the
-    // overall one and "narrow the term" is not the remedy for it.
     assertEquals(List.of("mission_participant.comment"), model.getAttribute("cappedColumns"));
     assertEquals(1, ((List<?>) model.getAttribute("hits")).size());
     assertFalse(model.containsAttribute("error"));
@@ -177,8 +168,6 @@ class AdminPersonSearchPageControllerTest {
 
   @Test
   void aBackendFailureLeavesSearchedFalseSoThePageCannotClaimNoMentions() {
-    // "No mentions found" and "the search did not run" look identical on a page that only counts
-    // hits, and they are opposite answers to a rectification request.
     BackendApiClient client = mock(BackendApiClient.class);
     when(client.get(any(String.class), resultType(), any(Object[].class)))
         .thenThrow(new BackendServiceException("boom", new RuntimeException(), 503));

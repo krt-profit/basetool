@@ -117,33 +117,24 @@ class BankDashboardFilterMvcTest {
                 true,
                 List.of(account("KB-0001", "Staffel IRIDIUM"), account("KB-0002", "KRT")),
                 null));
-    // One active account makes the direct-booking Kontobewegung CTA + modal render (canBook true).
     when(backendApiClient.get(startsWith("/api/v1/bank/accounts"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(activeAccount()), 0, 500, 1, 1, List.of()));
 
     mockMvc
         .perform(get("/bank"))
         .andExpect(status().isOk())
-        // The live-filter search box + its scope/empty wiring render.
         .andExpect(content().string(Matchers.containsString("id=\"bank-acc-filter\"")))
         .andExpect(content().string(Matchers.containsString("data-bank-acc-filter")))
-        // The table-view + by-Bereich grouping checkboxes render for every viewer with cards
-        // (marker attributes on <input type=checkbox>, not filled toggle buttons).
         .andExpect(content().string(Matchers.containsString("data-bank-view-toggles")))
         .andExpect(content().string(Matchers.containsString("data-bank-view-layout")))
         .andExpect(content().string(Matchers.containsString("data-bank-view-group")))
-        // The filter now scopes the whole switchable grid so it works across every view.
         .andExpect(
             content().string(Matchers.containsString("data-filter-scope=\"#bank-grid-results\"")))
         .andExpect(
             content()
                 .string(Matchers.containsString("data-filter-empty=\"#bank-acc-filter-empty\"")))
-        // Each card carries the account name the filter matches against.
         .andExpect(
             content().string(Matchers.containsString("data-filter-name=\"Staffel IRIDIUM\"")))
-        // The no-results note is present (hidden until the filter empties the grid); the direct-
-        // booking Kontobewegung CTA + modal render, and the management-only three-month report. The
-        // Verwaltung / Berechtigungen links are gone from the header (they live in the sidebar).
         .andExpect(content().string(Matchers.containsString("id=\"bank-acc-filter-empty\"")))
         .andExpect(content().string(Matchers.containsString("bank-movement-open")))
         .andExpect(content().string(Matchers.containsString("id=\"bank-movement-modal\"")))
@@ -162,12 +153,9 @@ class BankDashboardFilterMvcTest {
     mockMvc
         .perform(get("/bank"))
         .andExpect(status().isOk())
-        // The filter is available to a plain employee (not behind the BANK_MANAGEMENT gate)...
         .andExpect(content().string(Matchers.containsString("id=\"bank-acc-filter\"")))
         .andExpect(
             content().string(Matchers.containsString("data-filter-name=\"Staffel IRIDIUM\"")))
-        // ...while the management-only three-month report stays hidden, and the Verwaltung /
-        // Berechtigungen header links are gone entirely (sidebar only).
         .andExpect(content().string(Matchers.not(Matchers.containsString("bank-report-download"))))
         .andExpect(content().string(Matchers.not(Matchers.containsString("bank-manage-link"))));
   }
@@ -181,8 +169,6 @@ class BankDashboardFilterMvcTest {
     mockMvc
         .perform(get("/bank"))
         .andExpect(status().isOk())
-        // Nothing to filter -> no search box and no filter-empty note; the server-rendered "no
-        // accounts at all" empty state stands in instead.
         .andExpect(
             content().string(Matchers.not(Matchers.containsString("id=\"bank-acc-filter\""))))
         .andExpect(

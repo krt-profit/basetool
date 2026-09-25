@@ -121,9 +121,6 @@ class UserPlainLookupIntegrationTest {
 
   @Test
   void addShipThroughThePlainLookup_stillReturnsTheOwnersRoles() throws Exception {
-    // HangarService.addShip resolves the owner through findPlainById now; the ShipDto maps the
-    // owner's roles inside the controller's transaction. Outside of one this would be a
-    // LazyInitializationException and a 500.
     ShipRequestDto request =
         new ShipRequestDto("Plain lookup ship", shipTypeId, "LTI", null, false, null, null);
     MockMvc mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();

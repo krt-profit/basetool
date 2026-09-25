@@ -44,9 +44,7 @@ public final class LogMasker {
   /** Replacement used when a value is completely hidden. */
   public static final String FULL_MASK = "***";
 
-  private LogMasker() {
-    // utility class
-  }
+  private LogMasker() {}
 
   /**
    * Masks an e-mail address keeping only its first character and full domain ({@code a***@x.com}).

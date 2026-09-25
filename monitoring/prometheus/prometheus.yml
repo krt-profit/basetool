@@ -1,18 +1,3 @@
-# Prometheus scrape + alerting configuration for the Profit Basetool monitoring plane.
-# Epic #936, ADR-0072, REQ-OBS-005..011. Prometheus 3.13.x (verified 2026-07 latest LTS).
-#
-# Contains ZERO secrets. The scrape basic-auth password and the admin-API web.config
-# basic-auth hash live in host-side files under /var/iri/monitoring/secrets/ (mounted
-# read-only; provisioned per monitoring/README.md -> "Rebuilding the monitoring plane on a
-# new host"); the exported public CA for the apps' self-signed HTTPS lives under
-# /var/iri/monitoring/certs/. Retention (180d + 40GB cap) and the admin API are set via
-# command-line flags in docker-compose.monitoring.yml (the source quadlet/systemd/prometheus.container
-# is generated from), not here.
-#
-# Transport model (REQ-OBS-008): the three apps are scraped over HTTPS with the pinned
-# public CA (no insecure_skip_verify); everything else on the isolated monitoring networks
-# is plain HTTP by the owner-approved carve-out.
-
 global:
   scrape_interval: 30s
   scrape_timeout: 10s
@@ -29,11 +14,6 @@ rule_files:
   - /etc/prometheus/alerts/*.yml
 
 scrape_configs:
-  # --- Prometheus self-monitoring -------------------------------------------------------
-  # Prometheus's own web server is basic-auth protected (--web.config.file) because
-  # --web.enable-admin-api exposes deletion endpoints (ADR-0072), so the self-scrape must
-  # authenticate as well. The plaintext web password is provisioned on the host by the runbook;
-  # Grafana and the backup snapshot use the same credential (user "grafana").
   - job_name: prometheus
     basic_auth:
       username: grafana
@@ -41,14 +21,6 @@ scrape_configs:
     static_configs:
       - targets: ["localhost:9090"]
 
-  # --- Spring Boot apps: HTTPS scrape with pinned public CA + basic auth -----------------
-  # username is fixed to "monitoring" (not a secret) and MUST equal MONITORING_SCRAPE_USER
-  # in the prod .env; the password comes from the mounted secret file (fail-closed if the
-  # app has no MONITORING_SCRAPE_* set — the endpoint then denies every request).
-  # ADR-0134: the backend joined the ADR-0090 management-port posture (11271, internal-only), so
-  # like the two jobs below it carries NO basic_auth — the port is unreachable from the internet and
-  # from the host, which supersedes ADR-0072's fail-closed compensating control. Still HTTPS with
-  # the pinned CA (same keystore.p12, SAN dns:backend) so REQ-OBS-008 holds unchanged.
   - job_name: basetool-backend
     metrics_path: /actuator/prometheus
     scheme: https
@@ -60,12 +32,6 @@ scrape_configs:
         labels:
           application: basetool-backend
 
-  # ADR-0090: frontend + ingest serve Actuator on a DEDICATED internal-only management port (18091 /
-  # 11272), never host-published nor NPM-proxied, so /actuator/** is off the public connector. The
-  # management port is unauthenticated (Boot's management-context security backs off given the apps'
-  # custom chains), so — unlike the backend below — these jobs carry NO basic_auth: ADR-0072's
-  # fail-closed basic-auth is superseded by the port isolation (REQ-OBS-005 amended). Still HTTPS with
-  # the pinned CA (same keystore.p12, SAN dns:frontend / dns:ingest) so REQ-OBS-008 holds unchanged.
   - job_name: basetool-frontend
     metrics_path: /actuator/prometheus
     scheme: https
@@ -88,39 +54,16 @@ scrape_configs:
         labels:
           application: basetool-ingest
 
-  # --- Keycloak: management port 9000, plain HTTP (carve-out) ----------------------------
   - job_name: keycloak
     metrics_path: /metrics
     scheme: http
     static_configs:
       - targets: ["keycloak:9000"]
 
-  # --- Infrastructure exporters (plain HTTP inside the monitoring plane) -----------------
   - job_name: node
     static_configs:
       - targets: ["node-exporter:9100"]
 
-  # cAdvisor is gone. Its rootless-Podman support is closed as not planned upstream and the Quadlet
-  # translation deletes the service, so a job for it would be permanently down on the host this
-  # configuration is now written for.
-  #
-  # There is no soak: the old host is shut DOWN at the cutover, and a rollback means shutting the
-  # new one down and bringing the old one back up with its deploy timer stopped -- on the
-  # configuration it already has on disk, not on a bundle promoted afterwards. So this file only
-  # ever has to be right for the Podman host, and removing the job costs nothing anywhere.
-  # Ruled by @greluc 2026-09-20.
-  #
-  # The replacement is scripts/cgroup-container-metrics.py, whose eleven basetool_container_*
-  # series the `basetool:container:*` recording rules already read, plus the exporter below.
-
-  # prometheus-podman-exporter. It restores container_start_time_seconds and the container_network_*
-  # family that the cgroup collector cannot produce. container_memory_mapped_file is NOT among them:
-  # the cgroup collector emits basetool_container_memory_mapped_file_bytes (memory.stat file_mapped),
-  # which the basetool:container:memory_mapped_file_bytes recording rule reads.
-  #
-  # The name resolves through `AddHost=podman-exporter:host-gateway` on the prometheus unit, the
-  # same mechanism node-exporter and alloy use: all three are HOST services here, and the alias is
-  # what lets a service name in this file mean "the host" without the file having to say so.
   - job_name: podman-exporter
     static_configs:
       - targets: ["podman-exporter:9882"]
@@ -141,7 +84,6 @@ scrape_configs:
     static_configs:
       - targets: ["redis-exporter:9121"]
 
-  # --- Monitoring-plane self health ------------------------------------------------------
   - job_name: alertmanager
     static_configs:
       - targets: ["alertmanager:9093"]
@@ -159,29 +101,11 @@ scrape_configs:
     static_configs:
       - targets: ["alloy:12345"]
 
-  # Blackbox exporter's OWN metrics (not /probe): exposes blackbox_exporter_config_last_reload_successful
-  # so BlackboxConfigReloadFailed (meta.yml) can catch a failed SIGHUP reload that silently keeps the old
-  # module config running. The /probe results are produced by the blackbox-* jobs below; this job scrapes
-  # the exporter's self-instrumentation on the same port.
   - job_name: blackbox-exporter
     metrics_path: /metrics
     static_configs:
       - targets: ["blackbox-exporter:9115"]
 
-  # --- Blackbox external probes: TLS + status of the public endpoints --------------------
-  # Produces probe_success + probe_ssl_earliest_cert_expiry per target.
-  #
-  # Every /probe job below carries its OWN scrape_timeout: 15s (> the 10s module timeout, well under
-  # the 30s interval). Rationale (2026-07-12 false-critical fix, REQ-OBS-008/-012): the blackbox
-  # module timeout equalled the global scrape_timeout (both 10s), leaving blackbox's
-  # min(module_timeout, scrape_timeout) - timeout_offset(0.5s) clamp only ~0.5s of slack. A probe that
-  # runs to its deadline (an IPv6 connect with no v4 fallback that black-holes, or a slow internal-TLS
-  # handshake under the host's designed memory pressure) then tips the Prometheus->exporter scrape
-  # itself past 10s -> up==0 -> a false-critical TargetDown. Raising only this job's scrape_timeout to
-  # 15s lets a hung probe return probe_success==0 WITHIN the scrape window (up stays 1), so a real
-  # failure pages via its dedicated probe_success alert (BlackboxProbeFailed / EdgeIpv6Unreachable /
-  # DnsResolutionFailed / CertificateExpiringSoon) and never through the generic TargetDown, which is
-  # scoped off these jobs in infrastructure.yml.
   - job_name: blackbox-http
     metrics_path: /probe
     scrape_timeout: 15s
@@ -200,23 +124,14 @@ scrape_configs:
       - target_label: __address__
         replacement: blackbox-exporter:9115
 
-  # Auth-protected endpoint: the ingest gateway answers 401 on its root, which still proves it is
-  # reachable with a valid cert. Uses the http_2xx_or_401 module so a healthy (401) ingest reads as up;
-  # a real outage (timeout/5xx/connection error) still yields probe_success == 0 and alerts.
   - job_name: blackbox-http-auth
     metrics_path: /probe
-    scrape_timeout: 15s  # > the blackbox module timeout; see the blackbox-http note above (REQ-OBS-008/-012)
+    scrape_timeout: 15s
     params:
       module: [http_2xx_or_401]
     static_configs:
       - targets:
           - https://ingest.profit-base.online
-          # The API vhost of the mobile exposure (ADR-0135), un-staged as phase F of
-          # docs/archive/API_VHOST_ROLLOUT_RUNBOOK.md. Phase E — the vhost answering 401 from OUTSIDE —
-          # must be green before this reaches production, or it pages from the first scrape.
-          # The probed path is deliberately an ALLOW-LISTED one that answers 401: the vhost is a
-          # default-deny allow-list and 404s its own root, so probing `/` would assert nothing
-          # about the backend behind it and would fail on a perfectly healthy edge.
           - https://api.profit-base.online/api/v1/terms/status
     relabel_configs:
       - source_labels: [__address__]
@@ -226,44 +141,19 @@ scrape_configs:
       - target_label: __address__
         replacement: blackbox-exporter:9115
 
-  # --- Blackbox deny/posture assertions (REQ-OBS-012) ------------------------------------
-  # These jobs assert edge configuration that lives only in the NPM admin DB: probe_success == 1
-  # means the deny/redirect/header posture HOLDS; the matching alerts fire on == 0. They are
-  # deliberately separate jobs so BlackboxProbeFailed (liveness, job=~"blackbox-http(-auth)?")
-  # never overlaps with the posture alerts. The Keycloak /admin allow-list is asserted externally
-  # by .github/workflows/edge-deny-probe.yml — from inside, hairpinned probe traffic is SNAT'd to
-  # the allow-listed Docker bridge gateways and /admin always looks reachable.
   - job_name: blackbox-edge-deny
     metrics_path: /probe
-    scrape_timeout: 15s  # > the blackbox module timeout; see the blackbox-http note above (REQ-OBS-008/-012)
+    scrape_timeout: 15s
     params:
       module: [http_deny_404]
     static_configs:
       - targets:
-          # The whole `/actuator` prefix is denied at the edge (`location /actuator` → 404,
-          # `docker/edge/conf.d/10-frontend.conf.template` since ADR-0162 replaced NPM),
-          # so NEITHER the metrics endpoint NOR the health endpoint is internet-reachable. Both are
-          # asserted per public host: `/actuator/prometheus` (the credentialed metrics surface) and
-          # `/actuator/health` (liveness/readiness/build info — a passive info leak if it drifts
-          # open). Health/metrics reach Prometheus over net-monitoring-scrape and the Docker
-          # HEALTHCHECK over localhost, so neither needs any edge exposure (REQ-OBS-005/-012).
           - https://profit-base.online/actuator/prometheus
           - https://profit-base.online/actuator/health
-          # Keycloak's management surface, denied at the edge since ADR-0166 mounted identity on
-          # this host. They answer on the management port rather than the public one, so these
-          # denies are defence in depth — but `KC_HTTP_MANAGEMENT_RELATIVE_PATH` is what keeps them
-          # off the public connector, and if it is ever cleared, or either location is dropped or
-          # shadowed by a longer prefix, Keycloak's readiness detail and its full metric set (realm
-          # names, user and session counts, client ids) become internet-readable with nothing
-          # reporting it. A new public surface without a probe is incomplete (REQ-OBS-012).
           - https://profit-base.online/auth/health
           - https://profit-base.online/auth/metrics
           - https://ingest.profit-base.online/actuator/prometheus
           - https://ingest.profit-base.online/actuator/health
-          # The backend's actuator already moved to the internal-only management port 11271
-          # (ADR-0134), so these assert the SECOND layer: that the vhost's own
-          # `location /actuator { return 404; }` is in place, independently of which port the app
-          # happens to serve today.
           - https://api.profit-base.online/actuator/prometheus
           - https://api.profit-base.online/actuator/health
     relabel_configs:
@@ -274,14 +164,9 @@ scrape_configs:
       - target_label: __address__
         replacement: blackbox-exporter:9115
 
-  # The members-only posture, asserted from outside (REQ-SEC-052, ADR-0159). These three pages
-  # answered anonymously until the members-only cut-over; each must now send a browser navigation
-  # into the OAuth2 entry point. Probed at the edge rather than in-process because that is where
-  # the failure would be invisible: the app's own sweeps run against MockMvc and would stay green
-  # while a cache rule, a stale upstream or a mis-ordered NPM location served the old page.
   - job_name: blackbox-members-only
     metrics_path: /probe
-    scrape_timeout: 15s  # > the blackbox module timeout; see the blackbox-http note above (REQ-OBS-008/-012)
+    scrape_timeout: 15s
     params:
       module: [http_members_only_redirect]
     static_configs:
@@ -297,24 +182,9 @@ scrape_configs:
       - target_label: __address__
         replacement: blackbox-exporter:9115
 
-  # The public posture, asserted from outside — the inverse of blackbox-members-only and the half
-  # REQ-SEC-052 never had a probe for. Every path here is a deliberate permitAll entry that must
-  # answer 200 on the FIRST response; a 302 means it fell behind anyRequest().authenticated(), and
-  # http_2xx would have hidden exactly that by following the redirect to a Keycloak 200.
-  #
-  # The manifest is the one with a user-visible failure mode: a browser reads it before any login,
-  # so a redirect makes the installed app take its name and icon from the login page (REQ-UI-020,
-  # ADR-0164). assetlinks.json is the same trap on the Android side, and it is the one that has
-  # already sprung. ?locale=de is passed because the manifest keys its cache on it — probing the
-  # bare path would exercise a URL no page ever links.
-  #
-  # /app/link-help is the page a member reaches when their App Link did not open the app
-  # (REQ-SEC-038) — they are mid-login and hold no session, so behind the authenticated catch-all
-  # it would redirect into the OAuth2 entry point, which is the loop the page exists to break. Its
-  # partner /app/callback must answer 303 rather than 200 and is probed by blackbox-app-link below.
   - job_name: blackbox-public-surface
     metrics_path: /probe
-    scrape_timeout: 15s  # > the blackbox module timeout; see the blackbox-http note above (REQ-OBS-008/-012)
+    scrape_timeout: 15s
     params:
       module: [http_public_200_no_redirect]
     static_configs:
@@ -336,24 +206,9 @@ scrape_configs:
       - target_label: __address__
         replacement: blackbox-exporter:9115
 
-  # The one public path whose contract is a redirect rather than a page (REQ-SEC-038). /app/callback
-  # is where a member's Android login lands when the App Link did not open the app, and it must
-  # answer 303 to /app/link-help: the URL carries a live authorization code, and a redirect is what
-  # keeps that code out of the address bar and the history entry. It therefore cannot ride in
-  # blackbox-public-surface, whose module asserts 200.
-  #
-  # Two device-side ways into this route survive a correct assetlinks.json and neither can be closed
-  # from the server (a sticky failed domain verification; a desktop browser with no app to hand the
-  # link to), so the route is permanently live rather than vestigial — it was used from the wild on
-  # 2026-09-16, the day after it shipped.
-  #
-  # Note for anyone measuring how often the fallback is used: this probe puts a constant floor of
-  # 0.033 req/s on `http_server_requests_seconds_count{uri="/app/callback"}`, which drowns the
-  # handful of real hits. That measurement belongs in Loki over the edge access log, which carries
-  # the user agent and can tell a member's phone from this probe and from a crawler.
   - job_name: blackbox-app-link
     metrics_path: /probe
-    scrape_timeout: 15s  # > the blackbox module timeout; see the blackbox-http note above (REQ-OBS-008/-012)
+    scrape_timeout: 15s
     params:
       module: [http_app_link_fallback_303]
     static_configs:
@@ -369,7 +224,7 @@ scrape_configs:
 
   - job_name: blackbox-force-ssl
     metrics_path: /probe
-    scrape_timeout: 15s  # > the blackbox module timeout; see the blackbox-http note above (REQ-OBS-008/-012)
+    scrape_timeout: 15s
     params:
       module: [http_force_ssl_redirect]
     static_configs:
@@ -377,9 +232,6 @@ scrape_configs:
           - http://profit-base.online
           - http://ingest.profit-base.online
           - http://grafana.profit-base.online
-          # A native client that ever speaks plain HTTP to the API leaks its bearer token on the
-          # first request, so the per-host Force-SSL toggle is not optional here — and it lives only
-          # in the NPM admin DB, which is why it is probed.
           - http://api.profit-base.online
     relabel_configs:
       - source_labels: [__address__]
@@ -389,20 +241,14 @@ scrape_configs:
       - target_label: __address__
         replacement: blackbox-exporter:9115
 
-  # HSTS asserted only where the header source is version-controlled (app-side HSTS on the
-  # frontend, audit finding H-9). Extend to the keycloak/grafana/ingest vhosts once their
-  # header posture is verified/enabled in the NPM UI (per-host state, not in git).
   - job_name: blackbox-hsts
     metrics_path: /probe
-    scrape_timeout: 15s  # > the blackbox module timeout; see the blackbox-http note above (REQ-OBS-008/-012)
+    scrape_timeout: 15s
     params:
       module: [http_2xx_hsts]
     static_configs:
       - targets:
           - https://profit-base.online
-          # NOT extended to the api vhost: its probeable paths answer 401, which this module does
-          # not accept. The staged blackbox-hsts-auth job below uses the http_2xx_or_401_hsts
-          # variant instead of loosening the frontend's assertion.
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
@@ -411,17 +257,9 @@ scrape_configs:
       - target_label: __address__
         replacement: blackbox-exporter:9115
 
-  # --- Internal self-signed TLS expiry probes (REQ-OBS-008, #1041 item 8) ----------------------------
-  # Probe the app modules' basetool-CA-signed keystore.p12 cert and Grafana's own self-signed cert from
-  # INSIDE the monitoring plane. Their probe_ssl_earliest_cert_expiry feeds the (unfiltered)
-  # CertificateExpiringSoon alert, catching an internal-cert expiry ~14 days before it breaks all three
-  # app scrapes + the frontend->backend WebClient + the NPM->Grafana re-encryption at once (today only a
-  # same-day TargetDown warns). These jobs are deliberately OUTSIDE BlackboxProbeFailed's liveness
-  # include-list (job=~"blackbox-http|blackbox-http-auth"), so a down app pages once via TargetDown, not
-  # again here.
   - job_name: blackbox-internal-tls
     metrics_path: /probe
-    scrape_timeout: 15s  # > the blackbox module timeout; see the blackbox-http note above (REQ-OBS-008/-012)
+    scrape_timeout: 15s
     params:
       module: [https_internal]
     static_configs:
@@ -429,11 +267,6 @@ scrape_configs:
           - https://backend:11261
           - https://frontend:18081
           - https://ingest:11262
-          # Keycloak serves HTTPS on 18443 from the same keystore, and the edge reaches it
-          # through upstream-tls.conf with `proxy_ssl_verify on` -- so its expiry breaks the
-          # login path, not just a scrape. It was the one TLS listener in the deployment with
-          # no probe at all (measured 2026-09-20); the exporter reaches it over
-          # net-monitoring-scrape, which the two already share.
           - https://keycloak:18443
     relabel_configs:
       - source_labels: [__address__]
@@ -443,11 +276,9 @@ scrape_configs:
       - target_label: __address__
         replacement: blackbox-exporter:9115
 
-  # Grafana serves its own self-signed cert (not basetool-CA-signed), so it uses the
-  # insecure_skip_verify variant; probe_ssl_earliest_cert_expiry is still emitted for the same alert.
   - job_name: blackbox-internal-tls-grafana
     metrics_path: /probe
-    scrape_timeout: 15s  # > the blackbox module timeout; see the blackbox-http note above (REQ-OBS-008/-012)
+    scrape_timeout: 15s
     params:
       module: [https_internal_insecure]
     static_configs:
@@ -461,13 +292,9 @@ scrape_configs:
       - target_label: __address__
         replacement: blackbox-exporter:9115
 
-  # --- IPv6 reachability probes (owner-confirmed AAAA records, 2026-07-06) -------------------------
-  # Mirror the IPv4 liveness jobs over IPv6 so an IPv6-only regression (broken AAAA path, lost edge v6
-  # binding) is caught while IPv4 still answers. Same target URLs/instances as blackbox-http /
-  # blackbox-http-auth so EdgeIpv6Unreachable can guard on(instance) against the matching v4 probe.
   - job_name: blackbox-http-ipv6
     metrics_path: /probe
-    scrape_timeout: 15s  # > the blackbox module timeout; see the blackbox-http note above (REQ-OBS-008/-012)
+    scrape_timeout: 15s
     params:
       module: [http_2xx_ipv6]
     static_configs:
@@ -485,15 +312,12 @@ scrape_configs:
 
   - job_name: blackbox-http-auth-ipv6
     metrics_path: /probe
-    scrape_timeout: 15s  # > the blackbox module timeout; see the blackbox-http note above (REQ-OBS-008/-012)
+    scrape_timeout: 15s
     params:
       module: [http_2xx_or_401_ipv6]
     static_configs:
       - targets:
           - https://ingest.profit-base.online
-          # The instance label MUST stay byte-identical to its IPv4 twin above, or
-          # EdgeIpv6Unreachable's `on(instance)` guard silently matches nothing and the v6 path
-          # ships unmonitored while the rule looks healthy.
           - https://api.profit-base.online/api/v1/terms/status
     relabel_configs:
       - source_labels: [__address__]
@@ -503,14 +327,9 @@ scrape_configs:
       - target_label: __address__
         replacement: blackbox-exporter:9115
 
-  # --- Public DNS resolution probes (owner request 2026-07-06) ------------------------------------
-  # The probe target is the resolver (1.1.1.1); the query name/type live in the blackbox module.
-  # Validates that basetool's apex still resolves an A and an AAAA record end-to-end via a public
-  # resolver (NODATA — record silently removed — fails the probe, not only NXDOMAIN). blackbox has
-  # internet egress on net-monitoring-core.
   - job_name: blackbox-dns-a
     metrics_path: /probe
-    scrape_timeout: 15s  # > the blackbox module timeout; see the blackbox-http note above (REQ-OBS-008/-012)
+    scrape_timeout: 15s
     params:
       module: [dns_apex_a]
     static_configs:
@@ -525,7 +344,7 @@ scrape_configs:
 
   - job_name: blackbox-dns-aaaa
     metrics_path: /probe
-    scrape_timeout: 15s  # > the blackbox module timeout; see the blackbox-http note above (REQ-OBS-008/-012)
+    scrape_timeout: 15s
     params:
       module: [dns_apex_aaaa]
     static_configs:
@@ -538,24 +357,9 @@ scrape_configs:
       - target_label: __address__
         replacement: blackbox-exporter:9115
 
-  # --- API vhost of the mobile-client exposure (ADR-0135, Track C) -------------------------------
-  # Un-staged as phase F of docs/archive/API_VHOST_ROLLOUT_RUNBOOK.md. They shipped staged (commented)
-  # with the surface itself, so the cut-over is an un-comment rather than a config change written
-  # under time pressure — the staging discipline REQ-OBS-014 applies to the
-  # JvmNativeThreadExhaustion Loki rule. Phase E must be green before this reaches production: an
-  # api vhost that still answers 503 makes every one of these fire from the first scrape.
-  #
-  # They belong together with the api targets inside blackbox-http-auth, blackbox-http-auth-ipv6,
-  # blackbox-edge-deny and blackbox-force-ssl above: a partial enable leaves the surface
-  # half-probed, which reads as "monitored".
-  #
-  # blackbox-hsts-auth is its own job rather than a target on blackbox-hsts because the vhost's
-  # probeable paths answer 401, which the plain http_2xx_hsts module does not accept — it would
-  # fail on the status before ever looking at the header and read as "HSTS is broken".
-  # EdgeHstsHeaderMissing is scoped to job=~"blackbox-hsts.*" so this job is covered.
   - job_name: blackbox-hsts-auth
     metrics_path: /probe
-    scrape_timeout: 15s  # > the blackbox module timeout; see the blackbox-http note above
+    scrape_timeout: 15s
     params:
       module: [http_2xx_or_401_hsts]
     static_configs:
@@ -569,10 +373,6 @@ scrape_configs:
       - target_label: __address__
         replacement: blackbox-exporter:9115
 
-  # The api host's records are separate from the apex's, so the two apex DNS jobs prove nothing
-  # about them: a zone edit that drops api.profit-base.online leaves both apex probes green while
-  # every app in the field loses the backend. DnsResolutionFailed matches these
-  # (job=~"blackbox-dns-.*") and TargetDown excludes them, so no rule change is needed here.
   - job_name: blackbox-dns-api-a
     metrics_path: /probe
     scrape_timeout: 15s

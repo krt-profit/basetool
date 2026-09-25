@@ -89,19 +89,14 @@ class AuditLogPdfFormatTest {
 
     String text = extractText(pdf);
 
-    // The event row is rendered in the user zone: 10:30 UTC becomes 11:30 CET, and the raw UTC
-    // wall-clock (10:30) appears nowhere.
     assertTrue(
         text.contains("15.01.2026 11:30"), "event row time is shifted into the user zone (CET)");
     assertFalse(
         text.contains("15.01.2026 10:30"),
         "the raw UTC wall-clock is not printed when a user zone is supplied");
 
-    // The footer generation stamp stays UTC, independent of the user zone. Isolate the footer line
-    // so the meta 'generated' row (which IS rendered in the user zone) cannot leak into the check.
     String footer = footerLine(text);
     assertTrue(footer.contains(" UTC"), "footer keeps its UTC marker");
-    // Set.copyOf (unlike Set.of) tolerates a duplicate when before/after land in the same minute.
     Set<String> utcNow =
         Set.copyOf(
             List.of(

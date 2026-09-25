@@ -136,7 +136,6 @@ class HangarIntegrationTest {
 
   @Test
   void testUserManageOwnHangar() throws Exception {
-    // Add Ship
     ShipRequestDto shipReq =
         new ShipRequestDto("My Fighter", fighter.getId(), "LTI", null, true, null, null);
 
@@ -159,7 +158,6 @@ class HangarIntegrationTest {
     assertNotNull(savedShip.id());
     assertEquals("My Fighter", savedShip.name());
 
-    // Update Ship
     ShipRequestDto updateReq =
         new ShipRequestDto(
             "Updated Fighter", fighter.getId(), "LTI", null, true, savedShip.version(), null);
@@ -177,7 +175,6 @@ class HangarIntegrationTest {
     Ship updated = shipRepository.findById(savedShip.id()).orElseThrow();
     assertEquals("Updated Fighter", updated.getName());
 
-    // Delete Ship
     mockMvc
         .perform(
             delete("/api/v1/hangar/ships/" + savedShip.id())
@@ -192,7 +189,6 @@ class HangarIntegrationTest {
 
   @Test
   void testUserCannotManageOtherHangar() throws Exception {
-    // User1 creates ship
     Ship ship = new Ship();
     ship.setOwningOrgUnit(iridium);
     ship.setName("User1 Ship");
@@ -201,7 +197,6 @@ class HangarIntegrationTest {
     ship.setInsurance("LTI");
     ship = shipRepository.save(ship);
 
-    // User2 tries to update
     ShipRequestDto upReq =
         new ShipRequestDto("Hacked", fighter.getId(), "LTI", null, false, 0L, null);
     mockMvc
@@ -215,7 +210,6 @@ class HangarIntegrationTest {
                 .content(objectMapper.writeValueAsString(upReq)))
         .andExpect(status().isForbidden());
 
-    // User2 tries to delete
     mockMvc
         .perform(
             delete("/api/v1/hangar/ships/" + ship.getId())
@@ -228,7 +222,6 @@ class HangarIntegrationTest {
 
   @Test
   void testAdminManageUserHangar() throws Exception {
-    // Admin adds ship to User1
     ShipRequestDto req =
         new ShipRequestDto("Admin Gift", fighter.getId(), "LTI", null, false, null, null);
 
@@ -256,7 +249,6 @@ class HangarIntegrationTest {
     ShipDto savedShip = objectMapper.readValue(response, ShipDto.class);
     assertEquals(user1.getId(), savedShip.owner().id());
 
-    // Admin updates ship
     ShipRequestDto upReq =
         new ShipRequestDto(
             "Admin Updated", fighter.getId(), "LTI", null, false, savedShip.version(), null);
@@ -280,7 +272,6 @@ class HangarIntegrationTest {
     Ship updated = shipRepository.findById(savedShip.id()).orElseThrow();
     assertEquals("Admin Updated", updated.getName());
 
-    // Admin deletes ship
     mockMvc
         .perform(
             delete("/api/v1/hangar/users/" + user1.getId() + "/ships/" + savedShip.id())
@@ -301,7 +292,6 @@ class HangarIntegrationTest {
 
   @Test
   void testAdminResetAllFittedStatus() throws Exception {
-    // Setup two fitted ships
     Ship ship1 = new Ship();
     ship1.setOwningOrgUnit(iridium);
     ship1.setName("Fitted Ship 1");
@@ -321,7 +311,6 @@ class HangarIntegrationTest {
     ship2.setFitted(true);
     shipRepository.save(ship2);
 
-    // Admin resets all fitted statuses
     mockMvc
         .perform(
             post("/api/v1/hangar/ships/reset-fitted")
@@ -332,7 +321,6 @@ class HangarIntegrationTest {
         .andDo(org.springframework.test.web.servlet.result.MockMvcResultHandlers.print())
         .andExpect(status().isOk());
 
-    // Verify that statuses are now unfitted (fitted = false)
     Ship savedShip1 = shipRepository.findById(ship1.getId()).orElseThrow();
     Ship savedShip2 = shipRepository.findById(ship2.getId()).orElseThrow();
 
@@ -424,9 +412,6 @@ class HangarIntegrationTest {
 
   @Test
   void testSquadronOverviewPaginatesAndFiltersAcrossAllTypes() throws Exception {
-    // covers REQ-HANGAR-001 — page metadata counts ship TYPES (not ships) and the search
-    // term filters server-side across the whole scoped fleet, including types without a
-    // manufacturer (LEFT JOIN path).
     ShipType cutlass = new ShipType();
     cutlass.setName("Cutlass Black");
     cutlass = shipTypeRepository.save(cutlass);
@@ -444,7 +429,6 @@ class HangarIntegrationTest {
       ship.setFitted(false);
       shipRepository.save(ship);
     }
-    // A second ship of an already-counted type must not inflate totalElements.
     Ship second = new Ship();
     second.setOwningOrgUnit(iridium);
     second.setName("Second Cutlass");
@@ -469,7 +453,6 @@ class HangarIntegrationTest {
             .getResponse()
             .getContentAsString();
 
-    // 3 distinct types in scope, page size 2 -> 2 pages; 4 ships must NOT leak into the total.
     assertTrue(paged.contains("\"totalElements\":3"));
     assertTrue(paged.contains("\"totalPages\":2"));
 
@@ -503,7 +486,6 @@ class HangarIntegrationTest {
    */
   @Test
   void testSquadronOverviewAsPinnedAdmin_doesNotLeakForeignSkShipsOfSharedType() throws Exception {
-    // Iridium-owned ship of the shared "Fighter" type.
     Ship iridiumShip = new Ship();
     iridiumShip.setOwningOrgUnit(iridium);
     iridiumShip.setName("Iridium Fighter");
@@ -513,7 +495,6 @@ class HangarIntegrationTest {
     iridiumShip.setFitted(true);
     shipRepository.save(iridiumShip);
 
-    // A Spezialkommando plus a member who belongs ONLY to it (no squadron membership at all).
     SpecialCommand sk = new SpecialCommand();
     sk.setName("Leak Test SK");
     sk.setShorthand("LTSK");
@@ -529,8 +510,6 @@ class HangarIntegrationTest {
     skMembership.setJoinedAt(Instant.now());
     orgUnitMembershipRepository.save(skMembership);
 
-    // SK-owned ship of the SAME ship type as the Iridium ship — the shared type is what made the
-    // pre-fix unscoped owner lookup leak it into Iridium's overview.
     Ship skShip = new Ship();
     skShip.setOwningOrgUnit(sk);
     skShip.setName("SK Fighter");
@@ -540,7 +519,6 @@ class HangarIntegrationTest {
     skShip.setFitted(false);
     shipRepository.save(skShip);
 
-    // Admin pinned to Iridium via the active-org-unit relay header.
     String response =
         mockMvc
             .perform(
@@ -557,12 +535,10 @@ class HangarIntegrationTest {
             .getResponse()
             .getContentAsString();
 
-    // Only the pinned squadron's single ship is counted, and its owner is the only detail row.
     assertTrue(response.contains("\"count\":1"), "pinned admin must count only Iridium's ship");
     assertTrue(
         response.contains("\"ownerName\":\"user1\""),
         "the pinned squadron's own ship must still appear in the breakdown");
-    // The SK-only member's ship must never leak into the pinned squadron's overview.
     assertFalse(
         response.contains("skuser"),
         "an SK-only member's ship must not leak into the pinned squadron's hangar overview");
@@ -570,7 +546,6 @@ class HangarIntegrationTest {
 
   @Test
   void testDeleteShipInMission() throws Exception {
-    // Given a ship owned by user1
     Ship ship = new Ship();
     ship.setOwningOrgUnit(iridium);
     ship.setName("Mission Ship");
@@ -579,7 +554,6 @@ class HangarIntegrationTest {
     ship.setInsurance("LTI");
     ship = shipRepository.save(ship);
 
-    // And a mission where this ship is assigned
     Mission mission = new Mission();
     mission.setOwningOrgUnit(iridium);
     mission.setName("Test Mission");
@@ -592,8 +566,6 @@ class HangarIntegrationTest {
     unit.setShip(ship);
     missionUnitRepository.save(unit);
 
-    // When user1 tries to delete the ship
-    // Then it should fail with 500 if not handled, or succeed if handled
     mockMvc
         .perform(
             delete("/api/v1/hangar/ships/" + ship.getId())
@@ -603,19 +575,14 @@ class HangarIntegrationTest {
                         .authorities(new SimpleGrantedAuthority("HANGAR_WRITE"))))
         .andExpect(status().isOk());
 
-    // Verify that the ship is deleted from repository
     assertTrue(shipRepository.findById(ship.getId()).isEmpty());
 
-    // Verify that the mission unit still exists but has no ship assigned
     MissionUnit updatedUnit = missionUnitRepository.findById(unit.getId()).orElseThrow();
     assertNull(updatedUnit.getShip());
   }
 
-  // ---- DELETE /api/v1/hangar/ships (delete all) ----
-
   @Test
   void testDeleteAllShips_ReturnsNoContent() throws Exception {
-    // Given: user1 has two ships
     Ship ship1 = new Ship();
     ship1.setOwningOrgUnit(iridium);
     ship1.setShipType(fighter);
@@ -631,7 +598,6 @@ class HangarIntegrationTest {
     ship2.setInsurance("0");
     shipRepository.save(ship2);
 
-    // When
     mockMvc
         .perform(
             delete("/api/v1/hangar/ships")
@@ -641,7 +607,6 @@ class HangarIntegrationTest {
                         .authorities(new SimpleGrantedAuthority("HANGAR_WRITE"))))
         .andExpect(status().isNoContent());
 
-    // Then: user1's ships are deleted
     assertTrue(shipRepository.findByOwnerId(user1.getId()).isEmpty());
   }
 
@@ -664,7 +629,6 @@ class HangarIntegrationTest {
 
   @Test
   void testDeleteAllShips_WithLinkedMissionUnit_UnlinksBeforeDelete() throws Exception {
-    // Given: user1 has a ship assigned to a mission unit
     Ship ship = new Ship();
     ship.setOwningOrgUnit(iridium);
     ship.setShipType(fighter);
@@ -685,7 +649,6 @@ class HangarIntegrationTest {
     unit.setShip(ship);
     missionUnitRepository.save(unit);
 
-    // When: user1 deletes all ships
     mockMvc
         .perform(
             delete("/api/v1/hangar/ships")
@@ -695,12 +658,10 @@ class HangarIntegrationTest {
                         .authorities(new SimpleGrantedAuthority("HANGAR_WRITE"))))
         .andExpect(status().isNoContent());
 
-    // Then: ship deleted, mission unit still exists but ship reference is null
     assertTrue(shipRepository.findById(ship.getId()).isEmpty());
     MissionUnit updatedUnit = missionUnitRepository.findById(unit.getId()).orElseThrow();
     assertNull(updatedUnit.getShip());
 
-    // And: user2's ships are unaffected (multi-user isolation)
     Ship user2Ship = new Ship();
     user2Ship.setOwningOrgUnit(iridium);
     user2Ship.setShipType(fighter);

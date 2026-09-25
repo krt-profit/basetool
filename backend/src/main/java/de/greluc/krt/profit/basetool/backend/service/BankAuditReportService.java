@@ -98,11 +98,8 @@ public class BankAuditReportService {
                 e ->
                     new AuditLogPdfFormat.Row(
                         e.getOccurredAt(),
-                        // Erased by an Art. 17 request -> the placeholder, not the raw sentinel
-                        // (REQ-SEC-062).
                         HandleAnonymisation.humanise(
                             e.getActorHandle(), label("general.anonymisedHandle")),
-                        // Raw event code (the on-screen viewer shows the localized label).
                         e.getEventType().name(),
                         e.getAccountId() != null
                             ? accountNos.getOrDefault(e.getAccountId(), "—")

@@ -109,12 +109,8 @@ class SecurityConfigStaticAssetPermitAllTest {
       })
   @WithAnonymousUser
   void anonymousGetOnStaticAssetPath_doesNotRedirectToOAuth2Login(String path) throws Exception {
-    // When
     MockHttpServletResponse response = mockMvc.perform(get(path)).andReturn().getResponse();
 
-    // Then — SsoReAuthenticationEntryPoint emits a 302 to /oauth2/authorization/keycloak when it
-    // gates a request. The resource handler and the static-content path emit no redirect. Asserting
-    // a null redirect URL catches the only failure mode that matters for this fix.
     assertNull(
         response.getRedirectedUrl(),
         "Path "

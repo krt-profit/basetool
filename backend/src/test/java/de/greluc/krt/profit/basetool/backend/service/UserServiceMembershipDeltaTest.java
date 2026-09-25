@@ -167,7 +167,6 @@ class UserServiceMembershipDeltaTest {
     userService.applyMembershipDelta(userId, delta);
 
     verify(orgUnitMembershipService).addMember(skId, userId);
-    // Initial flags set inline on the managed entity (no second save call needed).
     assertEquals(true, freshRow.isLogistician());
     assertEquals(true, freshRow.isMissionManager());
   }

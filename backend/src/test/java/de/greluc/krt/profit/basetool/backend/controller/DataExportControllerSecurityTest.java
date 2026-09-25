@@ -80,7 +80,6 @@ class DataExportControllerSecurityTest {
     when(dataExportReportService.renderPdf(any())).thenReturn(new byte[] {1, 2, 3});
   }
 
-  // covers REQ-SEC-058 — every member may export their own data
   @Test
   void selfExport_member_isAllowed() throws Exception {
     mockMvc
@@ -110,7 +109,6 @@ class DataExportControllerSecurityTest {
     mockMvc.perform(get("/api/v1/users/me/export")).andExpect(status().isUnauthorized());
   }
 
-  // covers REQ-SEC-058 — the admin variant takes an id, so it is admin-only
   @Test
   void adminExport_member_isForbidden() throws Exception {
     mockMvc

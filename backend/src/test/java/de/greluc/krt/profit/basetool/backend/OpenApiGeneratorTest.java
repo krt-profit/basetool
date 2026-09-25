@@ -65,10 +65,6 @@ class OpenApiGeneratorTest {
 
   @Test
   void generateOpenApiDocs() throws Exception {
-    // REQ-SEC-052: the document is admin-gated now — it enumerates every path, parameter and DTO
-    // field the API has, which is the most efficient description of the attack surface the project
-    // can produce, and it was readable without a token on every profile that serves it. Being a 404
-    // in prod is a deployment property, not an access rule.
     MvcResult result =
         mockMvc
             .perform(
@@ -81,7 +77,6 @@ class OpenApiGeneratorTest {
     Object jsonObject = objectMapper.readValue(json, Object.class);
 
     Path path = Paths.get("src/main/resources/api/openapi.json");
-    // Ensure the directory exists
     if (path.getParent() != null) {
       Files.createDirectories(path.getParent());
     }
@@ -127,7 +122,6 @@ class OpenApiGeneratorTest {
         Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
       }
     } finally {
-      // A successful move already consumed the temporary file; this only cleans up after a failure.
       Files.deleteIfExists(temporary);
     }
   }

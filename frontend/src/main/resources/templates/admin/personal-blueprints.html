@@ -32,9 +32,6 @@
     <div class="hud-box krt-personal-inventory mt-2">
         <form th:action="@{/admin/personal-blueprints}" method="get" class="krt-pi-userform no-track">
             <label for="krt-bp-user-select" th:text="#{admin.personalInventory.userSelect.label}">Mitglied</label>
-            <!--/* Server-side searchable combobox (remote-users, #1193): the roster is no longer
-                 preloaded; only the currently-selected member is seeded so edit mode shows their
-                 name. Typing queries /users/search on demand. */-->
             <select id="krt-bp-user-select" name="userSub" data-trigger="submit-form" data-krt-combobox="remote-users">
                 <option value="" th:text="#{admin.personalInventory.userSelect.placeholder}">-- bitte waehlen --</option>
                 <option th:if="${selectedUser != null}"
@@ -48,9 +45,6 @@
              th:text="#{admin.personalInventory.userSelect.empty}">Bitte zunaechst ein Mitglied auswaehlen.</div>
     </div>
 
-    <!--/* Global danger zone (REQ-INV-024): purge every user's removable blueprints. Always visible,
-         independent of the member picker above. Wipe-reset-grade: type-to-confirm danger modal,
-         auto-granted defaults (REQ-INV-016) are preserved by the backend. */-->
     <div class="hud-box mt-2 krtm-border-color-var-color-danger-b169" data-testid="bp-purge-card">
         <h2 class="krt-bp-section-title" th:text="#{admin.personalInventory.blueprints.purge.title}">Alle Blueprints aller Nutzer l&ouml;schen</h2>
         <p class="krt-subtitle" th:text="#{admin.personalInventory.blueprints.purge.text}">Entfernt unwiderruflich die Blueprints ALLER Nutzer. Standard-Blueprints bleiben erhalten.</p>
@@ -61,10 +55,6 @@
         </button>
     </div>
 
-    <!--/* Type-to-confirm danger modal (wipe-reset-grade), opened and closed by the shared
-         open/close-modal-display triggers through window.krtModal.
-         admin-personal-blueprints-purge.js arms the submit and does the krtFetch POST; the classic
-         form POST is the no-JS fallback. */-->
     <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='bp-purge-modal', titleKey='admin.personalInventory.blueprints.purge.modal.title', variant='krt-modal--danger', body=~{::bp-purge-modal-body})}">
         <th:block th:ref="bp-purge-modal-body">
             <form method="post" th:action="@{/admin/personal-blueprints/delete-all-users}" class="no-track" data-bp-purge
@@ -94,7 +84,6 @@
     </th:block>
 
     <th:block th:if="${selectedUserSub != null and !#strings.isEmpty(selectedUserSub)}">
-        <!--/* Multi-select add bar + import */-->
         <div class="hud-box krt-personal-inventory mt-2">
             <div class="krt-bp-addbar-head">
                 <h2 class="krt-bp-section-title" th:text="#{personalInventory.blueprints.add.heading}">Blueprints hinzufuegen</h2>
@@ -126,7 +115,6 @@
             </div>
         </div>
 
-        <!--/* Owned blueprint list */-->
         <div class="hud-box krt-personal-inventory mt-2">
             <div class="krt-pi-actionbar">
                 <form th:action="@{/admin/personal-blueprints}" method="get" class="krt-pi-filter no-track">
@@ -139,12 +127,6 @@
                 </form>
             </div>
 
-            <!--/* AJAX swap target (REQ-FE-002): the search filter re-renders only this table via
-                 personal-inventory-blueprints.js + krtFetch (same user, so the per-user endpoints
-                 stay valid). Row edit/delete are krtEvents-delegated and modals live outside, so
-                 swapped-in rows stay live; .utc-time cells re-localise on krt:swapped. The member
-                 <select> stays a full reload by design (it changes the per-user endpoint context).
-                 No-JS GET fallback reloads the page. */-->
             <div id="bp-results">
             <th:block th:fragment="results">
             <div class="table-responsive krt-pi-table-wrapper">
@@ -198,10 +180,7 @@
     </th:block>
 </main>
 
-<!--/* The member's edit / remove / import dialogs render only with a member selected, like
-     their openers and the import script below. */-->
 <th:block th:if="${selectedUserSub != null and !#strings.isEmpty(selectedUserSub)}">
-<!--/* Edit-note modal (KRT modal frame, no native dialogs) */-->
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='krt-bp-edit-modal', titleKey='personalInventory.blueprints.modal.editNote.title', variant='krt-modal--wide', titleId='krt-bp-edit-title', closeTrigger='bp-close-edit', body=~{::krt-bp-edit-modal-body})}">
     <th:block th:ref="krt-bp-edit-modal-body">
         <form id="krt-bp-edit-form" method="post">
@@ -223,7 +202,6 @@
     </th:block>
 </th:block>
 
-<!--/* Remove confirmation modal (KRT danger frame; the body names what is removed) */-->
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='krt-bp-delete-modal', titleKey='personalInventory.blueprints.modal.remove.title', variant='krt-modal--danger', closeTrigger='bp-close-delete', body=~{::krt-bp-delete-modal-body})}">
     <th:block th:ref="krt-bp-delete-modal-body">
         <div class="krt-modal-body">
@@ -239,7 +217,6 @@
     </th:block>
 </th:block>
 
-<!--/* Blueprint import preview modal (KRT modal frame, wide). Body filled by JS. */-->
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='krt-bp-import-modal', titleKey='personalInventory.blueprints.import.title', variant='krt-bp-import-frame', body=~{::krt-bp-import-modal-body})}">
     <th:block th:ref="krt-bp-import-modal-body">
         <div class="krt-modal-body">
@@ -263,13 +240,9 @@
 </th:block>
 
 <th:block th:replace="~{fragments/toast :: toast}" />
-<!--/* Global purge handler (REQ-INV-024): loaded unconditionally so the danger zone works even with
-     no member selected. i18n rides on the form's data-* attributes, so this module stays
-     translation-free. */-->
 <script th:src="@{/js/admin-personal-blueprints-purge.js}" defer th:attr="nonce=${cspNonce}"></script>
 <th:block th:if="${selectedUserSub != null and !#strings.isEmpty(selectedUserSub)}">
     <script th:inline="javascript" th:attr="nonce=${cspNonce}">
-        /*<![CDATA[*/
         window.krtBlueprintsI18n = {
             editTitle:    /*[[#{personalInventory.blueprints.modal.editNote.title}]]*/ 'Notiz bearbeiten',
             removeBody:   /*[[#{personalInventory.blueprints.modal.remove.body}]]*/   'Wirklich entfernen?',
@@ -311,15 +284,9 @@
             importPreview: /*[[@{/admin/personal-blueprints/{sub}/import/preview(sub=${selectedUserSub})}]]*/ '/admin/personal-blueprints/x/import/preview',
             importApply:   /*[[@{/admin/personal-blueprints/{sub}/import/apply(sub=${selectedUserSub})}]]*/   '/admin/personal-blueprints/x/import/apply'
         };
-        /*]]>*/
     </script>
     <script th:src="@{/js/personal-inventory-blueprints-import.js}" defer th:attr="nonce=${cspNonce}"></script>
 </th:block>
-<!--/* Loaded UNCONDITIONALLY (after the optional bootstrap block above, so the i18n/endpoints
-     globals are set first whenever a member IS selected): the module carries the member-selection
-     persistence (REQ-UI-017), which must run on the BARE page — no member selected yet — to
-     replay the saved member via a one-time location.replace. Every element and bootstrap access
-     in it is null-guarded, so without a selected member it is inert beyond that persistence. */-->
 <script th:src="@{/js/personal-inventory-blueprints.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>
 </html>

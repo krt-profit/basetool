@@ -90,8 +90,6 @@ public class SpecialCommandSecurityService {
         .flatMap(
             userId ->
                 membershipRepository.findById(new OrgUnitMembershipId(userId, specialCommandId)))
-        // SK-Lead now lives on the unified rank (epic #800, REQ-ROLE-001); is_lead was dropped in
-        // the Phase 5 cleanup (V187).
         .map(m -> m.getRole() == MembershipRole.SK_LEAD)
         .orElse(false);
   }

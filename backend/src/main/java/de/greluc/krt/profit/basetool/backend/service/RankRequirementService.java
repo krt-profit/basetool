@@ -144,8 +144,6 @@ public class RankRequirementService {
   public RankRequirementResponse create(@NotNull RankRequirementWriteRequest request) {
     ownerScopeService.assertPromotionFeatureEnabled();
     validateSingleRankStep(request.fromRank(), request.toRank());
-    // REQ-ORG-017 "pin, else choose": a two-Staffel officer must pin the target Staffel via the
-    // switcher before creating, rather than silently stamping their name-sorted primary.
     if (ownerScopeService.hasAmbiguousStaffelContext()) {
       throw new BadRequestException(
           "You belong to two Staffeln — pin the Staffel this rank requirement belongs to via the"
@@ -209,8 +207,6 @@ public class RankRequirementService {
     mapper.updateEntity(entity, request);
     PromotionTopic resolvedTopic = resolveTopic(request.topicId());
     PromotionCategory resolvedCategory = resolveCategory(request.categoryId());
-    // The owning squadron is immutable post-create; any new topic/category reference must stay
-    // within it so a requirement cannot be re-pointed at a different squadron's catalog.
     assertReferencesBelongToSquadron(resolvedTopic, resolvedCategory, entity.getOwningSquadron());
     entity.setTopic(resolvedTopic);
     entity.setCategory(resolvedCategory);

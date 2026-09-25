@@ -156,8 +156,6 @@ public class ClientErrorReportController {
       @RequestBody(required = false) @Nullable ClientErrorReport report) {
     String kind = report == null ? null : report.kind();
     if (kind == null || !ALLOWED_KINDS.contains(kind)) {
-      // DEBUG, not WARN: rejecting a crafted payload is the endpoint working as designed, and the
-      // caller can repeat it at will. The raw value is still sanitised — it is about to be logged.
       log.debug(
           "Rejected client error report with unknown kind={}",
           LogSafe.text(kind, MAX_FIELD_LENGTH));
@@ -229,8 +227,7 @@ public class ClientErrorReportController {
             + uri.getHost()
             + (uri.getPort() >= 0 ? ":" + uri.getPort() : "");
       }
-    } catch (URISyntaxException e) {
-      // Not a URI at all: fall through to the keyword cut below.
+    } catch (URISyntaxException ignored) {
     }
     int cut = blocked.length();
     for (int i = 0; i < blocked.length(); i++) {

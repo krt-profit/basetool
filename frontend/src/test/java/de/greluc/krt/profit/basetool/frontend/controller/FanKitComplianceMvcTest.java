@@ -109,8 +109,6 @@ class FanKitComplianceMvcTest {
   void setup() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
 
-    // Anonymous home() path: null is a valid "no upcoming missions" response for the
-    // next-7-days search and keeps the rendered page to its empty-state branch.
     when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
         .thenReturn(null);
   }

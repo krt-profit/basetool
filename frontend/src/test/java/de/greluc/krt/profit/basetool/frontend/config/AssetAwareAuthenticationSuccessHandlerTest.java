@@ -54,25 +54,17 @@ class AssetAwareAuthenticationSuccessHandlerTest {
     handler = new AssetAwareAuthenticationSuccessHandler(requestCache, delegate);
   }
 
-  // ---------------------------------------------------------------------------
-  // onAuthenticationSuccess — branching between asset-drop and delegate paths.
-  // ---------------------------------------------------------------------------
-
   @Test
   void onAuthenticationSuccess_assetSavedRequest_dropsSavedRequestAndRedirectsToContextRoot()
       throws Exception {
-    // Given a saved request pointing to a /sm/* sourcemap probe.
     MockHttpServletRequest request = new MockHttpServletRequest();
     MockHttpServletResponse response = new MockHttpServletResponse();
     SavedRequest saved = mock(SavedRequest.class);
     when(saved.getRedirectUrl()).thenReturn("https://profit-base.online/sm/86972ebd.map");
     when(requestCache.getRequest(request, response)).thenReturn(saved);
 
-    // When
     handler.onAuthenticationSuccess(request, response, authentication);
 
-    // Then the saved request is removed, the response redirects to "/", and the delegate is not
-    // invoked.
     verify(requestCache).removeRequest(request, response);
     assertEquals("/", response.getRedirectedUrl());
     verify(delegate, never()).onAuthenticationSuccess(any(), any(), any());
@@ -81,8 +73,6 @@ class AssetAwareAuthenticationSuccessHandlerTest {
   @Test
   void onAuthenticationSuccess_assetSavedRequestWithContextPath_redirectsToContextRootHome()
       throws Exception {
-    // Given a context path is set on the request (deployed under /app), the redirect must respect
-    // it so the user lands on the application root rather than the servlet container root.
     MockHttpServletRequest request = new MockHttpServletRequest();
     request.setContextPath("/app");
     MockHttpServletResponse response = new MockHttpServletResponse();
@@ -90,27 +80,22 @@ class AssetAwareAuthenticationSuccessHandlerTest {
     when(saved.getRedirectUrl()).thenReturn("/js/vendor/foo.js.map");
     when(requestCache.getRequest(request, response)).thenReturn(saved);
 
-    // When
     handler.onAuthenticationSuccess(request, response, authentication);
 
-    // Then
     assertEquals("/app/", response.getRedirectedUrl());
   }
 
   @Test
   void onAuthenticationSuccess_navigationalSavedRequest_delegatesToWrappedHandler()
       throws Exception {
-    // Given a saved request that points to a legitimate business URL.
     MockHttpServletRequest request = new MockHttpServletRequest();
     MockHttpServletResponse response = new MockHttpServletResponse();
     SavedRequest saved = mock(SavedRequest.class);
     when(saved.getRedirectUrl()).thenReturn("/missions/abc-123");
     when(requestCache.getRequest(request, response)).thenReturn(saved);
 
-    // When
     handler.onAuthenticationSuccess(request, response, authentication);
 
-    // Then the delegate runs and we do not redirect ourselves or remove the saved request.
     verify(delegate).onAuthenticationSuccess(request, response, authentication);
     verify(requestCache, never()).removeRequest(any(), any());
     assertEquals(null, response.getRedirectedUrl(), "Wrapper must not write its own redirect");
@@ -118,22 +103,15 @@ class AssetAwareAuthenticationSuccessHandlerTest {
 
   @Test
   void onAuthenticationSuccess_noSavedRequest_delegatesToWrappedHandler() throws Exception {
-    // Given
     MockHttpServletRequest request = new MockHttpServletRequest();
     MockHttpServletResponse response = new MockHttpServletResponse();
     when(requestCache.getRequest(request, response)).thenReturn(null);
 
-    // When
     handler.onAuthenticationSuccess(request, response, authentication);
 
-    // Then
     verify(delegate).onAuthenticationSuccess(request, response, authentication);
     verify(requestCache, never()).removeRequest(any(), any());
   }
-
-  // ---------------------------------------------------------------------------
-  // isAssetLikePath — the suffix / prefix rules and edge cases.
-  // ---------------------------------------------------------------------------
 
   @ParameterizedTest
   @ValueSource(
@@ -197,8 +175,6 @@ class AssetAwareAuthenticationSuccessHandlerTest {
 
   @Test
   void isAssetLikePath_returnsFalseForUnparsableUri() {
-    // A path with an illegal character that URI.create rejects must surface as "not asset-like"
-    // rather than throwing — a malformed saved request must never short-circuit the login flow.
     assertFalse(AssetAwareAuthenticationSuccessHandler.isAssetLikePath("https://[bad-uri"));
   }
 }

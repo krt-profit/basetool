@@ -115,7 +115,7 @@ class SystemSettingServiceTest {
   void updateSetting_OptimisticLocking_ShouldThrowException() {
     when(systemSettingRepository.findById("test_key")).thenReturn(Optional.of(setting));
 
-    SystemSettingUpdateDto updateDto = new SystemSettingUpdateDto("new_value", 2L); // Wrong version
+    SystemSettingUpdateDto updateDto = new SystemSettingUpdateDto("new_value", 2L);
 
     assertThrows(
         ObjectOptimisticLockingFailureException.class,

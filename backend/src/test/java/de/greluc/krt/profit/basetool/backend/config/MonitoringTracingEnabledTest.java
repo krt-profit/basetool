@@ -57,8 +57,6 @@ import org.springframework.web.filter.ServerHttpObservationFilter;
       "management.opentelemetry.enabled=true",
       "management.tracing.export.otlp.enabled=false"
     })
-// REQ-SEC-052: every route these cases exercise requires a login now, so the class carries a
-// principal. What each case asserts is unchanged — only the caller is.
 @org.springframework.security.test.context.support.WithMockUser
 class MonitoringTracingEnabledTest {
 
@@ -91,8 +89,6 @@ class MonitoringTracingEnabledTest {
 
   @BeforeEach
   void setUp() {
-    // The ServerHttpObservationFilter is a container-level filter in production; MockMvc does not
-    // register container filters, so it is added explicitly with the app's observation registry.
     mockMvc =
         MockMvcBuilders.webAppContextSetup(context)
             .addFilters(new ServerHttpObservationFilter(observationRegistry))
@@ -103,18 +99,11 @@ class MonitoringTracingEnabledTest {
 
   @Test
   void shouldRecordServerSpanWithTemplatedUriAndNoUserIdentifyingAttributes() throws Exception {
-    // Given a permitAll endpoint with a path variable
     String rawId = UUID.randomUUID().toString();
 
-    // When: the query parameter stands in for user-entered search text — it must never reach
-    // span attributes or metric tags (ObservationPrivacyFilter, REQ-OBS-006/-009).
     mockMvc.perform(get("/api/v1/locations/" + rawId + "?probe=user-entered-search-text"));
     sdkTracerProvider.forceFlush().join(10, TimeUnit.SECONDS);
 
-    // Then: the span's low-cardinality `uri` tag is the route template (the raw path only appears
-    // in the standard high-cardinality `http.url` attribute, which for this app carries entity ids
-    // at most), and no attribute value carries user-identifying data such as an e-mail
-    // (REQ-OBS-009 mirrors the REQ-OBS-006 rule).
     List<SpanData> spans = spanExporter.getFinishedSpanItems();
     assertThat(spans).as("the observed request must produce at least one span").isNotEmpty();
     SpanData serverSpan = spans.getLast();
@@ -128,10 +117,8 @@ class MonitoringTracingEnabledTest {
 
   @Test
   void shouldPutTraceIdAndSpanIdIntoMdcWhileSpanIsInScope() {
-    // Given
     Span span = tracer.nextSpan().name("mdc-probe").start();
 
-    // When / Then: the JSON appenders' includeMdcKeyName entries rely on these exact MDC keys.
     try (Tracer.SpanInScope ignored = tracer.withSpan(span)) {
       assertThat(MDC.get("traceId")).isEqualTo(span.context().traceId());
       assertThat(MDC.get("spanId")).isEqualTo(span.context().spanId());

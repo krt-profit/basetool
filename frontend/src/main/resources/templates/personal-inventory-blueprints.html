@@ -22,7 +22,6 @@
 </header>
 
 <main>
-    <!--/* Head: greeting + facts subtitle left, compact add bar (typeahead + CTA + JSON import) right. */-->
     <div class="greeting hud-box krt-personal-inventory-header krt-bp-head"
          th:with="noteCount=${blueprints.?[note != null and !note.isBlank()].size()}">
         <div>
@@ -48,11 +47,6 @@
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-upload"/></svg>
                     <span th:text="#{personalInventory.blueprints.import.button}">JSON importieren</span>
                 </button>
-                <!--/* Companion to the JSON import: the export consumed above is produced by the
-                     desktop Basetool SC Extractor, so the way to obtain it sits right next to the
-                     import trigger. Points at GitHub's canonical "latest release" redirect (the
-                     same hardcoded-external-link pattern the footer uses), opened in a new tab so
-                     the collection stays put (REQ-INV-038). */-->
                 <a id="krt-bp-extractor-link" class="btn btn-ghost"
                    href="https://github.com/krt-profit/basetool-sc-extractor/releases/latest"
                    target="_blank" rel="noopener noreferrer"
@@ -60,9 +54,6 @@
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-download"/></svg>
                     <span th:text="#{scExtractor.download.button}">SC Extractor laden</span>
                 </a>
-                <!--/* One-click clear of the caller's own (removable) blueprints (REQ-INV-023). Hidden
-                     while the caller owns nothing removable (defaults stay non-removable); JS re-toggles
-                     it on every list swap. Opens the danger confirm modal below. */-->
                 <button type="button" id="krt-bp-delete-all-open" class="btn btn-quiet-danger"
                         data-trigger="bp-open-delete-all"
                         th:hidden="${blueprints.?[removable].size() == 0}"
@@ -71,8 +62,6 @@
                     <span th:text="#{personalInventory.blueprints.action.removeAll}">Alle l&ouml;schen</span>
                 </button>
             </div>
-            <!--/* Multi-select staging: chips appear compactly under the bar; the CTA stays
-                 disabled until at least one blueprint is staged. */-->
             <div class="krt-bp-staging-bar">
                 <span class="krt-bp-staging-label" th:text="#{personalInventory.blueprints.add.selectedHeading}">Auswahl</span>
                 <div id="krt-bp-staging-list" class="krt-bp-chip-list"
@@ -91,17 +80,7 @@
         </a>
     </nav>
 
-    <!--/* Collection: master list left, permanent recipe/stat detail right (V3). The hud-box wraps the
-         craftability toolbar + the in-place AJAX swap target (#krt-bp-list). The toggle sits INSIDE
-         the box but OUTSIDE the swap target, so its checkbox state survives a batch-add / import /
-         remove re-render (epic #571 / REQ-FE-005); only the inner fragment is re-rendered via GET
-         /personal-inventory/blueprints?fragment=list. The hidden meta drives the header subtitle +
-         tab-count resync after a swap; recipe.js re-inits on krt:swapped and mirrors the toolbar's
-         visibility from the collection's empty state. */-->
     <div class="hud-box krt-personal-inventory mt-2">
-    <!--/* Craftability controls (#781): refinery toggle + hint, hidden while the collection is empty
-         (mirrors the empty-state); recipe.js reads the toggle and recomputes the list badges +
-         detail breakdown client-side (both figure sets are fetched). */-->
     <div class="krt-bp-craft-toolbar" id="krt-bp-craft-toolbar"
          th:classappend="${#lists.isEmpty(blueprints)} ? ' is-empty' : ''">
         <label class="krt-bp-refinery-toggle" for="krt-bp-refinery-toggle">
@@ -109,10 +88,6 @@
             <span th:text="#{personalInventory.blueprints.craft.refineryToggle}">Raffinerie-Ertrag einrechnen</span>
         </label>
         <span class="krt-bp-craft-toolbar-hint" th:text="#{personalInventory.blueprints.craft.refineryHint}">Offene &amp; laufende Raffinerie-Auftr&auml;ge einrechnen</span>
-        <!--/* Craftable-only filter: a purely client-side view filter over the same craftability data
-             the refinery toggle drives. Lives outside the swapped #krt-bp-list fragment (like the
-             refinery toggle) so its state survives a batch-add / import / remove re-render; recipe.js
-             hides every master row that is not craftable under the current refinery-toggle state. */-->
         <label class="krt-bp-refinery-toggle krt-bp-craftable-toggle" for="krt-bp-craftable-toggle">
             <input type="checkbox" id="krt-bp-craftable-toggle">
             <span th:text="#{personalInventory.blueprints.craft.craftableFilter}">Nur craftbare anzeigen</span>
@@ -128,10 +103,7 @@
              th:insert="~{fragments/components :: emptyStateBody('personalInventory.blueprints.collection.emptyTitle', 'personalInventory.blueprints.empty', 'personalInventory.blueprints.collection.emptyFilterHint')}"></div>
 
         <div th:unless="${#lists.isEmpty(blueprints)}" class="master-detail krt-bp-md" id="krt-bp-md">
-            <!--/* Master list */-->
             <div class="master-list">
-                <!--/* One input, two filters: typing filters the rendered rows instantly
-                     (client-side); Enter submits the existing ?q= server filter. */-->
                 <form class="krt-bp-master-filter no-track" th:action="@{/personal-inventory/blueprints}" method="get">
                     <label for="krt-bp-q" class="visually-hidden" th:text="#{personalInventory.filter.search}">Suche</label>
                     <input id="krt-bp-q" type="search" name="q" th:value="${filterQuery}"
@@ -148,8 +120,6 @@
                                      data-removable=${bp.removable},
                                      data-acquired-at=${bp.acquiredAt}">
                         <span th:text="${bp.productName}">Produkt</span>
-                        <!--/* Trailing status cluster: note pencil + (JS-painted) craft badge. The
-                             wrapper is always present so recipe.js has a stable append target. */-->
                         <span class="krt-bp-row-aside">
                             <span class="master-row-note" th:if="${bp.note != null and !bp.note.isBlank()}"
                                   th:title="#{personalInventory.blueprints.field.note}" aria-hidden="true"><svg class="krt-icon"><use href="#krt-icon-edit"/></svg></span>
@@ -158,7 +128,6 @@
                 </div>
             </div>
 
-            <!--/* Detail pane */-->
             <div class="detail-pane" id="krt-bp-detail" aria-live="polite">
                 <button type="button" class="btn btn-ghost krt-bp-detail-back" id="krt-bp-detail-back">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-arrow-left"/></svg>
@@ -188,9 +157,6 @@
                         </div>
                     </div>
 
-                    <!--/* Craftability (#781): counter + per-material consumption / shortfall.
-                         Filled by recipe.js from the bulk craftability fetch; the slot sliders
-                         below default to the effective quality this section computes. */-->
                     <div class="krt-bp-craft" id="krt-bp-detail-craft" hidden></div>
 
                     <h2 class="section-title" th:text="#{personalInventory.blueprints.detail.heading}">Zutaten &amp; Stat-Beitrag nach Zutat-Qualit&auml;t</h2>
@@ -208,7 +174,6 @@
     </div>
 </main>
 
-<!--/* Edit-note modal (KRT modal frame, no native dialogs) */-->
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='krt-bp-edit-modal', titleKey='personalInventory.blueprints.modal.editNote.title', variant='krt-modal--wide', titleId='krt-bp-edit-title', closeTrigger='bp-close-edit', body=~{::krt-bp-edit-modal-body})}">
     <th:block th:ref="krt-bp-edit-modal-body">
         <form id="krt-bp-edit-form" method="post">
@@ -230,7 +195,6 @@
     </th:block>
 </th:block>
 
-<!--/* Remove confirmation modal (KRT danger frame; the body names what is removed) */-->
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='krt-bp-delete-modal', titleKey='personalInventory.blueprints.modal.remove.title', variant='krt-modal--danger', closeTrigger='bp-close-delete', body=~{::krt-bp-delete-modal-body})}">
     <th:block th:ref="krt-bp-delete-modal-body">
         <div class="krt-modal-body">
@@ -246,9 +210,6 @@
     </th:block>
 </th:block>
 
-<!--/* Delete-all confirmation modal (KRT danger frame): clears every removable blueprint the caller
-     owns (REQ-INV-023). Lives outside the swapped #krt-bp-list fragment so its form survives every
-     list re-render; the classic POST is the no-JS fallback. */-->
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='krt-bp-delete-all-modal', titleKey='personalInventory.blueprints.modal.removeAll.title', variant='krt-modal--danger', closeTrigger='bp-close-delete-all', body=~{::krt-bp-delete-all-modal-body})}">
     <th:block th:ref="krt-bp-delete-all-modal-body">
         <div class="krt-modal-body">
@@ -264,7 +225,6 @@
     </th:block>
 </th:block>
 
-<!--/* Blueprint import preview modal (KRT modal frame, wide). Body filled by JS. */-->
 <th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='krt-bp-import-modal', titleKey='personalInventory.blueprints.import.title', variant='krt-bp-import-frame', body=~{::krt-bp-import-modal-body})}">
     <th:block th:ref="krt-bp-import-modal-body">
         <div class="krt-modal-body">
@@ -288,7 +248,6 @@
 
 <th:block th:replace="~{fragments/toast :: toast}" />
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
-    /*<![CDATA[*/
     window.krtBlueprintsI18n = {
         editTitle:    /*[[#{personalInventory.blueprints.modal.editNote.title}]]*/ 'Notiz bearbeiten',
         removeBody:   /*[[#{personalInventory.blueprints.modal.remove.body}]]*/   'Wirklich entfernen?',
@@ -378,7 +337,6 @@
         importApply:   /*[[@{/personal-inventory/blueprints/import/apply}]]*/   '/personal-inventory/blueprints/import/apply',
         importStaged:  /*[[@{/personal-inventory/blueprints/import/staged}]]*/  '/personal-inventory/blueprints/import/staged'
     };
-    /*]]>*/
 </script>
 <script th:src="@{/js/personal-inventory-blueprints.js}" defer th:attr="nonce=${cspNonce}"></script>
 <script th:src="@{/js/personal-inventory-blueprints-import.js}" defer th:attr="nonce=${cspNonce}"></script>

@@ -156,13 +156,11 @@ public final class ShipTypeMatcher {
    */
   private static @Nullable ShipType resolveByName(
       @NotNull ShipTypeIndex index, @NotNull String rawName) {
-    // Stage 1: exact case-insensitive
     ShipType match = index.byExactLower.get(rawName.toLowerCase(Locale.ROOT));
     if (match != null) {
       return match;
     }
 
-    // Stage 2: normalised (lowercase + non-alphanumeric stripped)
     String normalized = normalizeForMatching(rawName);
     if (!normalized.isEmpty()) {
       match = index.byNormalized.get(normalized);
@@ -171,15 +169,11 @@ public final class ShipTypeMatcher {
       }
     }
 
-    // Stages 3 + 4: token-subset matches, both directions, each requiring uniqueness.
     Set<String> fvTokens = tokenize(rawName);
     if (fvTokens.isEmpty()) {
       return null;
     }
 
-    // Stage 3: fv ⊆ uex — fv is an abbreviation of a uex name. Skip on ambiguity, do NOT fall
-    // through to stage 4 — multiple uex candidates contain the fv tokens means the fv string is
-    // genuinely ambiguous (e.g. "F7C-M Super Hornet" between Mk I / Heartseeker / Mk II).
     ShipType uniqueSubset = findUniqueWhereFvSubsetOfUex(index.tokenized, fvTokens);
     if (uniqueSubset != null) {
       return uniqueSubset;
@@ -188,7 +182,6 @@ public final class ShipTypeMatcher {
       return null;
     }
 
-    // Stage 4: uex ⊆ fv — uex name is a shorter canonical form of the longer fv export name.
     return findUniqueWhereUexSubsetOfFv(index.tokenized, fvTokens);
   }
 

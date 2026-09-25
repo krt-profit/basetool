@@ -104,7 +104,6 @@ class PersonSearchCoverageTest {
     return columns;
   }
 
-  // covers REQ-SEC-060 — no text column may be neither searched nor deliberately exempted
   @Test
   @Transactional(readOnly = true)
   void everyTextColumnIsEitherSearchedOrExplicitlyExempt() {
@@ -143,8 +142,6 @@ class PersonSearchCoverageTest {
         .isEmpty();
   }
 
-  // covers REQ-SEC-060 — a registered target that no longer exists must fail here, not during a
-  // real data-subject request
   @Test
   @Transactional(readOnly = true)
   void everyRegisteredTargetStillExists() {
@@ -162,7 +159,6 @@ class PersonSearchCoverageTest {
         .isEmpty();
   }
 
-  // covers REQ-SEC-060 — the id column each hit is linked by must exist too
   @Test
   @Transactional(readOnly = true)
   void everyTargetIdColumnExists() {
@@ -190,11 +186,8 @@ class PersonSearchCoverageTest {
         .isEmpty();
   }
 
-  // covers REQ-SEC-060 — the assembled statement must actually run against the real schema
   @Test
   void theSweepRunsAgainstTheRealSchema() {
-    // A term that matches nothing: this asserts the SQL is valid across every branch, which a
-    // Mockito test cannot, and it is the one failure mode that would only show up in production.
     PersonSearchService.PersonSearchResult result =
         personSearchService.search("zzz-no-such-handle-zzz");
 
@@ -202,7 +195,6 @@ class PersonSearchCoverageTest {
     assertThat(result.truncated()).isFalse();
   }
 
-  // covers REQ-SEC-060 — the term floor, so a one-character search cannot sweep every table
   @Test
   void aTooShortTermIsRefused() {
     assertThatThrownBy(() -> personSearchService.search("ab"))
@@ -211,10 +203,8 @@ class PersonSearchCoverageTest {
         .isInstanceOf(IllegalArgumentException.class);
   }
 
-  // covers REQ-SEC-060 — a pasted wildcard must not turn the search into a database dump
   @Test
   void likeWildcardsInTheTermAreEscaped() {
-    // '%%%' would match every row of every searched column if the wildcards were not escaped.
     assertThat(personSearchService.search("%%%").hits()).isEmpty();
     assertThat(personSearchService.search("___").hits()).isEmpty();
   }

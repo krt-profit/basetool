@@ -471,9 +471,6 @@ public class MaterialExchangeService {
         offerLabel(offer),
         offer.getOwner() == null ? null : offer.getOwner().getId(),
         AuditDetails.of("offer", offerId));
-    // Notify the owner about the new interested party (#1187, REQ-MARKET-011). Published only on a
-    // genuinely new registration (the idempotent-duplicate return above skips it), inside this
-    // transaction so the after-commit listener never fires for a rolled-back registration.
     if (offer.getOwner() != null) {
       eventPublisher.publishEvent(
           new MaterialExchangeInterestRegisteredEvent(

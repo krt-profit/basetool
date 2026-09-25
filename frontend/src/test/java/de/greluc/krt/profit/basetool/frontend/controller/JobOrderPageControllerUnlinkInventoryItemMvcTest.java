@@ -78,7 +78,6 @@ class JobOrderPageControllerUnlinkInventoryItemMvcTest {
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void unlinkInventoryItem_AsLogistician_ShouldCallBackendAndRedirectWithSuccessToast()
       throws Exception {
-    // Given
     UUID orderId = UUID.randomUUID();
     UUID inventoryItemId = UUID.randomUUID();
 
@@ -87,11 +86,9 @@ class JobOrderPageControllerUnlinkInventoryItemMvcTest {
             eq(Void.class)))
         .thenReturn(null);
 
-    // When
     mockMvc
         .perform(
             post("/orders/" + orderId + "/inventory/" + inventoryItemId + "/unlink").with(csrf()))
-        // Then
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl("/orders/" + orderId))
         .andExpect(flash().attribute("successToast", "orders.detail.inventory.unlink.success"));
@@ -105,11 +102,9 @@ class JobOrderPageControllerUnlinkInventoryItemMvcTest {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER"})
   void unlinkInventoryItem_AsPlainMember_ShouldReturn403() throws Exception {
-    // Given
     UUID orderId = UUID.randomUUID();
     UUID inventoryItemId = UUID.randomUUID();
 
-    // When / Then
     mockMvc
         .perform(
             post("/orders/" + orderId + "/inventory/" + inventoryItemId + "/unlink").with(csrf()))
@@ -119,7 +114,6 @@ class JobOrderPageControllerUnlinkInventoryItemMvcTest {
   @Test
   @WithMockUser(roles = {"KRT_MEMBER", "LOGISTICIAN"})
   void unlinkInventoryItem_WhenBackendFails_ShouldRedirectWithErrorToast() throws Exception {
-    // Given
     UUID orderId = UUID.randomUUID();
     UUID inventoryItemId = UUID.randomUUID();
 
@@ -129,11 +123,9 @@ class JobOrderPageControllerUnlinkInventoryItemMvcTest {
             eq("/api/v1/orders/" + orderId + "/inventory/" + inventoryItemId + "/unlink"),
             eq(Void.class));
 
-    // When
     mockMvc
         .perform(
             post("/orders/" + orderId + "/inventory/" + inventoryItemId + "/unlink").with(csrf()))
-        // Then
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl("/orders/" + orderId))
         .andExpect(flash().attribute("errorToast", "orders.detail.inventory.unlink.error"));

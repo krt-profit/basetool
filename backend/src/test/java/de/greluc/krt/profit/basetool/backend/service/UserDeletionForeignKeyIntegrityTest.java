@@ -130,7 +130,6 @@ class UserDeletionForeignKeyIntegrityTest {
   @Test
   void
       deleteUser_ownerOfMissionAndClaimStamper_reassignsCompanionAndNullsStampWithoutFkViolation() {
-    // Given a fallback admin (so deleteUser has a reassignment target)...
     String tag = UUID.randomUUID().toString().substring(0, 8);
     Role adminRole =
         roleRepository
@@ -150,8 +149,6 @@ class UserDeletionForeignKeyIntegrityTest {
     admin.getRoles().add(adminRole);
     userRepository.save(admin);
 
-    // ...and an ex-member (gone from Keycloak — the only kind deleteUser touches) who owns a
-    // mission (hence a mission_ownership companion) and has stamped a material claim.
     User exMember = new User();
     exMember.setId(UUID.randomUUID());
     exMember.setUsername("fk-exmember-" + tag);
@@ -165,8 +162,6 @@ class UserDeletionForeignKeyIntegrityTest {
     mission.setIsInternal(false);
     mission = missionRepository.save(mission);
     UUID missionId = mission.getId();
-    // updateMissionOwner mirrors production: it sets mission.owner AND upserts the companion row.
-    // 0 is the ownership version of a mission whose owner was never changed.
     missionService.updateMissionOwner(missionId, exMember.getId(), 0L);
 
     SpecialCommand sk = new SpecialCommand();
@@ -210,11 +205,9 @@ class UserDeletionForeignKeyIntegrityTest {
     UUID claimId = claim.getId();
     UUID exMemberId = exMember.getId();
 
-    // Flush the seed to the DB and detach it so the post-delete reads see fresh state.
     entityManager.flush();
     entityManager.clear();
 
-    // Sanity: before the delete the companion + claim point at the ex-member.
     assertThat(
             missionOwnershipRepository.findByMissionId(missionId).orElseThrow().getOwner().getId())
         .isEqualTo(exMemberId);
@@ -222,7 +215,6 @@ class UserDeletionForeignKeyIntegrityTest {
         .isEqualTo(exMemberId);
     entityManager.clear();
 
-    // When the ex-member is deleted and the DELETE is flushed to Postgres...
     assertThatNoException()
         .isThrownBy(
             () -> {
@@ -231,8 +223,6 @@ class UserDeletionForeignKeyIntegrityTest {
             });
     entityManager.clear();
 
-    // Then no 23503 fired, the user is gone, the mission survives with its owner + companion both
-    // reassigned to the same admin, and the claim survives with its audit stamp nulled.
     assertThat(userRepository.findById(exMemberId)).isEmpty();
 
     Mission reloaded = missionRepository.findById(missionId).orElseThrow();
@@ -300,8 +290,6 @@ class UserDeletionForeignKeyIntegrityTest {
     sk.setProfitEligible(true);
     sk = specialCommandRepository.save(sk);
 
-    // Mirrors OrgUnitMembershipService.addSpecialCommandMembership: the kind column is written by
-    // the V95 trigger, so the in-memory value is only there for the immediate read-back.
     OrgUnitMembership membership = new OrgUnitMembership();
     membership.setId(new OrgUnitMembershipId(exMemberId, sk.getId()));
     membership.setUser(exMember);
@@ -370,8 +358,6 @@ class UserDeletionForeignKeyIntegrityTest {
     exMember.setInKeycloak(false);
     exMember = userRepository.save(exMember);
     final UUID exMemberId = exMember.getId();
-    // owner_user_id / user_id store app_user.id rendered as text — the JWT subject IS the primary
-    // key.
     final UUID ownerUserId = exMemberId;
 
     personalBlueprintRepository.save(

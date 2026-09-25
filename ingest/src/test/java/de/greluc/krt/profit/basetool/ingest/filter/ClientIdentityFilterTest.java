@@ -152,8 +152,6 @@ class ClientIdentityFilterTest {
 
   @Test
   void shouldStayInertWhenNothingIsConfigured() throws Exception {
-    // A build that ships the gate must be a no-op until the operator has run the Keycloak setup —
-    // otherwise deploying it rejects every real extractor token (REQ-INGEST-008 sequencing).
     authenticate("some-unregistered-client", null);
 
     filter(TestProperties.clientIdentity()).doFilter(request, response, chain);
@@ -216,7 +214,6 @@ class ClientIdentityFilterTest {
 
     filter(enforcing()).doFilter(request, response, chain);
 
-    // The chain must never run: a rejected client may not reach the relay.
     verify(chain, never()).doFilter(request, response);
     assertThat(response.getStatus()).isEqualTo(403);
     assertThat(response.getContentAsString()).contains(MetricNames.CODE_CLIENT_NOT_ALLOWED);
@@ -225,14 +222,10 @@ class ClientIdentityFilterTest {
 
   @Test
   void shouldNameTheFailingCheckSoTheClientMessageIsDiagnosable() throws Exception {
-    // The 2026-08-03 incident: all four checks answered with one identical sentence, so the client
-    // message could not distinguish a token-level refusal from the payload-provenance one and the
-    // operator had to reach for a log that the container recreation had already discarded.
     authenticate("some-other-tool", INGEST_SCOPE);
     filter(enforcing()).doFilter(request, response, chain);
     String unknownClientBody = response.getContentAsString();
 
-    // A scope failure must read differently from an identity failure.
     SecurityContextHolder.clearContext();
     MockHttpServletResponse scopeResponse = new MockHttpServletResponse();
     authenticate(ALLOWED_CLIENT, null);
@@ -241,14 +234,11 @@ class ClientIdentityFilterTest {
     assertThat(unknownClientBody).contains("client identity");
     assertThat(scopeResponse.getContentAsString()).contains("missing ingest scope");
     assertThat(unknownClientBody).isNotEqualTo(scopeResponse.getContentAsString());
-    // The refused caller still learns nothing about the configuration itself.
     assertThat(unknownClientBody).doesNotContain(ALLOWED_CLIENT).doesNotContain(INGEST_SCOPE);
   }
 
   @Test
   void shouldFailClosedWhenTheAzpClaimIsAbsentEntirely() throws Exception {
-    // A MISSING claim must not be the lenient branch. If it were, a realm change that stopped
-    // stamping azp would silently disable the gate instead of failing loudly.
     authenticate(null, INGEST_SCOPE);
 
     filter(enforcing()).doFilter(request, response, chain);
@@ -256,7 +246,6 @@ class ClientIdentityFilterTest {
     verify(chain, never()).doFilter(request, response);
     assertThat(response.getStatus()).isEqualTo(403);
     assertThat(rejected(MetricNames.REASON_MISSING_AZP)).isEqualTo(1.0d);
-    // Distinct from unknown_client: this one points at Keycloak, not at a foreign caller.
     assertThat(rejected(MetricNames.REASON_UNKNOWN_CLIENT)).isZero();
   }
 
@@ -297,8 +286,6 @@ class ClientIdentityFilterTest {
 
   @Test
   void shouldNeverUseTheRawAzpAsAMetricLabel() throws Exception {
-    // Deriving a label from a token claim is the shape of an unbounded-cardinality bug
-    // (REQ-OBS-011). An unknown client must collapse to the bounded `other` literal.
     authenticate("wildcard-client-name", INGEST_SCOPE);
 
     filter(enforcing()).doFilter(request, response, chain);
@@ -313,7 +300,6 @@ class ClientIdentityFilterTest {
 
   @Test
   void shouldServeTheRequestButStillCountAndLogWhileAuditOnly() throws Exception {
-    // The safe rollout path: measure the real client population before enforcing.
     ClientIdentityProperties properties =
         new ClientIdentityProperties(List.of(ALLOWED_CLIENT), INGEST_SCOPE, List.of(), true);
     authenticate("some-other-tool", INGEST_SCOPE);
@@ -332,7 +318,6 @@ class ClientIdentityFilterTest {
 
     verify(chain, times(1)).doFilter(request, response);
     assertThat(response.getStatus()).isEqualTo(200);
-    // Counted even though it was served — that counter is what the operator watches.
     assertThat(rejected(MetricNames.REASON_UNKNOWN_CLIENT)).isEqualTo(1.0d);
     assertThat(events).isNotEmpty();
     assertThat(events.getFirst().getFormattedMessage()).contains("audit-only");
@@ -341,11 +326,6 @@ class ClientIdentityFilterTest {
 
   @Test
   void shouldWarnWhenAnAccessTokenArrivesWithoutSenderConstraining() throws Exception {
-    // Canary for a silent regression of REQ-INGEST-012. Since ADR-0129 the gateway no longer
-    // relays the caller's token — it validates it here and calls the backend under its own service
-    // account — so the bound access token is the REQUIRED state, and an unbound one means the
-    // protection lapsed: the realm stopped honouring the proof, a client policy narrowed binding
-    // to the refresh token, or an older extractor build authenticated without a proof.
     Jwt jwt =
         Jwt.withTokenValue("t")
             .header("alg", "RS256")
@@ -376,10 +356,6 @@ class ClientIdentityFilterTest {
 
   @Test
   void shouldStaySilentOnTheRequiredSenderConstrainedToken() throws Exception {
-    // The inverse of the canary, pinned because it is the whole point of the change: a bound
-    // access token is the expected state and must produce no warning. The previous direction fired
-    // on exactly this request — on every successful send — with a cause that had stopped being
-    // true, which is how a canary trains operators to ignore it.
     Jwt jwt =
         Jwt.withTokenValue("t")
             .header("alg", "RS256")
@@ -408,9 +384,6 @@ class ClientIdentityFilterTest {
 
   @Test
   void shouldLetAnUnauthenticatedRequestThroughSoTheChainCanAnswer401() throws Exception {
-    // Turning a missing token into a 403 would tell a client to stop retrying when
-    // re-authenticating
-    // is exactly what it should do.
     filter(enforcing()).doFilter(request, response, chain);
 
     verify(chain, times(1)).doFilter(request, response);
@@ -419,7 +392,6 @@ class ClientIdentityFilterTest {
 
   @Test
   void shouldNotFilterOutsideTheIngestEndpoints() throws Exception {
-    // Gating the actuator would break the container healthcheck.
     MockHttpServletRequest health = new MockHttpServletRequest("GET", "/actuator/health");
 
     assertThat(filter(enforcing()).shouldNotFilter(health)).isTrue();

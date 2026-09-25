@@ -80,21 +80,15 @@ class RefineryOrderControllerTest {
 
   @BeforeEach
   void stubCallerId() {
-    // Most tests need the caller's user id; default to CALLER_ID.
     lenient().when(userService.getUserIdFromJwt(jwt)).thenReturn(CALLER_ID);
   }
-
-  // ---------------------------------------------------------------
-  // updateMyRefineryOrder — three security branches
-  // ---------------------------------------------------------------
 
   @Nested
   class UpdateMyRefineryOrderTests {
 
     @Test
     void logisticianWithExplicitOwnerInBody_routesToBodyOwner() {
-      // Logistician + body has owner id -> targetUserId = body's owner id.
-      RefineryOrder existing = newOrder(CALLER_ID); // existing owner = caller, irrelevant
+      RefineryOrder existing = newOrder(CALLER_ID);
       when(service.getRefineryOrder(ORDER_ID)).thenReturn(existing);
       when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
 
@@ -109,7 +103,6 @@ class RefineryOrderControllerTest {
       RefineryOrderDto result = controller.updateMyRefineryOrder(jwt, ORDER_ID, incoming);
 
       assertSame(incoming, result);
-      // Capture-verify the targetUserId argument explicitly.
       ArgumentCaptor<UUID> userIdCaptor = ArgumentCaptor.forClass(UUID.class);
       verify(service)
           .updateRefineryOrder(userIdCaptor.capture(), eq(ORDER_ID), eq(mapped), eq(true));
@@ -121,7 +114,6 @@ class RefineryOrderControllerTest {
 
     @Test
     void logisticianWithNoOwnerInBody_fallsBackToExistingOwner() {
-      // Logistician + body has no owner -> targetUserId = existing.owner.id.
       RefineryOrder existing = newOrder(OTHER_USER_ID);
       when(service.getRefineryOrder(ORDER_ID)).thenReturn(existing);
       when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
@@ -147,7 +139,6 @@ class RefineryOrderControllerTest {
 
     @Test
     void logisticianWithNoOwnerAnywhere_fallsBackToCaller() {
-      // Logistician + body has no owner + existing has no owner -> targetUserId = caller.
       RefineryOrder existing = newOrder(null);
       existing.setOwner(null);
       when(service.getRefineryOrder(ORDER_ID)).thenReturn(existing);
@@ -172,7 +163,6 @@ class RefineryOrderControllerTest {
 
     @Test
     void nonLogistician_andCallerIsOwner_passesThrough() {
-      // Non-logistician, owner matches caller -> ok, targetUserId = caller.
       RefineryOrder existing = newOrder(CALLER_ID);
       when(service.getRefineryOrder(ORDER_ID)).thenReturn(existing);
       when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
@@ -193,8 +183,6 @@ class RefineryOrderControllerTest {
 
     @Test
     void nonLogistician_andCallerIsNotOwner_throwsAccessDenied() {
-      // SECURITY CRITICAL: non-logistician trying to update someone else's
-      // refinery order -> must throw 403.
       RefineryOrder existing = newOrder(OTHER_USER_ID);
       when(service.getRefineryOrder(ORDER_ID)).thenReturn(existing);
       when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
@@ -210,8 +198,6 @@ class RefineryOrderControllerTest {
 
     @Test
     void nonLogistician_andExistingOwnerIsNull_throwsAccessDenied() {
-      // Defensive: even if the existing order has NO owner, a non-logistician
-      // must not be allowed to "claim" it via PUT.
       RefineryOrder existing = newOrder(null);
       existing.setOwner(null);
       when(service.getRefineryOrder(ORDER_ID)).thenReturn(existing);
@@ -227,18 +213,11 @@ class RefineryOrderControllerTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // createMyRefineryOrder — Logistician override of owner
-  // ---------------------------------------------------------------
-
   @Nested
   class CreateMyRefineryOrderTests {
 
     @Test
     void inScopeCallerCanCreateForAnotherUser() {
-      // REQ-SEC-005: the override is gated on the TARGET, not on the flat ROLE_LOGISTICIAN, which
-      // is the OR-union over every membership and let a logistician of any Staffel stamp an order
-      // into any other Staffel's member ledger.
       when(ownerScopeService.canManageUserRefineryOrders(OTHER_USER_ID)).thenReturn(true);
 
       RefineryOrderDto incoming = dtoWithOwner(OTHER_USER_ID);
@@ -259,13 +238,9 @@ class RefineryOrderControllerTest {
 
     @Test
     void outOfScopeCaller_withBodyOwner_isIgnored_useCallerInstead() {
-      // SECURITY: a caller attempting to create-on-behalf-of-someone-else outside their editable
-      // org-unit scope (by putting another id in body.owner) must NOT succeed in re-attribution.
-      // This now also covers a LOGISTICIAN of a different Staffel, which the previous role-only
-      // check waved through.
       when(ownerScopeService.canManageUserRefineryOrders(OTHER_USER_ID)).thenReturn(false);
 
-      RefineryOrderDto incoming = dtoWithOwner(OTHER_USER_ID); // spoof attempt
+      RefineryOrderDto incoming = dtoWithOwner(OTHER_USER_ID);
       when(mapper.toEntity(incoming)).thenReturn(new RefineryOrder());
       when(service.createRefineryOrder(any(), any(), any())).thenReturn(new RefineryOrder());
       when(mapper.toDto(any(), any())).thenReturn(incoming);
@@ -282,9 +257,6 @@ class RefineryOrderControllerTest {
 
     @Test
     void noOwnerInBody_useCallerInstead() {
-      // body.owner is null -> outer if short-circuits -> isLogisticianOrAbove
-      // is never invoked. (The controller skips the elevation check entirely
-      // when there's no owner to substitute.)
       RefineryOrderDto incoming = dtoWithOwner(null);
       when(mapper.toEntity(incoming)).thenReturn(new RefineryOrder());
       when(service.createRefineryOrder(any(), any(), any())).thenReturn(new RefineryOrder());
@@ -298,10 +270,6 @@ class RefineryOrderControllerTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // getMissionRefineryOrders — Logistician vs. user-filtered routing
-  // ---------------------------------------------------------------
-
   @Nested
   class GetMissionRefineryOrdersTests {
 
@@ -309,9 +277,6 @@ class RefineryOrderControllerTest {
 
     @Test
     void logistician_routesToOrgUnitScopedQuery() {
-      // SECURITY (BAC-004): the logistician branch must go through the org-unit-scoped service
-      // method, never an unscoped "all orders on the mission" path. Otherwise a squadron-A
-      // logistician could read squadron-B refinery financials by enumerating a public B mission.
       when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
       when(service.getMissionRefineryOrdersScoped(missionId)).thenReturn(java.util.List.of());
 
@@ -323,9 +288,6 @@ class RefineryOrderControllerTest {
 
     @Test
     void nonLogistician_seesOnlyOwnOrdersOnMission() {
-      // SECURITY: a normal user listing a mission must NOT see orders owned
-      // by other squadron members. The service has a two-arg overload that
-      // filters by owner; the controller must route to it.
       when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
       when(service.getMissionRefineryOrders(missionId, CALLER_ID)).thenReturn(java.util.List.of());
 
@@ -335,10 +297,6 @@ class RefineryOrderControllerTest {
       verify(service, never()).getMissionRefineryOrdersScoped(any(UUID.class));
     }
   }
-
-  // ---------------------------------------------------------------
-  // Smoke: thin pass-through endpoints — verify they delegate
-  // ---------------------------------------------------------------
 
   @Nested
   class DelegationTests {
@@ -426,10 +384,6 @@ class RefineryOrderControllerTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // helpers
-  // ---------------------------------------------------------------
-
   private static RefineryOrder newOrder(UUID ownerId) {
     RefineryOrder o = new RefineryOrder();
     o.setId(ORDER_ID);
@@ -447,19 +401,19 @@ class RefineryOrderControllerTest {
     return new RefineryOrderDto(
         ORDER_ID,
         owner,
-        null, // location
-        null, // mission
+        null,
+        null,
         Instant.now(),
         10L,
         null,
         null,
         null,
         null,
-        null, // refiningMethod
+        null,
         "OPEN",
         java.util.List.of(),
         null,
         1L,
-        null); // owningOrgUnitId (R5.d picker output) — not exercised by these tests
+        null);
   }
 }

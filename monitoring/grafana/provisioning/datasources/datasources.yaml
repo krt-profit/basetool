@@ -1,10 +1,6 @@
-# Grafana datasource provisioning. Grafana OSS 13.0.x (verified 2026-07). Epic #936, REQ-OBS-008/-009.
-# Grafana expands ${ENV} from the container environment in provisioning files; a literal $ is $$.
 apiVersion: 1
 
 datasources:
-  # Prometheus is protected by web.config.file basic auth (the admin API includes deletion
-  # endpoints), so Grafana authenticates. Username fixed to "grafana"; password from the container env.
   - name: Prometheus
     type: prometheus
     uid: prometheus
@@ -26,7 +22,6 @@ datasources:
     url: http://loki:3100
     jsonData:
       maxLines: 1000
-      # Logs↔traces: link a JSON log line's traceId to the Tempo trace (REQ-OBS-009).
       derivedFields:
         - name: TraceID
           datasourceUid: tempo
@@ -42,7 +37,6 @@ datasources:
     url: http://tempo:3200
     basicAuth: false
     jsonData:
-      # Traces↔logs: jump from a span back to the correlated Loki log lines.
       tracesToLogsV2:
         datasourceUid: loki
         spanStartTimeShift: '-1h'

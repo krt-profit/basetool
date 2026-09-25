@@ -205,12 +205,6 @@ public class AdminP4kImportPageController {
                     .retrieve()
                     .bodyToMono(P4kImportJobDto.class),
             "apply job");
-    // A P4K apply rewrites master data (materials, manufacturers, ship types) and the orderable
-    // item catalogue in an async backend job (REQ-DATA-007). Evict the affected frontend catalogue
-    // caches at apply-enqueue time so a subsequent page read re-fetches the post-import state. The
-    // eviction is deliberately eager (the backend job finishes moments later); the brief window in
-    // which a concurrent read could re-cache pre-apply data is bounded by the domain TTL, and this
-    // is a rare admin-only action. Preview jobs never reach this endpoint, so they never evict.
     backendApiClient.evict(
         CacheDomain.MATERIAL,
         CacheDomain.MANUFACTURER,

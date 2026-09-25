@@ -1,94 +1,32 @@
 #!/usr/bin/env bash
-# =============================================================================
-# Profit Basetool — Keycloak realm fingerprint
-#
-# Run it on the old host before the dump and on the new host after the restore,
-# then `diff` the two. Identical output means the realms came across whole.
-#
-# WHY A COUNT IS NOT ENOUGH, and why this exists.
-#
-# `restore-drill.sh` asserts that the restored Keycloak database has at least
-# twenty tables in `public`. A restore that produced the schema and NO ROWS has a
-# hundred tables and passes that check. The drill therefore proves the dump is
-# structurally restorable; it proves nothing about the realm's content.
-#
-# This prints identities, not only totals: every client id, every role name,
-# every flow and execution, every mapper, every key provider. A missing client is
-# then a missing LINE in a diff rather than a number that moved by one -- and a
-# number that moved by one is exactly what nobody notices.
-#
-# WHAT IT DELIBERATELY DOES NOT PRINT.
-#
-# No secret value, ever: client secrets, credential hashes, key material and IdP
-# secrets appear as `present`/`absent` and as counts. A dump restore reproduces
-# the bytes or fails loudly; a secret that is present on both sides and different
-# is not a failure mode `pg_restore` has. Printing them to compare them would
-# create the leak this check is supposed to protect against.
-#
-# It also does not print user names or e-mail addresses (REQ-SEC / PII): users are
-# counted, and their *linkage* is fingerprinted by counting federated identities
-# and role mappings per realm.
-#
-# WHAT LIVES OUTSIDE THE DATABASE, and is therefore NOT covered here. Section E
-# names it, because a fingerprint that matched perfectly while the SPI JAR was
-# missing would be the most misleading possible result:
-#
-#   * the SPI provider JAR      — a realm flow referencing `discord-guild-role-gate`
-#                                 breaks without it, and 50 users reach this
-#                                 deployment through Discord
-#   * the theme directory       — the realm names it by string; absent, Keycloak
-#                                 silently falls back to its own theme
-#   * the keystore              — TLS, not realm content
-#   * KRT_DISCORD_SPI_SHARED_SECRET and the KRT_BACKEND_* variables — the SPI's
-#                                 own configuration, which lives in the host .env
-#
-# Usage:
-#   scripts/keycloak-realm-fingerprint.sh                      # container db-keycloak
-#   scripts/keycloak-realm-fingerprint.sh --container kc-old   # a different one
-#   scripts/keycloak-realm-fingerprint.sh --runtime podman     # rootless host
-#
-#   old:  scripts/keycloak-realm-fingerprint.sh > /tmp/kc.before
-#   new:  scripts/keycloak-realm-fingerprint.sh > /tmp/kc.after
-#         diff -u /tmp/kc.before /tmp/kc.after && echo "realms identical"
-#
-# Exit codes: 0 fingerprint produced, 1 the database could not be read, 2 bad
-# invocation. It does not decide whether a difference is acceptable -- `diff`
-# does, and a human reads it.
-# =============================================================================
 set -uo pipefail
 
 RUNTIME="${IRI_RUNTIME:-docker}"
 CONTAINER="${IRI_KC_DB_CONTAINER:-db-keycloak}"
 PORT="${IRI_KC_DB_PORT:-15433}"
 
+usage() {
+  cat <<'USAGE'
+Usage: keycloak-realm-fingerprint.sh [--runtime docker|podman] [--container NAME] [--port PORT]
+
+Prints a secret-free fingerprint of every Keycloak realm. Run it on two hosts and diff the output.
+
+Exit codes: 0 fingerprint produced, 1 the database could not be read, 2 bad invocation.
+USAGE
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --runtime)   RUNTIME="$2"; shift 2 ;;
     --container) CONTAINER="$2"; shift 2 ;;
     --port)      PORT="$2"; shift 2 ;;
-    -h|--help)   sed -n '2,58p' "$0"; exit 0 ;;
+    -h|--help)   usage; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
 
 command -v "$RUNTIME" >/dev/null 2>&1 || { echo "FATAL: ${RUNTIME} is not on PATH" >&2; exit 2; }
 
-# Every query runs in a READ ONLY session. This script is run against production
-# and must not be capable of changing anything, whatever is passed to it.
-#
-# STDERR IS NOT DISCARDED, and that is the whole point of this comment.
-#
-# The first version sent it to /dev/null, so a query naming a column that does not
-# exist returned NOTHING and the section came out empty. Two sections did exactly
-# that against production -- clients and protocol mappers, the two that matter
-# most for "do the clients still work" -- because Keycloak 26.7 spells those
-# columns `standard_flow_enabled` and `protocol_mapper_name`. The output looked
-# like a realm with no clients, and a diff of two such fingerprints matches
-# perfectly.
-#
-# A failed query now prints its error into the fingerprint as a `psql-error|`
-# line. That makes it impossible to diff two fingerprints and see agreement where
-# there was only silence.
 q() {
   local out err rc
   err=$(mktemp)
@@ -133,12 +71,6 @@ echo
 echo "== C. clients — the thing that must keep working =="
 echo "# has_secret is presence only. A dump restore reproduces the byte or fails; printing"
 echo "# secrets to compare them would create the leak this check exists to avoid."
-# EVERY concatenated column is coalesced and cast, and that is not defensive
-# habit. In PostgreSQL `'x' || NULL` is NULL, so ONE nullable column makes the
-# WHOLE row vanish -- and this query produced zero rows on the first run against
-# production while the realm has nineteen clients. A fingerprint whose most
-# important section is silently empty is worse than no fingerprint, because the
-# diff of two empty sections matches.
 q "SELECT 'client|' || coalesce(r.name,'?') || '|' || coalesce(c.client_id,'?')
         || '|enabled=' || coalesce(c.enabled::text,'?')
         || '|public=' || coalesce(c.public_client::text,'?')
@@ -236,9 +168,7 @@ echo "== J. self-check =="
 echo "# A section that is silently empty defeats the whole point: two empty sections diff clean."
 echo "# The first run of this script against production emitted ZERO client lines, because one"
 echo "# nullable column made every concatenated row NULL. It looked like a realm with no clients."
-# Counted from the database directly rather than from this script's own output, so a query that
-# returns nothing is caught by comparing against the table it was supposed to read.
-expect() { # $1 label, $2 count-query
+expect() {
   local have; have=$(q "$2")
   if [[ "${have:-0}" =~ ^[0-9]+$ ]] && [[ "${have}" -gt 0 ]]; then
     echo "selfcheck|${1}|rows_in_db=${have}|ok"

@@ -103,8 +103,6 @@ class BankDashboardE2eTest {
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
         assertThat(page.locator("[data-account-no][data-testid='bank-account-card']").first())
             .isVisible();
-        // The seeded account, having a 30-day movement, renders a real (non-flat) sparkline
-        // polyline.
         assertTrue(
             page.locator("[data-testid='bank-account-card'] svg polyline").count() >= 1,
             "at least one account card shows a sparkline polyline");

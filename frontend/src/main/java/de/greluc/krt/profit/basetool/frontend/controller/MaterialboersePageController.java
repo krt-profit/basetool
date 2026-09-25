@@ -147,7 +147,6 @@ public class MaterialboersePageController {
       Model model) {
     boolean requests = "requests".equals(mode);
 
-    // A detail swap needs no counts/tab-bar; return the pane directly for the active mode.
     if ("detail".equals(fragment)) {
       if (requests) {
         model.addAttribute("selectedRequest", loadRequestDetail(selected));
@@ -158,12 +157,8 @@ public class MaterialboersePageController {
     }
 
     String activeTab = "mein".equals(tab) ? "mein" : "alle";
-    // The sort key is relayed straight into the backend query, so it is narrowed to the four keys
-    // the <select> actually offers rather than forwarded raw (REQ-SEC-051). An unknown key already
-    // collapsed to the default in the backend's own normalizeSort; it now never leaves this page.
     String activeSort = sort != null && SORT_KEYS.contains(sort) ? sort : DEFAULT_SORT;
 
-    // Both count pairs feed the shared four-tab bar, whichever mode is active.
     MaterialExchangeCountsDto offerCounts = loadCounts();
     MaterialExchangeCountsDto requestCounts = loadRequestCounts();
     model.addAttribute("countAll", offerCounts.all());
@@ -352,10 +347,6 @@ public class MaterialboersePageController {
       @RequestParam(required = false) String q, @RequestParam(required = false) String kind) {
     UriComponentsBuilder uri =
         UriComponentsBuilder.fromPath("/api/v1/material-exchange/releasable-items");
-    // Never forward the raw request value into the outbound URI: map the caller-supplied kind to a
-    // fixed literal, so only one of the two known enum tokens (or nothing) reaches the backend URL.
-    // The value placed on the URI is a compile-time constant, not user-controlled input — which is
-    // both the correct allow-list validation and what closes the CodeQL SSRF finding on this hop.
     appendIfPresent(uri, "kind", normaliseKind(kind));
     return proxy(
         "Load Materialbörse releasable items failed",
@@ -381,8 +372,6 @@ public class MaterialboersePageController {
     }
     return null;
   }
-
-  // ============================ Gesuche (requests) proxies ============================
 
   /**
    * Posts a material wanted-listing to the board ("Material suchen").
@@ -490,8 +479,6 @@ public class MaterialboersePageController {
         UriComponentsBuilder.fromPath("/api/v1/materials/search")
             .queryParam("size", MATERIAL_PICKER_LIMIT)
             .toUriString();
-    // Pass the free-text fragment as a URI-template variable so the WebClient encodes it exactly
-    // once (the #371 frontend→backend re-encoding contract); the backend param name is `search`.
     return proxy(
         "Load Materialbörse request materials failed",
         () ->

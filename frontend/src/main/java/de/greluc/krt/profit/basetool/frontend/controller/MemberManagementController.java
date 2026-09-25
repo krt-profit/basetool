@@ -133,12 +133,6 @@ public class MemberManagementController {
       @RequestParam(required = false) String fragment,
       Model model) {
     try {
-      // L-1: build the URI via UriComponentsBuilder so query-param encoding is correct and a
-      // crafted `search` cannot inject extra parameters (e.g. `foo&size=99999`). The free-text
-      // `search` rides as a WebClient URI-template variable ({query}) rather than baked into the
-      // pre-encoded toUriString() output — otherwise the WebClient percent-encodes it a second time
-      // (space -> %2520), so a multi-word / umlaut member search reaches the backend mangled and
-      // matches nothing (the #371 re-encoding trap). A blank search uses the plain listing route.
       boolean hasSearch = search != null && !search.isBlank();
       org.springframework.web.util.UriComponentsBuilder uriBuilder =
           hasSearch
@@ -162,9 +156,6 @@ public class MemberManagementController {
       model.addAttribute("usersPage", pageResponse);
       model.addAttribute("search", search);
 
-      // SPEZIALKOMMANDO_PLAN.md §7.5 — per-user SK shorthand list for the new column. N+1 is
-      // bounded by the page size (default 25, max from /api/v1/users), and the admin list page is
-      // rarely refreshed, so the round-trip cost is acceptable until a bulk endpoint lands.
       java.util.Map<
               UUID,
               List<de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto>>
@@ -212,11 +203,6 @@ public class MemberManagementController {
   @GetMapping("/api/search")
   @ResponseBody
   public List<UserDto> searchMembers(@RequestParam String query) {
-    // L-1: UriComponentsBuilder so a crafted `&` cannot inject extra parameters; the free-text
-    // `query` rides as a WebClient URI-template variable ({query}) so it is percent-encoded exactly
-    // once across the frontend->backend hop. Baking the pre-encoded toUriString() value into
-    // get(String) would let the WebClient encode it a second time (space -> %2520), so a multi-word
-    // member search reached the backend mangled and matched nothing (the #371 re-encoding trap).
     String uri =
         org.springframework.web.util.UriComponentsBuilder.fromPath("/api/v1/users/search")
             .queryParam("size", 1000)
@@ -253,9 +239,6 @@ public class MemberManagementController {
       UserDto user = backendApiClient.get("/api/v1/users/" + id, UserDto.class);
       model.addAttribute("user", user);
 
-      // Read-only Mitgliedschaften overview (names + SK manage links): the lean picker-option
-      // projection is enough — each SK row links through to its detail page for Lead / removal
-      // management. The editable Staffel slots below are seeded from the detail view instead.
       try {
         List<de.greluc.krt.profit.basetool.frontend.model.dto.OrgUnitMembershipOptionDto>
             memberships =
@@ -277,9 +260,6 @@ public class MemberManagementController {
                     emptyList());
       }
 
-      // REQ-ORG-017 — seed up to two editable Staffel slots from the full membership detail, which
-      // carries each Staffel's own Logistician / Mission-Manager flags (REQ-SEC-005). The detail
-      // endpoint sorts Staffel-first then by name, so the SQUADRON rows are the leading entries.
       List<OrgUnitMembershipDto> staffelRows = List.of();
       boolean staffelDetailLoaded = false;
       try {
@@ -289,10 +269,6 @@ public class MemberManagementController {
         if (detail != null && detail.memberships() != null) {
           staffelRows =
               detail.memberships().stream().filter(m -> m.kind() == OrgUnitKind.SQUADRON).toList();
-          // The authoritative Staffel set (incl. each Staffel's own flags) loaded — the two slots
-          // below can be trusted as the complete desired set on save. A failed/empty load leaves
-          // this false so applyMemberUpdate skips the Staffel reconcile (REQ-ORG-017): the blank
-          // slots must NOT be misread as "remove every Staffel".
           staffelDetailLoaded = true;
         }
       } catch (Exception ex) {
@@ -368,13 +344,10 @@ public class MemberManagementController {
       Model model,
       RedirectAttributes redirectAttributes) {
     if (bindingResult.hasErrors()) {
-      // Re-render the edit view directly; the BindingResult stays request-scoped so
-      // it never goes through a Redis-serialised FlashMap (see RedisSessionConfig).
       return editMember(id, form.source(), model, redirectAttributes);
     }
     try {
       applyMemberUpdate(id, form);
-      // #1235: rank / display name / Staffel membership all render on the /members roster.
       liveSyncLocalBus.publish("members", MEMBERS_ROSTER_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
       if ("profile".equals(form.source())) {
@@ -438,7 +411,6 @@ public class MemberManagementController {
     }
     try {
       applyMemberUpdate(id, form);
-      // #1235: mirrors the classic twin above — the roster row changed.
       liveSyncLocalBus.publish("members", MEMBERS_ROSTER_SECTION);
       Map<String, Object> body = new LinkedHashMap<>();
       body.put("version", currentUserVersion(id, form.version()));
@@ -476,19 +448,10 @@ public class MemberManagementController {
             form.rank(), form.description(), form.displayName(), form.version(), form.joinDate());
     backendApiClient.put("/api/v1/users/" + id + "/attributes", body, Void.class);
 
-    // REQ-ORG-017 — reconcile the Staffel set ONLY when the authoritative membership detail loaded
-    // on the edit-form GET (form.staffelDetailLoaded()). If that fetch failed, the two slots render
-    // blank, and a non-null staffeln list (even empty) is reconciled by the backend as the complete
-    // desired set — i.e. it would strip every Staffel membership (MEMBERSHIP_REVOKED, org-chart
-    // seats, inventory demotion). Skipping the PATCH entirely leaves the Staffel side untouched.
     if (!Boolean.TRUE.equals(form.staffelDetailLoaded())) {
       return;
     }
 
-    // Fold the two fixed Staffel slots into the desired complete Staffel set. A second slot equal
-    // to
-    // the first is dropped here so the backend never sees the same squadron twice; an empty slot is
-    // simply omitted. An empty list removes every Staffel membership.
     List<MembershipDeltaRequest.StaffelChange> staffeln = new ArrayList<>();
     if (form.staffel1Id() != null) {
       staffeln.add(
@@ -522,7 +485,6 @@ public class MemberManagementController {
         return user.version();
       }
     } catch (Exception ignored) {
-      // Re-fetch failed — fall through to the best-effort increment below.
     }
     return (priorVersion == null ? 0L : priorVersion) + 1;
   }
@@ -634,7 +596,6 @@ public class MemberManagementController {
       UserSyncResultDto result =
           backendApiClient.post("/api/v1/users/sync", null, UserSyncResultDto.class);
       int syncedCount = result != null ? result.syncedCount() : 0;
-      // #1235: a reconcile can add, remove or re-rank rows across the whole roster.
       liveSyncLocalBus.publish("members", MEMBERS_ROSTER_SECTION);
       return ResponseEntity.ok(Map.of("syncedCount", syncedCount));
     } catch (BackendServiceException e) {
@@ -670,7 +631,6 @@ public class MemberManagementController {
     try {
       UserDto survivor =
           backendApiClient.post("/api/v1/users/" + id + "/consolidate", body, UserDto.class);
-      // One row leaves and another changes, so the whole roster fragment is republished (#1235).
       liveSyncLocalBus.publish("members", MEMBERS_ROSTER_SECTION);
       return ResponseEntity.ok(survivor);
     } catch (BackendServiceException e) {

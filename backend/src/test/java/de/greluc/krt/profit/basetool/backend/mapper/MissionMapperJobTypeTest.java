@@ -39,7 +39,6 @@ import org.junit.jupiter.api.Test;
  */
 class MissionMapperJobTypeTest {
 
-  // None of the mappers MissionMapper uses is reached by the job-type mapping.
   private final MissionMapper mapper = new MissionMapperImpl(null, null, null, null);
 
   private static JobType jobType(boolean missionLead, boolean leadershipRole) {

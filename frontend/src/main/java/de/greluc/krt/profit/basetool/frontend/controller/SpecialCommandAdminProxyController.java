@@ -65,9 +65,6 @@ public class SpecialCommandAdminProxyController {
   public ResponseEntity<Void> setProfitEligible(
       @PathVariable @NotNull UUID id, @RequestBody @NotNull Map<String, Object> body) {
     backendApiClient.patch("/api/v1/special-commands/" + id + "/profit-eligible", body, Void.class);
-    // isProfitEligible is carried on the cached org-units owner-picker options and the admin
-    // switcher's SK catalogue, so the toggle must evict the SQUADRON and ORG_UNIT caches to keep
-    // them truthful (REQ-DATA-007 — same eviction gate as SquadronAdminProxyController).
     backendApiClient.evict(CacheDomain.SQUADRON, CacheDomain.ORG_UNIT);
     return ResponseEntity.noContent().build();
   }

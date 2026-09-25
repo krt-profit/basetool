@@ -84,11 +84,6 @@ public class NotificationEventListener {
       return;
     }
     try {
-      // Push through the fan-out seam: local-only by default, cross-replica via Redis when enabled
-      // (ADR-0094). Best-effort — the polling fallback keeps the badge correct (REQ-NOTIF-010).
-      //
-      // One call per signal, not one per event: recipients of the same event can have been told
-      // different things, and a client is entitled to know which of them it was told.
       for (Map.Entry<NotificationSignal, Set<UUID>> entry : recipientsBySignal.entrySet()) {
         notificationFanout.publish(entry.getValue(), entry.getKey());
       }

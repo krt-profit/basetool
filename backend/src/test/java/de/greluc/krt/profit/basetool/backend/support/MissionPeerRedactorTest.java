@@ -52,7 +52,6 @@ class MissionPeerRedactorTest {
 
     UserDto redacted = redactor.cleanupUserForPeer(full);
 
-    // Public callsign tuple + non-sensitive scalars kept.
     assertThat(redacted.id()).isEqualTo(full.id());
     assertThat(redacted.username()).isEqualTo("bob.callsign");
     assertThat(redacted.displayName()).isEqualTo("Bob");
@@ -60,7 +59,6 @@ class MissionPeerRedactorTest {
     assertThat(redacted.rank()).isEqualTo(5);
     assertThat(redacted.inKeycloak()).isTrue();
     assertThat(redacted.version()).isEqualTo(1L);
-    // PII + authorization surface dropped.
     assertThat(redacted.email()).isNull();
     assertThat(redacted.description()).isNull();
     assertThat(redacted.roles()).isNull();
@@ -83,7 +81,6 @@ class MissionPeerRedactorTest {
 
     assertThat(redacted.user().email()).isNull();
     assertThat(redacted.user().username()).isEqualTo("bob.callsign");
-    // A peer is a member of the organisation: payout preference and the free-text comment stay.
     assertThat(redacted.payoutPreference()).isEqualTo(PayoutPreference.PAYOUT);
     assertThat(redacted.comment()).isEqualTo("my comment");
   }
@@ -107,19 +104,13 @@ class MissionPeerRedactorTest {
 
     MissionDto redacted = redactor.cleanupMissionForPeer(full);
 
-    // Owner / managers stripped: this caller may not change either, so the response does not name
-    // them.
     assertThat(redacted.owner()).isNull();
     assertThat(redacted.managers()).isNull();
-    // The flags are forwarded, not forced — here they happen to be false, which is the whole
-    // reason the pair above is withheld.
     assertThat(redacted.canEdit()).isFalse();
     assertThat(redacted.canManageManagers()).isFalse();
-    // Member-peer view keeps the free-text description, the organisation and the planning data.
     assertThat(redacted.description()).isEqualTo("secret plan");
     assertThat(redacted.owningSquadron()).isEqualTo(squadron);
     assertThat(redacted.steps()).isSameAs(steps);
-    // Participant PII is stripped recursively, but payout + comment survive at the peer level.
     MissionParticipantDto cleaned = redacted.participants().iterator().next();
     assertThat(cleaned.user().email()).isNull();
     assertThat(cleaned.payoutPreference()).isEqualTo(PayoutPreference.PAYOUT);
@@ -149,8 +140,6 @@ class MissionPeerRedactorTest {
     assertThat(redacted.canManageManagers()).isTrue();
     assertThat(redacted.owner()).isEqualTo(full.owner());
     assertThat(redacted.managers()).isEqualTo(full.managers());
-    // Everything else this pass does is unchanged by the caller's capability — the exemption is
-    // the management pair, not the redaction.
     assertThat(redacted.participants().iterator().next().user().email()).isNull();
   }
 
@@ -181,10 +170,8 @@ class MissionPeerRedactorTest {
     assertThat(owner.discordLinked()).isNull();
     assertThat(owner.isLogistician()).isFalse();
     assertThat(owner.isMissionManager()).isFalse();
-    // The public callsign tuple survives — the unit card still names its ship's owner.
     assertThat(owner.username()).isEqualTo("bob.callsign");
     assertThat(owner.rank()).isEqualTo(5);
-    // The unit's own planning fields are untouched.
     assertThat(redacted.assignedUnits().getFirst().name()).isEqualTo("Alpha");
     assertThat(redacted.assignedUnits().getFirst().ship().name()).isEqualTo("Rocinante");
   }

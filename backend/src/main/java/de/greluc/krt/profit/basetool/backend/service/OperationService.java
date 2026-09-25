@@ -290,12 +290,6 @@ public class OperationService {
     operation.setDescription(updateDto.description());
     operation.setStatus(updateDto.status());
 
-    // saveAndFlush (not save): OperationController is class-level @Transactional and maps the
-    // returned entity to OperationDto INSIDE that still-open transaction. A plain save() defers the
-    // UPDATE — and the Hibernate @Version increment — to commit, so the DTO would carry the
-    // pre-increment version. The in-place AJAX twin (updateOperationAjax, #576) hands that version
-    // straight back to the form; a stale value makes the user's next consecutive save 409. Forcing
-    // the flush here bumps @Version before the mapping reads it. Same precedent as JobOrderService.
     Operation saved = operationRepository.saveAndFlush(operation);
     auditService.record(
         AuditEventType.OPERATION_UPDATED,
@@ -323,10 +317,6 @@ public class OperationService {
     log.info("Deleting operation with ID: {}", id);
     Operation operation = Entities.require(operationRepository.findById(id), "Operation not found");
 
-    // Unlink missions instead of cascading the delete. The mission itself,
-    // its participants, finance entries, inventory items and refinery orders
-    // all stay intact — only the operation_id back-reference is cleared so
-    // the rows can survive as operation-less missions.
     for (Mission mission : operation.getMissions()) {
       mission.setOperation(null);
     }

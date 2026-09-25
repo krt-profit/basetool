@@ -64,8 +64,6 @@ class IdentityProviderUnavailableFilterTest {
 
   @BeforeEach
   void setUp() {
-    // MessageSource returns the caller-supplied default (arg 2) so assertions run against a stable,
-    // locale-independent body; the i18n wiring itself is covered by the bundle test.
     MessageSource messageSource = mock(MessageSource.class);
     when(messageSource.getMessage(anyString(), any(), anyString(), any()))
         .thenAnswer(invocation -> invocation.getArgument(2));
@@ -143,9 +141,6 @@ class IdentityProviderUnavailableFilterTest {
 
   @Test
   void authenticationServiceException_withoutTransportCause_isRethrownUnchanged() {
-    // A non-transport AuthenticationServiceException must keep its existing behaviour (escapes to
-    // the
-    // container error dispatch → 500). The filter must NOT swallow it into a 503.
     FilterChain chain =
         (req, res) -> {
           throw new AuthenticationServiceException("programming bug", new IllegalStateException());
@@ -161,9 +156,6 @@ class IdentityProviderUnavailableFilterTest {
 
   @Test
   void unrelatedException_propagatesUnchanged() {
-    // Anything that is not an AuthenticationServiceException (e.g. a bad-token 401 is handled
-    // inside
-    // the entry point and never reaches here) must propagate untouched.
     FilterChain chain =
         (req, res) -> {
           throw new ServletException("downstream");

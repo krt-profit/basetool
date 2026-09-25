@@ -43,9 +43,7 @@ class UserZoneArgumentResolverTest {
 
   /** Reflection target providing the {@code @UserZone ZoneId} and control parameters. */
   @SuppressWarnings("unused")
-  private void handlers(@UserZone ZoneId zone, @UserZone String zoneOnWrongType, ZoneId plain) {
-    // Parameter carrier only; never invoked.
-  }
+  private void handlers(@UserZone ZoneId zone, @UserZone String zoneOnWrongType, ZoneId plain) {}
 
   private static MethodParameter param(int index) throws NoSuchMethodException {
     Method method =

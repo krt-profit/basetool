@@ -1,47 +1,3 @@
--- Profit Basetool - squadron-management web app.
--- Copyright (C) 2026 Lucas Greuloch
---
--- SPDX-License-Identifier: GPL-3.0-only
---
--- Keycloak realm CONFIGURATION snapshot of the realm `iri`, one fact per line, secret-free, for
--- comparing two environments with `diff`. It is what production's shape was read from on
--- 2026-09-22, and what scripts/provision-keycloak-realm.py encodes; re-run it on both hosts after
--- provisioning and diff the two outputs.
---
--- WHAT IT IS NOT. scripts/keycloak-realm-fingerprint.sh answers "did a dump restore bring the
--- realm across whole" (identities, flows, key providers, counts). This one answers "are two realms
--- configured alike": client flags and attributes, redirect URIs, scope assignments, mapper configs,
--- scope role mappings, service-account roles, client policies and token settings.
---
--- NOTHING SENSITIVE IS PRINTED. A client secret appears only as `present`/`absent`; attributes
--- whose name suggests a credential, key, certificate or token value are excluded by name; no user
--- is printed (the service-account query joins users only to reach their role mappings).
---
--- READ-ONLY BY CONSTRUCTION. The first statement makes the session read-only, so nothing below can
--- write whatever is edited into it. Reading needs no approval under the production-host rule; the
--- recipe (vault `60 Runbooks/Production Access.md`, and docs/keycloak/README.md) feeds this file on
--- stdin so `$POSTGRES_USER` / `$POSTGRES_DB` expand INSIDE the container and no credential reaches
--- a command line:
---
---   ssh <host> 'cd / && sudo -n -u iri podman exec -i db-keycloak sh -c "psql -qAt -U \$POSTGRES_USER -d \$POSTGRES_DB -p 15433 -f -"' \
---       < scripts/keycloak-config-snapshot.sql > realm-<env>.txt
---
--- From PowerShell, strip the carriage returns first (the file is LF in the repository; a CRLF copy
--- makes psql read `\pset footer off\r`). Then:
---
---   diff realm-prod.txt realm-testing.txt
---
--- Lines that legitimately differ between two environments: the public origin in redirect URIs,
--- web origins and `post.logout.redirect.uris`; `realm_client` on every client and the `basic` /
--- `acr` / `service_account` scope mapper configs of Keycloak's built-ins (both are artefacts of the
--- Keycloak version a realm was created under, and built-ins are left alone); anything the
--- provisioner reports as "only on this realm". Every other line is drift.
---
--- A NULL anywhere in a concatenation makes the whole row vanish in PostgreSQL, and a section that
--- silently comes back empty diffs clean against another empty section. Every nullable column is
--- therefore coalesced. (The realm-role section returned nothing on 2026-09-22 because it joined the
--- wrong column; fixed here to `realm_id`, which keycloak-realm-fingerprint.sh uses too.)
-
 SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY;
 \pset footer off
 
@@ -75,7 +31,6 @@ SELECT 'scopeattr|' || s.name || '|' || a.name || '=' || coalesce(left(a.value, 
   FROM client_scope_attributes a JOIN client_scope s ON s.id = a.scope_id JOIN realm r ON r.id = s.realm_id
  WHERE r.name = 'iri' ORDER BY 1;
 
--- The realm's DEFAULT client scopes: attached to every client created later (hardening step 9a).
 SELECT 'realmdefaultscope|' || s.name || '|' || CASE WHEN d.default_scope THEN 'default' ELSE 'optional' END
   FROM default_client_scope d JOIN client_scope s ON s.id = d.scope_id JOIN realm r ON r.id = d.realm_id
  WHERE r.name = 'iri' ORDER BY 1;

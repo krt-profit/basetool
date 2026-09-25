@@ -88,9 +88,6 @@ class BackendHealthUrlProdParityTest {
 
   @Test
   void theProbeDoesNotSilentlyFallBackToTheApiPort() throws IOException {
-    // The @Value default (${app.backend-health-url:${app.backend-url}}) is right for dev, test and
-    // e2e, where one connector serves both. In prod that fallback is the bug, so the key has to be
-    // present rather than inherited.
     String frontendProd = read(FRONTEND_PROD);
 
     assertThat(frontendProd).contains("backend-health-url:");

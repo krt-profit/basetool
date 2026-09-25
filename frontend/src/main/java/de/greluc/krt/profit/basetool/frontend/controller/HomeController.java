@@ -113,10 +113,6 @@ public class HomeController {
     if (principal == null) {
       return "landing";
     }
-    // Fetch the missions starting within the next seven days, nearest planned start first
-    // (REQ-MISSION-012). Replaces the former single "next mission" banner with a tile grid. Uses
-    // the broad mission-list scope (the viewer's own org units PLUS every unit's organisation-wide
-    // missions) via /api/v1/missions/search. The first tile is the soonest upcoming mission.
     try {
       Instant now = Instant.now();
       Instant horizon = now.plus(7, ChronoUnit.DAYS);
@@ -134,9 +130,6 @@ public class HomeController {
               : List.of();
       model.addAttribute("upcomingMissions", upcomingMissions);
     } catch (BackendServiceException e) {
-      // REQ-OBS-001: the BackendApiClient boundary already logged this (4xx WARN / 5xx ERROR /
-      // circuit-open DEBUG). This is the first page after a login, so a routine backend restart
-      // must not re-log at ERROR on every load and trip LogbackErrorSpike.
       log.debug("Could not fetch upcoming missions", e);
       model.addAttribute("upcomingMissions", List.of());
       model.addAttribute("error", "error.mission.fetch");
@@ -146,8 +139,6 @@ public class HomeController {
       model.addAttribute("error", "error.mission.fetch");
     }
 
-    // Default to no own-unit ids so the tile grid can flag the viewer's own-unit missions with a
-    // "Meine Einheit" chip (REQ-MISSION-012); populated below for authenticated users.
     model.addAttribute("myOrgUnitIds", Set.of());
 
     model.addAttribute("username", principal.getPreferredUsername());
@@ -165,13 +156,6 @@ public class HomeController {
               "/api/v1/users/me", de.greluc.krt.profit.basetool.frontend.model.dto.UserDto.class);
       model.addAttribute("currentUser", currentUser);
 
-      // Collect the viewer's own org-unit ids so the tile grid can flag own-unit missions with a
-      // "Meine Einheit" chip (REQ-MISSION-012). These are the caller's DIRECT memberships across
-      // every kind (Staffel / SK / Bereich / OL), with no leadership cascade. The
-      // /me/org-unit-ids endpoint is the authoritative kind-agnostic source; the Staffel ids from
-      // the already-fetched /me record are unioned in as a fallback so a transient failure of
-      // that
-      // call still flags own-Staffel missions.
       Set<UUID> myOrgUnitIds = new HashSet<>();
       if (currentUser.squadrons() != null) {
         for (SquadronReferenceDto su : currentUser.squadrons()) {
@@ -198,7 +182,6 @@ public class HomeController {
       }
       model.addAttribute("myOrgUnitIds", myOrgUnitIds);
 
-      // Fetch Public Announcement
       Map<String, Object> announcement =
           backendApiClient.get("/api/v1/announcement", ANNOUNCEMENT_MAP_TYPE);
       model.addAttribute("announcement", announcement);
@@ -213,8 +196,6 @@ public class HomeController {
       }
       model.addAttribute("unreadAnnouncement", unread);
     } catch (BackendServiceException e) {
-      // Fail-soft: the tiles/announcement are optional. The boundary already logged the backend
-      // error; keep a DEBUG breadcrumb (correlationId is in the MDC) rather than swallowing it.
       log.debug("Could not load home user/announcement context", e);
     } catch (Exception e) {
       log.warn("Unexpected failure building home context", e);

@@ -64,8 +64,6 @@ class ActiveSessionsTrackerTest {
   void endIsIdempotentAndNeverGoesNegative() {
     tracker.onSessionStarted("s1");
 
-    // A session end delivered twice (a delete AND an expire event for the same session) must not
-    // drive the count below zero.
     tracker.onSessionEnded("s1");
     tracker.onSessionEnded("s1");
     tracker.onSessionEnded("never-tracked");
@@ -76,7 +74,6 @@ class ActiveSessionsTrackerTest {
   @Test
   void seedAddsPreExistingSessionsAndIsIdempotentWithLiveEvents() {
     tracker.seed(List.of("s1", "s2", "s3"));
-    // A create event for a session already present in the seed must not double-count it.
     tracker.onSessionStarted("s2");
 
     assertThat(tracker.count()).isEqualTo(3L);

@@ -101,8 +101,6 @@ class DeprecatedBackendEndpointCallGuardTest {
 
   @Test
   void theParserRecognisesAConcatenatedPathAndMatchesItAgainstATemplate() {
-    // The guard on the guard: a call written the way the controllers write them must come out as
-    // the template the document spells, or the test above compares strings that can never match.
     String source =
         """
         backendApiClient.put(

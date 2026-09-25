@@ -1,5 +1,3 @@
-# Grafana, admin-only (Keycloak realm role Admin). Reached over a dedicated
-# network that keeps the edge off the monitoring core.
 server {
   listen 8443 ssl ${EDGE_LISTEN_OPTS};
   listen [::]:8443 ssl ${EDGE_LISTEN_OPTS};
@@ -18,23 +16,7 @@ server {
 
   location / {
     include /etc/nginx/edge/include/proxy.conf;
-    # Upstream TLS verification (REQ-OBS-008): Grafana presents its own self-signed
-    # certificate (CN=grafana) rather than a leaf of the internal CA, so it is
-    # verified against THAT certificate, pinned, in include/upstream-grafana-tls.conf.
-    # render-and-run.sh puts the include here when EDGE_GRAFANA_UPSTREAM_VERIFY=on and a
-    # comment when it is off (the default until the owner switches it on). Corrected
-    # 2026-09-23: this comment used to say the certificate is regenerated whenever the
-    # container is recreated. It is not: it is a host file minted once per host
-    # (monitoring/README.md, step 3, 825 days), which is what makes pinning it workable.
     ${EDGE_GRAFANA_UPSTREAM_TLS}
-    # A VARIABLE upstream, not a literal one. With a literal name nginx resolves it
-    # once at startup and caches the address forever, so a recreated container
-    # leaves the edge pointing at an address nobody answers on until the edge is
-    # restarted too. The variable form defers resolution to the resolver declared
-    # in nginx.conf and re-resolves on its TTL. $request_uri is appended because a
-    # proxy_pass carrying variables does not forward the request URI on its own; it
-    # is the RAW, still-encoded form, which is what the upstreams have always been
-    # given and what the allow-list deliberately does NOT match on.
     set $upstream_host grafana;
     proxy_pass https://$upstream_host:3000$request_uri;
   }

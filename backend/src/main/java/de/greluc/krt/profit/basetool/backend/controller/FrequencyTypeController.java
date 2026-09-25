@@ -104,8 +104,6 @@ public class FrequencyTypeController {
   public FrequencyTypeDto createFrequencyType(
       @RequestBody @NotNull FrequencyTypeDto frequencyType) {
     var toCreate = frequencyTypeMapper.toEntity(frequencyType);
-    // L-7: strip client-supplied id/version so create cannot become a merge()-UPSERT of another
-    // row.
     toCreate.setId(null);
     toCreate.setVersion(null);
     return frequencyTypeMapper.toDto(frequencyTypeService.createFrequencyType(toCreate));

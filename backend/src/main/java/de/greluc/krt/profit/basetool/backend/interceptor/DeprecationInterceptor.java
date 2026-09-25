@@ -85,8 +85,6 @@ public class DeprecationInterceptor implements HandlerInterceptor {
               LocalDate sunsetDate = LocalDate.parse(deprecation.sunset());
               response.addHeader("Sunset", HTTP_DATE_FORMATTER.format(sunsetDate.atStartOfDay()));
             } catch (DateTimeParseException e) {
-              // Warn at most once per handler: sunset() is a compile-time constant, so a malformed
-              // value would otherwise WARN on every request to this still-live deprecated endpoint.
               if (warnedBadSunset.add(handlerMethod.getMethod())) {
                 log.warn(
                     "Invalid sunset date format on {}: {}. Expected YYYY-MM-DD",

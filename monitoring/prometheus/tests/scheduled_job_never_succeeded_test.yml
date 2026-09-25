@@ -1,43 +1,9 @@
-# promtool unit test for the never-succeeded companion on the scheduled-job staleness alerts
-# (REQ-OBS-014, 2026-08-29).
-#
-# `basetool_scheduled_job_last_success_timestamp_seconds` is registered LAZILY, on a job's first
-# success, and it lives in the backend process. So `time() - gauge` has no series at all until a job
-# has succeeded once since the last restart -- and never, if a job never succeeds. Every one of the
-# six staleness alerts was therefore blind to exactly the case it exists for: a job failing every
-# run produces no gauge, so the rule has nothing to compare and stays silent.
-#
-# Found by sweeping the rules against production (#1707): `user_sync` and `scwiki_sync` had no
-# series, which on a daily cron and a 1h-initial-delay job is a perfectly normal post-restart state
-# -- and that is the point. The alert cannot tell that state apart from a job failing for a week.
-#
-# The companion is deliberately NOT the bare `or absent(...)` the ops-automation alerts use. Those
-# read TEXTFILE metrics, which survive a restart, so a bare absent() means "really never ran" there.
-# Here it would mean "just restarted" and would fire after every deploy. This one is gated on the
-# backend having been up longer than the job's own window instead.
-#
-# Second guard, `basetool_scheduled_job_enabled == 1` (2026-09-17): uptime alone does not separate
-# "has never succeeded" from "was switched off and was never going to run". All ten wrapped jobs
-# can be switched off by configuration, and a job that is off publishes no last-success gauge --
-# the very state the companion fires on. So `.env.example`'s own instruction to disable a retention
-# sweep before its first irreversible run raised a permanent warning for following the
-# documentation. Each job publishes 1 while it is configured to run, so absent-and-enabled means
-# "never ran" and absent-and-not-enabled means "off". The cases below pin BOTH directions: without
-# the second half the leg would be a mute button rather than a guard.
-#
-# Run locally (no promtool on the host -- use an ephemeral container, see monitoring/README.md):
-#   docker run --rm --entrypoint promtool -v "$PWD/monitoring/prometheus:/work" -w /work \
-#     prom/prometheus:v3.14.0 test rules tests/scheduled_job_never_succeeded_test.yml
-
 rule_files:
   - ../alerts/business.yml
 
 evaluation_interval: 1m
 
 tests:
-  # THE blind spot. business_metrics runs about every 60s, so a backend up for 30 minutes
-  # with no success gauge has failed every run. Before the companion the rule had no series
-  # to evaluate and said nothing at all.
   - name: fires - business_metrics has never succeeded and the backend is past its window
     interval: 1m
     input_series:
@@ -56,8 +22,6 @@ tests:
               summary: "Business-metrics sampler stale >10min"
               description: "BusinessMetricsCollector.refresh() has not completed successfully in over 10 minutes \u2014 the approval/work-queue depth gauges are frozen and the queue-overdue alerts may be evaluating stale values. Check the backend logs for the sampler's failure."
 
-  # The false positive a bare `or absent(...)` would have introduced: 4 minutes of uptime,
-  # the sampler simply has not run yet. Must stay quiet.
   - name: silent - the gauge is absent but the backend only just restarted
     interval: 1m
     input_series:
@@ -70,8 +34,6 @@ tests:
         alertname: BusinessMetricsStale
         exp_alerts: []
 
-  # The original behaviour has to survive: a fresh success keeps the alert quiet, and the
-  # companion must not fire alongside a healthy gauge.
   - name: silent - the job is succeeding, however long the backend has been up
     interval: 1m
     input_series:
@@ -84,9 +46,6 @@ tests:
         alertname: BusinessMetricsStale
         exp_alerts: []
 
-  # A multi-task rule must notice ONE missing task, not only both. A single absent() over the
-  # whole `uex_sync|scwiki_sync` selector would stay false here and hide scwiki_sync entirely,
-  # which is why the companion is written per task.
   - name: fires - one of two tasks has never succeeded while the other is healthy
     interval: 1m
     input_series:
@@ -108,12 +67,6 @@ tests:
             exp_annotations:
               summary: "External sync stale >48h (scwiki_sync)"
               description: "The scwiki_sync catalogue sync last succeeded more than 48 hours ago."
-  # The direction that was broken (max-effort finding 7, 2026-09-17). `.env.example` tells the
-  # operator to switch a retention sweep off before its first irreversible run. That skips the bean,
-  # so no last-success gauge is ever registered -- exactly the state the companion above fires on.
-  # The alert was permanently true from 26h of uptime onwards, at warning, for doing what the
-  # documentation asked. Here notification_retention is on and healthy, audit_retention is off:
-  # nothing may fire.
   - name: silent - a retention sweep switched off on purpose is not a stale one
     interval: 1m
     input_series:
@@ -128,8 +81,6 @@ tests:
         alertname: ScheduledJobStale
         exp_alerts: []
 
-  # The other direction, and the reason the leg is a guard rather than a mute button: the sweep IS
-  # switched on, has never succeeded, and the backend is well past the rule's own window.
   - name: fires - an enabled sweep that has never succeeded still fires
     interval: 1m
     input_series:
@@ -148,9 +99,6 @@ tests:
               summary: "Scheduled job stale >26h (audit_retention)"
               description: "The audit_retention job last succeeded more than 26 hours ago \u2014 it may have stopped being scheduled."
 
-  # A switched-off job must not mask a dead one inside the same multi-task rule -- the same reason
-  # the absent() legs are written per task and never over an alternation. scwiki_sync is off,
-  # uex_sync is on and has never succeeded: uex_sync alone fires.
   - name: fires - one task is off and the other is dead, and only the dead one fires
     interval: 1m
     input_series:

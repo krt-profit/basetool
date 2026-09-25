@@ -73,8 +73,6 @@ class ManagementPortIsolationTest {
   /** The running application context, whose embedded Tomcat the virtual-thread probe inspects. */
   @Autowired private ServletWebServerApplicationContext webServerContext;
 
-  // HTTP/1.1 explicitly: the JDK client defaults to HTTP/2, whose stream-capacity handling can
-  // RST_STREAM against a freshly started Tomcat under full-suite load. These are one-shot probes.
   private final HttpClient http =
       HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
 
@@ -136,7 +134,6 @@ class ManagementPortIsolationTest {
 
   @Test
   void actuatorHealthIsServedOnTheManagementPort() throws Exception {
-    // 200 when UP, 503 when a dependency is DOWN in this context — the point is "served, not 401".
     assertThat(get(managementPort, "/actuator/health").statusCode())
         .as("the Docker HEALTHCHECK probes this over localhost and sends no credentials")
         .isIn(200, 503);
@@ -156,9 +153,6 @@ class ManagementPortIsolationTest {
 
   @Test
   void theLogLevelMutatorStaysGatedOnTheManagementPort() throws Exception {
-    // The whole reason the permit-all matcher enumerates read endpoints instead of /actuator/**.
-    // An unauthenticated caller inside net-monitoring-scrape must not be able to flip ROOT to TRACE
-    // and turn a 744 h log stream into a bearer-token dump.
     HttpResponse<String> response =
         post(managementPort, "/actuator/loggers/ROOT", "{\"configuredLevel\":\"TRACE\"}");
 
@@ -184,8 +178,6 @@ class ManagementPortIsolationTest {
   @Test
   void theConnectorRunsOnVirtualThreadsSoOnlyTheActiveRequestGaugeMeasuresConcurrency()
       throws Exception {
-    // Any request on the application connector starts an http.server.requests observation, which
-    // registers the long-task timer behind the active-requests gauge.
     get(appPort, "/actuator/health");
 
     String scrape = get(managementPort, "/actuator/prometheus").body();
@@ -219,8 +211,6 @@ class ManagementPortIsolationTest {
    */
   @Test
   void theInFlightTimerCarriesNoHistogramWhileTheLatencyTimerKeepsIt() throws Exception {
-    // Any request on the application connector records an http.server.requests sample and
-    // registers the active-requests long-task timer.
     get(appPort, "/actuator/health");
 
     String scrape = get(managementPort, "/actuator/prometheus").body();

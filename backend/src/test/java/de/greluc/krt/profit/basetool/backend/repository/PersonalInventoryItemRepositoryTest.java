@@ -50,9 +50,6 @@ class PersonalInventoryItemRepositoryTest {
   @BeforeEach
   void clean() {
     repository.deleteAll();
-    // owner_user_id is a foreign key to app_user(id) since V235 (REQ-DATA-008), so both owners have
-    // to
-    // exist before an item can reference them.
     seedOwner(OWNER_A);
     seedOwner(OWNER_B);
   }
@@ -74,50 +71,41 @@ class PersonalInventoryItemRepositoryTest {
 
   @Test
   void findAllByOwnerUserIdShouldReturnOnlyMatchingItems() {
-    // Given
     repository.save(item(OWNER_A, "Medkit"));
     repository.save(item(OWNER_A, "Ammo"));
     repository.save(item(OWNER_B, "Helmet"));
 
-    // When
     Page<PersonalInventoryItem> page =
         repository.findAllByOwnerUserId(OWNER_A, PageRequest.of(0, 10, Sort.by("name")));
 
-    // Then
     assertEquals(2, page.getTotalElements());
     assertTrue(page.getContent().stream().allMatch(i -> OWNER_A.equals(i.getOwnerUserId())));
   }
 
   @Test
   void findByIdAndOwnerUserIdShouldEnforceOwnership() {
-    // Given
     PersonalInventoryItem aItem = repository.save(item(OWNER_A, "Medkit"));
 
-    // When
     Optional<PersonalInventoryItem> ownLookup =
         repository.findByIdAndOwnerUserId(aItem.getId(), OWNER_A);
     Optional<PersonalInventoryItem> foreignLookup =
         repository.findByIdAndOwnerUserId(aItem.getId(), OWNER_B);
 
-    // Then
     assertTrue(ownLookup.isPresent());
     assertTrue(foreignLookup.isEmpty(), "Foreign owner must NOT be able to load this item.");
   }
 
   @Test
   void nameSearchShouldBeCaseInsensitiveAndOwnerScoped() {
-    // Given
     repository.save(item(OWNER_A, "Medkit Alpha"));
     repository.save(item(OWNER_A, "MEDKIT BETA"));
     repository.save(item(OWNER_A, "Helmet"));
     repository.save(item(OWNER_B, "Medkit Foreign"));
 
-    // When
     Page<PersonalInventoryItem> page =
         repository.findAllByOwnerUserIdAndNameContainingIgnoreCase(
             OWNER_A, "medkit", PageRequest.of(0, 10, Sort.by("name")));
 
-    // Then
     assertEquals(
         2,
         page.getTotalElements(),
@@ -126,16 +114,13 @@ class PersonalInventoryItemRepositoryTest {
 
   @Test
   void versionShouldStartAtZeroAndIncrementOnUpdate() {
-    // Given
     PersonalInventoryItem saved = repository.saveAndFlush(item(OWNER_A, "Vase"));
     Long initialVersion = saved.getVersion();
     assertNotNull(initialVersion);
 
-    // When
     saved.setQuantity(saved.getQuantity() + 1);
     PersonalInventoryItem updated = repository.saveAndFlush(saved);
 
-    // Then
     assertNotNull(updated.getVersion());
     assertTrue(
         updated.getVersion() > initialVersion,

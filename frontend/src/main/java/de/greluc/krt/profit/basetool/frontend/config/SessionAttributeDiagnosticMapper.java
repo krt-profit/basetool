@@ -210,23 +210,14 @@ public class SessionAttributeDiagnosticMapper
         }
         cleaned.put(entry.getKey(), null);
         String attribute = attributeName(entry.getKey());
-        // Queued rather than removed here: see the class Javadoc for why the write belongs to
-        // SessionAttributeRepairFilter and not to the read path.
         SessionAttributeRepairQueue.record(attribute);
         report(attribute, marker);
       }
     }
     Map<String, Object> forDelegate = cleaned != null ? cleaned : entries;
     try {
-      // The delegate sees exactly what it sees today whenever nothing failed, and a map whose bad
-      // values are null when something did — which is the "attribute not set" it already handles.
       return delegate.apply(sessionId, forDelegate);
     } catch (IllegalStateException ex) {
-      // The only IllegalStateException RedisSessionMapper raises is the missing-required-key one
-      // (`getRequired`). Caught narrowly and answered with null, because null is a contract both
-      // upstream call sites already honour and an uncaught throw here is an HTTP 500 that repeats
-      // for the life of the cookie (REQ-SEC-063, ADR-0186). The hash is deliberately NOT repaired:
-      // that would be a Redis write on the session read path, which ADR-0157 rules out.
       String missingKey = missingRequiredKey(forDelegate);
       countUnmappable(missingKey);
       reportUnmappable(missingKey, ex);

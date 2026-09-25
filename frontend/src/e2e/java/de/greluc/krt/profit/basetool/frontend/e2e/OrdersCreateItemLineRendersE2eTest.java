@@ -106,8 +106,6 @@ class OrdersCreateItemLineRendersE2eTest {
       try {
         E2eSupport.navigate(page, baseUrl + "/orders/create");
 
-        // Switching to item mode reveals the (initially hidden) #mode-item section holding the
-        // add-item control; adding a line runs the innerHTML row builder under test.
         page.getByTestId("order-mode-item").check();
         page.locator("[data-trigger=\"orders-add-item\"]").click();
 

@@ -95,7 +95,6 @@ class MissionFinanceEntryRepositoryIntegrationTest {
 
     FinanceEntryAggregate agg = financeEntryRepository.aggregateFinanceByMission(mission.getId());
 
-    // A SQL SUM over an empty set is NULL — the service coalesces it to zero.
     assertThat(agg.expenseSum()).isNull();
     assertThat(agg.expenseCount()).isEqualTo(0L);
     assertThat(agg.incomeSum()).isEqualByComparingTo("42");
@@ -116,8 +115,6 @@ class MissionFinanceEntryRepositoryIntegrationTest {
 
   @Test
   void aggregateFinanceByMissionIds_groupsSumsPerMission() {
-    // #1121: the operation finance roll-up sums per mission in ONE grouped query. Validates the
-    // grouped constructor-expression JPQL against real Postgres (the unit tests only mock it).
     Mission m1 = newMission();
     MissionParticipant p1 = newParticipant(m1);
     saveEntry(m1, p1, FinanceType.INCOME, new BigDecimal("500.00"));
@@ -127,29 +124,25 @@ class MissionFinanceEntryRepositoryIntegrationTest {
     MissionParticipant p2 = newParticipant(m2);
     saveEntry(m2, p2, FinanceType.EXPENSE, new BigDecimal("200.00"));
 
-    Mission m3 = newMission(); // no entries -> no aggregate row at all
+    Mission m3 = newMission();
 
     List<MissionFinanceGroupAggregate> aggs =
         financeEntryRepository.aggregateFinanceByMissionIds(
             List.of(m1.getId(), m2.getId(), m3.getId()));
 
-    assertThat(aggs).hasSize(2); // m3 contributes no row
+    assertThat(aggs).hasSize(2);
     MissionFinanceGroupAggregate a1 =
         aggs.stream().filter(a -> a.missionId().equals(m1.getId())).findFirst().orElseThrow();
     assertThat(a1.incomeSum()).isEqualByComparingTo("500");
     assertThat(a1.expenseSum()).isEqualByComparingTo("100");
     MissionFinanceGroupAggregate a2 =
         aggs.stream().filter(a -> a.missionId().equals(m2.getId())).findFirst().orElseThrow();
-    // No INCOME row for m2 -> SUM over the empty set is NULL (coalesced to zero by the service).
     assertThat(a2.incomeSum()).isNull();
     assertThat(a2.expenseSum()).isEqualByComparingTo("200");
   }
 
   @Test
   void aggregateProfitByMissionIds_parsesAndExecutes() {
-    // #1121: smoke-test the grouped refinery profit JPQL (coalesce(sales) - coalesce(expenses) -
-    // coalesce(other), grouped per mission). A random, never-persisted mission id yields no row —
-    // enough to prove Hibernate parses and executes the query on real Postgres.
     List<RefineryMissionProfitAggregate> aggs =
         refineryOrderRepository.aggregateProfitByMissionIds(List.of(UUID.randomUUID()));
     assertThat(aggs).isEmpty();
@@ -157,9 +150,6 @@ class MissionFinanceEntryRepositoryIntegrationTest {
 
   @Test
   void findAllReferenceScoped_withStatusRecencyBound_parsesAndExecutes() {
-    // #1124: smoke-test the operation-picker query after adding the PLANNED/ACTIVE-always +
-    // terminal-within-cutoff status bound. Admin-all-scope + a now cutoff exercises the new WHERE;
-    // the assertion only proves the JPQL parses and executes (rows from other suites may appear).
     assertThat(
             operationRepository.findAllReferenceScoped(
                 true, null, List.of(), false, null, Instant.now()))

@@ -76,7 +76,6 @@ class MissionEinsatzleiterConstraintTest {
     einsatzleiter.setLeadershipRole(true);
     einsatzleiter.setMissionLead(true);
 
-    // p1 is a guest already holding the Einsatzleiter role; p2 is the guest being edited.
     p1 = new MissionParticipant();
     p1.setId(UUID.randomUUID());
     p1.setPlannedMissionJobType(einsatzleiter);
@@ -110,13 +109,13 @@ class MissionEinsatzleiterConstraintTest {
                 null,
                 null,
                 0L,
-                authentication)); // the Einsatzleiter designation is manager-only
+                authentication));
   }
 
   @Test
   void assigningEinsatzleiterWhenNobodyElseHoldsIt_succeeds() {
     when(missionSecurityService.canManageLoadedMission(any(), any())).thenReturn(true);
-    p1.setPlannedMissionJobType(null); // nobody is the Einsatzleiter yet
+    p1.setPlannedMissionJobType(null);
     when(missionRepository.findById(missionId)).thenReturn(Optional.of(mission));
     when(jobTypeRepository.findById(einsatzleiter.getId())).thenReturn(Optional.of(einsatzleiter));
 
@@ -134,6 +133,6 @@ class MissionEinsatzleiterConstraintTest {
                 null,
                 null,
                 0L,
-                authentication)); // the Einsatzleiter designation is manager-only
+                authentication));
   }
 }

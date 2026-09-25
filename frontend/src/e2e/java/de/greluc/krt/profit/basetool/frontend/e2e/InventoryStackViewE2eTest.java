@@ -81,8 +81,6 @@ class InventoryStackViewE2eTest {
       seeder.ensureIridiumMembership(USERNAME, PASSWORD);
       materialId = seeder.createRefineryMaterial(USERNAME, PASSWORD, MATERIAL_NAME);
       String locationId = seeder.createLocation(USERNAME, PASSWORD, "E2E Stack View Hub");
-      // Non-personal, no job order, no mission (owningOrgUnit auto-stamped to IRIDIUM): the exact
-      // row shape the implicit-inner-join regression dropped from the grouped view.
       seeder.createInventoryItem(USERNAME, PASSWORD, materialId, locationId, 800, 100.0);
     }
   }
@@ -115,9 +113,6 @@ class InventoryStackViewE2eTest {
       try {
         E2eSupport.navigate(page, baseUrl + "/inventory/all");
         page.waitForLoadState();
-        // Before the LEFT-JOIN fix the grouped table came back empty ("Keine Einträge gefunden"),
-        // so no group row existed; the seeded material's tree-row--group must now be present.
-        // 20 s, not the 5 s default: the grouped render is slow on WebKit under CI load.
         assertThat(page.locator("div.tree-row--group[data-material-id='" + materialId + "']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
       } catch (RuntimeException | AssertionError failure) {

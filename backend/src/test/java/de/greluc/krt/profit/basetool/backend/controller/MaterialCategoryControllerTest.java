@@ -49,7 +49,6 @@ class MaterialCategoryControllerTest {
 
   @Test
   void getAll_returnsServiceListMappedToDtos() {
-    // Given
     MaterialCategory minerals = new MaterialCategory();
     MaterialCategory gases = new MaterialCategory();
     MaterialCategoryDto mineralsDto = new MaterialCategoryDto(UUID.randomUUID(), "Mineral", 1L);
@@ -59,10 +58,8 @@ class MaterialCategoryControllerTest {
     when(mapper.toDto(minerals)).thenReturn(mineralsDto);
     when(mapper.toDto(gases)).thenReturn(gasesDto);
 
-    // When
     List<MaterialCategoryDto> result = controller.getAll();
 
-    // Then — the list order from the service is preserved
     assertEquals(2, result.size());
     assertSame(mineralsDto, result.get(0));
     assertSame(gasesDto, result.get(1));

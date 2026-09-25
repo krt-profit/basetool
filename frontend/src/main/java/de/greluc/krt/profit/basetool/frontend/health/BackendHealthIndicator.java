@@ -292,8 +292,6 @@ public class BackendHealthIndicator implements HealthIndicator {
           TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
       tmf.init(truststore);
       SSLContext context = SSLContext.getInstance("TLS");
-      // The JDK client always asks for HTTPS endpoint identification, so the plain PKIX managers
-      // verify the hostname by themselves; only the wrapper takes that check away.
       context.init(
           null,
           verifyHostname

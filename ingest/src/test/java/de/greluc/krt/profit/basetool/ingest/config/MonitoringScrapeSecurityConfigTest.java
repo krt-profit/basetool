@@ -70,7 +70,6 @@ class MonitoringScrapeSecurityConfigTest {
 
   @Test
   void shouldReject401WithoutCredentials() throws Exception {
-    // Given / When / Then
     mockMvc
         .perform(get(PROMETHEUS))
         .andExpect(status().isUnauthorized())
@@ -79,8 +78,6 @@ class MonitoringScrapeSecurityConfigTest {
 
   @Test
   void shouldServeMetricsWithValidBasicCredentials() throws Exception {
-    // Given / When / Then: the payload carries the module tag and the standard JVM meters (the
-    // gateway has no caches of its own).
     mockMvc
         .perform(get(PROMETHEUS).with(httpBasic("metrics-scraper", "test-scrape-password")))
         .andExpect(status().isOk())
@@ -91,7 +88,6 @@ class MonitoringScrapeSecurityConfigTest {
 
   @Test
   void shouldReject401WithWrongPassword() throws Exception {
-    // Given / When / Then
     mockMvc
         .perform(get(PROMETHEUS).with(httpBasic("metrics-scraper", "wrong-password")))
         .andExpect(status().isUnauthorized());
@@ -99,8 +95,6 @@ class MonitoringScrapeSecurityConfigTest {
 
   @Test
   void shouldReject401WithRawBearerHeader() throws Exception {
-    // Given / When / Then: the scrape chain has no bearer-token support — a raw Authorization:
-    // Bearer header is simply not an authentication here and the basic entry point answers 401.
     mockMvc
         .perform(get(PROMETHEUS).header(HttpHeaders.AUTHORIZATION, "Bearer some-token"))
         .andExpect(status().isUnauthorized());
@@ -108,9 +102,6 @@ class MonitoringScrapeSecurityConfigTest {
 
   @Test
   void shouldReject403WithValidJwtIdentity() throws Exception {
-    // Given / When / Then: even a fully authenticated extractor JWT must not read the metrics
-    // payload — only the dedicated scrape identity counts (REQ-OBS-005). Particularly relevant on
-    // this internet-facing gateway.
     mockMvc
         .perform(get(PROMETHEUS).with(jwt().jwt(j -> j.subject("extractor-user"))))
         .andExpect(status().isForbidden());
@@ -118,12 +109,8 @@ class MonitoringScrapeSecurityConfigTest {
 
   @Test
   void shouldKeepHealthEndpointReachableWithoutAuthentication() throws Exception {
-    // Given / When: the Docker HEALTHCHECK relies on anonymous access. Under the test profile the
-    // auto-configured Redis health indicator has no Redis to talk to, so the aggregate may be 503
-    // (DOWN) — the regression guard here is "no authentication gate", not "everything UP".
     int status = mockMvc.perform(get("/actuator/health")).andReturn().getResponse().getStatus();
 
-    // Then
     assertThat(status)
         .as("health endpoint must be reachable anonymously (200 UP or 503 DOWN, never 401/403)")
         .isIn(200, 503);

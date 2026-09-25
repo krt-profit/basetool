@@ -176,9 +176,6 @@ public class CapabilityFlagsAdvice {
   public boolean promotionFeatureEnabled(
       @ModelAttribute("activeSquadron") SquadronDto activeSquadron) {
     if (activeSquadron == null) {
-      // No single active staffel: an admin in all-scopes mode keeps the menu (the pages then
-      // prompt to pick a staffel), while a squadron-less non-admin / anonymous caller has no
-      // promotion system, so the menu is hidden and direct page access is blocked.
       return authHelper.isAdmin();
     }
     if (activeSquadron.isPromotionEnabled() == null) {

@@ -66,8 +66,6 @@ class MissionFinanceEntryControllerTest {
 
   @Mock private MissionFinanceEntryService service;
 
-  // Real redactor (not a mock) so the participant-PII assertions exercise the actual
-  // MissionPeerRedactor logic; @Spy makes @InjectMocks wire it into the controller.
   @org.mockito.Spy
   private de.greluc.krt.profit.basetool.backend.support.MissionPeerRedactor missionPeerRedactor =
       new de.greluc.krt.profit.basetool.backend.support.MissionPeerRedactor();
@@ -89,8 +87,6 @@ class MissionFinanceEntryControllerTest {
             UUID.randomUUID(),
             "bob.callsign",
             "Bob",
-            // effectiveName is displayName-or-username by construction, so it mirrors displayName
-            // here ("Bob") — never an independent real-name field.
             "Bob",
             "bob@example.invalid",
             5,
@@ -128,19 +124,12 @@ class MissionFinanceEntryControllerTest {
         new PageImpl<>(
             List.of(a, b), PageRequest.of(0, 10, Sort.by(Sort.Direction.ASC, "createdAt")), 2);
     when(service.getEntriesByMission(eq(missionId), any(Pageable.class))).thenReturn(page);
-    // These entries carry no participant, so the unconditional audit-H-1 redaction is a no-op and
-    // the page passes through verbatim.
 
-    // Audit finding M-1 (2026-05-20): the controller now builds the {@link Pageable} from
-    // explicit page / size / sort params with a whitelist (mirrors UserController / JobOrder).
     PageResponse<MissionFinanceEntryDto> result =
         controller.getFinanceEntries(missionId, 0, 10, "createdAt,asc");
 
     assertThat(result.content()).containsExactly(a, b);
     assertThat(result.totalElements()).isEqualTo(2L);
-    // The sort encoding "<field>,<direction>" is what the frontend's pagination component echoes
-    // back on the next request; the shared PageResponse.of factory renders the direction in
-    // lowercase, matching the PaginationUtil contract used by every other listing endpoint.
     assertThat(result.sort()).containsExactly("createdAt,asc");
     verify(service).getEntriesByMission(eq(missionId), any(Pageable.class));
   }
@@ -158,13 +147,10 @@ class MissionFinanceEntryControllerTest {
         controller.getFinanceEntries(missionId, 0, 20, "createdAt,desc");
 
     UserDto user = result.content().get(0).participant().user();
-    // Audit H-1: the ledger must never carry a peer's email regardless of the caller's role — email
-    // is a profile-only field. Roles / permissions / contextual flags are stripped alongside it.
     assertThat(user.email()).isNull();
     assertThat(user.roles()).isNull();
     assertThat(user.permissions()).isNull();
     assertThat(user.isLogistician()).isFalse();
-    // Only the public name tuple survives (consistent with MissionController guest redaction).
     assertThat(user.username()).isEqualTo("bob.callsign");
     assertThat(user.displayName()).isEqualTo("Bob");
     assertThat(user.effectiveName()).isEqualTo("Bob");
@@ -174,9 +160,6 @@ class MissionFinanceEntryControllerTest {
   void getFinanceEntries_rejectsUnknownSortField() {
     UUID missionId = UUID.randomUUID();
 
-    // Whitelist guard: {@code participant.user.email} is NOT in {@link
-    // MissionFinanceEntryController#ALLOWED_SORT} — a 400 here is what the global handler
-    // surfaces, so ordering information about PII columns cannot leak via sort.
     assertThatThrownBy(
             () -> controller.getFinanceEntries(missionId, 0, 10, "participant.user.email,desc"))
         .isInstanceOf(IllegalArgumentException.class);
@@ -213,8 +196,6 @@ class MissionFinanceEntryControllerTest {
     UUID missionId = UUID.randomUUID();
     when(service.getEntriesByMission(eq(missionId), any(Pageable.class))).thenReturn(Page.empty());
 
-    // A crafted large size must be clamped to the per-endpoint cap (500), not the global 100_000
-    // (ADR-0078): the mission finance ledger is not a load-all surface.
     controller.getFinanceEntries(missionId, 0, 100_000, "createdAt,desc");
 
     ArgumentCaptor<Pageable> pageable = ArgumentCaptor.captor();
@@ -231,10 +212,6 @@ class MissionFinanceEntryControllerTest {
     MissionFinanceEntryDto created = entry(missionId, FinanceType.INCOME, new BigDecimal("500.00"));
     when(service.createEntry(request)).thenReturn(created);
 
-    // The member/anonymous gate lives in @PreAuthorize (isAuthenticated + isMemberOrAbove +
-    // canSeeMission) and is exercised by MissionFinanceEntryControllerSecurityTest. At the pure
-    // pass-through level the entry carries no participant, so the unconditional H-1 redaction is a
-    // no-op and the persisted DTO comes back by identity.
     MissionFinanceEntryDto result = controller.createFinanceEntry(request);
 
     assertThat(result).isSameAs(created);

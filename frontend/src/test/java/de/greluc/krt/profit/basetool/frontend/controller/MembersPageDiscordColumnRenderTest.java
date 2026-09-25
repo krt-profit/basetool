@@ -83,7 +83,6 @@ class MembersPageDiscordColumnRenderTest {
 
     when(backendApiClient.get(eq("/api/v1/users?sort=username,asc"), anyTypeRef()))
         .thenReturn(page);
-    // Per-user SK membership lookups (one per row) — none needed for this assertion.
     when(backendApiClient.get(contains("/memberships"), anyTypeRef())).thenReturn(List.of());
 
     String html =

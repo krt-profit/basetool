@@ -70,7 +70,6 @@ class TerminalServiceTest {
     UUID id = UUID.randomUUID();
     Terminal terminal = new Terminal();
     terminal.setId(id);
-    // Admin pinned the value to true; the most recent UEX sweep reported false.
     terminal.setHasLoadingDock(true);
     terminal.setHasLoadingDockOverridden(true);
     terminal.setUexHasLoadingDock(false);
@@ -90,9 +89,6 @@ class TerminalServiceTest {
 
   @Test
   void clearLoadingDockOverride_revertsValueToNullWhenUexMirrorIsNull() {
-    // A terminal that has never been synced yet has uexHasLoadingDock=null. The
-    // contract is to fall through to null too — every downstream consumer treats
-    // null as "unknown" and the next UEX sweep will populate the real value.
     UUID id = UUID.randomUUID();
     Terminal terminal = new Terminal();
     terminal.setId(id);

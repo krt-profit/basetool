@@ -94,10 +94,6 @@ public class PersonalInventoryItemService {
   private final SpaceStationRepository spaceStationRepository;
   private final AuditService auditService;
 
-  // ---------------------------------------------------------------------------------
-  // Owner-scoped API
-  // ---------------------------------------------------------------------------------
-
   /**
    * Owner-scoped paged list. Every row is filtered by {@code ownerUserId} so a caller can never see
    * another user's items even if they craft the query parameters.
@@ -150,9 +146,6 @@ public class PersonalInventoryItemService {
     PersonalInventoryItem saved = repository.save(entity);
     log.info(
         "Created personal inventory item id={} for ownerUserId={}", saved.getId(), ownerUserId);
-    // Covers both createOwn and the admin createForUser (which delegates here): the actor (self vs
-    // admin) is resolved by AuditService; target_user_id is the owner. Do not also record in
-    // createForUser or the event would be doubled.
     auditService.record(
         AuditEventType.PERSONAL_INVENTORY_CREATED,
         saved.getId(),
@@ -198,12 +191,6 @@ public class PersonalInventoryItemService {
     auditService.record(
         AuditEventType.PERSONAL_INVENTORY_DELETED, id, label, ownerUserId, "scope=own");
   }
-
-  // ---------------------------------------------------------------------------------
-  // Admin-scoped API – callers MUST be guarded by @PreAuthorize("hasRole('ADMIN')")
-  // on the controller layer. The service does NOT re-check the role; it trusts its
-  // controller binding to keep this method out of reach of regular users.
-  // ---------------------------------------------------------------------------------
 
   /**
    * Admin-scoped list. Identical implementation to {@link #listOwn} — the {@code targetSub}
@@ -272,10 +259,6 @@ public class PersonalInventoryItemService {
         AuditEventType.PERSONAL_INVENTORY_DELETED, id, label, ownerUserId, "scope=admin");
   }
 
-  // ---------------------------------------------------------------------------------
-  // UEX location lookup – uses the locally synced UEX mirror (City / SpaceStation)
-  // ---------------------------------------------------------------------------------
-
   /**
    * Combined search across the locally synced UEX cities and space stations. Returns at most {@code
    * limit} entries, alphabetically sorted by name.
@@ -321,10 +304,6 @@ public class PersonalInventoryItemService {
     return hits.size() > cap ? hits.subList(0, cap) : hits;
   }
 
-  // ---------------------------------------------------------------------------------
-  // Internal helpers
-  // ---------------------------------------------------------------------------------
-
   @NotNull
   private PersonalInventoryItem loadOwn(@NotNull UUID ownerUserId, @NotNull UUID id) {
     return repository
@@ -340,10 +319,8 @@ public class PersonalInventoryItemService {
   @NotNull
   private PersonalInventoryItemResponse applyUpdate(
       @NotNull PersonalInventoryItem entity, @NotNull PersonalInventoryItemUpdateRequest request) {
-    // Manual optimistic-lock check; mirrored from AnnouncementService convention.
     OptimisticLock.check(
         entity.getVersion(), request.version(), PersonalInventoryItem.class, entity.getId());
-    // Re-resolve the location snapshot if the location reference changed.
     boolean locationChanged =
         !Objects.equals(entity.getLocationUexId(), request.locationUexId())
             || !Objects.equals(entity.getLocationType(), request.locationType());
@@ -359,8 +336,6 @@ public class PersonalInventoryItemService {
         "Updated personal inventory item id={} ownerUserId={}",
         saved.getId(),
         saved.getOwnerUserId());
-    // Shared by updateOwn and the admin updateForUser; the actor distinguishes them. Recorded here
-    // (not in the two public methods) so the event fires exactly once per update.
     auditService.record(
         AuditEventType.PERSONAL_INVENTORY_UPDATED,
         saved.getId(),

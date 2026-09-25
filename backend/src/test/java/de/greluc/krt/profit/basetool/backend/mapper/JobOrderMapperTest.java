@@ -49,14 +49,7 @@ class JobOrderMapperTest {
 
   @BeforeEach
   void setUp() {
-    // JobOrderMapperImpl receives UserMapper, MaterialMapper, JobOrderHandoverMapper and
-    // SquadronMapper through its constructor (CentralMapperConfig: injectionStrategy =
-    // CONSTRUCTOR); the test builds the graph bottom-up.
     var userMapper = Mappers.getMapper(UserMapper.class);
-    // Post-R9 D3 (V101): UserMapper derives squadron + flags from org_unit_membership — wire the
-    // membership repository plus the StaffelMembershipResolver collaborator (both mocked / empty
-    // for
-    // this fixture, so the squadron table is never read).
     ReflectionTestUtils.setField(
         userMapper,
         "membershipRepository",
@@ -72,15 +65,10 @@ class JobOrderMapperTest {
                 de.greluc.krt.profit.basetool.backend.repository.OrgUnitRepository.class)));
     var materialMapper = new MaterialMapperImpl(new MaterialCategoryMapperImpl());
     var squadronMapper = Mappers.getMapper(SquadronMapper.class);
-    // Post-fix #13: handover audit fields project user + squadron through their reference mappers
-    // (see JobOrderHandoverMapper.uses).
     var handoverMapper = new JobOrderHandoverMapperImpl(materialMapper, userMapper, squadronMapper);
 
     mapper = new JobOrderMapperImpl(userMapper, materialMapper, handoverMapper, squadronMapper);
-    // The Bearbeiter-list primer (REQ-DATA-003) seeds the same UserMapper's request memo.
     ReflectionTestUtils.setField(mapper, "assigneeUserMapper", userMapper);
-    // The caller-aware seam behind canEdit (REQ-SEC-047). Answering true keeps these tests about
-    // the field mapping; the role-and-scope rule itself is covered where it lives.
     ReflectionTestUtils.setField(
         mapper,
         "stockAccess",
@@ -99,7 +87,6 @@ class JobOrderMapperTest {
 
   @Test
   void toDto_shouldMapScalarsMaterialsAssigneesAndHandovers() {
-    // Given
     UUID id = UUID.randomUUID();
     Instant createdAt = Instant.parse("2026-05-01T10:00:00Z");
 
@@ -124,8 +111,6 @@ class JobOrderMapperTest {
     JobOrder jobOrder = new JobOrder();
     jobOrder.setId(id);
     jobOrder.setDisplayId(42);
-    // V88 removed the entity-side `squadron` String field — the DTO `squadron` slot is now
-    // fed from requestingSquadron.shorthand via the explicit @Mapping on JobOrderMapper.
     Squadron iridium = new Squadron();
     iridium.setShorthand("Iridium");
     jobOrder.setRequestingOrgUnit(iridium);
@@ -139,10 +124,8 @@ class JobOrderMapperTest {
     jobOrder.setCreatedAt(createdAt);
     jobOrder.setVersion(7L);
 
-    // When
     JobOrderDto dto = mapper.toDto(jobOrder);
 
-    // Then
     assertNotNull(dto);
     assertEquals(id, dto.id());
     assertEquals(42, dto.displayId());
@@ -155,7 +138,6 @@ class JobOrderMapperTest {
     assertEquals(createdAt, dto.createdAt());
     assertEquals(7L, dto.version());
 
-    // Materials are mapped and sorted
     assertNotNull(dto.materials());
     assertEquals(1, dto.materials().size());
     JobOrderMaterialDto matDto = dto.materials().getFirst();
@@ -164,25 +146,20 @@ class JobOrderMapperTest {
     assertEquals(5.0, matDto.amount());
     assertEquals("Gold", matDto.material().name());
 
-    // Assignees mapped via UserMapper, carrying the per-edge note + version
     assertNotNull(dto.assignees());
     assertEquals(1, dto.assignees().size());
     assertEquals("logist", dto.assignees().getFirst().user().username());
     assertEquals("works on Friday", dto.assignees().getFirst().note());
     assertEquals(2L, dto.assignees().getFirst().version());
 
-    // Handovers — empty set should map to empty list, not null
     assertNotNull(dto.handovers());
     assertTrue(dto.handovers().isEmpty());
   }
 
   @Test
   void toDto_withNullCollections_shouldProduceNullCollections() {
-    // Given — entity with no collections set (legacy fixture)
     JobOrder jobOrder = new JobOrder();
     jobOrder.setId(UUID.randomUUID());
-    // V88 removed the entity-side `squadron` String field — the DTO `squadron` slot is now
-    // fed from requestingSquadron.shorthand via the explicit @Mapping on JobOrderMapper.
     Squadron iridium = new Squadron();
     iridium.setShorthand("Iridium");
     jobOrder.setRequestingOrgUnit(iridium);
@@ -191,10 +168,8 @@ class JobOrderMapperTest {
     jobOrder.setAssignees(null);
     jobOrder.setHandovers(null);
 
-    // When
     JobOrderDto dto = mapper.toDto(jobOrder);
 
-    // Then
     assertNotNull(dto);
     assertNull(dto.materials(), "null source set should map to null list (MapStruct default)");
     assertNull(dto.assignees());
@@ -203,11 +178,8 @@ class JobOrderMapperTest {
 
   @Test
   void toDto_withHandovers_shouldMapEachHandoverViaHandoverMapper() {
-    // Given
     JobOrder jobOrder = new JobOrder();
     jobOrder.setId(UUID.randomUUID());
-    // V88 removed the entity-side `squadron` String field — the DTO `squadron` slot is now
-    // fed from requestingSquadron.shorthand via the explicit @Mapping on JobOrderMapper.
     Squadron iridium = new Squadron();
     iridium.setShorthand("Iridium");
     jobOrder.setRequestingOrgUnit(iridium);
@@ -225,10 +197,8 @@ class JobOrderMapperTest {
     jobOrder.setMaterials(new HashSet<>());
     jobOrder.setAssignees(new HashSet<>());
 
-    // When
     JobOrderDto dto = mapper.toDto(jobOrder);
 
-    // Then
     assertNotNull(dto.handovers());
     assertEquals(1, dto.handovers().size());
     var hDto = dto.handovers().getFirst();
@@ -242,7 +212,6 @@ class JobOrderMapperTest {
 
   @Test
   void singleMaterialToDto_shouldUseInjectedMaterialMapperAndLeaveCurrentStockNull() {
-    // Given
     Material material = newMaterial("Quantanium", QuantityType.SCU);
     material.setIsIllegal(1);
 
@@ -253,10 +222,8 @@ class JobOrderMapperTest {
     jm.setAmount(2.5);
     jm.setVersion(3L);
 
-    // When
     JobOrderMaterialDto dto = mapper.toDto(jm);
 
-    // Then
     assertNotNull(dto);
     assertEquals(jm.getId(), dto.id());
     assertEquals(900, dto.minQuality());
@@ -266,14 +233,11 @@ class JobOrderMapperTest {
     assertEquals("Quantanium", dto.material().name());
     assertEquals(QuantityType.SCU.name(), dto.material().quantityType());
     assertTrue(dto.material().isIllegal());
-    // The mapper explicitly leaves currentStock null; the service fills it
-    // from a separate stock lookup, so the mapper must NOT make up a value.
     assertNull(dto.currentStock());
   }
 
   @Test
   void mapAndSortMaterials_shouldSortScuFirstThenAlphabetically() {
-    // Given a deliberately unsorted set with both quantity types
     Material gold = newMaterial("Gold", QuantityType.SCU);
     Material iron = newMaterial("Iron", QuantityType.PIECE);
     Material silver = newMaterial("Silver", QuantityType.SCU);
@@ -302,10 +266,8 @@ class JobOrderMapperTest {
 
     Set<JobOrderMaterial> materials = Set.of(jm1, jm2, jm3, jm4);
 
-    // When
     List<JobOrderMaterialDto> result = mapper.mapAndSortMaterials(materials);
 
-    // Then — SCU first, then PIECE, each group case-insensitive alphabetical
     assertEquals(4, result.size());
     assertEquals("Gold", result.get(0).material().name());
     assertEquals("Silver", result.get(1).material().name());
@@ -315,8 +277,6 @@ class JobOrderMapperTest {
 
   @Test
   void mapAndSortMaterials_shouldHandleNullMaterialOnEntryGracefully() {
-    // Given a JobOrderMaterial with no material reference (paranoia — should not happen
-    // under DB constraint, but the mapper has a defensive null check we want to cover)
     JobOrderMaterial broken = new JobOrderMaterial();
     broken.setId(UUID.randomUUID());
     broken.setMaterial(null);
@@ -330,11 +290,8 @@ class JobOrderMapperTest {
     ok.setMinQuality(0);
     ok.setAmount(1.0);
 
-    // When
     List<JobOrderMaterialDto> result = mapper.mapAndSortMaterials(Set.of(broken, ok));
 
-    // Then — Gold first (SCU group), broken entry falls into the PIECE / no-material group at the
-    // end
     assertEquals(2, result.size());
     assertEquals("Gold", result.get(0).material().name());
     assertNull(result.get(1).material());
@@ -353,8 +310,6 @@ class JobOrderMapperTest {
 
   @Test
   void singleMaterialToDto_nullMinQuality_mapsToNull() {
-    // Given a material line with "Keine" (null minQuality) — must survive the mapping as null,
-    // not get coerced to 0 or a default.
     Material material = newMaterial("Quartz", QuantityType.SCU);
     JobOrderMaterial jm = new JobOrderMaterial();
     jm.setId(UUID.randomUUID());
@@ -362,15 +317,11 @@ class JobOrderMapperTest {
     jm.setMinQuality(null);
     jm.setAmount(42.0);
 
-    // When
     JobOrderMaterialDto dto = mapper.toDto(jm);
 
-    // Then
     assertNotNull(dto);
     assertNull(dto.minQuality(), "null minQuality (Keine) must map through as null");
   }
-
-  // ─── helper ─────────────────────────────────────────────────────────────────
 
   private static Material newMaterial(String name, QuantityType quantityType) {
     Material material = new Material();

@@ -55,25 +55,16 @@ class ScWikiSchedulerTest {
   @Mock private ScWikiManufacturerSyncService manufacturerSyncService;
   @Mock private MasterDataCacheEvictionService masterDataCacheEvictionService;
 
-  // A real coordinator (spied so it can be told the gate is busy); its default runs the sweep.
   @Spy private SyncCoordinator syncCoordinator = new SyncCoordinator(3_600_000);
 
-  // A real registry (held so tests can read the item counter) behind a real, spied TaskMetrics so
-  // the instrumentation wrapper genuinely runs the sweep body and records into it. Declared before
-  // taskMetrics so field initialisation order hands it the same instance.
   private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
 
-  // A real TaskMetrics (spied) so the instrumentation wrapper genuinely runs the sweep body.
   @Spy private TaskMetrics taskMetrics = new TaskMetrics(meterRegistry);
 
   private ScWikiScheduler scheduler;
 
   @BeforeEach
   void setUp() {
-    // Construct explicitly (not @InjectMocks) so the scheduler and the spied TaskMetrics share the
-    // one real SimpleMeterRegistry the assertions read — @InjectMocks cannot wire the plain
-    // meterRegistry field, which would leave the new step-failure counter writing to a null
-    // registry.
     scheduler =
         new ScWikiScheduler(
             scWikiClient,
@@ -118,7 +109,6 @@ class ScWikiSchedulerTest {
 
   @Test
   void schedule_recordsSummedItemCount_acrossAllSteps() {
-    // Given — each step reports how many catalogue rows it wrote this run.
     when(properties.schedulerEnabled()).thenReturn(true);
     when(commoditySyncService.syncCommodities()).thenReturn(3);
     when(vehicleSyncService.syncVehicles()).thenReturn(5);
@@ -126,11 +116,8 @@ class ScWikiSchedulerTest {
     when(blueprintSyncService.syncBlueprints()).thenReturn(7);
     when(manufacturerSyncService.syncManufacturers()).thenReturn(2);
 
-    // When
     scheduler.scheduleScWikiSync();
 
-    // Then — the scwiki_sync item counter is the sum of the five step counts (#1041 item 2), the
-    // signal the SyncZeroItems alert watches (a clean run summing to 0 means an empty-200 outage).
     assertEquals(
         3 + 5 + 11 + 7 + 2,
         meterRegistry
@@ -144,15 +131,11 @@ class ScWikiSchedulerTest {
 
   @Test
   void schedule_recordsZeroItems_whenAStepFailsAndTheRestWriteNothing() {
-    // Given — the item step throws (empty-200 outage or a transient error) and no step writes rows.
     when(properties.schedulerEnabled()).thenReturn(true);
     when(itemSyncService.syncItems()).thenThrow(new RuntimeException("Wiki 500"));
 
-    // When — the sweep must not propagate; the failing step contributes 0 to the tally.
     scheduler.scheduleScWikiSync();
 
-    // Then — a successful run that wrote zero rows records 0, which is exactly what SyncZeroItems
-    // fires on (as opposed to the series being absent).
     assertEquals(
         0.0,
         meterRegistry
@@ -169,36 +152,25 @@ class ScWikiSchedulerTest {
 
     scheduler.scheduleScWikiSync();
 
-    // The commodity/vehicle/manufacturer/blueprint writes bypass the @CacheEvict read services, so
-    // the sweep evicts the caches they can make stale on completion (CACHE-SYNC-EVICT-001,
-    // CACHE-DIST-03 for the blueprint-family index).
     verify(masterDataCacheEvictionService).evictScWikiSyncedMasterData();
   }
 
   @Test
   void schedule_continuesRemainingSteps_afterOneStepThrows() {
-    // Given — the master switch is on and the vehicle step (2nd in dependency order) throws.
     when(properties.schedulerEnabled()).thenReturn(true);
     when(vehicleSyncService.syncVehicles()).thenThrow(new RuntimeException("Wiki vehicle 500"));
 
-    // When — the sweep must not propagate the failure.
     scheduler.scheduleScWikiSync();
 
-    // Then — each step is wrapped in its own try/catch (runStep), the deliberate opposite of
-    // UexScheduler's whole-block abort: the later item, blueprint and manufacturer syncs STILL run
-    // even though an earlier step threw. A whole-block-abort refactor would skip these and leave
-    // those catalogues stale for the daily tick.
     verify(itemSyncService).syncItems();
     verify(blueprintSyncService).syncBlueprints();
     verify(manufacturerSyncService).syncManufacturers();
-    // And the finally-block eviction still runs after the partially-failing sweep.
     verify(masterDataCacheEvictionService).evictScWikiSyncedMasterData();
   }
 
   @Test
   void schedule_skipsEntireSweep_whenAnotherSyncIsAlreadyRunning() {
     when(properties.schedulerEnabled()).thenReturn(true);
-    // The shared gate denies entry (a UEX or SC Wiki sync is already in flight) → no step runs.
     doReturn(false).when(syncCoordinator).runExclusively(eq("SC Wiki"), any());
 
     scheduler.scheduleScWikiSync();
@@ -214,10 +186,6 @@ class ScWikiSchedulerTest {
 
   @Test
   void schedule_countsStepFailure_whenAStepThrows() {
-    // REQ-OBS-011: a single step throwing is swallowed so the other steps still run and the
-    // umbrella
-    // scwiki_sync records outcome=success — basetool_scheduled_job_step_failures_total{step} is the
-    // only signal a persistently-failing step leaves, feeding ScWikiStepFailing.
     when(properties.schedulerEnabled()).thenReturn(true);
     when(itemSyncService.syncItems()).thenThrow(new RuntimeException("Wiki 500"));
 

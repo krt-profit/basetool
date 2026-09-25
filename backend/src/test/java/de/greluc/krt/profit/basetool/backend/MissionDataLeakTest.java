@@ -44,10 +44,6 @@ import org.springframework.web.context.WebApplicationContext;
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
-// REQ-SEC-052: these cases used to issue their requests with no principal at all, because
-// the mission surface answered one. It does not, so the class carries a member — which is
-// also the caller each case was really about: what a MEMBER sees, not what the internet did.
-// The PII assertions are unchanged and are now REQ-SEC-007's peer tier.
 @org.springframework.security.test.context.support.WithMockUser(roles = "KRT_MEMBER")
 public class MissionDataLeakTest {
 
@@ -87,8 +83,6 @@ public class MissionDataLeakTest {
 
   @Test
   void testMissionDetail_Peer_SeesRosterWithoutPii() throws Exception {
-    // A member below Logistician sees the participant roster, with PII (e-mail / real name)
-    // stripped — only the public callsign tuple survives (REQ-SEC-007).
     String body =
         mockMvc
             .perform(get("/api/v1/missions/" + publicMission.getId()))
@@ -103,30 +97,14 @@ public class MissionDataLeakTest {
         body.contains("secret@leaked.org"), "outsider must never receive a participant email");
   }
 
-  // A role-less GUEST is treated exactly like an anonymous visitor on the mission surface
-  // (isMemberOrAbove() == false → same outsider redaction). That equivalence is proven without the
-  // fragile full-stack synthetic-JWT path here: AuthHelperServiceTest pins GUEST →
-  // isMemberOrAbove() == false, MissionControllerLifecycleTest pins isMemberOrAbove() == false →
-  // the outsider redaction, and MissionFinanceEntryControllerSecurityTest pins the GUEST → 403
-  // finance gate over the full security wiring.
-
   @Test
   void testMissionDetail_Peer_HidesOwnerAndInternalEconomy() throws Exception {
-    // A member below Logistician sees the mission and its description; what is cleared is the
-    // owner/manager relation and, on top of the PII stripping, nothing else.
-    //
-    // The description USED to be hidden here, by the outsider tier (ADR-0034). It is visible to a
-    // peer because a peer is a member of the organisation — the field was withheld from people who
-    // were not, and there are none (ADR-0159, REQ-SEC-021 superseded).
     String body =
         mockMvc
             .perform(get("/api/v1/missions/" + publicMission.getId()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.name").value("Public Mission"))
             .andExpect(jsonPath("$.owner").value(nullValue()))
-            // #1138: the mission economy is no longer embedded in the DTO — the fields are absent
-            // from the payload entirely (served member-gated at their own endpoints), so nobody
-            // sees them here.
             .andExpect(jsonPath("$.refineryOrders").doesNotExist())
             .andExpect(jsonPath("$.inventoryEntries").doesNotExist())
             .andReturn()

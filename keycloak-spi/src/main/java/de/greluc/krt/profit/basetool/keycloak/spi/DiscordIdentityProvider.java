@@ -102,11 +102,8 @@ public class DiscordIdentityProvider
 
   private static final Duration HTTP_TIMEOUT = DiscordHttp.TIMEOUT;
 
-  // The one Discord client of the provider JAR (KC-SIMP-01), shared with the first-login gate.
   private static final HttpClient HTTP_CLIENT = DiscordHttp.CLIENT;
 
-  // Best-effort (fail-open) reader for the per-guild server nickname; shares the profile-call
-  // client and timeout. Never breaks the login — see enrichWithGuildNickname.
   private static final DiscordGuildNicknameReader NICKNAME_READER =
       new DiscordGuildNicknameReader(HTTP_CLIENT, HTTP_TIMEOUT);
 
@@ -158,7 +155,6 @@ public class DiscordIdentityProvider
       HttpResponse<String> response =
           HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
       if (response.statusCode() != 200) {
-        // Status code only — never the body, which carries the Discord identity.
         throw new IdentityBrokerException(
             "Discord profile request returned HTTP " + response.statusCode());
       }

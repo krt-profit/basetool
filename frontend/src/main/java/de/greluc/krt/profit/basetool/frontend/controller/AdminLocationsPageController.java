@@ -140,8 +140,6 @@ public class AdminLocationsPageController {
               currentLocation.homeLocation(),
               currentLocation.version());
       backendApiClient.put("/api/v1/locations/" + id, body, Void.class);
-      // A visibility / home-location toggle changes the cached location catalogues (list, lookup,
-      // refineries, home-locations), so evict the LOCATION domain (REQ-DATA-007).
       backendApiClient.evict(CacheDomain.LOCATION);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
@@ -192,8 +190,6 @@ public class AdminLocationsPageController {
               homeLocation,
               currentLocation.version());
       backendApiClient.put("/api/v1/locations/" + id, body, Void.class);
-      // A visibility / home-location toggle changes the cached location catalogues (list, lookup,
-      // refineries, home-locations), so evict the LOCATION domain (REQ-DATA-007).
       backendApiClient.evict(CacheDomain.LOCATION);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {

@@ -83,7 +83,6 @@ class DataExportPdfFieldLabelCoverageTest {
     return out;
   }
 
-  // covers REQ-SEC-058 - a printed column name the bundle cannot name renders as the raw alias
   @Test
   void everyPrintedFieldNameHasAGermanLabel() throws IOException {
     Properties bundle = bundle();
@@ -104,7 +103,6 @@ class DataExportPdfFieldLabelCoverageTest {
         .isEmpty();
   }
 
-  // covers REQ-SEC-058 - and a label nothing prints is a stale line that reads as a decision
   @Test
   void everyFieldLabelIsAColumnSomethingPrints() throws IOException {
     Set<String> printed = printedFieldNames();

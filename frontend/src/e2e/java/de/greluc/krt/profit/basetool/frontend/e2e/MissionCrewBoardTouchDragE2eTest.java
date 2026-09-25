@@ -97,8 +97,6 @@ class MissionCrewBoardTouchDragE2eTest {
       String userId = seeder.getUserId(USERNAME, PASSWORD);
       missionId = seeder.createMission(USERNAME, PASSWORD, "E2E Touch Drag Mission", true);
       seeder.addRegisteredParticipant(USERNAME, PASSWORD, missionId, userId);
-      // A unit's responsible person is a separate field from its crew, so the participant stays
-      // in the pool and the unit's drop zone starts empty — which is the state under test.
       seeder.addUnitWithResponsible(USERNAME, PASSWORD, missionId, UNIT, userId);
     }
   }
@@ -126,8 +124,6 @@ class MissionCrewBoardTouchDragE2eTest {
           assertThat(page.locator("#board-pool .person-row")).hasCount(1);
           assertThat(page.locator(".board-units .drop-zone .person-row")).hasCount(0);
 
-          // Press and hold the pool row. The board arms its drag after 320 ms of a stationary
-          // finger; until then the same gesture is a scroll.
           page.evaluate(
               """
               () => {
@@ -141,8 +137,6 @@ class MissionCrewBoardTouchDragE2eTest {
               """);
           page.waitForTimeout(HOLD_WAIT_MS);
 
-          // ...then drag onto the unit zone and release there. The hint box is targeted rather
-          // than the zone's own centre because it is always inside the zone and always painted.
           page.evaluate(
               """
               () => {
@@ -160,8 +154,6 @@ class MissionCrewBoardTouchDragE2eTest {
               }
               """);
 
-          // The drop writes crew and re-renders the pane in place (no reload), so both counts
-          // flip. Web-first assertions carry their own wait for that swap.
           assertThat(page.locator(".board-units .drop-zone .person-row")).hasCount(1);
           assertThat(page.locator("#board-pool .person-row")).hasCount(0);
         });
@@ -191,17 +183,11 @@ class MissionCrewBoardTouchDragE2eTest {
                         };
                       }
                       """);
-          // Asserted by substring, not equality: the load-bearing part is that the row concedes
-          // vertical panning (a swipe still scrolls the board) while giving up the rest, and
-          // engines are free to serialise the shorthand's remainder differently.
           assertTrue(
               String.valueOf(style.get("touchAction")).contains("pan-y"),
               "row touch-action keeps vertical panning, was: " + style.get("touchAction"));
           assertEquals("none", style.get("userSelect"), "row user-select");
 
-          // The board cancels the platform's context menu for as long as a touch press on a row
-          // is live. Dispatched here in the same order the platform produces it: the press first,
-          // the menu on top of it.
           Object prevented =
               page.evaluate(
                   """
@@ -240,8 +226,6 @@ class MissionCrewBoardTouchDragE2eTest {
                 .setIgnoreHTTPSErrors(true)
                 .setStorageStatePath(storageState)
                 .setViewportSize(PHONE_WIDTH, PHONE_HEIGHT)
-                // isMobile is deliberately not set: Firefox rejects it outright, and nothing here
-                // depends on the meta viewport being honoured.
                 .setHasTouch(true))) {
       Page page = context.newPage();
       E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=crew");

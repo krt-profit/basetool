@@ -121,12 +121,10 @@ class OrgChartPositionCrudE2eTest {
         E2eSupport.navigate(page, STACK.baseUrl() + "/org-chart");
         clearAllKommandos(page);
 
-        // CREATE
         createLeaderlessKommando(page, "E2E CRUD Alpha");
         enterEditMode(page);
         assertThat(commandHeadNamed(page, "E2E CRUD Alpha")).isVisible();
 
-        // EDIT — rename
         page.locator(".oc-command-head [data-trigger='oc-rename']").first().click();
         assertThat(page.locator("#oc-modal")).isVisible();
         page.locator("#oc-name").fill("E2E CRUD Bravo");
@@ -135,7 +133,6 @@ class OrgChartPositionCrudE2eTest {
         assertThat(commandHeadNamed(page, "E2E CRUD Bravo")).isVisible();
         assertThat(commandHeadNamed(page, "E2E CRUD Alpha")).hasCount(0);
 
-        // DELETE
         confirmAndAwaitRefresh(page, page.locator(COMMAND_REMOVE_BUTTON).first());
         assertThat(commandHeadNamed(page, "E2E CRUD Bravo")).hasCount(0);
         assertThat(page.locator(".oc-command-head")).hasCount(0);
@@ -163,25 +160,18 @@ class OrgChartPositionCrudE2eTest {
 
         createLeaderlessKommando(page, "E2E CRUD Lead");
         enterEditMode(page);
-        // A freshly created Kommando is leaderless: it offers the assign affordance, not a vacate.
         assertThat(page.locator(ASSIGN_LEAD_BUTTON)).isVisible();
         assertThat(page.locator(VACATE_LEAD_BUTTON)).hasCount(0);
 
-        // EDIT — assign a free-text Kommandoleiter. Account-linked seats are managed under
-        // Organisation -> Leitung now (epic #800, REQ-ROLE-006); the chart editor places only a
-        // free-text holder, so the dialog offers a typed name, not an account picker.
         page.locator(ASSIGN_LEAD_BUTTON).first().click();
         assertThat(page.locator("#oc-modal")).isVisible();
         page.locator("#oc-display-name").fill("E2E Leiter Eins");
         submitModalAndAwaitRefresh(page);
         enterEditMode(page);
-        // The seat is now filled: a vacate affordance appears and the reassign control carries the
-        // typed holder name.
         assertThat(page.locator(VACATE_LEAD_BUTTON)).isVisible();
         assertThat(page.locator(REASSIGN_LEAD_ICON).first())
             .hasAttribute("data-display-name", "E2E Leiter Eins");
 
-        // EDIT — reassign to a different typed name.
         page.locator(REASSIGN_LEAD_ICON).first().click();
         assertThat(page.locator("#oc-modal")).isVisible();
         page.locator("#oc-display-name").fill("E2E Leiter Zwei");
@@ -190,14 +180,12 @@ class OrgChartPositionCrudE2eTest {
         assertThat(page.locator(REASSIGN_LEAD_ICON).first())
             .hasAttribute("data-display-name", "E2E Leiter Zwei");
 
-        // EDIT — vacate the Kommandoleiter: the holder is cleared but the Kommando(gruppe) stays.
         confirmAndAwaitRefresh(page, page.locator(VACATE_LEAD_BUTTON).first());
         enterEditMode(page);
         assertThat(commandHeadNamed(page, "E2E CRUD Lead")).isVisible();
         assertThat(page.locator(VACATE_LEAD_BUTTON)).hasCount(0);
         assertThat(page.locator(ASSIGN_LEAD_BUTTON)).isVisible();
 
-        // DELETE — remove the whole Kommando(gruppe).
         confirmAndAwaitRefresh(page, page.locator(COMMAND_REMOVE_BUTTON).first());
         assertThat(commandHeadNamed(page, "E2E CRUD Lead")).hasCount(0);
       } catch (RuntimeException | AssertionError failure) {
@@ -206,8 +194,6 @@ class OrgChartPositionCrudE2eTest {
       }
     }
   }
-
-  // ---------------------------------------------------------------------- helpers --
 
   /**
    * Opens a new authenticated browser context with HTTPS errors ignored (the stack uses a
@@ -326,9 +312,6 @@ class OrgChartPositionCrudE2eTest {
             + "  });"
             + "}");
     action.run();
-    // 30 s, not 15 s: the in-place refresh re-renders the entire org chart, which on the shared
-    // ephemeral stack keeps growing as sibling suites seed Staffeln/SKs into it. Under CI load that
-    // full re-render has overrun a 15 s budget.
     page.waitForFunction(
         "() => window.__ocSwapped === true",
         null,

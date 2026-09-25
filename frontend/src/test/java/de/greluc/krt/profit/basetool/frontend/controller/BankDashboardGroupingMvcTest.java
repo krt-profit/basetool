@@ -135,9 +135,6 @@ class BankDashboardGroupingMvcTest {
   void groupByBereich_fragment_rendersGroupsWithoutServerError() throws Exception {
     twoGroupsDashboard();
 
-    // The bankGrid fragment swap the by-Bereich checkbox fires MUST render (regression: grp unbound
-    // -> group.key() NPE -> 500). It emits one coloured group section per bucket, keyed by
-    // group.key.
     mockMvc
         .perform(get("/bank").param("group", "bereich").param("fragment", "bankGrid"))
         .andExpect(status().isOk())
@@ -169,8 +166,6 @@ class BankDashboardGroupingMvcTest {
                 List.of(account("KB-0001", "Staffel IRIDIUM", "ORG_UNIT", null, null, null)),
                 null));
 
-    // Card layout renders the grid ONLY — the table fragment must not also appear (regression: the
-    // ignored th:unless rendered both accTable and accGrid, stacking a table above the cards).
     mockMvc
         .perform(
             get("/bank")

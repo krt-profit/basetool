@@ -166,8 +166,6 @@ public class DataExportProxyController {
     } catch (ResponseStatusException e) {
       throw e;
     } catch (Exception e) {
-      // The subject is the caller and is identifiable from the session; nothing about them is
-      // written into the log line.
       log.error("Data-export proxy: unexpected error for {}", uri, e);
       throw new ResponseStatusException(
           HttpStatus.INTERNAL_SERVER_ERROR,

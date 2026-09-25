@@ -58,7 +58,6 @@ class ResilienceEventLoggerTest {
   @Test
   void logsCircuitBreakerStateTransitionAsWarn() {
     CircuitBreakerRegistry cbReg = CircuitBreakerRegistry.ofDefaults();
-    // Force a circuit breaker to exist so the logger subscribes to it.
     CircuitBreaker cb = cbReg.circuitBreaker("test-instance");
     RetryRegistry retryReg = RetryRegistry.ofDefaults();
     BulkheadRegistry bhReg = BulkheadRegistry.ofDefaults();
@@ -79,9 +78,6 @@ class ResilienceEventLoggerTest {
 
   @Test
   void logsCallNotPermittedAsDebugNotWarn() {
-    // A call rejected by an already-open breaker must NOT be logged at WARN: it fires for every
-    // short-circuited call for the whole open window and would flood the log during a routine
-    // backend restart/deploy (issue #1203). The one-time OPEN state transition carries the WARN.
     CircuitBreakerRegistry cbReg = CircuitBreakerRegistry.ofDefaults();
     CircuitBreaker cb = cbReg.circuitBreaker("test-instance");
     ResilienceEventLogger rel =
@@ -94,11 +90,9 @@ class ResilienceEventLoggerTest {
     logger.setLevel(Level.DEBUG);
 
     cb.transitionToOpenState();
-    // Invoking any call while OPEN is rejected and fires onCallNotPermitted.
     try {
       cb.executeSupplier(() -> "unreachable");
     } catch (CallNotPermittedException expected) {
-      // expected — the breaker short-circuits the call
     }
 
     assertThat(appender.list)

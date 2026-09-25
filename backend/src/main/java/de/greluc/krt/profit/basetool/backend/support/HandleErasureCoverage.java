@@ -100,7 +100,6 @@ public final class HandleErasureCoverage {
   /** Keyed {@code table.column}, exactly as {@link PersonSearchTargets} spells it. */
   public static final Map<String, Coverage> COVERAGE =
       Map.ofEntries(
-          // --- rewritten by the erasure -------------------------------------------------
           anonymised(
               "audit_event.actor_handle",
               "The activity trail's actor snapshot, matched by actor_user_id while the account"
@@ -150,8 +149,6 @@ public final class HandleErasureCoverage {
               "job_order_handover.recipient_handle",
               "A recipient with no user id beside them; matched by text, case-insensitively."),
           anonymised("job_order_item_handover.recipient_handle", "See job_order_handover."),
-
-          // --- the row goes with the account --------------------------------------------
           removed("app_user.username", "The account row itself is deleted."),
           removed("app_user.display_name", "The account row itself is deleted."),
           removed("app_user.email", "The account row itself is deleted."),
@@ -176,8 +173,6 @@ public final class HandleErasureCoverage {
               "inventory_item.note",
               "The departing member's warehouse rows are purged, with the job-order and mission"
                   + " allocations the database cascades off them."),
-
-          // --- names somebody or something else -----------------------------------------
           notTheMember(
               "mission.party_lead_guest_name",
               "A party lead with no account -- a third party, whose own request would be served"
@@ -206,8 +201,6 @@ public final class HandleErasureCoverage {
                   + " the name of a participant."),
           notTheMember("promotion_category.name", "A promotion catalogue entry."),
           notTheMember("promotion_topic.name", "A promotion catalogue entry."),
-
-          // --- prose: found by the search, edited by an admin ---------------------------
           byHand(
               "announcement.content",
               "An administrator's announcement. It can name a member mid-sentence, and rewriting"

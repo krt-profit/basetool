@@ -113,14 +113,11 @@ class PersonalInventoryCrudE2eTest {
         E2eSupport.navigate(page, baseUrl + "/personal-inventory");
         page.waitForLoadState();
 
-        // Marker on the live document: a full navigation/reload wipes it, so its survival proves
-        // both writes stayed in place. The position:fixed footer can cover the modal submit button.
         page.evaluate("() => { window.__krtNoReload = true; }");
         page.evaluate(
             "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
                 + " 'none'; } }");
 
-        // CREATE — open the modal, fill the fields, pick the seeded city from the typeahead.
         page.locator("button[data-trigger='pi-open-create']").click();
         Locator name = page.locator("#krt-pi-name");
         assertThat(name).isVisible();
@@ -147,7 +144,6 @@ class PersonalInventoryCrudE2eTest {
             "the create must update in place — no page reload cleared the marker");
         assertTrue(persistedItemExists(), "the created entry must be persisted in the backend");
 
-        // DELETE — open the confirm modal, confirm, and assert the row is removed in place.
         itemRow(page).locator("[data-trigger='pi-open-delete']").click();
         assertThat(page.locator("#krt-pi-delete-modal")).isVisible();
         page.waitForResponse(
@@ -168,8 +164,6 @@ class PersonalInventoryCrudE2eTest {
       }
     }
   }
-
-  // ---------------------------------------------------------------------- helpers --
 
   /**
    * Opens a new authenticated browser context with HTTPS errors ignored (the stack uses a

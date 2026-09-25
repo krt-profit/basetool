@@ -94,7 +94,6 @@ class ActiveSquadronContextFilterTest {
             throw new IllegalStateException("boom");
           });
     } catch (Exception expected) {
-      // The filter must not swallow the failure; only the cleanup is under test here.
       assertThat(expected).isInstanceOf(IllegalStateException.class);
     }
 

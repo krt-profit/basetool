@@ -113,8 +113,6 @@ public final class AllocationReductions {
     if (sumReductions > totalX + REDUCTION_EPSILON) {
       throw new BadRequestException("The deduct-from plan exceeds the deducted amount");
     }
-    // The rest absorbs whatever the tags did not; if that is more than the rest holds, the plan is
-    // under-assigned and cannot be applied without over-drawing the rest (the R5 422).
     if (totalX - sumReductions > rest + REDUCTION_EPSILON) {
       throw new OverAllocationException();
     }
@@ -161,7 +159,7 @@ public final class AllocationReductions {
     Map<UUID, Double> plan = new LinkedHashMap<>();
     double forced = InventoryItem.roundToScuScale(totalX - rest);
     if (forced <= REDUCTION_EPSILON) {
-      return plan; // the rest covers the whole deduction
+      return plan;
     }
     List<UUID> targets = new ArrayList<>();
     List<Double> sliceAmounts = new ArrayList<>();
@@ -188,11 +186,11 @@ public final class AllocationReductions {
     for (int i = 0; i < targets.size(); i++) {
       double share;
       if (i == targets.size() - 1) {
-        share = InventoryItem.roundToScuScale(forced - assigned); // last tag takes the residue
+        share = InventoryItem.roundToScuScale(forced - assigned);
       } else {
         share = InventoryItem.roundToScuScale(forced * (sliceAmounts.get(i) / totalSlice));
       }
-      share = Math.min(share, sliceAmounts.get(i)); // never over-draw a tag
+      share = Math.min(share, sliceAmounts.get(i));
       if (share > 0.0) {
         plan.put(targets.get(i), share);
         assigned = InventoryItem.roundToScuScale(assigned + share);

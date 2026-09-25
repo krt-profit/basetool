@@ -161,10 +161,6 @@ public class JobOrderItemHandoverService {
     handover.setRecipientHandle(dto.recipientHandle());
     stampAuditTrail(handover);
 
-    // The whole units handed over per game item in this handover — the amount of item stock the
-    // best-effort consumption (REQ-ORDERS-030) tries to draw from the order's earmark below.
-    // Aggregated per game item (not per line) because the earmark slices are keyed on (row, order),
-    // so two lines requesting the same game item share one earmark pool.
     final Map<UUID, Integer> handedByGameItem = new LinkedHashMap<>();
 
     for (JobOrderItemHandoverEntryCreateDto entryDto : dto.entries()) {
@@ -180,17 +176,12 @@ public class JobOrderItemHandoverService {
                               + " does not belong to job order "
                               + jobOrderId));
 
-      // A unit can only be delivered once it has been manufactured (REQ-ORDERS-025), so the
-      // deliverable ceiling is the manufactured-but-not-yet-delivered quantity, not amount −
-      // delivered. Legacy rows were backfilled with manufactured := delivered, so already-delivered
-      // lines stay valid; further delivery requires booking production first.
       int outstanding = line.getManufacturedAmount() - line.getDeliveredAmount();
       if (entryDto.amount() > outstanding) {
         throw new BadRequestException(
             "Cannot hand over more than the manufactured-but-undelivered amount for item line "
                 + line.getId());
       }
-      // Dirty-checked mutation only — no explicit save(), so no version double-bump.
       line.setDeliveredAmount(line.getDeliveredAmount() + entryDto.amount());
 
       if (line.getGameItem() != null) {
@@ -203,10 +194,6 @@ public class JobOrderItemHandoverService {
       handover.addEntry(entry);
     }
 
-    // Best-effort delivery-consumes-stock (REQ-ORDERS-030): draw the delivered units out of the
-    // order's earmarked item stock, oldest-first. Reduces only game-item rows (never the JobOrder
-    // aggregate) with no context-clearing bulk update, so the still-managed jobOrder drives the
-    // completion check below with a single @Version bump.
     final List<ConsumedItem> consumedItems =
         consumeEarmarkedItemStock(jobOrderId, handedByGameItem);
 
@@ -219,14 +206,6 @@ public class JobOrderItemHandoverService {
       jobOrderService.completeJobOrderWithinTransaction(jobOrder);
     }
 
-    // Ratchet the Materialbörse offers and emit the cross-domain audit from the loop-captured
-    // snapshots after the writes (so a deleted row is never re-read) — the same collect-then-run
-    // shape as the material handover. A non-depleted row that survives ratchets any active
-    // stock-backed item offer on it down to its reduced whole-unit stock
-    // (clampItemQuantityToStock, REQ-MARKET-013/014, ADR-0108) — the item-offer sibling of the
-    // material handover's clampOfferedAmountToStock; a depleted row was deleted and its offer
-    // cascade-removed with it (V210), so it needs no clamp. Each draw records one shared
-    // INVENTORY_HANDED_OVER (source ITEM_HANDOVER), which precedes the JOB_ORDER handover event.
     final Integer orderDisplayId = jobOrder.getDisplayId();
     for (ConsumedItem consumed : consumedItems) {
       if (!consumed.depleted()) {
@@ -246,9 +225,6 @@ public class JobOrderItemHandoverService {
               .with("depleted", consumed.depleted()));
     }
 
-    // The recipientHandle is user free text and is never written to the audit details.
-    // completeJobOrderWithinTransaction already recorded JOB_ORDER_COMPLETED when the order was
-    // fulfilled, so this method records only the handover.
     auditService.record(
         AuditEventType.JOB_ORDER_ITEM_HANDOVER_CREATED,
         jobOrderId,
@@ -303,9 +279,6 @@ public class JobOrderItemHandoverService {
         if (sliceAmount <= QUANTITY_EPSILON) {
           continue;
         }
-        // Draw only this order's own earmark on the row (R5 keeps the slice ≤ the row amount, so
-        // the
-        // physical remainder never goes negative), capped at what is still to consume.
         double take = Math.min(remainingToConsume, sliceAmount);
         double rowAmount = row.getAmount() != null ? row.getAmount() : 0.0;
         double rowRemaining = InventoryItem.roundToScuScale(rowAmount - take);
@@ -329,8 +302,6 @@ public class JobOrderItemHandoverService {
         }
         remainingToConsume -= take;
       }
-      // remainingToConsume may still be > 0 here — best-effort: the surplus delivers without stock
-      // backing (legacy manufactured-without-stock lines, or partial earmark). Never throw.
     }
     return consumed;
   }
@@ -354,11 +325,6 @@ public class JobOrderItemHandoverService {
         .ifPresent(
             current -> {
               handover.setExecutingUser(current);
-              // Polymorphic load + unproxy instead of a Squadron-typed findById: the executing
-              // Staffel id routinely equals the order's responsibleOrgUnit, which this transaction
-              // already holds as a base-typed OrgUnit proxy — a subclass-typed load would force
-              // Hibernate to narrow that proxy (HHH000179, breaks ==). The base-typed find reuses
-              // the persistence-context instance; unproxy yields the concrete Squadron.
               orgUnitMembershipQueryService
                   .findExecutingStaffelForOrder(current.getId(), responsibleOrgUnitId)
                   .flatMap(orgUnitRepository::findById)

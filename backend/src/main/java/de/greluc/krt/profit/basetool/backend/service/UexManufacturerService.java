@@ -137,9 +137,6 @@ public class UexManufacturerService {
       return;
     }
 
-    // Ascending id order makes the lowest-id (canonical) company of each brand commit before the
-    // duplicates that alias onto it — the invariant the merge logic relies on. Null ids (if any)
-    // sort last; they cannot be canonical-by-id anyway.
     List<UexCompanyDto> ordered =
         companies.stream()
             .sorted(Comparator.comparing(UexCompanyDto::id, Comparator.nullsLast(Integer::compare)))
@@ -169,8 +166,6 @@ public class UexManufacturerService {
           aliased++;
         }
       } catch (Exception e) {
-        // The failed company's own REQUIRES_NEW transaction has rolled back; the outer sweep is
-        // untouched, so we just tally it and carry on with the next company.
         log.error(
             "Failed to process UEX company dto (id={}, name='{}')",
             dto.id(),
@@ -221,9 +216,6 @@ public class UexManufacturerService {
       manufacturer = new Manufacturer();
     }
 
-    // The company owns the row's identity when the row is new, still unclaimed (legacy seed), or
-    // already stamped with this exact company id. Otherwise it is a duplicate of the same brand and
-    // must adopt the existing row without hijacking its canonical identity.
     final boolean canonical =
         isNew
             || manufacturer.getUexCompanyId() == null
@@ -232,7 +224,6 @@ public class UexManufacturerService {
     if (canonical) {
       applyCanonicalFields(manufacturer, dto, abbreviation);
     } else {
-      // Duplicate company of an already-resolved brand: only widen the surfaces it serves.
       manufacturer.setIsItemManufacturer(
           orFlag(
               manufacturer.getIsItemManufacturer(),

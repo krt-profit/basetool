@@ -146,10 +146,6 @@ public class NotificationRedisConfig {
       RedisNotificationFanout fanout,
       @Qualifier("notificationRedisListenerExecutor") ThreadPoolTaskExecutor listenerExecutor,
       MeterRegistry meterRegistry) {
-    // Resilient for the same reason the live-sync one is, and just as necessarily: both containers
-    // sit at SmartLifecycle phase Integer.MAX_VALUE, so whichever the lifecycle processor reaches
-    // first is the one that aborts the refresh. Hardening only the other would have renamed the
-    // 2026-09-02 crash loop rather than ended it.
     ResilientRedisMessageListenerContainer container = new ResilientRedisMessageListenerContainer();
     container.setConnectionFactory(connectionFactory);
     container.setTaskExecutor(listenerExecutor);

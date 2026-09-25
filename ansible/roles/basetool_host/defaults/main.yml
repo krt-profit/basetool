@@ -1,219 +1,89 @@
 ---
-# Defaults for the basetool_host role.
-#
-# Everything a host might legitimately differ on lives here. The testing host and the production
-# host are built from the SAME role with the same values except where they genuinely differ, which
-# is the property ADR-0188 exists to buy -- see docs/archive/PODMAN_HOST_BOOTSTRAP.md for why each of these
-# is what it is.
 
-# --- the rootless service user ----------------------------------------------------------------
-# It is in no privileged group, because there is no docker group to be in. That is the whole
-# security case for ADR-0163.
 basetool_host_service_user: iri
 basetool_host_service_group: iri
 
-# The account the operational scripts run as. NOT the service user: `iri` owns the container store
-# and runs the workload, while this one holds the registry pull token, rewrites unit files and
-# drives releases. Collapsing them would let the account that runs the application change what the
-# application is. The Docker deployment has the same split today -- `User=deploy, Group=docker` in
-# the four iri-*.service units -- and neither that user nor that group exists on a Rocky host,
-# which is the gap 22-deploy-user.yml closes.
 basetool_host_deploy_user: deploy
 
-# The units that run as that account and share one sandbox drop-in (OPS-SIMP-03,
-# scripts/iri-deploy-account-sandbox.conf, installed by tasks/25-scripts.yml).
 basetool_host_deploy_account_units:
   - iri-deploy.service
   - iri-backup.service
   - iri-restore-drill.service
   - iri-container-cleanup.service
 
-# Where the operational scripts are copied FROM. Relative to the playbook, so the role works from a
-# checkout without anything being installed into the role's own files/ directory -- and so a
-# reviewer can see that what lands on the host is exactly what is in the repository.
 basetool_host_scripts_src: "{{ playbook_dir }}/../scripts"
 
-# The subordinate id range. EVERY host-side uid in this role is derived from this number rather
-# than written down, so changing it here moves every ownership rule with it. That is the one thing
-# the prose bootstrap cannot do: a hand-computed 110000 is silently wrong the day this changes.
-#
-# It is not hypothetical. A user auto-allocated by useradd on the CentOS Stream 10 testing VM got
-# base 524288 (SUB_UID_MIN in that distribution's login.defs), not the 100000 the Debian guest
-# uses -- so the certificate the acme container hands to uid 101 sits at 524388 on that host and
-# at 100100 on the other. Measured 2026-09-16. This role pins the base explicitly so the two
-# hosts agree, and derives from the pin so that they still agree if it ever moves.
 basetool_host_subuid_base: 100000
 basetool_host_subuid_count: 65536
 
-# --- paths --------------------------------------------------------------------------------------
 basetool_host_root_dir: /var/iri
 basetool_host_state_dir: /var/lib/iri
 basetool_host_token_dir: /etc/iri
 
-# --- the versions the migration actually depends on ----------------------------------------------
-# This floor used to be podman 6, because only there does `rootless_port_forwarder="pasta"` exist and
-# that was how the edge was to keep seeing real client addresses. ADR-0187 replaced that mechanism
-# with a host-level PROXY-protocol front end, after the pasta forwarder was measured on 2026-09-16 to
-# preserve the address on IPv4 and deliver NO IPv6 at all.
-#
-# So the floor is now about Quadlet, not about networking. 5.8 is where this stack's units were
-# measured to translate completely: `Memory=` exists (5.4.2 has it not, and a missing key makes
-# REQ-OPS-020's limits silent decoration), alongside `PidsLimit=`, `ReadOnly=`, `DropCapability=`,
-# `NoNewPrivileges=`, `AutoUpdate=` and `Notify=healthy`.
 basetool_host_min_podman_major: 5
 basetool_host_min_podman_minor: 8
 
-# --- cosign, and why it is a pinned download rather than a package -----------
-#
-# REQ-OPS-015 verifies every resolved digest against the release workflow's keyless signature
-# BEFORE it is pulled, extracted or applied, and the deployer is fail-closed on it. So a host
-# without cosign cannot deploy at all.
-#
-# Measured 2026-09-18 on Rocky 10.2: cosign is in no enabled repository, AND it is not in EPEL 10
-# either -- queried against the real EPEL metadata with `dnf --repofrompath` rather than assumed,
-# because "enable EPEL" was the obvious answer and it is not an answer.
-#
-# So it is the upstream binary. The interesting part is what it is verified AGAINST. Sigstore
-# publishes `cosign_checksums.txt` and a Sigstore bundle signing it -- and verifying that bundle
-# needs cosign, which is the thing being installed. Trusting the downloaded checksum file instead
-# just moves the question one file along: whoever could swap the binary could swap its checksum.
-#
-# The pin below breaks the circle. It is the checksum of the release artefact, reviewed in git like
-# every image digest and every SHA-pinned action in this repository, and the role compares against
-# THIS value rather than against anything it downloaded. Upgrading cosign is therefore a commit
-# that changes this line, which someone reads.
 basetool_host_cosign_version: "v3.1.3"
 basetool_host_cosign_sha256: "4629c757b7618056f8ddd7e2625ae9fdd94c0372a65049520bc7d9df9efc7f71"
 basetool_host_cosign_url: >-
   https://github.com/sigstore/cosign/releases/download/{{ basetool_host_cosign_version }}/cosign-linux-amd64
 basetool_host_cosign_path: /usr/local/bin/cosign
 
-# --- SELinux ---------------------------------------------------------------------------------------
-# A permanent fcontext rule rather than :z/:Z on the mounts: it survives a relabel, it does not
-# mutate host paths at mount time, and a :Z on a shared path is how two services end up unable to
-# read each other's files.
 basetool_host_manage_selinux: true
 
-# --- the bind-mount owners ---------------------------------------------------------------------------
-# Each entry is a uid AS THE CONTAINER SEES IT, plus the paths under basetool_host_root_dir that need it.
-# The host uid is derived in tasks/30-directories.yml; it is never written here.
-#
-# Every one of these exists because something failed loudly and confusingly when it was missing.
-# The reasons are in docs/archive/PODMAN_HOST_BOOTSTRAP.md section 3 and they have not changed with the
-# runtime -- only the arithmetic has.
 basetool_host_container_owners:
-  - container_uid: 10001          # backend / frontend / ingest, set in docker/app/Dockerfile
+  - container_uid: 10001
     reason: "the app modules write their logs here"
     paths:
       - backend/log
       - frontend/log
       - ingest/log
-      # Loki and Tempo run as 10001 too -- read from the images themselves on 2026-09-18
-      # (`podman image inspect --format '{{.Config.User}}'`), not inferred from the Docker host.
       - monitoring/data/loki
       - monitoring/data/tempo
-  # --- the six that Docker created and Podman will not -------------------------------------
-  # Docker creates a missing bind-mount source directory. Podman refuses:
-  #     Error: statfs /var/iri/monitoring/data/prometheus: no such file or directory
-  # Measured on the testing host 2026-09-18, where six of the nine monitoring units would not
-  # start for exactly this reason. On the production Docker host these directories exist only
-  # because the daemon made them on 2026-07-04 and the containers then chowned them, so nothing
-  # in this repository ever had to name them -- and a fresh Podman host has no such helper.
-  - container_uid: 65534          # `nobody` in the prom/ images; confirmed numerically on prod
+  - container_uid: 65534
     reason: "prometheus and alertmanager write their TSDB and notification state here"
     paths:
       - monitoring/data/prometheus
       - monitoring/data/alertmanager
-  - container_uid: 472            # the grafana image's own user
+  - container_uid: 472
     reason: "grafana's sqlite database, dashboards and plugin state"
     paths:
       - monitoring/data/grafana
-  - container_uid: 1000           # the Keycloak Quarkus image
+  - container_uid: 1000
     reason: "without it Keycloak logs OPEN_FAILURE and silently keeps console-only logging"
     paths:
       - keycloak/log
-  - container_uid: 999            # redis inside the official image
+  - container_uid: 999
     reason: >-
       redis cannot chown its own /data because users.acl is mounted :ro from the same directory,
       so it dies on "Can't open or create append-only dir" and the health gate rolls the deploy back
     paths:
       - redis
-  - container_uid: 70             # postgres inside the alpine image
+  - container_uid: 70
     reason: "the postgres data directories"
     paths:
       - db-backend
       - db-keycloak
 
-# Directories owned by the service user itself (container root maps to it).
-#
-# `code` and `code/keycloak/providers` used to be here and are NOT any more. They hold the CONFIG
-# TREE, which the deployer writes on every release and the containers only read -- read from the
-# Docker production host 2026-09-18, where both are deploy-owned. With the service user owning them
-# the first deploy on a Podman host failed at
-#
-#     install: cannot create regular file '/var/iri/code/.docker-compose.yml.tmp': Permission denied
-#
-# They are in basetool_host_deploy_user_dirs below.
 basetool_host_service_user_dirs:
   - secrets
   - monitoring/data
   - monitoring/certs
   - monitoring/secrets
 
-# --- the host half of the monitoring plane -----------------------------------------------------
-# Set to false on a host that is not monitored. It is true by default because the alternative is a
-# host that looks fine and reports nothing.
 basetool_host_manage_observability: true
 
-# node_exporter's textfile collector. Owned by the DEPLOY account, not the service user: deploy.sh
-# writes a metric into it on every tick and could not -- measured 2026-09-18,
-# "/var/iri/monitoring/textfile/ghcr-token.prom.NNN: Permission denied" on a directory owned by
-# iri. The cgroup collector runs as root and is unaffected either way, and node_exporter reads it
-# as `prometheus`, which 0755 allows.
 basetool_host_deploy_user_dirs:
   - monitoring/textfile
-  # The config tree: compose file, monitoring config, edge config, Keycloak theme, and the units
-  # a release delivers. Written by the deployer, read by everything else -- 0755 and not 0750,
-  # because a container reads these through a bind mount as ITS OWN uid, which is a namespace uid
-  # and is in no host group. Group membership cannot help here; world-readable is the mechanism,
-  # and it is what the Docker host has always used.
   - code
-  # The deploy stages the promoted provider JAR here. If it is missing the deploy fails at the LAST
-  # step, after every container is already healthy, which reads like a glitch.
   - code/keycloak/providers
 
-
-# Three packages, from two repositories this role adds. Versions are NOT pinned here: both
-# node-exporter and alloy resolve to exactly the versions docker-compose.monitoring.yml already
-# pins (1.12.1 and 1.19.2, measured 2026-09-18), and a second pin that has to be kept in step with
-# the first is a drift source, not a safeguard. The compose file stays the single place a version
-# is chosen; `dnf` is asked for the package, and the assertion that the two agree belongs in a
-# check, not in a duplicated constant. That check exists since 2026-09-22 (OPS-SEC-06):
-# `check-conformance.py --only host-exporter-versions` compares each host's node_exporter_build_info
-# and alloy_build_info against the compose pins and fails on any difference. A role pin was the
-# rejected alternative -- it would also hold both packages back from dnf-automatic's security fixes.
 basetool_host_observability_packages:
-  - node-exporter                # EPEL 10. Host metrics, the systemd collector, and the textfile
-                                 # collector that deploy.sh and the cgroup collector write into.
-  - alloy                        # rpm.grafana.com. Logs and traces.
-  - prometheus-podman-exporter   # EPEL 10. Per-container state for the rootless containers, which
-                                 # the systemd collector cannot see because they are USER units.
+  - node-exporter
+  - alloy
+  - prometheus-podman-exporter
 
-# Both bind on all interfaces and are kept off the network by the host firewall instead, which is
-# default-deny in the public zone (tasks/65-firewall.yml). Verified 2026-09-18 from off-host: 9100
-# and 9882 refuse, SSH answers -- the control matters, because two closed ports and a broken probe
-# look identical. Binding to a single address is not an option: the containers reach the host over
-# `host.containers.internal`, which resolves to a per-network gateway, and there are eighteen
-# networks.
 basetool_host_node_exporter_listen: ":9100"
-# A LIST, joined into ARGS by the task. systemd's EnvironmentFile parser has no line continuation,
-# so the rendered line is one long one whatever happens -- but the flags are chosen here, one per
-# line, where a reviewer can see each of them and why.
-# Pressure stall information. Rocky compiles PSI in and switches it off (CONFIG_PSI=y with
-# CONFIG_PSI_DEFAULT_DISABLED=y), so /proc/pressure exists only with `psi=1` on the kernel command
-# line -- see 27-observability.yml for what stays dead without it. A variable rather than an
-# unconditional task because the parameter is a boot-time property of the machine and a host that
-# is not ours to reboot should be able to decline it; leaving it true is the supported shape.
 basetool_host_enable_psi: true
 basetool_host_node_exporter_flags:
   - "--collector.systemd"
@@ -221,40 +91,8 @@ basetool_host_node_exporter_flags:
   - "--no-collector.wifi"
   - "--web.listen-address={{ basetool_host_node_exporter_listen }}"
 basetool_host_podman_exporter_listen: ":9882"
-# Every interface, not loopback -- and node-exporter above is why the asymmetry was a bug rather
-# than a choice. Prometheus runs in a CONTAINER and reaches host services through
-# `AddHost=alloy:host-gateway`, which resolves to 169.254.1.2; a listener bound to 127.0.0.1 refuses
-# that connection. Measured on the testing host 2026-09-20: alloy active, its unit aliased
-# correctly, and `wget http://alloy:12345/metrics` from inside prometheus answering
-# "Connection refused (169.254.1.2)" -- so the alloy scrape target was permanently down and
-# LogStreamSilent, LokiIngestSilent and TargetDown all fired off the back of it.
-#
-# The port stays off the network the same way node-exporter's does: firewalld is default-deny and
-# opens 80 and 443 only (65-firewall.yml), which the role asserts rather than assumes.
 basetool_host_alloy_listen: ":12345"
 
-# Memory ceilings for the two host services, and the Go soft limit that keeps each one under its
-# ceiling. Added 2026-09-22: as containers both had a mem_limit and a GOMEMLIMIT in
-# docker-compose.monitoring.yml, and as host services they had neither -- measured on production the
-# day of the cutover, `systemctl show` reported MemoryMax=infinity for both and alloy's Go runtime
-# reported go_gc_gomemlimit_bytes = 9.2e18, i.e. unset. A leak in either one would have had the
-# whole 16 GB host to grow into, alongside the databases.
-#
-# The numbers are the container budgets carried across, re-checked against the host-native reading:
-#   alloy          anon 105 MiB, file 208 MiB (170 MiB of it the mapped binary), peak 329 MiB.
-#                  512M / 360MiB is docker-compose.monitoring.yml's budget -- working set ~= GOMEMLIMIT
-#                  + ~47 MiB of non-Go overhead lands at ~80 % of the limit. The mapped binary is
-#                  clean page cache the kernel reclaims under MemoryMax before it OOM-kills anything.
-#   node-exporter  anon 15 MiB, peak 35 MiB. The container ran at 32M / 24MiB; the host service
-#                  carries the systemd collector reading the system bus as well, so the ceiling is
-#                  doubled rather than copied, and GOMEMLIMIT stays at 75 % of it.
-# The cgroup collector reads both units, so ContainerMemoryHigh, ContainerOomKilled and
-# ContainerPidsHigh watch them under the names `alloy` and `node-exporter`, as they did as containers.
-# The persistent journal's retention (REQ-OBS-010, OPS-PRIV-01). The container stdout of the whole
-# stack is journald's under LogDriver=journald -- the edge access log with every client address among
-# it -- so the journal is held to the same 31 days as the Loki copy. The size cap is journald's own
-# default ceiling (4G) made explicit, so the disk budget is a reviewed number rather than a percentage
-# of whatever filesystem the host happens to have.
 basetool_host_journal_max_retention: "31d"
 basetool_host_journal_max_use: "4G"
 
@@ -263,27 +101,8 @@ basetool_host_alloy_gomemlimit: "360MiB"
 basetool_host_node_exporter_memory_max: "64M"
 basetool_host_node_exporter_gomemlimit: "48MiB"
 
-# Where the HOST-NATIVE alloy finds the log sink and the trace store. It cannot use the names in
-# config.alloy (`loki:3100`, `tempo:4317`): those live on the container network, and rootless Podman
-# keeps that network inside a user namespace with no route in from the host. generate-quadlet.py
-# publishes both on loopback (PODMAN_LOOPBACK_PUBLISH) and these two point at the published ports.
-#
-# config.alloy defaults to the container-network names when these are unset, so the Docker
-# deployment reads the very same file and is unaffected.
-#
-# Tempo is 4327 and not 4317 because alloy itself binds 0.0.0.0:4317 for its own OTLP receiver, and
-# 0.0.0.0 includes loopback -- the two would collide on the host.
-# --- cockpit --------------------------------------------------------------------------------
-# Rocky's server install pulls in the cockpit web console, and its socket binds 0.0.0.0:9090 on
-# every interface. @greluc: not wanted -- the hosts are administered over SSH (see the Production
-# Access runbook) and a second administrative entrance is a second thing to keep patched, watched
-# and reasoned about. Measured 2026-09-21: installed and listening on the testing host (firewalld
-# was the only thing in the way, which is not a reason to keep it), and absent on the migration
-# target, which is the state this makes deliberate rather than incidental.
 basetool_host_remove_cockpit: true
 
-# The set is named rather than globbed: `dnf remove cockpit*` would also take anything a future
-# package happens to prefix that way, and a removal list that can grow on its own is not a list.
 basetool_host_cockpit_packages:
   - cockpit
   - cockpit-bridge
@@ -294,27 +113,12 @@ basetool_host_cockpit_packages:
   - cockpit-ws
   - cockpit-ws-selinux
 
-# --- fail2ban --------------------------------------------------------------------------------
-# Intrusion prevention for SSH, banning through firewalld. Only the sshd jail is enabled; see the
-# jail.local template for why a jail on the edge would be a liability rather than a defence.
 basetool_host_fail2ban_enabled: true
 
-# Never banned. Loopback only by default -- a host administered from a management network adds it
-# in the inventory, because this file has no business knowing any site's addressing. Get this wrong
-# and the jail locks out the only way in.
 basetool_host_fail2ban_ignoreip:
   - 127.0.0.1/8
   - ::1
 
-# Ten failures in ten minutes, banned for an hour, doubling on every repeat up to a week. The
-# escalation is the part that matters: one ban is a typo, the second is a scanner coming back.
-#
-# TEN and not five, and the reason is a self-lockout rather than leniency: `ssh-agent` offers every
-# key it holds, and sshd logs a `Failed publickey` for each one it refuses BEFORE the right key is
-# tried. An administrator with six keys in their agent therefore produces six failures in a single
-# successful login, and at maxretry 5 the second login bans the person holding the correct key. A
-# scanner is not deterred by the difference between five and ten; an administrator locked out of the
-# only way in at 03:40 very much is.
 basetool_host_fail2ban_maxretry: 10
 basetool_host_fail2ban_findtime: 10m
 basetool_host_fail2ban_bantime: 1h
@@ -323,38 +127,16 @@ basetool_host_fail2ban_maxtime: 1w
 basetool_host_alloy_loki_endpoint: "127.0.0.1:3100"
 basetool_host_alloy_tempo_endpoint: "127.0.0.1:4327"
 
-# --- hardening -------------------------------------------------------------------------------------
-# The platform's own content: scap-security-guide ships a cs10 datastream with seventeen profiles.
-# Why cis_server_l1 and not bsi, cis level 2 or stig is measured in tasks/60-hardening.yml -- the
-# short version is that it is the only one of the four without fapolicyd, which would block every
-# rootless container, and its noexec targets do not include /home, where the container storage is.
 basetool_host_hardening_profile: xccdf_org.ssgproject.content_profile_cis_server_l1
-# NOT one hard-coded path. scap-security-guide ships one datastream per distribution, and this
-# migration has already changed platform twice in a day -- a pinned cs10 path was simply wrong on
-# Rocky, which ships ssg-rl10-ds.xml and ssg-rhel10-ds.xml and neither of the other name. The role
-# takes the first candidate that exists; set basetool_host_hardening_datastream to override.
 basetool_host_hardening_datastream_candidates:
-  - /usr/share/xml/scap/ssg/content/ssg-rl10-ds.xml      # Rocky Linux 10
-  - /usr/share/xml/scap/ssg/content/ssg-cs10-ds.xml      # CentOS Stream 10
-  - /usr/share/xml/scap/ssg/content/ssg-rhel10-ds.xml    # RHEL 10, and Rocky's fallback
+  - /usr/share/xml/scap/ssg/content/ssg-rl10-ds.xml
+  - /usr/share/xml/scap/ssg/content/ssg-cs10-ds.xml
+  - /usr/share/xml/scap/ssg/content/ssg-rhel10-ds.xml
   - /usr/share/xml/scap/ssg/content/ssg-almalinux10-ds.xml
 basetool_host_hardening_datastream: ""
 
-# Scanning always happens; remediation does not. Applying a thousand rules to a host is a
-# deliberate act, and the scan report is what makes it an informed one. Set this true on a host you
-# have a snapshot of, and re-run the conformance suite afterwards.
 basetool_host_hardening_remediate: false
 
-# --- what this deployment is actually judged against ----------------------------------------------
-# A benchmark rule tests a MEANS. Occasionally the deployment reaches the same END another way, and
-# then the rule fails forever -- which is read once and is scenery afterwards, along with whatever
-# genuine failure sits beside it. Each entry below deselects one rule AND carries the argument into
-# the tailoring file itself, where oscap cannot lose it and the next reader meets it at the same
-# moment as the rule.
-#
-# Empty means no tailoring file is written and oscap evaluates the upstream profile unchanged.
-#
-# `rule` is the bare rule name; the template prefixes `xccdf_org.ssgproject.content_rule_`.
 basetool_host_hardening_exclusions:
   - rule: service_systemd-journal-upload_enabled
     reason: >-
@@ -369,184 +151,54 @@ basetool_host_hardening_exclusions:
       critical while shipping nothing. Decided 2026-09-20; revisit if journal shipping ever leaves
       alloy.
 
-# A namespace of our own, so a tailored profile id can never collide with an upstream one, and a
-# name that says it is DERIVED from the profile rather than an alternative to it.
 basetool_host_hardening_tailoring_ns: krt.basetool
 basetool_host_hardening_tailored_profile: "xccdf_krt.basetool_profile_{{ basetool_host_hardening_profile | regex_replace('^.*_profile_', '') }}_basetool"
 basetool_host_hardening_tailoring_file: /etc/iri/ssg-tailoring.xml
-# When this set of exclusions was last CHANGED. XCCDF requires a `time` on <version> and oscap
-# enforces it, so it cannot simply be left out -- but rendering "now" into it rewrote the file on
-# every play, which is churn in the one file whose purpose is to record a decision that does not
-# change (measured 2026-09-20: changed=1 forever, with a diff consisting of nothing but the clock).
-#
-# Bump it when you add, remove or reword an exclusion above. Leaving it alone is the correct
-# behaviour for a run that changes nothing, and that is exactly what the attribute is supposed to
-# mean.
 basetool_host_hardening_tailoring_time: "2026-09-20T00:00:00Z"
 
-# --- the L4 front end (ADR-0187) ------------------------------------------------------------------
-# haproxy binds the public ports and hands the edge the client address with PROXY protocol, because
-# rootless port forwarding replaces it. The edge itself publishes on loopback only.
-#
-# basetool_host_edge_trusted_proxies is EVERY address the edge can present the PROXY header from,
-# and it must match the `ip=` the generated unit gives each of the edge's networks one for one.
-# Under rootless Podman the header arrives from the edge's OWN address -- rootlessport dials the
-# container's published port from inside its netns -- and podman chooses WHICH of the container's
-# networks that address comes from. Without a pin the address also moves between recreations, so
-# both halves are needed: pinned so it cannot drift, and all of them named because the choice
-# between them is not ours to make.
-#
-# Naming one was tried first and is not enough. Measured on the production host 2026-09-22, three
-# recreations with nothing else changed: the peer appeared on net-proxy-frontend, then
-# net-proxy-grafana, then net-proxy-api. Pinning one network only moves the choice to the next.
-#
-# What the gap cost while only net-edge-ingress was pinned: set_real_ip_from never matched, nginx
-# threw the PROXY header away and fell back to the TCP peer, and the edge logged EVERY request from
-# one bridge address -- 2340 in ten minutes. One rate-limit bucket for the whole internet and every
-# allow-list keyed on it, which is the 2026-07-20 outage's shape by another road.
-#
-# A LIST is not a relaxation of ADR-0187. Its rule is "name the address, never a prefix", and six
-# named addresses are no more a range than one is -- each is the edge itself, none is reachable by
-# anybody else. The assert below still refuses a prefix, per entry.
 basetool_host_edge_trusted_proxies:
-  - "172.28.15.10"   # net-edge-ingress
-  - "172.28.3.250"   # net-proxy-frontend
-  - "172.28.4.250"   # net-proxy-keycloak
-  - "172.28.7.250"   # net-proxy-ingest
-  - "172.28.11.250"  # net-proxy-grafana
-  - "172.28.13.250"  # net-proxy-api
+  - "172.28.15.10"
+  - "172.28.3.250"
+  - "172.28.4.250"
+  - "172.28.7.250"
+  - "172.28.11.250"
+  - "172.28.13.250"
 basetool_host_edge_loopback_ports: [8080, 8443]
 basetool_host_frontend_ports:
   - {public: 80, backend: 8080}
   - {public: 443, backend: 8443}
 basetool_host_frontend_maxconn: 4096
 basetool_host_frontend_timeout_connect: 5s
-# Generous on the client side: an SSE stream through the edge is a long-lived connection, and the
-# front end must not be the thing that cuts it. The edge's own keepalive governs the rest.
 basetool_host_frontend_timeout_client: 15m
 basetool_host_frontend_timeout_server: 15m
 basetool_host_manage_frontend: true
 
-# --- the public-name alias for the application containers ------------------------------------------
-# A container has to reach this host's OWN public names from the inside -- the frontend discovers
-# the OIDC issuer over `https://<public>/auth/realms/iri`, Grafana exchanges its OAuth code at the
-# same origin, and the blackbox exporter probes all four vhosts.
-#
-# EVERY rootless host needs this, production included, and the line that used to say otherwise is
-# the reason it is spelled out at length here. A container on this platform cannot reach the
-# machine through its own public address at all: the container networks live inside the service
-# user's network namespace and outbound leaves through pasta, which does not fold a connection to
-# the host's own address back into the host. Measured on the production host 2026-09-22 -- ports
-# 22, 80 and 443 on its public IPv4 all refused from inside a container, and its public IPv6
-# likewise, while the same ports on `host-gateway` answered. Under Docker the hairpin worked, so
-# the default was empty and nobody had cause to doubt it; on cutover day it cost the backend its
-# startup, Grafana its sign-in and every external probe its result, in three separate
-# investigations before the common cause was visible.
-#
-# A LIST of `hostname:ip` entries, one per AddHost line, since 2026-09-22. One entry was not
-# enough: the blackbox exporter probes four public names and a single alias left three of them
-# resolving to an address no container can reach. `host-gateway` is a legal value and the better
-# one -- podman resolves it itself, and the generator already emits `AddHost=alloy:host-gateway`
-# for the host-native Alloy.
-#
-# The FIRST entry must MATCH IRI_KEYCLOAK_HOST_ALIAS in the host `.env` --
-# `scripts/check-conformance.py` compares the two and fails when they disagree silently, which is
-# the whole reason that check exists.
-#
-# Empty means "write no drop-in and remove any this role wrote", so clearing the variable actually
-# clears the alias instead of leaving a stale one behind.
 basetool_host_public_name_aliases: []
-# The same names again, pointed at the address pasta maps to this host over IPv6 (see
-# basetool_host_pasta_map_guest_addrs). Separate from the list above because only a container with
-# an IPv6 route can use them, and because an AAAA record in a container that has none is a resolver
-# trap: Go sorts a reachable IPv4 behind an unreachable IPv6 often enough that it has already cost
-# this deployment a day. Empty means the v6 half is simply not written.
 basetool_host_public_name_aliases_v6: []
-# The services whose containers need it. The three JVM modules resolve the issuer; grafana's OAuth
-# token exchange is a back-channel call to the same origin; blackbox-exporter dials all four public
-# names. The generator emits `AddHost=` for the first three (their compose templates carry
-# `extra_hosts`); the last two get it only from this drop-in, which is why they were missing.
 basetool_host_public_name_alias_services:
   - backend
   - frontend
   - ingest
   - grafana
   - blackbox-exporter
-# Which of them also get the IPv6 half. ONLY services that are on an IPv6-capable network: the
-# exporter is, on net-blackbox-v6, and nothing else is. Adding a service here that has no v6 route
-# gives its resolver an address it cannot use.
 basetool_host_public_name_alias_v6_services:
   - blackbox-exporter
 
-# --- the addresses pasta translates back to this host ----------------------------------------------
-# Podman starts the rootless netns pasta with `--map-guest-addr 169.254.1.2`, which is what
-# `host-gateway` resolves to and the whole mechanism ADR-0196 relies on. It REPLACES that argument
-# with whatever `pasta_options` says rather than appending to it -- measured on the testing host
-# 2026-09-22, where setting only a v6 mapping took `host-gateway` from open to unreachable. So the
-# IPv4 entry is restated here on purpose: dropping it breaks every alias at once.
-#
-# The v6 entry is what makes the IPv6 blackbox probes possible at all. It is a ULA chosen to read as
-# the v6 twin of the v4 one, and it must not overlap any network in the stack (fd00:bb::/64,
-# fd00:28:*::/64 are taken).
 basetool_host_pasta_map_guest_addrs:
   - "169.254.1.2"
   - "fd00:169:254::2"
 
-# --- a JVM truststore for a privately-signed edge --------------------------------------------------
-# A non-production host reaches its own public name through an edge holding a certificate from a
-# PRIVATE CA. The name resolving (basetool_host_public_name_aliases, above) only gets the JVM as far
-# as the handshake; it then fails PKIX path building, because the public CA bundle inside the image
-# does not contain that CA. Measured on the testing host 2026-09-20 -- the frontend reached the
-# issuer and still would not start.
-#
-# Host path of a PKCS#12 truststore carrying that CA (and, normally, the public roots too, so the
-# JVM does not lose its ordinary trust). Empty means no drop-in, which is right for production: its
-# edge certificate is publicly signed.
-#
-# The container sees it at /run/secrets/jvm-truststore.p12 -- a SECOND destination, deliberately not
-# the existing /run/secrets/truststore.p12. Measured the same day: a drop-in Volume= APPENDS to the
-# unit's list, so re-using an existing destination gives podman two mounts on one path and it
-# refuses to start the container. Overriding would mean restating the unit's whole volume list in
-# the drop-in, which drifts on the next release.
-#
-# The JVM is pointed at it by IRI_EXTRA_JAVA_OPTS in the host .env, which is RENDERED into
-# JAVA_TOOL_OPTIONS on the host rather than baked into the unit -- so that half already works:
-#
-#   IRI_EXTRA_JAVA_OPTS=-Djavax.net.ssl.trustStore=/run/secrets/jvm-truststore.p12
-#                       -Djavax.net.ssl.trustStorePassword=... -Djavax.net.ssl.trustStoreType=PKCS12
 basetool_host_jvm_truststore_path: ""
-# Where the container sees it. A constant rather than a knob: the .env line above has to name the
-# same path, and two places to change is one too many.
 basetool_host_jvm_truststore_dest: /run/secrets/jvm-truststore.p12
-# Its own list, and deliberately not basetool_host_public_name_alias_services. The two coincided
-# until 2026-09-22, when the alias list grew to include grafana and blackbox-exporter -- neither of
-# which is a JVM. One shared list would have mounted a Java truststore into a Go process: inert,
-# and a lie in the unit about what the container is.
 basetool_host_jvm_truststore_services:
   - backend
   - frontend
   - ingest
 
-# --- the host firewall ----------------------------------------------------------------------------
-# Default-deny in front of a host that publishes two ports to the internet is straightforwardly
-# right, and the CIS profile installs firewalld regardless. Set this false only on a host whose
-# packet filtering genuinely lives somewhere else -- and then say where.
 basetool_host_manage_firewall: true
 
-# --- unattended security updates (OPS-SEC-01, REQ-OPS-032) ------------------------------------------
-# dnf-automatic, SECURITY ADVISORIES ONLY, applied without a person. The retired Ubuntu host had
-# unattended-upgrades; this host had nothing until 2026-09-22, so the kernel, openssh, haproxy, glibc
-# and the host-native node_exporter and alloy were patched only when somebody remembered to.
-# Set false only on a host whose patching genuinely happens elsewhere -- and then say where.
 basetool_host_manage_updates: true
 
-# The container runtime is EXCLUDED, by the owner's decision of 2026-09-22. A podman, crun, conmon,
-# netavark, aardvark-dns, containers-common or passt (pasta) update changes how every container on
-# the host starts, and this stack's behaviour has been measured release by release (the pasta
-# forwarder, the log driver default, the Quadlet keys the generator relies on). Those move on a
-# deliberate, tested maintenance -- on the testing host first -- never at 07:00 on their own.
-# `dnf` treats each entry as a glob, so `podman-*` covers podman-docker and podman-remote without
-# touching prometheus-podman-exporter.
 basetool_host_updates_exclude:
   - podman
   - podman-*
@@ -559,10 +211,5 @@ basetool_host_updates_exclude:
   - passt
   - passt-*
 
-# When the timer fires, host-local time. AWAY from everything that stops or reads the stack: the
-# backup quiesces the writers from 04:15 for up to an hour, the restore drill runs Sunday 05:30, the
-# weekly cleanup Saturday 02:00 UTC and the certificate collector 03:40. Nothing in the security set
-# restarts a container (the runtime is excluded above), and deploy.sh never calls dnf, so the
-# five-minute deploy ticks cannot collide with it.
 basetool_host_updates_on_calendar: "*-*-* 07:00:00"
 basetool_host_updates_randomized_delay: "15min"

@@ -74,8 +74,6 @@ class ShipTypeControllerTest {
 
     assertEquals(1, resp.totalElements());
     assertSame(dto, resp.content().getFirst());
-    // Note: the list endpoint uses `shipTypeToDto`, NOT `toDto`. A regression
-    // could accidentally serialise as the bigger ShipDto.
     verify(mapper).shipTypeToDto(entity);
   }
 

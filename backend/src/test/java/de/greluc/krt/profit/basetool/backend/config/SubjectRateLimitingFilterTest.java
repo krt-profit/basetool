@@ -143,8 +143,6 @@ class SubjectRateLimitingFilterTest {
 
   @Test
   void differentSubjectsDoNotShareABucket() throws Exception {
-    // The whole point of keying on the identity: one member exhausting their budget must not
-    // throttle another, which is exactly what a shared per-IP bucket does behind CGNAT.
     authenticateAs("member-a");
     assertEquals(200, send("POST", "/api/v1/missions").getStatus());
     assertEquals(429, send("POST", "/api/v1/missions").getStatus());
@@ -173,7 +171,6 @@ class SubjectRateLimitingFilterTest {
 
   @Test
   void anEncodedSpellingCannotShedTheBudget() throws Exception {
-    // REQ-SEC-029: the scope is decided on the decoded path, so /%61pi/... is still an API write.
     authenticateAs("member-a");
 
     assertEquals(200, send("POST", "/%61pi/v1/missions").getStatus());
@@ -182,8 +179,6 @@ class SubjectRateLimitingFilterTest {
 
   @Test
   void anonymousCallersPassThrough() throws Exception {
-    // They carry no subject to key on; the per-IP limiter and the anonymous page-size ceiling
-    // (REQ-SEC-032) are their bounds.
     for (int i = 0; i < 5; i++) {
       assertEquals(200, send("POST", "/api/v1/orders/items").getStatus());
     }
@@ -234,7 +229,6 @@ class SubjectRateLimitingFilterTest {
     filter = newFilter();
   }
 
-  // covers REQ-SEC-033 export carve-out (APPSEC-10)
   @Test
   @DisplayName("an export beyond the export budget is refused although it is a GET")
   void exportsBeyondTheExportBudgetAreRefused() throws Exception {
@@ -256,7 +250,6 @@ class SubjectRateLimitingFilterTest {
 
   @Test
   void everyExportFamilyIsCovered() throws Exception {
-    // One token each: every family must spend from the budget, so the second call of each refuses.
     config.put("subject.export.capacity", 1);
     config.put("subject.export.refill-tokens", 1);
     config.put("subject.export.refill-period", "10m");
@@ -280,7 +273,6 @@ class SubjectRateLimitingFilterTest {
 
   @Test
   void exportsAndWritesDoNotShareABucket() throws Exception {
-    // A burst of downloads must not cost the account its writes, and the reverse.
     withExportBudgetOfTwo();
     authenticateAs("member-a");
 
@@ -297,11 +289,8 @@ class SubjectRateLimitingFilterTest {
     withExportBudgetOfTwo();
     authenticateAs("member-a");
 
-    // The preview spends the one write token and one of the two export tokens.
     assertEquals(200, send("POST", "/api/v1/orders/o/handovers/report/preview").getStatus());
-    // The write bucket is now empty, so a plain write is refused ...
     assertEquals(429, send("POST", "/api/v1/missions").getStatus());
-    // ... while a GET export still has its second token.
     assertEquals(200, send("GET", "/api/v1/users/me/export").getStatus());
   }
 
@@ -318,7 +307,6 @@ class SubjectRateLimitingFilterTest {
 
   @Test
   void anEncodedExportSpellingCannotShedTheExportBudget() throws Exception {
-    // REQ-SEC-029: the segment is compared decoded, so %65xport is still `export`.
     withExportBudgetOfTwo();
     authenticateAs("member-a");
 

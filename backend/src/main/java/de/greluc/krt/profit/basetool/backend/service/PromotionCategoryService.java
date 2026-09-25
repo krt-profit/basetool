@@ -161,10 +161,6 @@ public class PromotionCategoryService {
         topic.getName() + " / " + saved.getName(),
         null,
         null);
-    // The name is admin-entered free text and reaches the log verbatim, so it goes through LogSafe:
-    // an embedded newline plus a fake level prefix would otherwise read as a second, forged log
-    // line
-    // during triage (CWE-117). 120 mirrors the DTO's @Size(MAX_SHORT_NAME).
     log.info(
         "Created PromotionCategory id={} name={}",
         saved.getId(),

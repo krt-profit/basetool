@@ -124,12 +124,6 @@ public class OrgUnitBankResponsibilityService {
               : orgUnitMembershipRepository.findUserIdsByOrgUnitAndRole(
                   owner, MembershipRole.BEREICHSLEITER);
       case CARTEL ->
-          // REQ-BANK-047/ADR-0109: the KRT account's responsible holders are the OL members (the
-          // collegial owner and the top-band approver). The middle band now routes to the
-          // Bankleitung (BANK_MANAGEMENT) — a Keycloak realm role, not an org-unit membership, so
-          // it is not enumerable via this membership-based seam; the Bankleitung instead picks the
-          // request up in the bank-staff queue (/bank/requests, reachable via BANK_MANAGEMENT >
-          // BANK_EMPLOYEE) and the requester notifies them directly.
           owner == null
               ? Set.of()
               : orgUnitMembershipRepository.findUserIdsByOrgUnitAndRole(
@@ -148,7 +142,6 @@ public class OrgUnitBankResponsibilityService {
    */
   @NotNull
   private Set<UUID> resolveCartelBankResponsibleHolders() {
-    // One statement for every Profit Bereich at once rather than one per Bereich (REQ-DATA-003).
     List<UUID> profitBereichIds =
         bereichRepository.findByDepartment(Department.PROFIT).stream().map(Bereich::getId).toList();
     if (profitBereichIds.isEmpty()) {

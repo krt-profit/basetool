@@ -103,11 +103,11 @@ class MissionTimelineCreateSeedTest {
 
     List<MissionObjective> ordered = orderedObjectives();
     assertEquals(2, ordered.size());
-    assertEquals("Erz sichern", ordered.get(0).getTitle()); // trimmed
+    assertEquals("Erz sichern", ordered.get(0).getTitle());
     assertEquals(MissionObjectiveKind.PRIMARY, ordered.get(0).getKind());
     assertEquals(0, ordered.get(0).getOrderIndex());
     assertEquals(1, ordered.get(1).getOrderIndex());
-    assertEquals(versionBefore, mission.getObjectivesVersion()); // never bumped at create
+    assertEquals(versionBefore, mission.getObjectivesVersion());
     verify(missionObjectiveRepository, times(2)).save(any(MissionObjective.class));
     verify(missionRepository, never()).findById(any());
     verify(auditService, times(2))
@@ -127,11 +127,11 @@ class MissionTimelineCreateSeedTest {
 
     List<MissionStep> ordered = orderedSteps();
     assertEquals(1, ordered.size());
-    assertEquals("Briefing", ordered.get(0).getTitle()); // trimmed
-    assertEquals("TS 20:00", ordered.get(0).getMeta()); // normalized / trimmed
+    assertEquals("Briefing", ordered.get(0).getTitle());
+    assertEquals("TS 20:00", ordered.get(0).getMeta());
     assertEquals(0, ordered.get(0).getOrderIndex());
     assertFalse(ordered.get(0).isDone());
-    assertEquals(versionBefore, mission.getStepsVersion()); // never bumped at create
+    assertEquals(versionBefore, mission.getStepsVersion());
     verify(missionStepRepository).save(any(MissionStep.class));
     verify(missionRepository, never()).findById(any());
     verify(auditService)
@@ -157,8 +157,8 @@ class MissionTimelineCreateSeedTest {
             any(),
             isNull(),
             goalDetails.capture());
-    assertTrue(goalDetails.getValue().toString().contains("PRIMARY")); // kind is allowed
-    assertFalse(goalDetails.getValue().toString().contains("SECRET")); // title must not leak
+    assertTrue(goalDetails.getValue().toString().contains("PRIMARY"));
+    assertFalse(goalDetails.getValue().toString().contains("SECRET"));
 
     ArgumentCaptor<CharSequence> stepDetails = ArgumentCaptor.forClass(CharSequence.class);
     verify(auditService)
@@ -168,6 +168,6 @@ class MissionTimelineCreateSeedTest {
             any(),
             isNull(),
             stepDetails.capture());
-    assertFalse(stepDetails.getValue().toString().contains("SECRET")); // title must not leak
+    assertFalse(stepDetails.getValue().toString().contains("SECRET"));
   }
 }

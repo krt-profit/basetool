@@ -128,8 +128,6 @@ class LeitungPageControllerMvcTest {
         .thenReturn(new LeitungViewDto(false, List.of(), List.of(), List.of(), List.of(sk)));
   }
 
-  // An SK lead (roster cap only) gets the link to the SK member page and no lead toggle — the
-  // lead seat is appointed from the tier above, never from within the SK.
   @Test
   @WithMockUser(roles = "OFFICER")
   void page_skLead_linksToMemberPageWithoutLeadToggle() throws Exception {
@@ -145,8 +143,6 @@ class LeitungPageControllerMvcTest {
         .andExpect(content().string(not(containsString("toggle-sk-lead"))));
   }
 
-  // A Bereichsleiter who does not lead the SK (lead cap only) keeps the lead toggle and gets no
-  // member-page link.
   @Test
   @WithMockUser(roles = "OFFICER")
   void page_bereichsleiter_keepsLeadToggleWithoutMemberPageLink() throws Exception {
@@ -178,9 +174,6 @@ class LeitungPageControllerMvcTest {
     mockMvc.perform(get("/organisation/leitung")).andExpect(status().isForbidden());
   }
 
-  // The whole Leitung surface is gated, not just the GET: the write proxies carry the same
-  // Roles.ADMIN_OR_OFFICER, so an officer's appointment write relays to the backend (200) while a
-  // logistician is forbidden before any backend call.
   @Test
   @WithMockUser(roles = "OFFICER")
   void assignSquadronRank_officer_returns200() throws Exception {

@@ -102,17 +102,11 @@ public class BankGrantsPageController {
     List<BankGrantDto> allGrants =
         backendApiClient.get("/api/v1/bank/grants", BANK_GRANT_LIST_TYPE);
 
-    // The per-employee selector lists every grantee that currently holds at least one grant.
     Map<UUID, String> grantees = new LinkedHashMap<>();
     for (BankGrantDto grant : allGrants == null ? List.<BankGrantDto>of() : allGrants) {
       grantees.putIfAbsent(grant.userId(), grant.userHandle());
     }
 
-    // The per-account filter and the create modal's account picker are server-side account-search
-    // comboboxes (remote-bank-accounts, REQ-FE-017/ADR-0106), so the full account roster is no
-    // longer preloaded. Only the currently-filtered account is resolved for the combobox's
-    // edit-mode seed (so the box shows its name, not a raw id); a lookup failure degrades to no
-    // seed (the filter then shows its "all accounts" placeholder).
     BankAccountDto selectedAccount = null;
     if (!byEmployee && accountId != null) {
       try {

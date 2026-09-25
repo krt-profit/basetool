@@ -80,7 +80,6 @@ public class ProfitCalculationPageController {
   public String showProfitCalculationPage(Model model) {
     log.debug("Showing profit calculation page");
     try {
-      // Fetch ship types for the dropdown
       PageResponse<ShipTypeDto> shipTypesPage =
           backendApiClient.getCached(CachedCatalog.SHIP_TYPES_SORTED, SHIP_TYPE_PAGE_TYPE);
 
@@ -93,13 +92,11 @@ public class ProfitCalculationPageController {
 
       model.addAttribute("shipTypes", shipTypes);
 
-      // Set C2 as default ship if present
       shipTypes.stream()
           .filter(s -> s.name().contains("C2 Hercules Starlifter"))
           .findFirst()
           .ifPresent(c2 -> model.addAttribute("defaultShipId", c2.id()));
 
-      // Fetch terminals to get unique star systems
       PageResponse<Map<String, Object>> terminalsPage =
           backendApiClient.getCached(CachedCatalog.TERMINALS, TERMINAL_PAGE_TYPE);
 

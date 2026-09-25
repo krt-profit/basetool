@@ -70,8 +70,6 @@ class InventoryPageControllerTest {
   @BeforeEach
   void setUp() {
     backendApiClient = mock(BackendApiClient.class);
-    // The real hierarchy, not a mock: the point of resolving through it is that ADMIN and
-    // OFFICER reach LOGISTICIAN without being listed, and a stub would assert nothing.
     controller = new InventoryPageController(backendApiClient, PARALLEL, ROLE_HIERARCHY);
     writeController = new InventoryWriteController(backendApiClient, controller);
   }
@@ -104,16 +102,13 @@ class InventoryPageControllerTest {
 
   @Test
   void viewAggregatedInventory_fragmentResults_returnsResultsFragmentSelector() {
-    // Given — an AJAX swap request (fragment=results) for in-place pagination (#573).
     Model model = new ConcurrentModel();
     PageResponse<AggregatedInventoryDto> page =
         new PageResponse<>(List.of(), 0, 1, 0, 1, Collections.emptyList());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
 
-    // When
     String view = controller.viewAggregatedInventory(null, null, null, "results", model);
 
-    // Then — only the results fragment is rendered, not the full page.
     assertEquals("inventory-index :: inventoryResults", view);
   }
 
@@ -129,8 +124,6 @@ class InventoryPageControllerTest {
 
     assertEquals("inventory-material", view);
     assertTrue(model.containsAttribute("items"));
-    // REQ-INV-033: the drilldown is paginated — the PageResponse and the size options must reach
-    // the template so the pager + size picker render inside the results fragment.
     assertSame(page, model.getAttribute("inventoryMaterialPage"));
     assertEquals(List.of(50, 100, 200), model.getAttribute("pageSizes"));
     assertEquals(materialId, model.getAttribute("selectedMaterialId"));
@@ -138,35 +131,28 @@ class InventoryPageControllerTest {
 
   @Test
   void viewMaterialInventory_forwardsPageAndWhitelistedSizeToBackend() {
-    // Given
     Model model = new ConcurrentModel();
     UUID materialId = UUID.randomUUID();
     PageResponse<InventoryItemDto> page =
         new PageResponse<>(List.of(), 3, 100, 350, 4, Collections.emptyList());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
 
-    // When — the pager asks for page 3 with a whitelisted size.
     controller.viewMaterialInventory(materialId, 3, 100, null, model);
 
-    // Then — both reach the backend verbatim (REQ-INV-033).
     verify(backendApiClient)
         .get(eq("/api/v1/inventory/material/" + materialId + "?page=3&size=100"), anyTypeRef());
   }
 
   @Test
   void viewMaterialInventory_snapsOutOfListSizeBackToDefault() {
-    // Given
     Model model = new ConcurrentModel();
     UUID materialId = UUID.randomUUID();
     PageResponse<InventoryItemDto> page =
         new PageResponse<>(List.of(), 0, 50, 0, 1, Collections.emptyList());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
 
-    // When — a crafted URL asks for the pre-REQ-INV-033 silent-cap size and a negative page.
     controller.viewMaterialInventory(materialId, -1, 1000, null, model);
 
-    // Then — the size snaps back to the default and the page clamps to 0, so a crafted URL can
-    // never request an unbounded page from the backend again.
     verify(backendApiClient)
         .get(eq("/api/v1/inventory/material/" + materialId + "?page=0&size=50"), anyTypeRef());
   }
@@ -179,13 +165,9 @@ class InventoryPageControllerTest {
         new PageResponse<>(List.of(), 1, 50, 120, 3, Collections.emptyList());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
 
-    // #1309 / REQ-FE-005: the live-sync receiver and the pager re-fetch ?fragment=results, which
-    // renders only the results table, not the whole page.
     String view = controller.viewMaterialInventory(materialId, 1, null, "results", model);
 
     assertEquals("inventory-material :: inventoryMaterialResults", view);
-    // Fragment-gating (REQ-DATA-012 rule): the swap needs only the items page — the material
-    // switcher catalog renders outside the fragment and must not be re-fetched per page click.
     verify(backendApiClient, never()).getCached(any(), anyTypeRef());
     verify(backendApiClient, times(1)).get(anyString(), anyTypeRef());
   }
@@ -202,7 +184,6 @@ class InventoryPageControllerTest {
 
     assertEquals("inventory-game-item", view);
     assertTrue(model.containsAttribute("items"));
-    // REQ-INV-033: the item drilldown paginates exactly like the material sibling.
     assertSame(page, model.getAttribute("inventoryGameItemPage"));
     assertEquals(List.of(50, 100, 200), model.getAttribute("pageSizes"));
     assertEquals(gameItemId, model.getAttribute("selectedGameItemId"));
@@ -218,8 +199,6 @@ class InventoryPageControllerTest {
         new PageResponse<>(List.of(), 0, 50, 0, 1, Collections.emptyList());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
 
-    // Crafted 1000-size + fragment=results: the size snaps to the default and only the results
-    // fragment renders (live-sync / pager swap, REQ-FE-015).
     String view = controller.viewGameItemInventory(gameItemId, null, 1000, "results", model);
 
     assertEquals("inventory-game-item :: inventoryGameItemResults", view);
@@ -229,8 +208,6 @@ class InventoryPageControllerTest {
 
   @Test
   void viewMaterialInventory_clampsOutOfRangePageToLastPage() {
-    // Given — a stale deep-link (or a peer's book-out) left the URL on page 5 while the material
-    // now holds a single page of 40 rows.
     Model model = new ConcurrentModel();
     UUID materialId = UUID.randomUUID();
     String base = "/api/v1/inventory/material/" + materialId;
@@ -241,11 +218,8 @@ class InventoryPageControllerTest {
     when(backendApiClient.get(eq(base + "?page=5&size=50"), anyTypeRef())).thenReturn(overrun);
     when(backendApiClient.get(eq(base + "?page=0&size=50"), anyTypeRef())).thenReturn(lastPage);
 
-    // When
     controller.viewMaterialInventory(materialId, 5, null, null, model);
 
-    // Then — the overrun page is clamped to the last page so the viewer sees real rows + a usable
-    // pager instead of an empty stranded table (REQ-INV-033).
     assertSame(lastPage, model.getAttribute("inventoryMaterialPage"));
     verify(backendApiClient).get(eq(base + "?page=5&size=50"), anyTypeRef());
     verify(backendApiClient).get(eq(base + "?page=0&size=50"), anyTypeRef());
@@ -253,23 +227,19 @@ class InventoryPageControllerTest {
 
   @Test
   void viewMaterialInventory_doesNotClampAGenuinelyEmptyMaterial() {
-    // Given — the material truly has no stock: an empty page 0 must NOT trigger a clamp re-fetch.
     Model model = new ConcurrentModel();
     UUID materialId = UUID.randomUUID();
     PageResponse<InventoryItemDto> empty =
         new PageResponse<>(List.of(), 0, 50, 0, 0, Collections.emptyList());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(empty);
 
-    // When
     controller.viewMaterialInventory(materialId, 0, null, null, model);
 
-    // Then — exactly one fetch; the empty-state row renders (no pager) with no wasted round-trip.
     verify(backendApiClient, times(1)).get(anyString(), anyTypeRef());
   }
 
   @Test
   void viewGameItemInventory_clampsOverrunPageAndResolvesTitleFromLastPage() {
-    // Given — the item drilldown URL overran to page 3 while the item now holds one page of rows.
     Model model = new ConcurrentModel();
     UUID gameItemId = UUID.randomUUID();
     String base = "/api/v1/inventory/game-item/" + gameItemId;
@@ -299,11 +269,8 @@ class InventoryPageControllerTest {
     when(backendApiClient.get(eq(base + "?page=3&size=50"), anyTypeRef())).thenReturn(overrun);
     when(backendApiClient.get(eq(base + "?page=0&size=50"), anyTypeRef())).thenReturn(lastPage);
 
-    // When
     controller.viewGameItemInventory(gameItemId, 3, null, null, model);
 
-    // Then — the clamped page carries rows, so the drilldown shows stock (and its title resolves)
-    // instead of a stranded empty table with a vanished header (REQ-INV-033).
     assertSame(lastPage, model.getAttribute("inventoryGameItemPage"));
     assertEquals("Quantum Drive", model.getAttribute("gameItemName"));
   }
@@ -326,7 +293,6 @@ class InventoryPageControllerTest {
 
   @Test
   void viewMyInventory_shouldForwardMaterialAndMinQualityFiltersToBackend() {
-    // Given
     Model model = new ConcurrentModel();
     PageResponse<InventoryItemDto> page =
         new PageResponse<>(List.of(), 0, 1, 0, 1, Collections.emptyList());
@@ -334,7 +300,6 @@ class InventoryPageControllerTest {
     UUID materialId = UUID.randomUUID();
     UUID jobOrderId = UUID.randomUUID();
 
-    // When
     String view =
         controller.viewMyInventory(
             null,
@@ -349,7 +314,6 @@ class InventoryPageControllerTest {
             false,
             model);
 
-    // Then
     assertEquals("inventory-my", view);
     assertEquals(List.of(materialId), model.getAttribute("selectedMaterialIds"));
     assertEquals(500, model.getAttribute("selectedMinQuality"));
@@ -372,16 +336,13 @@ class InventoryPageControllerTest {
 
   @Test
   void viewMyInventory_personalOnly_forwardsFlagToBackendAndModel() {
-    // Given
     Model model = new ConcurrentModel();
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(List.of());
 
-    // When
     String view =
         controller.viewMyInventory(
             null, null, null, null, null, null, null, true, false, false, model);
 
-    // Then
     assertEquals("inventory-my", view);
     assertEquals(true, model.getAttribute("selectedPersonalOnly"));
     org.mockito.ArgumentCaptor<String> urlCaptor =
@@ -399,16 +360,13 @@ class InventoryPageControllerTest {
 
   @Test
   void viewMyInventory_nonPersonalOnly_forwardsFlagToBackendAndModel() {
-    // Given
     Model model = new ConcurrentModel();
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(List.of());
 
-    // When
     String view =
         controller.viewMyInventory(
             null, null, null, null, null, null, null, false, true, false, model);
 
-    // Then
     assertEquals("inventory-my", view);
     assertEquals(true, model.getAttribute("selectedNonPersonalOnly"));
     org.mockito.ArgumentCaptor<String> urlCaptor =
@@ -427,38 +385,30 @@ class InventoryPageControllerTest {
 
   @Test
   void viewMyInventory_shouldReturnFragmentWhenRequested() {
-    // Given
     Model model = new ConcurrentModel();
     PageResponse<InventoryItemDto> page =
         new PageResponse<>(List.of(), 0, 1, 0, 1, Collections.emptyList());
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(page);
 
-    // When
     String view =
         controller.viewMyInventory(
             null, null, null, null, null, null, null, false, false, true, model);
 
-    // Then
     assertEquals("inventory-my :: inventoryTableFragment", view);
   }
 
-  // ── /inventory/my/entry-ids (select-all proxy, REQ-INV-034) ───────────
-
   @Test
   void myEntryIds_material_forwardsFiltersAndReturnsIds() {
-    // Given
     UUID materialId = UUID.randomUUID();
     UUID jobOrderId = UUID.randomUUID();
     UUID entryA = UUID.randomUUID();
     UUID entryB = UUID.randomUUID();
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(List.of(entryA, entryB));
 
-    // When (material view: no view param)
     List<UUID> ids =
         controller.myEntryIds(
             null, List.of(materialId), 500, List.of(jobOrderId), null, null, null, false, false);
 
-    // Then
     assertEquals(List.of(entryA, entryB), ids);
     org.mockito.ArgumentCaptor<String> urlCaptor =
         org.mockito.ArgumentCaptor.forClass(String.class);
@@ -475,17 +425,14 @@ class InventoryPageControllerTest {
 
   @Test
   void myEntryIds_itemsView_relaysCatalogItemAndGameItemFilters() {
-    // Given
     UUID gameItemId = UUID.randomUUID();
     UUID entry = UUID.randomUUID();
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(List.of(entry));
 
-    // When (items view)
     List<UUID> ids =
         controller.myEntryIds(
             "items", null, null, null, null, List.of(gameItemId), null, true, false);
 
-    // Then
     assertEquals(List.of(entry), ids);
     org.mockito.ArgumentCaptor<String> urlCaptor =
         org.mockito.ArgumentCaptor.forClass(String.class);
@@ -498,10 +445,8 @@ class InventoryPageControllerTest {
 
   @Test
   void myEntryIds_nullBackendResult_returnsEmptyList() {
-    // Given a backend that yields no body
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(null);
 
-    // When / Then: never null, so the select-all JS just selects nothing
     assertEquals(
         List.of(), controller.myEntryIds(null, null, null, null, null, null, null, false, false));
   }
@@ -581,9 +526,6 @@ class InventoryPageControllerTest {
         writeController.addInventoryItem(
             form, bindingResult, new ConcurrentModel(), redirectAttributes);
 
-    // After the render-instead-redirect refactor a validation error renders the
-    // input view inline rather than redirecting; BindingResult stays request-scoped
-    // (see RedisSessionConfig — no more self-referencing flash attribute).
     assertEquals("inventory-input", view);
   }
 
@@ -689,9 +631,6 @@ class InventoryPageControllerTest {
         writeController.bookOutInventoryItem(
             id, form, bindingResult, renderModel, redirectAttributes, referer);
 
-    // After the render-instead-redirect refactor a validation error during book-out
-    // re-renders the originating listing (admin variant here) inline; the URL filters
-    // are not re-applied, the errorToast lives on the request-scoped Model instead.
     assertEquals("inventory-admin", view);
     assertEquals("error.validation.failed", renderModel.getAttribute("errorToast"));
     assertEquals(id, renderModel.getAttribute("showBookOutModal"));
@@ -721,7 +660,6 @@ class InventoryPageControllerTest {
 
   @Test
   void updateInventoryItemNote_shouldReturnOkWithUpdatedDtoOnSuccess() {
-    // Given
     UUID id = UUID.randomUUID();
     InventoryItemNoteUpdateRequest request = new InventoryItemNoteUpdateRequest("hello", 1L);
     InventoryItemDto updated =
@@ -747,18 +685,15 @@ class InventoryPageControllerTest {
             eq("/api/v1/inventory/" + id + "/note"), eq(request), eq(InventoryItemDto.class)))
         .thenReturn(updated);
 
-    // When
     org.springframework.http.ResponseEntity<InventoryItemDto> response =
         writeController.updateInventoryItemNote(id, request);
 
-    // Then
     assertEquals(200, response.getStatusCode().value());
     assertSame(updated, response.getBody());
   }
 
   @Test
   void updateInventoryItemNote_shouldPropagate409FromBackendServiceException() {
-    // Given: backend returned 409 CONFLICT (wrapped in BackendServiceException by BackendApiClient)
     UUID id = UUID.randomUUID();
     InventoryItemNoteUpdateRequest request = new InventoryItemNoteUpdateRequest("hello", 1L);
     de.greluc.krt.profit.basetool.frontend.service.BackendServiceException ex =
@@ -766,12 +701,9 @@ class InventoryPageControllerTest {
             "Backend service returned error: 409 CONFLICT", null, 409);
     when(backendApiClient.put(anyString(), any(), eq(InventoryItemDto.class))).thenThrow(ex);
 
-    // When
     org.springframework.http.ResponseEntity<InventoryItemDto> response =
         writeController.updateInventoryItemNote(id, request);
 
-    // Then: must be 409, NOT 500, so the JS modal can react (toast + reload) instead of
-    // treating the response as a generic server error.
     assertEquals(409, response.getStatusCode().value());
   }
 
@@ -803,11 +735,8 @@ class InventoryPageControllerTest {
     assertEquals(500, response.getStatusCode().value());
   }
 
-  // --- transferInventoryItem (POST /inventory/{id}/transfer) --------------------------------
-
   @Test
   void transferInventoryItem_fullyConsumed_returns204() {
-    // Given — the backend book-out consumed the source row entirely, so it returns no body.
     UUID id = UUID.randomUUID();
     InventoryItemBookOutDto dto =
         new InventoryItemBookOutDto(
@@ -826,19 +755,15 @@ class InventoryPageControllerTest {
             eq("/api/v1/inventory/" + id + "/book-out"), eq(dto), eq(InventoryItemDto.class)))
         .thenReturn(null);
 
-    // When
     org.springframework.http.ResponseEntity<Object> response =
         writeController.transferInventoryItem(id, dto);
 
-    // Then — a null result must map to 204 (No Content), not 200-with-empty-body, so the
-    // material-collection page removes/reloads the depleted row instead of rendering an empty one.
     assertEquals(204, response.getStatusCode().value());
     assertNull(response.getBody());
   }
 
   @Test
   void transferInventoryItem_notFullyConsumed_returns200WithBody() {
-    // Given — a partial transfer leaves a remaining source row, returned by the backend.
     UUID id = UUID.randomUUID();
     InventoryItemBookOutDto dto =
         new InventoryItemBookOutDto(
@@ -876,18 +801,15 @@ class InventoryPageControllerTest {
             eq("/api/v1/inventory/" + id + "/book-out"), eq(dto), eq(InventoryItemDto.class)))
         .thenReturn(remaining);
 
-    // When
     org.springframework.http.ResponseEntity<Object> response =
         writeController.transferInventoryItem(id, dto);
 
-    // Then — the remaining row is echoed with 200 so the page can re-render it in place.
     assertEquals(200, response.getStatusCode().value());
     assertSame(remaining, response.getBody());
   }
 
   @Test
   void transferInventoryItem_conflict_propagatesProblemJsonWithCode() {
-    // Given — a concurrent edit made the backend book-out fail with 409 OPTIMISTIC_LOCK.
     UUID id = UUID.randomUUID();
     InventoryItemBookOutDto dto =
         new InventoryItemBookOutDto(
@@ -913,12 +835,9 @@ class InventoryPageControllerTest {
             null);
     when(backendApiClient.post(anyString(), any(), eq(InventoryItemDto.class))).thenThrow(ex);
 
-    // When
     org.springframework.http.ResponseEntity<Object> response =
         writeController.transferInventoryItem(id, dto);
 
-    // Then — the 409 must be relayed as problem+json carrying the stable code so krt-fetch.js
-    // keeps its optimistic-lock reload-confirm distinction rather than a bare status / 500.
     assertEquals(409, response.getStatusCode().value());
     assertEquals(
         org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON,
@@ -928,11 +847,8 @@ class InventoryPageControllerTest {
     assertEquals("OPTIMISTIC_LOCK", body.get("code"));
   }
 
-  // --- updateDelivered (PATCH /inventory/{id}/delivered) ------------------------------------
-
   @Test
   void updateDelivered_success_returnsUpdatedDtoWithBumpedVersion() {
-    // Given — the backend accepted the delivered toggle and returns the incremented version.
     UUID id = UUID.randomUUID();
     UpdateDeliveredRequest request = new UpdateDeliveredRequest(true, UUID.randomUUID(), 1L);
     InventoryItemDto updated =
@@ -958,12 +874,9 @@ class InventoryPageControllerTest {
             eq("/api/v1/inventory/" + id + "/delivered"), eq(request), eq(InventoryItemDto.class)))
         .thenReturn(updated);
 
-    // When
     org.springframework.http.ResponseEntity<Object> response =
         writeController.updateDelivered(id, request);
 
-    // Then — the updated DTO (with the bumped version) must be echoed so the DOM data-version
-    // syncs; dropping it would 409 the next toggle click on the same row.
     assertEquals(200, response.getStatusCode().value());
     assertSame(updated, response.getBody());
     assertEquals(Long.valueOf(2L), ((InventoryItemDto) response.getBody()).version());
@@ -971,7 +884,6 @@ class InventoryPageControllerTest {
 
   @Test
   void updateDelivered_conflict_propagatesProblemJsonWithCode() {
-    // Given — a concurrent edit made the delivered relay fail with 409 OPTIMISTIC_LOCK.
     UUID id = UUID.randomUUID();
     UpdateDeliveredRequest request = new UpdateDeliveredRequest(true, UUID.randomUUID(), 1L);
     de.greluc.krt.profit.basetool.frontend.service.BackendServiceException ex =
@@ -985,12 +897,9 @@ class InventoryPageControllerTest {
             null);
     when(backendApiClient.patch(anyString(), any(), eq(InventoryItemDto.class))).thenThrow(ex);
 
-    // When
     org.springframework.http.ResponseEntity<Object> response =
         writeController.updateDelivered(id, request);
 
-    // Then — must be 409 problem+json with the code preserved, not a bare status / 500, so the
-    // reload-confirm fires and the audited Mein-Inventar relay failure surfaces truthfully.
     assertEquals(409, response.getStatusCode().value());
     assertEquals(
         org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON,
@@ -1000,11 +909,8 @@ class InventoryPageControllerTest {
     assertEquals("OPTIMISTIC_LOCK", body.get("code"));
   }
 
-  // --- rebookPersonalInventoryItem (POST /inventory/{id}/personal-rebook) -------------------
-
   @Test
   void rebookPersonalInventoryItem_success_returnsNewRow() {
-    // Given — the backend split the source row and returns the new opposite-personal row.
     UUID id = UUID.randomUUID();
     InventoryItemPersonalRebookDto dto = new InventoryItemPersonalRebookDto(5.0, 1L, null, null);
     InventoryItemDto newRow =
@@ -1032,12 +938,9 @@ class InventoryPageControllerTest {
             eq(InventoryItemDto.class)))
         .thenReturn(newRow);
 
-    // When
     org.springframework.http.ResponseEntity<Object> response =
         writeController.rebookPersonalInventoryItem(id, dto);
 
-    // Then — 200 with the new row (so the page re-swaps the grouped table); the relay path must
-    // hit /personal-rebook, since a wrong path or dropped body would leave the table stale.
     assertEquals(200, response.getStatusCode().value());
     assertSame(newRow, response.getBody());
     verify(backendApiClient)
@@ -1049,7 +952,6 @@ class InventoryPageControllerTest {
 
   @Test
   void rebookPersonalInventoryItem_conflict_propagatesProblemJson() {
-    // Given — a concurrent edit made the amount-splitting rebook fail with 409 OPTIMISTIC_LOCK.
     UUID id = UUID.randomUUID();
     InventoryItemPersonalRebookDto dto = new InventoryItemPersonalRebookDto(5.0, 1L, null, null);
     de.greluc.krt.profit.basetool.frontend.service.BackendServiceException ex =
@@ -1063,12 +965,9 @@ class InventoryPageControllerTest {
             null);
     when(backendApiClient.post(anyString(), any(), eq(InventoryItemDto.class))).thenThrow(ex);
 
-    // When
     org.springframework.http.ResponseEntity<Object> response =
         writeController.rebookPersonalInventoryItem(id, dto);
 
-    // Then — the 409 must surface as problem+json with the code, not a 500, so an amount-split
-    // conflict drives the reload-confirm instead of silently losing the split.
     assertEquals(409, response.getStatusCode().value());
     assertEquals(
         org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON,
@@ -1156,8 +1055,6 @@ class InventoryPageControllerTest {
     controller.viewMyInventory(
         null, null, null, null, null, null, List.of(pickedId), false, false, false, model);
 
-    // Sorted by name, so the excluded "Area18" comes first — and it being present at all is the
-    // point: the filter must stay reversible.
     assertEquals(List.of(other, picked), model.getAttribute("locations"));
   }
 

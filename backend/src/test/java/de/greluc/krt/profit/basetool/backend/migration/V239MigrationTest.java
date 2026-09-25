@@ -61,7 +61,6 @@ class V239MigrationTest {
 
   @AfterEach
   void cleanup() {
-    // Idempotent: a half-failed case still leaves the shared container clean.
     if (seededUserId != null) {
       jdbcTemplate.update("DELETE FROM user_roles WHERE user_id = ?", seededUserId);
       jdbcTemplate.update("DELETE FROM app_user WHERE id = ?", seededUserId);
@@ -75,8 +74,6 @@ class V239MigrationTest {
 
   @Test
   void v239RemovesTheGuestRole() {
-    // Matched on code AND on name, because V73 stamped the code but a deployment that ran under a
-    // renamed role still carries the old name — the migration deletes by both for that reason.
     assertThat(count("SELECT count(*) FROM role WHERE code = 'GUEST'"))
         .as("the GUEST role must not exist after V239")
         .isZero();
@@ -97,13 +94,6 @@ class V239MigrationTest {
 
   @Test
   void v239LeavesNoNotificationRuleAddressingTheDeletedRole() {
-    // `notification_rule_selector.role_code` is a bare VARCHAR with no FK to `role` (V156), so
-    // deleting the role cannot cascade here. A surviving GUEST selector matches no recipient, which
-    // is harmless — but it also makes its rule permanently unsaveable: NotificationRuleService
-    // re-validates every selector on update and findByCode('GUEST') is now empty, so any edit to
-    // that rule is refused with a 400, and the UI cannot repair it because the option is gone from
-    // the picker. Asserted against the live catalogue rather than a fixture: this is a statement
-    // about what the migration left behind in the database it ran on.
     assertThat(count("SELECT count(*) FROM notification_rule_selector WHERE role_code = 'GUEST'"))
         .as("no notification rule may still address the deleted role")
         .isZero();
@@ -111,12 +101,6 @@ class V239MigrationTest {
 
   @Test
   void theSelectorCleanupIsCaseInsensitive() {
-    // The stored casing is whatever the client sent: `applySelectors` persisted
-    // `trimToNull(request.roleCode())` until this release, and only now canonicalises it. An
-    // exact-match DELETE would leave `Guest` / `guest` behind, and the new case-insensitive
-    // existence check would then refuse every future edit of that rule with a 400 - the exact
-    // failure the DELETE exists to prevent. Asserted against the migration's own statement rather
-    // than a fixture, because the statement is what has to be right.
     String selectorSql =
         "SELECT count(*) FROM notification_rule_selector"
             + " WHERE kind = 'ROLE' AND upper(role_code) = 'GUEST'";
@@ -132,12 +116,6 @@ class V239MigrationTest {
 
   @Test
   void everyRoleSelectorCarriesTheCatalogueOwnCasing() {
-    // The migration argues at length that the recipient query is the case-SENSITIVE
-    // `r.code = :roleCode` while applySelectors stored whatever casing the client sent - and then
-    // repaired only GUEST. A rule persisted as `Admin` or `officer` addresses nobody, silently and
-    // for ever, and after this release it also PASSES the new findByCodeIgnoreCase validation, so
-    // nothing surfaces it either. V239 canonicalises every ROLE selector; this asserts the
-    // invariant that leaves behind, which is also what a future write must not break.
     assertThat(
             count(
                 "SELECT count(*) FROM notification_rule_selector s JOIN role r"
@@ -149,8 +127,6 @@ class V239MigrationTest {
 
   @Test
   void noNotificationRuleSelectorPointsAtARoleThatDoesNotExist() {
-    // The general form of the case above, so the next role deletion is covered on the day it
-    // happens: any ROLE selector naming a code with no row in `role` is the same trap.
     assertThat(
             count(
                 "SELECT count(*) FROM notification_rule_selector s WHERE s.kind = 'ROLE'"
@@ -179,8 +155,6 @@ class V239MigrationTest {
         .as("precondition: the account holds exactly one role")
         .isOne();
 
-    // The file's own statements, against the seeded code rather than 'GUEST' so the shared
-    // container's real catalogue is never touched.
     jdbcTemplate.update(
         "DELETE FROM user_roles WHERE role_id IN (SELECT id FROM role WHERE code = ?)",
         SEEDED_ROLE_CODE);

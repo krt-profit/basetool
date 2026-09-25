@@ -71,7 +71,6 @@ class PersonalBlueprintOverviewControllerTest {
     verify(service).listAvailableBlueprints(any(), any());
   }
 
-  // covers REQ-INV-013 — the search query parameter reaches the service untouched.
   @Test
   void list_relaysSearchToService() {
     when(service.listAvailableBlueprints(any(), eq("aurora")))

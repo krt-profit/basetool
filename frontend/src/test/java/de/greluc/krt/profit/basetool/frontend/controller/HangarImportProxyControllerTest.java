@@ -55,8 +55,6 @@ import org.springframework.web.server.ResponseStatusException;
  * <p>{@link MockWebServer} stands in for the backend so the real WebClient fluent chain (URI /
  * content-type / multipart body / bodyToMono) is exercised.
  */
-// Most tests here deliberately exercise the deprecated-for-removal importFleetview proxy alias;
-// referencing it triggers expected [removal] warnings, hence the class-level suppression.
 @SuppressWarnings("removal")
 class HangarImportProxyControllerTest {
 
@@ -80,13 +78,11 @@ class HangarImportProxyControllerTest {
     try {
       server.shutdown();
     } catch (Exception ignored) {
-      // already shut down in tests that simulate a connection failure
     }
   }
 
   @Test
   void importShips_happyPath_proxiesMultipartToCanonicalBackendPath() throws Exception {
-    // Given a backend that accepts the upload and replies with a JSON summary
     server.enqueue(
         new MockResponse()
             .setResponseCode(200)
@@ -97,14 +93,11 @@ class HangarImportProxyControllerTest {
         new MockMultipartFile(
             "file", "shiplist.json", "application/json", "[]".getBytes(StandardCharsets.UTF_8));
 
-    // When
     ResponseEntity<Map<?, ?>> result = controller.importShips(file);
 
-    // Then
     assertEquals(HttpStatus.OK, result.getStatusCode());
     assertEquals(5, result.getBody().get("importedCount"));
 
-    // The new canonical proxy must hit the new backend path, NOT the deprecated alias.
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
     assertNotNull(req);
     assertEquals("POST", req.getMethod());
@@ -120,7 +113,6 @@ class HangarImportProxyControllerTest {
 
   @Test
   void importFleetview_happyPath_proxiesMultipartToBackend() throws Exception {
-    // Given a backend that accepts the upload and replies with a JSON summary
     server.enqueue(
         new MockResponse()
             .setResponseCode(200)
@@ -134,18 +126,14 @@ class HangarImportProxyControllerTest {
             "application/json",
             "{\"ships\":[]}".getBytes(StandardCharsets.UTF_8));
 
-    // When
     ResponseEntity<Map<?, ?>> result = controller.importFleetview(file);
 
-    // Then
     assertEquals(HttpStatus.OK, result.getStatusCode());
     Map<?, ?> body = result.getBody();
     assertNotNull(body);
     assertEquals(3, body.get("imported"));
     assertEquals(1, body.get("skipped"));
 
-    // The request must be a POST to /api/v1/hangar/import/fleetview with
-    // multipart content-type carrying the file under name "file".
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
     assertNotNull(req);
     assertEquals("POST", req.getMethod());
@@ -163,10 +151,6 @@ class HangarImportProxyControllerTest {
 
   @Test
   void importFleetview_withoutOriginalFilename_fallsBackToShiplistJson() throws Exception {
-    // Given a MultipartFile that returns null from getOriginalFilename().
-    // MockMultipartFile normalises a null-constructor-arg into the empty
-    // string ("") which the controller does NOT treat as "no filename",
-    // so we override the getter directly to force the real null branch.
     server.enqueue(
         new MockResponse()
             .setResponseCode(200)
@@ -182,13 +166,8 @@ class HangarImportProxyControllerTest {
           }
         };
 
-    // When
     controller.importFleetview(file);
 
-    // Then — the fallback filename "shiplist.json" must be used so the
-    // backend's Content-Disposition parsing doesn't see an empty filename.
-    // (The fallback is format-neutral now that the proxy handles both
-    // Fleetview and HangarXPLOR Shiplist uploads through the same plumbing.)
     RecordedRequest req = server.takeRequest(1, TimeUnit.SECONDS);
     assertNotNull(req);
     assertTrue(
@@ -226,8 +205,6 @@ class HangarImportProxyControllerTest {
 
   @Test
   void importFleetview_onFileReadIoException_wrapsAs500() {
-    // Given a MultipartFile whose content cannot be read — simulating a torn upload. The relay
-    // streams the part, so the failure surfaces from getInputStream(), not getBytes().
     MultipartFile broken =
         new MockMultipartFile("file", "x.json", "application/json", new byte[] {1, 2, 3}) {
           @Override
@@ -252,7 +229,6 @@ class HangarImportProxyControllerTest {
 
   @Test
   void importFleetview_onConnectionFailure_wrapsAs500() throws Exception {
-    // Given — backend unreachable
     server.shutdown();
 
     MultipartFile file =
@@ -267,8 +243,6 @@ class HangarImportProxyControllerTest {
 
   @Test
   void importShips_oneByteOverTheCap_isRefusedWith413BeforeAnyBackendRequest() throws Exception {
-    // An upload one byte above the cap must be refused without reading it and without a backend
-    // call (APPSEC-03): the relay was the cheaper DoS target of the two hops.
     MultipartFile oversized =
         new MockMultipartFile(
             "file",
@@ -299,7 +273,6 @@ class HangarImportProxyControllerTest {
 
   @Test
   void importShips_exactlyAtTheCap_isStreamedToTheBackendWhole() throws Exception {
-    // The cap is inclusive: exactly 8 MiB is a legitimate upload and reaches the backend intact.
     server.enqueue(
         new MockResponse()
             .setResponseCode(200)

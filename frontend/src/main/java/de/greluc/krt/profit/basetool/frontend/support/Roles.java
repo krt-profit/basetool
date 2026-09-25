@@ -48,8 +48,6 @@ public final class Roles {
   /** Prefix Spring Security authorities carry; {@code hasRole(...)} strips/re-adds it itself. */
   public static final String ROLE_PREFIX = "ROLE_";
 
-  // --- Bare role codes, mirroring the backend's support.Roles (must stay byte-identical) --------
-
   public static final String ADMIN = "ADMIN";
   public static final String OFFICER = "OFFICER";
   public static final String KRT_MEMBER = "KRT_MEMBER";

@@ -68,7 +68,6 @@ class DiscordGuildRoleGateAuthenticatorTest {
       "https://backend:11261/internal/discord/account-existence";
   private static final String SECRET = "s3cr3t";
 
-  // Overridable env/identity seams, settable per test before building the authenticator.
   private String precheckUrl;
   private String sharedSecret;
   private boolean accountLinking;

@@ -75,7 +75,6 @@ class JobOrderItemStockControllerTest {
 
   @Test
   void getItemStock_responsibleSideViewer_returnsListUnredacted() {
-    // covers REQ-ORDERS-028/029
     UUID jobOrderId = UUID.randomUUID();
     List<JobOrderItemStockGroupDto> expected = List.of(sampleGroup());
     when(inventoryItemService.getItemStockForJobOrder(jobOrderId)).thenReturn(expected);
@@ -90,7 +89,6 @@ class JobOrderItemStockControllerTest {
 
   @Test
   void getItemStock_requestingSideViewer_returnsRedactedList() {
-    // covers REQ-ORDERS-029
     UUID jobOrderId = UUID.randomUUID();
     List<JobOrderItemStockGroupDto> raw = List.of(sampleGroup());
     List<JobOrderItemStockGroupDto> redacted = List.of(sampleGroup());
@@ -106,7 +104,6 @@ class JobOrderItemStockControllerTest {
 
   @Test
   void getItemStock_emptyResult_isReturnedAsIs() {
-    // covers REQ-ORDERS-028
     UUID jobOrderId = UUID.randomUUID();
     when(inventoryItemService.getItemStockForJobOrder(jobOrderId)).thenReturn(List.of());
     when(ownerScopeService.canSeeJobOrderInventoryOwners(jobOrderId)).thenReturn(true);

@@ -66,7 +66,6 @@ class ProdLogMaskingTest {
           .getLogger("de.greluc.krt.profit.basetool.frontend.Probe")
           .warn("relaying Bearer {} for {}", SECRET, ADDRESS);
     } finally {
-      // Drains the asynchronous appenders and closes the files.
       context.stop();
     }
 

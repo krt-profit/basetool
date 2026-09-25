@@ -68,7 +68,6 @@ class PromotionTopicServiceTest {
 
   @Test
   void listAll_shouldReturnMappedTopics() {
-    // Given
     PromotionTopic topic = PromotionTopic.builder().name("Grundlagen").sortOrder(0).build();
     PromotionTopicResponse response =
         new PromotionTopicResponse(UUID.randomUUID(), 0L, "Grundlagen", null, 0, null, null, null);
@@ -76,17 +75,14 @@ class PromotionTopicServiceTest {
     when(repository.findAllScoped((UUID) null)).thenReturn(List.of(topic));
     when(mapper.toResponse(topic)).thenReturn(response);
 
-    // When
     List<PromotionTopicResponse> result = service.listAll();
 
-    // Then
     assertEquals(1, result.size());
     assertEquals("Grundlagen", result.get(0).name());
   }
 
   @Test
   void get_shouldReturnTopic_whenFound() {
-    // Given
     UUID id = UUID.randomUUID();
     PromotionTopic topic = PromotionTopic.builder().name("Grundlagen").sortOrder(0).build();
     PromotionTopicResponse response =
@@ -94,26 +90,21 @@ class PromotionTopicServiceTest {
     when(repository.findById(id)).thenReturn(Optional.of(topic));
     when(mapper.toResponse(topic)).thenReturn(response);
 
-    // When
     PromotionTopicResponse result = service.get(id);
 
-    // Then
     assertEquals("Grundlagen", result.name());
   }
 
   @Test
   void get_shouldThrow_whenNotFound() {
-    // Given
     UUID id = UUID.randomUUID();
     when(repository.findById(id)).thenReturn(Optional.empty());
 
-    // When / Then
     assertThrows(NotFoundException.class, () -> service.get(id));
   }
 
   @Test
   void create_shouldSaveAndReturnTopic() {
-    // Given
     PromotionTopicWriteRequest request =
         new PromotionTopicWriteRequest("Grundlagen", null, 0, null);
     PromotionTopic entity = PromotionTopic.builder().name("Grundlagen").sortOrder(0).build();
@@ -127,10 +118,8 @@ class PromotionTopicServiceTest {
     when(repository.save(entity)).thenReturn(entity);
     when(mapper.toResponse(entity)).thenReturn(response);
 
-    // When
     PromotionTopicResponse result = service.create(request);
 
-    // Then
     assertEquals("Grundlagen", result.name());
     verify(repository).save(entity);
     verify(auditService)
@@ -144,7 +133,6 @@ class PromotionTopicServiceTest {
 
   @Test
   void update_shouldThrow_whenVersionMismatch() {
-    // Given
     UUID id = UUID.randomUUID();
     PromotionTopic entity = PromotionTopic.builder().name("Grundlagen").sortOrder(0).build();
     entity.setVersion(1L);
@@ -152,13 +140,11 @@ class PromotionTopicServiceTest {
         new PromotionTopicWriteRequest("Grundlagen neu", null, 1, 0L);
     when(repository.findById(id)).thenReturn(Optional.of(entity));
 
-    // When / Then
     assertThrows(ObjectOptimisticLockingFailureException.class, () -> service.update(id, request));
   }
 
   @Test
   void update_shouldUpdateAndReturn_whenVersionMatches() {
-    // Given
     UUID id = UUID.randomUUID();
     PromotionTopic entity = PromotionTopic.builder().name("Grundlagen").sortOrder(0).build();
     entity.setVersion(0L);
@@ -170,10 +156,8 @@ class PromotionTopicServiceTest {
     when(repository.save(entity)).thenReturn(entity);
     when(mapper.toResponse(entity)).thenReturn(response);
 
-    // When
     PromotionTopicResponse result = service.update(id, request);
 
-    // Then
     assertEquals("Grundlagen neu", result.name());
     verify(mapper).updateEntity(entity, request);
     verify(auditService)
@@ -182,15 +166,12 @@ class PromotionTopicServiceTest {
 
   @Test
   void delete_shouldCallRepositoryDelete() {
-    // Given
     UUID id = UUID.randomUUID();
     PromotionTopic entity = PromotionTopic.builder().name("Grundlagen").sortOrder(0).build();
     when(repository.findById(id)).thenReturn(Optional.of(entity));
 
-    // When
     service.delete(id);
 
-    // Then
     verify(repository).delete(entity);
     verify(auditService)
         .record(

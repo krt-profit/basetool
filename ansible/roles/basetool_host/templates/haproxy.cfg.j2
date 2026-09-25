@@ -1,12 +1,8 @@
 {{ ansible_managed | comment }}
-# The L4 front end for the edge (ADR-0187). Byte forwarding only: TLS terminates at the edge, this
-# never sees a private key, and the certificate handover is unaffected.
 
 global
     log         /dev/log local0
     maxconn     {{ basetool_host_frontend_maxconn }}
-    # Drop privileges after binding :80 and :443. The packaged unit already runs with
-    # CAP_NET_BIND_SERVICE; this makes the workers unprivileged regardless.
     user        haproxy
     group       haproxy
     daemon
@@ -22,20 +18,10 @@ defaults
 
 {% for entry in basetool_host_frontend_ports %}
 frontend fe_edge_{{ entry.public }}
-    # TWO binds, not one `v4v6`. A single dual-stack bind delivers IPv4 clients as ::ffff:A.B.C.D,
-    # and every CIDR-based `allow` rule behind the edge then stops matching -- silently, because the
-    # connection itself still works. Measured; see the plan's section 13.
     bind 0.0.0.0:{{ entry.public }}
     bind [::]:{{ entry.public }} v6only
     default_backend be_edge_{{ entry.public }}
 
 backend be_edge_{{ entry.public }}
-    # send-proxy-v2 is the whole point: the edge learns the client's real address from the header
-    # rather than from the TCP peer, which rootless port forwarding has already replaced by then.
-    #
-    # The backend is LOOPBACK. That is not a performance choice -- it is what makes the header
-    # unforgeable. PROXY protocol asserts a source address; it does not prove one. If anything other
-    # than this process could reach the edge's port, it could invent a client address and walk past
-    # the rate limiter and the admin allow-list.
     server edge 127.0.0.1:{{ entry.backend }} send-proxy-v2
 {% endfor %}

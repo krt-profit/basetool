@@ -43,9 +43,6 @@ class AppVersionPolicyControllerTest {
   void unconfiguredServerStatesNoFloor() {
     AppVersionPolicyDto policy = policyOf(BoundProperties.defaults(AndroidClientProperties.class));
 
-    // The whole point of the default. A non-zero floor here would mean that the first deployment
-    // carrying this code refuses every installed build, and the members it refuses are exactly the
-    // ones who cannot be told why by any other channel.
     assertThat(policy.minimumVersionCode()).isZero();
     assertThat(policy.latestVersionCode()).isZero();
     assertThat(policy.releasesUrl()).contains("basetool-android/releases");
@@ -61,8 +58,6 @@ class AppVersionPolicyControllerTest {
 
     AppVersionPolicyDto policy = policyOf(properties);
 
-    // A client on 9 is behind the newest build and above the floor: it must be offered an update,
-    // never blocked. Collapsing these two into one number is the mistake this pins.
     assertThat(policy.minimumVersionCode()).isEqualTo(7);
     assertThat(policy.latestVersionCode()).isEqualTo(11);
   }

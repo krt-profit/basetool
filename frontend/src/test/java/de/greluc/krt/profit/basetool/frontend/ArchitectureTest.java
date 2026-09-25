@@ -59,11 +59,6 @@ class ArchitectureTest {
 
   @Test
   void frontendShouldNotDependOnSpringDataJpa() {
-    // No code under `de.greluc.krt.profit.basetool.frontend.*` may reference any class
-    // from `org.springframework.data.jpa..` — that includes JpaRepository,
-    // EntityManager helpers, etc. The frontend module deliberately does not pull
-    // the spring-boot-starter-data-jpa dependency, so this check is a belt-and-
-    // suspenders guard against accidentally adding it on a hot fix.
     noClasses()
         .that()
         .resideInAPackage("de.greluc.krt.profit.basetool.frontend..")
@@ -78,9 +73,6 @@ class ArchitectureTest {
 
   @Test
   void frontendShouldNotUseJdbcDirectly() {
-    // Sibling rule to JpaRepository: the frontend must not open JDBC connections of
-    // its own either. `java.sql.Connection`/`Statement`/`PreparedStatement` are
-    // forbidden imports.
     noClasses()
         .that()
         .resideInAPackage("de.greluc.krt.profit.basetool.frontend..")
@@ -165,10 +157,6 @@ class ArchitectureTest {
    */
   @Test
   void everyViewControllerOptsIntoTheLayoutModel() {
-    // The five layout advices in `frontend.config` select on @UsesLayoutModel. A @Controller
-    // renders Thymeleaf views, so it needs the model they contribute; forgetting the marker
-    // produces a page with no org-unit context, capability flags, app title, unread count or
-    // CSRF metas rather than a compile error, so it is pinned here instead.
     List<String> unmarked =
         CLASSES.stream()
             .filter(c -> c.isAnnotatedWith(Controller.class))
@@ -184,9 +172,6 @@ class ArchitectureTest {
 
   @Test
   void noRestControllerOptsIntoTheLayoutModel() {
-    // The inverse half. A @RestController serialises through Jackson and can never read a model
-    // attribute, so marking one only buys back the backend round trips the advices cost — three
-    // of the five reach the backend. LayoutModelScopeMvcTest pins the runtime half of this.
     List<String> marked =
         CLASSES.stream()
             .filter(c -> c.isAnnotatedWith(RestController.class))

@@ -62,8 +62,6 @@ class PersonalBlueprintRepositoryTest {
   @BeforeEach
   void clean() {
     repository.deleteAll();
-    // owner_user_id is a foreign key to app_user(id) since V235 (REQ-DATA-008), so the three owners
-    // have to exist before any blueprint can reference them.
     seedOwner(OWNER_A);
     seedOwner(OWNER_B);
     seedOwner(OWNER_C);
@@ -101,16 +99,11 @@ class PersonalBlueprintRepositoryTest {
   void findOwnerProductByOwnerUserIdIn_projectsOwnerAndNameForGivenOwnersOnly() {
     repository.save(bp(OWNER_A, "aurora", "Aurora MR"));
     repository.save(bp(OWNER_B, "cutlass", "Cutlass Black"));
-    repository.save(bp(OWNER_C, "gladius", "Gladius")); // owner out of scope
+    repository.save(bp(OWNER_C, "gladius", "Gladius"));
 
     List<BlueprintOwnerProduct> rows =
         repository.findOwnerProductByOwnerUserIdIn(Set.of(OWNER_A, OWNER_B));
 
-    // Assert the exact (ownerUserId, productName) pairs for the in-scope owners only. Comparing the
-    // whole projection (not just the owner subs) pins the constructor-argument order, so a swapped
-    // projection — product name landing in ownerUserId — fails here instead of silently
-    // mis-grouping
-    // the family aggregation downstream; the absence of OWNER_C also proves the owner restriction.
     assertEquals(
         Set.of(
             new BlueprintOwnerProduct(OWNER_A, "Aurora MR"),
@@ -122,8 +115,8 @@ class PersonalBlueprintRepositoryTest {
   void findAllByProductKeyAndOwnerUserIdIn_restrictsToProductAndOwners() {
     repository.save(bp(OWNER_A, "aurora", "Aurora MR"));
     repository.save(bp(OWNER_B, "aurora", "Aurora MR"));
-    repository.save(bp(OWNER_C, "aurora", "Aurora MR")); // owner out of scope
-    repository.save(bp(OWNER_A, "cutlass", "Cutlass Black")); // other product
+    repository.save(bp(OWNER_C, "aurora", "Aurora MR"));
+    repository.save(bp(OWNER_A, "cutlass", "Cutlass Black"));
 
     List<PersonalBlueprint> rows =
         repository.findAllByProductKeyAndOwnerUserIdIn("aurora", Set.of(OWNER_A, OWNER_B));
@@ -138,8 +131,8 @@ class PersonalBlueprintRepositoryTest {
     defaultBlueprintRepository.save(defaultBp(DEFAULT_KEY, "Test Default"));
     repository.save(bp(OWNER_A, "test-removable-1", "Removable One"));
     repository.save(bp(OWNER_A, "test-removable-2", "Removable Two"));
-    repository.save(bp(OWNER_A, DEFAULT_KEY, "Test Default")); // granted default — must survive
-    repository.save(bp(OWNER_B, "test-removable-1", "Removable One")); // other owner — untouched
+    repository.save(bp(OWNER_A, DEFAULT_KEY, "Test Default"));
+    repository.save(bp(OWNER_B, "test-removable-1", "Removable One"));
 
     int removed = repository.deleteRemovableByOwnerUserId(OWNER_A);
 

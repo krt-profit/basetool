@@ -103,23 +103,14 @@ class JobOrderCreateE2eTest {
       Page page = context.newPage();
       try {
         E2eSupport.navigate(page, baseUrl + "/orders/create");
-        // Responsible (processing) unit — restricted to profit-eligible org units; IRIDIUM is opted
-        // in at stack bootstrap. Required, so it must be selected for the create to pass.
         page.locator("#responsibleOrgUnitId").selectOption(IRIDIUM_ID);
         page.locator("#requestingOrgUnitId").selectOption(IRIDIUM_ID);
         page.locator("#handle").fill("E2E Contact");
-        // Select whatever material the (frontend-cached) searchable combobox offers — see setUp().
         E2eSupport.selectComboboxFirstOption(page.getByTestId("order-material-select"));
         page.getByTestId("order-material-amount").fill("100");
-        // Wait for the full post-submit redirect to settle before navigating, else WebKit aborts
-        // the in-flight redirect GET (HTTP/2 INTERNAL_ERROR) — see E2eSupport#awaitFormPost.
         E2eSupport.awaitFormPost(page, () -> page.getByTestId("order-submit").click());
 
-        // The created order must appear in the list (fresh ephemeral DB => exactly one). The
-        // post-submit GET goes through the retry helper — WebKit can abort it (HTTP/2
-        // INTERNAL_ERROR) even after the redirect settled. See E2eSupport#navigate.
         E2eSupport.navigate(page, baseUrl + "/orders");
-        // 20 s, not the 5 s default: the post-submit list render is slow on WebKit under CI load.
         assertThat(page.getByTestId("order-row").first())
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
       } catch (RuntimeException | AssertionError failure) {

@@ -73,7 +73,6 @@ class ModelErrorKeyCoverageTest {
           "messages_en.properties",
           resolveModuleRelative("src/main/resources/messages_en.properties"));
 
-  // covers the i18n rule - a key the page renders but no bundle defines shows as ??key_de??
   @Test
   void everyErrorKeyPutInTheModelExistsInEveryBundle() throws IOException {
     Map<String, List<String>> keysBySource = errorKeys();

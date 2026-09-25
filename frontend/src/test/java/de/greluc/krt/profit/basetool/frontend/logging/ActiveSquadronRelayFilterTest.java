@@ -92,8 +92,6 @@ class ActiveSquadronRelayFilterTest {
         .singleElement()
         .satisfies(
             event -> {
-              // DEBUG is the contract: every anonymous and every unpinned request takes this
-              // branch, so anything higher would be a log-flood vector.
               assertThat(event.getLevel()).isEqualTo(Level.DEBUG);
               assertThat(event.getFormattedMessage())
                   .contains(ActiveSquadronRelayFilter.ACTIVE_ORG_UNIT_HEADER)

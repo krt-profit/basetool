@@ -84,14 +84,11 @@ class MonitoringTracingPropagationTest {
 
   @Test
   void shouldPropagateTraceparentHeaderOnOutboundBackendCall() throws Exception {
-    // Given
     mockBackend.enqueue(new MockResponse().setResponseCode(200).setBody("[]"));
 
-    // When
     termsDocumentClient.get().uri("/api/v1/locations").retrieve().toBodilessEntity().block();
     RecordedRequest recorded = mockBackend.takeRequest(10, TimeUnit.SECONDS);
 
-    // Then: the instrumented client injected the W3C trace context (version-traceId-spanId-flags).
     assertThat(recorded).isNotNull();
     assertThat(recorded.getHeader("traceparent"))
         .as("outbound backend call must carry the W3C traceparent header")

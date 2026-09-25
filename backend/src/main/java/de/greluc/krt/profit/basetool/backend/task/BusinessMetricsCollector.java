@@ -124,8 +124,6 @@ public class BusinessMetricsCollector {
    */
   @PostConstruct
   void registerGauges() {
-    // A bean @ConditionalOnProperty never created publishes nothing, and that
-    // absence is what lets ScheduledJobStale tell "switched off" from "never ran".
     taskMetrics.markEnabled(ScheduledJob.BUSINESS_METRICS);
     countGauge(MetricNames.REGISTRATION_PENDING, registrationPending);
     ageGauge(MetricNames.REGISTRATION_PENDING_OLDEST_AGE, registrationOldestAge);
@@ -199,22 +197,12 @@ public class BusinessMetricsCollector {
     registrationOldestAge.set(
         ageSeconds(userRepository.findOldestCreatedAtByApprovalStatus(ApprovalStatus.PENDING)));
 
-    // Members' Art. 17 erasure requests awaiting a decision (REQ-SEC-061). Art. 12(3) sets a
-    // one-month response deadline, so this queue's age gauge measures against a statute rather
-    // than against an operational preference.
     deletionRequestPending.set(
         deletionRequestRepository.countByStatus(DeletionRequestStatus.PENDING));
     deletionRequestOldestAge.set(
         ageSeconds(
             deletionRequestRepository.findOldestCreatedAtByStatus(DeletionRequestStatus.PENDING)));
 
-    // Accounts already gone from Keycloak but still present locally: a deletion whose second half
-    // was forgotten (REQ-SEC-059). Unlike the queues above nothing enqueues these, so a non-zero
-    // value is always somebody's unfinished work -- which holds only because service-account rows
-    // are excluded. Such a row is permanently flagged and cannot be un-flagged, so counting it
-    // made the alert fire seven days after deploy and never resolve. The exclusion is
-    // unconditional and lower-cased: it used to depend on a property that defaults empty, and
-    // empty is exactly the configuration in which the row gets created.
     usersPendingDeletion.set(userRepository.countOrphanedMemberAccounts());
     usersPendingDeletionOldestAge.set(
         ageSeconds(userRepository.findOldestOrphanedMemberAbsenceStamp()));

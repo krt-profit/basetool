@@ -1,152 +1,32 @@
-; systemd service for the periodic Profit Basetool deploy check.
-;
-; Installation is by the Ansible role (ansible/roles/basetool_host/tasks/25-scripts.yml), not by
-; hand: it copies this unit and iri-deploy.timer to /etc/systemd/system/, verifies them with
-; `systemd-analyze verify`, and enables the timer without starting it -- the first deploy on a host
-; is an operator's decision (docs/deployment.md -> "Bootstrapping a host"). A changed unit reaches
-; the host the same way (docs/deployment.md -> "Updating the operational scripts and units").
-;
-; Force an immediate run (bypassing the next scheduled tick):
-;   sudo systemctl start iri-deploy.service
-;
-; Inspect:
-;   systemctl status iri-deploy.timer
-;   journalctl -u iri-deploy.service -f     # unit lifecycle ONLY — no script output, see below
-;   tail -f /var/log/iri-deploy.log         # what the script actually printed
-; Off-host (no SSH needed): Grafana -> Explore -> Loki, `{app="ops-deploy"}`.
-;
-; The unit deliberately runs as a dedicated `deploy` user (no shell, no password
-; sudo) — not as root, and not as the rootless service user `iri` that owns the
-; containers. It reaches them only through /etc/sudoers.d/basetool-deploy
-; (ansible/roles/basetool_host/tasks/22-deploy-user.yml): `podman *` and
-; `systemctl --user *` as `iri`, plus `systemctl restart alloy.service` as root.
-; Be honest about what that bounds: `podman *` as `iri` is full control of the
-; application's containers and data, so `deploy` is NOT a hard boundary around the
-; application against a fully-compromised deploy.sh — only around the host, which
-; which a `docker` group membership (root-equivalent) would not have been. What bounds the
-; blast radius is: (1) the host-side cosign signature gate (REQ-OPS-015) — deploy.sh
-; refuses to run an image not signed by our release-images identity, so a moved
-; `:stable` tag or a compromised GHCR pull token cannot get attacker code executed
-; here; and (2) the systemd sandbox below, which confines deploy.sh's own process.
-
 [Unit]
 Description=Profit Basetool — pull and apply latest GHCR images
 Documentation=https://github.com/krt-profit/basetool/blob/main/docs/deployment.md
 Wants=network-online.target
 After=network-online.target
-# Ordered after the rootless service user's manager by the drop-in 20-service-user.conf, which the
-# Ansible role writes beside this unit because only the role knows that user's uid
-# (ansible/roles/basetool_host/templates/iri-deploy-account-order.conf.j2): After= only, never
-# Wants=, so a job never starts a manager an operator stopped. It exists for this unit's SANDBOX,
-# not for the stack: a mount namespace built before user@<uid>.service mounts /run/user/<uid> never
-# sees that mount, and the job could not reach the containers for its whole run (reproduced
-# 2026-09-25). What the job needs beyond that -- the manager's first container, and for the
-# maintenance jobs its startup FINISHED -- only the script can wait on: rt_detect and
-# rt_wait_for_startup in scripts/lib/container-runtime.sh. (These units carried
-# `After=docker.service` until 2026-09-22, which ordered them on nothing on a Podman host.)
 
 [Service]
 Type=oneshot
 
-# The `deploy` user is created by the Ansible role
-# (ansible/roles/basetool_host/tasks/22-deploy-user.yml) with a `/sbin/nologin`
-# shell — interactive use is impossible — and no sudo beyond the bridge named in
-# the header.
 User=deploy
-# No Group=: systemd takes the account's own primary group. The deploy account reaches the
-# containers through the sudoers rule of ansible/roles/basetool_host/tasks/22-deploy-user.yml, not
-# through any group membership.
 
 ExecStart=/var/iri/code/scripts/deploy.sh
 
-# Send stdout/stderr to /var/log/iri-deploy.log, where logrotate keeps human-readable
-# history for post-mortems beyond the journald retention window.
-#
-# `append:` REPLACES journald for these two streams — it does NOT tee to it. So
-# `journalctl -u iri-deploy.service` shows only systemd's own unit records (Starting /
-# Succeeded / Failed / the exit code) and NOT a single line deploy.sh printed. Read the
-# script output from /var/log/iri-deploy.log, or — without an SSH session — from Loki:
-# Alloy tails this file as `{app="ops-deploy"}` (monitoring/alloy/config.alloy), which is
-# where the DeployRolledBack / DeployFailed alert annotations now point. Do not "fix" this
-# by switching to `journal+file:` or dropping the redirection: logrotate's copytruncate
-# strategy here is written against the held-open append fd, and the Loki tail is now the
-# documented triage path.
 StandardOutput=append:/var/log/iri-deploy.log
 StandardError=append:/var/log/iri-deploy.log
 
-; --- Hardening ----------------------------------------------------------------
-; The sandbox all four deploy-account units share -- ProtectSystem=strict, ProtectHome=read-only,
-; PrivateTmp, PrivateDevices, the kernel and cgroup protections -- is the drop-in
-; 10-deploy-account-sandbox.conf the Ansible role installs beside this unit, from
-; scripts/iri-deploy-account-sandbox.conf, together with why NoNewPrivileges and RestrictNamespaces
-; are absent (OPS-SIMP-03). What follows is this job's own.
-; iri-deploy adds the protections below: it holds the registry token and rewrites unit files, so it
-; is the one job whose process is worth confining further than the shared baseline.
 ProtectKernelLogs=true
 ProtectClock=true
 ProtectHostname=true
 ProtectProc=invisible
 RestrictSUIDSGID=true
 RemoveIPC=true
-# NOT emptied. deploy.sh has to BECOME the service user, and sudo says exactly what an empty set
-# costs:
-#
-#     sudo: unable to change to root gid: Operation not permitted
-#
-# Measured on the testing host 2026-09-18. A narrow allowlist was tried first and is not enough
-# either -- CAP_SETUID/CAP_SETGID alone gets past the gid change and then dies in sudo's PAM
-# stack ("Authentication service cannot retrieve authentication info"), which needs more than the
-# switch itself. So the form is a BLOCKLIST: everything stays available except the capabilities
-# that would let this account reconfigure the host, load code into the kernel, or read another
-# process's memory. That is a real restriction, and it is one that can be stated exactly.
 CapabilityBoundingSet=~CAP_SYS_ADMIN CAP_SYS_MODULE CAP_SYS_RAWIO CAP_SYS_BOOT CAP_SYS_TIME CAP_NET_ADMIN CAP_MAC_ADMIN CAP_MAC_OVERRIDE CAP_SYS_PTRACE
-# The script talks to local sockets (sudo, the user's systemd bus, podman) over AF_UNIX and makes outbound HTTPS
-# (GHCR pulls + cosign's Sigstore reach) over AF_INET/AF_INET6; AF_NETLINK covers
-# routing/interface lookups the CLIs do at startup. Everything else is denied.
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
 SystemCallArchitectures=native
-# Confine to the syscall set a normal service needs (blocks @obsolete, @privileged,
-# raw @swap/@reboot etc.). podman, skopeo, cosign and the coreutils/bash the script
-# drives all fall inside @system-service. If a future tool trips this,
-# `deploy.sh --check-only` surfaces it before a real deploy — widen or comment it
-# out then, do not weaken the rest of the sandbox.
-#
-# `@mount` is the one widening, and it is what that instruction anticipated. Rootless Podman sets
-# up its container's filesystem itself, in a user namespace, with the mount family that
-# @system-service deliberately excludes. Without it the call dies under seccomp with no message at
-# all -- the process is killed, so nothing is written to say why, which is the least helpful
-# failure in this whole file. Measured 2026-09-18: `@system-service` fails silently,
-# `@system-service @mount` succeeds.
 SystemCallFilter=@system-service @mount
 SystemCallErrorNumber=EPERM
-# The script writes ONLY to these paths (everything else is read-only under
-# ProtectSystem=strict). Deliberately NOT the whole /var/iri: the DB / redis
-# bind mounts under /var/iri are written by the containers, which run as the
-# service user outside this sandbox, so deploy.sh needs no write access to them.
-#   /var/lib/iri/       — state files (digest pins, last-deployed marker, the
-#                         config-stage/ + config-previous/ dirs, config-blocked.marker,
-#                         the registry credential cosign and skopeo read + the
-#                         $HOME/.sigstore cosign cache)
-#   /var/log/           — append to iri-deploy.log
-#   /var/lock/          — flock file
-#   /var/iri/code/      — where the config bundle is applied (units, compose source,
-#                         edge/monitoring/theme trees) and the keycloak provider JAR is staged
-#   /var/iri/monitoring — the node_exporter textfile dir deploy.sh writes metrics into
-#                         (absent on a host without monitoring → the metric write
-#                         degrades to a best-effort no-op)
-# /etc/containers/systemd/users is where a RELEASE installs the Quadlet units and where this
-# script writes each service's digest-pin drop-in. ProtectSystem=strict makes everything
-# outside this list read-only, and the run died on
-#   mkdir: cannot create directory '.../992/backend.container.d': Read-only file system
-# right after the signatures verified -- the last step before anything would have been
-# applied. The DIRECTORY, not the per-user subdirectory: the uid is not known to a static
-# unit file, and the parent is root-owned so only the delivery directory inside it is
-# writable by this account anyway.
 ReadWritePaths=/etc/containers/systemd/users /var/lib/iri /var/log /var/lock /var/iri/code /var/iri/monitoring
 
-# Hard memory and CPU caps so a runaway script cannot starve the production
-; stack of resources during a deploy. Generous on purpose — the actual work
-; is delegated to the container runtime, the script itself is a thin wrapper.
 MemoryMax=512M
 CPUQuota=200%
 

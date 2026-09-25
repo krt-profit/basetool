@@ -149,8 +149,6 @@ public class RedisLiveSyncFanout implements LiveSyncFanout, MessageListener {
               metricLabel(canonicalTopic))
           .increment();
     } catch (RuntimeException e) {
-      // Local relay already delivered to this instance's viewers; a failed cross-replica publish
-      // only degrades peer delivery, so swallow-and-count rather than propagate to the caller.
       meterRegistry
           .counter(MetricNames.LIVESYNC_REDIS_ERRORS, MetricNames.TAG_OP, MetricNames.OP_PUBLISH)
           .increment();
@@ -186,9 +184,6 @@ public class RedisLiveSyncFanout implements LiveSyncFanout, MessageListener {
               metricLabel(canonicalTopic))
           .increment();
     } catch (RuntimeException e) {
-      // Same swallow-and-count contract as the changed relay: the local dots were already
-      // broadcast, so a failed gossip costs peers a cosmetic dot until the next tick, never a
-      // stale view of the data itself.
       meterRegistry
           .counter(
               MetricNames.LIVESYNC_REDIS_ERRORS,
@@ -218,7 +213,6 @@ public class RedisLiveSyncFanout implements LiveSyncFanout, MessageListener {
       JsonNode root = jsonMapper.readTree(new String(message.getBody(), StandardCharsets.UTF_8));
       String origin = textOrNull(root, "origin");
       if (instanceId.equals(origin)) {
-        // Our own publication looped back — the local relay already delivered it. Skip.
         return;
       }
       String topic = textOrNull(root, "topic");
@@ -266,8 +260,6 @@ public class RedisLiveSyncFanout implements LiveSyncFanout, MessageListener {
       JsonNode root = jsonMapper.readTree(new String(message.getBody(), StandardCharsets.UTF_8));
       String origin = textOrNull(root, "origin");
       if (origin == null || origin.isBlank() || instanceId.equals(origin)) {
-        // Our own gossip looped back (or a payload with no usable origin, which cannot key a
-        // partition) — the local broadcast already carried our own state. Skip.
         return;
       }
       String topic = textOrNull(root, "topic");

@@ -86,14 +86,10 @@ class RedisSessionConfigTest {
     BeanPropertyBindingResult bindingResult = new BeanPropertyBindingResult(form, "sampleForm");
     bindingResult.rejectValue("name", "NotBlank", "must not be blank");
 
-    // Mirror the exact shape FlashMap puts on the wire: an attribute under the
-    // "<BindingResult-prefix><formName>" key plus the form attribute itself.
     Map<String, Object> flashAttributes = new HashMap<>();
     flashAttributes.put(BindingResult.MODEL_KEY_PREFIX + "sampleForm", bindingResult);
     flashAttributes.put("sampleForm", form);
 
-    // Without the mix-in this would throw with
-    //   `Document nesting depth (501) exceeds the maximum allowed (500, …)`.
     String json = mapper.writeValueAsString(flashAttributes);
 
     assertThat(json)
@@ -246,8 +242,6 @@ class RedisSessionConfigTest {
     ReflectionTestUtils.setField(config, "redisUsername", username);
     RedisConnection connection = mock(RedisConnection.class);
     when(connection.ping()).thenReturn("PONG");
-    // Stubbed so the pre-fix action would run to completion and be caught by the verification
-    // below, rather than stop at a null.
     RedisServerCommands server = mock(RedisServerCommands.class);
     when(connection.serverCommands()).thenReturn(server);
     Properties current = new Properties();

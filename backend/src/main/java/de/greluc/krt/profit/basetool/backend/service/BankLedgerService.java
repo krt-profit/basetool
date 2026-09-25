@@ -152,8 +152,6 @@ public class BankLedgerService {
             request.counterpartyOrgUnitId());
 
     Instant now = Instant.now();
-    // A deposit carries no bank-borne fee: whoever pays money IN bears their own in-game transfer
-    // fee, so the full amount lands on the account and the holder's stash (REQ-BANK-033).
     BankTransaction tx =
         writer.persistTransaction(
             BankTransactionType.DEPOSIT,
@@ -212,7 +210,6 @@ public class BankLedgerService {
   private BankTransactionDto bookSplitDeposit(
       @NotNull BankDepositRequest request, @NotNull BankHolder holder) {
     BigDecimal gross = request.amount();
-    // slice = round(gross * percent / 100) to whole aUEC; the named account keeps gross - slice.
     BigDecimal slice =
         gross
             .multiply(request.splitPercent())
@@ -224,8 +221,6 @@ public class BankLedgerService {
           Map.of("amount", plain(gross), "percent", plain(request.splitPercent())));
     }
 
-    // Enumerate the active squadron accounts (ORG_UNIT + kind SQUADRON), excluding the named
-    // account, then lock the named account and the targets together in ascending id order.
     List<UUID> squadronIds =
         accountRepository
             .findByTypeAndStatusOrderById(BankAccountType.ORG_UNIT, BankAccountStatus.ACTIVE)
@@ -248,8 +243,6 @@ public class BankLedgerService {
     }
     BankAccount named = locked.get(request.accountId());
     guards.requireActive(named);
-    // Drop any squadron account that closed between the unlocked enumeration and the lock; the
-    // distribution always runs over currently-active targets only.
     List<UUID> targets =
         squadronIds.stream()
             .filter(id -> locked.get(id).getStatus() == BankAccountStatus.ACTIVE)
@@ -281,14 +274,10 @@ public class BankLedgerService {
             BigDecimal.ZERO,
             now,
             counterparty);
-    // The named account keeps the remainder; a 100 % split leaves nothing for it, so its leg is
-    // dropped (a posting is never zero, REQ-BANK-004).
     if (namedShare.signum() > 0) {
       writer.persistAccountPosting(tx, named, namedShare, now);
     }
     shares.forEach((id, share) -> writer.persistAccountPosting(tx, locked.get(id), share, now));
-    // The money physically landed once with one custodian, so a single holder leg over the gross
-    // (REQ-BANK-003); the split is purely an account-side allocation.
     writer.persistHolderPosting(tx, holder, gross, now);
     bankAuditService.record(
         BankAuditEventType.DEPOSIT_SPLIT_BOOKED,
@@ -377,12 +366,6 @@ public class BankLedgerService {
             request.counterpartyExternalName(),
             request.counterpartyOrgUnitId());
 
-    // Fee mode (REQ-BANK-033, #999). The fee is always round(entered amount x rate). On-top
-    // (default):
-    // the source is debited amount + fee and the recipient gets the full amount. Inclusive: the
-    // source
-    // is debited exactly the entered amount and the recipient gets amount - fee (rejected if that
-    // leaves nothing to arrive). The overdraft guard runs against whatever is actually debited.
     BigDecimal fee = transferFeeService.feeOn(request.amount());
     BigDecimal debit =
         request.feeInclusive() ? request.amount() : transferFeeService.totalDebit(request.amount());
@@ -478,21 +461,8 @@ public class BankLedgerService {
     BankHolder destinationHolder = writer.requireHolder(request.destinationHolderId());
     guards.requireActiveHolder(destinationHolder);
 
-    // Custody only physically moves — and thus incurs the in-game fee — when source and destination
-    // holders differ; a same-holder transfer is a pure re-label (fee-free, debit = amount). When
-    // the
-    // holder changes the fee is added on top: the source is debited the gross (amount + fee) while
-    // the destination is credited the full entered amount (ADR-0052). The overdraft guard runs
-    // against the gross so the fee can never drive the source account negative.
     final boolean holderChanges = !sourceHolder.getId().equals(destinationHolder.getId());
     BigDecimal fee = holderChanges ? transferFeeService.feeOn(request.amount()) : BigDecimal.ZERO;
-    // Fee mode (REQ-BANK-033, #999), effective only on a holder-changing transfer (a same-holder
-    // transfer is fee-free, so both modes debit and credit the plain amount). On-top (default):
-    // source
-    // debited amount + fee, destination credited the full amount. Inclusive: source debited exactly
-    // the entered amount, destination credited amount - fee (rejected if that leaves nothing). Both
-    // net to -fee across the account legs, so the ledger-integrity invariant (SUM(legs) =
-    // -transfer_fee, ADR-0052) holds in either mode. The overdraft guard runs against the debit.
     final boolean inclusive = request.feeInclusive() && holderChanges;
     BigDecimal debit = inclusive ? request.amount() : request.amount().add(fee);
     final BigDecimal credit = inclusive ? request.amount().subtract(fee) : request.amount();
@@ -568,10 +538,6 @@ public class BankLedgerService {
     BankHolder sourceHolder = writer.requireHolder(request.sourceHolderId());
     BankHolder destinationHolder = writer.requireHolder(request.destinationHolderId());
 
-    // The fee is borne by, and debited from, the KRT/CARTEL account (#998). Locked + overdraft-
-    // guarded so it is never driven negative; missing/closed -> BANK_ACCOUNT_CLOSED. A fee that
-    // rounds
-    // to 0 (tiny amount) books no account leg and keeps the legacy fee-free shape.
     BigDecimal fee = transferFeeService.feeOn(request.amount());
     BankAccount cartel = null;
     if (fee.signum() > 0) {
@@ -659,9 +625,6 @@ public class BankLedgerService {
                 Collectors.toMap(id -> id, writer::lockAccount, (a, b) -> a, LinkedHashMap::new));
     lockedAccounts.values().forEach(guards::requireActive);
 
-    // Validate the negated mirror against the current account balances: an account leg that was
-    // positive becomes a removal and must still be covered (REQ-BANK-006). Holder legs are not
-    // checked - the holder dimension may go negative (ADR-0039).
     for (BankCounterLeg leg : accountLegs) {
       BigDecimal negated = leg.amount().negate();
       if (negated.signum() < 0) {
@@ -675,12 +638,6 @@ public class BankLedgerService {
     }
 
     Instant now = Instant.now();
-    // A reversal negates the original's actual recorded legs (source leg = the gross debited,
-    // destination leg = the amount that arrived), so the pair cancels exactly per account/holder
-    // and
-    // the reversal itself carries no new fee (ADR-0052): the in-game money was already moved; this
-    // is
-    // a bookkeeping correction. Restoring the gross makes the source whole again.
     BankTransaction reversal =
         writer.persistTransaction(
             BankTransactionType.REVERSAL, note, null, null, original, BigDecimal.ZERO, now, null);
@@ -722,12 +679,6 @@ public class BankLedgerService {
             .collect(
                 Collectors.toMap(
                     BankAccount::getId, a -> postingRepository.accountBalance(a.getId())));
-    // The holder dimension is lock-free by design (no overdraft invariant to protect, ADR-0039), so
-    // the holder zeroing is NOT serialized against a concurrent bookHolderTransfer. This is only
-    // reachable via the admin post-SC-wipe operation, which runs on a quiescent bank; any residual
-    // a
-    // racing Umbuchung might leave is reconcilable by a follow-up Umbuchung. Account legs ARE
-    // serialized (the accounts are locked above).
     List<BankHolderBalance> holderBalances =
         holderPostingRepository.holderTotals().stream()
             .filter(h -> h.amount().signum() != 0)
@@ -846,7 +797,6 @@ public class BankLedgerService {
       return new CounterpartySnapshot(
           user.getId(), user.getEffectiveName(), membership.orgUnitId(), membership.orgUnitName());
     }
-    // External counterparty (#994): free-text name + any active org unit, no membership check.
     if (orgUnitId == null) {
       return new CounterpartySnapshot(null, external, null, null);
     }

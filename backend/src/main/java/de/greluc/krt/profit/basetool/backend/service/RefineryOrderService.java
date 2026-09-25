@@ -321,14 +321,6 @@ public class RefineryOrderService {
   @Transactional
   public RefineryOrder createRefineryOrder(
       @NotNull UUID userId, @NotNull RefineryOrder order, UUID owningOrgUnitId) {
-    // Mass-assignment guard (audit H-2): the create path must never honour a client-supplied id or
-    // version. RefineryOrderDto is shared with the update path and carries both fields, and
-    // RefineryOrderMapper.toEntity copies them onto the transient entity (it ignores only owner).
-    // Because AbstractEntity.isNew() is id == null, a non-null id would route
-    // JpaRepository.save() through EntityManager.merge() (UPSERT) and let a caller overwrite and
-    // re-own an existing order, bypassing the per-resource canEditRefineryOrder gate. Resetting
-    // both forces a clean INSERT — the LocationMapper.stripServerManaged contract applied at the
-    // single create choke point so every create endpoint (my-orders + users/{userId}) is covered.
     order.setId(null);
     order.setVersion(null);
 
@@ -363,7 +355,6 @@ public class RefineryOrderService {
       order.setRefiningMethod(null);
     }
 
-    // Handle Goods relationships
     if (order.getGoods() != null) {
       order.getGoods().forEach(good -> resolveGood(good, order));
     }
@@ -372,11 +363,6 @@ public class RefineryOrderService {
       order.setStartedAt(Instant.now());
     }
 
-    // Monetary fields (expenses, otherExpenses, oreSales) are optional. Both null and 0
-    // are treated semantically as "not set" and persisted as null, so the frontend never
-    // has to distinguish between "empty" and "0" and the columns stay cleanly empty in
-    // the DB when the user has not entered a value. The profit calculation
-    // (see RefineryOrder#getProfit) already treats null as 0.
     order.setExpenses(zeroToNull(order.getExpenses()));
     order.setOtherExpenses(zeroToNull(order.getOtherExpenses()));
     order.setOreSales(zeroToNull(order.getOreSales()));
@@ -478,9 +464,6 @@ public class RefineryOrderService {
     Mission requestedMission = details.getMission();
     UUID requestedMissionId = requestedMission != null ? requestedMission.getId() : null;
     if (requestedMissionId != null) {
-      // REQ-SEC-042: only a CHANGED link is checked. An order that already sits on a mission keeps
-      // it through an ordinary edit, so a link made before the rule existed — or an owner who has
-      // since left the mission — does not block editing the order's other fields.
       Mission currentMission = order.getMission();
       if (currentMission == null || !requestedMissionId.equals(currentMission.getId())) {
         order.setMission(resolveMissionForOwner(requestedMissionId, order.getOwner()));
@@ -500,7 +483,6 @@ public class RefineryOrderService {
 
     order.setStartedAt(details.getStartedAt() != null ? details.getStartedAt() : Instant.now());
     order.setDurationMinutes(details.getDurationMinutes());
-    // Money fields: 0 is treated as "not set" and persisted as null (see createRefineryOrder).
     order.setExpenses(zeroToNull(details.getExpenses()));
     order.setOtherExpenses(zeroToNull(details.getOtherExpenses()));
     order.setOreSales(zeroToNull(details.getOreSales()));
@@ -509,7 +491,6 @@ public class RefineryOrderService {
       order.setStatus(details.getStatus());
     }
 
-    // Update goods
     if (details.getGoods() != null) {
       order.getGoods().clear();
       details
@@ -654,8 +635,6 @@ public class RefineryOrderService {
     RefineryOrder order = getRefineryOrder(orderId);
 
     if (order.getStatus() == RefineryOrderStatus.COMPLETED) {
-      // A client-side condition (a second store of the same order), so a 400 with a localized
-      // detail — a raw IllegalStateException is answered as a 500 (APPSEC-06).
       throw new BadRequestException("error.refinery_order.already_stored");
     }
 
@@ -679,28 +658,10 @@ public class RefineryOrderService {
               locationRepository.findById(itemDto.locationId()),
               () -> "Location not found: " + itemDto.locationId());
 
-      // REQ-SEC-039: the per-item userId names the RECEIVING inventory owner, so it decides whose
-      // ledger the output lands in. The order-ownership check above does not cover that — it
-      // constrains which order may be stored, not who the stock is booked for — so without this
-      // guard a member storing their OWN order could redirect arbitrary amounts of any material
-      // into any other member's stock (shared, or with `personal` into their private stock) and
-      // leave INVENTORY_RECEIVED_FROM_REFINERY audit rows attributed to that member. Only a
-      // logistician books on behalf of someone else, mirroring the Einbuchen path's guard verbatim
-      // (InventoryItemService#createInventoryItem): the same "create an InventoryItem for another
-      // user" operation must not be privileged in one entry point and open in the other.
-      //
-      // Checked on the REQUESTED id and BEFORE the lookup, for the same reason createInventoryItem
-      // does it in that order: resolving first would answer "user not found" vs "access denied" to
-      // an unauthorised caller, turning the endpoint into a user-existence oracle.
       final UUID targetUserId =
           itemDto.userId() != null
               ? itemDto.userId()
               : (order.getOwner() != null ? order.getOwner().getId() : null);
-      // The flat ROLE_LOGISTICIAN that used to stand here is org-unit-less (the OR-union over ALL
-      // of the caller's memberships), so it authorised booking into ANY member of ANY Staffel -
-      // shared or, with `personal`, private. REQ-SEC-039 closed the caller-vs-owner axis and never
-      // looked at the org-unit axis. canManageUserInventory is the same gate the Einbuchen path now
-      // uses for the same operation, evaluated per item because the receiver is per item.
       if (targetUserId != null
           && !userId.equals(targetUserId)
           && !ownerScopeService.canManageUserInventory(targetUserId)) {
@@ -722,11 +683,6 @@ public class RefineryOrderService {
         assignee = order.getOwner();
       }
 
-      // REQ-INV-035: the store dialog may mark an output row as the receiver's private stock. A
-      // personal row never carries an allocation (the standing assertNotPersonal invariant), so the
-      // contradictory per-item job-order pick is rejected rather than silently dropped — mirroring
-      // the Einbuchen (InventoryItemService#createInventoryItem) and item-production book-in
-      // guards.
       final boolean personal = Boolean.TRUE.equals(itemDto.personal());
       if (personal && itemDto.jobOrderId() != null) {
         throw new BadRequestException(
@@ -741,32 +697,12 @@ public class RefineryOrderService {
                 () -> "JobOrder not found: " + itemDto.jobOrderId());
       }
 
-      // Resolve the assignee's owning org-unit pool up front — the eighth identity dimension — so
-      // the freshly created row is stamped with that pool. The store dialog carries a per-item
-      // owning-org-unit picker (#596 follow-up to the SK §5.5 stamping wave), pre-filled with the
-      // order's own org unit: the resolver auto-stamps for a single-membership assignee, yields an
-      // ownerless personal row (owningOrgUnit == null, V132) for a membershipless one, and honours
-      // an
-      // explicit pick that is one of the assignee's memberships or — epic #692 Phase 4 /
-      // REQ-ORG-016,
-      // when the current caller differs from the assignee — a unit the caller may edit (create-on-
-      // behalf). It 400s a multi-membership assignee with no pick, or a pick foreign to BOTH the
-      // assignee's memberships and the caller's editable scope. See InventoryItemService and
-      // OwnerScopeService.resolveStampedOrgUnit.
       final OrgUnit owningOrgUnit =
           ownerScopeService.resolveOrgUnitForPickerOutputNullable(
               assignee, itemDto.owningOrgUnitId());
 
-      // Why: The amount the user enters in the store dialog is the authoritative
-      // amount (it overrides the originally calculated output amount of the refinery
-      // order). The note is propagated to the resulting InventoryItem so the user can
-      // attach storage remarks directly to the inventory item.
       String incomingNote = StringNormalization.trimToNull(itemDto.note());
 
-      // Append-only: every stored refinery output becomes its own row and is never folded into an
-      // existing identical stack. Rows that share a stack identity are grouped only for display
-      // (group-on-read in aggregateInventoryItems), so no read-add-write race exists and each
-      // entry keeps its own note and provenance.
       InventoryItem item = new InventoryItem();
       item.setUser(assignee);
       item.setOwningOrgUnit(owningOrgUnit);
@@ -776,12 +712,6 @@ public class RefineryOrderService {
       item.setAmount(InventoryItem.roundToScuScale(itemDto.amount()));
       item.setNote(incomingNote);
       item.setPersonal(personal);
-      // Variante C (REQ-INV-027): the deposited row earmarks its full amount to the order it was
-      // refined for and to the refinery order's mission (each as one allocation); an unset
-      // dimension
-      // stays empty. A personal row (REQ-INV-035) takes neither: the job-order pick was already
-      // rejected above, and the order's mission earmark is dropped because marking the batch
-      // personal is precisely the act of taking it out of the mission pool.
       if (jobOrder != null) {
         InventoryAllocations.addJobOrder(item, jobOrder, item.getAmount(), false);
       }
@@ -790,9 +720,6 @@ public class RefineryOrderService {
       }
 
       inventoryItemRepository.save(item);
-      // Cross-domain inventory effect: each stored refinery output creates one warehouse row. No
-      // @Modifying(clearAutomatically) runs in this loop, so the audit insert is loop-safe. The id
-      // is generated onto the managed entity by save() (GenerationType.UUID), so read it off item.
       auditService.record(
           AuditEventType.INVENTORY_RECEIVED_FROM_REFINERY,
           item.getId(),
@@ -806,10 +733,6 @@ public class RefineryOrderService {
               .with("personal", personal)
               .with("jobOrder", jobOrder != null ? "#" + jobOrder.getDisplayId() : "-"));
 
-      // Write the adjusted amount back into the refinery order so that the
-      // actually stored output amount is documented there as well.
-      // Match by output material; if multiple identical goods exist, the
-      // first not-yet-updated entry is taken.
       updateGoodOutputQuantity(order, itemDto);
     }
 
@@ -875,10 +798,6 @@ public class RefineryOrderService {
         || itemDto.amount() == null) {
       return;
     }
-    // Material AND grade. One run can yield the same material at two qualities, and matching on the
-    // material alone put every item of that material on the first of them: the later item overwrote
-    // the earlier one and the second good was never updated. The grade-less fallback keeps callers
-    // that send no quality working exactly as before.
     RefineryGood target = findGood(order, itemDto.materialId(), itemDto.quality());
     if (target == null) {
       target = findGood(order, itemDto.materialId(), null);
@@ -896,7 +815,6 @@ public class RefineryOrderService {
       } else {
         rawNew = Math.round(amount);
       }
-      // Respect @Min(1) on outputQuantity: 0 would be an invalid value.
       int clamped = (int) Math.max(1L, Math.min(rawNew, Integer.MAX_VALUE));
       good.setOutputQuantity(clamped);
     }

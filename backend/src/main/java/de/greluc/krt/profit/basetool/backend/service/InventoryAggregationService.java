@@ -992,15 +992,6 @@ public class InventoryAggregationService {
                   item.getUser().getDisplayName() != null
                       ? item.getUser().getDisplayName()
                       : item.getUser().getUsername();
-              // Variante C (REQ-INV-027): both the delivered flag and the order-relevant quantity
-              // are per-order — read this order's own job-order slice (batched via @BatchSize), not
-              // the whole entry. `delivered` is the slice's flag (an entry serving several orders
-              // shows the right state for each); `allocatedQuantity` is the slice's amount, i.e.
-              // the
-              // share actually earmarked to THIS order, which is what counts toward its fulfilment.
-              // `quantity` stays the entry's total physical stock — it backs the full-row owner /
-              // location transfer (data-amount) and is shown as context alongside the allocated
-              // share.
               Optional<InventoryJobOrderAllocation> slice =
                   item.getJobOrderAllocations().stream()
                       .filter(
@@ -1048,9 +1039,6 @@ public class InventoryAggregationService {
     JobOrder jobOrder =
         Entities.require(jobOrderRepository.findById(jobOrderId), "Job order not found");
 
-    // Per-gameItem ordered/manufactured context from the order's own item lines (REQ-ORDERS-025).
-    // getId() on the lazy GameItem proxy resolves from the FK without initialising it, so this
-    // walk issues no per-line catalogue queries; the set is empty for MATERIAL orders.
     Map<UUID, int[]> lineTotals = new HashMap<>();
     for (JobOrderItem line : jobOrder.getItems()) {
       if (line.getGameItem() == null) {
@@ -1061,9 +1049,6 @@ public class InventoryAggregationService {
       totals[1] += line.getManufacturedAmount() != null ? line.getManufacturedAmount() : 0;
     }
 
-    // Group the earmarked rows per game item (keyed by id — entity identity is irrelevant here).
-    // The query sorts by owner/location/name, so within a group the entries already carry the
-    // display order; the LinkedHashMap only collects them.
     Map<UUID, List<InventoryItem>> byGameItem = new LinkedHashMap<>();
     for (InventoryItem row :
         inventoryItemRepository.findGameItemRowsByJobOrderIdOrdered(jobOrderId)) {
@@ -1081,9 +1066,6 @@ public class InventoryAggregationService {
                 row.getUser().getDisplayName() != null
                     ? row.getUser().getDisplayName()
                     : row.getUser().getUsername();
-            // Variante C (REQ-INV-027): delivered and the order-relevant quantity are per-order —
-            // read this order's own slice (batched via @BatchSize), never the whole entry. Item
-            // rows hold whole units (REQ-INV-029), so the SCU-typed amounts round loss-free.
             Optional<InventoryJobOrderAllocation> slice =
                 row.getJobOrderAllocations().stream()
                     .filter(

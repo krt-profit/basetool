@@ -34,8 +34,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-// covers REQ-MISSION-001 (server-side whole-aUEC enforcement) - see
-// docs/specs/whole-number-amounts.md
 /**
  * Bean Validation contract tests for the mission-finance write DTOs. They pin the whole-aUEC rule
  * (REQ-MISSION-001): an operator-entered finance amount must be a whole number, so the

@@ -74,9 +74,6 @@ class OrgUnitControllerTest {
 
   @Test
   void listActiveOrgUnitsAllKinds_delegatesToService() {
-    // Epic #692 Phase 6 (REQ-ORG-019): the all-kinds picker (bank account-create form) surfaces the
-    // Bereich/OL tiers the public /active list omits, so the handler must wire to the all-kinds
-    // service method, not listAllActiveOptions.
     OrgUnitMembershipOptionDto bereich =
         new OrgUnitMembershipOptionDto(
             UUID.randomUUID(), "Profit", "PRF", OrgUnitKind.BEREICH, false);

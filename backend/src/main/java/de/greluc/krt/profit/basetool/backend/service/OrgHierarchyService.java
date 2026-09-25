@@ -179,9 +179,6 @@ public class OrgHierarchyService {
     OptimisticLock.check(child.getVersion(), version, OrgUnit.class, orgUnitId);
     if (parentOrgUnitId == null) {
       child.setParent(null);
-      // saveAndFlush (not save): the controller is class-@Transactional, so without an explicit
-      // flush the @Version increment would be deferred past the toDto mapping and the response
-      // would carry the stale pre-update version, 409-ing the caller's next chained edit.
       return orgUnitRepository.saveAndFlush(child);
     }
     OrgUnit parent =

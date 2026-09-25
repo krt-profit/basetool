@@ -73,9 +73,6 @@ class BankAccountDetailFragmentMvcTest {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   }
 
-  // covers REQ-FE-002 — fragment=bookings renders only the booking-history block: the booking row
-  // and page-nav are present, but the swap-target wrapper and the page's modals (outside the
-  // fragment) are not.
   @Test
   @WithMockUser(roles = "BANK_EMPLOYEE")
   void accountDetail_fragmentBookings_rendersOnlyBookingsFragment() throws Exception {
@@ -99,7 +96,6 @@ class BankAccountDetailFragmentMvcTest {
             BigDecimal.ZERO,
             null,
             null);
-    // Two pages so the embedded pager renders.
     when(backendApiClient.get(contains("/transactions"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(booking), 0, 20, 25L, 2, List.of()));
 
@@ -107,24 +103,14 @@ class BankAccountDetailFragmentMvcTest {
         .perform(get("/bank/accounts/" + accountId).param("fragment", "bookings"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("Fragment note")))
-        // REQ-BANK-045: the Begründung and Notiz render in the expandable per-row detail sub-row.
         .andExpect(content().string(containsString("Fragment reason")))
         .andExpect(content().string(containsString("class=\"pagination\"")))
-        // REQ-BANK-051: the pager link carries page=1; paginationBaseUrl now also carries the
-        // period.
         .andExpect(content().string(containsString("page=1")))
-        // REQ-BANK-051: the page-size picker (10/50/100) renders once the total exceeds the
-        // smallest.
         .andExpect(content().string(containsString("page-size-picker")))
-        // Wrapper div and the page's modals live outside the fragment.
         .andExpect(content().string(not(containsString("id=\"bank-bookings-results\""))))
         .andExpect(content().string(not(containsString("bank-statement-submit"))));
   }
 
-  // covers REQ-BANK-049 — fragment=balanceChart renders only the balance-chart block: the preset
-  // range selector (default 90d active), the inline SVG line + a target-line legend when a target
-  // is
-  // set. The swap-target wrapper (outside the fragment) is not.
   @Test
   @WithMockUser(roles = "BANK_EMPLOYEE")
   void accountDetail_fragmentBalanceChart_rendersRangeSelectorAndChart() throws Exception {
@@ -149,7 +135,6 @@ class BankAccountDetailFragmentMvcTest {
         .andExpect(content().string(not(containsString("id=\"bank-chart-results\""))));
   }
 
-  // covers REQ-BANK-049 — an empty series renders the chart's empty state, not the SVG.
   @Test
   @WithMockUser(roles = "BANK_EMPLOYEE")
   void accountDetail_fragmentBalanceChart_emptySeries_rendersEmptyState() throws Exception {

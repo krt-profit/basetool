@@ -111,9 +111,6 @@ public class JobOrderMaterialDemandService {
   @NotNull
   @Transactional(readOnly = true)
   public MaterialDemandOverviewDto getMaterialDemandOverview() {
-    // Viewer-side profit gate, mirroring the order queue: a caller who belongs to no
-    // profit-eligible
-    // org unit is not part of the order workflow and must not see its aggregated demand either.
     if (!ownerScopeService.canViewJobOrders()) {
       return new MaterialDemandOverviewDto(List.of());
     }
@@ -137,9 +134,6 @@ public class JobOrderMaterialDemandService {
                 .filter(JobOrderMaterialDemandService::isSpecialCommandResponsible)
                 .toList());
 
-    // LinkedHashMap throughout: the orders arrive displayId-ordered, so a bucket's
-    // contributing-order
-    // list is built in that order and stays stable across requests without a second sort.
     Map<UUID, GroupAccumulator> groups = new LinkedHashMap<>();
     for (JobOrder order : orders) {
       Map<BucketKey, ClaimBucketDto> claimByBucket =

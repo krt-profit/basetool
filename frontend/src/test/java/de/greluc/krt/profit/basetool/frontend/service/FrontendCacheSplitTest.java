@@ -65,9 +65,6 @@ class FrontendCacheSplitTest {
 
   @Test
   void cachedCatalogFetchModesArePinned() {
-    // REQ-ADMIN-003: exactly these paged catalogues are assembled complete by the page walk
-    // inside getCached — dropping one from this set silently reintroduces the bounded-page
-    // truncation this test exists to prevent.
     java.util.EnumSet<CachedCatalog> expectedPageWalked =
         java.util.EnumSet.of(
             CachedCatalog.SQUADRONS,
@@ -90,15 +87,11 @@ class FrontendCacheSplitTest {
           catalog.isPageWalked(),
           () -> catalog.name() + " has an unexpected fetch mode");
     }
-    // ITEM_CATALOG is a deliberate single-row existence probe (size=1) — pinned SINGLE so nobody
-    // "fixes" it into a walk and pulls the whole item catalogue into the probe cache entry.
     assertEquals(CachedCatalog.Fetch.SINGLE, CachedCatalog.ITEM_CATALOG.getFetch());
   }
 
   @Test
   void pageWalkedCatalogUrisSupportPageAppending() {
-    // The walk appends "&page=N" to the pinned URI, so every page-walked URI must already carry
-    // a query string with an explicit chunk size and must not pin a page index of its own.
     for (CachedCatalog catalog : CachedCatalog.values()) {
       if (!catalog.isPageWalked()) {
         continue;

@@ -173,8 +173,6 @@ public class SpecialCommandController {
   })
   public SpecialCommandDto createSpecialCommand(@RequestBody @Valid SpecialCommandDto dto) {
     var toCreate = specialCommandMapper.toEntity(dto);
-    // L-7: strip client-supplied id/version so create cannot become a merge()-UPSERT of another
-    // row.
     toCreate.setId(null);
     toCreate.setVersion(null);
     return specialCommandMapper.toDto(specialCommandService.createSpecialCommand(toCreate));

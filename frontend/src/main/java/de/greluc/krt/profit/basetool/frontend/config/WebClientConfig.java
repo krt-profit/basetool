@@ -349,8 +349,6 @@ public class WebClientConfig {
    */
   @NotNull
   private ReactorClientHttpConnector connector(boolean streaming, String poolName) {
-    // The SSE relay never negotiates HTTP/2 (see the Javadoc); everything else follows the
-    // property.
     boolean http2 =
         !streaming && httpProperties.backendProtocol() == AppHttpProperties.BackendProtocol.H2;
     try {
@@ -370,21 +368,9 @@ public class WebClientConfig {
           builder = builder.trustManager(tmf);
           pinnedTrust = true;
         } catch (NoSuchSslBundleException ignored) {
-          // No `backend-trust` SSL bundle defined for the active profile —
-          // fall back to the JVM default trust store. This path supports
-          // deployments where the backend is fronted by a publicly-trusted
-          // cert (Let's Encrypt, internal corporate CA already in cacerts,
-          // etc.) and no per-deployment truststore configuration is needed.
-          // pinnedTrust stays false so hostname verification remains enabled
-          // on this fallback path.
         }
       }
       if (http2) {
-        // Without this the negotiation cannot happen at all: Reactor Netty asks the SslContext what
-        // to advertise, and a context built with no applicationProtocolConfig advertises nothing,
-        // so the server answers HTTP/1.1 and the `.protocol(H2, HTTP11)` below silently buys
-        // nothing. NO_ADVERTISE / ACCEPT is the pair Netty documents for a client: offer both, and
-        // accept whichever the server picks rather than failing the handshake over it.
         builder =
             builder.applicationProtocolConfig(
                 new ApplicationProtocolConfig(
@@ -395,40 +381,14 @@ public class WebClientConfig {
                     ApplicationProtocolNames.HTTP_1_1));
       }
       SslContext sslContext = builder.build();
-      // Pinned trust skips the name check -- unless the per-service certificates are in place
-      // (REQ-SEC-070): one internal CA then signs every service, so the chain alone no longer
-      // tells the backend from the ingest or Keycloak, and the name is what does. dev/test keep the
-      // wholesale trust of the ephemeral certificate either way.
       boolean disableHostnameVerification =
           pinnedTrust
               && (profiles.contains("dev")
                   || profiles.contains("test")
                   || !httpProperties.verifyBackendHostname());
 
-      // The connection pool differs by traffic shape: request/response traffic reuses a bounded
-      // pool, while the SSE relay needs a far larger one because each live stream holds its
-      // connection for the whole time the viewer's page is open (ADR-0078 scale-hardening).
       final reactor.netty.resources.ConnectionProvider provider;
       if (streaming) {
-        // SSE relay pool. Each viewing browser holds one long-lived (~30-min) frontend->backend
-        // stream for as long as its page is open, and a streaming connection is never returned to
-        // the pool until the stream ends -- so maxConnections here is a hard ceiling on *concurrent
-        // live viewers*, not a connection-reuse cap. At the request pool's 100 the 101st concurrent
-        // viewer's relay would block on pendingAcquireTimeout and then fail, silently dropping that
-        // user's live notification push. Sized at 1000 so a full mission audience (200+ viewers)
-        // has ample headroom on the 16 GB host; mostly-idle long-lived TCP sockets are cheap. No
-        // maxLifeTime: a 30-minute stream must never be treated as "too old" to keep alive. The
-        // 10 s pendingAcquireTimeout is live here (unlike the request pool's): the SSE relay runs
-        // through NO Resilience4j TimeLimiter, so this is the only bound on an acquire wait once
-        // the
-        // 1000 ceiling is hit. metrics(true) exposes reactor.netty.connection.provider.* so pool
-        // saturation -- the silent 1001st-viewer drop -- is visible on the dashboard and alertable.
-        //
-        // The idle bound is the shared BACKEND_POOL_MAX_IDLE_TIME even though this pool's
-        // connections are rarely idle: "idle" here means a connection with no live stream on it,
-        // and such a connection faces the same Tomcat keep-alive as any other. Its former 30 s sat
-        // ABOVE that keep-alive, so this pool was the worse half of the same collision. It cannot
-        // touch a running stream -- a streaming connection is not in the pool while it streams.
         provider =
             reactor.netty.resources.ConnectionProvider.builder(poolName)
                 .maxConnections(1000)
@@ -438,19 +398,6 @@ public class WebClientConfig {
                 .metrics(true)
                 .build();
       } else {
-        // Request/response pool sized at 100 connections: a single mission-detail render now fans
-        // out to four parallel backend calls via `ParallelPageLoader`, so ~25 concurrent users can
-        // exhaust a 50-slot pool. 100 gives comfortable headroom. pendingAcquireTimeout is 5 s to
-        // MATCH the backendApi Resilience4j TimeLimiter (timeoutDuration 5 s, cancelRunningFuture),
-        // which wraps the whole exchange including pool acquisition: a longer acquire wait here was
-        // dead config (the TimeLimiter cancels the exchange at 5 s before it could ever elapse) and
-        // let the two budgets diverge. Keeping them equal means a saturation wait fails fast at the
-        // caller's real patience instead of the backend later running a query for a request the
-        // frontend already abandoned. metrics(true) exposes reactor.netty.connection.provider.* for
-        // pool observability. The idle bound and its sweep are BACKEND_POOL_MAX_IDLE_TIME /
-        // BACKEND_POOL_EVICT_INTERVAL — deliberately shorter than the peer's keep-alive rather than
-        // equal to it; see that constant for why equal is the one setting that cannot work.
-        // maxLifeTime is unrelated to that race (connection age, not idleness) and is unchanged.
         reactor.netty.resources.ConnectionProvider.Builder pool =
             reactor.netty.resources.ConnectionProvider.builder(poolName)
                 .maxConnections(100)
@@ -460,31 +407,6 @@ public class WebClientConfig {
                 .evictInBackground(BACKEND_POOL_EVICT_INTERVAL)
                 .metrics(true);
         if (http2) {
-          // Order matters and is not obvious: ConnectionProvider.Builder#maxConnections NULLS any
-          // allocation strategy set before it, so this must come after the call above or the whole
-          // strategy is silently dropped. maxConnections is repeated inside the strategy because
-          // that, and not the builder field, is what the H2 pool reads.
-          //
-          // strictConnectionReuse(true) is the line without which none of this does anything.
-          // Reactor Netty's H2 pool defaults it to FALSE, which means: while a permit is available,
-          // prefer opening a NEW connection over adding a stream to an open one. Negotiating HTTP/2
-          // and leaving that default in place gives forty concurrent calls forty sockets carrying
-          // one stream each -- the HTTP/1.1 shape, at HTTP/2's framing cost, with the pool metrics
-          // reporting the same numbers as before. Measured, not assumed:
-          // WebClientHttp2NegotiationTest counts distinct peer addresses on a real handshake and
-          // saw exactly 40 before this flag was set and 2 after.
-          // maxConnections(5), not 100. Under HTTP/2 an allocation permit is a CONNECTION and each
-          // then carries up to maxConcurrentStreams, so `Http2AllocationStrategy.permitMaximum()`
-          // returning 100 would have meant a ceiling of 100 x 20 = 2000 concurrent calls where
-          // HTTP/1.1 had 100. For the two bulkheaded clients that is invisible -- `backendApi` caps
-          // them at 100 either way -- but `liveSyncAuthWebClient` deliberately carries no
-          // Resilience4j chain, so its ceiling really would have moved from 100 to 2000. On a
-          // frontend redeploy every open /ws/sync socket fires a subscribe-authorization probe at
-          // once, and 2000 of them reach a Tomcat that executes 20 streams per connection.
-          //
-          // 5 x 20 = 100 restores exactly the ceiling that was there before, and keeps the
-          // Javadoc's claim above -- "the bulkhead's 100 remains the real gate" -- true for the one
-          // bean the bulkhead does not cover.
           pool =
               pool.allocationStrategy(
                   Http2AllocationStrategy.builder()
@@ -515,16 +437,9 @@ public class WebClientConfig {
                   ChannelOption.CONNECT_TIMEOUT_MILLIS,
                   Math.toIntExact(httpProperties.connectTimeout().toMillis()));
       if (http2) {
-        // Both, never H2 alone. Reactor Netty removes H2 from a multi-protocol config when the URL
-        // turns out to be plain `http://` and only errors out when H2 is the sole entry -- which is
-        // what lets the `test` profile keep pointing at http://backend:11261 without a second
-        // code path. HttpClientConnect#removeIncompatibleProtocol is the exact behaviour relied on.
         httpClient = httpClient.protocol(HttpProtocol.H2, HttpProtocol.HTTP11);
       }
       if (streaming) {
-        // SSE relay: a long-lived response delivering sparse events. A response / read timeout
-        // would sever the stream between events, so neither is applied (the backend heartbeat
-        // keeps the connection warm); only a write timeout guards the outbound request.
         httpClient =
             httpClient.doOnConnected(
                 conn ->
@@ -532,40 +447,8 @@ public class WebClientConfig {
                         new WriteTimeoutHandler(
                             httpProperties.writeTimeout().toMillis(), TimeUnit.MILLISECONDS)));
       } else {
-        // NO gzip on this hop (BE-PERF-14, ADR-0161 §8.5 amendment 2026-09-23): the client sends no
-        // `Accept-Encoding`, so the backend never compresses for it. Measured on the real embedded
-        // Tomcat: a 210 KB inventory page (a no-store family, the only kind Tomcat compresses at
-        // all) cost about 1.4 ms of server CPU to gzip and 0.2 ms to inflate here, and answered
-        // 1.6-3.2 ms SLOWER than uncompressed — the hop is a container bridge on one host, where
-        // the
-        // ten-fold byte saving buys nothing. The ETagged catalogue families (materials, missions,
-        // ...) were never compressed in the first place: Tomcat 11 refuses gzip for a response with
-        // a strong ETag, which the backend's ShallowEtagHeaderFilter sets on every one of them. The
-        // backend keeps `server.compression` for the callers behind the edge, which do ask for it.
-        // The in-memory codec limit bounds the body either way.
         httpClient = httpClient.responseTimeout(httpProperties.responseTimeout());
         if (http2) {
-          // NO channel-level ReadTimeoutHandler under HTTP/2, and this is not a nicety.
-          //
-          // That handler bounds silence on a CONNECTION, which was the right unit when a connection
-          // carried one request at a time: under HTTP/1.1 it fired on an idle pooled connection,
-          // closed it, and cost a spare out of a hundred. Under HTTP/2 with strict connection reuse
-          // one or two connections carry everything and are idle between bursts by design -- so the
-          // 3 s timeout fires on the connection the whole application is riding, closes it, and the
-          // next request in flight dies with `PrematureCloseException: Connection prematurely
-          // closed BEFORE response`. The pool's own idle bound never gets a say because 3 s comes
-          // first.
-          //
-          // Observed, not theorised: the first E2E run after HTTP/2 landed carried 169 of exactly
-          // that pair in the frontend log, and five write flows failed because krtFetch fell back
-          // to a full page reload on the failed call. The log lines have no correlation id, which
-          // is the tell -- the timeout fired with no request in flight.
-          //
-          // What still bounds a call: `responseTimeout` (Reactor Netty adds a ReadTimeoutHandler
-          // when the request is sent and removes it when the response is complete -- per REQUEST,
-          // and HTTP/2-aware), and the `backendApi` Resilience4j TimeLimiter at 5 s. The write
-          // timeout is kept because it arms per write promise rather than on idle, so multiplexing
-          // does not change what it means.
           httpClient =
               httpClient.doOnConnected(
                   conn ->
@@ -604,20 +487,6 @@ public class WebClientConfig {
 
     return (request, next) ->
         next.exchange(request)
-            // Surface ONLY 5xx server errors to the resilience operators below. A 4xx is a
-            // client-side signal — a 429 rate-limit, a 404, a 409 conflict — NOT a backend-health
-            // fault: retrying it wastes the budget (and for 429 ignores Retry-After, piling load
-            // onto an already-throttled backend), and recording it as a circuit-breaker failure
-            // would trip the shared 'backendApi' breaker OPEN and cascade a per-request client
-            // error
-            // into a total frontend outage (the 429 storm of 2026-07-06, ADR-0077). 4xx responses
-            // therefore pass through untouched; retrieve() turns them into a
-            // WebClientResponseException
-            // downstream, where handleWebClientException maps each to its proper per-call
-            // user-facing
-            // result. Transport failures (timeout, connection reset) already arrive as errors and
-            // still reach the operators. Mirrors the ingest gateway's breaker, which likewise never
-            // opens on an HTTP status error.
             .flatMap(
                 resp -> {
                   if (resp.statusCode().is5xxServerError()) {
@@ -625,9 +494,6 @@ public class WebClientConfig {
                   }
                   return Mono.just(resp);
                 })
-            // Apply operators (order: bulkhead -> timeLimiter -> retry -> circuitBreaker)
-            // Retry before CB so all retry attempts are executed against backend;
-            // CB will evaluate across top-level calls.
             .transformDeferred(BulkheadOperator.of(bh))
             .transformDeferred(TimeLimiterOperator.of(tl))
             .transformDeferred(
@@ -783,8 +649,6 @@ public class WebClientConfig {
         new DefaultOAuth2AuthorizedClientManager(
             clientRegistrationRepository, authorizedClientRepository);
     delegate.setAuthorizedClientProvider(authorizedClientProvider);
-    // Stop the servlet request's parameters (notably the "Staffel" filter's scope=all|mine) from
-    // leaking into the refresh-token grant as the OAuth2 requested scope (REQ-SEC-012).
     delegate.setContextAttributesMapper(NO_REQUEST_DERIVED_ATTRIBUTES);
 
     return new SingleFlightAuthorizedClientManager(delegate);

@@ -104,9 +104,6 @@ class ProvenanceGuardTest {
 
   @Test
   void shouldAcceptBothSpellingsTheExtractorActuallyEmits() {
-    // The 2026-08-03 incident: the extractor emits a DIFFERENT producer string per export path —
-    // the slug on the refinery path, the display name on the blueprint path. The allowlist named
-    // only the slug, so every blueprint send was refused with 403 while refinery sends worked.
     ProvenanceGuard guard = guard(List.of(APPROVED_TOOL, "Basetool SC Extractor"), false);
 
     assertThatCode(
@@ -120,9 +117,6 @@ class ProvenanceGuardTest {
 
   @Test
   void shouldCompareTheProducerIgnoringCase() {
-    // Defence against the adjacent failure: a later release merely re-casing its constant would
-    // otherwise take the ingest path down again. The two real spellings differ structurally, so
-    // case folding alone would not have prevented the incident — it removes the next one.
     assertThatCode(
             () ->
                 guard(List.of(APPROVED_TOOL), false)
@@ -144,8 +138,6 @@ class ProvenanceGuardTest {
 
   @Test
   void shouldRejectAPayloadThatDeclaresNoProducerAtAll() {
-    // The casual hand-rolled payload: it never thought to set `tool`. Absent must be refused, not
-    // waved through as "nothing to compare".
     assertThatThrownBy(
             () ->
                 guard(List.of(APPROVED_TOOL), false)
@@ -161,14 +153,11 @@ class ProvenanceGuardTest {
                 guard(List.of(APPROVED_TOOL), true)
                     .requireApprovedTool(new Provenance("some-other-tool", "1.0", 1)))
         .doesNotThrowAnyException();
-    // Counted regardless — that is what makes the audit-only rollout measurable.
     assertThat(rejected()).isEqualTo(1.0d);
   }
 
   @Test
   void shouldSanitiseTheRejectedToolBeforeLoggingIt() {
-    // `tool` is unvalidated internet-facing free text. A newline in it would forge a second log
-    // line — and this reject path is exactly where an attacker-chosen value reaches the logger.
     Provenance forged = new Provenance("evil\nERROR fabricated entry", "1.0", 1);
 
     List<ILoggingEvent> events =
@@ -179,7 +168,6 @@ class ProvenanceGuardTest {
               try {
                 guard(List.of(APPROVED_TOOL), false).requireApprovedTool(forged);
               } catch (ClientNotAllowedException expected) {
-                // The reject is the point of the test; the log line is what is asserted.
               }
             });
 
@@ -189,7 +177,6 @@ class ProvenanceGuardTest {
 
   @Test
   void shouldNotEchoTheRejectedToolBackToTheCaller() {
-    // The response must not quote unvalidated input back at the client; the log carries the value.
     assertThatThrownBy(
             () ->
                 guard(List.of(APPROVED_TOOL), false)

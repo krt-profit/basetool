@@ -1,34 +1,12 @@
-; systemd timer for the cgroup v2 container metrics collector.
-;
-; EVERY 30 SECONDS, matching Prometheus's scrape interval for this deployment. A textfile metric is
-; only as fresh as the last write, and writing less often than the scrape turns a counter into a
-; staircase: rate() over container_cpu_usage would read as flat for a minute and then jump, and the
-; throttling and OOM alerts -- whose whole value is catching a short spike -- would miss anything
-; shorter than the gap.
-;
-; AccuracySec is pinned to 1s. systemd's default is a full minute of slack, which it uses to batch
-; timers for power saving, and on a 30s period that slack IS the period: the interval would wander
-; between 30 and 90 seconds while `systemctl list-timers` still displayed 30s.
-
 [Unit]
 Description=Profit Basetool — container metrics every 30s
 Documentation=https://github.com/krt-profit/basetool/blob/main/scripts/cgroup-container-metrics.py
-; No Requires= on the service: a timer only TRIGGERS it, through Unit= below. A Requires= also
-; starts the service whenever the timer itself starts -- at every boot, when timers.target pulls the
-; timer in -- without the timer elapsing, which defeated the OnBootSec=30s below on every boot until
-; 2026-09-25 (docs/arc42/07-deployment-view.md §7.4b). Guarded by scripts/container-runtime.test.sh.
 
 [Timer]
-; The first run 30s after boot, not immediately: at boot the container units are still starting and
-; their cgroups do not exist yet, so an immediate run would write an empty file and log "nothing
-; matched" on every single boot.
 OnBootSec=30s
 OnUnitActiveSec=30s
 AccuracySec=1s
 
-; Deliberately NOT Persistent=true. Catching up a missed run means writing a metric file whose
-; contents describe a moment that has passed; for a gauge read by the next scrape that is worse
-; than the gap it fills.
 Persistent=false
 
 Unit=iri-container-metrics.service

@@ -75,8 +75,6 @@ class StaffelMembershipResolverTest {
         resolver.resolveNameSortedStaffelIds(List.of(staffelRow(userId, squadronId)));
 
     assertEquals(List.of(squadronId), result);
-    // The single-Staffel case is already its own primary — only a cheap existence check, no name
-    // sort and no full entity load.
     verify(squadronRepository).existsById(squadronId);
     verify(orgUnitRepository, never()).findAllById(any());
   }
@@ -85,8 +83,6 @@ class StaffelMembershipResolverTest {
   void resolveNameSortedStaffelIds_singleDangling_returnsEmpty() {
     UUID userId = UUID.randomUUID();
     UUID danglingId = UUID.randomUUID();
-    // A single dangling row (its squadron no longer resolves) is dropped exactly like a dangling
-    // row among two — not returned unchecked (finding #4: consistent dangling-row handling).
     when(squadronRepository.existsById(danglingId)).thenReturn(false);
 
     List<UUID> result =
@@ -100,7 +96,6 @@ class StaffelMembershipResolverTest {
     UUID userId = UUID.randomUUID();
     UUID alphaId = UUID.randomUUID();
     UUID bravoId = UUID.randomUUID();
-    // Rows + entities in non-alphabetical order to prove the sort decides, not the input order.
     when(orgUnitRepository.findAllById(any()))
         .thenReturn(List.of((OrgUnit) squadron(bravoId, "Bravo"), squadron(alphaId, "alpha")));
 
@@ -108,7 +103,6 @@ class StaffelMembershipResolverTest {
         resolver.resolveNameSortedStaffelIds(
             List.of(staffelRow(userId, bravoId), staffelRow(userId, alphaId)));
 
-    // Case-insensitive: "alpha" sorts before "Bravo".
     assertEquals(List.of(alphaId, bravoId), result);
   }
 
@@ -117,7 +111,6 @@ class StaffelMembershipResolverTest {
     UUID userId = UUID.randomUUID();
     UUID aliveId = UUID.randomUUID();
     UUID danglingId = UUID.randomUUID();
-    // Only the live squadron resolves; the dangling row is silently dropped by the batch load.
     when(orgUnitRepository.findAllById(any()))
         .thenReturn(List.of((OrgUnit) squadron(aliveId, "Alpha")));
 
@@ -148,15 +141,11 @@ class StaffelMembershipResolverTest {
             List.of(staffelRow(userId, bravoId), staffelRow(userId, alphaId)));
 
     assertEquals(List.of(alpha, bravo), result);
-    // The single-row fast path of the id variant does NOT apply here — the entity variant always
-    // batch-loads, even for one row, because the caller needs the squadron's name + shorthand.
     verify(orgUnitRepository).findAllById(any());
   }
 
   @Test
   void resolveNameSortedStaffeln_filtersNonSquadronKinds() {
-    // The polymorphic batch (HHH000179 narrowing fix) may surface any OrgUnit kind; the resolver
-    // must keep the old Squadron-typed query's discriminator semantics and drop non-Staffel rows.
     UUID userId = UUID.randomUUID();
     UUID staffelId = UUID.randomUUID();
     UUID skId = UUID.randomUUID();

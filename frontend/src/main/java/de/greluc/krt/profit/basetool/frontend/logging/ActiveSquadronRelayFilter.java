@@ -78,8 +78,6 @@ public class ActiveSquadronRelayFilter {
     return (request, next) -> {
       UUID active = ActiveSquadronContext.get();
       if (active == null) {
-        // Only the method and the path — never the query string, which carries user-typed
-        // search terms on the catalog/type-ahead proxies (REQ-OBS-004).
         log.debug(
             "No active OrgUnit bound on this thread; relaying {} {} without the {} header",
             request.method(),

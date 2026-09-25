@@ -80,8 +80,6 @@ class MaterialCollectionDeliveredInPlaceE2eTest {
   private static BackendSeeder seeder;
   private static Path storageState;
 
-  // Seeded once: a job order, its requested material, a storage location, and a job-order-linked
-  // inventory item whose delivered flag the test toggles twice.
   private static String jobOrderId;
   private static String deliveredItemId;
 
@@ -145,8 +143,6 @@ class MaterialCollectionDeliveredInPlaceE2eTest {
         E2eSupport.navigate(page, baseUrl + "/orders/" + jobOrderId + "/material-collection");
         page.waitForLoadState();
 
-        // Marker on the live document: a full reload wipes it, so its survival proves both toggles
-        // stayed in place.
         page.evaluate("() => { window.__krtNoReload = true; }");
 
         Locator checkbox =
@@ -155,7 +151,6 @@ class MaterialCollectionDeliveredInPlaceE2eTest {
 
         boolean initial = persistedDelivered();
 
-        // First in-place toggle: flips the boolean, a genuine change.
         toggleInPlace(page, checkbox);
         assertEquals(
             Boolean.TRUE,
@@ -163,8 +158,6 @@ class MaterialCollectionDeliveredInPlaceE2eTest {
             "the delivered toggle must update in place — no page reload on success");
         assertEquals(!initial, persistedDelivered(), "the first in-place toggle must persist");
 
-        // Second consecutive in-place toggle WITHOUT a reload: only succeeds if the first write
-        // synced the fresh @Version onto the row's data-version (otherwise the stale version 409s).
         toggleInPlace(page, checkbox);
         assertEquals(
             Boolean.TRUE,

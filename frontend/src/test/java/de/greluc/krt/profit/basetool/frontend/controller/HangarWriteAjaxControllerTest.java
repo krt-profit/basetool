@@ -175,8 +175,6 @@ class HangarWriteAjaxControllerTest {
   @Test
   @WithMockUser
   void addShip_withoutAjaxHeader_routesToClassicRedirectFallback() throws Exception {
-    // No X-Requested-With header -> the classic @ModelAttribute handler wins and redirects, proving
-    // the header-gated twin does not shadow the no-JS fallback (REQ-FE-006).
     mockMvc
         .perform(
             post("/hangar/add")

@@ -136,7 +136,7 @@ class UserServiceTest {
   @Test
   void updateUserShareBlueprintsGlobally_staleVersion_throwsAndDoesNotSave() {
     UUID id = UUID.randomUUID();
-    User user = userWithId(id); // version 0
+    User user = userWithId(id);
     when(userRepository.findById(id)).thenReturn(Optional.of(user));
 
     assertThrows(

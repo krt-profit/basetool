@@ -130,7 +130,6 @@ class JobOrderItemProductionServiceTest {
             .deliveredAmount(0)
             .build();
     line.setVersion(LINE_VERSION);
-    // requiredQuantity holds the demand for the WHOLE ordered amount (4 units) → per-unit 40.
     JobOrderItemMaterial req =
         JobOrderItemMaterial.builder()
             .id(UUID.randomUUID())
@@ -151,8 +150,6 @@ class JobOrderItemProductionServiceTest {
     inventoryItem.setMaterial(material);
     inventoryItem.setAmount(100.0);
     inventoryItem.setVersion(INVENTORY_VERSION);
-    // Variante C (REQ-INV-027): earmark the entry's full stock to this order, as the create path
-    // does — the production guard reads this job-order slice.
     InventoryAllocations.addJobOrder(inventoryItem, order, 100.0, false);
 
     lenient().when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(order));
@@ -164,9 +161,6 @@ class JobOrderItemProductionServiceTest {
         .thenReturn(
             List.of(new JobOrderItemDto(lineId, null, null, 4, 1, 0, null, List.of(), false, 4L)));
 
-    // REQ-INV-032: bookIn is required on every payload, so the fixture line carries a produced
-    // game item and the book-in collaborators resolve the defaultBookIn() target (acting user,
-    // fixture location, no picker output). Lenient — the guard-path tests throw before book-in.
     GameItem fixtureGameItem = new GameItem();
     fixtureGameItem.setId(UUID.randomUUID());
     fixtureGameItem.setName("Quantum Drive");
@@ -201,7 +195,6 @@ class JobOrderItemProductionServiceTest {
 
   @Test
   void bookProduction_happyPath_bumpsManufactured_reducesInventoryAndSlice_audits() {
-    // Given — one unit is produced, consuming exactly its 40-SCU Steel demand from the entry.
     JobOrderItemProductionCreateDto dto =
         new JobOrderItemProductionCreateDto(
             1,
@@ -212,11 +205,8 @@ class JobOrderItemProductionServiceTest {
             List.of(),
             defaultBookIn());
 
-    // When
     JobOrderItemDto result = service.bookProduction(orderId, lineId, dto);
 
-    // Then — the line advances to 1 manufactured, the entry drops to 60 and its slice follows;
-    // the required bookIn additionally creates the produced stock row (REQ-INV-032).
     assertThat(result.id()).isEqualTo(lineId);
     assertThat(line.getManufacturedAmount()).isEqualTo(1);
     assertThat(inventoryItem.getAmount()).isEqualTo(60.0);
@@ -234,12 +224,10 @@ class JobOrderItemProductionServiceTest {
 
   @Test
   void bookProduction_amountExceedsRemainingToManufacture_throws422_noSave() {
-    // Given — 3 of 4 already manufactured, so only 1 unit remains, but 2 are requested.
     line.setManufacturedAmount(3);
     JobOrderItemProductionCreateDto dto =
         new JobOrderItemProductionCreateDto(2, LINE_VERSION, List.of(), List.of(), defaultBookIn());
 
-    // When & Then
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
         .isInstanceOf(ProductionAllocationException.class);
     assertThat(line.getManufacturedAmount()).isEqualTo(3);
@@ -249,7 +237,6 @@ class JobOrderItemProductionServiceTest {
 
   @Test
   void bookProduction_consumptionUnderCoversDemand_throws422() {
-    // Given — 30 SCU assigned against a 40-SCU demand: the plan under-covers the material.
     JobOrderItemProductionCreateDto dto =
         new JobOrderItemProductionCreateDto(
             1,
@@ -260,7 +247,6 @@ class JobOrderItemProductionServiceTest {
             List.of(),
             defaultBookIn());
 
-    // When & Then
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
         .isInstanceOf(ProductionAllocationException.class);
     verify(inventoryItemRepository, never()).save(any());
@@ -269,7 +255,6 @@ class JobOrderItemProductionServiceTest {
 
   @Test
   void bookProduction_consumptionOverCoversDemand_throws422() {
-    // Given — 50 SCU assigned against a 40-SCU demand: the plan over-covers the material.
     JobOrderItemProductionCreateDto dto =
         new JobOrderItemProductionCreateDto(
             1,
@@ -280,7 +265,6 @@ class JobOrderItemProductionServiceTest {
             List.of(),
             defaultBookIn());
 
-    // When & Then
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
         .isInstanceOf(ProductionAllocationException.class);
     verify(inventoryItemRepository, never()).save(any());
@@ -289,14 +273,12 @@ class JobOrderItemProductionServiceTest {
 
   @Test
   void bookProduction_nonItemOrder_throwsBadRequest() {
-    // Given — the order is a MATERIAL order, which has no item lines to produce.
     JobOrder materialOrder = JobOrder.builder().type(JobOrderType.MATERIAL).build();
     materialOrder.setId(orderId);
     when(jobOrderRepository.findById(orderId)).thenReturn(Optional.of(materialOrder));
     JobOrderItemProductionCreateDto dto =
         new JobOrderItemProductionCreateDto(1, LINE_VERSION, List.of(), List.of(), defaultBookIn());
 
-    // When & Then
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
         .isInstanceOf(BadRequestException.class)
         .hasMessageContaining("not an item order");
@@ -304,7 +286,6 @@ class JobOrderItemProductionServiceTest {
 
   @Test
   void bookProduction_lineVersionMismatch_throwsOptimisticLock() {
-    // Given — the echoed line version does not match the persisted one.
     JobOrderItemProductionCreateDto dto =
         new JobOrderItemProductionCreateDto(
             1,
@@ -315,7 +296,6 @@ class JobOrderItemProductionServiceTest {
             List.of(),
             defaultBookIn());
 
-    // When & Then
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
         .isInstanceOf(ObjectOptimisticLockingFailureException.class);
     assertThat(line.getManufacturedAmount()).isZero();
@@ -324,8 +304,6 @@ class JobOrderItemProductionServiceTest {
 
   @Test
   void bookProduction_consumedEntryHasNoOrderSlice_throwsBadRequest() {
-    // Given — the coverage plan is exact (40 SCU for the 40-SCU demand), but the entry carries no
-    // slice earmarked to this order, so the per-entry guard rejects it.
     inventoryItem.getJobOrderAllocations().clear();
     JobOrderItemProductionCreateDto dto =
         new JobOrderItemProductionCreateDto(
@@ -337,7 +315,6 @@ class JobOrderItemProductionServiceTest {
             List.of(),
             defaultBookIn());
 
-    // When & Then
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
         .isInstanceOf(BadRequestException.class)
         .hasMessage(JobOrderHandoverService.ERROR_ITEM_NOT_LINKED_TO_ORDER);
@@ -347,8 +324,6 @@ class JobOrderItemProductionServiceTest {
 
   @Test
   void bookProduction_consumesFullStock_deletesEntry_stillAudits() {
-    // Given — the entry holds exactly the 40-SCU demand, earmarked in full to the order, so
-    // consuming it depletes the row.
     inventoryItem.setAmount(40.0);
     inventoryItem.getJobOrderAllocations().clear();
     InventoryAllocations.addJobOrder(inventoryItem, order, 40.0, false);
@@ -362,11 +337,8 @@ class JobOrderItemProductionServiceTest {
             List.of(),
             defaultBookIn());
 
-    // When
     service.bookProduction(orderId, lineId, dto);
 
-    // Then — the depleted row is deleted (never saved, never clamped), the line still advances
-    // and the audit trail is emitted. The only save is the required bookIn's fresh stock row.
     assertThat(line.getManufacturedAmount()).isEqualTo(1);
     verify(inventoryItemRepository).delete(inventoryItem);
     verify(inventoryItemRepository, never()).save(inventoryItem);
@@ -379,16 +351,12 @@ class JobOrderItemProductionServiceTest {
 
   @Test
   void bookProduction_lineWithoutMaterials_emptyConsumption_bumpsManufactured_noInventoryWrites() {
-    // Given — an item line with no derivable material requirements: nothing is consumed.
     line.getMaterials().clear();
     JobOrderItemProductionCreateDto dto =
         new JobOrderItemProductionCreateDto(1, LINE_VERSION, List.of(), List.of(), defaultBookIn());
 
-    // When
     service.bookProduction(orderId, lineId, dto);
 
-    // Then — the counter advances with no consumption access; besides the booking audit only the
-    // required bookIn's fresh stock row is written.
     assertThat(line.getManufacturedAmount()).isEqualTo(1);
     verify(inventoryItemRepository, never()).findByIdForUpdate(any());
     verify(inventoryItemRepository, never()).delete(any());
@@ -400,17 +368,12 @@ class JobOrderItemProductionServiceTest {
 
   @Test
   void bookProduction_materialMarkedSkip_notBookedOut_bumpsManufactured_noInventoryWrites() {
-    // Given — the line's only material (Steel) is marked "nicht ausbuchen", so its 40-SCU demand is
-    // dropped and the consumption plan is empty: production is recorded but no stock is touched.
     JobOrderItemProductionCreateDto dto =
         new JobOrderItemProductionCreateDto(
             1, LINE_VERSION, List.of(), List.of(materialId), defaultBookIn());
 
-    // When
     JobOrderItemDto result = service.bookProduction(orderId, lineId, dto);
 
-    // Then — the counter advances with no consumption access; the earmarked entry is left fully
-    // intact (the only save is the required bookIn's fresh stock row).
     assertThat(result.id()).isEqualTo(lineId);
     assertThat(line.getManufacturedAmount()).isEqualTo(1);
     assertThat(inventoryItem.getAmount()).isEqualTo(100.0);
@@ -423,10 +386,6 @@ class JobOrderItemProductionServiceTest {
     verify(auditService, never())
         .record(eq(AuditEventType.INVENTORY_CONSUMED_BY_PRODUCTION), any(), any(), any(), any());
   }
-
-  // ---------------------------------------------------------------
-  // production book-in (REQ-INV-032)
-  // ---------------------------------------------------------------
 
   /**
    * Prepares the fixture line for a book-in scenario: no material requirements (so the consumption
@@ -463,15 +422,8 @@ class JobOrderItemProductionServiceTest {
         locationId, ownerUserId, owningOrgUnitId, personal, allocateToOrder);
   }
 
-  // The former nullBookIn legacy no-op test moved: a missing bookIn is now rejected as a 400
-  // validation error at the API boundary (REQ-INV-032 flip), pinned by
-  // JobOrderItemProductionCreateDtoValidationTest — the service never sees a null block.
-
-  // covers REQ-INV-032 (bookIn creates the earmarked item row, merges after save, audits)
   @Test
   void bookProduction_bookIn_createsEarmarkedItemRow_mergesAfterSave_andAudits() {
-    // Given a producible line, a named owner / location / org-unit target and the default
-    // auto-earmark (allocateToOrder omitted)
     GameItem gameItem = givenProducibleLineWithoutMaterials();
     UUID ownerId = UUID.randomUUID();
     User owner = new User();
@@ -483,7 +435,6 @@ class JobOrderItemProductionServiceTest {
     UUID orgUnitId = UUID.randomUUID();
     Squadron orgUnit = new Squadron();
     orgUnit.setId(orgUnitId);
-    // A same-Staffel owner: the on-behalf scope gate passes (APPSEC-01).
     when(ownerScopeService.canManageUserInventory(ownerId)).thenReturn(true);
     when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
     when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
@@ -501,11 +452,8 @@ class JobOrderItemProductionServiceTest {
             List.of(),
             bookIn(locationId, ownerId, orgUnitId, null, null));
 
-    // When
     service.bookProduction(orderId, lineId, dto);
 
-    // Then — one fresh item row: gameItem set, quality null (REQ-INV-029), stamped through the
-    // create-on-behalf resolver, carrying the auto-earmark slice attached BEFORE the single save.
     org.mockito.ArgumentCaptor<InventoryItem> captor =
         org.mockito.ArgumentCaptor.forClass(InventoryItem.class);
     verify(inventoryItemRepository).save(captor.capture());
@@ -522,15 +470,10 @@ class JobOrderItemProductionServiceTest {
     assertThat(slice.getJobOrder()).isSameAs(order);
     assertThat(slice.getAmount()).isEqualTo(2.0);
     assertThat(slice.getDelivered()).isFalse();
-    // The org-unit stamp went through the owner-validated picker resolution (REQ-ORG-004/016).
     verify(ownerScopeService).resolveOrgUnitForPickerOutputNullable(owner, orgUnitId);
-    // Slice-first-then-merge: the merge helper folds the saved row AFTER the save (item rows
-    // always auto-merge, client flag false).
     org.mockito.InOrder callOrder = inOrder(inventoryItemRepository, inventoryCheckoutService);
     callOrder.verify(inventoryItemRepository).save(stockRow);
     callOrder.verify(inventoryCheckoutService).mergeStockIfRequested(stockRow, false);
-    // The audit event carries the PII-free details payload — the order's #displayId ref (matching
-    // the sibling consumption events) plus raw ids (REQ-AUDIT-001).
     org.mockito.ArgumentCaptor<CharSequence> details =
         org.mockito.ArgumentCaptor.forClass(CharSequence.class);
     verify(auditService)
@@ -545,14 +488,11 @@ class JobOrderItemProductionServiceTest {
         .contains("gameItemId=" + gameItem.getId())
         .contains("amount=2")
         .contains("locationId=" + locationId);
-    // A named owner is used verbatim — the acting-user fallback is never consulted.
     verifyNoInteractions(userService);
   }
 
-  // covers REQ-INV-032 (personal + allocateToOrder is contradictory — default true variant)
   @Test
   void bookProduction_bookIn_personalWithDefaultAllocate_throwsBadRequest() {
-    // Given a personal book-in that leaves allocateToOrder at its true default
     givenProducibleLineWithoutMaterials();
     JobOrderItemProductionCreateDto dto =
         new JobOrderItemProductionCreateDto(
@@ -562,17 +502,13 @@ class JobOrderItemProductionServiceTest {
             List.of(),
             bookIn(UUID.randomUUID(), null, null, true, null));
 
-    // When / Then — personal stock never carries allocations; the earmark must be explicitly
-    // deselected, never silently dropped
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
         .isInstanceOf(BadRequestException.class);
     verify(inventoryItemRepository, never()).save(any());
   }
 
-  // covers REQ-INV-032 (personal + explicit allocateToOrder=true is equally contradictory)
   @Test
   void bookProduction_bookIn_personalWithExplicitAllocate_throwsBadRequest() {
-    // Given a personal book-in explicitly requesting the order earmark
     givenProducibleLineWithoutMaterials();
     JobOrderItemProductionCreateDto dto =
         new JobOrderItemProductionCreateDto(
@@ -582,16 +518,13 @@ class JobOrderItemProductionServiceTest {
             List.of(),
             bookIn(UUID.randomUUID(), null, null, true, true));
 
-    // When / Then
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
         .isInstanceOf(BadRequestException.class);
     verify(inventoryItemRepository, never()).save(any());
   }
 
-  // covers REQ-INV-032 (personal book-in with the earmark deselected creates a slice-less row)
   @Test
   void bookProduction_bookIn_personalWithAllocateFalse_createsPersonalRowWithoutSlice() {
-    // Given a personal book-in that deselects the auto-earmark
     GameItem gameItem = givenProducibleLineWithoutMaterials();
     UUID ownerId = UUID.randomUUID();
     User owner = new User();
@@ -599,7 +532,6 @@ class JobOrderItemProductionServiceTest {
     UUID locationId = UUID.randomUUID();
     Location location = new Location();
     location.setId(locationId);
-    // The caller names themselves: a personal book-in is only ever into one's own pool.
     when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
     when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
     when(locationRepository.findById(locationId)).thenReturn(Optional.of(location));
@@ -611,10 +543,8 @@ class JobOrderItemProductionServiceTest {
         new JobOrderItemProductionCreateDto(
             1, LINE_VERSION, List.of(), List.of(), bookIn(locationId, ownerId, null, true, false));
 
-    // When
     service.bookProduction(orderId, lineId, dto);
 
-    // Then — the produced unit lands in the owner's personal pool with no earmark slice
     org.mockito.ArgumentCaptor<InventoryItem> captor =
         org.mockito.ArgumentCaptor.forClass(InventoryItem.class);
     verify(inventoryItemRepository).save(captor.capture());
@@ -623,13 +553,10 @@ class JobOrderItemProductionServiceTest {
     assertThat(captor.getValue().getJobOrderAllocations()).isEmpty();
   }
 
-  // covers REQ-INV-032 (unknown book-in owner -> 404)
   @Test
   void bookProduction_bookIn_unknownOwner_throwsNotFound() {
-    // Given a book-in naming an owner that does not exist
     givenProducibleLineWithoutMaterials();
     UUID unknownOwnerId = UUID.randomUUID();
-    // Only a caller who passes the scope gate ever reaches the lookup (and so the 404).
     when(ownerScopeService.canManageUserInventory(unknownOwnerId)).thenReturn(true);
     when(userRepository.findById(unknownOwnerId)).thenReturn(Optional.empty());
     JobOrderItemProductionCreateDto dto =
@@ -640,16 +567,13 @@ class JobOrderItemProductionServiceTest {
             List.of(),
             bookIn(UUID.randomUUID(), unknownOwnerId, null, null, null));
 
-    // When / Then
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
         .isInstanceOf(NotFoundException.class);
     verify(inventoryItemRepository, never()).save(any());
   }
 
-  // covers REQ-INV-032 (owner defaults to the acting user)
   @Test
   void bookProduction_bookIn_defaultsOwnerToActingUser() {
-    // Given a book-in without an explicit owner
     givenProducibleLineWithoutMaterials();
     User actor = new User();
     actor.setId(UUID.randomUUID());
@@ -666,10 +590,8 @@ class JobOrderItemProductionServiceTest {
         new JobOrderItemProductionCreateDto(
             1, LINE_VERSION, List.of(), List.of(), bookIn(locationId, null, null, null, null));
 
-    // When
     service.bookProduction(orderId, lineId, dto);
 
-    // Then — the row is created for the acting user; no owner lookup by id happens
     org.mockito.ArgumentCaptor<InventoryItem> captor =
         org.mockito.ArgumentCaptor.forClass(InventoryItem.class);
     verify(inventoryItemRepository).save(captor.capture());
@@ -678,10 +600,8 @@ class JobOrderItemProductionServiceTest {
     verify(ownerScopeService).resolveOrgUnitForPickerOutputNullable(actor, null);
   }
 
-  // covers REQ-INV-032 (a line without a game item cannot be booked in)
   @Test
   void bookProduction_bookIn_lineWithoutGameItem_throwsBadRequest() {
-    // Given a book-in against a line explicitly stripped of its game item (the fixture seeds one)
     line.getMaterials().clear();
     line.setGameItem(null);
     JobOrderItemProductionCreateDto dto =
@@ -692,17 +612,14 @@ class JobOrderItemProductionServiceTest {
             List.of(),
             bookIn(UUID.randomUUID(), null, null, null, null));
 
-    // When / Then
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
         .isInstanceOf(BadRequestException.class)
         .hasMessageContaining("no game item");
     verify(inventoryItemRepository, never()).save(any());
   }
 
-  // covers REQ-INV-032 (APPSEC-01: an owner outside the caller's scope is refused before anything)
   @Test
   void bookProduction_bookIn_ownerOutsideCallerScope_throwsAccessDenied_noLookupNoSave() {
-    // Given a book-in naming a member of another Staffel: the on-behalf scope gate refuses
     UUID callerId = UUID.randomUUID();
     UUID foreignOwnerId = UUID.randomUUID();
     when(authHelperService.currentUserId()).thenReturn(Optional.of(callerId));
@@ -715,8 +632,6 @@ class JobOrderItemProductionServiceTest {
             List.of(),
             bookIn(UUID.randomUUID(), foreignOwnerId, null, null, null));
 
-    // When / Then — refused before the order is loaded or any stock consumed, and before the owner
-    // lookup, so the refusal is no existence oracle for the id
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
         .isInstanceOf(AccessDeniedException.class);
     verify(inventoryItemRepository, never()).save(any());
@@ -726,10 +641,8 @@ class JobOrderItemProductionServiceTest {
     assertThat(line.getManufacturedAmount()).isZero();
   }
 
-  // covers REQ-INV-032 (APPSEC-01: never into another member's personal pool, even in scope)
   @Test
   void bookProduction_bookIn_personalOnBehalfOfOther_throwsAccessDenied_noSave() {
-    // Given a same-Staffel owner the caller may book for, but a personal (private-pool) target
     UUID callerId = UUID.randomUUID();
     UUID ownerId = UUID.randomUUID();
     when(authHelperService.currentUserId()).thenReturn(Optional.of(callerId));
@@ -742,7 +655,6 @@ class JobOrderItemProductionServiceTest {
             List.of(),
             bookIn(UUID.randomUUID(), ownerId, null, true, false));
 
-    // When / Then
     assertThatThrownBy(() -> service.bookProduction(orderId, lineId, dto))
         .isInstanceOf(AccessDeniedException.class)
         .hasMessageContaining("personal");
@@ -750,10 +662,8 @@ class JobOrderItemProductionServiceTest {
     verify(userRepository, never()).findById(any());
   }
 
-  // covers REQ-INV-032 (APPSEC-01: a same-Staffel owner passes the gate and receives the row)
   @Test
   void bookProduction_bookIn_ownerInCallerScope_passesGate_andBooksIntoOwnersLedger() {
-    // Given a named owner the caller shares a Staffel with
     givenProducibleLineWithoutMaterials();
     UUID callerId = UUID.randomUUID();
     UUID ownerId = UUID.randomUUID();
@@ -770,10 +680,8 @@ class JobOrderItemProductionServiceTest {
             List.of(),
             bookIn(BOOK_IN_LOCATION_ID, ownerId, null, null, null));
 
-    // When
     service.bookProduction(orderId, lineId, dto);
 
-    // Then — the gate was asked for exactly that owner, and the row lands in the owner's ledger
     verify(ownerScopeService).canManageUserInventory(ownerId);
     org.mockito.ArgumentCaptor<InventoryItem> captor =
         org.mockito.ArgumentCaptor.forClass(InventoryItem.class);
@@ -781,10 +689,8 @@ class JobOrderItemProductionServiceTest {
     assertThat(captor.getValue().getUser()).isSameAs(owner);
   }
 
-  // covers REQ-INV-032 (APPSEC-01: naming oneself explicitly needs no on-behalf check)
   @Test
   void bookProduction_bookIn_ownerIsCaller_skipsOnBehalfGate() {
-    // Given a book-in whose explicit owner is the caller themselves
     givenProducibleLineWithoutMaterials();
     UUID callerId = UUID.randomUUID();
     User caller = new User();
@@ -799,10 +705,8 @@ class JobOrderItemProductionServiceTest {
             List.of(),
             bookIn(BOOK_IN_LOCATION_ID, callerId, null, null, null));
 
-    // When
     service.bookProduction(orderId, lineId, dto);
 
-    // Then — no scope question for one's own ledger; the row is the caller's
     verify(ownerScopeService, never()).canManageUserInventory(any());
     org.mockito.ArgumentCaptor<InventoryItem> captor =
         org.mockito.ArgumentCaptor.forClass(InventoryItem.class);

@@ -170,7 +170,7 @@ class MaterialExchangeRequestRepositoryDataTest {
     bad.setKind(MaterialExchangeRequestKind.MATERIAL);
     bad.setRequestedMaterial(material);
     bad.setRequestedAmount(120.0);
-    bad.setItemProductKey("venture_helmet"); // forbidden on the MATERIAL branch
+    bad.setItemProductKey("venture_helmet");
     bad.setOwner(owner);
     bad.setStatus(MaterialExchangeRequestStatus.ACTIVE);
     bad.setPostedAt(Instant.now());
@@ -187,7 +187,7 @@ class MaterialExchangeRequestRepositoryDataTest {
     bad.setKind(MaterialExchangeRequestKind.ITEM);
     bad.setItemProductKey("venture_helmet");
     bad.setItemName("Venture Helmet");
-    bad.setItemQuantity(null); // required on the ITEM branch
+    bad.setItemQuantity(null);
     bad.setOwner(owner);
     bad.setStatus(MaterialExchangeRequestStatus.ACTIVE);
     bad.setPostedAt(Instant.now());
@@ -205,7 +205,7 @@ class MaterialExchangeRequestRepositoryDataTest {
     bad.setKind(MaterialExchangeRequestKind.MATERIAL);
     bad.setRequestedMaterial(material);
     bad.setRequestedAmount(50.0);
-    bad.setMinQuality(1500); // out of the 0-1000 range
+    bad.setMinQuality(1500);
     bad.setOwner(owner);
     bad.setStatus(MaterialExchangeRequestStatus.ACTIVE);
     bad.setPostedAt(Instant.now());

@@ -91,17 +91,10 @@ class MaterialMatrixQueryDataTest {
     Material alu = persistMaterial(aluminum);
     Material tit = persistMaterial(titanium);
 
-    // Stanton: Area18 has both a dock and auto-load; Lorville has neither.
     Terminal tArea18 = persistTerminal(area18, stanton, true, true, false);
     Terminal tLorville = persistTerminal(lorville, stanton, false, false, false);
-    // Pyro: a dock terminal without auto-load.
     Terminal tRuin = persistTerminal(pyroRuin, pyro, true, false, false);
-    // A hidden Stanton dock terminal — must never surface regardless of the filters.
     Terminal tHidden = persistTerminal(hiddenDock, stanton, true, true, true);
-    // A VISIBLE Stanton dock+auto-load terminal whose only Aluminum price has been neutralised by
-    // the UEX stale-row sweep (both sides inactive). It matches every filter dimension the active
-    // terminals do, so the ONLY thing that can exclude it is the active buy/sell-side predicate —
-    // not the hidden flag, not any filter. It proves that predicate is really enforced.
     Terminal tStale = persistTerminal(staleDock, stanton, true, true, false);
 
     persistSellPrice(alu, tArea18, 100);
@@ -117,7 +110,6 @@ class MaterialMatrixQueryDataTest {
     Page<MaterialMatrixItemDto> page =
         materialPriceRepository.findMatrixItems(List.of(aluminum), null, null, null, PAGE);
 
-    // Aluminum trades at Area18, Lorville and Ruin — the hidden terminal's Aluminum row is dropped.
     assertThat(page.getContent())
         .extracting(MaterialMatrixItemDto::terminalName)
         .containsExactlyInAnyOrder(area18, lorville, pyroRuin);
@@ -134,7 +126,6 @@ class MaterialMatrixQueryDataTest {
     Page<MaterialMatrixItemDto> page =
         materialPriceRepository.findMatrixItems(null, List.of(pyro), null, null, PAGE);
 
-    // Only the Pyro terminal (Ruin) is in scope; it trades Aluminum.
     assertThat(page.getContent())
         .extracting(MaterialMatrixItemDto::terminalName)
         .containsExactly(pyroRuin);
@@ -149,8 +140,6 @@ class MaterialMatrixQueryDataTest {
         materialPriceRepository.findMatrixItems(
             null, List.of(stanton, pyro), Boolean.TRUE, null, PAGE);
 
-    // Dock terminals in my systems: Area18 (Aluminum + Titanium) and Ruin (Aluminum). Lorville has
-    // no dock; the hidden dock terminal is excluded by the base predicate.
     assertThat(page.getContent())
         .extracting(MaterialMatrixItemDto::terminalName)
         .containsExactlyInAnyOrder(area18, area18, pyroRuin);
@@ -165,7 +154,6 @@ class MaterialMatrixQueryDataTest {
         materialPriceRepository.findMatrixItems(
             null, List.of(stanton, pyro), null, Boolean.TRUE, PAGE);
 
-    // Only Area18 auto-loads (Ruin does not); it trades Aluminum and Titanium.
     assertThat(page.getContent())
         .extracting(MaterialMatrixItemDto::terminalName)
         .containsExactlyInAnyOrder(area18, area18);
@@ -180,8 +168,6 @@ class MaterialMatrixQueryDataTest {
         materialPriceRepository.findMatrixItems(
             List.of(aluminum), List.of(stanton), Boolean.TRUE, null, PAGE);
 
-    // Aluminum AND Stanton AND has-dock ⇒ Area18 only (Lorville has no dock, Ruin is Pyro, the
-    // hidden dock terminal is excluded).
     assertThat(page.getContent()).hasSize(1);
     assertThat(page.getContent().get(0).terminalName()).isEqualTo(area18);
     assertThat(page.getContent().get(0).materialName()).isEqualTo(aluminum);
@@ -189,8 +175,6 @@ class MaterialMatrixQueryDataTest {
 
   @Test
   void noFilters_returnsEveryActiveSeededRow_butNeverTheHiddenTerminal() {
-    // Scope to my two star systems (still "no material / dock / auto-load filter") so the count is
-    // exact against the seeded set rather than the shared catalogue.
     Page<MaterialMatrixItemDto> page =
         materialPriceRepository.findMatrixItems(null, List.of(stanton, pyro), null, null, PAGE);
 
@@ -204,11 +188,6 @@ class MaterialMatrixQueryDataTest {
 
   @Test
   void neutralisedPrice_isExcludedByActiveSidePredicate_notByHiddenOrFilter() {
-    // The stale terminal is visible and matches every filter dimension the active terminals do
-    // (Stanton, dock, auto-load, trades Aluminum). It appears in neither the unfiltered
-    // (system-scoped) result nor a filter selection that its own attributes satisfy — so the only
-    // thing excluding it is the active buy/sell-side predicate. If that WHERE clause were dropped,
-    // the stale terminal would surface and these assertions would fail.
     Page<MaterialMatrixItemDto> unfiltered =
         materialPriceRepository.findMatrixItems(null, List.of(stanton, pyro), null, null, PAGE);
     assertThat(unfiltered.getContent())

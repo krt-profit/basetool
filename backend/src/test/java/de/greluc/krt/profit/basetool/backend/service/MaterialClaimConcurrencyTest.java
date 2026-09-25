@@ -173,9 +173,6 @@ class MaterialClaimConcurrencyTest {
     fixture = seed();
     final List<CreateClaimDto> payloads = List.of(claim(AMOUNT_A), claim(AMOUNT_B));
 
-    // Capture the @WithMockUser admin context on the test thread so each worker can re-apply it —
-    // the service permission gate (assertCanManage → isAdmin) reads SecurityContextHolder, whose
-    // default MODE_THREADLOCAL strategy does not propagate into a thread pool.
     final SecurityContext adminContext = SecurityContextHolder.getContext();
 
     CountDownLatch ready = new CountDownLatch(THREADS);
@@ -306,15 +303,12 @@ class MaterialClaimConcurrencyTest {
    */
   @Test
   void firstClaimRace_differentSquadrons_neverOverclaims() throws Exception {
-    // covers REQ-ORDERS-024 — cross-squadron no-overclaim is concurrency-safe (ADR-0092)
     fixture = seedTwoSquadrons();
     final List<CreateClaimDto> payloads =
         List.of(
             claimFor(fixture.squadronId(), OVERCLAIM_EACH),
             claimFor(fixture.squadronBId(), OVERCLAIM_EACH));
 
-    // See the same-squadron test: the admin permission context is captured here and re-applied
-    // inside each worker because SecurityContextHolder does not propagate into a thread pool.
     final SecurityContext adminContext = SecurityContextHolder.getContext();
 
     CountDownLatch ready = new CountDownLatch(THREADS);

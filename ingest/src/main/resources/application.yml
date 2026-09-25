@@ -1,27 +1,9 @@
 server:
-  # No Tomcat MBean registry (FE-PERF-07, 2026-09-22). It was enabled only so TomcatMetrics could
-  # publish tomcat_threads_* for the "Spring Boot apps" dashboard (epic #936), but under virtual
-  # threads those gauges are always -1; the panel reads http_server_requests_active_seconds_count.
   port: 11262
-  # Behind nginx-proxy-manager (TLS terminated at the proxy). `native` routes X-Forwarded-* through
-  # Tomcat's RemoteIpValve, which only honours the header from a TRUSTED internal proxy (its default
-  # internal-proxies regex covers the Docker private ranges, including the NPM hop). Unlike
-  # `framework`, this stops an external client spoofing an arbitrary X-Forwarded-For to mint a fresh
-  # per-IP rate-limit budget (security audit INGEST-RATELIMIT-1). The enforceable throttle is the
-  # per-subject limiter; this only hardens the coarse per-IP front line.
   forward-headers-strategy: native
   max-http-request-header-size: 65536
   shutdown: graceful
   ssl:
-    # The gateway serves HTTPS on 11262, mirroring backend/frontend (REQ-INGEST-001). nginx-proxy-
-    # manager terminates the public TLS and re-encrypts to this connector over https:// on the
-    # internal network (NPM upstream: scheme https, upstream-certificate verification OFF, since the
-    # shared cert is self-signed). The SERVER_SSL_KEY_STORE / SERVER_SSL_KEY_STORE_PASSWORD env vars
-    # feed BOTH this server connector AND the `backend-trust` SSL *bundle* (the truststore that
-    # validates the backend's self-signed https://backend:11261 cert — see application-prod.yml); the
-    # same PKCS12 file serves as both server identity and trust anchor. The Docker HEALTHCHECK probes
-    # https://localhost:11262/... with --no-check-certificate (self-signed). The test profile disables
-    # this connector (application-test.yml) since the MOCK web environment ships no keystore.
     enabled: true
     key-store: ${SERVER_SSL_KEY_STORE:classpath:keystore.p12}
     key-store-password: ${SERVER_SSL_KEY_STORE_PASSWORD}
@@ -47,8 +29,6 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
-      # The service's own Redis ACL user (REQ-SEC-068, ADR-0207). Empty = no username, i.e. a
-      # password-only AUTH as the shared `default` user, exactly as before the per-service users.
       username: ${REDIS_USERNAME:}
       password: ${REDIS_PASSWORD:}
   security:
@@ -59,9 +39,6 @@ spring:
 
 app:
   logging:
-    # Same keys the backend/frontend bind (REQ-OBS-001/-002), so all three modules are tuned through
-    # one APP_LOGGING_* surface. The gateway has no `org-unit-id-mdc-key`: it relays drafts and owns
-    # no squadron-scoped data, so that field would always be empty.
     correlation-id-header: X-Correlation-Id
     correlation-id-mdc-key: correlationId
     user-id-mdc-key: userId
@@ -70,104 +47,39 @@ app:
     structured-enabled: false
   ingest:
     backend-base-url: ${BACKEND_URL:https://backend:11261}
-    # REQ-SEC-070 / ADR-0211: verify that the backend's certificate names `backend` on the
-    # pinned relay. Off by default (chain pinned, name ignored -- ADR-0204's opt-out); on once every
-    # service has its own leaf from the internal CA.
     verify-backend-hostname: ${INTERNAL_TLS_VERIFY_HOSTNAME:false}
     frontend-base-url: ${FRONTEND_URL:https://app.profit-base.online}
-    # The gateway's own public origin, used only as the DPoP `htu` target (ADR-0129). Configured
-    # rather than derived from the request, because Spring compares htu byte-exactly against a URL
-    # Tomcat assembles from the proxy's forwarded headers — a mismatch fails only in production.
     public-base-url: ${APP_INGEST_PUBLIC_BASE_URL:}
-    # The gateway's OWN Keycloak identity for the backend hop (ADR-0129). Since the gateway stopped
-    # relaying the caller's token it needs a credential of its own. Empty disables the feature and
-    # the gateway refuses ingest writes with a named error, rather than sending a null token the
-    # backend answers with an opaque 401.
     service-account:
       token-uri: ${APP_INGEST_SERVICE_ACCOUNT_TOKEN_URI:}
       client-id: ${APP_INGEST_SERVICE_ACCOUNT_CLIENT_ID:}
       client-secret: ${APP_INGEST_SERVICE_ACCOUNT_CLIENT_SECRET:}
     refinery-path: /refinery-orders/create
     blueprint-path: /personal-inventory/blueprints
-    # One-time browser handoff lifetime (REQ-INGEST-003). Raised from 5m to 30m: the extractor stages
-    # the draft the moment the user clicks Send, but opening the pre-filled basetool page is a SEPARATE
-    # manual click (plus a possible full browser login), so a 5m window could expire before pickup for
-    # a slower user and surface as "Import-Link abgelaufen oder ungueltig" on every send. The entry
-    # stays single-use and per-subject scoped, so the longer window does not weaken the replay / IDOR
-    # guarantees. Env-overridable so the value can be tuned from .env without rebuilding the image.
     handoff-ttl: ${APP_INGEST_HANDOFF_TTL:PT30M}
     max-payload-bytes: 2097152
-    # Staging budget, deliberately NOT the ingress cap above. The handoff store shares the Redis
-    # instance that holds the frontend's Spring Session store, and that instance runs
-    # `--maxmemory-policy noeviction`: reaching the ceiling REFUSES WRITES, i.e. nobody can log in
-    # any more. A real draft is a few KB, and a member has one or two in flight, so these two bound
-    # one subject's footprint at 10 x 256 KiB instead of 900 x 2 MiB (30 req/min x 30 min TTL).
     max-handoff-bytes: ${APP_INGEST_MAX_HANDOFF_BYTES:262144}
     max-handoffs-per-subject: ${APP_INGEST_MAX_HANDOFFS_PER_SUBJECT:10}
-    # Client-identity gate (REQ-INGEST-011): WHICH CLIENT SOFTWARE may drive the gateway. The user
-    # gate is unchanged and stays isAuthenticated() for every member (REQ-INGEST-002/-008).
-    #
-    # THE INGEST INTERFACE IS RESTRICTED TO CLIENTS APPROVED BY THE BASETOOL DEVELOPER (@greluc).
-    # Approval = a dedicated Keycloak client registration PLUS an entry in the allowlist below. Two
-    # independent gates, so neither a stray Keycloak registration nor a config slip grants access on
-    # its own, and removing the allowlist entry is the instant kill switch.
-    #
-    # Every value is EMPTY by default, which makes each check inert — the Keycloak-side mappers and
-    # scopes are an operator step that cannot be done by a PR (docs/INGEST_KEYCLOAK_SETUP.md), so
-    # shipping these pre-enabled would reject every real extractor token on deploy. Configure, verify
-    # against a live token with audit-only, then enforce (same sequencing as REQ-INGEST-008).
-    #
-    # No defaults are baked in on purpose: the code shows THAT a gate exists, the environment decides
-    # WHO passes it.
     client-identity:
-      # Keycloak client ids (azp) allowed to call /v1/**, e.g. `basetool-sc-extractor`. Comma-separated.
-      # Several at once are supported so a client-id rotation needs no downtime.
       allowed-client-ids: ${APP_INGEST_CLIENT_IDENTITY_ALLOWED_CLIENT_IDS:}
-      # OAuth scope an ingest token must carry, e.g. `extractor-ingest` -> SCOPE_extractor-ingest.
-      # Only discriminating if that scope was NOT also assigned to the frontend client (runbook step 3).
       required-scope: ${APP_INGEST_CLIENT_IDENTITY_REQUIRED_SCOPE:}
-      # Accepted payload `tool` provenance, e.g. `basetool-sc-extractor`. Client-supplied and hence
-      # forgeable — telemetry with a reject attached, never authentication.
       allowed-tools: ${APP_INGEST_CLIENT_IDENTITY_ALLOWED_TOOLS:}
-      # true = run every configured check but never reject; log + count only. The safe way to enable
-      # the gates in prod: configure, watch basetool_ingest_client_rejected_total stay at zero, flip off.
       audit-only: ${APP_INGEST_CLIENT_IDENTITY_AUDIT_ONLY:false}
   rate-limit:
     enabled: true
-    # Per authenticated subject (SubjectRateLimiter) - the enforceable budget.
     capacity: 30
     refill-tokens: 30
     refill-period: PT1M
-    # Per source IP (RateLimitingFilter) - deliberately looser: several members can share one public
-    # address behind a CGNAT or an office NAT, and the IP bucket used to hand all of them the 30/min
-    # a single member gets. Same refill period as the subject bucket (REQ-INGEST-005).
     ip-capacity: ${APP_RATE_LIMIT_IP_CAPACITY:120}
     ip-refill-tokens: ${APP_RATE_LIMIT_IP_REFILL_TOKENS:120}
   security:
     jwt:
-      # Opt-in audience check, empty by default. The gateway's value is `basetool-ingest`, stamped by
-      # the extractor-only `extractor-ingest-only` client scope (docs/INGEST_KEYCLOAK_SETUP.md step 7a,
-      # ADR-0018 amendment 1). It is NOT the backend's audience: every frontend session token carries
-      # that one, so an audience check set to it would admit exactly the web-session tokens this
-      # interface exists to refuse. Set it LAST, after the audit-only pass of the client-identity
-      # gate, and only once a live extractor token carries aud=basetool-ingest - this check answers
-      # 401 and is never softened by audit-only. basetool_ingest_gate_enforcing{gate="audience"}
-      # reports whether it is on. The gateway is not part of the E2E stack, so unlike the backend
-      # this path has no end-to-end rehearsal - SecurityConfigTest is its only coverage.
-      # scripts/check-ingest-audience.py (repo-lint) fails the build if this file pairs the key with
-      # the backend's audience again.
       expected-audiences: ${APP_SECURITY_JWT_EXPECTED_AUDIENCES:}
   monitoring:
     scrape:
-      # Basic-auth credentials for GET /actuator/prometheus (REQ-OBS-005, ADR-0072). Fail-closed:
-      # when either variable is unset/blank, MonitoringScrapeSecurityConfig denies every request
-      # to the endpoint. Set both only where a Prometheus scraper actually runs; never commit
-      # real values.
       username: ${MONITORING_SCRAPE_USER:}
       password: ${MONITORING_SCRAPE_PASSWORD:}
 
-# Resilience4j around the backend relay. HTTP response errors are ignored (a 400 envelope reject is
-# a client problem, not a backend-health signal); only transport failures open the breaker.
 resilience4j:
   circuitbreaker:
     instances:
@@ -183,38 +95,11 @@ logging:
   level:
     root: INFO
     io.github.resilience4j: INFO
-    # REQ-OBS-013: this is a THRESHOLD, not a demotion (corrected 2026-09-02 — the note here used to
-    # claim it demoted ERROR to WARN; it never did). The OTLP exporter logs a transport failure at
-    # JUL SEVERE, which arrives as ERROR and clears a WARN threshold untouched. Accepted, because the
-    # SDK's ThrottlingLogger caps that source at <= 1/min — two orders below LogbackErrorSpike's
-    # > 0.2/s — and an unreachable Alloy pages via TargetDown regardless. The pin's real effect is
-    # dropping the exporter's INFO chatter; not OFF, which would also drop the only local breadcrumb.
     io.opentelemetry.exporter: WARN
 
-# Actuator: expose `health` (Docker HEALTHCHECK / compose service_healthy gating; bare status)
-# plus `prometheus` for the monitoring scrape (REQ-OBS-005). `/actuator/prometheus` is NOT
-# public: MonitoringScrapeSecurityConfig guards it with fail-closed basic auth (denyAll until
-# MONITORING_SCRAPE_USER/PASSWORD are set).
 management:
   endpoints:
     web:
-      # `loggers` is exposed so a log level can be raised at RUNTIME instead of requiring a config
-      # change plus a redeploy plus a force-recreate. That matters because the most diagnostic lines
-      # in this codebase sit at DEBUG on purpose (bot blocks, the per-IP rate limit, the open circuit
-      # breaker, a relayed backend 4xx) — without this endpoint they exist but are unreachable during
-      # an incident. It adds no PUBLIC surface: `/actuator/health*` is the only permitted actuator
-      # path there, everything else falls through to `anyRequest().authenticated()` on the public
-      # connector.
-      #
-      # The management port is the other half of the story, and it is not "no surface". In prod the
-      # endpoints move to it, and ADR-0090 leaves that port UNAUTHENTICATED — a trade made when
-      # everything exposed was read-only. `loggers` is not: a ROOT logger at TRACE writes bearer
-      # tokens and request bodies into a Loki stream retained for 744h. There is no identity on
-      # that port to gate on, so application-prod.yml removes the mutator instead
-      # (`management.endpoint.loggers.access: read-only`).
-      # Read: GET /actuator/loggers/<logger> — everywhere, including prod.
-      # Write: POST {"configuredLevel":"DEBUG"} — dev and test only; not persisted, so a restart
-      # returns to the configured levels (REQ-OBS-016).
       exposure:
         include: health, prometheus, loggers
   endpoint:
@@ -225,20 +110,10 @@ management:
         enabled: true
   metrics:
     tags:
-      # Common tag on every meter; the Grafana "Spring Boot apps" dashboard selects the
-      # module through this `application` label (epic #936 dashboard set).
       application: basetool-ingest
     distribution:
-      # Publish latency histogram buckets for http.server.requests so the "HTTP p95 Latency"
-      # dashboard panel can compute histogram_quantile (Spring Boot emits no buckets by
-      # default). Bounded to 5ms..10s to keep the per-URI bucket cardinality in check (epic #936).
       percentiles-histogram:
         "[http.server.requests]": true
-        # The in-flight long-task timers Micrometer derives from each observation
-        # (`<name>.active`) inherit the histogram by prefix, which exported ~50 bucket series per
-        # label set that nothing reads: the In-flight Requests panel reads only `_count`.
-        # Switched off for the `.active` timers alone; the latency histograms stay
-        # (ManagementPortIsolationTest).
         "[http.server.requests.active]": false
       minimum-expected-value:
         "[http.server.requests]": 5ms
@@ -247,31 +122,14 @@ management:
   tracing:
     export:
       otlp:
-        # Second half of the master gate: without the monitoring stack the OTLP span exporter
-        # bean is not even instantiated (Boot gates it via ConditionalOnEnabledTracingExport;
-        # belt and braces on top of management.opentelemetry.enabled below).
         enabled: ${MONITORING_TRACING_ENABLED:false}
     sampling:
-      # Only honored while tracing is enabled. Low traffic makes full sampling affordable;
-      # revisited in the Phase-3 tuning (epic #936).
       probability: ${MONITORING_TRACING_SAMPLING_PROBABILITY:1.0}
   opentelemetry:
-    # Master gate for distributed tracing (REQ-OBS-009, epic #936 Phase 1b). Default false keeps
-    # dev/test/e2e and a prod host without the monitoring stack inert: no OTel tracer, no span
-    # exporter, no export attempts (Boot leaves only no-op propagators behind). Phase 2 sets
-    # MONITORING_TRACING_ENABLED=true together with the OTLP endpoint below. Boot 4 note: THIS
-    # flag is the gate the OTel tracing auto-configuration actually honours
-    # (@ConditionalOnEnabledOpenTelemetry); the legacy `management.tracing.enabled` is not
-    # consumed by any Boot 4.1 auto-configuration (verified against the module bytecode) and an
-    # endpoint-only gate is likewise not possible - tracing would be active by default.
     enabled: ${MONITORING_TRACING_ENABLED:false}
     resource-attributes:
-      # Align the trace service name with the `application` metric tag so Grafana's
-      # logs<->traces<->metrics correlation uses one identity per module.
       "service.name": basetool-ingest
     tracing:
       export:
         otlp:
-          # OTLP HTTP endpoint of the span collector (Phase 2: Alloy on the scrape network,
-          # http://alloy:4318/v1/traces). Only honored while tracing is enabled.
           endpoint: ${MONITORING_OTLP_ENDPOINT:http://localhost:4318/v1/traces}

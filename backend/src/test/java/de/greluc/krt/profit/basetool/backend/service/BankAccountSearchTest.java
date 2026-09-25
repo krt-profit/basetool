@@ -67,44 +67,36 @@ class BankAccountSearchTest {
 
   @Test
   void managementSearch_filtersByNameSubstring_caseInsensitive() {
-    // Given three distinctly-named SPECIAL accounts
     BankAccount phoenix = newAccount("Staffel PHOENIX", BankAccountType.SPECIAL);
     newAccount("Staffel IRIDIUM", BankAccountType.SPECIAL);
     newAccount("Sonderkonto Logistik", BankAccountType.SPECIAL);
 
-    // When searching by a lower-cased name fragment
     Page<BankAccountDto> result =
         bankAccountService.getAccounts(
             true, UUID.randomUUID(), "phoenix", ALL_STATUSES, ALL_TYPES, FIRST_PAGE);
 
-    // Then only the matching account comes back
     assertThat(result.getContent()).extracting(BankAccountDto::id).containsExactly(phoenix.getId());
   }
 
   @Test
   void managementSearch_matchesAccountNumber() {
-    // Given an account whose number we can search for
     BankAccount account = newAccount("Any Name", BankAccountType.SPECIAL);
     String accountNo = account.getAccountNo();
 
-    // When searching by the account number
     Page<BankAccountDto> result =
         bankAccountService.getAccounts(
             true, UUID.randomUUID(), accountNo, ALL_STATUSES, ALL_TYPES, FIRST_PAGE);
 
-    // Then the account is found by its number, not just its name
     assertThat(result.getContent()).extracting(BankAccountDto::id).contains(account.getId());
   }
 
   @Test
   void managementSearch_statusFilter_excludesClosed() {
-    // Given one active and one closed account sharing a search term
     BankAccount active = newAccount("Filterprobe Aktiv", BankAccountType.SPECIAL);
     BankAccount closed = newAccount("Filterprobe Zu", BankAccountType.SPECIAL);
     closed.setStatus(BankAccountStatus.CLOSED);
     accountRepository.save(closed);
 
-    // When searching ACTIVE-only (the picker path)
     Page<BankAccountDto> result =
         bankAccountService.getAccounts(
             true,
@@ -114,17 +106,14 @@ class BankAccountSearchTest {
             ALL_TYPES,
             FIRST_PAGE);
 
-    // Then the closed account is excluded
     assertThat(result.getContent()).extracting(BankAccountDto::id).containsExactly(active.getId());
   }
 
   @Test
   void managementSearch_typeFilter_narrowsToRequestedType() {
-    // Given a CARTEL and a SPECIAL account
     BankAccount cartel = newAccount("Typprobe Kartell", BankAccountType.CARTEL);
     newAccount("Typprobe Sonder", BankAccountType.SPECIAL);
 
-    // When narrowing to CARTEL (the singleton lookup path)
     Page<BankAccountDto> result =
         bankAccountService.getAccounts(
             true,
@@ -134,26 +123,19 @@ class BankAccountSearchTest {
             EnumSet.of(BankAccountType.CARTEL),
             FIRST_PAGE);
 
-    // Then only the CARTEL account matches
     assertThat(result.getContent()).extracting(BankAccountDto::id).containsExactly(cartel.getId());
   }
 
   @Test
   void search_isInjectionSafe_andTreatsWildcardsAsHarmlessLikeWildcards() {
-    // The query is a bound parameter, so it can never break out of the LIKE; a caller-supplied '%'
-    // acts as a harmless LIKE wildcard on this bank-employee-gated read (it is intentionally not
-    // LikePatterns-escaped — plain LIKE does not honour the backslash escape here). A distinctive
-    // token still narrows the result; an SQL-injection attempt is treated as literal text.
     BankAccount phoenix =
         newAccount("Phoenix Reserve " + UUID.randomUUID(), BankAccountType.SPECIAL);
 
-    // A wildcard-bearing query still finds the matching account (does not error out).
     Page<BankAccountDto> wildcard =
         bankAccountService.getAccounts(
             true, UUID.randomUUID(), "Phoenix%Reserve", ALL_STATUSES, ALL_TYPES, FIRST_PAGE);
     assertThat(wildcard.getContent()).extracting(BankAccountDto::id).contains(phoenix.getId());
 
-    // A crafted injection string is bound as literal text and simply matches nothing (no error).
     Page<BankAccountDto> injection =
         bankAccountService.getAccounts(
             true,
@@ -169,18 +151,15 @@ class BankAccountSearchTest {
 
   @Test
   void employeeSearch_scopesToGrantedAccounts() {
-    // Given an employee granted exactly one of two matching accounts
     User employee = newUser("search-emp-" + UUID.randomUUID());
     BankAccount granted = newAccount("Grantprobe A", BankAccountType.SPECIAL);
     BankAccount ungranted = newAccount("Grantprobe B", BankAccountType.SPECIAL);
     grant(employee, granted);
 
-    // When the employee (non-management) searches the shared term
     Page<BankAccountDto> result =
         bankAccountService.getAccounts(
             false, employee.getId(), "Grantprobe", ALL_STATUSES, ALL_TYPES, FIRST_PAGE);
 
-    // Then only the granted account is visible; the ungranted one is filtered out
     assertThat(result.getContent()).extracting(BankAccountDto::id).containsExactly(granted.getId());
     assertThat(result.getContent())
         .extracting(BankAccountDto::id)
@@ -189,16 +168,13 @@ class BankAccountSearchTest {
 
   @Test
   void blankQuery_dropsTheTextFilter() {
-    // Given a couple of accounts
     BankAccount a = newAccount("Leerprobe Eins " + UUID.randomUUID(), BankAccountType.SPECIAL);
     BankAccount b = newAccount("Leerprobe Zwei " + UUID.randomUUID(), BankAccountType.SPECIAL);
 
-    // When the query is blank (the browse-mode empty fetch)
     Page<BankAccountDto> result =
         bankAccountService.getAccounts(
             true, UUID.randomUUID(), "   ", ALL_STATUSES, ALL_TYPES, FIRST_PAGE);
 
-    // Then both accounts are within the unfiltered result
     assertThat(result.getContent()).extracting(BankAccountDto::id).contains(a.getId(), b.getId());
   }
 

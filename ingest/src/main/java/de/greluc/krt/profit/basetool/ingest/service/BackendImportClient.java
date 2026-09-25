@@ -129,11 +129,6 @@ public class BackendImportClient {
     this.circuitBreaker = circuitBreakerRegistry.circuitBreaker("backend");
     this.correlationIdHeader = loggingProperties.correlationIdHeader();
     this.correlationIdMdcKey = loggingProperties.correlationIdMdcKey();
-    // Log the one-time OPEN/CLOSED transition at WARN so a backend outage leaves a breadcrumb in
-    // the
-    // ingest log (the frontend has ResilienceEventLogger; ingest had only ported the breaker). This
-    // is the sanctioned health signal that pairs with the per-call DEBUG in GlobalExceptionHandler
-    // and the resilience4j_circuitbreaker_state gauge (REQ-OBS-001).
     circuitBreaker
         .getEventPublisher()
         .onStateTransition(
@@ -228,10 +223,6 @@ public class BackendImportClient {
       @NotNull String callerSub, String acceptLanguage) {
     String safeLanguage = sanitizedAcceptLanguage(acceptLanguage);
     String correlationId = MDC.get(correlationIdMdcKey);
-    // Resolved here, once per relay, rather than captured earlier: the provider hands back a cached
-    // token until shortly before expiry, so this is a field read in the common case and a grant
-    // only
-    // when the cache is cold.
     String gatewayToken = serviceAccountTokenProvider.currentToken();
     return headers -> {
       headers.setBearerAuth(gatewayToken);

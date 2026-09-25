@@ -214,9 +214,6 @@ public class BackendApiClient {
    */
   @Cacheable(cacheResolver = "catalogCacheResolver", key = "#catalog.name()", sync = true)
   public <T> T getCached(CachedCatalog catalog, ParameterizedTypeReference<T> responseType) {
-    // The page walk is not an optimisation: a bounded single GET of a PAGE_WALK catalogue returns
-    // its first chunk, and the cache then holds that truncated answer for the whole TTL
-    // (REQ-ADMIN-003). A mid-walk failure propagates unchanged, so no partial catalogue is cached.
     if (catalog.isPageWalked()) {
       return fetchCompleteCatalog(catalog, responseType);
     }
@@ -262,9 +259,6 @@ public class BackendApiClient {
    * @param <T> the caller's response body type
    * @return the merged catalogue as a single {@code PageResponse}
    */
-  // A PAGE_WALK catalogue is always consumed as PageResponse<E> via the type-ref overload
-  // (FrontendCacheSplitTest pins the modes; the Class overload rejects walked constants), so the
-  // T <-> PageResponse casts below are the unavoidable Object->generic case.
   @NotNull
   @SuppressWarnings("unchecked")
   private <T> T fetchCompleteCatalog(
@@ -474,31 +468,9 @@ public class BackendApiClient {
 
   private <T> T handleWebClientException(WebClientResponseException e, String method, String uri) {
     if (!e.getStatusCode().isError()) {
-      // Not a backend refusal at all, despite the exception type. A WebClient exchange that fails
-      // while the RESPONSE BODY is still being read is wrapped by Spring's DefaultClientResponse
-      // into a WebClientResponseException carrying the status that had ALREADY arrived — so a
-      // connection torn down mid-body surfaces as "200 OK from GET /api/v1/missions/lookup, but
-      // response failed with cause: PrematureCloseException: Connection prematurely closed DURING
-      // response". The status line is the truth about the headers, not about the call.
-      //
-      // Feeding that to the Problem+JSON path produced `Backend returned 200 [UNKNOWN]`: an error
-      // object that claims success, a WARN naming a "client error" no client made, an empty
-      // correlationId the backend never got to send, and — because 200 < 500 — the transport fault
-      // counted as `reason=backend_4xx`, i.e. blamed on the caller. The page controllers then
-      // logged it at ERROR with a stack trace whose top frame pointed at `fromProblem`, which
-      // reads as a parsing bug rather than a lost connection. Observed in production 2026-09-20.
-      //
-      // The sibling failure — the connection dying BEFORE any response — never had this problem:
-      // Spring raises WebClientRequestException there, which `catch (Exception)` already routes to
-      // handleException. Send this one the same way so both halves of one transport fault are
-      // classified alike (504 / BACKEND_TIMEOUT / reason=timeout).
       return handleException(e, method, uri);
     }
     BackendServiceException parsed = BackendServiceException.fromProblem(e, objectMapper);
-    // Log every RFC7807 backend failure exactly once, at the boundary, so individual page
-    // controllers don't have to repeat the same boilerplate. Field errors and the
-    // user-facing detail are included to make a 400 VALIDATION_FAILED diagnosable from the
-    // log alone (see AGENTS.md / CHANGELOG); rejected user values are never logged.
     if (parsed.getStatusCode() >= 500) {
       log.error(
           "Backend error on {} {}: status={}, code={}, correlationId={}, detail={}, fieldErrors={}",
@@ -510,20 +482,6 @@ public class BackendApiClient {
           parsed.getProblemDetail(),
           parsed.getFieldErrors());
     } else if (isExpectedAccessGateRefusal(parsed.getProblemCode())) {
-      // Expected, high-frequency 403s, not faults. A pending-approval session polls several
-      // endpoints on every page load; an unconsented session 403s on every request, because
-      // BackendRoleSyncFilter's GET /api/v1/users/me is not exempt from the consent gate and its
-      // failure path deliberately leaves the sync stamp unset so the next request retries. After a
-      // terms change that is the whole squadron times every request. A role-less account is the
-      // same shape at a smaller scale: every fragment of every page it loads, until an
-      // administrator assigns a role. Log at DEBUG so none of them floods the client-error log
-      // (mirrors the backend PendingApprovalAccessFilter and TermsAcceptanceAccessFilter, both of
-      // which log their own refusal at DEBUG for the same reason). The backend-4xx metric below is
-      // unaffected, so the monitoring signal stays.
-      //
-      // Reading the same predicate as the metric exclusion below is deliberate: the two lists were
-      // written out separately and NO_ROLE was added to neither, so a third gate could diverge
-      // from a fourth. One list, two readers.
       log.debug(
           "Backend client error on {} {}: status={}, code={}, correlationId={}",
           method,
@@ -543,19 +501,6 @@ public class BackendApiClient {
           parsed.getProblemDetail(),
           parsed.getFieldErrors());
     }
-    // The two access-gate refusals are NOT backend-call failures and must not be counted as such.
-    // They are the application telling the user to do something — get approved, accept the terms —
-    // and they arrive at the rate of "every unconsented session, every request". Counting them here
-    // made `BackendCallFailureSustained` (sum(rate(basetool_backend_client_errors_total[5m])) >
-    // 0.5)
-    // fire 38 minutes after the consent gate shipped, at 3.2/s: the alert cannot tell "the backend
-    // is failing" from "the gate is working", and during a rollout the second drowns the first.
-    //
-    // Nothing is lost. The backend counts each refusal itself, by code, in
-    // basetool_http_error_total{code=PENDING_APPROVAL|TERMS_NOT_ACCEPTED}, and the consent rollout
-    // has its own signal in TermsConsentRolloutStalled. Excluding only these two named codes keeps
-    // the alert sensitive to every genuine 4xx storm — which dropping the whole backend_4xx bucket
-    // from the alert expression would not.
     if (!isExpectedAccessGateRefusal(parsed.getProblemCode())) {
       countBackendError(
           parsed.getStatusCode() >= 500
@@ -568,11 +513,6 @@ public class BackendApiClient {
 
   private <T> T handleException(Exception e, String method, String uri) {
     if (ReauthenticationRequiredException.isReauthSignal(e)) {
-      // The frontend OAuth2 client has no usable token for this session (access token expired and
-      // the refresh token was rejected / rotated away). This is a per-session auth state, not a
-      // backend health problem — log it tersely (no stack trace, DEBUG) and rethrow a typed
-      // exception so GlobalExceptionHandler can bounce the user through a fresh Keycloak login
-      // instead of rendering an empty page and flooding the log with stack traces (REQ-SEC-012).
       log.debug(
           "Re-authentication required on {} {} (correlationId={})",
           method,
@@ -583,10 +523,6 @@ public class BackendApiClient {
     }
     Throwable root = unwrap(e);
     if (root instanceof CallNotPermittedException) {
-      // DEBUG, not WARN: the breaker's one-time OPEN transition already logged WARN
-      // (ResilienceEventLogger). This branch fires for every call blocked while the breaker stays
-      // open, so at WARN a routine backend restart floods the log (issue #1203, REQ-OBS-001). The
-      // failure is still metered under reason=circuit_open below, so the count is never lost.
       log.debug("Circuit breaker open for {} {}: {}", method, uri, root.getMessage());
       countBackendError(MetricNames.REASON_CIRCUIT_OPEN, method);
       throw new BackendServiceException(
@@ -610,14 +546,6 @@ public class BackendApiClient {
           java.util.Collections.emptyList(),
           null);
     }
-    // java.io.IOException is the whole transport family in one predicate: ConnectException
-    // (refused / unreachable), SocketException (reset), SSLException (handshake), and the one
-    // that motivated widening this from the former bare ConnectException — reactor.netty's
-    // PrematureCloseException, which is how a connection dying mid-exchange reaches us.
-    //
-    // Codec failures cannot land here: a body that will not decode raises DecodingException, a
-    // RuntimeException. So broadening to IOException cannot swallow a parsing bug and report it
-    // as a dead backend.
     if (root instanceof TimeoutException
         || root instanceof WebClientRequestException
         || root instanceof java.io.IOException) {

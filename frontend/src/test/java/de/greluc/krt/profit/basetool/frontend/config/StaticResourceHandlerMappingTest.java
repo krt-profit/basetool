@@ -124,7 +124,6 @@ class StaticResourceHandlerMappingTest {
       for (Resource resource : resolver.getResources(location)) {
         String name = resource.getFilename();
         assertNotNull(name, () -> "unnamed classpath entry under " + location);
-        // A directory is served as a tree; a bare file at the root as itself (robots.txt).
         expected.add(resource.getFile().isDirectory() ? "/" + name + "/**" : "/" + name);
       }
     }

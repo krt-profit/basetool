@@ -62,8 +62,6 @@ class PromotionProxyControllerTest {
 
   @InjectMocks private PromotionProxyController controller;
 
-  // ── Topics ──────────────────────────────────────────────────────────────
-
   @Test
   void createTopic_forwardsBodyToBackendTopicsEndpoint() {
     Map<String, Object> body = Map.of("name", "Combat", "sortOrder", 0);
@@ -101,8 +99,6 @@ class PromotionProxyControllerTest {
     verify(backendApiClient).delete("/api/v1/promotion/topics/" + id, Void.class);
   }
 
-  // ── Categories ──────────────────────────────────────────────────────────
-
   @Test
   void createCategory_forwardsBodyToBackendCategoriesEndpoint() {
     Map<String, Object> body =
@@ -136,8 +132,6 @@ class PromotionProxyControllerTest {
     verify(backendApiClient).delete("/api/v1/promotion/categories/" + id, Void.class);
   }
 
-  // ── Rank Requirements ───────────────────────────────────────────────────
-
   @Test
   void createRankRequirement_forwardsBodyToBackend() {
     Map<String, Object> body = Map.of("fromRank", 20, "toRank", 19, "minimumLevel", "LEVEL_A");
@@ -169,8 +163,6 @@ class PromotionProxyControllerTest {
     assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
     verify(backendApiClient).delete("/api/v1/promotion/rank-requirements/" + id, Void.class);
   }
-
-  // ── Level Contents ──────────────────────────────────────────────────────
 
   @Test
   void createLevelContent_forwardsBodyToBackend() {
@@ -205,14 +197,8 @@ class PromotionProxyControllerTest {
     verify(backendApiClient).delete("/api/v1/promotion/level-contents/" + id, Void.class);
   }
 
-  // ── Evaluations ─────────────────────────────────────────────────────────
-
   @Test
   void updateEvaluation_buildsUserCategoryPath_andForwardsBody() {
-    // The evaluations endpoint uniquely takes two path variables, and the proxy must expand both
-    // into the backend URI in the right order. Both are UUIDs: Keycloak issues the JWT sub as one
-    // and the backend's MemberEvaluationController declares `@PathVariable UUID userId`, so a
-    // non-UUID sub never had a route through this proxy in the first place.
     UUID userId = UUID.randomUUID();
     UUID categoryId = UUID.randomUUID();
     Map<String, Object> body = Map.of("version", 0, "assignedLevel", "LEVEL_B");
@@ -227,9 +213,6 @@ class PromotionProxyControllerTest {
 
   @Test
   void updateEvaluation_handlesNullAssignedLevelInBody() {
-    // Setting a level back to "Keine" sends assignedLevel: null. The proxy
-    // is body-agnostic; we verify the body is passed through unchanged so
-    // the backend's optimistic-lock + null-handling logic stays in charge.
     UUID userId = UUID.randomUUID();
     UUID categoryId = UUID.randomUUID();
     java.util.Map<String, Object> body = new java.util.HashMap<>();

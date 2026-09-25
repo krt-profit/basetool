@@ -212,8 +212,6 @@ class TermsAcceptanceServiceTest {
         .thenThrow(new DataIntegrityViolationException("uq_terms_acceptance_user_version"));
 
     assertThat(service.acceptCurrentTerms(userId)).isFalse();
-    // The winner's row satisfies this user, so the gate lets them through — established by asking
-    // the database, which is why the second stubbed answer is the one that decides.
     assertThat(service.hasAcceptedCurrentTerms(userId)).isTrue();
     verify(termsAcceptanceRepository, times(2)).existsByUserIdAndTermsVersion(userId, VERSION);
     assertThat(meterRegistry.counter("basetool.terms.acceptances").count()).isEqualTo(0.0);
@@ -241,7 +239,6 @@ class TermsAcceptanceServiceTest {
     try {
       assertThat(service.acceptCurrentTerms(userId)).isTrue();
 
-      // No commit happened, so nothing may be remembered: the next probe must ask the database.
       assertThat(service.hasAcceptedCurrentTerms(userId)).isFalse();
       verify(termsAcceptanceRepository, times(2)).existsByUserIdAndTermsVersion(userId, VERSION);
     } finally {
@@ -262,7 +259,6 @@ class TermsAcceptanceServiceTest {
           .forEach(TransactionSynchronization::afterCommit);
 
       assertThat(service.hasAcceptedCurrentTerms(userId)).isTrue();
-      // Exactly one: accept()'s own probe. The verdict came from memory, which is the point.
       verify(termsAcceptanceRepository, times(1)).existsByUserIdAndTermsVersion(userId, VERSION);
     } finally {
       TransactionSynchronizationManager.clearSynchronization();

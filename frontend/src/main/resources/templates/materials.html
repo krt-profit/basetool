@@ -35,26 +35,11 @@
 
         <div class="form-group krtm-position-relative-a8a9">
             <input type="text" id="materialFilter" th:placeholder="#{filter.material.placeholder}" data-trigger="materials-filter" autocomplete="off">
-            <!--/*
-              Material names for the custom krtAutocomplete dropdown. The names live in a datalist
-              rather than being inlined into the surrounding script via the Thymeleaf JS inline
-              comment-fallback pattern, because Thymeleaf 3.1's inline mechanism truncates the
-              rest of the script block as soon as it serialises a Java List/Collection into a JS
-              context — the substituted JSON array swallows every event after it, including the
-              data-trigger registrations for the category-expand handler further down.
-            */-->
             <datalist id="materialNames-data">
                 <option th:each="mat : ${materials}" th:value="${mat.name}"></option>
             </datalist>
         </div>
 
-        <!--/*
-          View toggle: checked groups materials under the admin-defined categories (the accordion
-          in #materialsGrouped); unchecked hides the category grouping and shows every material in
-          one flat, alphabetically sorted grid (#materialsFlat). Pure presentation preference,
-          persisted per browser in localStorage by the script below (mirrors the sidebar-section
-          persistence pattern). Both views render the same card from fragments/material-card.html.
-        */-->
         <div class="materials-grouping-toggle">
             <input type="checkbox" id="groupByCategory" data-trigger="materials-toggle-grouping" checked>
             <label for="groupByCategory" th:text="#{filter.groupByCategory}">Nach Kategorie gruppieren</label>

@@ -117,14 +117,10 @@ class OperationLiveSyncE2eTest {
         E2eSupport.navigate(pageB, baseUrl + "/operations/" + operationId);
         pageB.waitForLoadState();
 
-        // B starts with the original name (not the renamed one).
         assertThat(pageB.locator("#operation-title")).not().containsText(RENAMED);
 
-        // A full reload on B would clear this marker; the live in-place swap leaves it intact.
         pageB.evaluate("window.__krtNoReload = true;");
 
-        // Deterministic wait: B is registered with the relay once its operation:{id} subscribe is
-        // acked (subscribedTopics non-empty), so A's change frame cannot race past it.
         pageB.waitForCondition(
             () ->
                 Boolean.TRUE.equals(
@@ -132,17 +128,12 @@ class OperationLiveSyncE2eTest {
                         "!!(window.krtLiveSync && window.krtLiveSync.subscribedTopics"
                             + " && window.krtLiveSync.subscribedTopics().length > 0)")));
 
-        // Context A renames the operation on the Verwaltung tab and saves.
         pageA.locator("#optab-verw").click();
         pageA.locator("#op-name").fill(RENAMED);
         pageA.locator("button[type='submit'][form='operation-form']").click();
-        // A's own sticky header updates in place (sanity: the mutation succeeded).
         assertThat(pageA.locator("#operation-title"))
             .containsText(RENAMED, new LocatorAssertions.ContainsTextOptions().setTimeout(20_000));
 
-        // The assertion under test: context B — which did nothing — reflects the new name in its
-        // sticky header, pushed over /ws/sync and applied as an in-place overview swap + header
-        // patch.
         assertThat(pageB.locator("#operation-title"))
             .containsText(RENAMED, new LocatorAssertions.ContainsTextOptions().setTimeout(20_000));
         assertEquals(

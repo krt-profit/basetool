@@ -73,7 +73,6 @@ class OfficerRefineryAccessTest {
 
   @Test
   void officer_ShouldBeAbleToSelectUserInCreateForm() throws Exception {
-    // Given
     UUID userId = UUID.randomUUID();
     UserDto userDto =
         new UserDto(
@@ -96,18 +95,11 @@ class OfficerRefineryAccessTest {
             null,
             false);
     when(backendApiClient.get(eq("/api/v1/users/me"), eq(UserDto.class))).thenReturn(userDto);
-    // #1193: the owner picker is a server-side searchable combobox (remote-users). The create form
-    // defaults the owner to the caller and seeds only that one option via a single-user lookup — no
-    // preloaded roster. Stub the seed lookup so the box shows the officer's name.
     when(backendApiClient.get(eq("/api/v1/users/" + userId), eq(UserDto.class)))
         .thenReturn(userDto);
 
-    // Mock other data
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
-    // A non-empty material catalog proves the page no longer dumps it: the input-material picker
-    // is a server-side searchable combobox, so on a fresh create (no preselected material to seed)
-    // no catalog material name may appear anywhere in the rendered page.
     MaterialDto rawMaterial =
         new MaterialDto(
             UUID.randomUUID(),
@@ -163,28 +155,19 @@ class OfficerRefineryAccessTest {
     OAuth2AuthenticationToken auth =
         new OAuth2AuthenticationToken(oidcUser, oidcUser.getAuthorities(), "keycloak");
 
-    // When & Then
     mockMvc
         .perform(get("/refinery-orders/create").with(authentication(auth)))
         .andExpect(status().isOk())
         .andExpect(content().string(not(containsString("disabled=\"disabled\" id=\"ownerId\""))))
         .andExpect(content().string(containsString("id=\"ownerId\"")))
-        // The picker is the enabled server-side searchable combobox (not a preloaded dropdown), and
-        // it seeds the defaulted owner (the officer) so edit mode shows a name, not a raw id.
         .andExpect(content().string(containsString("data-krt-combobox=\"remote-users\"")))
         .andExpect(content().string(containsString("Officer")))
-        // REQ-FE-016: the goods row's input-material select opts into the server-side searchable
-        // combobox (remote raw-material search). A fresh create has no preselected input material,
-        // so the picker renders with just its placeholder option.
         .andExpect(
             content()
                 .string(
                     containsString(
                         "data-trigger=\"rfc-update-output\""
                             + " data-krt-combobox=\"remote-materials-raw\"")))
-        // The raw catalog is fetched on demand, never dumped into the page: no catalog material
-        // name renders, and the former inert options catalog for JS-added rows is gone (added
-        // rows search the backend instead of cloning preloaded options).
         .andExpect(content().string(not(containsString("Quantainium Raw Distinctive"))))
         .andExpect(content().string(not(containsString("Stileron Raw Distinctive"))))
         .andExpect(
@@ -193,7 +176,6 @@ class OfficerRefineryAccessTest {
 
   @Test
   void officer_ShouldSeeEditButtonsInDetails() throws Exception {
-    // Given
     UUID officerId = UUID.randomUUID();
     UUID otherUserId = UUID.randomUUID();
     UUID orderId = UUID.randomUUID();
@@ -260,17 +242,12 @@ class OfficerRefineryAccessTest {
     OAuth2AuthenticationToken auth =
         new OAuth2AuthenticationToken(oidcUser, oidcUser.getAuthorities(), "keycloak");
 
-    // When & Then
     mockMvc
         .perform(get("/refinery-orders/" + orderId).with(authentication(auth)))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("Speichern")))
         .andExpect(content().string(containsString("Abbrechen")))
         .andExpect(content().string(containsString("Einlagern")))
-        // REQ-FE-016: the editable details form's input-material select opts into the server-side
-        // searchable combobox (remote raw-material search; the form seeds one blank goods row even
-        // for an order without goods). The inert options catalog for JS-added rows is gone — added
-        // rows search the backend on demand instead of cloning preloaded options.
         .andExpect(
             content()
                 .string(
@@ -279,9 +256,6 @@ class OfficerRefineryAccessTest {
                             + " data-krt-combobox=\"remote-materials-raw\"")))
         .andExpect(
             content().string(not(containsString("id=\"refinery-material-options-template\""))))
-        // covers the .form-group checkbox regression class (PR #1405): the page-scoped rule must
-        // carry the :where() exclusion so it can never capture a checkbox/radio and stretch it into
-        // a full-width padded bar (it ties the global KRT square rule and renders after it).
         .andExpect(
             PageStylesheets.content(
                 containsString(

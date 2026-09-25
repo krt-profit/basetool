@@ -102,10 +102,6 @@ class InventoryItemServiceAggregateTest {
 
   @InjectMocks private InventoryAggregationService service;
 
-  // ---------------------------------------------------------------------
-  // filter routing
-  // ---------------------------------------------------------------------
-
   @Nested
   class FilterRoutingTests {
 
@@ -201,17 +197,12 @@ class InventoryItemServiceAggregateTest {
     }
   }
 
-  // ---------------------------------------------------------------------
-  // assembly — material grouping, weighted average, ordering
-  // ---------------------------------------------------------------------
-
   @Nested
   class AssemblyTests {
 
     @Test
     void singleStack_singleMaterial_isProjectedWithItsAggregates() {
       Material mat = material("Quantanium");
-      // total 100 @ quality 500 -> weighted sum 50000 -> mean 500
       stubGlobalStacks(agg(mat, location("ARC-L1"), 500, 100.0, 50_000.0, 500, 1));
       stubRefMapper();
 
@@ -235,8 +226,6 @@ class InventoryItemServiceAggregateTest {
     @Test
     void weightedAverageQuality_isAccumulatedFromRawSqlSums() {
       Material mat = material("Quantanium");
-      // (amount 100, q 400 -> wsum 40000) and (amount 300, q 500 -> wsum 150000)
-      // material mean = (40000 + 150000) / (100 + 300) = 475
       stubGlobalStacks(
           agg(mat, location("ARC-L1"), 400, 100.0, 40_000.0, 400, 1),
           agg(mat, location("ARC-L2"), 500, 300.0, 150_000.0, 500, 1));
@@ -251,7 +240,6 @@ class InventoryItemServiceAggregateTest {
     @Test
     void perStackMeanQuality_roundedHalfUpToTwoDecimals() {
       Material mat = material("Quantanium");
-      // wsum 451 over total 3 -> 150.333... -> 150.33
       stubGlobalStacks(agg(mat, location("ARC-L1"), 200, 3.0, 451.0, 200, 3));
       stubRefMapper();
 
@@ -286,7 +274,6 @@ class InventoryItemServiceAggregateTest {
       List<InventoryStackDto> stacks =
           service.getAllAggregatedInventory(null, null).get(0).stacks();
 
-      // q500 first (locA amt20, locA amt10, locB amt10), then q300 last
       assertEquals("A", stacks.get(0).location().name());
       assertEquals(20.0, stacks.get(0).totalAmount(), "locA q500 highest amount first");
       assertEquals("A", stacks.get(1).location().name());
@@ -311,10 +298,6 @@ class InventoryItemServiceAggregateTest {
           result.stream().map(g -> g.material().name()).toList());
     }
   }
-
-  // ---------------------------------------------------------------------
-  // helpers
-  // ---------------------------------------------------------------------
 
   /** Stubs the scoped stack query to return no stacks (for the filter-routing verifications). */
   private void stubFindGlobalStacks() {

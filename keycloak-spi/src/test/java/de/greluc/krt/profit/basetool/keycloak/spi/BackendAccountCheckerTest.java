@@ -118,7 +118,6 @@ class BackendAccountCheckerTest {
               writeResponse(exchange, 200, "{\"exists\":true}");
             });
     try {
-      // 300 ms request timeout against a 2 s server => fail open (UNKNOWN), never a spurious deny.
       assertEquals(Result.UNKNOWN, check(server, Duration.ofMillis(300)));
     } finally {
       server.stop(0);

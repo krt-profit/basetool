@@ -55,7 +55,6 @@ class AuditRetentionTaskTest {
         retentionService, taskMetrics, new AuditRetentionProperties(true, MAX_AGE, INTERVAL));
   }
 
-  // covers REQ-AUDIT-006 — the cutoff is "now - max-age"
   @Test
   void purgesAuditRowsOlderThanTheCutoff() {
     when(retentionService.purgeOlderThan(any())).thenReturn(17);
@@ -72,7 +71,6 @@ class AuditRetentionTaskTest {
   void swallowsFailuresSoSchedulerSurvives() {
     when(retentionService.purgeOlderThan(any())).thenThrow(new RuntimeException("db down"));
 
-    // Must not propagate.
     task().purgeExpiredAuditEvents();
   }
 }

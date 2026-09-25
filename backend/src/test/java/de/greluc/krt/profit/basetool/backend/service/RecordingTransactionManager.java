@@ -66,7 +66,5 @@ class RecordingTransactionManager extends AbstractPlatformTransactionManager {
   }
 
   @Override
-  protected void doResume(Object transaction, Object suspendedResources) {
-    // Nothing is bound, so there is nothing to restore.
-  }
+  protected void doResume(Object transaction, Object suspendedResources) {}
 }

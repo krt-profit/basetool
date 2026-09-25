@@ -92,7 +92,6 @@ class GlobalExceptionHandlerAdviceOrderTest {
    */
   private static List<ControllerAdviceBean> sortedAdvice(
       AnnotationConfigApplicationContext context) {
-    // Registered competitor-first so a passing result can never be an artefact of definition order.
     context.registerBean("competingSpringAdvice", CompetingSpringAdvice.class);
     context.registerBean(
         "globalExceptionHandler",

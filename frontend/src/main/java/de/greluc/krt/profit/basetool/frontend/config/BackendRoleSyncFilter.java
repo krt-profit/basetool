@@ -191,12 +191,6 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
         && !isStaticAsset(request)) {
       HttpSession session = request.getSession(false);
       if (session != null) {
-        // Epic #720, Track 1: a PENDING/REJECTED Discord registration is routed to the
-        // account-status page rather than left to collect 403s. REQ-SEC-053 adds a third state to
-        // the same routing: an approved account holding no role, which reaches the identical dead
-        // end for a different reason and needs different words for it. The backend is the source of
-        // truth for all three (it withholds every authority in each case), so this redirect is UX,
-        // not the access control.
         String approval = resolveApprovalState(session);
         if (STATE_PENDING.equals(approval)
             || STATE_REJECTED.equals(approval)
@@ -205,12 +199,6 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
           return;
         }
 
-        // REQ-SEC-028: while the Terms-of-Use gate is closed for this session, the backend refuses
-        // /api/v1/users/me with 403 TERMS_NOT_ACCEPTED. The failure path below deliberately leaves
-        // the sync stamp unset so the next request retries, which turns "unconsented" into one
-        // futile round trip per non-static request — for every member at once, right after a
-        // wording change. Skipping it costs nothing: the sync could not have succeeded, and the
-        // moment consent is recorded the cached verdict is cleared and the next request syncs.
         if (TermsAcceptanceGateFilter.consentKnownMissing(request)) {
           filterChain.doFilter(request, response);
           return;
@@ -219,19 +207,9 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
         if (isDue(session.getAttribute(ROLES_SYNCED_AT_FLAG), ROLE_RESYNC_MILLIS)) {
           log.debug(
               "Session exists, starting role sync for user: {}", maskPrincipal(token.getName()));
-          // Only stamp the session when the backend role read genuinely succeeded. A Resilience4j
-          // fallback (null) or a thrown error must NOT stamp it — otherwise a single backend hiccup
-          // would leave the OidcUser principal without its ROLE_* authorities for a whole
-          // re-sync interval instead of retrying on the very next request (REQ-SEC-013).
           if (syncRoles(token, session, request, response)) {
             session.setAttribute(ROLES_SYNCED_AT_FLAG, System.currentTimeMillis());
           } else if (STATE_NO_ROLE.equals(session.getAttribute(APPROVAL_STATE_FLAG))) {
-            // The role read is where a role-less account is first recognised, and it runs after the
-            // approval routing above rather than before it. Without this the request that made the
-            // discovery would still be served: the dashboard renders, every backend call on it is
-            // refused with 403 NO_ROLE, and only the NEXT navigation reaches the account-status
-            // page. REQ-SEC-053 wants the dead end at the first request, so route the one that
-            // found it.
             routeToAccountStatus(request, response, filterChain);
             return;
           }
@@ -274,8 +252,6 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
 
     String fresh = fetchApprovalStatus();
     if (fresh == null) {
-      // Backend unreadable: keep whatever we had rather than downgrading a known verdict, and leave
-      // the stamp untouched so the next request retries instead of waiting out the interval.
       return cached;
     }
     session.setAttribute(APPROVAL_STATE_FLAG, fresh);
@@ -350,9 +326,6 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
           backendApiClient.get("/api/v1/users/me/registration-status", RegistrationStatusDto.class);
       return dto == null ? null : dto.approvalStatus();
     } catch (BackendServiceException e) {
-      // Boundary already logged it; this probe re-runs on every request until it succeeds, so keep
-      // the expected backend-unavailable case at DEBUG to avoid per-request WARN spam
-      // (REQ-OBS-001).
       log.debug("Could not read approval status; treating as non-pending for this request.", e);
       return null;
     } catch (Exception e) {
@@ -468,9 +441,6 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
       UserDto user = backendApiClient.get("/api/v1/users/me", UserDto.class);
 
       if (user == null) {
-        // Resilience4j fallback returns null when the backend is unavailable (e.g. mid-deploy).
-        // Returning false leaves the sync stamp unset so the next request retries instead of
-        // poisoning the session with a principal that never received its ROLE_* (REQ-SEC-013).
         log.warn(
             "Backend role sync skipped: /api/v1/users/me returned no user for {}; leaving the"
                 + " session unsynced so the next request retries.",
@@ -495,9 +465,7 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
             updatedAuthorities.size());
         OAuth2AuthenticationToken newAuth;
         if (token.getPrincipal() instanceof OidcUser oidcUser) {
-          // We must preserve the nameAttributeKey to avoid changing the principal name,
-          // which would break OAuth2AuthorizedClient lookups.
-          String nameAttributeKey = "sub"; // Default
+          String nameAttributeKey = "sub";
           String currentName = oidcUser.getName();
 
           if (currentName != null) {
@@ -506,7 +474,6 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
             } else if (currentName.equals(oidcUser.getEmail())) {
               nameAttributeKey = "email";
             } else {
-              // Search for the key that matches the current name
               for (java.util.Map.Entry<String, Object> entry :
                   oidcUser.getAttributes().entrySet()) {
                 if (currentName.equals(String.valueOf(entry.getValue()))) {
@@ -564,11 +531,6 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
 
       return true;
     } catch (BackendServiceException | ReauthenticationRequiredException e) {
-      // REQ-SEC-053: the role read is the frontend's first meeting with a role-less account — the
-      // backend refuses it with 403 NO_ROLE like every other /api call. Cached as the session's
-      // verdict so the next request routes to the account-status page instead of repeating the
-      // same refusal on every navigation, and expiring on the same interval as the approval verdict
-      // so an administrator granting a role reaches the member without a re-login.
       if (e instanceof BackendServiceException backendFailure
           && BackendServiceException.CODE_NO_ROLE.equals(backendFailure.getProblemCode())) {
         session.setAttribute(APPROVAL_STATE_FLAG, STATE_NO_ROLE);
@@ -576,12 +538,6 @@ public class BackendRoleSyncFilter extends OncePerRequestFilter {
         log.info("Backend refused the role sync with NO_ROLE; routing to the account-status page.");
         return false;
       }
-      // REQ-OBS-001: the BackendApiClient boundary already logged this once (5xx=ERROR, 4xx=WARN,
-      // circuit-open=DEBUG). syncRoles re-runs on EVERY request until it succeeds
-      // (SYNC_COMPLETE_FLAG
-      // is only set on success), so re-logging a relayed backend failure at ERROR here turns one
-      // backend outage into a per-request ERROR storm and undoes the #1203 circuit-open-at-DEBUG
-      // design. Defer quietly; the principal gains ROLE_* on the next good request.
       log.debug(
           "Backend role sync deferred (backend unavailable) for user: {}",
           maskPrincipal(token.getName()),

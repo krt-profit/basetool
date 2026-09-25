@@ -48,10 +48,6 @@ class MonitoringTracingInertTest {
 
   @Test
   void shouldNotCreateSdkTracerProviderWhenTracingDisabled() {
-    // Given the default configuration (gate pinned false, mirroring an unset env var)
-    // When / Then: without an SDK tracer provider no span can ever be recorded or exported. (A
-    // Micrometer OtelTracer bean may still exist by Boot 4 design, but it is backed by the no-op
-    // OpenTelemetry fallback.)
     assertThat(context.getBeansOfType(SdkTracerProvider.class))
         .as("no SDK tracer provider must exist while tracing is disabled")
         .isEmpty();
@@ -59,8 +55,6 @@ class MonitoringTracingInertTest {
 
   @Test
   void shouldNotCreateAnySpanExporterWhenTracingDisabled() {
-    // Given / When / Then: no exporter means no OTLP connection attempts against the (absent)
-    // collector — the "fully inert" guarantee of REQ-OBS-009.
     assertThat(context.getBeansOfType(SpanExporter.class))
         .as("no SpanExporter bean must exist while tracing is disabled")
         .isEmpty();

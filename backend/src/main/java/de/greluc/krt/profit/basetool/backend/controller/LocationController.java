@@ -176,8 +176,6 @@ public class LocationController {
   @PostMapping
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public LocationDto createLocation(@RequestBody @Valid @NotNull LocationDto location) {
-    // stripServerManaged drops client-supplied id / version so JPA performs an INSERT
-    // and the client cannot mass-assign onto an existing row through this endpoint.
     Location entity = LocationMapper.stripServerManaged(locationMapper.toEntity(location));
     return locationMapper.toDto(locationService.createLocation(entity));
   }

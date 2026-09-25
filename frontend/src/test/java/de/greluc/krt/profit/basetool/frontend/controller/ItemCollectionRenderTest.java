@@ -130,9 +130,6 @@ class ItemCollectionRenderTest {
             .getResponse()
             .getContentAsString();
 
-    // The flattened row carries the group's game-item name, the owner, the location and a
-    // delivered toggle bound to THIS order; the this-order slice shows with the total-stock
-    // context.
     assertThat(html).as("collection table").contains("id=\"item-collection-table\"");
     assertThat(html).as("game-item name in the Item column").contains("Cirrus Optic Scope");
     assertThat(html).as("owner seeded into the combobox").contains("Alice");

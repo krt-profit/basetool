@@ -57,7 +57,6 @@ class UserApprovalMailEventListenerTest {
         new UserApprovalDecidedEvent(UUID.randomUUID(), false, "a@example.test", "Name", "reason");
     doThrow(new RuntimeException("boom")).when(userApprovalMailService).sendDecisionMail(event);
 
-    // Best-effort: a mail failure must not propagate out of the after-commit listener.
     listener.onUserApprovalDecided(event);
 
     verify(userApprovalMailService).sendDecisionMail(event);

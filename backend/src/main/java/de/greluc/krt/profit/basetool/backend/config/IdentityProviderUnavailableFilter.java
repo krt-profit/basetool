@@ -197,9 +197,6 @@ public class IdentityProviderUnavailableFilter extends OncePerRequestFilter {
             "The authentication service is temporarily unreachable. Please retry shortly.",
             locale);
 
-    // WARN, not ERROR: an unreachable identity provider is an availability event, not an
-    // application fault — keeping it out of ERROR avoids inflating the logback error-rate signal
-    // (LogbackErrorSpike). Log the cause class only, never the message/stack (may carry a URL).
     log.warn(
         "Identity provider unreachable for {} {} [cause={}, correlationId={}] — returning 503",
         request.getMethod(),

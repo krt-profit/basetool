@@ -100,8 +100,6 @@ public class UexVehicleService {
     log.info("Starting synchronization of UEX vehicles (ships)...");
     UexClient.FetchResult<UexVehicleDto> fetched = uexClient.getVehicles();
     if (fetched.notModified()) {
-      // Catalogue byte-identical to the last run: nothing to upsert, and the orphan sweep below is
-      // skipped with it — every ship_type it would tombstone is still in the (unchanged) feed.
       log.info("UEX vehicle catalogue unchanged since the last sync (304) — nothing to import.");
       return;
     }
@@ -113,9 +111,6 @@ public class UexVehicleService {
 
     Instant now = Instant.now();
     Set<Integer> seenUexVehicleIds = new HashSet<>();
-    // BE-PERF-09 / REQ-DATA-005: written after the fetch in chunk transactions of their own; a
-    // refused chunk is replayed row by row. The seen-id set may keep the id of a row that then
-    // failed on its own, which only spares that row the orphan sweep this run.
     SyncChunkWriter.Outcome<Boolean> outcome =
         chunkWriter.write(
             vehicles,
@@ -135,7 +130,6 @@ public class UexVehicleService {
     if (seenUexVehicleIds.isEmpty()) {
       log.warn("Skipping orphan sweep — no UEX vehicle was processed successfully.");
     } else {
-      // A bulk update needs a transaction, and the sync no longer holds one (BE-PERF-09).
       int marked =
           chunkWriter.inNewTransaction(
               () -> shipTypeRepository.markUexDeletedExcept(seenUexVehicleIds, now));
@@ -182,9 +176,6 @@ public class UexVehicleService {
       shipType.setSourceSystems(GameItemSourceSystem.UEX_ONLY);
     }
 
-    // Backfill the cross-source keys. The legacy name-fallback rows get external_uuid +
-    // uex_vehicle_id
-    // on this run; subsequent syncs never re-enter the name path.
     if (externalUuid != null && shipType.getExternalUuid() == null) {
       shipType.setExternalUuid(externalUuid);
     }
@@ -202,7 +193,6 @@ public class UexVehicleService {
 
     shipType.setUexSyncedAt(now);
     shipType.setUexDeletedAt(null);
-    // Promote UEX_ONLY -> BOTH when Wiki already wrote this row (R4+).
     if (shipType.getSourceSystems() == GameItemSourceSystem.WIKI_ONLY) {
       shipType.setSourceSystems(GameItemSourceSystem.BOTH);
     }
@@ -223,8 +213,6 @@ public class UexVehicleService {
     shipType.setUexSlug(dto.slug());
     shipType.setNameFull(dto.nameFull());
     shipType.setScu(dto.scu());
-    // UEX serves the crew complement as one compact string ("1", "1,2"), not as crew_min/crew_max
-    // (REQ-DATA-015): binding those two decoded to null and cleared both columns on every run.
     UexValues.CrewRange crew = UexValues.parseCrew(dto.crew());
     shipType.setCrewMin(crew.min());
     shipType.setCrewMax(crew.max());
@@ -241,10 +229,6 @@ public class UexVehicleService {
     shipType.setUrlHotsite(dto.urlHotsite());
     shipType.setUrlPhoto(dto.urlPhoto());
     shipType.setUrlVideo(dto.urlVideo());
-    // NOT written here, because UEX's /vehicles payload does not carry them (REQ-DATA-015):
-    // mass_total, ore_capacity, max_medical_tier, health, shield_hp, url_wiki, description and
-    // description_de. Writing them cleared eight columns outright and — for vehicle_inventory_scu
-    // and description_en — undid what the SC-Wiki vehicle sync had filled in, every single run.
 
     shipType.setIsAddon(UexValues.asBooleanOrNull(dto.isAddon()));
     shipType.setIsBoarding(UexValues.asBooleanOrNull(dto.isBoarding()));

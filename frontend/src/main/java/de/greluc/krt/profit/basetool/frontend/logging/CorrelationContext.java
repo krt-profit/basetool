@@ -41,9 +41,7 @@ public final class CorrelationContext {
 
   private static final ThreadLocal<String> HOLDER = new ThreadLocal<>();
 
-  private CorrelationContext() {
-    // utility
-  }
+  private CorrelationContext() {}
 
   /** Stores the given correlation id in the calling thread; a blank value clears the slot. */
   public static void set(@Nullable String correlationId) {

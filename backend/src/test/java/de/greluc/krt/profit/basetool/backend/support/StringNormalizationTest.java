@@ -64,34 +64,27 @@ class StringNormalizationTest {
 
   @Test
   void normalizeAndCap_collapsesCombiningSequenceToNfc() {
-    // Given a decomposed grapheme that is longer in code units than its precomposed form
     String input = "caf" + DECOMPOSED_E_ACUTE;
     assertEquals(5, input.length(), "precondition: decomposed input is five code units");
 
-    // When
     String result =
         StringNormalization.normalizeAndCap(input, StringNormalization.MAX_FREE_TEXT_LENGTH);
 
-    // Then it canonicalizes to the single-code-point NFC form
     assertEquals("caf" + PRECOMPOSED_E_ACUTE, result);
     assertEquals(4, result.length(), "NFC collapses the two-code-unit accent into one");
   }
 
   @Test
   void normalizeAndCap_passesThroughWhenWithinCap() {
-    // Given a value exactly at the cap
     String input = "a".repeat(10);
 
-    // When / Then it is returned unchanged
     assertEquals(input, StringNormalization.normalizeAndCap(input, 10));
   }
 
   @Test
   void normalizeAndCap_throwsWhenExceedingCap() {
-    // Given a value one character over the cap
     String input = "a".repeat(11);
 
-    // When / Then the length guard fires
     IllegalArgumentException ex =
         assertThrows(
             IllegalArgumentException.class, () -> StringNormalization.normalizeAndCap(input, 10));
@@ -100,69 +93,54 @@ class StringNormalizationTest {
 
   @Test
   void normalizeAndCap_measuresLengthAfterNormalization() {
-    // Given 10 decomposed accents (20 code units) that collapse to 10 precomposed ones
     String input = DECOMPOSED_E_ACUTE.repeat(10);
     assertEquals(20, input.length(), "precondition: decomposed input is twenty code units");
 
-    // When capped at 10 — the pre-normalization length (20) would exceed it, the NFC length (10)
-    // does not — Then the guard must use the post-normalization length and accept it
     String result = StringNormalization.normalizeAndCap(input, 10);
     assertEquals(PRECOMPOSED_E_ACUTE.repeat(10), result);
   }
 
   @Test
   void blankToNull_collapsesNullAndIsWhitespaceBlankButLeavesContentUnstripped() {
-    // Null / empty / ASCII-whitespace / isWhitespace-only (em space) all collapse to null
     assertNull(StringNormalization.blankToNull(null));
     assertNull(StringNormalization.blankToNull(""));
     assertNull(StringNormalization.blankToNull("   "));
     assertNull(StringNormalization.blankToNull(EM_SPACE));
 
-    // A non-breaking space is NOT isWhitespace, so it counts as content and is kept
     assertEquals(NBSP, StringNormalization.blankToNull(NBSP));
 
-    // A value with content is returned byte-for-byte — surrounding whitespace is NOT stripped
     assertEquals("  x  ", StringNormalization.blankToNull("  x  "));
     assertEquals("hello", StringNormalization.blankToNull("hello"));
   }
 
   @Test
   void trimToNull_collapsesBlankAndStripsIsWhitespaceFromContent() {
-    // Null / empty / ASCII-whitespace / isWhitespace-only (em space) all collapse to null
     assertNull(StringNormalization.trimToNull(null));
     assertNull(StringNormalization.trimToNull(""));
     assertNull(StringNormalization.trimToNull("   "));
     assertNull(StringNormalization.trimToNull(EM_SPACE));
 
-    // Content is stripped of ASCII and Unicode edge whitespace (em space), interior kept
     assertEquals("note", StringNormalization.trimToNull("  note  "));
     assertEquals("note", StringNormalization.trimToNull(EM_SPACE + "note" + EM_SPACE));
     assertEquals("a b", StringNormalization.trimToNull(" a b "));
 
-    // A non-breaking space is NOT isWhitespace: strip() leaves it, so it survives as content
     assertEquals(NBSP + "note" + NBSP, StringNormalization.trimToNull(NBSP + "note" + NBSP));
   }
 
   @Test
   void normalize_trimsAppliesEmptyPolicyThenNfcAndCaps() {
-    // Null stays null regardless of the flag
     assertNull(StringNormalization.normalize(null, 10, true));
     assertNull(StringNormalization.normalize(null, 10, false));
 
-    // emptyAsNull=true collapses a trimmed-empty (ASCII) value to null; the NBSP survives trim so
-    // it is NOT collapsed (mirrors NormalizedStringEditor's ASCII-only empty policy)
     assertNull(StringNormalization.normalize("   ", 10, true));
     assertEquals(NBSP, StringNormalization.normalize(NBSP, 10, true));
 
-    // emptyAsNull=false keeps a trimmed-empty value as the empty string
     assertEquals("", StringNormalization.normalize("   ", 10, false));
 
-    // Content is trimmed, NFC-normalized and length-checked
     assertEquals(
         "caf" + PRECOMPOSED_E_ACUTE,
         StringNormalization.normalize("  caf" + DECOMPOSED_E_ACUTE + "  ", 10, true));
 
-    // The cap is enforced on the post-trim, post-NFC length
     assertThrows(
         IllegalArgumentException.class,
         () -> StringNormalization.normalize("a".repeat(11), 10, true));

@@ -77,8 +77,6 @@ class AdminSettingsPageControllerMvcTest {
         .thenReturn(new SystemSettingDto("k", "v", 1L));
   }
 
-  // covers #582 — the settings twin (X-Requested-With + JSON body) PUTs each setting and returns
-  // the bumped versions so the page writes them back into the hidden inputs.
   @Test
   @WithMockUser(roles = "ADMIN")
   void updateSettingsAjax_withHeader_returns200WithBumpedVersions() throws Exception {
@@ -99,13 +97,9 @@ class AdminSettingsPageControllerMvcTest {
         .andExpect(content().string(containsString("ageYellowVersion")))
         .andExpect(content().string(containsString("transferFeeVersion")));
 
-    // The orders pages read the age thresholds through getCached, so a successful save must evict
-    // the static cache for the change to surface on the next render.
     verify(backendApiClient).clearStaticDataCache();
   }
 
-  // covers #582 — the cross-field invariant: yellow >= red short-circuits with a 422 problem+json
-  // before any backend PUT.
   @Test
   @WithMockUser(roles = "ADMIN")
   void updateSettingsAjax_withHeaderYellowGteRed_returns422() throws Exception {
@@ -123,8 +117,6 @@ class AdminSettingsPageControllerMvcTest {
         .andExpect(status().isUnprocessableContent());
   }
 
-  // covers #582 — header routing: the same URL WITHOUT the header still hits the classic form
-  // handler and redirects (no-JS fallback preserved).
   @Test
   @WithMockUser(roles = "ADMIN")
   void updateSettings_withoutHeader_redirects() throws Exception {
@@ -144,15 +136,9 @@ class AdminSettingsPageControllerMvcTest {
                 .param("transferFeeVersion", "0"))
         .andExpect(status().is3xxRedirection());
 
-    // Same eviction guarantee on the classic (no-JS) save path.
     verify(backendApiClient).clearStaticDataCache();
   }
 
-  // covers the .form-group checkbox regression class (PR #1405) — the page-scoped .form-group
-  // input rule ties the global KRT square-checkbox rule at (0,1,1) and, rendering after
-  // styles.css, would win and stretch any .form-group checkbox/radio into a full-width padded
-  // bar. Pins the :where() exclusion so the page rule can never capture checkbox/radio inputs.
-  // The GET handler degrades every backend fetch to defaults, so no stubbing is needed.
   @Test
   @WithMockUser(roles = "ADMIN")
   void viewSettings_ShouldExcludeCheckboxesFromFormGroupInputRule() throws Exception {
@@ -165,14 +151,10 @@ class AdminSettingsPageControllerMvcTest {
                     ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
   }
 
-  // Partial-save guarantee (AJAX): when an early setting PUT lands but a later one throws, the
-  // controller still evicts the static cache (it drops it in a finally) so the threshold that did
-  // persist surfaces on the next render instead of being stranded until the 10-min TTL.
   @Test
   @WithMockUser(roles = "ADMIN")
   void updateSettingsAjax_partialSaveFailure_stillEvictsStaticCache() throws Exception {
     stubAllPuts();
-    // The yellow PUT lands; the red PUT (a later write) blows up mid-save.
     when(backendApiClient.put(
             eq("/api/v1/settings/job_order.age_red_days"), any(), eq(SystemSettingDto.class)))
         .thenThrow(new RuntimeException("backend down mid-save"));
@@ -193,7 +175,6 @@ class AdminSettingsPageControllerMvcTest {
     verify(backendApiClient).clearStaticDataCache();
   }
 
-  // Partial-save guarantee (classic no-JS path): a later PUT failing must not strand the eviction.
   @Test
   @WithMockUser(roles = "ADMIN")
   void updateSettings_partialSaveFailure_stillEvictsStaticCache() throws Exception {

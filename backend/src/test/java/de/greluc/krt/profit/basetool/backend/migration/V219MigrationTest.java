@@ -80,9 +80,6 @@ class V219MigrationTest {
 
   @Test
   void v219DoesNotLeaveTheManufacturedColumnNullable() {
-    // A regression guard alongside the column shape: an absent NOT NULL flag would let the
-    // production-booking counter go null and silently break the delivery gate (delivered <=
-    // manufactured), so pin the nullability explicitly rather than only asserting the type.
     String isNullable =
         jdbcTemplate.queryForObject(
             "SELECT is_nullable FROM information_schema.columns "

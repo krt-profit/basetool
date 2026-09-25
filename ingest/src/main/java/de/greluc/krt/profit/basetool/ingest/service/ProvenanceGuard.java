@@ -88,10 +88,6 @@ public class ProvenanceGuard {
           LogSafe.text(provenance.toolVersion(), MAX_LOGGED_PROVENANCE));
       return;
     }
-    // WARN with the declared values: this is the one reject reason a caller fully controls, so the
-    // actual string is the entire diagnostic value — it separates "an old extractor build emits a
-    // legacy tool name" from "someone is hand-building payloads". LogSafe first: the fields are
-    // unvalidated internet-facing free text and could otherwise forge a second log line.
     log.warn(
         "Ingest payload provenance rejected: tool={}, toolVersion={}, schemaVersion={}",
         LogSafe.text(tool, MAX_LOGGED_PROVENANCE),

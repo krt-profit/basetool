@@ -156,9 +156,6 @@ public class DataExportService {
         for (TupleElement<?> element : tuple.getElements()) {
           String name = element.getAlias();
           Object value = tuple.get(name);
-          // Per column, not per section. Scrubbing every String of a section corrupted structured
-          // values -- an e-mail address, a status, a username -- whenever another member's handle
-          // occurred inside one (REQ-SEC-058, DataExportSections#UNSCRUBBED_PERSON_COLUMNS).
           if (sectionHasProse
               && DataExportSections.isScrubbed(section.key(), name)
               && value instanceof String text) {
@@ -178,8 +175,6 @@ public class DataExportService {
     DataExport export =
         new DataExport(
             userId, subject.getEffectiveName(), Instant.now(), scrubbed, OUT_OF_SCOPE, sections);
-    // The subject's id, never their handle: a log line about an access request must not be a second
-    // place the name is written (REQ-OBS-004).
     log.info(
         "Assembled data export for {}: {} section(s), {} row(s){}",
         userId,
@@ -251,18 +246,6 @@ public class DataExportService {
    * @param subjectId the member the export is about
    * @return the scrubber
    */
-  /*
-   * The whole roster, once per export, and deliberately so.
-   *
-   * A projection of the three name columns would read less; it would also route the scrubber around
-   * HandleSpellings, which exists so the export and the erasure cannot disagree about what a
-   * member's names are (HandleSpellingCoverageTest holds that list against the search registry).
-   * The roster is bounded by the organisation's membership, in the hundreds, and it is read once
-   * for an operation that already runs ~29 statements across the whole schema on a request that
-   * arrives a few times a year. Trading a gate-enforced single source for a read that is not the
-   * bottleneck would be the wrong way round -- noted 2026-09-17 after the cost was raised in
-   * review.
-   */
   private @NotNull HandleScrubber scrubberForOthers(@NotNull UUID subjectId) {
     List<User> roster = userRepository.findAll();
     List<String> others =
@@ -271,11 +254,6 @@ public class DataExportService {
             .flatMap(HandleSpellings::of)
             .filter(h -> h != null && !h.isBlank())
             .toList();
-    // The subject's own names go in as PROTECTED terms rather than being left out. Excluding them
-    // entirely is what shredded them: longest-match can only rank terms the matcher knows, so a
-    // third party called "Val" beat the subject's own "Valkyrie" and turned it into
-    // "#OTHER_MEMBER#kyrie" -- in the subject's own export, reported to the reviewing admin as a
-    // third-party redaction.
     List<String> own =
         roster.stream()
             .filter(u -> u.getId().equals(subjectId))

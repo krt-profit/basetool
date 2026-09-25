@@ -1,17 +1,8 @@
-# External deny assertions for the public edge (REQ-OBS-012).
-#
-# Why a GitHub Action and not the blackbox exporter: the Keycloak /auth/admin lockdown is an nginx
-# allow-list admitting only addresses that originate on the host itself — the container-bridge
-# gateways and, behind the haproxy PROXY-protocol front end, loopback (docs/deployment.md →
-# "Keycloak Admin Console via SSH tunnel"). Probe traffic from the internal blackbox exporter
-# reaches the edge from the host side, so from inside the console ALWAYS looks reachable — only a
-# genuinely external vantage point (a GitHub-hosted runner) can assert the deny. The /actuator check duplicates the internal blackbox-edge-deny probe from outside as a
-# cross-check. A failing run notifies the repository owner via GitHub's workflow-failure e-mail.
 name: Edge deny probe
 
 on:
   schedule:
-    - cron: "17 5 * * *" # daily, off the full hour to dodge scheduler congestion
+    - cron: "17 5 * * *"
   workflow_dispatch:
 
 permissions:
@@ -40,10 +31,6 @@ jobs:
       - name: Actuator edge deny must answer 404 from the internet
         run: |
           fail=0
-          # Read from a heredoc rather than a `for url in … \` list so a target can be STAGED as a
-          # comment: api.profit-base.online does not exist until the owner applies the vhost (D3)
-          # and its DNS (D4), and a live entry would fail this workflow nightly until then — which
-          # trains the reader to ignore a red run. Blank and `#` lines are skipped.
           while read -r url; do
             case "$url" in ''|\#*) continue ;; esac
             code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 --retry 2 --retry-delay 10 "$url" || true)
@@ -57,9 +44,6 @@ jobs:
           https://profit-base.online/actuator/health
           https://ingest.profit-base.online/actuator/prometheus
           https://ingest.profit-base.online/actuator/health
-          # The API vhost (un-staged as runbook phase F). This external vantage point matters most
-          # on that host: it is the one the native app reaches, and the only place a mistaken
-          # `location /actuator` proxy_pass would be visible from outside.
           https://api.profit-base.online/actuator/prometheus
           https://api.profit-base.online/actuator/health
           TARGETS
@@ -67,20 +51,6 @@ jobs:
 
       - name: Former public pages must send a browser into the login (REQ-SEC-052)
         run: |
-          # The members-only contract as a member's browser sees it (ADR-0159). These three pages
-          # rendered without a login until the cut-over; each must now answer a NAVIGATION with a
-          # 302 into the OAuth2 entry point.
-          #
-          # The internal blackbox-members-only job asserts the same thing, and this run is the
-          # cross-check from a vantage point that shares nothing with it: no Docker bridge, no
-          # hairpin, no local resolver. What both are really watching for is a cache rule or a
-          # mis-ordered edge `location` serving the old page — which republishes the roster and
-          # leaves every in-process test green, because those run against MockMvc.
-          #
-          # Sent as a navigation on purpose. The same paths answer 401 to a background call by
-          # design (REQ-SEC-012), so a bare curl would assert the wrong half of the contract.
-          # -o /dev/null with no -L: the FIRST response is the assertion; following it would land
-          # on Keycloak and report Keycloak's status instead.
           fail=0
           for path in /missions /operations /orders; do
             url="https://profit-base.online$path"
@@ -98,27 +68,10 @@ jobs:
 
       - name: API vhost allow-list must answer the statuses REQ-SEC-037 records
         run: |
-          # The counterpart to the runbook's manual § D.3a check, run nightly from outside.
-          #
-          # This is the only check of what the LIVE edge answers. The allow-list is
-          # docker/edge/include/api-allowlist.conf since ADR-0162, and in-repo gates read that
-          # file (probe-vs-allowlist, ExternalContractTest) -- but a path missing on the running
-          # edge answers 404 exactly like a path that was never meant to be there, and the app's
-          # screen simply goes blank. That is not hypothetical: when the list still lived in NPM's
-          # admin database, a half-applied paste shipped a mission-detail 404 while the read-only
-          # guard from the same block was live, and it was found by hand.
-          #
-          # Failing in the other direction matters more: a path that starts answering 2xx where
-          # this table says a refusal is an unauthenticated read of member data.
           base=https://api.profit-base.online
           fail=0
-          # Two expectations for one verb+path is a bug in THIS table, not a finding about the
-          # vhost, and it has happened twice: a phase admits a path, adds its new row above and
-          # leaves the old refusal row standing further down. The run then demands both answers of
-          # one path and reports whichever it reaches second as edge drift -- which sends the
-          # reader to the nginx config for a mistake that is here. Catch it as what it is.
           declare -A seen=()
-          probe() { # verb path expected
+          probe() {
             key="$1 $2"
             if [ -n "${seen[$key]:-}" ] && [ "${seen[$key]}" != "$3" ]; then
               echo "::error::probe table conflict: '$key' is expected to answer both ${seen[$key]} and $3. A path admitted by a phase must have its old refusal row DELETED, not just a new row added."
@@ -133,28 +86,16 @@ jobs:
             fi
           }
 
-          # Anonymous by design (ADR-0138, ADR-0034).
-          # REQ-SEC-052: exactly two paths on this vhost answer without a token, and both
-          # are GET-scoped. The version policy was never probed before ADR-0159 — the one
-          # read the app makes before it can hold a session, and the one whose silence
-          # looks like a working app rather than a broken one.
           probe GET /api/v1/terms/document 200
           probe GET /api/v1/app/version-policy 200
-          # A HEAD on either falls to the authenticated catch-all: the rules name the verb,
-          # and Spring Security compares it with String.equals. This is the REQ-SEC-032
-          # shape that once served a material price query to a HEAD.
           probe HEAD /api/v1/terms/document 401
           probe HEAD /api/v1/app/version-policy 401
           probe GET /api/v1/missions/search 401
 
-          # Me-scoped: refused before the dispatch, so the entry point answers 401.
           for p in /api/v1/terms/status /api/v1/me/active-org-unit /api/v1/me/capabilities                    /api/v1/users/me/registration-status /api/v1/users/me/memberships; do
             probe GET "$p" 401
           done
 
-          # Phase 2's remaining reads. These join together with the paste that opens them
-          # (runbook § Phase H): between merging this and pasting the block, the run is red and
-          # correctly so -- it is reporting exactly the state the paste fixes.
           for p in /api/v1/operations/search /api/v1/orders /api/v1/inventory/aggregated \
                    /api/v1/inventory/all/grouped /api/v1/org-units/bank/balances \
                    /api/v1/hangar/my-ships /api/v1/hangar/squadron-overview \
@@ -163,26 +104,13 @@ jobs:
             probe GET "$p" 401
           done
 
-          # This used to be the one where only the VERB separated two surfaces: the path also
-          # answered a POST that was permitAll by design (the public request form), and the
-          # read-only guard was what kept it off this host. The create requires a login since
-          # ADR-0149, so the vhost admits it and the chain refuses an anonymous caller -- which is
-          # the stronger assertion, because it does not depend on an nginx rule to hold.
           probe POST /api/v1/orders 401
 
-          # Phase 5 - the item order, the other half of the same form as the unit pickers. The
-          # two catalogue reads and the create, all authenticated since ADR-0149. Same joining
-          # rule as above: red until the block is pasted, and one paste covers both halves.
           probe GET "/api/v1/inventory/material/00000000-0000-4000-8000-00000000cafe" 401
           probe GET /api/v1/orders/item-catalog 401
           probe GET "/api/v1/orders/item-catalog/00000000-0000-4000-8000-00000000cafe/blueprints" 401
           probe POST /api/v1/orders/items 401
 
-
-          # Phase 3's writes. Same rule as phase 2's reads above: these join with the ONE paste
-          # that opens them (runbook § Phase I), so between merging this and pasting the block the
-          # run is red and correctly so. A UUID that exists nowhere is deliberate -- what is being
-          # asserted is the chain's refusal, which happens before any row is looked up.
           nil=00000000-0000-4000-8000-00000000cafe
           for p in /api/v1/personal-inventory /api/v1/personal-blueprints \
                    /api/v1/personal-blueprints/craftability /api/v1/blueprints/products/search \
@@ -192,37 +120,18 @@ jobs:
             probe GET "$p" 401
           done
 
-          # Once anonymous catalogues (REQ-SEC-037); since ADR-0159 there is no anonymous surface
-          # beyond version-policy and the terms document, so an anonymous caller gets 401 like
-          # everywhere else. A 404 would mean the allow-list lost the picker; a 200 an anonymous
-          # read that REQ-SEC-052 forbids.
           probe GET /api/v1/ship-types 401
           probe GET /api/v1/materials/search 401
           probe GET /api/v1/locations/search 401
-          # Phase M - the create form's write and its two mandatory pickers. All three must reach
-          # the backend; the org-wide list and the extractor import must not.
-          #
-          # All three answer 401. The vhost admits them, and since ADR-0159 the chain refuses every
-          # anonymous caller before dispatch. (Before that the two pickers answered differently:
-          # /locations/refineries 403 from the method seam and /refining-methods 200 as an
-          # anonymous catalogue. Neither surface exists any more.)
           probe POST /api/v1/refinery-orders 401
           probe GET /api/v1/locations/refineries 401
           probe GET /api/v1/refining-methods 401
-          # Admitted by phase Y (2026-09-08) so the app's Raffinerie can name each run's owner.
-          # It was 404 here for as long as the vhost refused it; the admission moved the answer
-          # to the backend's own isAuthenticated(). Nothing about the DATA changed -- the web has
-          # defaulted to this endpoint since the feature existed.
           probe GET /api/v1/refinery-orders/all 401
           probe POST /api/v1/refinery-orders/import-extract 404
           probe GET "/api/v1/materials/$nil/terminals" 401
 
-          # 401 from the chain since ADR-0159 (it used to be a 403 from the method seam).
           probe GET /api/v1/locations/home-locations 401
 
-          # The writes themselves. Each must reach the backend and be refused there -- a 405 would
-          # mean the read-only guard swallowed a write this phase is supposed to open, and a 404
-          # that the allow-list line never matched.
           probe POST "/api/v1/inventory/$nil/book-out" 401
           probe POST "/api/v1/orders/$nil/assignees/$nil" 401
           probe PUT "/api/v1/orders/$nil/status" 401
@@ -230,26 +139,11 @@ jobs:
           probe PUT "/api/v1/operations/$nil/payouts/paid-out" 401
           probe PUT "/api/v1/org-units/bank/accounts/$nil/balance-target" 401
 
-          # Phase P - the Freigabe-Limits. Four leaves under one allow-list rule, and BOTH verbs on
-          # each: the carve-out opens the PUT that sets a ceiling and the DELETE that clears one, so
-          # probing only the PUT would say nothing about half of what was opened. A 405 here would
-          # mean the carve-out never matched, a 404 that the rule did not.
           for leaf in all-members area-members role/LOGISTICIAN "user/$nil"; do
             probe PUT "/api/v1/org-units/bank/accounts/$nil/approval-limit/$leaf" 401
             probe DELETE "/api/v1/org-units/bank/accounts/$nil/approval-limit/$leaf" 401
           done
-          # The ladder editor beside them is a DIFFERENT endpoint the app does not call and is
-          # asserted 404 further down, in the group that keeps the bank's shut paths together.
-          # Phase P's rule is $-anchored so that assertion keeps meaning something.
 
-          # Phase 5 - the member's bank booking requests and the one membership read the Lager's
-          # Umbuchen picker needs. Same rule again: these join with the paste that opens them
-          # (runbook § Phase K), so the run is red between merging this and pasting the block.
-          #
-          # The two GETs are 401 because the entry point refuses before any row is read. The four
-          # writes must be 401 too: a 405 would mean the read-only guard swallowed a write this
-          # phase opens, and a 404 that the allow-list line never matched. The owner-approval pair
-          # is the only place a DELETE is opened on the /org-units stem, so it is probed on its own.
           for p in /api/v1/org-units/bank/requests /api/v1/org-units/bank/requests/foreign                    /api/v1/org-units/bank/transfer-targets "/api/v1/users/$nil/memberships"; do
             probe GET "$p" 401
           done
@@ -259,42 +153,24 @@ jobs:
           probe POST "/api/v1/org-units/bank/requests/$nil/owner-approval" 401
           probe DELETE "/api/v1/org-units/bank/requests/$nil/owner-approval" 401
 
-          # And the one that must stay shut: PATCH on the same membership path is the org-unit
-          # admin write. It is inside the read-only family and nothing clears it, so 405.
           probe PATCH "/api/v1/users/$nil/memberships" 405
 
-          # Phase Q - the member's own two settings and the Aushang's read marker. Read AND write on
-          # both settings, because they were admitted together and for a reason the probe should
-          # keep testing: the two rows share one optimistic-lock version, so a client that could
-          # write but not read would echo 0. A 404 on any of the five means the paste lost a line;
-          # a 405 means the /users carve-out did -- this is the first one that prefix has.
           for p in /api/v1/users/me/payout-preference /api/v1/users/me/blueprint-sharing; do
             probe GET "$p" 401
             probe PUT "$p" 401
           done
           probe PUT "/api/v1/users/me/read-announcement/$nil" 401
 
-          # Phase R - the two 405s, and the assertion that matters is the SECOND pair. Opening the
-          # PUT is one line; keeping the DELETE shut is the reason the carve-out was written
-          # method-scoped, because the backend serves DELETE on both of these paths and the app
-          # sends neither. A 401 on a DELETE here would mean the exception went verb-blind.
           probe PUT "/api/v1/orders/$nil" 401
           probe PUT "/api/v1/operations/$nil" 401
           probe DELETE "/api/v1/orders/$nil" 405
           probe DELETE "/api/v1/operations/$nil" 405
 
-          # Phase S - the four pickers. They once answered three different ways (401, a 403 from the
-          # method seam for /missions, 200 for the anonymous /job-types catalogue); since ADR-0159
-          # every one is refused by the chain with 401. A 404 means the allow-list lost a line.
           probe GET /api/v1/orders/lookup 401
           probe GET /api/v1/operations/lookup 401
           probe GET /api/v1/missions/lookup 401
           probe GET /api/v1/job-types 401
 
-          # Phase T - the Auftrags-Familie. All nine answer 401: nothing under /api/v1/orders is
-          # permitAll except the item catalogue, so there is no seam to fall through. The DELETE is
-          # the one to watch - it is the only destructive verb this phase opens, and it is opened
-          # on the claims LEAF, not on the Auftrag.
           probe GET /api/v1/orders/material-demand 401
           probe GET "/api/v1/orders/$nil/item-stock" 401
           probe GET "/api/v1/orders/$nil/claims" 401
@@ -307,29 +183,18 @@ jobs:
           probe POST "/api/v1/orders/$nil/items/$nil/production" 401
           probe PUT "/api/v1/orders/$nil/priority?priority=1" 401
 
-          # Phase U - the three Lager writes. The allocation is three verbs on one path, and all
-          # three are probed: the app sends every one of them, and the carve-out that opens them
-          # rides the leaf group that already carried book-out and delivered.
           probe POST /api/v1/inventory/bulk-checkout 401
           probe POST /api/v1/inventory/bulk-rebook 401
           probe POST "/api/v1/inventory/$nil/allocation" 401
           probe PATCH "/api/v1/inventory/$nil/allocation" 401
           probe DELETE "/api/v1/inventory/$nil/allocation" 401
 
-          # Phase V - the Einsatz planning set. All 401, the one read (unit-ship-options) included:
-          # since ADR-0159 the chain refuses an anonymous GET under /missions before dispatch, as it
-          # does /missions/lookup in phase S.
           probe GET "/api/v1/missions/$nil/unit-ship-options" 401
           for leaf in core schedule flags; do
             probe PATCH "/api/v1/missions/$nil/$leaf" 401
           done
           probe PUT "/api/v1/missions/$nil/party-lead" 401
-          # The deprecated add-by-id endpoint was deleted on 2026-09-22 and its admission with it:
-          # the edge refuses it again, and this row keeps it refused.
           probe POST "/api/v1/missions/$nil/participants" 404
-          # Its manager-only replacement (REQ-MISSION-020, ADR-0170 amended 2026-09-22) is admitted
-          # and refused anonymously by the backend's chain; the add-anybody `…/participants/slim`
-          # stays shut at the edge.
           probe POST "/api/v1/missions/$nil/participants/by-id/slim" 401
           probe POST "/api/v1/missions/$nil/participants/slim" 404
           probe POST "/api/v1/missions/$nil/units/slim" 401
@@ -348,24 +213,12 @@ jobs:
             probe PUT "/api/v1/missions/$nil/$section/reorder/slim" 401
           done
           probe PATCH "/api/v1/missions/$nil/steps/$nil/done/slim" 401
-          # And the Einsatz's own DELETE stays shut: every rule this phase adds is a leaf UNDER the
-          # id, none is the id itself.
           probe DELETE "/api/v1/missions/$nil" 405
 
-          # Phase W - the Handel family, and the three lines that matter most are the price reads.
-          # They answered 200 (prices-overview, */prices) and 500 (profit-calculation) ANONYMOUSLY
-          # until the REQ-SEC-032 carve-out was widened to cover them; a 200 here again would mean
-          # UEX trade prices are back on the public internet.
           probe GET /api/v1/materials/prices-overview 401
           probe GET /api/v1/materials/profit-calculation 401
           probe GET "/api/v1/materials/$nil/prices" 401
           probe GET /api/v1/materials/matrix 401
-          # This WAS anonymous by decision -- MaterialDto is catalogue only and /materials/search
-          # had published the same fields since phase 2. REQ-SEC-052 closed it: the public surface
-          # is an enumerated list of four backend paths and no catalogue is on it. The backend has
-          # been pinned on 401 since then (ApiVhostAnonymousSurfaceTest, which says in as many
-          # words that "a 401 here where a 404 used to stand is the whole change in one line").
-          # This row kept the old number until production settled it, 2026-09-09.
           probe GET "/api/v1/materials/$nil" 401
           probe GET /api/v1/terminals 401
           probe GET /api/v1/material-exchange/released-item-ids 401
@@ -374,10 +227,6 @@ jobs:
           probe PUT "/api/v1/material-exchange/offers/$nil/remark" 401
           probe PUT "/api/v1/material-requests/$nil" 401
 
-          # Phase X - the last seven. The two settings keys are anonymous BY DESIGN (REQ-SEC-037):
-          # two integers from the same permitAll catalogue block as /locations and /job-types. What
-          # must stay shut is the PUT on the same path - the admin write that changes them for the
-          # whole organisation - and it is the read-only family, not a carve-out, that holds it.
           probe GET /api/v1/settings/job_order.age_yellow_days 401
           probe GET /api/v1/settings/job_order.age_red_days 401
           probe PUT /api/v1/settings/job_order.age_red_days 405
@@ -388,14 +237,8 @@ jobs:
           probe POST /api/v1/personal-blueprints/import/apply 401
           probe POST /api/v1/hangar/import/fleetview 401
           probe POST /api/v1/hangar/ships/home-location 401
-          # And the admin ship surface under the same prefix stays shut: /hangar is a read-only
-          # family precisely because its prefix also carries this.
           probe GET "/api/v1/hangar/users/$nil/ships" 404
-          # That the Auftrag's own DELETE stays shut is asserted by phase R above, and phase T must
-          # not loosen it: every carve-out here is on a leaf UNDER the id, none on the id itself.
 
-          # Phase L - the bank-STAFF surface, admitted for the first time (runbook § Phase L).
-          # Every one of these must reach the backend and be refused there.
           for p in /api/v1/bank/dashboard /api/v1/bank/accounts /api/v1/bank/requests \
                    /api/v1/bank/grants /api/v1/bank/holders \
                    /api/v1/users/search-bank \
@@ -413,14 +256,6 @@ jobs:
           probe POST "/api/v1/bank/requests/$nil/reject" 401
           probe POST /api/v1/bank/grants 401
 
-          # `balance-series` was REMOVED from the allow-list on 2026-09-03 and must now stay shut.
-          # It was admitted in phase L and frozen by nothing, and closing that gap the other way
-          # round was the cheaper answer: no Kotlin under core/ or app/ builds that path, so the
-          # rule went instead of the contract growing to promise a shape nobody reads.
-          #
-          # This line moved with it a day late. It still asserted 401 and turned the first nightly
-          # run after the paste red -- the probe doing exactly its job on a fact the repository
-          # knew and this file had not been told.
           probe GET "/api/v1/bank/accounts/$nil/balance-series" 404
           probe PATCH "/api/v1/bank/grants/$nil/$nil" 401
           probe DELETE "/api/v1/bank/grants/$nil/$nil" 401
@@ -429,69 +264,24 @@ jobs:
           probe POST /api/v1/bank/holders/transfer 401
           probe POST "/api/v1/bank/transactions/$nil/reversal" 401
 
-          # Phase O - the Verwaltung's direct booking. These four were on the STAY-SHUT list below
-          # until 2026-09-03, asserted at 404 on the ground that no artboard drew them. Chapter 12
-          # artboard 9 draws exactly that sheet and the app shipped it, so the assertion was
-          # pinning a mistake and reporting it green every night. They belong here.
           probe POST /api/v1/bank/deposits 401
           probe POST /api/v1/bank/withdrawals 401
           probe POST /api/v1/bank/transfers 401
           probe GET /api/v1/bank/transfer-fee-rate 401
 
-          # And the parts of the same stem that must STAY shut. The admin half is web-only by owner
-          # decision; the KRT ladder editor is not one of the app's four tabs.
-          # A 401 on either of these would mean the allow-list opened something by accident.
           probe GET /api/v1/bank/admin/audit 404
           probe POST /api/v1/bank/admin/wipe-reset 404
           probe PATCH "/api/v1/bank/accounts/$nil/approval-tiers" 404
 
-          # The four participant writes USED to be the exception on this whole list:
-          # canAccessParticipant resolved the row BEFORE it judged the caller, because a guest
-          # sign-up was editable by the anonymous creator holding its capability token
-          # (REQ-SEC-018), so an unknown row answered 404 to everybody. Both halves are gone --
-          # V239 dropped the token hash column and REQ-SEC-052 the anonymous caller -- so the
-          # request no longer reaches the lookup and the entry point answers 401. The backend has
-          # been pinned on that since 2026-09-06
-          # (ApiVhostAnonymousSurfaceTest.shouldRefuseAnonymousParticipationWritesOnAnAbsentRow);
-          # this row kept the old expectation and only production could tell, which it did the
-          # morning the block was pasted. There is no anonymous-but-legitimate caller left on this
-          # list.
           probe POST "/api/v1/missions/$nil/participants/$nil/check-in/slim" 401
 
-          # Still refused, and that is the point: the every-member inventory list is on no
-          # allow-list line at all.
-          #
-          # It answers 404 rather than 405, and the ORDER of the two guards is why: the
-          # allow-list's `if ($krt_api_allowed = 0) { return 404; }` fires before the read-only
-          # family guard, so a path that was never admitted is refused without its verb ever being
-          # judged. A family membership in the read-only guard therefore says nothing about a path
-          # the deny already swallowed -- it only starts to matter on the day the path is admitted.
-          #
-          # This group has now lost two members to that day, and both left the same lesson: an
-          # admission has to delete the row here, not only add one above. `POST
-          # /api/v1/bank/deposits` went first (phase O) and sits with the other bank writes; the
-          # bank canary it left behind is `POST /api/v1/bank/admin/wipe-reset`, which guards a
-          # decision that is still a decision. `POST /api/v1/hangar/import/fleetview` went with
-          # phase X, which added its 401 above and left this line asserting 404 -- so the probe
-          # demanded both answers of one path and went red on the first scheduled run after the
-          # merge (2026-09-06). The vhost was right throughout; only this table was not.
           probe POST /api/v1/inventory/all 404
 
-          # Default deny.
           probe GET /api/v1/definitely-not-allow-listed 404
 
-          # These rows used to need a real Einsatz id, discovered by reading the anonymous
-          # mission search from this very probe. That discovery WAS the finding: a nightly
-          # job could learn which Einsätze existed, from outside, with no credentials.
-          # REQ-SEC-052 closed the search, so a nil UUID is enough — authorisation is decided
-          # before the row is looked up, and a fixed id cannot rot or depend on which
-          # Einsatz happens to exist tonight.
           probe GET "/api/v1/missions/$nil" 401
           probe GET "/api/v1/missions/$nil/finance-entries" 401
           probe GET "/api/v1/missions/$nil/finance-entries/summary" 401
-          # The family is read-only on this vhost: the guard is verb-blind and returns 405
-          # before the request reaches the backend, so these two are unchanged by ADR-0159
-          # and still say something the 401 rows cannot.
           probe PUT "/api/v1/missions/$nil" 405
           probe DELETE "/api/v1/missions/$nil" 405
           exit $fail

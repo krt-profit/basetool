@@ -80,7 +80,6 @@ class MatrixGridDtoTest {
       assertTrue(json.contains(key), "expected JSON key " + key + " in: " + json);
     }
 
-    // The bean-stripped forms must NOT appear — the client does not read them.
     assertFalse(json.contains("\"illegal\""), "isIllegal must not be stripped to 'illegal'");
     assertFalse(json.contains("\"loadingDock\""), "hasLoadingDock must not be stripped");
     assertFalse(json.contains("\"autoLoad\""), "isAutoLoad must not be stripped to 'autoLoad'");

@@ -131,13 +131,9 @@ public class RejectedRegistrationRetentionService {
         return false;
       }
     } catch (RuntimeException e) {
-      // Log the id only — never the handle or e-mail of the person this row describes.
       log.warn("Retention: could not purge rejected registration {}: {}", userId, e.toString());
       return false;
     }
-    // Only after the database half has committed. A throw here leaves a Keycloak user with no
-    // app_user row, which the roster sync recreates as a fresh PENDING registration -- visible and
-    // resolvable, unlike the reverse failure.
     try {
       keycloakService.deleteUser(userId);
     } catch (RuntimeException e) {

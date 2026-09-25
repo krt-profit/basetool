@@ -33,7 +33,6 @@ class RefiningMethodMapperTest {
 
   @Test
   void toDto_shouldMapAllFields() {
-    // Given
     UUID id = UUID.randomUUID();
     RefiningMethod entity = new RefiningMethod();
     entity.setId(id);
@@ -44,10 +43,8 @@ class RefiningMethodMapperTest {
     entity.setRatingCost(70);
     entity.setRatingSpeed(30);
 
-    // When
     RefiningMethodDto dto = mapper.toDto(entity);
 
-    // Then
     assertNotNull(dto);
     assertEquals(id, dto.id());
     assertEquals("Cormack", dto.name());
@@ -60,15 +57,12 @@ class RefiningMethodMapperTest {
 
   @Test
   void toEntity_shouldMapAllFields() {
-    // Given
     UUID id = UUID.randomUUID();
     RefiningMethodDto dto =
         new RefiningMethodDto(id, "Dinyx Solventation", "Balanced", "DINYX", 50, 60, 70);
 
-    // When
     RefiningMethod entity = mapper.toEntity(dto);
 
-    // Then
     assertNotNull(entity);
     assertEquals(id, entity.getId());
     assertEquals("Dinyx Solventation", entity.getName());
@@ -81,15 +75,12 @@ class RefiningMethodMapperTest {
 
   @Test
   void roundtrip_shouldPreserveAllFields() {
-    // Given
     RefiningMethodDto original =
         new RefiningMethodDto(
             UUID.randomUUID(), "Pyrometric Chromalysis", null, "PYRO", 40, 30, 100);
 
-    // When
     RefiningMethodDto back = mapper.toDto(mapper.toEntity(original));
 
-    // Then
     assertEquals(original, back);
   }
 

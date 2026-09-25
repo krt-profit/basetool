@@ -36,16 +36,13 @@ class ObservationPrivacyFilterTest {
 
   @Test
   void shouldCutQueryStringFromUriTagAndHttpUrlAttribute() {
-    // Given
     Observation.Context context = new Observation.Context();
     context.addLowCardinalityKeyValue(KeyValue.of("uri", "/api/v1/users/search?username=hans"));
     context.addHighCardinalityKeyValue(
         KeyValue.of("http.url", "/api/v1/users/search?username=hans"));
 
-    // When
     filter.map(context);
 
-    // Then
     assertThat(context.getLowCardinalityKeyValue("uri").getValue())
         .isEqualTo("/api/v1/users/search");
     assertThat(context.getHighCardinalityKeyValue("http.url").getValue())
@@ -54,17 +51,14 @@ class ObservationPrivacyFilterTest {
 
   @Test
   void shouldCollapseUuidAndNumericSegmentsInUriTagOnly() {
-    // Given
     Observation.Context context = new Observation.Context();
     context.addLowCardinalityKeyValue(
         KeyValue.of("uri", "/api/v1/locations/3f2a8c1e-0d4b-4f6a-9c3e-1b2d3f4a5b6c/items/42"));
     context.addHighCardinalityKeyValue(
         KeyValue.of("http.url", "/api/v1/locations/3f2a8c1e-0d4b-4f6a-9c3e-1b2d3f4a5b6c"));
 
-    // When
     filter.map(context);
 
-    // Then: the metric tag is bounded, the trace attribute keeps the raw path (ids only).
     assertThat(context.getLowCardinalityKeyValue("uri").getValue())
         .isEqualTo("/api/v1/locations/{id}/items/{id}");
     assertThat(context.getHighCardinalityKeyValue("http.url").getValue())
@@ -73,16 +67,13 @@ class ObservationPrivacyFilterTest {
 
   @Test
   void shouldLeaveTemplatedUriAndOtherKeyValuesUntouched() {
-    // Given
     Observation.Context context = new Observation.Context();
     context.addLowCardinalityKeyValue(KeyValue.of("uri", "/api/v1/locations/{id}"));
     context.addLowCardinalityKeyValue(KeyValue.of("outcome", "SUCCESS"));
     context.addLowCardinalityKeyValue(KeyValue.of("exception", "What?Ever"));
 
-    // When
     filter.map(context);
 
-    // Then: route templates stay intact and non-URL keys are never modified.
     assertThat(context.getLowCardinalityKeyValue("uri").getValue())
         .isEqualTo("/api/v1/locations/{id}");
     assertThat(context.getLowCardinalityKeyValue("outcome").getValue()).isEqualTo("SUCCESS");

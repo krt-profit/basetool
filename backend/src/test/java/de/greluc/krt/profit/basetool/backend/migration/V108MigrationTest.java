@@ -164,7 +164,6 @@ class V108MigrationTest {
             "SELECT count(*) FROM material_external_alias WHERE created_by = 'system'",
             Integer.class);
 
-    // Replay the six seed INSERTs (conflict target matches the V146 case-insensitive index).
     for (String[] pair : SEED_PAIRS) {
       String wikiName = pair[0];
       String uexName = pair[1];
@@ -189,8 +188,6 @@ class V108MigrationTest {
         seededAfter,
         "exactly 6 alias rows must materialise once the target materials exist");
 
-    // Case-variant replay: uppercased external names must hit the V146 case-insensitive index
-    // and insert nothing (covers REQ-REFINERY-010).
     for (String[] pair : SEED_PAIRS) {
       jdbcTemplate.update(
           "INSERT INTO material_external_alias "
@@ -213,7 +210,6 @@ class V108MigrationTest {
         seededAfterCaseVariantReplay,
         "case-variant replay must not create additional rows");
 
-    // Spot-check one resolution: the Wiki name resolves back to the UEX material we inserted.
     java.util.UUID resolvedMaterialId =
         jdbcTemplate.queryForObject(
             "SELECT material_id FROM material_external_alias "

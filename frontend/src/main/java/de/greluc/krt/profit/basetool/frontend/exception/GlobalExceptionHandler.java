@@ -102,8 +102,6 @@ public class GlobalExceptionHandler {
     String messageKey = CODE_TO_MESSAGE_KEY.getOrDefault(ex.getProblemCode(), DEFAULT_MESSAGE_KEY);
     boolean unauthenticated = isUnauthenticatedAccessDenial(ex.getProblemCode());
     if (unauthenticated && isForbiddenCode(ex.getProblemCode())) {
-      // Replace the generic "you don't have permission" wording with one that tells the user
-      // they are not signed in and recommends retrying after authentication — issue #108.
       messageKey = FORBIDDEN_UNAUTHENTICATED_KEY;
     }
     String localizedMessage = resolve(messageKey, locale, ex.getReadableErrorMessage());
@@ -178,9 +176,6 @@ public class GlobalExceptionHandler {
       body.put("status", HttpStatus.UNAUTHORIZED.value());
       body.put("reauthenticate", Boolean.TRUE);
       body.put("location", reauthUrl);
-      // Carry the request-scoped correlation id (set by CorrelationIdFilter) so an AJAX caller can
-      // quote it to support, mirroring the general BackendServiceException JSON branch — RFC-7807
-      // hardening.
       String correlationId = MDC.get("correlationId");
       if (correlationId != null && !correlationId.isBlank()) {
         body.put("correlationId", correlationId);
@@ -248,7 +243,6 @@ public class GlobalExceptionHandler {
       @NotNull HttpServletRequest request) {
     Locale locale = LocaleContextHolder.getLocale();
     if (isAssetShapedUuidMismatch(ex, request)) {
-      // Do NOT log ex.getValue() - request parameter values may carry PII (REQ-OBS-004).
       log.debug(
           "Asset-shaped path failed UUID conversion, treating as 404 for {} {} [parameter={}]",
           request.getMethod(),
@@ -266,8 +260,6 @@ public class GlobalExceptionHandler {
             .contentType(MediaType.APPLICATION_JSON)
             .body(body);
       }
-      // ModelAndView.setStatus overrides the method-level @ResponseStatus(BAD_REQUEST) at render
-      // time, so the error page ships with an honest 404 for this branch only.
       ModelAndView notFound = new ModelAndView("error/error", HttpStatus.NOT_FOUND);
       notFound.addObject("error", resolve("error.404.title", locale, "Not Found"));
       notFound.addObject(
@@ -276,7 +268,6 @@ public class GlobalExceptionHandler {
       notFound.addObject("status", "404");
       return notFound;
     }
-    // Do NOT log ex.getValue() - request parameter values may carry PII.
     log.warn(
         "Frontend type mismatch for {} {} [parameter={}, targetType={}]",
         request.getMethod(),
@@ -343,16 +334,6 @@ public class GlobalExceptionHandler {
       @NotNull Exception ex, @NotNull HttpServletRequest request, @NotNull Model model) {
     Locale locale = LocaleContextHolder.getLocale();
     String title = resolve("error.403.title", locale, "Forbidden");
-    // The "not signed in at all" branch of issue #108 is gone with its cause: an anonymous caller
-    // could reach handleAccessDenied because a permitAll() route still ran @PreAuthorize on the
-    // controller method, and that raised AuthorizationDeniedException for the anonymous principal
-    // instead of triggering SsoReAuthenticationEntryPoint. There is no permitAll() route with a
-    // method gate behind it any more (ADR-0159), so an unauthenticated request meets the entry
-    // point and never arrives here.
-    //
-    // The `unauthenticated` model attribute stays: the backend's own UNAUTHENTICATED problem code
-    // still sets it (see handleBackendServiceException), and the error view renders the sign-in CTA
-    // off that — a session that expired mid-request is a real case and a different one.
     String message = resolve("error.forbidden", locale, "Access denied.");
     log.warn(
         "Access denied for {} {} [exception={}]: {}",
@@ -366,9 +347,6 @@ public class GlobalExceptionHandler {
       body.put("status", 403);
       body.put("title", title);
       body.put("message", message);
-      // Always false on THIS path - see above. The attribute itself stays because
-      // handleBackendServiceException sets it true for the backend's own
-      // UNAUTHENTICATED code, and the error view renders the sign-in CTA off it.
       body.put("unauthenticated", false);
       return ResponseEntity.status(HttpStatus.FORBIDDEN)
           .contentType(MediaType.APPLICATION_JSON)
@@ -409,8 +387,6 @@ public class GlobalExceptionHandler {
             "error.uploadTooLarge",
             locale,
             "The upload exceeded the allowed size or number of parts.");
-    // WARN, not ERROR: malformed/oversized client input is not a server fault. Never log the body —
-    // it may carry PII.
     log.warn(
         "Upload rejected for {} {}: multipart part-count or size limit exceeded",
         request.getMethod(),
@@ -605,7 +581,6 @@ public class GlobalExceptionHandler {
     String titleKey = DEFAULT_TITLE_KEY;
     String messageKey = DEFAULT_MESSAGE_KEY;
 
-    // Unwrap well-known frameworks to give users a meaningful hint.
     Throwable cause = e;
     while (cause != null) {
       if (cause instanceof WebClientResponseException wcre) {
@@ -629,10 +604,6 @@ public class GlobalExceptionHandler {
     model.addAttribute("status", status);
     return "error/error";
   }
-
-  // ------------------------------------------------------------------------
-  // helpers
-  // ------------------------------------------------------------------------
 
   private static @NotNull HttpStatus resolveStatus(int statusCode) {
     HttpStatus resolved = HttpStatus.resolve(statusCode);
@@ -753,8 +724,6 @@ public class GlobalExceptionHandler {
     m.put("CONFLICT", "error.conflict.duplicate");
     m.put("DATA_INTEGRITY", "error.conflict.duplicate");
     m.put("LOCKED", "error.pessimisticLock");
-    // Kartell bank stable 409 codes (epic #556) — bank.js renders these inline at the
-    // booking-modal fields (K1 mockup: 409 never toast-only).
     m.put("BANK_OVERDRAFT", "error.bank.overdraft");
     m.put("BANK_HOLDER_OVERDRAFT", "error.bank.holderOverdraft");
     m.put("BANK_ACCOUNT_NOT_EMPTY", "error.bank.accountNotEmpty");
@@ -763,10 +732,6 @@ public class GlobalExceptionHandler {
     m.put("BANK_SELF_TRANSFER", "error.bank.selfTransfer");
     m.put("BANK_ALREADY_REVERSED", "error.bank.alreadyReversed");
     m.put("BANK_HOLDER_INACTIVE", "error.bank.holderInactive");
-    // Booking-request lifecycle, split-deposit, justification and fee-inclusive 409s (epic #666 /
-    // REQ-BANK-023/-043/-045/-033) plus the retired KRT direct-booking cap (BANK_CARTEL_APPROVAL_
-    // REQUIRED, kept defensively though ADR-0109 now files a request instead of throwing it).
-    // Without these the codes fell through to error.unexpected ("Ein unerwarteter Fehler ...").
     m.put("BANK_NOT_REVERSIBLE", "error.bank.notReversible");
     m.put("BANK_REQUEST_NOT_PENDING", "error.bank.requestNotPending");
     m.put("BANK_ACCOUNT_HAS_PENDING_REQUESTS", "error.bank.accountHasPendingRequests");
@@ -780,7 +745,6 @@ public class GlobalExceptionHandler {
     m.put(BackendServiceException.CODE_SERVICE_UNAVAILABLE, "error.unavailable");
     m.put(BackendServiceException.CODE_BACKEND_TIMEOUT, "error.backendTimeout");
     m.put(BackendServiceException.CODE_UNKNOWN, "error.unexpected");
-    // A ResponseStatusException 413 (an upload relay refusing an oversized file) — APPSEC-03/-11.
     m.put("UPLOAD_TOO_LARGE", "error.uploadTooLarge");
     return Map.copyOf(m);
   }

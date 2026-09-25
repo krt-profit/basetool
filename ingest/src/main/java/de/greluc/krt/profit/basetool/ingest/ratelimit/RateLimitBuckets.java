@@ -40,9 +40,7 @@ import org.jetbrains.annotations.NotNull;
  */
 public final class RateLimitBuckets {
 
-  private RateLimitBuckets() {
-    // utility
-  }
+  private RateLimitBuckets() {}
 
   /**
    * Builds a thread-safe, access-ordered LRU map of token buckets with a hard upper bound on the

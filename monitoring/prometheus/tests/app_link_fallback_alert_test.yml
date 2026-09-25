@@ -1,35 +1,14 @@
-# promtool unit test for EdgeAppLinkFallbackBroken (REQ-SEC-038 / REQ-OBS-012).
-#
-# The alert exists because /app/callback's contract is a redirect, and the redirect is the security
-# half: the URL carries a live authorization code, and answering 303 to /app/link-help is what keeps
-# that code out of the address bar and the history entry. Every way this route can regress ends with
-# the code left somewhere, or with a member sent back into a login they cannot finish — and none of
-# them is visible to AppLinkControllerTest, which runs in-process against MockMvc while the failure
-# lives at the edge. Before the route existed, the same failure surfaced only as
-# `No mapping for GET /app/callback` in a log archive and was found from a member's report.
-#
-# Two things are pinned here, and the second is the one that gets written wrong:
-#   - the alert fires while the edge itself is up;
-#   - the `and on()` guard SUPPRESSES it while the edge is down, because a probe against a dead edge
-#     carries no posture signal and BlackboxProbeFailed already pages that case.
-#
-# Run locally (no promtool on the host — use an ephemeral container, see monitoring/README.md):
-#   docker run --rm -v "$PWD/monitoring/prometheus:/work" -w /work \
-#     prom/prometheus:v3.14.0 promtool test rules tests/app_link_fallback_alert_test.yml
-
 rule_files:
   - ../alerts/infrastructure.yml
 
 evaluation_interval: 30s
 
 tests:
-  # ── The regression the alert is for: the fallback stops answering 303 to the help page. ──
   - name: EdgeAppLinkFallbackBroken fires while the edge is up
     interval: 30s
     input_series:
       - series: 'probe_success{job="blackbox-app-link", instance="https://profit-base.online/app/callback"}'
         values: "0x40"
-      # The edge is up, so the guard does not suppress.
       - series: 'probe_success{job="blackbox-http", instance="https://profit-base.online"}'
         values: "1x40"
     alert_rule_test:
@@ -44,7 +23,6 @@ tests:
               summary: "Android App Link fallback broken: https://profit-base.online/app/callback"
               description: "https://profit-base.online/app/callback no longer answers 303 to /app/link-help on its first response (REQ-SEC-038). A 200 means the authorization code is being left in the member's address bar and history; a 302 into /oauth2/authorization/keycloak means the permitAll entry was lost and the member is sent back into a login they cannot finish; a 404 means AppLinkController is gone from the image. Check the frontend SecurityConfig anonymous matchers, AppLinkController, and the NPM proxy host for a rule ahead of the app."
 
-  # ── The guard: an edge outage pages once, as an outage, not again as a posture drift. ──
   - name: EdgeAppLinkFallbackBroken stays silent while the edge itself is down
     interval: 30s
     input_series:
@@ -57,7 +35,6 @@ tests:
         alertname: EdgeAppLinkFallbackBroken
         exp_alerts: []
 
-  # ── The 15m `for`, which absorbs a deploy: a single failed scrape must not page. ──
   - name: EdgeAppLinkFallbackBroken does not page inside the deploy window
     interval: 30s
     input_series:
@@ -70,7 +47,6 @@ tests:
         alertname: EdgeAppLinkFallbackBroken
         exp_alerts: []
 
-  # ── The healthy steady state, so the cases above cannot pass by the rule never firing at all. ──
   - name: EdgeAppLinkFallbackBroken is silent while the fallback redirects
     interval: 30s
     input_series:

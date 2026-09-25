@@ -150,9 +150,6 @@ class OperationPayoutStatusConcurrencyTest {
     fixture = seed();
     final String participantKey = fixture.userId().toString();
 
-    // Capture the @WithMockUser admin context on the test thread so each worker can re-apply it —
-    // SecurityContextHolder's default MODE_THREADLOCAL strategy does not propagate into a thread
-    // pool, and the toggle reads the context to resolve the acting user.
     final SecurityContext adminContext = SecurityContextHolder.getContext();
 
     CountDownLatch ready = new CountDownLatch(THREADS);

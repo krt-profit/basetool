@@ -125,20 +125,14 @@ class JobOrderInventoryUnlinkInPlaceE2eTest {
         E2eSupport.navigate(page, baseUrl + "/orders/" + jobOrderId);
         page.waitForLoadState();
 
-        // Marker on the live document: a full reload wipes it, so its survival proves the unlink
-        // stayed in place.
         page.evaluate("() => { window.__krtNoReload = true; }");
 
-        // The item starts linked to the order.
         assertEquals(
             100.0,
             linkedInventoryAmount(inventoryItemId),
             0.001,
             "the seeded item must start linked to the order");
 
-        // Clicking the material row lazily fetches the order's linked inventory and renders the
-        // drill-down with the unlink button; gate on that GET (a page-side waitForFunction would
-        // trip the strict CSP).
         page.waitForResponse(
             response ->
                 response.url().contains("/materials/" + materialId + "/inventory")
@@ -153,9 +147,6 @@ class JobOrderInventoryUnlinkInPlaceE2eTest {
         assertThat(unlinkButton)
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
 
-        // Unlink in place (#575): DELETE /orders/{id}/inventory/{invId}/unlink/ajax re-swaps the
-        // materials section — await the XHR DELETE (the commit) rather than a navigation that never
-        // comes, so the backend read-back below sees the cleared link.
         page.waitForResponse(
             response ->
                 response.url().contains("/orders/" + jobOrderId + "/inventory/" + inventoryItemId)

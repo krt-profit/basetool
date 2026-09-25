@@ -116,12 +116,6 @@ public class NotificationStreamService {
   @NotNull
   public SseEmitter subscribe(@NotNull UUID recipientUserId) {
     SseEmitter emitter = newEmitter();
-    // #1157: register under the map entry's bin lock so an old stream completing concurrently
-    // cannot
-    // evict the entry after this thread read the queue but before its add lands (which would orphan
-    // a
-    // live emitter — silently dead for up to EMITTER_TIMEOUT_MS). #1156: cap the streams per user;
-    // when full, evict the OLDEST (queue head) — retired outside the lambda below.
     List<SseEmitter> evicted = new ArrayList<>();
     emittersBySub.compute(
         recipientUserId,
@@ -137,16 +131,7 @@ public class NotificationStreamService {
           q.add(emitter);
           return q;
         });
-    // Retire evicted emitters OUTSIDE the compute lambda: complete() fires onCompletion ->
-    // remove(),
-    // which re-enters compute() on the same key — illegal from within a ConcurrentHashMap
-    // remapping.
-    // They were already polled out, so that remove() is a harmless no-op.
     for (SseEmitter old : evicted) {
-      // The eviction is otherwise invisible: basetool_sse_connections stays flat PRECISELY because
-      // the cap holds, so a user whose tabs keep knocking each other off the push channel produced
-      // no signal at all. Count every retirement (untagged — the recipient sub must never become a
-      // label) and leave the sub in a DEBUG line for the "one of my tabs stopped updating" report.
       meterRegistry.counter(MetricNames.SSE_EMITTERS_EVICTED).increment();
       log.debug(
           "Evicting oldest SSE emitter for recipient {}: per-recipient cap {} reached",
@@ -157,14 +142,6 @@ public class NotificationStreamService {
     emitter.onCompletion(() -> remove(recipientUserId, emitter));
     emitter.onTimeout(
         () -> {
-          // Complete the emitter on timeout so Spring MVC records a NORMAL async completion rather
-          // than raising AsyncRequestTimeoutException — which Micrometer books as a phantom 503 on
-          // http.server.requests even though the client received a clean 30-minute stream and
-          // simply
-          // reconnects. Without the explicit complete() the request finalizes as a server error and
-          // inflates the frontend's 5xx rate (REQ-NOTIF-010). Removal also runs via the
-          // onCompletion
-          // callback complete() triggers; the extra remove() here is idempotent.
           remove(recipientUserId, emitter);
           emitter.complete();
         });
@@ -335,9 +312,6 @@ public class NotificationStreamService {
   }
 
   private void remove(@NotNull UUID recipientUserId, @NotNull SseEmitter emitter) {
-    // #1157: remove-and-maybe-evict atomically under the entry's bin lock, so the empty-check
-    // cannot
-    // race a concurrent subscribe() into an orphaned queue.
     emittersBySub.compute(
         recipientUserId,
         (key, queue) -> {

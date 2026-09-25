@@ -362,23 +362,15 @@ public class ScWikiClient {
     int pageSize = effectivePageSize(pageSizeOverride);
     String firstPageUri = buildPagedUri(endpoint, 1, include, filters, pageSize);
     String previousEtag = etagByFirstPageUri.get(firstPageUri);
-    // One latch for the whole walk: however many distinct problems this fetch turns out to have,
-    // they collectively contribute exactly one external-fetch-error increment.
     FetchErrorLatch errorLatch = new FetchErrorLatch();
 
     PageOutcome<T> firstOutcome =
         fetchSinglePage(firstPageUri, typeRef, resourceLabel, previousEtag, errorLatch);
     if (firstOutcome.notModified()) {
-      // Page-1 304: the catalogue is byte-identical to the last successful fetch. Surface it as a
-      // distinct outcome (empty data + notModified=true) so the caller reports its live row count
-      // rather than 0 — an unchanged catalogue must not read as a zero-item outage (#1182).
       return FetchResult.unchanged();
     }
     ScWikiResponseDto<T> first = firstOutcome.body();
     if (first == null) {
-      // Genuine empty-200 / network / parse failure (NOT a 304) — an empty list with the flag
-      // cleared so a real outage still surfaces as zero items to SyncZeroItems. The walk never
-      // enumerated the catalogue, so it is reported as INCOMPLETE and no caller may tombstone.
       forgetFirstPageEtag(firstPageUri);
       return FetchResult.partial(Collections.emptyList());
     }
@@ -388,23 +380,12 @@ public class ScWikiClient {
       accumulated.addAll(first.data());
     }
 
-    // Page 1's meta is the census BASELINE: what the feed claimed about itself before the walk
-    // started. Later pages' meta is tracked separately (freshestMeta) so a feed that grows past its
-    // own announced page count mid-walk is still caught — but the row-count baseline stays page
-    // 1's on purpose. On a SHRINKING feed the fresher, lower total would hide exactly the rows a
-    // mid-walk deletion pushed out of the pagination window before the walk reached them.
     ScWikiMetaDto meta = first.meta();
     ScWikiMetaDto freshestMeta = meta;
     boolean complete = true;
     boolean walkAbandoned = false;
     int lastPage = 1;
     if (meta == null || meta.lastPage() == null) {
-      // The envelope carries no page count. Two very different situations share this shape, and
-      // only one of them is healthy: a genuinely single-page result (page 1 came back short), and
-      // an upstream contract break — a renamed/moved meta field that @JsonIgnoreProperties turns
-      // into a silent null rather than an exception. The tell is a FULL page 1: the Wiki filled the
-      // page size exactly, so there is almost certainly a page 2 we would never ask for, and every
-      // row on it would then read as "no longer in the Wiki feed" to an orphan sweep.
       if (isFullPage(accumulated.size(), pageSize)) {
         log.warn(
             "SC Wiki {} returned no pagination metadata (meta.last_page absent) while page 1 came"
@@ -426,8 +407,6 @@ public class ScWikiClient {
       ScWikiResponseDto<T> next =
           fetchSinglePage(pageUri, typeRef, resourceLabel, null, errorLatch).body();
       if (next == null) {
-        // fetchSinglePage already logged the transport cause; the latch keeps this walk's total at
-        // one increment while still covering the bodiless-2xx case it does not count itself.
         log.warn(
             "Page {} of {} failed mid-pagination; returning an INCOMPLETE result of {} row(s).",
             page,
@@ -450,12 +429,6 @@ public class ScWikiClient {
     int distinctRows = countDistinctRows(accumulated);
     int repeatedRows = accumulated.size() - distinctRows;
     if (repeatedRows > 0) {
-      // The walk was served the same row twice. A consistent snapshot never repeats a row, so this
-      // is a pagination window that moved underneath the walk: an upstream insert or delete shifts
-      // every later row across the page boundaries, re-serving some and pushing others out of view
-      // entirely. The rows that were pushed out are precisely the ones a tombstone sweep would read
-      // as deleted — and no row-COUNT comparison can see them, because a duplicate and an omission
-      // cancel each other out in the total.
       log.warn(
           "SC Wiki {} page walk merged {} row(s) but only {} distinct one(s) — the feed was"
               + " re-paginated mid-walk, so {} row(s) came back twice and an unknown number never"
@@ -470,10 +443,6 @@ public class ScWikiClient {
 
     Integer announcedTotal = meta == null ? null : meta.total();
     if (announcedTotal != null && distinctRows < announcedTotal) {
-      // A SHORTFALL: the feed states more rows than the walk can account for — a dropped page, a
-      // page-size disagreement, or rows deleted mid-walk shifting later ones out of the window.
-      // Whichever it is, rows the Wiki still lists are missing from the merged list, so the list
-      // must not drive a tombstone sweep.
       log.warn(
           "SC Wiki {} page walk enumerated {} distinct row(s) but meta.total reports {} — {} row(s)"
               + " are unaccounted for; treating the result as INCOMPLETE, the accumulated rows are"
@@ -485,14 +454,6 @@ public class ScWikiClient {
       recordFetchErrorOnce(errorLatch);
       complete = false;
     } else if (announcedTotal != null && distinctRows > announcedTotal) {
-      // A SURPLUS is not a gap, and is deliberately NOT a census failure. The upstream's own count
-      // query can disagree with what its own paginator serves — /api/items answers 12 331 distinct
-      // rows across its 62 announced pages for a stated total of 12 283 (reproduced against the
-      // live API on 2026-08-28, stable across the whole walk, while every kind endpoint agrees
-      // exactly) — and rows appended while the walk ran land here too. Neither can hide a row from
-      // the sweep: the surplus rows were SEEN, and an omission would have surfaced above as a
-      // duplicate or a shortfall. Reading a surplus as "incomplete" is what suppressed the
-      // cross-kind orphan sweep on every single run.
       log.info(
           "SC Wiki {} page walk enumerated {} distinct row(s) while meta.total reports {} — every"
               + " announced page was fetched and no row came back twice, so the surplus is an"
@@ -507,10 +468,6 @@ public class ScWikiClient {
         && freshestMeta != null
         && freshestMeta.lastPage() != null
         && freshestMeta.lastPage() > lastPage) {
-      // The loop bound was fixed when page 1 answered, and by the end of the walk the feed
-      // announced more pages than that. The tail was never requested — the same "we never asked"
-      // case as a dropped page, and the reason a surplus above is allowed to stand: growth that
-      // outruns the announced page count is caught here instead.
       log.warn(
           "SC Wiki {} announced {} page(s) on page 1 but {} by the end of the walk — the {} page(s)"
               + " past the original bound were never requested; treating the result as INCOMPLETE.",
@@ -644,15 +601,7 @@ public class ScWikiClient {
   @Nullable
   public <T> T fetchOne(String uri, Class<T> type, String resourceLabel) {
     log.debug("Fetching one {} from SC Wiki API: {}", resourceLabel, uri);
-    // One latch for this single-resource fetch too: the transport and the parse branch below are
-    // mutually exclusive today, but the latch makes "one fetch, at most one increment" structural
-    // rather than a property of the current control flow.
     FetchErrorLatch errorLatch = new FetchErrorLatch();
-    // Decode to a raw String, then parse + unwrap with this client's own mapper. The Wiki wraps
-    // some
-    // single-resource responses in {"data": {…}} and returns others flat, so reading the body as a
-    // tree and unwrapping a top-level "data" node before binding is simpler and more robust than a
-    // codec-level bind that would have to know about the envelope.
     String rawBody;
     try {
       rawBody =
@@ -714,10 +663,6 @@ public class ScWikiClient {
       String resourceLabel,
       String previousEtag,
       FetchErrorLatch errorLatch) {
-    // .uri(String) parses as a URI template, prepends the configured baseUrl when the URI is
-    // relative, and treats already-encoded sequences (%5B / %5D) as literal — exactly what
-    // buildPagedUri produces. Passing a URI directly would BYPASS the baseUrl (Spring treats a
-    // URI argument as fully resolved), which caused MockWebServer tests to hit localhost:80.
     RestClient.RequestHeadersSpec<?> request = client.get().uri(requestUri);
     if (previousEtag != null && !previousEtag.isBlank()) {
       request = request.header(HttpHeaders.IF_NONE_MATCH, previousEtag);
@@ -740,8 +685,6 @@ public class ScWikiClient {
               etagByFirstPageUri.put(requestUri, etag);
             }
             ScWikiResponseDto<T> body = response.bodyTo(typeRef);
-            // An empty 2xx body decodes to null; the reactive pipeline completed empty there and
-            // fell through to the same uncounted error outcome.
             return body == null ? PageOutcome.<T>error() : PageOutcome.ok(body);
           });
     } catch (RuntimeException e) {

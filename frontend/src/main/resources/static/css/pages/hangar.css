@@ -1,7 +1,3 @@
-/* Page stylesheet of templates/hangar.html, moved out of its inline style block
- * (FE-PERF-02). Linked in the same place the block stood, so the cascade order is
- * unchanged. */
-
 @layer base, components, page, migration, utilities;
 
 @layer page {
@@ -15,13 +11,6 @@
         font-size: 0.9rem;
         font-weight: 700;
     }
-    /* Checkboxes (the ship modal's "Fitted" toggle) and radios are excluded: width:100% +
-       the 0.5rem padding would deform the 1.2rem KRT squares (styles.css). The exclusions
-       sit in :where() so they add ZERO specificity — the rule keeps the plain `.form-group
-       input` weight (0,1,1) and stays below the (0,2,0) combobox rule `.krt-combobox
-       .krt-combobox__input`. The page's old checkbox-only width:auto override is removed:
-       it only restored the width, and with the exclusion in place its (0,2,1) weight would
-       instead shrink the global 1.2rem square. */
     .form-group input:where(:not([type='checkbox']):not([type='radio'])),
     .form-group select,
     .form-group textarea {
@@ -37,7 +26,6 @@
         font-family: var(--font-body);
         font-weight: 700;
     }
-    /* ---- Fleetview Import Section ---- */
     .import-section {
         margin-top: 2rem;
     }
@@ -61,7 +49,6 @@
         font-size: 0.9rem;
         color: var(--color-primary);
     }
-    /* Import result modal */
     #import-result-modal .stat-row {
         display: flex;
         justify-content: space-between;
@@ -73,8 +60,6 @@
         color: var(--color-gray-1);
     }
     #import-result-modal .stat-row span:last-child {
-        /* Result counts read as bright-neutral DATA (like .stat-value), not as
-           an action — orange is reserved for action + identity. */
         color: var(--color-white);
         font-weight: 700;
     }
@@ -99,7 +84,6 @@
             width: 100%;
         }
     }
-    /* ---- Delete All Ships Section ---- */
     .delete-all-section {
         margin-top: 1.5rem;
         padding-top: 1.5rem;
@@ -131,7 +115,6 @@
             width: 100%;
         }
     }
-    /* ---- Server-side ship-type filter above the table ---- */
     .hangar-filter-form {
         display: flex;
         flex-wrap: wrap;

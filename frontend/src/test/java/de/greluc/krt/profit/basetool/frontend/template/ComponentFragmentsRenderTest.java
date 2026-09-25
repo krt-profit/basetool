@@ -46,8 +46,6 @@ class ComponentFragmentsRenderTest {
 
   @Autowired private ITemplateEngine templateEngine;
 
-  // The full application context refuses to start without these collaborators; they are not
-  // touched by the engine render itself (see OperationPageControllerMvcTest for the same pattern).
   @MockitoBean private BackendApiClient backendApiClient;
 
   @MockitoBean private ClientRegistrationRepository clientRegistrationRepository;
@@ -67,18 +65,14 @@ class ComponentFragmentsRenderTest {
 
     String html = templateEngine.process("component-fragment-harness", context);
 
-    // Button: .btn + variant class, submit type and the resolved label.
     assertThat(html).contains("class=\"btn btn-danger\"");
     assertThat(html).contains("type=\"submit\"");
     assertThat(html).contains(">DELETE<");
 
-    // Alert with a message: tinted alert in the status colour plus the extra utility class.
     assertThat(html).contains("class=\"alert alert-danger mt-2\"");
 
-    // Alert with a null message key self-gates (th:if inside the fragment) -> nothing rendered.
     assertThat(html).doesNotContain("alert-success");
 
-    // Data table: responsive wrapper + krt-table shell + injected head cells and body rows.
     assertThat(html).contains("class=\"table-responsive\"");
     assertThat(html).contains("class=\"krt-table\"");
     assertThat(html).contains(">COL-A<");

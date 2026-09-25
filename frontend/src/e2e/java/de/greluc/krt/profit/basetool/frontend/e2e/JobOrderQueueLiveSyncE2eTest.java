@@ -127,10 +127,8 @@ class JobOrderQueueLiveSyncE2eTest {
 
         int before = pageB.locator("#orders-results tr[data-id]").count();
 
-        // A full reload on B would clear this marker; the live in-place swap leaves it intact.
         pageB.evaluate("window.__krtNoReload = true;");
 
-        // Deterministic wait: B is registered with the relay once its `orders` subscribe is acked.
         pageB.waitForCondition(
             () ->
                 Boolean.TRUE.equals(
@@ -138,10 +136,6 @@ class JobOrderQueueLiveSyncE2eTest {
                         "!!(window.krtLiveSync && window.krtLiveSync.subscribedTopics"
                             + " && window.krtLiveSync.subscribedTopics().length > 0)")));
 
-        // Context A creates an order through the frontend form. The frontend
-        // JobOrderWriteController fans orders/[queue] to the room server-side, which is what B is
-        // waiting on: A is on the create page and holds no queue subscription of its own.
-        // Responsible = IRIDIUM (profit-eligible) so the row lands in B's queue.
         E2eSupport.navigate(pageA, baseUrl + "/orders/create");
         pageA.locator("#requestingOrgUnitId").selectOption(IRIDIUM_ID);
         pageA.locator("#responsibleOrgUnitId").selectOption(IRIDIUM_ID);
@@ -151,8 +145,6 @@ class JobOrderQueueLiveSyncE2eTest {
         E2eSupport.clickSubmitClearingFooter(pageA.getByTestId("order-submit"));
         pageA.waitForLoadState();
 
-        // The assertion under test: B's queue gains the new row in place (global room coalesces at
-        // ~1.5 s, so allow a generous window), without a full-page reload.
         pageB.waitForCondition(
             () -> pageB.locator("#orders-results tr[data-id]").count() == before + 1,
             new Page.WaitForConditionOptions().setTimeout(30_000));

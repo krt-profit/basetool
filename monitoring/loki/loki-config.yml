@@ -1,10 +1,3 @@
-# Loki single-binary config for the Basetool monitoring plane. Loki 3.7.x (verified 2026-07).
-# Epic #936, REQ-OBS-007 (per-stream log-privacy rules), ADR-0072.
-#
-# Retention is 31 days, enforced by the compactor (table_manager is deprecated in 3.x and is NOT
-# used). This bounds the deliberate, owner-approved 31-day IP retention for the edge-access /
-# SSH-host-auth / Keycloak streams; Loki data is deliberately excluded from backups so restic's GFS
-# retention cannot silently extend those 31 days (ADR-0072). Rate caps guard against log storms.
 auth_enabled: false
 
 server:
@@ -42,7 +35,6 @@ storage_config:
     directory: /loki/chunks
 
 limits_config:
-  # Rate caps against log storms (a bad deploy could otherwise flood the ingester).
   ingestion_rate_mb: 8
   ingestion_burst_size_mb: 16
   per_stream_rate_limit: 5MB
@@ -51,7 +43,6 @@ limits_config:
   max_line_size: 256KB
   reject_old_samples: true
   reject_old_samples_max_age: 168h
-  # 31-day retention (744h). 0 would disable it.
   retention_period: 744h
 
 compactor:
@@ -62,8 +53,6 @@ compactor:
   retention_delete_worker_count: 150
   delete_request_store: filesystem
 
-# Loki ruler: alerting rules evaluated by Loki over log streams (committed, not optional — the
-# 3 Spring apps' logback_events cover only them; these catch Keycloak/Postgres/edge/host-auth).
 ruler:
   storage:
     type: local
@@ -74,5 +63,4 @@ ruler:
     kvstore:
       store: inmemory
   enable_api: true
-  # Loki pushes its own firing alerts to the shared Alertmanager.
   alertmanager_url: http://alertmanager:9093

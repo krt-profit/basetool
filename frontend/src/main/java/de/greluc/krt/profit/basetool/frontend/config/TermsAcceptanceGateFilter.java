@@ -121,14 +121,6 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
       @NotNull HttpServletResponse response,
       @NotNull FilterChain filterChain)
       throws ServletException, IOException {
-    // The exempt paths first, as a guard of their own: they pass for everyone, so no identity or
-    // consent question is asked for them at all. This is the same verdict the former single
-    // expression `isTestProfile() || isExempt(...) || ...` reached — both predicates are pure, so
-    // their order changes nothing — but spelled as an early exit it states that the path decides
-    // ALONE here, which CodeQL's java/user-controlled-bypass could not see through the OR chain and
-    // flagged as a request-path-controlled skip of the authentication check (alert #1126). The
-    // exemption list is the shared, decode-aware PublicPaths set (REQ-SEC-029), and the backend's
-    // own consent filter still enforces REQ-SEC-028 on every API call behind these pages.
     if (isExempt(request)) {
       filterChain.doFilter(request, response);
       return;
@@ -137,29 +129,7 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
     try {
       mayProceed = isTestProfile() || !isAuthenticated() || hasAccepted(request);
     } catch (ReauthenticationRequiredException e) {
-      // An exception thrown from a SERVLET FILTER never reaches @ExceptionHandler — that advice
-      // only sees exceptions raised during controller handling. So the redirect
-      // GlobalExceptionHandler implements for exactly this exception does not apply here, and
-      // before this catch existed the request died as a 500 instead.
-      //
-      // It is not hypothetical: the ADR-0166 identity cutover (2026-09-14) retired the old Keycloak
-      // host, and every session created before it carries an OAuth2AuthorizedClient whose
-      // SERIALISED ClientRegistration still names the retired token endpoint. The refresh attempted
-      // on this gate's own /api/v1/terms/status read is the first thing most members touch after a
-      // cutover, so the first page load answered 500 and stayed broken — authenticated sessions
-      // idle out after 720h, so it would not have healed on its own, and the only way out a member
-      // could find was clearing the site data.
-      //
-      // The sibling BackendRoleSyncFilter has caught this exception since it was introduced; this
-      // filter simply never did. Redirecting into the authorization flow replaces the stale
-      // authorized client from the CURRENT registration repository, which is what makes the
-      // redirect a fix and not just a friendlier error.
       if (isWebSocketUpgrade(request)) {
-        // The one transport with no good answer at this point, and the reason is the same one the
-        // consent path documents below: a refused upgrade reaches the browser as close 1006, which
-        // is indistinguishable from a dropped connection, so krt-live-sync.js reconnects forever.
-        // Letting the handshake through is the lesser evil — the socket closes on its own once it
-        // tries to use the token, and the member's next navigation takes the redirect.
         filterChain.doFilter(request, response);
         return;
       }
@@ -172,54 +142,17 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
     }
     String consentUrl = request.getContextPath() + CONSENT_PATH;
     if (isEventStream(request)) {
-      // An EventSource can read neither a status code nor a response header, so the X-Terms-
-      // Acceptance-Required contract below is invisible to it and a redirect is actively harmful:
-      // the stream receives the consent page as text/html, fails to parse it, and notifications.js
-      // reconnects on its own jittered timer — indefinitely. Measured in production on 2026-08-03:
-      // 491 stream attempts and 483 consent-page loads in ten minutes, from open tabs alone.
-      //
-      // Exempting the path would only move the loop one hop: the relay would then reach the backend
-      // boundary, take the 403 there, and error just the same. So answer ON the channel, which is
-      // the one thing the client can act on — a single `terms-gate` event carrying the consent URL,
-      // then close. This mirrors the `reauth` handoff the stream already implements for a lost
-      // OAuth2 token (REQ-SEC-012, REQ-NOTIF-010).
       log.debug("Consent missing; handing the SSE stream off to the consent page");
       writeOneShotEvent(response, SSE_GATE_EVENT, consentUrl);
       return;
     }
     if (isAjax(request)) {
-      // A 302 is wrong for an XHR and fails SILENTLY, which is the worst of both worlds: krtFetch's
-      // swap sees `res.redirected` and bails with a dev-only warning, so the section simply stops
-      // updating; a write follows the redirect, gets the consent page as 200 text/html, and shows a
-      // generic error toast. Neither tells the user what happened. This is the case of a tab that
-      // was already open when a new wording deployed — i.e. exactly when the feature first does
-      // anything at all.
-      //
-      // So mirror the contract the codebase already has for a lost OAuth2 token (REQ-SEC-012): a
-      // status plus a header the client acts on, and let krtFetch navigate. Sending the target in
-      // the header rather than hardcoding it client-side keeps the context path correct.
       log.debug("Consent missing; signalling the gate to the AJAX caller");
       response.setStatus(HttpServletResponse.SC_FORBIDDEN);
       response.setHeader(TERMS_GATE_HEADER, consentUrl);
       return;
     }
     if (isWebSocketUpgrade(request)) {
-      // A WebSocket handshake has exactly one useful answer, and it is not the usual one here.
-      // A refused upgrade — 302, 403, anything but 101 — reaches the browser's WebSocket
-      // object as `close` with code 1006 and no reason, which is byte-for-byte what a dropped
-      // connection looks like; the client cannot tell "you must consent" from "the wifi blinked",
-      // so it does the only correct thing for the latter and reconnects. krt-live-sync.js does that
-      // on full-jitter backoff capped at 30 s, for as long as any topic is registered, and consent
-      // can never be given from a background socket: the loop has no exit. That is the same defect
-      // the SSE stream had before REQ-SEC-028's channel handoff, and the same fix does not transfer
-      // — at handshake time there is no channel yet to write an event on.
-      //
-      // So let the upgrade complete and refuse the socket where a close CODE exists: the handshake
-      // is marked here, LiveSyncSyncHandshakeInterceptor copies the mark onto the session, and
-      // LiveSyncWebSocketHandler closes it immediately with 4003 carrying this URL — the shape the
-      // per-user socket cap's 4029 already established. Marking rather than exempting is what keeps
-      // the verdict in one place: the gate's own 60 s-bounded read decides, and the relay only
-      // relays it.
       log.debug("Consent missing; marking the WebSocket handshake for a terminal refusal");
       TermsGateHandoff.mark(request, consentUrl);
       filterChain.doFilter(request, response);
@@ -340,8 +273,6 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
     response.setStatus(HttpServletResponse.SC_OK);
     response.setContentType(MediaType.TEXT_EVENT_STREAM_VALUE);
     response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-    // Proxies that buffer would hold the event until the stream closes anyway, but an explicit
-    // no-cache keeps an intermediary from serving this one-shot answer to a later subscription.
     response.setHeader(HttpHeaders.CACHE_CONTROL, "no-cache");
     PrintWriter writer = response.getWriter();
     writer.write("event: " + eventName + "\ndata: " + url + "\n\n");
@@ -435,12 +366,6 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
         return true;
       }
     }
-    // A fresh negative is honoured too, not just a fresh positive. Storing the verdict but reading
-    // back only one side made every gated request a blocking backend round trip: during the
-    // 2026-08-03 rollout 491 stream attempts produced 491 reads of /api/v1/terms/status, and the
-    // consent-page renders they triggered produced 483 more. The cache is bounded by the same
-    // RECHECK_MILLIS as the positive one, and recording consent calls clearCachedVerdict, so a user
-    // who accepts is never held behind a stale "no".
     if (consentKnownMissing(request)) {
       return false;
     }
@@ -449,7 +374,6 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
       TermsStatusDto status = backendApiClient.get(TERMS_STATUS_URI, TermsStatusDto.class);
       accepted = status == null || status.accepted();
     } catch (BackendServiceException e) {
-      // Already logged at the BackendApiClient boundary (REQ-OBS-001).
       log.debug("Consent status unreadable; letting the request through (backend still enforces).");
       return true;
     }
@@ -493,10 +417,6 @@ public class TermsAcceptanceGateFilter extends OncePerRequestFilter {
     String path = PublicPaths.relativePath(request);
     return path.equals(CONSENT_PATH)
         || path.startsWith("/pending-approval")
-        // The three legal pages moved into PublicPaths.isLegalPage, which isGateExempt now covers,
-        // so BackendRoleSyncFilter honours them too — it did not, and a member awaiting approval
-        // could not read the imprint. Restating them here was the drift this class's own Javadoc
-        // warned about two paragraphs up.
         || PublicPaths.isGateExempt(path);
   }
 }

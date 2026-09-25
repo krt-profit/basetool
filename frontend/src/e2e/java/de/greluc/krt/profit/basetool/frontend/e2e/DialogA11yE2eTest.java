@@ -131,11 +131,9 @@ class DialogA11yE2eTest {
           seeder.createJobOrder(
               USERNAME, PASSWORD, IRIDIUM_ID, "E2E Dialog Order", jobMaterial, 650, 100.0);
       SEEDED_DETAILS.add("/orders/" + orderId);
-      // An ITEM order renders two more dialogs (item handover, production record).
       String widget = seeder.seedOrderableItem("E2E Dialog Widget", jobMaterial);
       String itemOrderId =
           seeder.createItemJobOrder(USERNAME, PASSWORD, IRIDIUM_ID, "E2E Dialog Item", widget, 2);
-      // The item handover dialog renders only once something has been manufactured.
       seeder.manufactureItemOrderLineFully(
           USERNAME,
           PASSWORD,
@@ -148,8 +146,6 @@ class DialogA11yE2eTest {
       String orgUnitAccountId =
           seeder.ensureOrgUnitBankAccount(USERNAME, PASSWORD, "E2E Dialog OU Account", IRIDIUM_ID);
       SEEDED_DETAILS.add("/org-unit-bank/accounts/" + orgUnitAccountId);
-      // An own PENDING request renders its per-request edit dialog (ou-req-edit-<id>) on the
-      // org-unit bank page, which the route list already visits.
       seeder.raiseBankDepositRequest(USERNAME, PASSWORD, orgUnitAccountId, 100);
       String hub = seeder.findLocationIdByName(USERNAME, PASSWORD, REFINERY_HUB);
       String refineryMaterial =
@@ -283,10 +279,6 @@ class DialogA11yE2eTest {
           findings.add(path + ": could not be checked: " + firstLine(failure.getMessage()));
         }
       }
-      // The promotion admin pages render their dialogs only with a squadron pinned; the admin's
-      // default all-squadrons view shows a prompt instead (REQ-UI-013). Pin IRIDIUM through the
-      // app's own switcher, walk them, and unpin again: the pin lives in the server-side session,
-      // which the shared storage state hands to every later class.
       try {
         pinOrgUnit(page, baseUrl, IRIDIUM_ID);
         for (String path : SQUADRON_PAGES) {
@@ -363,8 +355,6 @@ class DialogA11yE2eTest {
             }
             """,
             id);
-    // The probe joins its problems into one string, empty when there are none; anything else
-    // (a null from a probe that threw) is itself a finding, so it is not filtered out here.
     String problems = String.valueOf(shape);
     if (!problems.isEmpty()) {
       findings.add(where + problems);

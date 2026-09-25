@@ -13,8 +13,6 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
-      # The service's own Redis ACL user (REQ-SEC-068, ADR-0207). Empty = no username, i.e. a
-      # password-only AUTH as the shared `default` user, exactly as before the per-service users.
       username: ${REDIS_USERNAME:}
       password: ${REDIS_PASSWORD:}
 

@@ -50,11 +50,8 @@ class BankTransferFeeServiceTest {
 
   @Test
   void feeOn_roundsToWholeAuecHalfUp() {
-    // Given the seeded 0.5% rate
     rate("0.005");
 
-    // When / Then: 1000 * 0.005 = 5 (exact); 300 * 0.005 = 1.5 -> 2 (HALF_UP); 100 * 0.005 = 0.5 ->
-    // 1
     assertEquals(
         0, bankTransferFeeService.feeOn(new BigDecimal("1000")).compareTo(new BigDecimal("5")));
     assertEquals(
@@ -64,11 +61,8 @@ class BankTransferFeeServiceTest {
 
   @Test
   void totalDebit_isAmountPlusFee() {
-    // Given the seeded 0.5% rate
     rate("0.005");
 
-    // When / Then: the fee is added on top, so the source is debited amount + fee. The owner's
-    // worked example — a 500 000 transfer at 0.5% — costs the source 502 500 (ADR-0052).
     assertEquals(
         0,
         bankTransferFeeService
@@ -83,7 +77,6 @@ class BankTransferFeeServiceTest {
 
   @Test
   void feeOn_nonPositiveGross_isZero() {
-    // No setting lookup needed for a non-positive gross — short-circuits to zero.
     assertEquals(0, bankTransferFeeService.feeOn(BigDecimal.ZERO).signum());
     assertEquals(0, bankTransferFeeService.feeOn(new BigDecimal("-50")).signum());
   }

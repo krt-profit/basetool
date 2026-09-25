@@ -89,8 +89,6 @@ class SseDeliveryThroughFilterChainTest {
   /** The test stream endpoint, whose open emitters are completed after each test. */
   @Autowired private TestStreamController streamController;
 
-  // HTTP/1.1 explicitly: the JDK client's HTTP/2 stream handling can RST_STREAM against a Tomcat
-  // still warming up under full-suite load (see ManagementPortIsolationTest).
   private final HttpClient http =
       HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
 
@@ -164,8 +162,6 @@ class SseDeliveryThroughFilterChainTest {
         .as("a stream is never a candidate for an ETag")
         .isEmpty();
 
-    // The read has to be interruptible: a swallowed stream blocks forever rather than failing, so
-    // an ordinary read on this thread would hang the build instead of reporting the defect.
     CompletableFuture<List<String>> firstLine =
         CompletableFuture.supplyAsync(
             () -> response.body().filter(line -> !line.isBlank()).limit(1).toList());

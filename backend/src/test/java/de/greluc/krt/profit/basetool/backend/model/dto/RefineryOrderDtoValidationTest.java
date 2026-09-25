@@ -114,8 +114,6 @@ class RefineryOrderDtoValidationTest {
 
   @Test
   void invalidGood_cascadesConstraintViolationIntoListElement() {
-    // inputQuantity 0 violates @Min(1) on RefineryGoodDto; the violation must surface at
-    // goods[0].inputQuantity because goods is declared List<@Valid RefineryGoodDto> (issue #1206).
     RefineryGoodDto invalidGood = new RefineryGoodDto(null, null, 0, null, 1, null, null);
     assertTrue(
         hasViolationOn(withGood(invalidGood), "goods[0].inputQuantity"),

@@ -99,8 +99,6 @@ class JobOrderPageControllerResponsiblePickerMvcTest {
         .thenReturn(Collections.emptyList());
     when(backendApiClient.getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS), anyTypeRef()))
         .thenReturn(Collections.emptyList());
-    // The catalog stays a server-side model attribute (it gates the redisplay seed option), but
-    // with no bound row value neither material name may reach the rendered page.
     MaterialDto agricium = jobOrderMaterial("Agricium");
     MaterialDto quantainium = jobOrderMaterial("Quantainium-Distinct");
     when(backendApiClient.getCached(eq(CachedCatalog.MATERIALS_JOB_ORDER), anyTypeRef()))
@@ -161,12 +159,8 @@ class JobOrderPageControllerResponsiblePickerMvcTest {
         new OrgUnitMembershipOptionDto(
             UUID.randomUUID(), "Kartellleitung XYZ", "OL", "ORGANISATIONSLEITUNG", false);
 
-    // Reference catalogs (materials / orderable items / squadrons) go through the cached client;
-    // empty keeps them from blocking the render.
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
         .thenReturn(Collections.emptyList());
-    // Authenticated requesting picker sources the all-kinds catalog via the authenticated client
-    // (now cached — REQ-DATA-007, eviction gated on Squadron/SK/Bereich/OL admin mutations).
     when(backendApiClient.getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS), anyTypeRef()))
         .thenReturn(List.of(profitStaffel, profitSk, bereich, ol));
 
@@ -174,14 +168,10 @@ class JobOrderPageControllerResponsiblePickerMvcTest {
         .perform(get("/orders/create"))
         .andExpect(status().isOk())
         .andExpect(view().name("orders-create"))
-        // The profit SK still reaches the responsible picker.
         .andExpect(content().string(Matchers.containsString("Profit Spezialkommando")))
-        // The Bereich + OL are non-profit, so a rendered Bereich/OL option name can only have come
-        // from the requesting picker (the responsible picker filters non-profit out).
         .andExpect(content().string(Matchers.containsString("Bereich Profit XYZ")))
         .andExpect(content().string(Matchers.containsString("Kartellleitung XYZ")));
 
-    // Authenticated callers source the all-kinds catalog — never the Staffel/SK-only /active.
     verify(backendApiClient).getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE_ALL_KINDS), anyTypeRef());
     verify(backendApiClient, never()).getCached(eq(CachedCatalog.ORG_UNITS_ACTIVE), anyTypeRef());
     verify(backendApiClient, never()).getCached(eq(CachedCatalog.SPECIAL_COMMANDS), anyTypeRef());

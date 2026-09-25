@@ -124,8 +124,6 @@ public class NotificationService {
       entity.setRead(true);
       entity.setReadAt(Instant.now());
     }
-    // saveAndFlush so the bumped @Version reaches the response DTO the frontend writes back in
-    // place.
     return mapper.toDto(notificationRepository.saveAndFlush(entity));
   }
 

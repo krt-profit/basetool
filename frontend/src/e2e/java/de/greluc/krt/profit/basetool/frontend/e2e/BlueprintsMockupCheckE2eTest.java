@@ -102,7 +102,6 @@ class BlueprintsMockupCheckE2eTest {
               .setFullPage(true)
               .setPath(Paths.get("build", "e2e", "bp-initial.png")));
 
-      // Add a blueprint through the typeahead if the collection is still empty.
       Locator rows = page.locator("#krt-bp-master-rows .master-row");
       if (rows.count() == 0) {
         page.locator("#krt-bp-search-input").fill("Demo");
@@ -138,7 +137,6 @@ class BlueprintsMockupCheckE2eTest {
               .setFullPage(true)
               .setPath(Paths.get("build", "e2e", "bp-master-detail.png")));
 
-      // Open the edit-note modal: must use the wide KRT frame without scrollbars.
       if (page.locator("#krt-bp-detail-edit").isVisible()) {
         page.locator("#krt-bp-detail-edit").click();
         page.waitForTimeout(300);

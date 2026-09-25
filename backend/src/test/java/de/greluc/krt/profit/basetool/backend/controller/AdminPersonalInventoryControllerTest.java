@@ -54,15 +54,12 @@ class AdminPersonalInventoryControllerTest {
 
   @Test
   void listForUserShouldDelegateToServiceWithPathSub() {
-    // Given
     Page<PersonalInventoryItemResponse> page = new PageImpl<>(List.of(sampleResponse()));
     when(service.listForUser(eq(TARGET), any(), any())).thenReturn(page);
 
-    // When
     PageResponse<PersonalInventoryItemResponse> result =
         controller.listForUser(TARGET, 0, 10, null, null);
 
-    // Then
     assertEquals(1, result.content().size());
     verify(service).listForUser(eq(TARGET), any(), any());
   }

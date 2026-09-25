@@ -110,10 +110,6 @@ public class MissionFinanceEntryService {
     BigDecimal financeExpenseSum = agg.expenseSum() != null ? agg.expenseSum() : BigDecimal.ZERO;
     long financeExpenseCount = agg.expenseCount() != null ? agg.expenseCount() : 0L;
 
-    // Refinery orders are bounded per mission (not the unbounded size=1000 ledger), so
-    // materializing
-    // them stays cheap. Each folds its profit into the signed total and its raw expenses (> 0) into
-    // the expense bucket, exactly as the previous frontend loop did.
     BigDecimal refineryProfit = BigDecimal.ZERO;
     BigDecimal refineryExpenseSum = BigDecimal.ZERO;
     long refineryExpenseCount = 0L;
@@ -215,7 +211,6 @@ public class MissionFinanceEntryService {
     MissionFinanceEntry entry =
         Entities.require(financeEntryRepository.findById(entryId), "Finance entry not found");
 
-    // Optimistic Locking Check
     if (!entry.getVersion().equals(dto.version())) {
       throw new BusinessConflictException(
           "The entry has been updated by someone else. Please reload.");

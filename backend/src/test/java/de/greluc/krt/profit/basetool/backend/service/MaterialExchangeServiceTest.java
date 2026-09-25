@@ -110,14 +110,8 @@ class MaterialExchangeServiceTest {
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private ObjectProvider<MaterialExchangeService> selfProvider;
 
-  // Constructed in the @BeforeEach rather than by @InjectMocks: the REAL board service is one of
-  // its arguments
   private MaterialExchangeService service;
 
-  // Read/write split (#14): the board/detail/counts/picker reads plus the interessenten-anonymity
-  // redaction moved to MaterialExchangeBoardService, built from the same mocks and co-wired into
-  // the write service below so both the moved read paths and the write→read projection keep
-  // exercising the real logic from this fixture.
   @InjectMocks private MaterialExchangeBoardService boardService;
 
   private final UUID ownerId = UUID.randomUUID();
@@ -129,12 +123,6 @@ class MaterialExchangeServiceTest {
   /** Builds a fresh owner + active offer fixture before each test. */
   @BeforeEach
   void setUp() {
-    // The REAL co-built board service goes in through the constructor so the write->read
-    // projection runs the real redaction/DTO mapping.
-    // Built through the constructor instead of patched in afterwards: these fields are
-    // `private final`, and reflective mutation of a final field is what JEP 500 (JDK 26)
-    // warns about and a later release will refuse. Arg order matches the
-    // @RequiredArgsConstructor field-declaration order of each service.
     service =
         new MaterialExchangeService(
             offerRepository,
@@ -209,7 +197,6 @@ class MaterialExchangeServiceTest {
     when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
     when(offerRepository.findWithDetailById(offerId)).thenReturn(Optional.of(offer));
     when(interestRepository.countByOfferId(offerId)).thenReturn(0L);
-    // Rows returned in a deliberately unsorted order to prove the service imposes the ordering.
     when(orgUnitMembershipRepository.findAllByIdUserIdInAndKindIn(any(), any()))
         .thenReturn(
             List.of(
@@ -276,7 +263,7 @@ class MaterialExchangeServiceTest {
    */
   @Test
   void release_partialAmount_storesOfferedAmountAndExposesAvailableToOwner() {
-    UUID itemId = offer.getInventoryItem().getId(); // item stock = 340 SCU
+    UUID itemId = offer.getInventoryItem().getId();
     when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
     when(inventoryItemRepository.findById(itemId))
         .thenReturn(Optional.of(offer.getInventoryItem()));
@@ -298,7 +285,7 @@ class MaterialExchangeServiceTest {
   /** Offering more than the item's current stock is rejected (400) and persists nothing. */
   @Test
   void release_amountExceedsStock_badRequest() {
-    UUID itemId = offer.getInventoryItem().getId(); // item stock = 340 SCU
+    UUID itemId = offer.getInventoryItem().getId();
     when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
     when(inventoryItemRepository.findById(itemId))
         .thenReturn(Optional.of(offer.getInventoryItem()));
@@ -439,7 +426,7 @@ class MaterialExchangeServiceTest {
   @Test
   void detail_offeredAmountClampedToCurrentStock() {
     offer.setOfferedAmount(340.0);
-    offer.getInventoryItem().setAmount(60.0); // booked out since release
+    offer.getInventoryItem().setAmount(60.0);
     when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
     when(offerRepository.findWithDetailById(offerId)).thenReturn(Optional.of(offer));
 
@@ -492,8 +479,6 @@ class MaterialExchangeServiceTest {
     when(inventoryItemRepository.findReleasableForUser(
             any(), any(), anyBoolean(), anyBoolean(), any()))
         .thenReturn(List.of());
-    // No offerRepository stub: an empty picker result short-circuits releasedInventoryItemIds
-    // before it queries the offer repo, so stubbing it would be flagged as unnecessary.
 
     boardService.myReleasableItems(null, MaterialExchangeOfferKind.MATERIAL);
     boardService.myReleasableItems(null, MaterialExchangeOfferKind.ITEM);
@@ -599,7 +584,7 @@ class MaterialExchangeServiceTest {
    */
   @Test
   void release_existingActiveOffer_updatesInPlaceAndFlagsReRelease() {
-    InventoryItem item = offer.getInventoryItem(); // stock = 340 SCU, owned by ownerId
+    InventoryItem item = offer.getInventoryItem();
     UUID itemId = item.getId();
     Instant past = Instant.now().minusSeconds(3600);
     offer.setReleasedAt(past);
@@ -733,8 +718,6 @@ class MaterialExchangeServiceTest {
     verify(auditService, never()).record(any(), any(), any(), any(), any());
   }
 
-  // ---- stock-backed item offers (design §8, REQ-MARKET-014, ADR-0108) ----
-
   /**
    * Releasing a game-item Lager row creates a <b>stock-backed</b> ITEM offer (REQ-MARKET-014): the
    * offer carries the Lager row (bound to physical stock), stores the whole-unit quantity, derives
@@ -744,7 +727,6 @@ class MaterialExchangeServiceTest {
    */
   @Test
   void release_gameItemRow_createsStockBackedItemOffer() {
-    // covers REQ-MARKET-014
     GameItem gameItem = gameItem("Quantum Drive");
     InventoryItem row = itemStockRow(owner, gameItem, 8.0);
     UUID itemId = row.getId();
@@ -781,7 +763,6 @@ class MaterialExchangeServiceTest {
   /** Offering more whole units than a game-item row holds is rejected (400) — nothing persisted. */
   @Test
   void release_gameItemRow_quantityExceedsStock_badRequest() {
-    // covers REQ-MARKET-014
     GameItem gameItem = gameItem("Cooler");
     InventoryItem row = itemStockRow(owner, gameItem, 3.0);
     UUID itemId = row.getId();
@@ -798,7 +779,6 @@ class MaterialExchangeServiceTest {
   /** A non-whole item quantity is rejected (400) — item stock is integral. */
   @Test
   void release_gameItemRow_fractionalQuantity_badRequest() {
-    // covers REQ-MARKET-014
     GameItem gameItem = gameItem("Shield");
     InventoryItem row = itemStockRow(owner, gameItem, 6.0);
     UUID itemId = row.getId();
@@ -814,7 +794,6 @@ class MaterialExchangeServiceTest {
   /** A game-item row not produced by any active blueprint cannot be offered (400). */
   @Test
   void release_gameItemRow_noBlueprintProduct_badRequest() {
-    // covers REQ-MARKET-014
     GameItem gameItem = gameItem("Loot Only");
     InventoryItem row = itemStockRow(owner, gameItem, 4.0);
     UUID itemId = row.getId();
@@ -834,7 +813,6 @@ class MaterialExchangeServiceTest {
    */
   @Test
   void release_gameItemRow_existingActiveOffer_reReleasesInPlace() {
-    // covers REQ-MARKET-014
     GameItem gameItem = gameItem("Power Plant");
     InventoryItem row = itemStockRow(owner, gameItem, 10.0);
     UUID itemId = row.getId();
@@ -861,7 +839,6 @@ class MaterialExchangeServiceTest {
   /** The release picker returns a game-item row as an ITEM entry (PIECE unit, no quality). */
   @Test
   void myReleasableItems_returnsGameItemRowAsItemKind() {
-    // covers REQ-MARKET-014
     when(authHelperService.currentUserId()).thenReturn(Optional.of(ownerId));
     GameItem gameItem = gameItem("Power Plant");
     InventoryItem row = itemStockRow(owner, gameItem, 4.0);
@@ -889,7 +866,6 @@ class MaterialExchangeServiceTest {
    */
   @Test
   void updateOffer_stockBackedItemOffer_editsQuantity() {
-    // covers REQ-MARKET-014
     GameItem gameItem = gameItem("Cooler");
     InventoryItem row = itemStockRow(owner, gameItem, 10.0);
     MaterialExchangeOffer itemOffer = stockBackedItemOffer(offerId, row, owner, 6);
@@ -911,7 +887,6 @@ class MaterialExchangeServiceTest {
   /** Editing a stock-backed item offer above the backing row's current stock is rejected (400). */
   @Test
   void updateOffer_stockBackedItemOffer_quantityExceedsStock_badRequest() {
-    // covers REQ-MARKET-014
     GameItem gameItem = gameItem("Cooler");
     InventoryItem row = itemStockRow(owner, gameItem, 3.0);
     MaterialExchangeOffer itemOffer = stockBackedItemOffer(offerId, row, owner, 3);
@@ -933,7 +908,6 @@ class MaterialExchangeServiceTest {
    */
   @Test
   void updateOffer_freeStatedItemOffer_editsQuantityWithoutNpe() {
-    // covers REQ-MARKET-014
     MaterialExchangeOffer freeItem = new MaterialExchangeOffer();
     freeItem.setId(offerId);
     freeItem.setKind(MaterialExchangeOfferKind.ITEM);
@@ -964,9 +938,8 @@ class MaterialExchangeServiceTest {
    */
   @Test
   void detail_stockBackedItemOffer_clampsQuantityToCurrentStock() {
-    // covers REQ-MARKET-014
     GameItem gameItem = gameItem("Shield");
-    InventoryItem row = itemStockRow(owner, gameItem, 2.0); // booked down since release
+    InventoryItem row = itemStockRow(owner, gameItem, 2.0);
     MaterialExchangeOffer itemOffer = stockBackedItemOffer(offerId, row, owner, 6);
     when(authHelperService.currentUserId()).thenReturn(Optional.of(otherId));
     when(offerRepository.findWithDetailById(offerId)).thenReturn(Optional.of(itemOffer));

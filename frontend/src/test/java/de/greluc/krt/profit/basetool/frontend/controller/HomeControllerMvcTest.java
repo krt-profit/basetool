@@ -67,12 +67,6 @@ import org.springframework.web.context.WebApplicationContext;
  * regression cases here intentionally supply a matching query parameter.
  */
 @SpringBootTest
-// REQ-SEC-052: these cases exist to render the WHOLE index template through Thymeleaf — the
-// sidebar, the toast fragment, the SpEL in both. That template is the member's dashboard now, so
-// every request carries an OIDC principal (`oidcLogin()`, not `@WithMockUser`: the handler binds
-// `@AuthenticationPrincipal OidcUser`, and a username/password principal arrives as null and routes
-// to the landing page). The anonymous half of GET / has its own case at the bottom, and it asserts
-// the opposite of rendering: no data, no backend call, no session.
 class HomeControllerMvcTest {
 
   private static final String ERROR_TOAST_ID = "errorNotificationParam";
@@ -92,20 +86,12 @@ class HomeControllerMvcTest {
   void setup() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
 
-    // The member's home() path: backendApiClient.get(searchUri, typeRef) for the
-    // next-7-days upcoming-missions search. Returning null is a valid "no upcoming missions"
-    // response and keeps the template's empty-state branch simple.
     when(backendApiClient.get(startsWith("/api/v1/missions/search"), anyTypeRef()))
         .thenReturn(null);
   }
 
   @Test
   void home_ShouldRenderIndex_WithoutQueryParams() throws Exception {
-    // Given: no toast-controlling query parameters
-    // When: GET / as a member
-    // Then: index renders normally; the toast fragment's param-gated branches stay
-    //       inactive, but the rest of fragments/toast (script + style block) still
-    //       runs through Thymeleaf and SpEL.
     mockMvc
         .perform(get("/").with(oidcLogin()))
         .andExpect(status().isOk())
@@ -120,9 +106,6 @@ class HomeControllerMvcTest {
    */
   @Test
   void home_ShouldRenderIndex_WhenErrorParamMatchesKeyPattern() throws Exception {
-    // Given: ?error= with a value that matches '^[A-Za-z][A-Za-z0-9._-]{0,79}$'
-    // When: GET / as a member
-    // Then: 200, view "index", and the param-error toast div is in the HTML.
     mockMvc
         .perform(get("/").with(oidcLogin()).param("error", "notification.error.title"))
         .andExpect(status().isOk())
@@ -153,9 +136,6 @@ class HomeControllerMvcTest {
   @Test
   void home_ShouldRenderIndex_WithoutParamErrorToast_WhenErrorParamFailsKeyPattern()
       throws Exception {
-    // Given: a value that violates the key pattern (contains spaces, starts with digit)
-    // When: GET / as a member
-    // Then: 200, view "index", and the param-error toast div is absent.
     mockMvc
         .perform(get("/").with(oidcLogin()).param("error", "9 invalid value with spaces"))
         .andExpect(status().isOk())
@@ -232,7 +212,6 @@ class HomeControllerMvcTest {
             null,
             false,
             null,
-            // owningSquadron null → ownerless mission (mirrors the serialized DTO).
             null,
             null,
             0L,
@@ -373,7 +352,6 @@ class HomeControllerMvcTest {
   void home_ShouldShowMyUnitChip_WhenUpcomingMissionIsOwnedByViewersSpecialCommand()
       throws Exception {
     UUID specialCommandId = UUID.randomUUID();
-    // No Staffel on the /me record — the membership comes purely from /me/org-unit-ids.
     UserDto me =
         new UserDto(
             UUID.randomUUID(),

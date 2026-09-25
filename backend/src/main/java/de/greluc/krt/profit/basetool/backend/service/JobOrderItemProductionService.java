@@ -165,8 +165,6 @@ public class JobOrderItemProductionService {
   @Transactional
   public JobOrderItemDto bookProduction(
       UUID jobOrderId, UUID jobOrderItemId, JobOrderItemProductionCreateDto dto) {
-    // Before anything is loaded or consumed: whose ledger the produced stock lands in is an
-    // authorization input, not a detail of the final book-in step (REQ-INV-032, APPSEC-01).
     assertMayBookInFor(dto.bookIn());
 
     JobOrder jobOrder =
@@ -182,30 +180,18 @@ public class JobOrderItemProductionService {
             jobOrder.getItems().stream().filter(i -> i.getId().equals(jobOrderItemId)).findFirst(),
             () -> "Item line " + jobOrderItemId + " does not belong to job order " + jobOrderId);
 
-    // Optimistic lock: a production booking must carry the line's current version (checkRequired
-    // treats an unversioned line as a conflict too). GlobalExceptionHandler maps the resulting
-    // ObjectOptimisticLockingFailureException to a 409 (code OPTIMISTIC_LOCK).
     OptimisticLock.checkRequired(
         line.getVersion(), dto.version(), JobOrderItem.class, jobOrderItemId);
 
     final int amount = dto.amount();
     final int remainingToManufacture = line.getAmount() - line.getManufacturedAmount();
     if (amount > remainingToManufacture) {
-      // Producing more than the line still needs — a 422 quantity-invariant violation.
       throw new ProductionAllocationException();
     }
 
-    // Materials the operator marked "nicht ausbuchen": their demand is dropped from the coverage
-    // check and their linked stock is left untouched (nothing is consumed for them). A null list is
-    // treated as "none skipped".
     final Set<UUID> skippedMaterials =
         dto.skippedMaterialIds() == null ? Set.of() : new HashSet<>(dto.skippedMaterialIds());
 
-    // Required per-material demand for `amount` units, scaled from the line's snapshot (the same
-    // snapshot that feeds the aggregated-materials view). requiredQuantity holds the demand for the
-    // whole ordered amount, so scale it to `amount` and round for the material's quantity type. A
-    // skipped material is excluded here, so the coverage check below neither requires nor allows
-    // consumption for it.
     Map<UUID, Double> demandByMaterial = new LinkedHashMap<>();
     final Set<UUID> skippedRequiredMaterials = new LinkedHashSet<>();
     for (JobOrderItemMaterial req : line.getMaterials()) {
@@ -223,8 +209,6 @@ public class JobOrderItemProductionService {
       demandByMaterial.merge(material.getId(), demand, Double::sum);
     }
 
-    // The consumption must exactly cover every required material's demand, and may not name a
-    // material the line does not require.
     Map<UUID, Double> consumedByMaterial = new LinkedHashMap<>();
     for (JobOrderItemProductionConsumptionDto c : dto.consumption()) {
       consumedByMaterial.merge(c.materialId(), c.amount() == null ? 0.0 : c.amount(), Double::sum);
@@ -250,14 +234,11 @@ public class JobOrderItemProductionService {
               inventoryItemRepository.findByIdForUpdate(c.inventoryItemId()),
               () -> "Inventory item not found: " + c.inventoryItemId());
 
-      // Optimistic lock on the entry — a concurrent stock change surfaces as a 409.
       OptimisticLock.check(
           inventoryItem.getVersion(), c.version(), InventoryItem.class, c.inventoryItemId());
 
       var orderSlice = InventoryAllocations.jobOrderSlice(inventoryItem, jobOrderId);
       if (orderSlice == null) {
-        // The entry is not earmarked to this order — a stale payload or a concurrent unlink. A
-        // client-side condition, so a 400 with a localized detail (APPSEC-06).
         throw new BadRequestException(JobOrderHandoverService.ERROR_ITEM_NOT_LINKED_TO_ORDER);
       }
       if (inventoryItem.getMaterial() == null
@@ -272,8 +253,6 @@ public class JobOrderItemProductionService {
       }
       double orderSliceAmount = orderSlice.getAmount() != null ? orderSlice.getAmount() : 0.0;
       if (consumed > orderSliceAmount + QUANTITY_EPSILON) {
-        // May only draw from this order's own earmark on the entry, never a sibling's slice or the
-        // free rest — mirrors the handover cap (Variante C, REQ-INV-027).
         throw new ProductionAllocationException();
       }
       if (consumed > inventoryItem.getAmount() + QUANTITY_EPSILON) {
@@ -305,9 +284,6 @@ public class JobOrderItemProductionService {
       if (depleted) {
         inventoryItemRepository.delete(inventoryItem);
       } else {
-        // The consumed SCU physically leave inventory AND this order's earmark; the same SCU also
-        // leave any mission earmark, so clamp the mission dimension by the same amount (auto plan:
-        // rest-first then proportional) to keep R5 without a 422.
         Map<UUID, Double> missionPlan =
             AllocationReductions.resolveReductionPlan(inventoryItem, null, consumed, false);
         InventoryAllocations.reduceJobOrder(inventoryItem, jobOrderId, consumed);
@@ -317,15 +293,9 @@ public class JobOrderItemProductionService {
       }
     }
 
-    // Bump the manufactured counter via dirty checking (no explicit save → single @Version bump).
     line.setManufacturedAmount(line.getManufacturedAmount() + amount);
-    // Flush so the returned DTO carries the advanced line @Version (and the inventory writes commit
-    // before the audit snapshot reads).
     jobOrderRepository.flush();
 
-    // Audit AFTER the writes, from the loop-captured snapshots (never re-reading a deleted entity).
-    // One cross-domain INVENTORY_CONSUMED_BY_PRODUCTION per consumed entry plus one
-    // JOB_ORDER_PRODUCTION_BOOKED. No user free text goes into the details payload.
     for (ConsumedItem ci : consumedItems) {
       if (!ci.depleted()) {
         materialExchangeOfferRepository.clampOfferedAmountToStock(ci.itemId(), ci.remaining());
@@ -352,9 +322,6 @@ public class JobOrderItemProductionService {
             .with("consumed", dto.consumption().size())
             .with("skipped", skippedRequiredMaterials.size()));
 
-    // Book the produced units into the Lager (REQ-INV-032) — appended after the consumption
-    // bookkeeping, flush and offer clamps, in the same transaction. bookIn is required (@NotNull
-    // at the API boundary), so every booking creates the produced stock.
     bookProducedStockIn(jobOrder, line, amount, dto.bookIn());
 
     return Entities.require(
@@ -450,8 +417,6 @@ public class JobOrderItemProductionService {
     final boolean personal = Boolean.TRUE.equals(bookIn.personal());
     final boolean allocateToOrder = !Boolean.FALSE.equals(bookIn.allocateToOrder());
     if (personal && allocateToOrder) {
-      // Personal stock never carries allocations (the standing assertNotPersonal invariant): the
-      // combination is contradictory, so reject it instead of silently dropping the earmark.
       throw new BadRequestException("Personal items cannot be assigned to a mission or job order");
     }
     if (line.getGameItem() == null) {
@@ -480,13 +445,9 @@ public class JobOrderItemProductionService {
     stockRow.setAmount((double) amount);
     stockRow.setPersonal(personal);
     if (allocateToOrder) {
-      // Auto-earmark through the cascade list + back-reference so the slice persists with the
-      // single save below (design §5.6 step 2 — never a separate pre-save of the allocation).
       InventoryAllocations.addJobOrder(stockRow, jobOrder, (double) amount, false);
     }
     InventoryItem saved = inventoryItemRepository.save(stockRow);
-    // Slice-first-then-merge (transfer-flow precedent): item rows always auto-merge, and the
-    // client merge flag is irrelevant for them, so pass false.
     InventoryItem merged = inventoryCheckoutService.mergeStockIfRequested(saved, false);
     auditService.record(
         AuditEventType.INVENTORY_RECEIVED_FROM_PRODUCTION,

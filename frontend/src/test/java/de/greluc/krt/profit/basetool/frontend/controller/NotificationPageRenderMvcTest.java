@@ -93,9 +93,6 @@ class NotificationPageRenderMvcTest {
     return new PageResponse<>(content, 0, 50, totalElements, totalPages, List.of());
   }
 
-  // covers REQ-NOTIF-019 — an inbox with more than one page renders the truncation hint + the
-  // load-more control, so the newest-50 cap is visible, never silent. Also proves the template's
-  // showingLatest(...) MessageFormat call and the load-more fragment render without error.
   @Test
   @WithMockUser
   void page_withMoreThanOnePage_rendersHintAndLoadMore() throws Exception {
@@ -110,7 +107,6 @@ class NotificationPageRenderMvcTest {
         .andExpect(content().string(containsString("data-notif-next-page=\"1\"")));
   }
 
-  // covers REQ-NOTIF-019 — an inbox that fits one page renders neither the hint nor the load-more.
   @Test
   @WithMockUser
   void page_withSinglePage_rendersNoLoadMore() throws Exception {

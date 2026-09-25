@@ -44,9 +44,7 @@ public class NoopLiveSyncFanout implements LiveSyncFanout {
    * @param sections the section keys (unused)
    */
   @Override
-  public void publish(@NotNull String canonicalTopic, @NotNull List<String> sections) {
-    // Single-instance: nothing to fan out.
-  }
+  public void publish(@NotNull String canonicalTopic, @NotNull List<String> sections) {}
 
   /**
    * No-op: with one replica the local presence store is already the complete picture, so there is
@@ -58,7 +56,5 @@ public class NoopLiveSyncFanout implements LiveSyncFanout {
   @Override
   public void publishPresence(
       @NotNull String canonicalTopic,
-      @NotNull Map<String, List<LiveSyncPresenceService.PresenceEditor>> sections) {
-    // Single-instance: the local presence store is the whole truth.
-  }
+      @NotNull Map<String, List<LiveSyncPresenceService.PresenceEditor>> sections) {}
 }

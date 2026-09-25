@@ -61,37 +61,28 @@ class InventoryAuditLabelsTest {
     return location;
   }
 
-  // covers REQ-INV-029 / REQ-AUDIT-001 (item rows render the game-item name, not the em dash)
   @Test
   void label_gameItemRow_rendersGameItemNameAtLocation() {
-    // Given a game-item stock row (material == null)
     GameItem drive = new GameItem();
     drive.setId(UUID.randomUUID());
     drive.setName("Quantum Drive");
 
-    // When / Then
     assertEquals(
         "Quantum Drive @ ARC-L1", InventoryAuditLabels.label(row(null, drive, location("ARC-L1"))));
   }
 
-  // covers REQ-AUDIT-001 (material rows keep their historical label byte-identically)
   @Test
   void label_materialRow_rendersMaterialNameAtLocation() {
-    // Given a material stock row
     Material steel = new Material();
     steel.setId(UUID.randomUUID());
     steel.setName("Steel");
 
-    // When / Then
     assertEquals(
         "Steel @ Hurston", InventoryAuditLabels.label(row(steel, null, location("Hurston"))));
   }
 
-  // covers REQ-AUDIT-001 (orphaned rows keep a well-formed label)
   @Test
   void label_missingCatalogReferencesAndLocation_fallsBackToEmDashes() {
-    // Given an orphaned row with neither catalog reference and no location
-    // When / Then — both parts render as em dashes rather than NPE-ing the audit write
     assertEquals("— @ —", InventoryAuditLabels.label(row(null, null, null)));
   }
 }

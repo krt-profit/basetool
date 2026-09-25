@@ -71,14 +71,10 @@ class AdditiveTrustManagerTest {
   private static X509TrustManager accepting() {
     return new X509TrustManager() {
       @Override
-      public void checkClientTrusted(X509Certificate[] chain, String authType) {
-        // accepts
-      }
+      public void checkClientTrusted(X509Certificate[] chain, String authType) {}
 
       @Override
-      public void checkServerTrusted(X509Certificate[] chain, String authType) {
-        // accepts
-      }
+      public void checkServerTrusted(X509Certificate[] chain, String authType) {}
 
       @Override
       public X509Certificate[] getAcceptedIssuers() {
@@ -128,14 +124,10 @@ class AdditiveTrustManagerTest {
     X509TrustManager one =
         new X509TrustManager() {
           @Override
-          public void checkClientTrusted(X509Certificate[] chain, String authType) {
-            // unused
-          }
+          public void checkClientTrusted(X509Certificate[] chain, String authType) {}
 
           @Override
-          public void checkServerTrusted(X509Certificate[] chain, String authType) {
-            // unused
-          }
+          public void checkServerTrusted(X509Certificate[] chain, String authType) {}
 
           @Override
           public X509Certificate[] getAcceptedIssuers() {

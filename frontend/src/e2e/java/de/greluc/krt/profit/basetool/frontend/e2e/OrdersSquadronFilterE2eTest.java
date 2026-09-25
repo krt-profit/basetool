@@ -118,19 +118,13 @@ class OrdersSquadronFilterE2eTest {
         page.waitForLoadState();
         E2eSupport.openFilterPanel(page);
         assertThat(page.getByTestId("nav-logout")).isVisible();
-        // The multi-select renders for the full queue (admin is not the requester-only view), and
-        // with every squadron checked (the default) the IRIDIUM order is visible.
         assertThat(page.locator("#squadronFilterContainer")).isVisible();
         assertVisible(page, iridiumOrderId);
 
-        // Deselect IRIDIUM: a single checkbox change fires one server-side re-fetch (no rapid
-        // multi-swap race), dropping the IRIDIUM order from the queue.
         page.locator("#squadronHeader").click();
         page.locator("input.sqCheck[value='" + IRIDIUM_ID + "']").uncheck();
         assertAbsent(page, iridiumOrderId);
 
-        // The deselection persists: a full reload restores it from localStorage and re-applies it,
-        // so the IRIDIUM order stays hidden without any manual re-filtering.
         E2eSupport.navigate(page, baseUrl + QUEUE_URL_SUFFIX);
         page.waitForLoadState();
         E2eSupport.openFilterPanel(page);

@@ -138,14 +138,10 @@ class InventorySharedLagerLiveSyncE2eTest {
         expandToLeaf(pageA);
         expandToLeaf(pageB);
 
-        // B sees the row but not yet the order chip (the order is unallocated).
         assertThat(pageB.locator(chip)).hasCount(0);
 
-        // A full reload on B would clear this marker; the live in-place swap leaves it intact.
         pageB.evaluate("window.__krtNoReload = true;");
 
-        // Deterministic wait: B is registered with the relay once its `inventory` subscribe is
-        // acked.
         pageB.waitForCondition(
             () ->
                 Boolean.TRUE.equals(
@@ -154,14 +150,8 @@ class InventorySharedLagerLiveSyncE2eTest {
                             + " window.krtLiveSync.subscribedTopics().indexOf('inventory') >="
                             + " 0)")));
 
-        // Context A earmarks 60 SCU of the row to the order (broadcasts inventory/[stock]).
         addOrderChip(pageA);
 
-        // The assertion under test: context B — which did nothing — shows the new chip in place,
-        // its
-        // filtered fragment re-fetched with the expanded tree restored (the global room coalesces
-        // at
-        // ~1.5 s), and never reloaded.
         assertThat(pageB.locator(chip))
             .hasCount(1, new LocatorAssertions.HasCountOptions().setTimeout(30_000));
         assertEquals(
@@ -190,8 +180,6 @@ class InventorySharedLagerLiveSyncE2eTest {
         .click(new Locator.ClickOptions().setTimeout(20_000));
     page.locator("div.stack-header[data-material-id='" + materialId + "']")
         .click(new Locator.ClickOptions().setTimeout(20_000));
-    // 20 s, not the 5 s default: the lazy stack-entries fetch + render is slow on WebKit under
-    // load.
     assertThat(page.locator("div.tree-row--leaf[data-item-id='" + itemId + "']"))
         .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
   }
@@ -209,15 +197,6 @@ class InventorySharedLagerLiveSyncE2eTest {
         page.locator(
             "div.assoc-split[data-entry-id='" + itemId + "'][data-assoc-field='JOB_ORDER']");
     dropFooter(page);
-    // Centre the trigger BEFORE opening the popover, and never let the scroll position decide the
-    // rest. The popover is `position: fixed` and re-anchors to its trigger on every scroll
-    // (assocPositionPop / assocRepositionOpenPop), so Playwright's own scroll-into-view moves the
-    // very element it is trying to reach — a chase that ends in "element is outside of the
-    // viewport" after 60 retries even though the rendered page is correct. Anchored mid-viewport
-    // there is room below, the popover drops downward instead of flipping up, and every later
-    // target (combobox, option, amount, Speichern) is already on screen, so Playwright never
-    // scrolls again. The expanded leaf sits near the bottom of the tree, which is why this was
-    // load-bearing without anyone noticing until the footer's height changed (#1529).
     split.evaluate("el => el.scrollIntoView({ block: 'center', behavior: 'instant' })");
     split
         .locator("button[data-trigger='inv-admin-assoc-add-open']")

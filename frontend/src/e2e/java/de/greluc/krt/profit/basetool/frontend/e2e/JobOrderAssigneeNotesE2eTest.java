@@ -122,28 +122,22 @@ class JobOrderAssigneeNotesE2eTest {
       Page page = context.newPage();
       try {
         E2eSupport.navigate(page, detailUrl);
-        // A full navigation wipes this marker, so its survival at the end proves that all five
-        // krtFetch-driven assignee writes re-rendered the section in place.
         page.evaluate("() => { window.__krtNoReload = true; }");
 
-        // 1) Enroll self (AJAX POST /orders/{id}/assignees, no reload).
         page.waitForResponse(
             response -> isEnrollCall(response.url()) && "POST".equals(response.request().method()),
             () -> page.locator("[data-trigger='oa-add-me']").click());
         assertThat(page.locator("#assignees-section [data-trigger='oa-edit-note']")).isVisible();
         assertTrue(isEnrolled(), "the acting user is an assignee after self-enroll");
 
-        // 2) Add a note on the own entry (AJAX PUT .../note).
         openNoteModalAndSave(page, NOTE_FIRST);
         assertThat(page.locator("#assignees-section").getByText(NOTE_FIRST)).isVisible();
         assertEquals(NOTE_FIRST, persistedNote(), "note persists after the first save");
 
-        // 3) Edit the note (re-open with the fresh version carried on the swapped button).
         openNoteModalAndSave(page, NOTE_EDITED);
         assertThat(page.locator("#assignees-section").getByText(NOTE_EDITED)).isVisible();
         assertEquals(NOTE_EDITED, persistedNote(), "note persists after the edit");
 
-        // 4) Delete the note (AJAX DELETE .../note); the row stays, the note text + delete icon go.
         page.waitForResponse(
             response ->
                 response.url().contains("/note") && "DELETE".equals(response.request().method()),
@@ -152,7 +146,6 @@ class JobOrderAssigneeNotesE2eTest {
         assertTrue(persistedNote() == null, "note is cleared after delete");
         assertTrue(isEnrolled(), "the user stays an assignee after the note is deleted");
 
-        // 5) Unenroll self (AJAX DELETE /orders/{id}/assignees/{userId}, no reload).
         page.waitForResponse(
             response ->
                 isEnrollCall(response.url()) && "DELETE".equals(response.request().method()),

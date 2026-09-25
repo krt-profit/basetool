@@ -122,10 +122,6 @@ public class AdminPersonalInventoryPageController {
       PageResponse<PersonalInventoryItemDto> items = fetchItems(selectedSub, q, page, size, sort);
       model.addAttribute("items", items != null ? items.content() : Collections.emptyList());
       model.addAttribute("page", items);
-      // The member picker is now a server-side searchable combobox (remote-users, #1193): instead
-      // of
-      // preloading the whole roster, seed only the selected member's option (edit-mode label) via a
-      // single lookup. Lives OUTSIDE the AJAX swap target, so a results-fragment swap skips it.
       if (!isFragment) {
         model.addAttribute("selectedUser", fetchUser(selectedSub));
       }
@@ -298,7 +294,6 @@ public class AdminPersonalInventoryPageController {
     try {
       return backendApiClient.get("/api/v1/users/" + userSub, UserDto.class);
     } catch (Exception e) {
-      // REQ-OBS-004: log the id only, never the resolved name.
       log.warn(
           "Failed to fetch selected member {} for admin personal inventory picker", userSub, e);
       return null;
@@ -319,10 +314,6 @@ public class AdminPersonalInventoryPageController {
         uri.append("&sort=").append(safeSort);
       }
       if (q != null && !q.isBlank()) {
-        // Free-text term as a WebClient URI-template variable so it is percent-encoded exactly
-        // once across the frontend->backend hop; URLEncoder form-encoding (space -> '+')
-        // double-encodes umlauts / reserved chars when re-encoded on the hop, yielding zero
-        // matches.
         uri.append("&q={q}");
         return backendApiClient.get(uri.toString(), PERSONAL_INVENTORY_PAGE_TYPE, q);
       }

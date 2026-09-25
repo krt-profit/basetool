@@ -132,8 +132,6 @@ public class SyncChunkWriter {
         }
       }
     }
-    // Not List.copyOf: a writer may legitimately report a null result for a row (a caller that
-    // counts rows rather than ids), and copyOf rejects null elements.
     return new Outcome<>(Collections.unmodifiableList(results), failedRows);
   }
 

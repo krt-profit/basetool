@@ -91,8 +91,6 @@ class LogisticianRoleTest {
     user.setUsername("logistician_user");
     userRepository.save(user);
     userRepository.flush();
-    // Post-R9 D3 (V101): the Logistician flag lives on the Staffel membership row only — the
-    // legacy app_user.is_logistician column was dropped.
     saveLogisticianMembership(userId, user, true);
 
     Jwt jwt =
@@ -256,7 +254,6 @@ class LogisticianRoleTest {
     user.setUsername("test_logistician");
     userRepository.save(user);
     userRepository.flush();
-    // Post-R9 D3 (V101): membership flag is the only way to grant ROLE_LOGISTICIAN.
     saveLogisticianMembership(userId, user, true);
 
     mockMvc
@@ -288,8 +285,7 @@ class LogisticianRoleTest {
         .perform(
             get("/api/v1/inventory/material/" + UUID.randomUUID())
                 .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))))
-        .andExpect(
-            status().isNotFound()); // NotFound because material ID doesn't exist, but NOT 403
+        .andExpect(status().isNotFound());
   }
 
   @Test

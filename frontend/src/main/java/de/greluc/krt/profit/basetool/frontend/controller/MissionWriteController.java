@@ -223,7 +223,6 @@ public class MissionWriteController {
       RedirectAttributes redirectAttributes,
       @AuthenticationPrincipal OidcUser principal) {
     if (bindingResult.hasErrors()) {
-      // Render directly; BindingResult stays request-scoped (see RedisSessionConfig).
       model.addAttribute("openModal", "participant-modal");
       return missionPageController.missionDetail(id, model, principal, null);
     }
@@ -250,9 +249,6 @@ public class MissionWriteController {
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       log.debug("Add participant failed with status {}: {}", e.getStatusCode(), e.getMessage());
-      // 409 Conflict = backend found more than one registered member matching the free-text name
-      // -> show a dedicated, localized hint that the user should pick an entry from the
-      // autocomplete.
       String toastKey =
           (e.getStatusCode() == 409)
               ? "error.mission.participant.ambiguous"
@@ -302,9 +298,6 @@ public class MissionWriteController {
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (BackendServiceException e) {
       log.debug("Set party lead failed with status {}: {}", e.getStatusCode(), e.getMessage());
-      // 409 = either an ambiguous free-text name (matches more than one member) or a stale
-      // partyLeadVersion (someone else changed it meanwhile); a single conflict toast covers both
-      // and the reload below shows the current value.
       String toastKey =
           (e.getStatusCode() == 409)
               ? "error.mission.party_lead.conflict"
@@ -484,7 +477,7 @@ public class MissionWriteController {
       schedulePatch.put("plannedEndTime", current.plannedEndTime());
       schedulePatch.put("actualStartTime", newStart);
       schedulePatch.put("actualEndTime", newEnd);
-      schedulePatch.put("version", request.version()); // scheduleVersion from the DOM
+      schedulePatch.put("version", request.version());
 
       backendApiClient.patch("/api/v1/missions/" + id + "/schedule", schedulePatch, Void.class);
       MissionDto refreshed = backendApiClient.get("/api/v1/missions/" + id, MissionDto.class);
@@ -808,8 +801,6 @@ public class MissionWriteController {
       @AuthenticationPrincipal OidcUser principal,
       RedirectAttributes redirectAttributes) {
     if (bindingResult.hasErrors()) {
-      // Render the create form directly; BindingResult stays request-scoped. The submitted form
-      // (already in the model) carries any operationId, so pass null here.
       return missionPageController.createMissionForm(model, principal, null);
     }
     try {
@@ -866,12 +857,8 @@ public class MissionWriteController {
 
       MissionDto created =
           backendApiClient.post("/api/v1/missions", createRequest, MissionDto.class);
-      // #1235: a new mission row must appear on every open /missions list without a reload. The
-      // creator is about to be redirected off this request, so the poke is issued server-side.
       liveSyncLocalBus.publish("missions", MISSIONS_LIST_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
-      // Land the user straight on the freshly-created mission's Verwaltung tab (?tab=verw deeplink)
-      // so they can keep planning (crew, refine goals/steps) without hunting for it in the list.
       return "redirect:/missions/" + created.id() + "?tab=verw";
     } catch (Exception e) {
       log.error("Create mission failed", e);
@@ -925,8 +912,6 @@ public class MissionWriteController {
     }
     try {
       applyMissionUpdate(id, form);
-      // #1235: name / status / planned start all render on the /missions list, so a core edit must
-      // refresh every open list in place. Its AJAX twin publishes the same section.
       liveSyncLocalBus.publish("missions", MISSIONS_LIST_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
     } catch (Exception e) {
@@ -1053,10 +1038,6 @@ public class MissionWriteController {
     if (bindingResult.hasErrors()) {
       Map<String, String> fieldErrors = new LinkedHashMap<>();
       for (FieldError fe : bindingResult.getFieldErrors()) {
-        // First error per field wins (the form's fields carry one constraint each); the message is
-        // resolved exactly as th:errors does so the inline text matches the classic re-render. A
-        // constraint without a resolvable message key falls back to its default message rather than
-        // crashing the 422 contract to a 500.
         String message;
         try {
           message = messageSource.getMessage(fe, locale);
@@ -1072,7 +1053,6 @@ public class MissionWriteController {
         "update mission (ajax) for " + id,
         () -> {
           applyMissionUpdate(id, form);
-          // #1235: mirrors the classic twin above — a core edit changes the /missions list row.
           liveSyncLocalBus.publish("missions", MISSIONS_LIST_SECTION);
           MissionDto refreshed = backendApiClient.get("/api/v1/missions/" + id, MissionDto.class);
           Map<String, Object> versions = new LinkedHashMap<>();
@@ -1098,7 +1078,6 @@ public class MissionWriteController {
       @PathVariable @NotNull UUID id, RedirectAttributes redirectAttributes) {
     try {
       backendApiClient.delete("/api/v1/missions/" + id, Void.class);
-      // #1235: drop the deleted row from every open /missions list without a reload.
       liveSyncLocalBus.publish("missions", MISSIONS_LIST_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "notification.success.mission_delete");
     } catch (Exception e) {
@@ -1260,8 +1239,6 @@ public class MissionWriteController {
       return ResponseEntity.ok(mission);
     } catch (BackendServiceException e) {
       if (e.getStatusCode() == 409) {
-        // Somebody else changed the owner since this page read its ownershipVersion. Relayed as-is:
-        // the OPTIMISTIC_LOCK code in the body is what makes krtFetch offer the reload.
         log.debug("Owner change for mission {} conflicted with a concurrent change", id);
         return propagateBackendError(e);
       }
@@ -1296,8 +1273,6 @@ public class MissionWriteController {
         () -> {
           Map<String, Object> out = new HashMap<>();
           Object owningOrgUnitId = body.get("owningOrgUnitId");
-          // Forward an explicit null for the ownerless target; a blank/empty string also means
-          // "none".
           out.put(
               "owningOrgUnitId",
               (owningOrgUnitId != null && !String.valueOf(owningOrgUnitId).isBlank())
@@ -1517,8 +1492,6 @@ public class MissionWriteController {
         });
   }
 
-  // --- Ablauf steps (procedure timeline) ---
-
   /**
    * AJAX proxy: appends an Ablauf step via the backend slim endpoint and returns the resulting
    * ordered step list. The page re-renders the editor + overview-checklist fragments in place; the
@@ -1650,8 +1623,6 @@ public class MissionWriteController {
         });
   }
 
-  // --- Mission goals (Ziele) ---
-
   /**
    * AJAX proxy: appends a goal (Ziel) via the backend slim endpoint and returns the resulting
    * ordered goal list. The page re-renders the editor + overview Ziele fragments in place; the
@@ -1777,11 +1748,6 @@ public class MissionWriteController {
         log,
         "add participant (ajax) for mission " + id,
         () -> {
-          // Relayed with the caller's token, like every other write. It used to go out on the
-          // anonymous client so the backend could take its guest-signup branch (jwt == null +
-          // guestName); that branch and that client are gone (ADR-0159). The row it created
-          // survives
-          // as an EXTERNAL participant — same shape, recorded by a member who can see the Einsatz.
           Object result =
               backendApiClient.post(
                   "/api/v1/missions/" + id + "/participants/slim", body, Object.class);
@@ -1806,10 +1772,6 @@ public class MissionWriteController {
         log,
         "update participant (ajax) for mission " + id + " participant " + participantId,
         () -> {
-          // Anonymous guests are allowed to edit their own guest participant entries
-          // (see backend MissionSecurityService#canAccessParticipant: guest entries
-          // with user == null are editable). Route via the public WebClient when no
-          // OIDC principal is present, mirroring addParticipantAjax.
           Object result =
               backendApiClient.put(
                   "/api/v1/missions/" + id + "/participants/" + participantId + "/slim",
@@ -1997,14 +1959,9 @@ public class MissionWriteController {
     }
     final String value = dateTimeStr.trim();
     try {
-      // A date-only value (the splitter submits a bare date when no time was entered) maps to the
-      // start of that day in the display zone.
       if (value.length() == 10) {
         return LocalDate.parse(value).atStartOfDay(MISSION_TIME_ZONE).toInstant();
       }
-      // ISO_DATE_TIME parses both a zone-bearing value (absolute instant) and a zoneless local
-      // datetime of any fractional precision; parseBest picks OffsetDateTime when a zone is present
-      // and LocalDateTime otherwise.
       TemporalAccessor parsed =
           DateTimeFormatter.ISO_DATE_TIME.parseBest(
               value, OffsetDateTime::from, LocalDateTime::from);
@@ -2012,8 +1969,6 @@ public class MissionWriteController {
           ? odt.toInstant()
           : ((LocalDateTime) parsed).atZone(MISSION_TIME_ZONE).toInstant();
     } catch (Exception e) {
-      // The raw form value is client-supplied free text; sanitise it before it reaches the
-      // logger so an embedded newline cannot forge a second log line (CWE-117).
       log.warn("Failed to parse datetime string: {}", LogSafe.text(value, 64), e);
       return null;
     }

@@ -50,8 +50,6 @@ class ModalWrapperRenderTest {
 
   @Autowired private ITemplateEngine templateEngine;
 
-  // The full application context refuses to start without these collaborators; the engine render
-  // itself does not touch them (the same pattern as ComponentFragmentsRenderTest).
   @MockitoBean private BackendApiClient backendApiClient;
 
   @MockitoBean private ClientRegistrationRepository clientRegistrationRepository;

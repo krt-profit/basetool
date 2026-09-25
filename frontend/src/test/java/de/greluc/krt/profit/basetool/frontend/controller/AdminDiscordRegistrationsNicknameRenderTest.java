@@ -263,8 +263,6 @@ class AdminDiscordRegistrationsNicknameRenderTest {
 
   @Test
   void rejectedListFailure_doesNotBlankThePendingQueue() throws Exception {
-    // The rejected read is the secondary surface; a failure there (e.g. a backend that predates
-    // ?status= during a rolling deploy) must not take the pending queue down with it.
     when(backendApiClient.get(eq("/api/v1/admin/registrations"), anyTypeRef()))
         .thenReturn(
             List.of(

@@ -548,9 +548,6 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
         REAPER_INTERVAL.toSeconds(),
         REAPER_INTERVAL.toSeconds(),
         TimeUnit.SECONDS);
-    // Shares the reaper's thread rather than taking one of its own: both sweeps are short, neither
-    // blocks (the decorator buffers instead of waiting on a slow peer), and one daemon thread per
-    // handler is enough.
     this.reaper.scheduleAtFixedRate(
         this::tickKeepalive,
         KEEPALIVE_INTERVAL.toSeconds(),
@@ -622,11 +619,6 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   public void afterConnectionEstablished(@NotNull WebSocketSession session) throws Exception {
     String consentUrl = (String) session.getAttributes().get(ATTR_TERMS_GATE);
     if (consentUrl != null) {
-      // The consent gate let this handshake complete for exactly this moment (REQ-SEC-028): a
-      // refused upgrade is a bare 1006 the client must read as "connection dropped" and retry, so
-      // the refusal is delivered here, where a close CODE and a reason exist. Checked before the
-      // principal resolution and the per-user cap so a gated socket neither takes a slot nor logs
-      // as a cap refusal.
       log.debug("Live-sync /ws/sync socket refused (Terms of Use not accepted)");
       socketRejectedCounter(MetricNames.SOCKET_REJECTED_TERMS_GATE).increment();
       session.close(termsConsentRequired(consentUrl));
@@ -640,10 +632,6 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
       return;
     }
     if (!tryAcquireUserSocket(userId)) {
-      // Per-user socket cap: bound the number of concurrent /ws/sync sockets one user holds so the
-      // K in the changed-publish amplification lever (K sockets × rate × room viewers) is bounded.
-      // The count was undone in tryAcquireUserSocket, and ATTR_USER_COUNTED is left unset so
-      // the ensuing afterConnectionClosed does not decrement again.
       log.debug("Live-sync /ws/sync socket refused (per-user cap {})", MAX_SOCKETS_PER_USER);
       socketRejectedCounter(MetricNames.SOCKET_REJECTED_USER_CAP).increment();
       session.close(SOCKET_CAP_EXCEEDED);
@@ -744,9 +732,7 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
       case "subscribe" -> handleSubscribe(session, node);
       case "changed" -> handleMultiplexedChanged(session, node);
       case "focus", "blur", "heartbeat" -> handleMultiplexedPresence(session, node, type, userId);
-      default -> {
-        // Unknown type: ignore to keep the wire format forward-compatible.
-      }
+      default -> {}
     }
   }
 
@@ -763,17 +749,10 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
       @NotNull WebSocketSession session, @NotNull CloseStatus status) {
     recordSocketLifetime(session);
     String userId = (String) session.getAttributes().get(ATTR_USER_ID);
-    // Release the per-user socket slot exactly once (F2 / #1243) — only for a socket that actually
-    // acquired one (a cap-refused socket already released it inline and left ATTR_USER_COUNTED
-    // unset). Done before the subscription-set check so it runs even for a socket closed between
-    // establish and its first subscribe.
     if (userId != null && Boolean.TRUE.equals(session.getAttributes().get(ATTR_USER_COUNTED))) {
       releaseUserSocket(userId);
     }
     WebSocketSession decorated = decorated(session);
-    // Before the subscription-set check, like the socket-slot release above: a socket that closed
-    // before its first subscribe has no subscription set, and would otherwise stay in the keepalive
-    // sweep for the life of the process.
     liveSessions.remove(decorated);
     Set<String> subs = subscriptions(session);
     if (subs == null) {
@@ -823,10 +802,6 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
       log.debug(
           "Live-sync subscribe to unknown topic '{}' refused",
           LogSafe.text(rawTopic, MAX_LOGGED_TOPIC_LENGTH));
-      // #1239: an unknown/unparseable subscribe topic is the signature of a client/server
-      // topic-vocabulary skew — count it so the drift is visible. No topic_class tag: the topic did
-      // not parse, so it belongs to no class (a dedicated unlabelled meter, not a topic_class
-      // sentinel — REQ-OBS-011).
       meterRegistry.counter(MetricNames.LIVESYNC_INVALID_TOPIC).increment();
       sendControlFrame(session, "denied", rawTopic);
       return;
@@ -835,12 +810,6 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     if (subs == null) {
       return;
     }
-    // Rate-limit the subscribe path per session with the same bucket primitive the changed and
-    // presence paths use — the topic cap alone does not bound it, because completeSubscribe
-    // releases the reserved slot on a deny (see SUBSCRIBE_BURST). Dropped silently, never answered
-    // with a `denied` control frame: the client treats a deny as terminal for the topic, so
-    // answering a throttled frame that way would turn a transient burst into a permanently dead
-    // room. The client's next reconnect re-subscribes against a fresh bucket.
     if (!allowSubscribeFrame(session)) {
       droppedCounter(topic, MetricNames.DROPPED_THROTTLED).increment();
       log.debug(
@@ -848,8 +817,6 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
       return;
     }
     if (subs.contains(topic.canonical())) {
-      // Idempotent (re)subscribe — e.g. after a reconnect: the socket already holds this room, so
-      // just re-ack so the client can drive its post-reconnect resync.
       sendControlFrame(session, "subscribed", topic.canonical());
       return;
     }
@@ -858,9 +825,6 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
       sendControlFrame(session, "denied", topic.canonical());
       return;
     }
-    // Reserve the slot synchronously so the cap and idempotency hold even while the async probe
-    // runs;
-    // a DENY (or a close during the probe) removes it again in completeSubscribe.
     subs.add(topic.canonical());
     String token = (String) session.getAttributes().get(ATTR_ACCESS_TOKEN);
     UUID pin = session.getAttributes().get(ATTR_ACTIVE_ORG_UNIT) instanceof UUID u ? u : null;
@@ -868,27 +832,9 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     try {
       authExecutor.execute(() -> authorizeAndRegister(session, topic, token, pin, authorities));
     } catch (RejectedExecutionException e) {
-      // Auth executor saturated: indeterminate verdict. Fail in the class's direction — open for a
-      // non-presence class (opaque keys only; each fragment re-pull re-authorizes), closed for a
-      // presence class so the editor-identity snapshot is never leaked on an unverified subscribe
-      // (F1).
       LiveSyncSubscriptionAuthorizer.Decision verdict =
           LiveSyncSubscriptionAuthorizer.failOpen(topic);
       droppedCounter(topic, MetricNames.DROPPED_AUTHORIZE_SATURATED).increment();
-      // WARN, not DEBUG. The earlier justification here — "a client cannot provoke it" — was wrong:
-      // reaching this branch needs a saturated executor AND an inbound subscribe frame, and the
-      // subscribe path used to be the one frame type with no rate limit (the topic cap does not
-      // bound it, because a denied subscribe releases its reserved slot). A crafted client could
-      // therefore cycle subscribe → deny → subscribe, push the queue to rejection and author these
-      // lines at will. It is bucketed now, exactly like the changed and presence paths
-      // (SUBSCRIBE_BURST / SUBSCRIBE_REFILL_PER_SEC), and the per-user socket cap
-      // (MAX_SOCKETS_PER_USER) bounds how many buckets one user can hold — so the sustained line
-      // rate a single caller can drive is a small constant per second, and only while the executor
-      // is already saturated. That is a genuine infrastructure symptom, not a flood vector, and it
-      // matters: saturation silently degrades authorization for every subscribe landing on this
-      // instance, and on a presence class it fails closed, costing that tab live updates for the
-      // topic until it reconnects. The deny counter deliberately carries no `saturated` reason
-      // value — the authorize_saturated relay-drop series above is that signal.
       log.warn(
           "Live-sync subscribe authorization for topic {} was not scheduled (auth executor"
               + " saturated); resolved as {}",
@@ -930,9 +876,6 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     try {
       decision = authorizer.authorize(topic, token, pin, authorities);
       if (decision == LiveSyncSubscriptionAuthorizer.Decision.DENY_INDETERMINATE) {
-        // The authorizer logged the underlying transient (status code / exception) at DEBUG as
-        // probe detail; this is the single line stating that it became a user-visible, terminal
-        // refusal — the level the outcome warrants (REQ-OBS-001).
         log.warn(
             "Live-sync subscribe to topic {} failed closed on an indeterminate authorization"
                 + " outcome; this tab gets no live updates for it until it reconnects",
@@ -984,9 +927,6 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
       if (subs != null) {
         subs.remove(topic.canonical());
       }
-      // The refusal flavour rides the wire frame, not just the metric: an indeterminate (fail-
-      // closed) deny is an availability symptom the client retries once on its next reconnect,
-      // while an authz deny stays terminal. Same bounded vocabulary as the deny metric's tag.
       String reason = denyReason(decision);
       sendControlFrame(session, "denied", topic.canonical(), reason);
       subscribeCounter(topic, MetricNames.OUTCOME_DENIED, reason).increment();
@@ -994,7 +934,6 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     }
     WebSocketSession decorated = decorated(session);
     if (!decorated.isOpen() || subs == null || !subs.contains(topic.canonical())) {
-      // Socket closed (or the subscribe was cleaned up) while the probe ran: nothing to join.
       if (subs != null) {
         subs.remove(topic.canonical());
       }
@@ -1002,8 +941,6 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     }
     joinRoom(decorated, topic);
     if (!decorated.isOpen()) {
-      // Lost the race with a concurrent close between the check and the join: undo so no closed
-      // decorator lingers in the room.
       leaveRoom(decorated, topic);
       return;
     }
@@ -1045,13 +982,6 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     String rawTopic = textValue(node, "topic");
     LiveSyncTopic topic = LiveSyncTopic.parse(rawTopic);
     if (topic == null) {
-      // The publish-side face of the client/server topic-vocabulary skew the subscribe path counts:
-      // the acting client believes in a topic this server does not know, so its peers never hear of
-      // the change (REQ-FE-010) and the drop is otherwise completely silent. Not counted — the
-      // relay-drop meter requires a `topic_class` an unparseable topic has none of, and the
-      // unlabelled invalid-topic meter is defined for the subscribe path, so widening it here would
-      // change what its dashboards and alerts mean. DEBUG because the frame is client-supplied and
-      // therefore an attacker-triggerable flood at INFO/WARN.
       log.debug(
           "Discarding live-sync changed frame for unknown topic '{}'",
           LogSafe.text(rawTopic, MAX_LOGGED_TOPIC_LENGTH));
@@ -1099,7 +1029,6 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
         || sectionKey.length() > MAX_SECTION_KEY_LENGTH) {
       return;
     }
-    // Rate-limit the presence path per session (#1245) — see allowPresenceFrame for the rationale.
     if (!allowPresenceFrame(session)) {
       droppedCounter(topic, MetricNames.DROPPED_THROTTLED).increment();
       return;
@@ -1214,9 +1143,6 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
   @Nullable
   @SuppressWarnings("unchecked")
   private static Set<String> subscriptions(@NotNull WebSocketSession session) {
-    // Object -> generic cast is unavoidable reading the WebSocket attribute map
-    // (Map<String,Object>);
-    // ATTR_SUBSCRIPTIONS is only ever written as a ConcurrentHashMap keySet of topic strings.
     Object value = session.getAttributes().get(ATTR_SUBSCRIPTIONS);
     return value instanceof Set ? (Set<String>) value : null;
   }
@@ -1498,9 +1424,6 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     for (String canonical : uniqueTopics) {
       LiveSyncTopic topic = LiveSyncTopic.parse(canonical);
       if (topic != null) {
-        // Gossips even when the topic just lost its last local editor and is therefore no longer
-        // tracked: that empty snapshot is exactly what drops this instance's partition on the peers
-        // immediately, instead of leaving decayed dots up for a full REMOTE_PARTITION_TTL.
         broadcastLocalPresenceChange(topic);
       }
     }
@@ -1964,11 +1887,6 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     if (!session.isOpen()) {
       return false;
     }
-    // `session` is a ConcurrentWebSocketSessionDecorator (#1149): it serialises concurrent sends
-    // and
-    // bounds a slow consumer via its send-time / buffer-size limits, so NO external synchronized is
-    // used here — that would re-introduce the blocking serial fan-out this fixes. A buffer/time
-    // overflow surfaces as SessionLimitExceededException and TERMINATEs that one socket.
     try {
       session.sendMessage(message);
       return true;
@@ -2031,9 +1949,6 @@ public class LiveSyncWebSocketHandler extends TextWebSocketHandler {
     if (principal instanceof AbstractAuthenticationToken token) {
       Object p = token.getPrincipal();
       if (p instanceof OidcUser oidc) {
-        // Privacy / data minimisation: the presence label is derived from the public callsign
-        // (preferred_username) only. given_name / family_name / the composite name claim are not
-        // read here — those claims are removed from the Keycloak tokens.
         String preferred = oidc.getPreferredUsername();
         if (preferred != null && !preferred.isBlank()) {
           return preferred;

@@ -273,12 +273,6 @@ public final class E2eStackExtension implements BeforeAllCallback {
         return;
       }
       if (bootFailure != null) {
-        // The stack already failed to come up for an earlier test class. Re-running the
-        // multi-minute compose bring-up for every remaining class would just re-fail identically
-        // and
-        // burn the whole job timeout (~45 min) with no new signal — the mode that masked a real
-        // startup crash behind a "cancelled" e2e run. Fail fast with the original cause instead, so
-        // every class reports the actual reason in seconds and the job ends promptly.
         throw new IllegalStateException(
             "E2E stack bring-up already failed for an earlier test class; not retrying it",
             bootFailure);
@@ -313,30 +307,14 @@ public final class E2eStackExtension implements BeforeAllCallback {
     requireFrontendPortFree(root);
     prePullImages(root);
     composeUp(root);
-    // Register the teardown as soon as the stack is up, not after it has been checked and seeded:
-    // a failure in either (the served-build check below, a seeder error) used to leave this
-    // checkout's containers, networks and volumes running, holding the fixed ports and subnets
-    // every later run on the machine needs.
     context
         .getRoot()
         .getStore(ExtensionContext.Namespace.GLOBAL)
         .put("e2e-docker-stack", (AutoCloseable) () -> composeDown(root));
-    // The stack must be THIS checkout's: compare what it serves with the files here, before a
-    // single test runs against it (ServedBuildCheck).
     ServedBuildCheck.assertServesThisCheckout(
         EPHEMERAL_BASE_URL, root, BackendSeeder.trustingTestCa());
-    // Seed UEX-owned catalog reference data (refinery-hosting location, ship type, refining
-    // method) the admin REST API cannot create on a fresh DB — unblocks the Refinery/Hangar
-    // flows.
     BackendSeeder seeder = new BackendSeeder();
     seeder.seedCatalog();
-    // Seed every material a refinery create-form test picks, before any page renders. The
-    // frontend caches the materials catalogue (6 h, evicted only by mutations made THROUGH the
-    // frontend), so the first render of a refinery page fixes the picker's options for the whole
-    // run; a material a class seeds through the backend API afterwards never shows up. Until
-    // 2026-09-23 the three refinery classes each seeded the union of each other's materials and
-    // relied on one of them running before the first create-page render anywhere in the suite —
-    // which a new class that renders every page (DialogA11yE2eTest) broke.
     seeder.ensureRefineryMaterial(E2E_ADMIN_USER, E2E_ADMIN_PASSWORD, PICKER_MATERIAL_IMPORT);
     seeder.ensureRefineryMaterial(E2E_ADMIN_USER, E2E_ADMIN_PASSWORD, PICKER_MATERIAL_REFINERY);
     seeder.ensureRefineryMaterialWithRefinedOutput(
@@ -344,18 +322,7 @@ public final class E2eStackExtension implements BeforeAllCallback {
         E2E_ADMIN_PASSWORD,
         PICKER_MATERIAL_KEYBOARD_RAW,
         PICKER_MATERIAL_KEYBOARD_REFINED);
-    // Opt the canonical IRIDIUM Squadron into Job-Order processing exactly once, before any test
-    // page warms the frontend's long-lived squadrons-catalog cache. Only profit-eligible org units
-    // may be a job order's responsible (processing) unit (V128); without this the create form's
-    // responsible picker stays empty and every order-create / handover flow 400s. Seeding it here
-    // (not per test class) guarantees the cache never pins a stale not-eligible snapshot.
     seeder.setSquadronProfitEligible(E2E_ADMIN_USER, E2E_ADMIN_PASSWORD, IRIDIUM_SQUADRON_ID, true);
-    // Seed one orderable item (a game_item + an active blueprint with a resolved RESOURCE
-    // ingredient) so the item-order create form's *frontend-cached* item picker is never empty.
-    // Done here — before any test navigates to /orders/create and warms that long-lived cache —
-    // for the same reason the profit-eligibility seeding above runs at bootstrap. Non-fatal: only
-    // the anonymous item-order flow (UC-12) depends on it, so a seed hiccup must not sink the
-    // whole suite's bring-up.
     try {
       String ingredientMaterialId =
           seeder.ensureJobOrderMaterial(
@@ -499,9 +466,6 @@ public final class E2eStackExtension implements BeforeAllCallback {
         return;
       } catch (Exception up) {
         lastFailure = up;
-        // Dump the container logs into build/e2e so the CI artifact shows *why* — `up --wait`
-        // itself
-        // only reports "dependency failed to start", not the failing container's own output.
         captureComposeLogs(root);
         if (attempt < COMPOSE_UP_ATTEMPTS) {
           System.out.printf(
@@ -652,9 +616,6 @@ public final class E2eStackExtension implements BeforeAllCallback {
     cmd.add("--profile");
     cmd.add("dev");
     cmd.addAll(List.of(verbAndArgs));
-    // Scope `up` and `logs` to the explicit service list (ingest-dev is not started); scope
-    // `pull` to only the external, registry-sourced images (the built services have no pullable
-    // tag).
     if ("up".equals(verbAndArgs[0]) || "logs".equals(verbAndArgs[0])) {
       cmd.addAll(SERVICES);
     } else if ("pull".equals(verbAndArgs[0])) {
@@ -685,14 +646,7 @@ public final class E2eStackExtension implements BeforeAllCallback {
     env.put("KC_BOOTSTRAP_ADMIN_USERNAME", "admin");
     env.put("KC_BOOTSTRAP_ADMIN_PASSWORD", "admin-e2e-pw-do-not-use-in-prod");
     env.put("KEYCLOAK_ADMIN_CLIENT_SECRET", "e2e-client-secret-do-not-use-in-prod");
-    // ADR-0001 / REQ-SEC-069: the E2E frontend logs in as the CONFIDENTIAL client (secret + PKCE),
-    // the shape production reaches at the end of its rollout. Must match `basetool-frontend` in
-    // realm-export.e2e.json; BackendSeeder presents the same secret on its password grant.
     env.put("KEYCLOAK_FRONTEND_CLIENT_SECRET", FRONTEND_CLIENT_SECRET);
-    // The per-service Redis ACL users (REQ-SEC-068): docker-compose.e2e.yml loads the committed
-    // docker/test-redis/users.acl with `default` OFF, so each app must reach Redis as its own user
-    // through the same REDIS_<SVC>_USERNAME / _PASSWORD mapping production uses. REDIS_PASSWORD is
-    // the operator's `admin` user here, which no application is handed.
     env.put("REDIS_PASSWORD", RedisAclTemplate.E2E_PASSWORDS.get("REDIS_PASSWORD"));
     env.put("REDIS_FRONTEND_USERNAME", RedisAclTemplate.FRONTEND_USER);
     env.put(
@@ -703,11 +657,7 @@ public final class E2eStackExtension implements BeforeAllCallback {
     env.put("REDIS_INGEST_PASSWORD", RedisAclTemplate.E2E_PASSWORDS.get("REDIS_INGEST_PASSWORD"));
     env.put("SERVER_SSL_KEY_STORE_PASSWORD", KEYSTORE_PW);
     env.put("IRI_BASETOOL_VERSION", imageTag());
-    // Its own compose project too, for the same reason: two checkouts whose directories share a
-    // name would otherwise share containers, networks and volumes.
     env.put("COMPOSE_PROJECT_NAME", ServedBuildCheck.composeProjectName(repoRoot()));
-    // Audit L-1 / REQ-SEC-024: exercise the enforced `aud` path. See EXPECTED_AUDIENCE — the
-    // e2e realm stamps this audience, so turning the knob on here rehearses the prod flip.
     env.put("IRI_BACKEND_EXPECTED_AUDIENCES", EXPECTED_AUDIENCE);
     return env;
   }

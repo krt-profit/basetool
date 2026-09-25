@@ -94,15 +94,11 @@ class BlueprintImportServiceTest {
 
   @Test
   void previewImport_fileExceedingSizeCap_rejectedBeforeParsing() {
-    // Security audit gap-fill: an oversized upload is rejected by file.getSize() BEFORE readTree
-    // materialises the JSON into an in-memory tree.
     MultipartFile file = mock(MultipartFile.class);
-    when(file.getSize()).thenReturn(9L * 1024 * 1024); // > 8 MB cap
+    when(file.getSize()).thenReturn(9L * 1024 * 1024);
 
     assertThrows(BadRequestException.class, () -> service.previewImport(SUB, file));
   }
-
-  // ---------------------------------------------------------------- preview --
 
   @Test
   void preview_exactNameMatches() {
@@ -144,12 +140,6 @@ class BlueprintImportServiceTest {
 
   @Test
   void preview_aliasFallsBackToSnapshotWhenProductGoneFromMaster() {
-    // A learned alias must never silently regress to UNMATCHED when the master product it points at
-    // is later renamed / removed (its productKey is gone from allProducts()). resolveViaAlias then
-    // dereferences the alias's own productKey / productName / outputItem snapshot instead of the
-    // (now-missing) master row, so the entry stays MATCHED_BY_ALIAS and the user's
-    // previously-learned
-    // resolution keeps working.
     when(blueprintProductService.allProducts())
         .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
     BlueprintExternalAlias alias = new BlueprintExternalAlias();
@@ -157,7 +147,6 @@ class BlueprintImportServiceTest {
     alias.setExternalName("Gone Product");
     alias.setProductKey("gone-key");
     alias.setProductName("Gone Product");
-    // Master no longer carries 'gone-key' — only the unrelated 'arclight pistol' is present.
     when(aliasRepository.findBySourceSystemAndExternalNameIgnoreCase(SCMDB, "Gone Product"))
         .thenReturn(Optional.of(alias));
 
@@ -225,7 +214,6 @@ class BlueprintImportServiceTest {
     when(blueprintProductService.allProducts())
         .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
 
-    // Two records of the same product; the later ts appears first in the file.
     String json =
         "{\"blueprints\":["
             + "{\"productName\":\"Arclight Pistol\",\"ts\":1774534484.0},"
@@ -253,9 +241,6 @@ class BlueprintImportServiceTest {
     when(blueprintProductService.allProducts())
         .thenReturn(List.of(product("calico legs tactical", "Calico Legs Tactical")));
 
-    // Exact shape the original SCMDB log-watcher import mode (run_import) writes: a metadata
-    // envelope plus a blueprints[] of entries carrying productName + ts (fractional epoch SECONDS,
-    // value taken from a real Game.log line) and mission-correlation fields the import ignores.
     String json =
         "{\"exportSchemaVersion\":1,\"watcherVersion\":\"0.1.7\",\"channel\":\"LIVE\","
             + "\"exportedAt\":\"2026-03-26T17:00:00+00:00\",\"sourceLogs\":[\"Game Build(1).log\"],"
@@ -269,8 +254,6 @@ class BlueprintImportServiceTest {
     assertEquals(1, preview.matched());
     BlueprintImportEntryDto entry = preview.entries().get(0);
     assertEquals("calico legs tactical", entry.productKey());
-    // ts is epoch SECONDS; 1774534484.296 -> 2026-03-26T14:14:44.296Z (verified against the
-    // watcher).
     assertEquals(Instant.parse("2026-03-26T14:14:44.296Z"), entry.suggestedAcquiredAt());
   }
 
@@ -279,9 +262,6 @@ class BlueprintImportServiceTest {
     when(blueprintProductService.allProducts())
         .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
 
-    // Basetool Blueprint Extractor shape: full document with receivedAt (ISO-8601) instead of ts.
-    // Deliberately has no additionalSourceFolders key — pins that exports from extractor versions
-    // predating that additive v1 field keep importing unchanged.
     String json =
         "{\"schemaVersion\":1,\"tool\":\"Basetool Blueprint Extractor\","
             + "\"players\":[{\"handle\":\"greluc\",\"blueprintCount\":1}],"
@@ -302,9 +282,6 @@ class BlueprintImportServiceTest {
     when(blueprintProductService.allProducts())
         .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
 
-    // Blueprint Extractor envelope with the additive v1 field additionalSourceFolders populated
-    // (the extractor also scanned the HOTFIX sibling channel beside sourceFolder). The envelope is
-    // provenance only — the import must resolve the entries exactly as without it.
     String json =
         "{\"schemaVersion\":1,\"tool\":\"Basetool Blueprint Extractor\","
             + "\"sourceFolder\":\"C:\\\\Games\\\\StarCitizen\\\\LIVE\","
@@ -326,8 +303,6 @@ class BlueprintImportServiceTest {
     when(blueprintProductService.allProducts())
         .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
 
-    // The extractor encodes defaults, so a single-folder scan writes the key with a JSON null
-    // instead of omitting it — that explicit null must parse like an absent key.
     String json =
         "{\"schemaVersion\":1,\"tool\":\"Basetool Blueprint Extractor\","
             + "\"sourceFolder\":\"C:\\\\Games\\\\StarCitizen\\\\LIVE\","
@@ -341,11 +316,8 @@ class BlueprintImportServiceTest {
     assertEquals("arclight pistol", preview.entries().get(0).productKey());
   }
 
-  // ------------------------------------------------------- scmdb.net export --
-
   @Test
   void preview_acceptsScmdbNetNameAlias() {
-    // covers REQ-INV-014 — scmdb.net entries name the product under `name`, not `productName`.
     when(blueprintProductService.allProducts())
         .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
 
@@ -357,15 +329,11 @@ class BlueprintImportServiceTest {
     BlueprintImportEntryDto entry = preview.entries().get(0);
     assertEquals(BlueprintImportStatus.MATCHED, entry.status());
     assertEquals("arclight pistol", entry.productKey());
-    // scmdb.net carries no acquisition timestamp.
     assertNull(entry.suggestedAcquiredAt());
   }
 
   @Test
   void preview_acceptsFullScmdbNetProfileExportIgnoringMissions() {
-    // covers REQ-INV-014 — the scmdb.net profile export wraps blueprints[] alongside a profile and
-    // a
-    // missions[] tracker; only blueprints[] is consumed, every other envelope field is ignored.
     when(blueprintProductService.allProducts())
         .thenReturn(List.of(product("p8-ar rifle", "P8-AR Rifle")));
 
@@ -382,7 +350,6 @@ class BlueprintImportServiceTest {
     assertEquals(1, preview.total());
     assertEquals(1, preview.matched());
     assertEquals("p8-ar rifle", preview.entries().get(0).productKey());
-    // The missions[] tracker must never leak into the import — only the one blueprint is present.
     assertEquals(
         List.of("P8-AR Rifle"),
         preview.entries().stream().map(BlueprintImportEntryDto::externalName).toList());
@@ -390,8 +357,6 @@ class BlueprintImportServiceTest {
 
   @Test
   void preview_skipsNotCompletedScmdbNetEntries() {
-    // covers REQ-INV-014 — an scmdb.net entry the user has not unlocked (completed == false) is a
-    // checklist placeholder, not an owned blueprint, and must be dropped before resolution.
     when(blueprintProductService.allProducts())
         .thenReturn(
             List.of(
@@ -411,9 +376,6 @@ class BlueprintImportServiceTest {
 
   @Test
   void preview_matchesByTagWhenNameWouldNotMatch() {
-    // covers REQ-INV-019 — the scmdb.net structural tag resolves straight to the product, bypassing
-    // the name chain. The name here is deliberately unmatchable (mirrors a CIG-mislabeled output
-    // name, REQ-INV-047) yet the entry still resolves via its DataForge tag.
     when(blueprintProductService.allProducts())
         .thenReturn(List.of(product("antium arms maroon", "Antium Arms Maroon")));
     when(blueprintProductService.scwikiKeyToProductKeyIndex())
@@ -434,9 +396,6 @@ class BlueprintImportServiceTest {
 
   @Test
   void preview_tagMatchIsCaseInsensitive() {
-    // covers REQ-INV-019 — the Wiki keeps CamelCase scwiki_keys, scmdb.net lower-cases them; the
-    // tag
-    // index is lower-cased so the two spellings still meet.
     when(blueprintProductService.allProducts())
         .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
     when(blueprintProductService.scwikiKeyToProductKeyIndex())
@@ -453,8 +412,6 @@ class BlueprintImportServiceTest {
 
   @Test
   void preview_tagMissFallsBackToNameChain() {
-    // covers REQ-INV-019 — a tag absent from the index (unsynced or ambiguous blueprint) is not an
-    // error: resolution falls through to the normal name match.
     when(blueprintProductService.allProducts())
         .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
     when(blueprintProductService.scwikiKeyToProductKeyIndex()).thenReturn(Map.of());
@@ -470,7 +427,6 @@ class BlueprintImportServiceTest {
 
   @Test
   void preview_acceptsBareArrayOfScmdbNetEntries() {
-    // covers REQ-INV-014 — the bare-array upload form also accepts scmdb.net-shaped records.
     when(blueprintProductService.allProducts())
         .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
 
@@ -487,9 +443,6 @@ class BlueprintImportServiceTest {
 
   @Test
   void preview_keepsDistinctTagsUnderSameName() {
-    // covers REQ-INV-019 — two scmdb.net blueprints sharing a display name but carrying different
-    // DataForge tags (a genuine piece and a CIG-mislabeled one both shown as "Antium Core Jet",
-    // REQ-INV-047) must NOT collapse by name: each resolves via its own tag to its own product.
     when(blueprintProductService.allProducts())
         .thenReturn(
             List.of(
@@ -521,7 +474,6 @@ class BlueprintImportServiceTest {
     when(blueprintProductService.allProducts())
         .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
 
-    // ts (epoch seconds) wins over receivedAt when an export carries both.
     String json =
         "{\"blueprints\":[{\"productName\":\"Arclight Pistol\",\"ts\":1700000000.0,"
             + "\"receivedAt\":\"2026-03-26T16:49:31.050Z\"}]}";
@@ -536,7 +488,6 @@ class BlueprintImportServiceTest {
     when(blueprintProductService.allProducts())
         .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
 
-    // Two records of the same product; the later receivedAt appears first in the file.
     String json =
         "{\"blueprints\":["
             + "{\"productName\":\"Arclight Pistol\",\"receivedAt\":\"2026-03-26T16:49:31.050Z\"},"
@@ -606,15 +557,12 @@ class BlueprintImportServiceTest {
     verify(blueprintProductService, never()).allProducts();
   }
 
-  // ------------------------------------------------------------------ apply --
-
   @Test
   void apply_addsRowAndLearnsAliasForManualPick() {
     when(blueprintProductService.allProducts())
         .thenReturn(List.of(product("calico legs tactical", "Calico Legs Tactical")));
     when(personalBlueprintRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-    // External name differs from the chosen key by normalization -> a manual resolution.
     BlueprintImportResultDto result =
         service.applyImport(
             SUB,
@@ -705,7 +653,6 @@ class BlueprintImportServiceTest {
                 new BlueprintImportResolutionDto("C", "c", null, null)));
 
     assertEquals(3, result.added());
-    // No double save (no @Version re-bump from a detaching bulk update mid-loop).
     verify(personalBlueprintRepository, times(3)).save(any());
   }
 
@@ -732,13 +679,9 @@ class BlueprintImportServiceTest {
 
   @Test
   void apply_doesNotDuplicateAliasWhenCaseVariantAlreadyExists() {
-    // covers REQ-INV-020 — the pre-create alias guard folds case (matching the resolution lookup
-    // and the LOWER(external_name) unique index), so a differently-cased stored alias suppresses a
-    // new insert instead of producing a duplicate that would later break the Optional lookup.
     when(blueprintProductService.allProducts())
         .thenReturn(List.of(product("calico legs tactical", "Calico Legs Tactical")));
     when(personalBlueprintRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-    // A stored alias under a different casing is matched by the case-insensitive guard.
     when(aliasRepository.findBySourceSystemAndExternalNameIgnoreCase(
             SCMDB, "CALICO LEGS (TACTICAL)"))
         .thenReturn(Optional.of(new BlueprintExternalAlias()));
@@ -757,8 +700,6 @@ class BlueprintImportServiceTest {
 
   @Test
   void apply_suppressesCaseVariantDuplicateWithinSameRequest() {
-    // covers REQ-INV-020 — two manual picks in one request that differ only in case must learn the
-    // alias exactly once (the in-request seen-set folds case), never two rows for one folded name.
     when(blueprintProductService.allProducts())
         .thenReturn(List.of(product("calico legs tactical", "Calico Legs Tactical")));
     when(personalBlueprintRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -776,8 +717,6 @@ class BlueprintImportServiceTest {
     assertEquals(1, result.aliasesLearned());
     verify(aliasRepository, times(1)).save(any(BlueprintExternalAlias.class));
   }
-
-  // ----------------------------------------------------- apply: re-import refresh --
 
   @Test
   void apply_refreshesAcquiredAtEarlierOnReimportWithoutDuplicating() {
@@ -805,7 +744,6 @@ class BlueprintImportServiceTest {
     assertEquals(1, result.alreadyOwned());
     assertEquals(1, result.acquiredAtUpdated());
     assertEquals(earlier, owned.getAcquiredAt());
-    // No duplicate row: the already-owned entity is only mutated, never re-saved.
     verify(personalBlueprintRepository, never()).save(any());
   }
 

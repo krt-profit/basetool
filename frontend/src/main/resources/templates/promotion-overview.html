@@ -35,7 +35,6 @@
     <th:block th:unless="${isAllSquadronsMode}">
 
     <div class="hud-box mt-2">
-        <!--/* Bewertungskategorien */-->
         <h2 th:text="#{promotion.overview.topics.title}">Bewertungskategorien</h2>
 
         <div th:if="${#maps.isEmpty(topicCategoryMap)}">
@@ -67,7 +66,6 @@
     </div>
 
     <div class="hud-box mt-2">
-        <!--/* Rangvoraussetzungen */-->
         <h2 th:text="#{promotion.overview.ranks.title}">Rangvoraussetzungen</h2>
 
         <div th:if="${#lists.isEmpty(rankRequirements)}">

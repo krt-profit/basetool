@@ -61,10 +61,6 @@ class BotProtectionFilterTest {
     return counter == null ? 0.0 : counter.count();
   }
 
-  // -------------------------------------------------------------------------
-  // Path-prefix blocking
-  // -------------------------------------------------------------------------
-
   @ParameterizedTest
   @ValueSource(
       strings = {
@@ -89,7 +85,6 @@ class BotProtectionFilterTest {
         "/shell.php",
         "/cgi-bin/test",
         "/vendor/autoload.php",
-        // M-17: /robots.txt removed — served as a static file with "Disallow: /".
         "/sitemap.xml",
         "/sitemap-users-1.xml",
         "/actuator/env",
@@ -121,15 +116,12 @@ class BotProtectionFilterTest {
         "/trace"
       })
   void doFilterInternal_shouldReturn404_whenBotPathDetected(String botUri) throws Exception {
-    // Given
     MockHttpServletRequest request = new MockHttpServletRequest("GET", botUri);
     request.setRequestURI(botUri);
     MockHttpServletResponse response = new MockHttpServletResponse();
 
-    // When
     filter.doFilterInternal(request, response, filterChain);
 
-    // Then
     assertEquals(404, response.getStatus(), "Bot path should return 404. URI=" + botUri);
     verify(filterChain, never()).doFilter(request, response);
     assertEquals(1.0, botCount(MetricNames.BOT_RULE_PATH_PREFIX));
@@ -140,7 +132,6 @@ class BotProtectionFilterTest {
       strings = {
         "/WP-ADMIN/install.php",
         "/Wp-Login.php",
-        // M-17: /ROBOTS.TXT no longer blocked — see static robots.txt + isBotPath test.
         "/ACTUATOR/env",
         "/.ENV",
         "/PHPMYADMIN/",
@@ -149,23 +140,16 @@ class BotProtectionFilterTest {
       })
   void doFilterInternal_shouldReturn404_whenBotPathDetectedCaseInsensitive(String botUri)
       throws Exception {
-    // Given
     MockHttpServletRequest request = new MockHttpServletRequest("GET", botUri);
     request.setRequestURI(botUri);
     MockHttpServletResponse response = new MockHttpServletResponse();
 
-    // When
     filter.doFilterInternal(request, response, filterChain);
 
-    // Then
     assertEquals(
         404, response.getStatus(), "Bot path detection must be case-insensitive. URI=" + botUri);
     verify(filterChain, never()).doFilter(request, response);
   }
-
-  // -------------------------------------------------------------------------
-  // File-extension blocking
-  // -------------------------------------------------------------------------
 
   @ParameterizedTest
   @ValueSource(
@@ -198,20 +182,14 @@ class BotProtectionFilterTest {
       })
   void doFilterInternal_shouldReturn404_whenBotFileExtensionDetected(String botUri)
       throws Exception {
-    // Given
     MockHttpServletRequest request = new MockHttpServletRequest("GET", botUri);
     request.setRequestURI(botUri);
     MockHttpServletResponse response = new MockHttpServletResponse();
 
-    // When
     filter.doFilterInternal(request, response, filterChain);
 
-    // Then
     assertEquals(404, response.getStatus(), "Bot file extension should return 404. URI=" + botUri);
     verify(filterChain, never()).doFilter(request, response);
-    // Blocked exactly once. Some URIs (e.g. /config.php, /backup.zip) also match a bot PATH prefix
-    // (/config, /backup), which is checked before the file-extension rule — so the block is counted
-    // under path_prefix for those and under file_extension for the rest. Either way, exactly one.
     assertEquals(
         1.0,
         botCount(MetricNames.BOT_RULE_FILE_EXTENSION) + botCount(MetricNames.BOT_RULE_PATH_PREFIX),
@@ -223,25 +201,18 @@ class BotProtectionFilterTest {
   @ValueSource(strings = {"/CONFIG.PHP", "/INDEX.ASP", "/DUMP.SQL", "/BACKUP.BAK"})
   void doFilterInternal_shouldReturn404_whenBotFileExtensionDetectedCaseInsensitive(String botUri)
       throws Exception {
-    // Given
     MockHttpServletRequest request = new MockHttpServletRequest("GET", botUri);
     request.setRequestURI(botUri);
     MockHttpServletResponse response = new MockHttpServletResponse();
 
-    // When
     filter.doFilterInternal(request, response, filterChain);
 
-    // Then
     assertEquals(
         404,
         response.getStatus(),
         "File extension detection must be case-insensitive. URI=" + botUri);
     verify(filterChain, never()).doFilter(request, response);
   }
-
-  // -------------------------------------------------------------------------
-  // HTTP method blocking
-  // -------------------------------------------------------------------------
 
   @ParameterizedTest
   @ValueSource(
@@ -258,24 +229,17 @@ class BotProtectionFilterTest {
       })
   void doFilterInternal_shouldReturn405_whenDisallowedHttpMethodUsed(String method)
       throws Exception {
-    // Given
     MockHttpServletRequest request = new MockHttpServletRequest(method, "/dashboard");
     request.setRequestURI("/dashboard");
     MockHttpServletResponse response = new MockHttpServletResponse();
 
-    // When
     filter.doFilterInternal(request, response, filterChain);
 
-    // Then
     assertEquals(
         405, response.getStatus(), "Disallowed HTTP method should return 405. Method=" + method);
     verify(filterChain, never()).doFilter(request, response);
     assertEquals(1.0, botCount(MetricNames.BOT_RULE_METHOD));
   }
-
-  // -------------------------------------------------------------------------
-  // Legitimate requests pass through
-  // -------------------------------------------------------------------------
 
   @ParameterizedTest
   @ValueSource(
@@ -301,15 +265,12 @@ class BotProtectionFilterTest {
       })
   void doFilterInternal_shouldPassThrough_whenLegitimatePathRequested(String appUri)
       throws Exception {
-    // Given
     MockHttpServletRequest request = new MockHttpServletRequest("GET", appUri);
     request.setRequestURI(appUri);
     MockHttpServletResponse response = new MockHttpServletResponse();
 
-    // When
     filter.doFilterInternal(request, response, filterChain);
 
-    // Then
     assertEquals(
         200, response.getStatus(), "Legitimate path should pass through filter. URI=" + appUri);
     verify(filterChain, times(1)).doFilter(request, response);
@@ -322,29 +283,20 @@ class BotProtectionFilterTest {
   @ValueSource(strings = {"GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"})
   void doFilterInternal_shouldPassThrough_whenAllowedHttpMethodUsed(String method)
       throws Exception {
-    // Given
     MockHttpServletRequest request = new MockHttpServletRequest(method, "/missions");
     request.setRequestURI("/missions");
     MockHttpServletResponse response = new MockHttpServletResponse();
 
-    // When
     filter.doFilterInternal(request, response, filterChain);
 
-    // Then
     assertEquals(
         200, response.getStatus(), "Allowed HTTP method should pass through. Method=" + method);
     verify(filterChain, times(1)).doFilter(request, response);
   }
 
-  // -------------------------------------------------------------------------
-  // Unit tests for helper methods
-  // -------------------------------------------------------------------------
-
   @Test
   void isBotPath_shouldReturnTrue_forKnownBotPrefixes() {
     assertTrue(filter.isBotPath("/wp-admin/"));
-    // `/actuator` (without the /health suffix) is still a bot path — only the
-    // /actuator/health sub-path is whitelisted, see test below.
     assertTrue(filter.isBotPath("/actuator"));
     assertTrue(filter.isBotPath("/actuator/env"));
     assertTrue(filter.isBotPath("/.env"));
@@ -358,15 +310,11 @@ class BotProtectionFilterTest {
     assertFalse(filter.isBotPath("/orders"));
     assertFalse(filter.isBotPath("/hangar"));
     assertFalse(filter.isBotPath("/css/main.css"));
-    // M-17: /robots.txt is now served as a regular static file ("Disallow: /"); the bot
-    // filter does NOT short-circuit it anymore.
     assertFalse(filter.isBotPath("/robots.txt"));
   }
 
   @Test
   void isBotPath_shouldReturnFalse_forWhitelistedActuatorHealth() {
-    // The Docker HEALTHCHECK hits /actuator/health, so this exact path is
-    // explicitly whitelisted even though /actuator/* is otherwise blocked.
     assertFalse(filter.isBotPath("/actuator/health"));
     assertFalse(filter.isBotPath("/actuator/health/liveness"));
     assertFalse(filter.isBotPath("/actuator/health/readiness"));
@@ -374,10 +322,6 @@ class BotProtectionFilterTest {
 
   @Test
   void isBotPath_shouldReturnFalse_forWhitelistedActuatorPrometheus() {
-    // The monitoring scrape endpoint (REQ-OBS-005, epic #936) must reach the dedicated
-    // fail-closed basic-auth chain in MonitoringScrapeSecurityConfig — without the whitelist
-    // entry the bot filter would answer 404 before any security chain runs. Every other
-    // /actuator/... path stays blocked (assertion below).
     assertFalse(filter.isBotPath("/actuator/prometheus"));
     assertTrue(filter.isBotPath("/actuator/env"));
     assertTrue(filter.isBotPath("/actuator/metrics"));
@@ -386,10 +330,6 @@ class BotProtectionFilterTest {
 
   @Test
   void isBotPath_shouldMatchActuatorPrometheusExactlyOnly() {
-    // The prometheus whitelist is exact and case-sensitive, mirroring the scrape chain's
-    // securityMatcher: the endpoint has no sub-resources, so sub-paths, trailing slashes and
-    // case variants are scanner noise and keep the cheap bot 404 instead of falling through to
-    // the main OAuth2 chain (login redirect + request-cache churn).
     assertTrue(filter.isBotPath("/actuator/prometheus/"));
     assertTrue(filter.isBotPath("/actuator/prometheus/anything"));
     assertTrue(filter.isBotPath("/ACTUATOR/PROMETHEUS"));
@@ -398,15 +338,12 @@ class BotProtectionFilterTest {
 
   @Test
   void doFilterInternal_shouldPassThrough_forActuatorPrometheus() throws Exception {
-    // Given
     MockHttpServletRequest request = new MockHttpServletRequest("GET", "/actuator/prometheus");
     request.setRequestURI("/actuator/prometheus");
     MockHttpServletResponse response = new MockHttpServletResponse();
 
-    // When
     filter.doFilterInternal(request, response, filterChain);
 
-    // Then: the scrape path reaches the (fail-closed) security chain instead of a bot 404.
     assertEquals(200, response.getStatus(), "/actuator/prometheus must pass the bot filter");
     verify(filterChain, times(1)).doFilter(request, response);
   }
@@ -429,39 +366,19 @@ class BotProtectionFilterTest {
     assertFalse(filter.isBotFileExtension("/page.html"));
   }
 
-  // -------------------------------------------------------------------------
-  // Malformed query string (rule 0)
-  // -------------------------------------------------------------------------
-
   @ParameterizedTest
-  @ValueSource(
-      strings = {
-        // The stock PHP-CGI probe, verbatim from the production log that motivated this rule.
-        "=phpinfo",
-        "=phpinfo()",
-        "=-phpinfo()",
-        // The empty name can also sit in a later chunk.
-        "a=1&=2",
-        "a=1&=",
-        // A bare "=" is invalid too: empty name, empty value.
-        "="
-      })
+  @ValueSource(strings = {"=phpinfo", "=phpinfo()", "=-phpinfo()", "a=1&=2", "a=1&=", "="})
   void doFilterInternal_shouldReturn400_whenQueryStringIsMalformed(String queryString)
       throws Exception {
-    // Given
     MockHttpServletRequest request = new MockHttpServletRequest("GET", "/");
     request.setRequestURI("/");
     request.setQueryString(queryString);
     MockHttpServletResponse response = new MockHttpServletResponse();
 
-    // When
     filter.doFilterInternal(request, response, filterChain);
 
-    // Then
     assertEquals(
         400, response.getStatus(), "malformed query string must be rejected: " + queryString);
-    // sendError() would hand the request to the container's error dispatch, which re-reads the very
-    // parameters that cannot be parsed. The reject therefore carries no error page at all.
     assertNull(response.getErrorMessage());
     assertEquals("", response.getContentAsString());
     verify(filterChain, never()).doFilter(request, response);
@@ -470,9 +387,6 @@ class BotProtectionFilterTest {
 
   @Test
   void doFilterInternal_shouldRejectMalformedQueryString_beforeTheOtherRules() throws Exception {
-    // A scanner combines both: a bot path AND a broken query string. The path rule answers with
-    // sendError(404), whose error dispatch would re-parse the query string and blow up — so the
-    // query-string rule has to win.
     MockHttpServletRequest request = new MockHttpServletRequest("GET", "/wp-login.php");
     request.setRequestURI("/wp-login.php");
     request.setQueryString("=phpinfo()");
@@ -490,15 +404,11 @@ class BotProtectionFilterTest {
       strings = {
         "lang=en",
         "page=2&size=25",
-        // An empty chunk is legal for Tomcat and must not be rejected.
         "a=1&&b=2",
         "&",
-        // A name with no value is legal.
         "flag",
         "a=1&flag&b=2",
-        // "=" inside a VALUE is legal; only a chunk STARTING with "=" is not.
         "filter=a=b",
-        // %3D is a separator only after decoding, which happens per chunk — not a chunk boundary.
         "%3Dphpinfo=1"
       })
   void doFilterInternal_shouldPassThrough_whenQueryStringIsWellFormed(String queryString)
@@ -550,8 +460,6 @@ class BotProtectionFilterTest {
         "",
         "&",
         "&&",
-        // Rejected by Tomcat's DECODER, not by the empty-name rule — the assertion below is
-        // one-directional precisely so this stays legal input for the filter.
         "q=100%",
         "q=%zz"
       })
@@ -572,8 +480,6 @@ class BotProtectionFilterTest {
 
     boolean filterRejects = BotProtectionFilter.isMalformedQueryString(queryString);
     if (queryString.indexOf('%') < 0) {
-      // No percent-escape means the decoder cannot be the reason, so the empty-name rule is the
-      // only one in play and the two verdicts must match exactly.
       assertEquals(
           tomcatRejects, filterRejects, "filter and container disagree on: " + queryString);
     } else if (filterRejects) {

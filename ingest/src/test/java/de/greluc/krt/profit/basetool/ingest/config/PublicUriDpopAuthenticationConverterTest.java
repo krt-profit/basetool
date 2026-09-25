@@ -38,17 +38,12 @@ import org.springframework.security.oauth2.server.resource.authentication.DPoPAu
  */
 class PublicUriDpopAuthenticationConverterTest {
 
-  // Opaque on purpose. This converter copies both values through without parsing either, so a
-  // JWT-shaped literal buys nothing here — and a fake one trips the secret scanner's
-  // generic-api-key rule, which cannot tell a synthetic fixture from a leaked credential.
   private static final String PROOF = "proof-value";
   private static final String TOKEN = "access-token-value";
 
   private MockHttpServletRequest dpopRequest() {
     MockHttpServletRequest request = new MockHttpServletRequest("POST", "/v1/blueprint-preview");
     request.setRequestURI("/v1/blueprint-preview");
-    // What Tomcat would have assembled behind a proxy that dropped X-Forwarded-Port: the INTERNAL
-    // port, which is exactly the value the client cannot have signed.
     request.setScheme("http");
     request.setServerName("ingest");
     request.setServerPort(11262);

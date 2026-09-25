@@ -43,23 +43,18 @@ class LocationRepositoryTest {
 
   @Test
   void findHomeLocations_returnsOnlyCuratedVisible_orderedByNameDescending() {
-    // Given a mix of curated/non-curated and visible/hidden rows. Unique "HL-Test-" prefixes keep
-    // the assertion robust against any rows another test or the V139 seed may have left behind.
     repository.save(loc("HL-Test-Alpha", true, false));
     repository.save(loc("HL-Test-Charlie", true, false));
     repository.save(loc("HL-Test-Bravo", true, false));
     repository.save(loc("HL-Test-NotHome", false, false));
     repository.save(loc("HL-Test-HiddenHome", true, true));
 
-    // When
     List<String> mine =
         repository.findByHomeLocationTrueAndHiddenFalseOrderByNameDesc().stream()
             .map(Location::getName)
             .filter(name -> name.startsWith("HL-Test-"))
             .toList();
 
-    // Then: NotHome (not curated) and HiddenHome (hidden) are excluded; the rest come back
-    // descending by name.
     assertEquals(List.of("HL-Test-Charlie", "HL-Test-Bravo", "HL-Test-Alpha"), mine);
   }
 

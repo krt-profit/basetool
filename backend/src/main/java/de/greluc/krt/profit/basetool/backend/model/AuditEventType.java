@@ -32,7 +32,6 @@ import org.jetbrains.annotations.NotNull;
 @RequiredArgsConstructor
 public enum AuditEventType {
 
-  // ---------------------------------------------------------------- INVENTORY (Lager) --
   /** A warehouse inventory row was created. */
   INVENTORY_ITEM_CREATED(AuditDomain.INVENTORY),
 
@@ -158,7 +157,6 @@ public enum AuditEventType {
   /** Inventory audit rows older than an admin-chosen cutoff were purged (retention). */
   INVENTORY_AUDIT_PURGED(AuditDomain.INVENTORY),
 
-  // ------------------------------------------------------------- JOB_ORDER (Aufträge) --
   /** A material job order was created. */
   JOB_ORDER_CREATED(AuditDomain.JOB_ORDER),
 
@@ -230,7 +228,6 @@ public enum AuditEventType {
   /** Job-order audit rows older than an admin-chosen cutoff were purged (retention). */
   JOB_ORDER_AUDIT_PURGED(AuditDomain.JOB_ORDER),
 
-  // --------------------------------------------------------- REFINERY (Raffinerie) --
   /** A refinery order was created. */
   REFINERY_ORDER_CREATED(AuditDomain.REFINERY),
 
@@ -267,7 +264,6 @@ public enum AuditEventType {
   /** Refinery audit rows older than an admin-chosen cutoff were purged (retention). */
   REFINERY_AUDIT_PURGED(AuditDomain.REFINERY),
 
-  // ------------------------------------------------- PERSONAL_INVENTORY (Mein Inventar) --
   /** A personal inventory item was created (admin-on-behalf sets the target user). */
   PERSONAL_INVENTORY_CREATED(AuditDomain.PERSONAL_INVENTORY),
 
@@ -291,7 +287,6 @@ public enum AuditEventType {
   /** Personal-inventory audit rows older than an admin-chosen cutoff were purged (retention). */
   PERSONAL_INVENTORY_AUDIT_PURGED(AuditDomain.PERSONAL_INVENTORY),
 
-  // ---------------------------------------------------------------- MISSION (Missionen) --
   /** A mission (or sub-mission) was created. */
   MISSION_CREATED(AuditDomain.MISSION),
 
@@ -397,7 +392,6 @@ public enum AuditEventType {
   /** Mission audit rows older than an admin-chosen cutoff were purged (retention). */
   MISSION_AUDIT_PURGED(AuditDomain.MISSION),
 
-  // ------------------------------------------------------------ OPERATION (Operationen) --
   /** An operation was created. */
   OPERATION_CREATED(AuditDomain.OPERATION),
 
@@ -416,7 +410,6 @@ public enum AuditEventType {
   /** Operation audit rows older than an admin-chosen cutoff were purged (retention). */
   OPERATION_AUDIT_PURGED(AuditDomain.OPERATION),
 
-  // -------------------------------------------------------- ROLE (Rollen & Mitglieder) --
   /** A user was added as a member of an org unit (Staffel / Spezialkommando). */
   MEMBERSHIP_GRANTED(AuditDomain.ROLE),
 
@@ -572,7 +565,6 @@ public enum AuditEventType {
   /** Role &amp; membership audit rows older than an admin-chosen cutoff were purged (retention). */
   ROLE_AUDIT_PURGED(AuditDomain.ROLE),
 
-  // ----------------------------------------------------------- PROMOTION (Beförderung) --
   /** A promotion topic (the catalogue's top-level grouping) was created. */
   PROMOTION_TOPIC_CREATED(AuditDomain.PROMOTION),
 
@@ -624,7 +616,6 @@ public enum AuditEventType {
   /** Promotion audit rows older than an admin-chosen cutoff were purged (retention). */
   PROMOTION_AUDIT_PURGED(AuditDomain.PROMOTION),
 
-  // ------------------------------------------------------------- MARKET (Materialbörse) --
   /** A Lager row was released to the Materialbörse (an offer became publicly listed). */
   MARKET_OFFER_RELEASED(AuditDomain.MARKET),
 

@@ -118,7 +118,6 @@ public class InventoryWriteController {
     }
 
     if (bindingResult.hasErrors()) {
-      // Render directly; BindingResult stays request-scoped (see RedisSessionConfig).
       return inventoryPageController.viewInputPage(form.getSource(), model);
     }
 
@@ -373,10 +372,6 @@ public class InventoryWriteController {
     String redirectPath = buildInventoryRedirectFromReferer(basePath, referer);
 
     if (bindingResult.hasErrors()) {
-      // Render the originating listing directly so the BindingResult stays
-      // request-scoped (see RedisSessionConfig). The user-side trade-off is that
-      // the filter state from the referer URL is dropped — acceptable for a rare
-      // validation error path; the modal re-opens with the input + field errors.
       model.addAttribute("errorToast", "error.validation.failed");
       model.addAttribute("showBookOutModal", id);
       if (fromAdminListing) {
@@ -399,11 +394,6 @@ public class InventoryWriteController {
               form.getVersion(),
               form.getTargetOwningOrgUnitId(),
               form.getMergeStock(),
-              // The no-JS classic fallback cannot collect a "deduct from" plan; both lists stay
-              // null
-              // so the backend defaults to "take it from the rest" (a SELL through it is therefore
-              // a
-              // fully-personal sale). The JS path sends the plan on the /transfer route.
               null,
               null);
       backendApiClient.post("/api/v1/inventory/" + id + "/book-out", request, Void.class);
@@ -480,7 +470,6 @@ public class InventoryWriteController {
           backendApiClient.post(
               "/api/v1/inventory/" + id + "/book-out", dto, InventoryItemDto.class);
       if (result == null) {
-        // Item was fully consumed (deleted) – return 204 so the frontend can reload
         return org.springframework.http.ResponseEntity.noContent().build();
       }
       return org.springframework.http.ResponseEntity.ok(result);
@@ -542,10 +531,6 @@ public class InventoryWriteController {
   @ResponseBody
   public org.springframework.http.ResponseEntity<Object> bulkCheckout(
       @RequestBody BulkCheckoutRequest request) {
-    // Guard the empty/missing id list here (rather than via @Valid, which the frontend
-    // GlobalExceptionHandler would surface as a 500) so the page gets a clean 422 problem+json —
-    // mirroring addInventoryItemAjax's manual validation. The page already blocks an empty
-    // selection client-side; the backend re-validates per item.
     if (request == null || request.itemIds() == null || request.itemIds().isEmpty()) {
       return inventoryValidationError("VALIDATION");
     }
@@ -718,9 +703,6 @@ public class InventoryWriteController {
               "/api/v1/inventory/" + id + "/note", request, InventoryItemDto.class);
       return org.springframework.http.ResponseEntity.ok(updated);
     } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
-      // Propagate backend status (e.g. 409 Conflict from Optimistic Locking, 400 Validation,
-      // 403 Forbidden) to the browser instead of masking it as 500, so the JS note modal
-      // can react appropriately (toast + reload on 409).
       log.debug(
           "Failed to update inventory item note: status={}, {}", e.getStatusCode(), e.getMessage());
       return org.springframework.http.ResponseEntity.status(e.getStatusCode()).build();

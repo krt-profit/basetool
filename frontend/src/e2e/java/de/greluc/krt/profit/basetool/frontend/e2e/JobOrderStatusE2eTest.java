@@ -120,7 +120,6 @@ class JobOrderStatusE2eTest {
       try {
         E2eSupport.navigate(page, detailUrl);
 
-        // OPEN -> IN_PROGRESS: a non-terminal target posts straight away on the change event.
         page.waitForResponse(
             response ->
                 response.url().contains("/status") && "POST".equals(response.request().method()),
@@ -128,13 +127,8 @@ class JobOrderStatusE2eTest {
         assertEquals(
             "IN_PROGRESS", persistedStatus(), "status persists after the in-progress change");
 
-        // Reload so the dropdown carries the refreshed @Version for the terminal transition.
         E2eSupport.navigate(page, detailUrl);
 
-        // IN_PROGRESS -> COMPLETED: a terminal target opens the warning modal first; wait until it
-        // is
-        // shown before confirming, so the confirm click never out-races the modal. Only that click
-        // posts (and unlinks the order's inventory).
         page.locator("#status-select").selectOption("COMPLETED");
         assertThat(page.locator("#status-warning-modal")).isVisible();
         page.waitForResponse(

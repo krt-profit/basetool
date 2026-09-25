@@ -209,8 +209,6 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
     Refusal refusal = refusalFor(request);
     if (refusal != null) {
       if (NO_ROLE_REFUSAL.equals(refusal)) {
-        // As a SUBJECT, not as a request: one member's background polling and a realm-wide lockout
-        // produce very different subject counts and indistinguishable request rates.
         AuthenticatedSubject.of(SecurityContextHolder.getContext().getAuthentication())
             .map(PendingApprovalAccessFilter::toUuidOrNull)
             .ifPresent(noRoleRefusedSubjects::record);
@@ -293,9 +291,6 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
     if (auth == null || !auth.isAuthenticated()) {
       return null;
     }
-    // Two short-circuiting scans rather than materialising the whole authority collection into a
-    // HashSet on every authenticated /api request: both markers are exclusive and neither is
-    // common, so the set was allocated in full to answer two questions that stop at the first hit.
     if (hasAuthority(auth, PENDING_AUTHORITY)) {
       return PENDING_REFUSAL;
     }
@@ -387,8 +382,6 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
     if (existing != null && !existing.isBlank()) {
       return false;
     }
-    // Asked of AuthenticatedSubject, not of the type — an acting member (ADR-0129) is a named
-    // caller with no token, and a refusal logged as anonymous is the one line forensics would need.
     String sub =
         AuthenticatedSubject.of(SecurityContextHolder.getContext().getAuthentication())
             .orElse(null);
@@ -418,10 +411,6 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
     final String detail =
         messageSource.getMessage(refusal.detailKey(), null, refusal.defaultDetail(), locale);
 
-    // Logged at DEBUG, not WARN: a pending user's shell polls several endpoints on every page load,
-    // so an approved-status-pending session emits a steady stream of these 403s — an expected,
-    // self-inflicted condition, not an operational warning. The metric below (not this line) is the
-    // monitoring signal, so dropping to DEBUG does not blind the mass-403 detector.
     log.debug(
         "{} blocked on {} {} [correlationId={}]",
         refusal.logSubject(),
@@ -429,19 +418,11 @@ public class PendingApprovalAccessFilter extends OncePerRequestFilter {
         request.getRequestURI(),
         correlationId);
 
-    // REQ-OBS-011: this 403 is written at the servlet-filter level and bypasses
-    // GlobalExceptionHandler, so it never reaches basetool_http_error_total via the advice. Count
-    // it
-    // here (mirroring IdentityProviderUnavailableFilter) so a converter / approval-sync regression
-    // that mass-403s legitimate users surfaces on PendingApprovalBlockSpike, not in the log (which
-    // is now DEBUG for this expected condition).
     meterRegistry.counter(MetricNames.HTTP_ERROR, MetricNames.TAG_CODE, refusal.code()).increment();
 
     response.setStatus(HttpServletResponse.SC_FORBIDDEN);
     response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
     response.setHeader(CORRELATION_ID_HEADER, correlationId);
-    // Write UTF-8 bytes directly rather than through getWriter(): the localized title/detail may
-    // contain non-ASCII (German umlauts) and the servlet writer defaults to ISO-8859-1.
     ProblemDetail problem =
         problemResponseFactory.problem(
             HttpStatus.FORBIDDEN,

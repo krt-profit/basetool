@@ -143,10 +143,6 @@ class FirstLoginAuthoritiesIntegrationTest {
   @Test
   @DisplayName("a brand-new ordinary member is PENDING, not admitted with its roles")
   void firstLoginOfAMemberIsPendingApproval() {
-    // The counterpart that keeps the case above honest: it must not pass merely because "the first
-    // login works". An admin is force-ACTIVEd at first login precisely so the first administrator
-    // can never be locked out (bootstrap safety); everybody else lands in the approval queue
-    // (REQ-SEC-017, epic #720) and holds the single ROLE_PENDING_APPROVAL until an admin decides.
     Jwt jwt = tokenFor("first-login-member", List.of("KRT Member"));
 
     List<String> authorities =
@@ -160,9 +156,6 @@ class FirstLoginAuthoritiesIntegrationTest {
   @Test
   @DisplayName("an approved member whose realm roles map to nothing is refused with NO_ROLE")
   void anApprovedMemberWithNoMappableRoleIsRefused() {
-    // REQ-SEC-053 from the other side, and it needs an APPROVED account: the role-less marker sits
-    // after the approval short-circuit in assembleFor, so a brand-new row would answer
-    // ROLE_PENDING_APPROVAL and prove nothing about the role mapping.
     Jwt jwt = tokenFor("first-login-nobody", List.of("no-such-realm-role"));
     converter.convert(jwt);
     User user = userRepository.findById(UUID.fromString(jwt.getSubject())).orElseThrow();
@@ -178,12 +171,6 @@ class FirstLoginAuthoritiesIntegrationTest {
   @Test
   @DisplayName("the first thing every seeded client does - accepting the terms - works")
   void aFreshlyLoggedInAdminCanAcceptTheTerms() {
-    // The E2E seeder records consent immediately after its password grant, because the stack runs
-    // the dev profile and the gate is armed there. That call failing is invisible by design (it is
-    // logged and swallowed, so the failure is reported by the seeding step that actually needed
-    // consent) - which on 2026-09-06 turned a 500 here into a TERMS_NOT_ACCEPTED three calls later
-    // and cost two CI cycles to trace back. Asserted directly, so the next time it breaks it says
-    // so here.
     Jwt jwt = tokenFor("first-login-consenter", List.of("Admin", "Officer", "KRT Member"));
     converter.convert(jwt);
     UUID userId = UUID.fromString(jwt.getSubject());

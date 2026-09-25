@@ -37,14 +37,11 @@ class OperationMapperTest {
 
   @BeforeEach
   void setUp() {
-    // OperationMapperImpl receives SquadronMapper for the owningSquadron projection through its
-    // constructor (CentralMapperConfig: injectionStrategy = CONSTRUCTOR).
     mapper = new OperationMapperImpl(Mappers.getMapper(SquadronMapper.class));
   }
 
   @Test
   void toDto_shouldMapAllFields() {
-    // Given
     UUID id = UUID.randomUUID();
     Instant created = Instant.parse("2026-01-01T10:00:00Z");
     Instant updated = Instant.parse("2026-02-01T10:00:00Z");
@@ -57,10 +54,8 @@ class OperationMapperTest {
     entity.setCreatedAt(created);
     entity.setUpdatedAt(updated);
 
-    // When
     OperationDto dto = mapper.toDto(entity);
 
-    // Then
     assertNotNull(dto);
     assertEquals(id, dto.id());
     assertEquals("Operation Sunfire", dto.name());
@@ -73,19 +68,15 @@ class OperationMapperTest {
 
   @Test
   void toEntity_fromCreateDto_shouldIgnoreIdAndTimestampsAndMissions() {
-    // Given
     OperationCreateDto create =
         new OperationCreateDto("Op Aurora", "Recon", OperationStatus.PLANNED, null);
 
-    // When
     Operation entity = mapper.toEntity(create);
 
-    // Then
     assertNotNull(entity);
     assertEquals("Op Aurora", entity.getName());
     assertEquals("Recon", entity.getDescription());
     assertEquals(OperationStatus.PLANNED, entity.getStatus());
-    // Explicitly ignored — must not leak from a body-supplied DTO
     assertNull(entity.getId());
     assertNull(entity.getCreatedAt());
     assertNull(entity.getUpdatedAt());

@@ -84,11 +84,6 @@ public class DiscordAccountExistenceController {
    * @return {@code 200} with the existence flag on success; {@code 503} when the feature is not
    *     configured (blank secret); {@code 401} when the presented secret is absent or wrong
    */
-  // Intentionally NOT role-gated: the caller is Keycloak (no JWT principal), so method security
-  // imposes no authority requirement here. permitAll() makes that explicit (and satisfies the
-  // ArchUnit "@RestController declares @PreAuthorize" invariant); the real gate is the
-  // constant-time
-  // shared-secret check below, on top of the SecurityConfig permitAll for /internal/**.
   @PreAuthorize("permitAll()")
   @PostMapping
   public ResponseEntity<DiscordAccountExistenceResponse> checkAccountExistence(
@@ -96,7 +91,6 @@ public class DiscordAccountExistenceController {
       @RequestBody DiscordAccountExistenceRequest request) {
     String configuredSecret = properties.sharedSecret();
     if (configuredSecret == null || configuredSecret.isBlank()) {
-      // Feature not configured on this deployment → endpoint disabled. The SPI fails open.
       log.debug("Discord account-existence precheck called but no shared secret is configured.");
       recordPrecheck(MetricNames.DISCORD_PRECHECK_DISABLED);
       return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();

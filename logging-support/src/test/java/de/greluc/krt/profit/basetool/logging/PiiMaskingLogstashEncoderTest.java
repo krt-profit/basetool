@@ -45,9 +45,6 @@ class PiiMaskingLogstashEncoderTest {
   @BeforeEach
   void setUp() {
     context = new LoggerContext();
-    // LogstashEncoder reads the MDC at encode time; an empty LoggerContext has no
-    // MDCAdapter set, which throws NPE inside MdcJsonProvider. Attach the standard
-    // logback MDC adapter so the encoder sees an empty-but-valid MDC.
     context.setMDCAdapter(new ch.qos.logback.classic.util.LogbackMDCAdapter());
     logger = context.getLogger(PiiMaskingLogstashEncoderTest.class);
     encoder = new PiiMaskingLogstashEncoder();
@@ -81,8 +78,6 @@ class PiiMaskingLogstashEncoderTest {
   @Test
   void shouldKeepJsonStructureIntact() {
     String json = encode("Email user@example.org used token=my-secret");
-    // The masker only inserts alphanumerics, so the surrounding JSON must still
-    // start with '{' and end with '}\n' (LogstashEncoder appends a trailing newline).
     String trimmed = json.trim();
     assertTrue(
         trimmed.startsWith("{") && trimmed.endsWith("}"),
@@ -93,7 +88,6 @@ class PiiMaskingLogstashEncoderTest {
 
   @Test
   void shouldHandBackTheEncodersOwnBytesWhenNothingIsMasked() {
-    // The PII-free event is the common one: re-encoding it would double the cost of every line.
     ILoggingEvent event =
         new LoggingEvent(
             PiiMaskingLogstashEncoderTest.class.getName(),

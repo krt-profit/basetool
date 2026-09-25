@@ -65,7 +65,6 @@ class LiveSyncRelayServiceTest {
     assertThat(service.publishFromClient(ALICE, INVENTORY, List.of("stock")))
         .isEqualTo(LiveSyncRelayService.Outcome.ACCEPTED);
 
-    // The order is what makes a Redis outage cost peer delivery and nothing else.
     InOrder order = inOrder(streamService, fanout);
     order.verify(streamService).deliver(INVENTORY, List.of("stock"));
     order.verify(fanout).publish(INVENTORY, List.of("stock"));
@@ -114,7 +113,6 @@ class LiveSyncRelayServiceTest {
       service.publishFromClient(ALICE, INVENTORY, List.of("stock"));
     }
 
-    // Bob has emitted nothing; Alice flooding must not cost him his own signal.
     assertThat(service.publishFromClient(BOB, BOARD, List.of("board")))
         .isEqualTo(LiveSyncRelayService.Outcome.ACCEPTED);
   }
@@ -122,12 +120,8 @@ class LiveSyncRelayServiceTest {
   @Test
   @DisplayName("a room's aggregate bucket bounds it even when every publisher stays under theirs")
   void theTopicBucketBoundsARoomAcrossPublishers() {
-    // The bound that matters: many clients each well under their own limit can still flood one
-    // global room's re-fetch fan-out, which is exactly what ADR-0094 sized the second bucket for.
     long accepted = 0;
     long attempts = LiveSyncRelayService.TOPIC_BURST + 40;
-    // `long`, like `attempts`: an `int` counter compared against a `long` bound is the shape that
-    // can wrap before it reaches the bound (CodeQL java/comparison-with-wider-type).
     for (long i = 0; i < attempts; i++) {
       UUID publisher = new UUID(0L, i);
       if (service.publishFromClient(publisher, INVENTORY, List.of("stock"))

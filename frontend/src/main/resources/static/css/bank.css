@@ -1,17 +1,6 @@
-/*
- * KRT "DAS KARTELL" Corporate Design styling for the Kartell bank (epic #556).
- * Ports the design-system bank component layer (krt-components.css, submodule pin
- * >= 2ba5678): .kpi-total/.kpi-card, .holder-row/.holder-bar/.holder-sum,
- * .stack-bar/.stack-legend, .matrix-flag(.on) + tr.is-inert, the formalized
- * .krt-modal frame and .confirm-input — plus the D1/K1/W1/G1 page scaffolding.
- * Typography: Lato only; square-first HUD style; responsive across the four
- * device classes (<=768, <=1024, default, >=1600).
- */
-
 @layer base, components, page, migration, utilities;
 
 @layer page {
-    /* ---- Dashboard tiles (D1): .kpi-total aggregate strip + .kpi-card per account ---- */
     .bank-totals {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
@@ -45,24 +34,11 @@
     .bank-acc-grid {
         display: grid;
 
-        /*
-     * `minmax(0, 1fr)`, not `1fr` — the same reason `.bank-detail-panels` further down states it.
-     *
-     * `1fr` is `minmax(auto, 1fr)`, and `auto` resolves to the item's MIN-CONTENT width, so a card
-     * that cannot shrink pushes its own track past the container and the PAGE scrolls sideways
-     * instead of the card adapting. On the phone class a seeded account name took /bank to a 408px
-     * document in a 375px viewport and /org-unit-bank to 445px.
-     *
-     * The track is only the first of three links: the card must be allowed to shrink as well
-     * (`min-width: 0` below), and so must the row inside it that sits beside the fixed-width
-     * sparkline. Fixing only the track moves the overflow one level down.
-     */
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 10px;
     }
 
     .kpi-card {
-        /* Link 2 of the chain above: a grid item's automatic minimum size is its min-content. */
         min-width: 0;
         background: var(--color-bg-dark-gray);
         border: var(--border-hairline);
@@ -90,7 +66,6 @@
         color: var(--color-white);
         font-size: 0.85rem;
 
-        /* A long account name is otherwise one unbreakable run holding the row open. */
         overflow-wrap: anywhere;
     }
 
@@ -110,8 +85,6 @@
         align-items: flex-start;
         gap: 8px;
 
-        /* Link 3: the title block is a flex item beside a fixed-width sparkline, and flex items carry
-       the same automatic minimum size as grid items. */
         min-width: 0;
     }
 
@@ -126,13 +99,6 @@
         gap: 8px;
     }
 
-    /*
- * Action footer (detail link + request button / view-only label): the auto top
- * margin consumes the card's free vertical space so the action feet sit flush at
- * the card bottom. The grid stretches every card in a row to equal height, so the
- * detail and request buttons line up across cards whether or not a given card
- * carries the optional balance-target progress block above it (REQ-BANK-036).
- */
     .kpi-card .kpi-card-foot--actions {
         margin-top: auto;
     }
@@ -159,7 +125,6 @@
         opacity: 0.55;
     }
 
-    /* 30-day trend sparkline: design-system tokens, not inline hex (KRT orange / muted grey). */
     .kpi-sparkline {
         stroke: var(--color-primary);
     }
@@ -168,7 +133,6 @@
         stroke: var(--color-gray-2);
     }
 
-    /* ---- Holder distribution (K1): rows with track bars + the proportional stack bar ---- */
     .holder-row {
         display: flex;
         align-items: center;
@@ -272,7 +236,6 @@
         vertical-align: -1px;
     }
 
-    /* ---- Permission flag matrix (G1): row existence = view right ---- */
     .matrix-flag {
         display: inline-flex;
         width: 18px;
@@ -307,10 +270,6 @@
         opacity: 0.5;
     }
 
-    /* ---- KRT modal frame (formalized head/body/foot) + type-to-confirm ---- */
-    /* Mirrors the global `.krt-modal-overlay` in styles.css (same hidden default).
-   Kept as defense-in-depth so the overlay stays hidden even if only one of the two
-   stylesheets loads; both must agree on `display: none`. */
     .krt-modal-overlay {
         position: fixed;
         inset: 0;
@@ -375,7 +334,6 @@
         border-bottom: var(--border-hairline);
     }
 
-    /* Mirrors styles.css: the shell's title is the wrapper's <h2>. */
     .krt-modal-head h2 {
         font-family: var(--font-headline);
         font-weight: var(--fw-bold);
@@ -393,14 +351,6 @@
     .krt-modal-body {
         padding: 14px 16px;
     }
-
-    /* `.krt-modal-foot` is NOT redeclared here any more.
- *
- * This file loads after styles.css, so a copy of the selector wins every property it names — and
- * the copy named six of the canonical rule's seven, silently dropping `flex-shrink: 0`. A tall bank
- * modal's button row could therefore be squeezed while every other modal's could not. Deleting the
- * copy gives the bank pages the canonical rule, wrap included, and ends the obligation to keep two
- * declarations of one thing in step. */
 
     .krt-modal .confirm-input {
         width: 100%;
@@ -420,7 +370,6 @@
         box-shadow: var(--glow-primary);
     }
 
-    /* ---- Admin danger card (A1: wipe-reset) ---- */
     .bank-danger-card {
         background: var(--color-bg-dark-gray);
         border: 1px solid var(--color-danger);
@@ -456,14 +405,12 @@
         margin: 0 0 14px;
     }
 
-    /* ---- Audit filter bar action cluster ---- */
     .bank-filter-actions {
         display: flex;
         gap: 8px;
         align-items: flex-end;
     }
 
-    /* ---- Bank page scaffolding (screen panels, facts strip, two-column detail) ---- */
     .bank-head-actions {
         display: flex;
         gap: 8px;
@@ -471,9 +418,6 @@
         align-items: center;
     }
 
-    /* Requests overview header right side (#997): the direct-booking "Kontobewegung" CTA sits above the
-   parallel status-filter chip group; both align to the right edge and wrap onto their own line on
-   narrow viewports. */
     .bank-requests-head-right {
         display: flex;
         flex-wrap: wrap;
@@ -482,8 +426,6 @@
         justify-content: flex-end;
     }
 
-    /* Request status filter (REQ-BANK-023): the independent status checkboxes, wrapping onto their own
-   line on narrow viewports. */
     .bank-status-filter {
         display: inline-flex;
         flex-wrap: wrap;
@@ -491,19 +433,11 @@
         align-items: center;
     }
 
-    /* ---- Account-name live filter (REQ-BANK-046): dashboard cards + org-unit account list ---- */
-    /*
- * The filter hides non-matching items via the `hidden` attribute. The card / row author rules set
- * `display: flex` / `display: grid`, which would otherwise beat the UA stylesheet's
- * `[hidden] { display: none }`, so both are re-hidden explicitly here (same landmine the
- * `.bank-form-row[hidden]` rule guards against).
- */
     .kpi-card[hidden],
     .ou-row[hidden] {
         display: none;
     }
 
-    /* Search box: the magnifier icon overlays the input's left padding (square-first HUD, no rounding). */
     .bank-acc-search {
         position: relative;
         display: inline-flex;
@@ -519,12 +453,7 @@
         pointer-events: none;
     }
 
-    /* The descendant selector lifts this above the global `input[type='search']` rule (specificity
-   0,1,1), whose `padding` shorthand would otherwise reset padding-left and slide the placeholder
-   text under the magnifier icon (dashboard D1 + org-unit bank live filters, REQ-BANK-046). */
     .bank-acc-search .bank-acc-search-input {
-        /* Wide enough for the full German placeholder "Nach Kontonamen filtern" once the 30px icon gutter
-       is subtracted; max-width keeps it from overflowing the narrow device classes. */
         width: 260px;
         max-width: 100%;
         padding-left: 30px;
@@ -618,10 +547,6 @@
         margin-bottom: 12px;
     }
 
-    /* The hidden attribute must win over the flex display above (the author-level rule outranks the UA
-   stylesheet's [hidden] { display: none }). Without this the JS-toggled conditional rows — the
-   transfer-only Zielkonto, the split-percentage row, the WITHDRAWAL/TRANSFER-only Begruendung and
-   the confirm modal's destination-holder — would stay visible even while marked hidden. */
     .bank-form-row[hidden] {
         display: none;
     }
@@ -644,9 +569,6 @@
         letter-spacing: normal;
     }
 
-    /* Compact inline checkbox + label used by the dashboard view options (REQ-BANK-016) and the request
-   status filter (REQ-BANK-023): a small checkbox that is orange only when ticked, beside a quiet
-   label — deliberately NOT a filled-orange toggle button, so an active filter does not shout. */
     .bank-check-inline {
         display: inline-flex;
         align-items: center;
@@ -718,8 +640,6 @@
         white-space: nowrap;
     }
 
-    /* Collapsible Konto-Info tile head (REQ-BANK-017): the .bank-panel-head is a full-width toggle
-   button; it keeps the head look and the orange underline while resetting the native button chrome. */
     .bank-collapse-head {
         width: 100%;
         cursor: pointer;
@@ -746,8 +666,6 @@
         gap: 8px;
     }
 
-    /* Chevron shared by the info tile and the expandable booking rows: points right when collapsed and
-   rotates down (90deg) when its aria-expanded control is open. */
     .bank-chevron {
         width: 0.85em;
         height: 0.85em;
@@ -760,8 +678,6 @@
         transform: rotate(90deg);
     }
 
-    /* Expandable booking rows: a leading chevron marks a row carrying a Begruendung/Notiz; clicking the
-   row (or its chevron) reveals the detail sub-row below it. */
     .bank-bookings-table .bank-expand-col {
         width: 1.8rem;
     }
@@ -796,8 +712,6 @@
         outline-offset: 1px;
     }
 
-    /* Booking-detail sub-row (REQ-BANK-045): the reason + note revealed on expand, indented under the
-   row and set on the input surface so it reads as belonging to the booking above. */
     .bank-booking-detail-cell {
         padding: 8px 12px 10px 2.4rem;
         background: var(--color-surface-input);
@@ -847,14 +761,6 @@
         color: var(--color-gray-2-text);
     }
 
-    /*
- * Grants view only: the account/employee filter <select> sits directly beside
- * the .tab-nav group (its label is .visually-hidden, so the form row is just
- * the select). Stretch both children to a shared height and drop the form-row's
- * bottom margin so the two dark-gray surfaces — the tab box and the dropdown —
- * line up flush at their top and bottom edges. Scoped to the --tabs modifier so
- * the multi-row audit filter bar keeps its flex-end baseline alignment.
- */
     .bank-filterbar--tabs {
         align-items: stretch;
     }
@@ -867,7 +773,6 @@
         height: 100%;
     }
 
-    /* ---- Small shared utilities scoped to the bank pages ---- */
     .btn-sm {
         padding: 3px 9px;
         font-size: 0.62rem;
@@ -877,7 +782,6 @@
         text-align: right;
     }
 
-    /* ---- Responsive: tablet and smartphone device classes ---- */
     @media (width <= 1024px) {
         .bank-acc-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -887,32 +791,9 @@
             grid-template-columns: 1fr;
         }
 
-        /*
-     * The two in-row controls of the bank tables, raised to REQ-UI-009's dense
-     * floor on the touch classes (measured by TouchClassLayoutE2eTest on seeded
-     * data, 2026-09-13: the grant flags 18px, the booking chevron 15px).
-     *
-     * They take `--touch-target-dense` (32px) and not the full 44px because both
-     * are REPEATED DENSE IN-ROW controls, which is precisely the exception
-     * REQ-UI-009 writes down — the same class of control as `.btn-xs`,
-     * `.btn-icon` and `.master-row`. 44px would be the wrong trade here in a
-     * concrete way: the grants matrix puts its three flags side by side per row,
-     * so a 44px cell either widens the table by a third or, if the hit area were
-     * faked with a transparent overlay instead, the overlay of one flag would
-     * reach over its neighbours and a mis-tap would grant the wrong banking
-     * right. 32px keeps every flag's target its own, and still clears WCAG 2.5.8
-     * AA's 24px — which 15px and 18px did not.
-     *
-     * The chevron grows the booking row with it, which on a phone is an
-     * improvement rather than a cost.
-     */
         .matrix-flag {
             width: var(--touch-target-dense);
             height: var(--touch-target-dense);
-            /* `min-height`, not only `height`: styles.css puts the 44px floor on every `button` by
-           default now (ADR-0176), and a min-height clamps a height regardless of specificity —
-           different properties never compete. Declaring the dense token is what opts this flag
-           out, and it is also what puts it in TouchClassLayoutE2eTest's CSSOM-derived dense set. */
             min-height: var(--touch-target-dense);
         }
 
@@ -946,16 +827,6 @@
         }
     }
 
-    /* Settings-tab tiles (REQ-BANK-035/-036/-041): the responsible holder's three independent settings
-   boxes — Sichtbarkeit, Freigabe-Limits, Kontostandsziel — laid out as an auto-fill grid whose track
-   floor (540px) is wide enough that each tile's widest row (a Freigabe-Limit tier: a long role label
-   + the amount input + the "Setzen"/"Entfernen" buttons) stays on ONE line. The tiles therefore never
-   cram their content; when the row cannot hold two at >=540px they overflow to the next row instead —
-   two abreast on desktop / ultra-wide (main caps at 1600px, so three would force a sub-540px,
-   content-wrapping width) and one per row on narrower desktops, tablets and phones. min(540px, 100%)
-   lets the lone column shrink to the viewport on a phone rather than overflowing it; auto-fill (not
-   auto-fit) keeps the trailing Kontostandsziel tile at a single track width instead of stretching it
-   across the whole row; align-items keeps tiles top-aligned despite differing heights. */
     .oud-settings-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(min(540px, 100%), 1fr));
@@ -963,7 +834,6 @@
         align-items: start;
     }
 
-    /* Balance-target progress (REQ-BANK-036) and org-unit visibility settings (REQ-BANK-035). */
     .bank-target-bar {
         width: 100%;
         height: 6px;
@@ -1014,17 +884,10 @@
         border-bottom: var(--border-hairline);
     }
 
-    /* ==========================================================================
-   Org-unit bank overview (REQ-BANK-021/-038) — DS alignment: tabs + a dense
-   account list (no CTA-heavy cards) + quiet detail visibility toggles.
-   ========================================================================== */
-
-    /* Tab panels: the [hidden] attribute must win even if a layout rule sets display. */
     [data-tabpanel][hidden] {
         display: none;
     }
 
-    /* Dense account list: one grid row per account, header strip on top. */
     .ou-list {
         border: var(--border-hairline);
         background: var(--color-bg-dark-gray);
@@ -1118,7 +981,6 @@
         font-size: 0.72rem;
     }
 
-    /* Compact balance-target progress in the list "Ziel" column. */
     .ou-target {
         width: 100%;
     }
@@ -1138,7 +1000,6 @@
         font-variant-numeric: tabular-nums;
     }
 
-    /* The list collapses to stacked rows on the smartphone device class. */
     @media (width <= 820px) {
         .ou-rowhead {
             display: none;
@@ -1165,8 +1026,6 @@
         }
     }
 
-    /* Konten toolbar (REQ-BANK-021/-046): the account-name filter grows, the view toggle trails, both
-   wrap onto their own line on a narrow viewport. */
     .ou-konten-toolbar {
         display: flex;
         align-items: center;
@@ -1179,12 +1038,7 @@
         flex: 1 1 220px;
     }
 
-    /* Card view of the org-unit account list (REQ-BANK-021): the shared responsive .bank-acc-grid track
-   holds one .ou-card per account. Unlike the dashboard .kpi-card the whole card is NOT a link — the
-   name and the "Details" action are the click targets — so it carries no pointer cursor, only the
-   same hover-border affordance. */
     .ou-card {
-        /* Same three-link chain as `.kpi-card` above — this card shares `.bank-acc-grid`. */
         min-width: 0;
         display: flex;
         flex-direction: column;
@@ -1217,7 +1071,6 @@
         font-size: 0.95rem;
         text-decoration: none;
 
-        /* As `.kpi-title` above. */
         overflow-wrap: anywhere;
     }
 
@@ -1253,15 +1106,12 @@
         font-size: 0.6em;
     }
 
-    /* The action sits flush-bottom-right so cards with and without a target line up their buttons. */
     .ou-card-act {
         display: flex;
         justify-content: flex-end;
         margin-top: auto;
     }
 
-    /* Org-unit account-detail facts: a 4-up kpi-total grid (NOT the shared .bank-facts strip,
-   which two other bank pages keep using with .fact-key/.fact-value). */
     .ou-facts {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
@@ -1274,7 +1124,6 @@
         }
     }
 
-    /* Detail visibility toggles: one quiet row per audience. */
     .sub-h {
         font-family: var(--font-headline);
         font-weight: var(--fw-bold);
@@ -1309,7 +1158,6 @@
         align-items: center;
     }
 
-    /* Inline label + control + action row (the "grant a user" picker). */
     .field-row {
         display: flex;
         gap: 12px;
@@ -1323,15 +1171,10 @@
         max-width: 340px;
     }
 
-    /* Every labeled field in an inline action row drops its default 12px stacking margin so the
-   select, the per-user limit input and the action button bottom-align flush (align-items:
-   flex-end). Without this a non-.grow .bank-form-row (the Freigabe-Limit "Einzelne Nutzer" input)
-   keeps its margin-bottom and its input floats 12px above the select and the Setzen button. */
     .field-row .bank-form-row {
         margin-bottom: 0;
     }
 
-    /* Approval limits (REQ-BANK-041): inline per-tier set/clear editor in a vis-row. */
     .bank-limit-edit {
         flex-wrap: wrap;
         justify-content: flex-end;
@@ -1342,7 +1185,6 @@
         max-width: 45vw;
     }
 
-    /* Quiet over-limit warning tone (requester request modal + bank-staff confirm modal). */
     .bank-limit-warning {
         margin-top: 6px;
         padding: 8px 10px;
@@ -1369,10 +1211,6 @@
         color: var(--color-warning);
     }
 
-    /* ===== Dashboard view options (REQ-BANK-016): table-view + by-Bereich grouping checkboxes ===== */
-
-    /* The two view-option checkboxes sit inline in the dashboard header (both unchecked = the default
-   card grid ordered A→Z). */
     .bank-view-toggles {
         display: inline-flex;
         gap: 14px;
@@ -1380,7 +1218,6 @@
         align-items: center;
     }
 
-    /* Tabular account view — reuses the shared .data-table look; keep the trend cell compact. */
     .bank-acc-table td .kpi-sparkline {
         stroke: var(--color-primary);
     }
@@ -1389,7 +1226,6 @@
         opacity: 0.55;
     }
 
-    /* A by-Bereich group: a coloured header rule over its accounts, stacked vertically. */
     .bank-acc-group {
         margin-top: 1.25rem;
     }
@@ -1404,8 +1240,6 @@
         color: var(--color-text);
     }
 
-    /* Bereich department colour classes — mirror the org chart's oc-dept--* over the shared
-   --color-dept-* tokens so both surfaces read from one design-system source (REQ-ORG-026). */
     .bank-dept--profit {
         --bank-dept: var(--color-dept-profit);
     }
@@ -1430,13 +1264,6 @@
         --bank-dept: var(--color-dept-search-rescue);
     }
 
-    /* ============================================================================
-   Account-detail balance chart (REQ-BANK-049) + booking-history period filter
-   (REQ-BANK-051). Server-rendered inline SVG line chart (BankBalanceChart), a
-   segmented preset-range selector and the from/to period filter. Colours are
-   design-system tokens; no external chart library (CSP).
-   ============================================================================ */
-
     .bank-chart-toolbar {
         display: flex;
         flex-wrap: wrap;
@@ -1445,7 +1272,6 @@
         margin-bottom: 0.75rem;
     }
 
-    /* Segmented preset-range group (30 Tage / 90 Tage / 1 Jahr / Gesamt). */
     .bank-chart-ranges {
         display: inline-flex;
         flex-wrap: wrap;
@@ -1577,10 +1403,6 @@
         color: var(--color-gray-2-text);
     }
 
-    /* Chart + booking-history layout (REQ-BANK-052): stacked by default (chart above the history),
-   side by side on ultra-wide screens. There, main.bank-detail is allowed past its normal 1200px
-   content cap so the two panels get real room to sit next to each other (REQ-UI-009 "exploit
-   space"); minmax(0, 1fr) lets the history table shrink and scroll instead of blowing out the grid. */
     .bank-detail-panels {
         display: grid;
         grid-template-columns: minmax(0, 1fr);

@@ -70,13 +70,12 @@ class SyncChunkWriterTest {
             "row",
             String::valueOf);
 
-    // Chunk [1,2,3] commits; chunk [4,5,6] fails and is replayed as [4], [5] (fails), [6].
     assertThat(outcome.results()).containsExactly(1, 2, 3, 4, 6);
     assertThat(outcome.failedRows()).isEqualTo(1);
     assertThat(attempts)
         .containsExactly(List.of(1, 2, 3), List.of(4, 5, 6), List.of(4), List.of(5), List.of(6));
-    assertThat(tx.committed).isEqualTo(3); // [1,2,3], [4], [6]
-    assertThat(tx.rolledBack).isEqualTo(2); // [4,5,6], [5]
+    assertThat(tx.committed).isEqualTo(3);
+    assertThat(tx.rolledBack).isEqualTo(2);
   }
 
   @Test

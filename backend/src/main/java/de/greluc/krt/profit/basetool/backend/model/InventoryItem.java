@@ -68,10 +68,6 @@ public class InventoryItem extends AbstractEntity<UUID> {
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
-  // @ToString.Exclude on every LAZY association so a call to toString() outside
-  // of a Hibernate session (e.g. from a log statement after the transaction
-  // has committed) does not trigger LazyInitializationException. Matches the
-  // pattern already used in Mission / Operation / RefineryOrder.
   @ManyToOne(optional = false, fetch = FetchType.LAZY)
   @JoinColumn(name = "user_id", nullable = false)
   @ToString.Exclude
@@ -116,7 +112,7 @@ public class InventoryItem extends AbstractEntity<UUID> {
 
   @Min(0)
   @Column(nullable = false)
-  private Double amount; // SCU
+  private Double amount;
 
   @Column(nullable = false)
   private Boolean personal = false;

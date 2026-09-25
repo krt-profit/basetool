@@ -58,9 +58,6 @@ class RoleHierarchyTest {
 
   @MockitoBean private ClientRegistrationRepository clientRegistrationRepository;
 
-  // filterChain now injects the pool-hardened authorization_code token client (ADR-0115), which in
-  // production comes from WebClientConfig; this SecurityConfig-only slice mocks it like the other
-  // collaborators so the context still loads.
   @MockitoBean
   private OAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest>
       oauthAuthorizationCodeTokenResponseClient;

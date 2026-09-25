@@ -1,16 +1,9 @@
-/* Page stylesheet of templates/blueprint-overview.html, moved out of its inline style block
- * (FE-PERF-02). Linked in the same place the block stood, so the cascade order is
- * unchanged. */
-
 @layer base, components, page, migration, utilities;
 
 @layer page {
     .details-row {
         display: none;
     }
-    /* Toggled per row by blueprint-overview.js. A tr:has(details[open]) sibling
-   rule here forced a style recalculation across the whole (up to 1000-row)
-   table on every expand and visibly janked the UI (REQ-INV-012). */
     .details-row.bp-expanded {
         display: table-row;
     }
@@ -46,8 +39,6 @@
         background-color: rgba(231, 126, 35, 0.08);
         border: 1px solid rgba(231, 126, 35, 0.25);
     }
-    /* Discreet marker for an owner shown only via global blueprint sharing
-   (REQ-INV-018) — not a member of the caller's oversight org unit. */
     .bp-owners-list .bp-owner-external {
         margin-left: 0.4rem;
         color: var(--color-gray-2-text);
@@ -57,7 +48,6 @@
     .bp-owner-count {
         font-weight: 700;
     }
-    /* ---- Blueprint live filter ---- */
     .bp-filter {
         position: relative;
         max-width: 360px;

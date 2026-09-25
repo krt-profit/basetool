@@ -220,7 +220,6 @@ class NotificationRepositoryIntegrationTest {
                 .executeUpdate());
   }
 
-  // covers REQ-NOTIF-009 — the unread half of the sweep ages from createdAt, not readAt
   @Test
   void deleteUnreadOlderThanDeletesOnlyOldUnreadRows() {
     UUID a = UUID.randomUUID();
@@ -238,12 +237,9 @@ class NotificationRepositoryIntegrationTest {
     assertThat(deleted).isEqualTo(1);
     assertThat(repository.findByIdAndRecipientUserId(oldUnread.getId(), a)).isEmpty();
     assertThat(repository.findByIdAndRecipientUserId(recentUnread.getId(), a)).isPresent();
-    // A read row of the same age belongs to the other window and must survive this statement.
     assertThat(repository.findByIdAndRecipientUserId(oldRead.getId(), a)).isPresent();
   }
 
-  // covers REQ-NOTIF-009 — the unread backlog that used to outlive every stated retention period
-  // is now bounded; this is the regression the two-window sweep was built for
   @Test
   void anUnreadBacklogNoLongerSurvivesIndefinitely() {
     UUID a = UUID.randomUUID();
@@ -259,8 +255,6 @@ class NotificationRepositoryIntegrationTest {
 
   @Test
   void supersedeByTypeAndEntityMatchesTypeAndEntityOnly() {
-    // REQ-NOTIF-018: clearing the created-notifications of a decided request must match by type +
-    // loose entity, span all recipients, and leave other types / other entities untouched.
     UUID staffA = UUID.randomUUID();
     UUID staffB = UUID.randomUUID();
     UUID requestId = UUID.randomUUID();
@@ -279,14 +273,12 @@ class NotificationRepositoryIntegrationTest {
             NotificationType.BANK_BOOKING_REQUEST_CREATED,
             "BANK_BOOKING_REQUEST",
             requestId);
-    // Different type, same entity — must survive (the requester's decision notification).
     Notification decision =
         save(
             staffA,
             NotificationType.BANK_BOOKING_REQUEST_CONFIRMED,
             "BANK_BOOKING_REQUEST",
             requestId);
-    // Same type, different entity — must survive (another still-open request).
     Notification otherRequest =
         save(
             staffA,

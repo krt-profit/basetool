@@ -1,17 +1,6 @@
-/* Page stylesheet of templates/orders-detail.html, moved out of its inline style block
- * (FE-PERF-02). Linked in the same place the block stood, so the cascade order is
- * unchanged. */
-
 @layer base, components, page, migration, utilities;
 
 @layer page {
-    /*
- * Classes for the handover-row and inventory-expand markup that orders-detail.js builds
- * via innerHTML. They replace the former inline style="" attributes on those elements:
- * an inline style inside a JS innerHTML string is blocked by the CSP style-src-attr 'none'
- * pin just like a template one (ADR-0093). Visibility of the SCU hints and the withdraw
- * button toggles the runtime .krtm-hidden class instead of clearing an inline style.
- */
     .od-remove-btn {
         padding: 0.5rem;
     }
@@ -43,9 +32,6 @@
         min-height: 44px;
     }
 
-    /* Kennzahlen-Band (KPI strip, REQ-ORDERS-026): derived-total tiles between the
-   overview card and the tabs. Page-scoped so it does not collide with the page-scoped
-   .kpi-total in bank.css. Collapses to 2 / 1 columns on narrow devices. */
     .kpi-band {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
@@ -88,9 +74,6 @@
         }
     }
 
-    /* Mini progress bars. .progress-mini is the block bar inside a KPI tile; .mini-bar is
-   the inline bar in table cells (Hergestellt / Geliefert). Fill widths are applied
-   CSP-safely from data-krtm-width by inline-style-apply.js (ADR-0093). */
     .progress-mini {
         height: 7px;
         background: var(--color-surface-input);
@@ -121,9 +104,6 @@
         background: var(--color-success);
     }
 
-    /* Collapsible "Bedarf je Stück" sub-row in the Herstellung table — mirrors the bank
-   request table's Notiz/Begründung detail row. The chevron button toggles the sub-row
-   (orders-detail.js od-toggle-demand); page-scoped so it never leaks to other tables. */
     .od-prod-expand-col {
         width: 1.8rem;
     }
@@ -177,9 +157,6 @@
     .od-prod-demand-value {
         color: var(--color-white);
     }
-    /* Earmarked warehouse stock, rendered inline in the item expand row beneath the
-   per-unit demand (REQ-ORDERS-028). The reused label becomes a block heading above a
-   compact table. */
     .od-item-stock-inline {
         margin-top: 10px;
     }
@@ -192,9 +169,6 @@
         font-size: 0.8rem;
     }
 
-    /* Tab panes (mission-detail pattern): hidden by default, shown when the JS controller
-   (orders-detail.js) adds .on to the active pane. Scoped to .tab-panes so it never
-   reaches the mission-detail page's own .tab-pane rules. */
     .tab-panes {
         border: var(--border-hairline);
         border-top: none;
@@ -211,8 +185,6 @@
         margin-top: 0;
     }
 
-    /* Herstellung modal: one row per linked inventory entry (source + amount input) inside
-   each material's reconciliation card. */
     .od-prod-entry {
         display: grid;
         grid-template-columns: 1fr 110px;
@@ -234,8 +206,6 @@
         width: 100%;
         min-height: 44px;
     }
-    /* "Nicht ausbuchen" opt-out: a compact checkbox row under each material's head. When
-   ticked the card is flagged .od-prod-skipped and its stock inputs are dimmed. */
     .od-prod-skip {
         display: flex;
         align-items: center;

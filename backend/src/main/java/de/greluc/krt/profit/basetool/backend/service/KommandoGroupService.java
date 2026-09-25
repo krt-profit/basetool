@@ -124,7 +124,6 @@ public class KommandoGroupService {
             .sortIndex((int) existing)
             .build();
     KommandoGroup saved = kommandoGroupRepository.saveAndFlush(group);
-    // Mirror the group onto the descriptive chart as a leaderless Kommando node (REQ-ROLE-006).
     orgChartService.mirrorCreateKommandoGroup(saved);
     auditService.record(
         AuditEventType.KOMMANDO_GROUP_CREATED,
@@ -155,7 +154,6 @@ public class KommandoGroupService {
     group.setName(request.name().strip());
     group.setSortIndex(request.sortIndex());
     KommandoGroup saved = kommandoGroupRepository.saveAndFlush(group);
-    // Mirror the rename / reorder onto the Kommando node (REQ-ROLE-006).
     orgChartService.mirrorUpdateKommandoGroup(saved);
     auditService.record(
         AuditEventType.KOMMANDO_GROUP_UPDATED, saved.getId(), saved.getName(), null, null);
@@ -180,7 +178,6 @@ public class KommandoGroupService {
           "Kommandogruppe still has assigned members — reassign them before deleting it");
     }
     String name = group.getName();
-    // Remove the mirrored Kommando node first, then the group (REQ-ROLE-006).
     orgChartService.mirrorDeleteKommandoGroup(groupId);
     kommandoGroupRepository.delete(group);
     auditService.record(AuditEventType.KOMMANDO_GROUP_DELETED, groupId, name, null, null);

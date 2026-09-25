@@ -115,7 +115,6 @@ class JobOrderTenancyE2eTest {
           false,
           false);
 
-      // Squadron C is left non-profit (the default), so its member is outside the order workflow.
       String squadronCId =
           seeder.createSquadron(ADMIN_USER, ADMIN_PASSWORD, "E2E Tenancy C", "ETNC");
       seeder.assignStaffelMembership(
@@ -135,9 +134,6 @@ class JobOrderTenancyE2eTest {
           seeder.createJobOrder(
               ADMIN_USER, ADMIN_PASSWORD, IRIDIUM_ID, "E2E Tenancy IRI Order", materialId, 650, 50);
 
-      // An order the non-profit squadron C REQUESTED (processed by the profit SK): squadron C's
-      // member is its requester and may view it under "Meine Aufträge" (REQ-ORDERS-023), even
-      // though squadron C is non-profit.
       cRequestedOrderId =
           seeder.createJobOrder(
               ADMIN_USER,
@@ -175,17 +171,12 @@ class JobOrderTenancyE2eTest {
       Page page = context.newPage();
       try {
         E2eSupport.login(page, baseUrl, OFFICER_USER, OFFICER_PASSWORD);
-        // The default order list (no Staffel narrowing selected) shows the caller's natural
-        // cross-staffel union — own squadron + SK-public — governed purely by backend tenancy
-        // scoping.
         E2eSupport.navigate(page, baseUrl + "/orders?status=OPEN");
         page.waitForLoadState();
         assertThat(page.getByTestId("nav-logout")).isVisible();
 
-        // The SK-public order surfaces for the foreign-squadron officer (slow WebKit list render).
         assertThat(page.locator("[data-testid='order-row'][data-id='" + skOrderId + "']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
-        // The IRIDIUM-private order does not.
         assertThat(page.locator("[data-testid='order-row'][data-id='" + iridiumOrderId + "']"))
             .hasCount(0);
       } catch (RuntimeException | AssertionError failure) {
@@ -212,10 +203,6 @@ class JobOrderTenancyE2eTest {
       try {
         E2eSupport.login(page, baseUrl, MEMBER_USER, MEMBER_PASSWORD);
 
-        // "Meine Aufträge": the order squadron C requested surfaces; the general queue (the
-        // SK-public order, requested by another unit) does not; and the member is NOT bounced to
-        // the
-        // create form.
         E2eSupport.navigate(page, baseUrl + "/orders");
         page.waitForLoadState();
         assertThat(page.locator("[data-testid='order-row'][data-id='" + cRequestedOrderId + "']"))
@@ -224,8 +211,6 @@ class JobOrderTenancyE2eTest {
             .hasCount(0);
         assertThat(page.getByTestId("order-mode-material")).hasCount(0);
 
-        // A direct link to a foreign order the member did not request is denied and bounced back to
-        // their own-orders list — not opened, and not the create form.
         E2eSupport.navigate(page, baseUrl + "/orders/" + skOrderId);
         page.waitForLoadState();
         assertThat(page.locator("[data-testid='order-row'][data-id='" + cRequestedOrderId + "']"))

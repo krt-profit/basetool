@@ -89,8 +89,6 @@ class SessionAttributeRepairIntegrationTest {
     connectionFactory.afterPropertiesSet();
     connectionFactory.start();
 
-    // Assembled exactly as RedisSessionConfig assembles it in production: the fault-tolerant
-    // wrapper over the configured mapper, string keys, and the diagnostic session mapper.
     RedisSerializer<Object> sessionSerializer =
         new FaultTolerantSessionSerializer(
             new GenericJacksonJsonRedisSerializer(
@@ -155,9 +153,6 @@ class SessionAttributeRepairIntegrationTest {
 
   @Test
   void theRepositoryWritesTheContainerRecordWithItsForcedTypeId() {
-    // The half SessionSerializerRoundTripTest cannot see: not "the serializer can write @class" but
-    // "Spring Session's repository actually writes the attribute through that serializer". If this
-    // ever fails, values are being poisoned again at the source and no amount of repair will help.
     RedisIndexedSessionRepository.RedisSession session = repository.createSession();
     session.setAttribute(ATTRIBUTE, new WsHttpSessionBindingListener("a-session-id"));
     repository.save(session);
@@ -186,14 +181,10 @@ class SessionAttributeRepairIntegrationTest {
 
   @Test
   void theRepairEndsTheDropInsteadOfLettingItRepeatForever() {
-    // The 2026-09-03 defect, pinned. Without the repair this second read drops again, and so does
-    // every read after it for up to the 720-hour authenticated window (REQ-SEC-025) — which is what
-    // kept SessionValueDropsSustained firing for hours after the write path had already been fixed.
     String id = poisonedSession();
     var poisoned = repository.findById(id);
     assertThat(poisoned).isNotNull();
 
-    // Exactly what SessionAttributeRepairFilter does on the way out of the chain.
     for (String attribute : SessionAttributeRepairQueue.drain()) {
       poisoned.removeAttribute(attribute);
     }
@@ -210,9 +201,6 @@ class SessionAttributeRepairIntegrationTest {
 
   @Test
   void theRepairedFieldStillReadsBackAsAbsentRatherThanFailing() {
-    // removeAttribute writes an EMPTY value rather than issuing an HDEL — Spring Session's ordinary
-    // removal shape. Pinned because the repair's whole safety argument rests on that empty value
-    // deserialising to null instead of becoming a second kind of unreadable byte string.
     String id = poisonedSession();
     var poisoned = repository.findById(id);
     assertThat(poisoned).isNotNull();

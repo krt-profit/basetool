@@ -2,7 +2,6 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 <th:block th:fragment="toast">
-    <!--/* Login Notification Toast */-->
     <div th:if="${showLoginNotification}"
          id="loginNotification"
          class="notification-toast"
@@ -11,7 +10,6 @@
         <p th:text="#{notification.authentication}">You are successfully authenticated. You can now access your data.</p>
     </div>
 
-    <!--/* General Success Toast */-->
     <div th:if="${successToast}"
          id="successNotification"
          class="notification-toast"
@@ -20,7 +18,6 @@
         <p th:text="#{${successToast}}"></p>
     </div>
 
-    <!--/* General Success Toast (Text) */-->
     <div th:if="${success}"
          id="successNotificationText"
          class="notification-toast"
@@ -29,12 +26,6 @@
         <p th:text="${!#strings.isEmpty(success)} ? #{${success}} : #{notification.success.title}"></p>
     </div>
 
-    <!--/* General Success Toast (Param) */-->
-    <!--/* Only renders for keys that match the safe pattern below (alphanumeric + dots,
-         up to 80 chars). Without that gate any URL like ?success=any.translation.key
-         would let an attacker pick an arbitrary translation entry, enabling UI
-         spoofing and translation-key enumeration. Server-controlled toasts use the
-         flash-attribute "successToast" above instead. */-->
     <div th:if="${param.success != null and param.success[0] matches '^[A-Za-z][A-Za-z0-9._-]{0,79}$'}"
          id="successNotificationParam"
          class="notification-toast"
@@ -43,7 +34,6 @@
         <p th:text="#{${param.success[0]}} ?: #{notification.success.title}"></p>
     </div>
 
-    <!--/* General Error Toast */-->
     <div th:if="${errorToast}"
          id="errorNotification"
          class="notification-toast error-toast"
@@ -52,7 +42,6 @@
         <p th:text="#{${errorToast}}"></p>
     </div>
 
-    <!--/* General Error Toast (Text) */-->
     <div th:if="${error}"
          id="errorNotificationText"
          class="notification-toast error-toast"
@@ -61,9 +50,6 @@
         <p th:text="${!#strings.isEmpty(error)} ? #{${error}} : #{notification.error.title}"></p>
     </div>
 
-    <!--/* General Error Toast (Param) */-->
-    <!--/* Same key-pattern gate as the success variant above: prevents arbitrary
-         translation-key lookup via ?error=any.key. */-->
     <div th:if="${param.error != null and param.error[0] matches '^[A-Za-z][A-Za-z0-9._-]{0,79}$'}"
          id="errorNotificationParam"
          class="notification-toast error-toast"

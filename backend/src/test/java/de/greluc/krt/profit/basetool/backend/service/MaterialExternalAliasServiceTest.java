@@ -179,8 +179,6 @@ class MaterialExternalAliasServiceTest {
     verify(repository, never()).save(any());
   }
 
-  // covers REQ-REFINERY-010 — a case-only variant of an existing alias is a duplicate (409),
-  // matching the case-insensitive resolution lookup and the V146 unique index.
   @Test
   void create_throwsDuplicate_whenCaseVariantOfExistingAliasIsSubmitted() {
     MaterialExternalAliasWriteRequest request =
@@ -260,8 +258,6 @@ class MaterialExternalAliasServiceTest {
     verify(repository, never()).save(any());
   }
 
-  // covers REQ-REFINERY-010 — renaming an alias onto a case-variant of ANOTHER row's name is a
-  // duplicate (409); renaming a row onto a case-variant of ITSELF stays allowed.
   @Test
   void update_throwsDuplicate_whenCaseVariantOfAnotherRowExists() {
     MaterialExternalAlias existing = newAlias("Old Name");
@@ -284,8 +280,6 @@ class MaterialExternalAliasServiceTest {
     verify(repository, never()).save(any());
   }
 
-  // covers REQ-REFINERY-010 — recasing a row's own name (same id matched case-insensitively) is
-  // NOT a duplicate; admins may fix casing in place.
   @Test
   void update_allowsRecasingOwnName_withoutDuplicateError() {
     MaterialExternalAlias existing = newAlias("stileron (ore)");

@@ -54,12 +54,8 @@ class BankPdfFormatTest {
    */
   @Test
   void formattingUsesGermanGroupingAndSignRules() {
-    // amount(): ledger scale (1850000.0000) is dropped and grouped with the German dot separator.
     assertEquals("1.850.000 aUEC", BankPdfFormat.amount(new BigDecimal("1850000.0000")));
-    // groupedAmount(): the same grouping without the unit suffix (chart axis labels).
     assertEquals("1.850.000", BankPdfFormat.groupedAmount(new BigDecimal("1850000")));
-    // signedAmount(): positive gets an explicit '+', negative keeps DecimalFormat's own '-',
-    // and zero (signum == 0, not > 0) must render WITHOUT a leading '+'.
     assertEquals("+250.000", BankPdfFormat.signedAmount(new BigDecimal("250000")));
     assertEquals("-100.000", BankPdfFormat.signedAmount(new BigDecimal("-100000")));
     assertEquals("0", BankPdfFormat.signedAmount(BigDecimal.ZERO));

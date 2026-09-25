@@ -53,13 +53,9 @@ public class ValidQuantityAmountValidator
   @Override
   public boolean isValid(QuantityAware dto, ConstraintValidatorContext context) {
     if (dto == null || dto.amount() == null) {
-      return true; // Let @NotNull handle these
+      return true;
     }
 
-    // Game-item payloads (REQ-INV-029): unconditionally positive whole units, no catalog lookup
-    // needed. Checked BEFORE the materialId null-guard — with materialId optional since V220, a
-    // gameItemId-only payload would otherwise skip ALL amount validation (the silent hole the
-    // item-inventory design flagged).
     if (dto.gameItemId() != null) {
       if (dto.amount() <= 0) {
         context.disableDefaultConstraintViolation();
@@ -81,7 +77,7 @@ public class ValidQuantityAmountValidator
     }
 
     if (dto.materialId() == null) {
-      return true; // Let @NotNull / the catalog-XOR validation handle these
+      return true;
     }
 
     if (dto.amount() <= 0) {
@@ -93,9 +89,6 @@ public class ValidQuantityAmountValidator
       return false;
     }
 
-    // A missing material resolves to false here, identical to a non-PIECE (SCU) material: the
-    // whole-number rule is skipped and the missing-material case is reported by @NotNull /
-    // foreign-key checks instead.
     if (materialPieceTypeLookup.isPieceQuantity(dto.materialId()) && dto.amount() % 1 != 0) {
       context.disableDefaultConstraintViolation();
       context
@@ -104,9 +97,6 @@ public class ValidQuantityAmountValidator
           .addConstraintViolation();
       return false;
     }
-    // SCU amounts with more than three decimals are NOT rejected: they are rounded HALF_UP to
-    // three places at the persistence boundary (see roundAmountToScuScale on the amount entities),
-    // so the server normalises fractional precision the same way the frontend does.
     return true;
   }
 }

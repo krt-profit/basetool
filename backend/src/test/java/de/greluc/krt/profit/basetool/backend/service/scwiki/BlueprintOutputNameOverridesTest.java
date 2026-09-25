@@ -47,8 +47,6 @@ class BlueprintOutputNameOverridesTest {
 
   @Test
   void seedEntries_carryTheConfirmedWrongAndInGameCorrectNames() {
-    // Given the two confirmed CIG-mislabeled QRT specialist-armor blueprints.
-    // When / Then the seeded corrections match the verified table.
     Correction arms = overrides.findByKey(ARMS_KEY).orElseThrow();
     assertEquals("Antium Helmet Jet", arms.expectedWrongName());
     assertEquals("Antium Arms Maroon", arms.correctedName());
@@ -60,8 +58,6 @@ class BlueprintOutputNameOverridesTest {
 
   @Test
   void correct_appliesCorrection_whenIncomingMatchesTheWrongName() {
-    // Given a feed value equal to the known-wrong name for each key.
-    // When corrected. Then the in-game-correct name is returned and the guard reports a fire.
     assertEquals("Antium Arms Maroon", overrides.correct(ARMS_KEY, "Antium Helmet Jet"));
     assertEquals("Antium Helmet Jet", overrides.correct(HELMET_KEY, "Antium Core Jet"));
     assertTrue(overrides.fires(ARMS_KEY, "Antium Helmet Jet"));
@@ -69,16 +65,12 @@ class BlueprintOutputNameOverridesTest {
 
   @Test
   void correct_isNormalizationInsensitive_onCaseAndWhitespace() {
-    // Given a wrong name that differs only by case / surrounding & internal whitespace.
-    // When corrected. Then it still resolves to the corrected name (normalizer folds the diffs).
     assertEquals("Antium Arms Maroon", overrides.correct(ARMS_KEY, "  antium   HELMET jet "));
     assertTrue(overrides.fires(ARMS_KEY, "ANTIUM HELMET JET"));
   }
 
   @Test
   void correct_passesThrough_whenCigFixedOrChangedTheName() {
-    // Given CIG has fixed the name (incoming already correct) or changed it to something else.
-    // When corrected. Then the upstream value passes through unchanged and the guard does not fire.
     assertEquals("Antium Arms Maroon", overrides.correct(ARMS_KEY, "Antium Arms Maroon"));
     assertEquals("Totally New Name", overrides.correct(ARMS_KEY, "Totally New Name"));
     assertFalse(overrides.fires(ARMS_KEY, "Antium Arms Maroon"));
@@ -86,9 +78,6 @@ class BlueprintOutputNameOverridesTest {
 
   @Test
   void correct_passesThrough_forUnrelatedKey() {
-    // Given a key with no registered correction.
-    // When corrected with even a string that is a wrong name under another key.
-    // Then nothing changes — the correction is keyed strictly on scwiki_key.
     assertEquals(
         "Antium Helmet Jet", overrides.correct("BP_CRAFT_unrelated_01", "Antium Helmet Jet"));
     assertFalse(overrides.isRegistered("BP_CRAFT_unrelated_01"));
@@ -97,8 +86,6 @@ class BlueprintOutputNameOverridesTest {
 
   @Test
   void crossedNames_areKeyedIndependently_soTheyDoNotInterfere() {
-    // "Antium Helmet Jet" is the WRONG name for the arms key but the CORRECT name for the helmet
-    // key. Keying on scwiki_key keeps the two independent, with no accidental double-correction.
     assertEquals("Antium Arms Maroon", overrides.correct(ARMS_KEY, "Antium Helmet Jet"));
     assertEquals("Antium Helmet Jet", overrides.correct(HELMET_KEY, "Antium Helmet Jet"));
     assertFalse(overrides.fires(HELMET_KEY, "Antium Helmet Jet"));

@@ -104,7 +104,6 @@ class AdminBlueprintsPageControllerMvcTest {
     return new PageResponse<>(List.of(dto), 0, 25, total, totalPages, List.of());
   }
 
-  // covers REQ-FE-002 — the full page renders the swap-target wrapper and the toolbar.
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_fullPage_rendersSwapWrapper() throws Exception {
@@ -117,8 +116,6 @@ class AdminBlueprintsPageControllerMvcTest {
         .andExpect(content().string(containsString("id=\"admin-bp-filter\"")));
   }
 
-  // covers REQ-FE-002 — fragment=results renders only the inner toolbar + table block: the table
-  // and the live total are present, but the swap-target wrapper (outside the fragment) is not.
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_fragmentResults_rendersOnlyInnerFragment() throws Exception {
@@ -133,11 +130,6 @@ class AdminBlueprintsPageControllerMvcTest {
         .andExpect(content().string(not(containsString("id=\"admin-bp-results\""))));
   }
 
-  // Regression guard for the frontend-proxy double-encoding sub-class: the admin blueprint list
-  // forwards a multi-word free-text term as a WebClient URI-template variable ({search}), not
-  // URLEncoder it into the URI string, so the backend @RequestParam decodes the exact typed term.
-  // URLEncoder form-encoding (space -> '+') double-encodes across the frontend->backend hop and
-  // yields zero matches.
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_passesMultiWordSearchAsUriVariable() throws Exception {
@@ -154,9 +146,6 @@ class AdminBlueprintsPageControllerMvcTest {
     assertEquals("Omni Sky", termCaptor.getValue());
   }
 
-  // Same guard with an umlaut term: "Größe Röhre" encodes to Gr%C3%B6%C3%9Fe… under URLEncoder,
-  // which the hop would re-encode to a literal zero-match. As a URI variable the raw term reaches
-  // the backend.
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_passesUmlautSearchAsUriVariable_notFormEncoded() throws Exception {

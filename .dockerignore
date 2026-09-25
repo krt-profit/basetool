@@ -1,15 +1,4 @@
-# Belt-and-suspenders against secrets ever entering a Docker build context.
-#
-# These files are also in .gitignore (so a clean GitHub checkout will never
-# contain them), but a developer running `docker compose build` locally could
-# still have them lying around in their working tree from an earlier local
-# stack spin-up. This .dockerignore guarantees they never make it past the
-# build context boundary even in that case.
-#
-# Rule of thumb: anything that is `.gitignore`d for security reasons belongs
-# here too.
 
-# --- Secrets / credentials --------------------------------------------------
 **/keystore.p12
 **/*.p12
 **/*.jks
@@ -20,7 +9,6 @@
 !.env.example
 **/realm-export.json
 
-# --- VCS / build artefacts (size + cache invalidation) ----------------------
 .git
 .gitattributes
 .gitignore
@@ -33,7 +21,6 @@
 **/node_modules
 **/dist
 
-# --- IDE / editor scratch ---------------------------------------------------
 .idea
 .vscode
 **/*.iml
@@ -45,13 +32,11 @@
 **/.settings
 **/.factorypath
 
-# --- Local-only documentation / runbooks ------------------------------------
 HELP.md
 ToDo.md
 .aiignore
 .claude
 
-# --- Test / harness leftovers ----------------------------------------------
 **/build/reports
 **/build/test-results
 **/logs
@@ -59,9 +44,5 @@ ToDo.md
 **/*.log.zip
 log.txt
 
-# Test and E2E (Playwright) source sets: never compiled into the image. The app build
-# runs `:<module>:bootJar` (BLD-PERF-01), which does not touch either, and docker/app/Dockerfile
-# copies only `src/main`. Excluding them anyway keeps the build context small and makes the
-# boundary explicit: nothing test-only can reach an image, even through a future wider COPY.
 **/src/test
 **/src/e2e

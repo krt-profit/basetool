@@ -89,13 +89,10 @@ class RefineryExtractDtoJsonTest {
 
   @Test
   void deserializesContractExampleVerbatim() throws Exception {
-    // Given
     JsonMapper mapper = JsonMapper.builder().addModule(new JavaTimeModule()).build();
 
-    // When
     RefineryExtractDto extract = mapper.readValue(CONTRACT_EXAMPLE, RefineryExtractDto.class);
 
-    // Then — envelope & provenance
     assertThat(extract.schemaVersion()).isEqualTo(1);
     assertThat(extract.tool()).isEqualTo("basetool-sc-extractor");
     assertThat(extract.model()).isEqualTo("qwen3-vl:8b-instruct");
@@ -103,7 +100,6 @@ class RefineryExtractDtoJsonTest {
     assertThat(extract.clientLanguage()).isEqualTo("en");
     assertThat(extract.orders()).hasSize(1);
 
-    // Then — order incl. the amended header-total and quoted fields
     RefineryExtractOrderDto order = extract.orders().getFirst();
     assertThat(order.panelType()).isEqualTo("SETUP");
     assertThat(order.quoted()).isTrue();
@@ -120,7 +116,6 @@ class RefineryExtractDtoJsonTest {
     assertThat(order.sourceImages().getFirst().capturedAt())
         .isEqualTo(Instant.parse("2026-06-05T19:38:23Z"));
 
-    // Then — goods incl. rowIndex and the nullable outputQuantity (un-quoted row)
     assertThat(order.goods()).hasSize(2);
     RefineryExtractGoodDto quoted = order.goods().getFirst();
     assertThat(quoted.rowIndex()).isZero();

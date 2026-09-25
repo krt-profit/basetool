@@ -1,18 +1,6 @@
-# Loki ruler alerting rules (LogQL). Epic #936 — "committed in Phase 2, not optional".
-# These catch failure signals that `logback_events_total` cannot see (it covers only the 3 Spring
-# apps): Keycloak's fail-open Discord SPI error path, Postgres FATAL/PANIC, SSH auth attacks, and
-# edge 5xx/429. The `app`/`level` stream labels are set by Alloy
-# (config.alloy). "fake" is the single-tenant id when auth_enabled is false.
-#
-# NOTE: the exact NPM access-log and host auth.log line formats are verified ONCE on
-# the test stack during rollout (docs/archive/MONITORING_ROLLOUT_RUNBOOK.md) and the line filters below
-# adjusted there if needed — they are the documented first-cut patterns.
 groups:
   - name: log-alerts-critical
     rules:
-      # A successful password OR keyboard-interactive SSH login on a key-only host implies a
-      # compromise or misconfig. keyboard-interactive is the PAM password back door on UsePAM hosts
-      # (logs as "Accepted keyboard-interactive/pam"); a bare "Accepted password" matcher misses it.
       - alert: SshPasswordLoginOnKeyOnlyHost
         expr: sum(rate({app="host-auth"} |~ "Accepted (password|keyboard-interactive)" [5m])) > 0
         for: 0m
@@ -22,36 +10,6 @@ groups:
           summary: "Successful password/keyboard-interactive SSH login on a key-only host"
           description: "auth.log shows an 'Accepted password' or 'Accepted keyboard-interactive' login. The host is key-only — investigate immediately."
 
-      # High-signal theft detection: a SUCCESSFUL login from outside the operator's known networks.
-      # DISABLED by default — it needs the operator's real egress prefix(es); with the example
-      # placeholders it would fire on every legitimate login. To enable: replace the example
-      # prefixes with your stable egress CIDR/prefix(es) (RE2 line filter on the logged source IP)
-      # and uncomment. LogQL cannot restrict by IP structurally, so this is a negative line filter.
-      # - alert: SshAcceptedFromUnexpectedIp
-      #   expr: |
-      #     sum(count_over_time(
-      #       {app="host-auth"} |~ "Accepted " !~ "from (203\.0\.113\.|198\.51\.100\.)" [5m]
-      #     )) > 0
-      #   for: 0m
-      #   labels:
-      #     severity: critical
-      #   annotations:
-      #     summary: "SSH login accepted from an unexpected source network"
-      #     description: "A successful SSH login originated outside the operator's known networks — possible key theft. Verify it was you."
-
-      # FATAL is Postgres's log level for many BENIGN connection-lifecycle events that occur on every
-      # restart/deploy: a client (a dependent app retry-connecting) that hits the DB while it is
-      # starting up, shutting down or in recovery, or a connection terminated by an admin command. The
-      # unfiltered "FATAL|PANIC" matcher paged CRITICAL on every DB recreate (the 2026-07-15 restart
-      # cascade) from those lifecycle lines. The four excluded substrings are the standard Postgres
-      # server messages for exactly those benign cases; SECURITY-relevant FATALs (password
-      # authentication failed, role/database does not exist, too many clients) are NOT excluded and
-      # still page. PANIC stays effectively unconditional: a PANIC line (WAL/checkpoint/corruption) never
-      # contains one of these connection-lifecycle phrases, so the != filters never drop a PANIC. Single
-      # combined rate() on purpose — a two-term sum(PANIC)+sum(FATAL) would drop to an empty vector (and
-      # miss a real FATAL) whenever one term has no matching lines. These are documented first-cut line
-      # filters — verify/adjust against real prod Loki lines on the test stack per the file header +
-      # rollout runbook.
       - alert: PostgresFatalOrPanic
         expr: |
           sum(rate({app=~"postgres-.+"} |~ "FATAL|PANIC" != "the database system is starting up" != "the database system is shutting down" != "the database system is in recovery mode" != "terminating connection due to administrator command" [5m])) > 0
@@ -62,61 +20,6 @@ groups:
           summary: "PostgreSQL FATAL/PANIC in logs"
           description: "A PostgreSQL container logged a PANIC or a non-benign FATAL line (benign connection-lifecycle FATALs during a restart — starting up / shutting down / in recovery / admin-terminated — are excluded)."
 
-      # JVM native-thread exhaustion breadcrumb (ADR-0095). The `<svc>-stdout` streams carry the
-      # JVM/glibc native errors that bypass logback and never reach the masked JSON file — including the
-      # `pthread_create failed (EAGAIN)` / `unable to create native thread` line of the 2026-07-12 ingest
-      # pids-cap OOM. This is a LAGGING forensic complement: the LEADING indicator is ContainerPidsHigh
-      # (infrastructure.yml, #1275 — watches the cgroup pids count, so it sees the zombie/task leak that
-      # the JVM-only JvmThreadsHigh was blind to) and the root cause is fixed by init:true zombie reaping
-      # (#1274), so a crash should not recur — this only leaves the native line in Loki when one does.
-      #
-      # ENABLED 2026-08-29 (was staged under the REQ-OBS-014 dead-alert guard). The signature was
-      # verified rather than assumed, in four steps — recorded here because the line is
-      # JVM-version-dependent and the next Temurin bump should be re-checked against it:
-      #
-      #   1. THE LINE, observed. A JVM run under a cgroup pids cap on the SAME digest-pinned image
-      #      production runs (eclipse-temurin:25-jre-alpine@sha256:28db6fdf…) writes, verbatim:
-      #
-      #        [0.053s][warning][os,thread] Failed to start thread "Unknown thread" -
-      #          pthread_create failed (EAGAIN) for attributes: stacksize: 1024k, guardsize: 0k, detached.
-      #        [0.055s][warning][os,thread] Failed to start the native thread for java.lang.Thread "Thread-47"
-      #        Exception in thread "main" java.lang.OutOfMemoryError: unable to create native thread:
-      #          possibly out of memory or process/resource limits reached
-      #
-      #      The first and third match the filter below; the second does NOT, and does not need to —
-      #      it never appears alone.
-      #   2. THE STREAM, observed in production: backend-stdout ~30k, frontend-stdout ~43k and
-      #      ingest-stdout ~1k lines per 24h. The pipeline demonstrably carries these apps' console
-      #      output (Appendix B step 1).
-      #   3. NOTHING DROPS IT: the only stage.drop in config.alloy is `older_than = "167h"`, which a
-      #      fresh line cannot hit.
-      #   4. NOTHING REWRITES IT: the three masking replaces on `(backend|frontend|ingest|keycloak)-stdout`
-      #      match a JWT, an e-mail address, and a bearer/token/session-id keyword. None occurs in either
-      #      phrase, so the filter still matches after masking.
-      #
-      # Step 1 is a local observation and steps 3-4 are a config reading; only step 2 was measured on
-      # the host. Say so rather than implying all four were watched live.
-      #
-      # RE-VERIFIED 2026-09-22 on the digest the Dockerfiles now pin,
-      # eclipse-temurin:25-jre-alpine@sha256:3137541d… (Temurin 25.0.4+7), after the Podman cutover:
-      #   1. The same Spawn-under-`--pids-limit 60` run printed both matched phrases word for word
-      #      ("pthread_create failed (EAGAIN) for attributes: stacksize: 1024k, guardsize: 0k,
-      #      detached." and "java.lang.OutOfMemoryError: unable to create native thread: possibly out
-      #      of memory or process/resource limits reached").
-      #   2. The streams now arrive through journald rather than Docker's json-file, and they do:
-      #      production Loki held backend-stdout 11,180, frontend-stdout 29,796 and ingest-stdout 706
-      #      lines over the preceding 24 h, entry for entry what the journal holds for those units.
-      #
-      # RE-VERIFIED 2026-09-25 on eclipse-temurin:25-jre-alpine@sha256:2ca9adf4… (Temurin 25.0.4+7,
-      # the #2035 bump): the same Spawn class (compiled on the pinned JDK, run under
-      # `--pids-limit 60`) printed, word for word,
-      #   [0.048s][warning][os,thread] Failed to start thread "Unknown thread" - pthread_create failed (EAGAIN) for attributes: stacksize: 1024k, guardsize: 0k, detached.
-      #   [0.049s][warning][os,thread] Failed to start the native thread for java.lang.Thread "Thread-42"
-      #   Exception in thread "main" java.lang.OutOfMemoryError: unable to create native thread: possibly out of memory or process/resource limits reached
-      # and config.alloy's container_mask is unchanged in what it can touch (the JWT / e-mail /
-      # bearer-token-keyword replaces; the only stage.drop is older_than = "167h").
-      #   3-4. Unchanged in config.alloy: still the one `older_than = "167h"` drop, still the same three
-      #      masking replaces, none of which touches either phrase.
       - alert: JvmNativeThreadExhaustion
         expr: 'sum(count_over_time({app=~"(backend|frontend|ingest)-stdout"} |~ "pthread_create failed|unable to create native thread" [5m])) > 0'
         for: 0m
@@ -128,37 +31,6 @@ groups:
 
   - name: log-alerts-warning
     rules:
-      # The JVM started WITHOUT the startup cache baked into its image (IMG-CI-13, REQ-OPS-030,
-      # ADR-0180). The image build proves the cache is usable by a JVM started with the image's own
-      # object layout (docker/app/Dockerfile runs a second start under -XX:AOTMode=on and fails the
-      # build otherwise). What it cannot prove is that a DEPLOYMENT starts that way: the layout flag
-      # lives in JAVA_TOOL_OPTIONS (docker-compose.yml, quadlet/env.d), and the documented rollback
-      # `IRI_EXTRA_JAVA_OPTS=-XX:-UseCompactObjectHeaders` flips it on purpose. A JVM whose layout
-      # differs from the cache's does not fail -- under the default -XX:AOTMode=auto it prints the
-      # lines below to stdout and starts without the cache, which costs startup time and nothing
-      # else (a bare ingest context refresh: 3.2 s with the cache, 6.5 s without; ADR-0209). That silent shape is exactly what went unnoticed under AppCDS, so it
-      # is made loud here, at warning: the service is up, only slower, and the fix is a flag or an
-      # image rebuild, never an incident.
-      #
-      # Re-verified 2026-09-25 on eclipse-temurin:25-jre-alpine@sha256:2ca9adf4… (the #2035 bump):
-      # an ingest image built on it and started with -XX:-UseCompactObjectHeaders printed the same
-      # "[warning][aot] Unable to use AOT cache." and "[error  ][aot] Loading static archive failed."
-      # lines. Originally verified 2026-09-23 on eclipse-temurin:25-jre-alpine@sha256:3137541d… (Temurin 25.0.4+7):
-      # an ingest cache trained with -XX:+UseCompactObjectHeaders, started with the flag off, writes
-      #
-      #   [0.005s][warning][aot] Unable to use AOT cache.
-      #   [                    ] The AOT cache's UseCompactObjectHeaders setting (enabled) does not
-      #                          equal the current UseCompactObjectHeaders setting (disabled).
-      #   [0.005s][error  ][aot] Loading static archive failed.
-      #
-      # and then starts. The AppCDS wording the images used until 2026-09-23 ("Unable to use shared
-      # archive file", "Loading dynamic archive failed", verified 2026-09-15 for ADR-0180) is matched
-      # too, so an image from before the switch is still covered while it can be rolled back to.
-      # These lines are written by HotSpot's unified logging, outside logback, so they exist only in
-      # the `<svc>-stdout` streams (ADR-0095); none of the three Alloy masking replaces can touch
-      # them. scripts/check-loki-rule-signatures.py asserts the filter against the verbatim lines,
-      # and the next Temurin bump owes the same re-check as JvmNativeThreadExhaustion
-      # (monitoring/README.md).
       - alert: JvmStartupCacheRejected
         expr: 'sum by (app) (count_over_time({app=~"(backend|frontend|ingest)-stdout"} |~ "Unable to use (AOT cache|shared archive)|Loading (static|dynamic) archive failed" [10m])) > 0'
         for: 0m
@@ -168,8 +40,6 @@ groups:
           summary: "A JVM started without its image's startup cache ({{ $labels.app }})"
           description: "The container's stdout carries 'Unable to use AOT cache' (or the AppCDS equivalent): the JVM refused the cache baked into the image and started without it, typically because JAVA_TOOL_OPTIONS sets a different -XX:UseCompactObjectHeaders than the image was built with (ADR-0180, REQ-OPS-030). The service runs; only its start is slower. Compare the flag in JAVA_TOOL_OPTIONS / IRI_EXTRA_JAVA_OPTS with docker/app/Dockerfile; if the rollback lever is in use on purpose, this is expected until the image is rebuilt."
 
-      # Fail-open Discord SPI: a persistently erroring precheck silently disables a security gate
-      # while logins keep succeeding — only the Keycloak ERROR-rate catches it.
       - alert: KeycloakErrorRateHigh
         expr: sum(rate({app="keycloak"} |~ "(?i)\\bERROR\\b" [5m])) > 0.2
         for: 10m
@@ -179,59 +49,6 @@ groups:
           summary: "Keycloak ERROR-level log rate elevated"
           description: "Keycloak is logging ERRORs at an elevated rate — check the Discord SPI fail-open precheck path in particular."
 
-      # Keycloak OAuth backchannel failing (2026-07-22 incident): the frontend's token grants
-      # (refresh_token + authorization_code, ADR-0115 pool) died for 41 minutes with
-      # PrematureCloseException while the edge, Keycloak and all metrics-level probes stayed green —
-      # zero alerts fired. Each such line is one genuinely lost token grant (not retried by design,
-      # REQ-SEC-012): sustained occurrences mean idle sessions cannot refresh and NEW LOGINS are at
-      # risk, since the login code exchange shares the same transport. Pattern verified against the
-      # real prod lines of the incident (logger reactor.netty HttpClientConnect, stack_trace
-      # PrematureCloseException, remote keycloak.profit-base.online in the same JSON line).
-      #
-      # The discriminator EXCLUDES the backend hop instead of naming the Keycloak one (2026-09-13).
-      #
-      # It used to be `|~ "keycloak"`, which matched the remote `keycloak.profit-base.online` in
-      # that line. ADR-0166 moved identity onto the app origin, so the remote is now
-      # `profit-base.online` and the filter matched NOTHING — the 2026-07-22 incident class, 41
-      # minutes of lost token grants with every probe green and zero alerts, was unmonitored again
-      # and nothing said so. A filter that goes silently empty is the worst failure an alert has.
-      #
-      # The replacement was chosen by REPRODUCING the line rather than by reading the old comment
-      # (reactor-netty 1.3, a server that accepts and closes without answering, DEBUG on):
-      #
-      #   WARN reactor.netty.http.client.HttpClientConnect --
-      #     [b8f9b8d6-1, L:/10.0.0.5:53170 - R:profit-base.online/1.2.3.4:443]
-      #     The connection observed an error
-      #
-      # which rules out the two obvious candidates:
-      #   - the REQUEST URI is not in it. `Handler is being applied: {uri=...}` is a separate DEBUG
-      #     event, and DEBUG is off in production — so `|~ "/auth/realms"` would match nothing and
-      #     reproduce the very silence being fixed.
-      #   - the POOL NAME is not in it either. `Creating a new [frontend-oauth-pool] client pool`
-      #     is logged once, at pool creation, at DEBUG. Keying on ADR-0115's pool name fails the
-      #     same way.
-      #
-      # The remote address is the only discriminator the line actually carries, and naming the
-      # PUBLIC host would re-couple this alert to a value that just moved once and can move again.
-      # The frontend has exactly two reactor-netty destinations — the backend (`BACKEND_URL`,
-      # `https://backend:11261`, pools `frontend-pool` / `frontend-sse-pool`) and Keycloak
-      # (`frontend-oauth-pool`) — so excluding `R:backend` leaves the OAuth backchannel, and does it
-      # through a COMPOSE SERVICE NAME that no domain change touches. If a third outbound
-      # destination is ever added, it lands in this alert as a false attribution, which is loud;
-      # the previous shape failed the other way.
-      #
-      # (2026-09-20) `R:backend` is necessary but NOT sufficient, because reactor-netty's own
-      # connection line is not the only place the exception NAME appears. When a backend call dies
-      # mid-response the application logs its own ERROR with the full cause chain, and that stack
-      # trace quotes `reactor.netty.http.client.PrematureCloseException` while carrying no `R:` at
-      # all — the discriminator this alert is built on is simply absent from it. Five such lines
-      # landed in this Keycloak alert on 2026-09-20 (below the >10 threshold, so nothing fired, and
-      # nothing would have said which system was actually failing if it had). The second exclusion
-      # is the same idea applied to the shape those lines DO carry: the backend's origin as it
-      # appears in a URL (`https://backend:11261/api/v1/...`), matched on `//backend:` so a port
-      # change does not reopen it. Keycloak is reached over the public edge, so its lines can never
-      # contain it. Both exclusions name the backend rather than naming Keycloak, so neither can
-      # narrow this alert into silence.
       - alert: FrontendKeycloakBackchannelFailing
         expr: 'sum(count_over_time({app="frontend"} |~ "PrematureCloseException" != "R:backend" != "//backend:" [10m])) > 10'
         for: 5m
@@ -241,13 +58,6 @@ groups:
           summary: "Frontend->Keycloak token backchannel failing (PrematureClose)"
           description: "The frontend logs a sustained rate of PrematureCloseException against the Keycloak token endpoint — refresh grants are being lost and logins may fail. 2026-07-22 pattern: a transient L4 fault on the public hairpin stalled token POST bodies; the edge reaped each attempt after ~60s. Check the hairpin path (NPM, conntrack) and frontend re-auth rates."
 
-      # A health contributor crossing Spring Boot's 10s slow-indicator threshold is always
-      # pathological (the Docker HEALTHCHECK budget is 5s): during the 2026-07-22 incident the
-      # frontend's reactive Redis PING hung for 161-836 SECONDS, readiness hung with it and the
-      # container sat unhealthy for ~15 minutes — with no alert anywhere. Pattern verified against
-      # the real prod lines ("Health contributor org.springframework...ReactiveHealthIndicatorAdapter
-      # (redis) took 836643ms to respond"); backend included — its prod-enabled Redis indicator runs
-      # without a Lettuce timeout bound and can log the same line.
       - alert: HealthContributorHanging
         expr: 'sum by (app) (count_over_time({app=~"backend|frontend"} |~ "Health contributor .+ took" [10m])) > 0'
         for: 0m
@@ -266,10 +76,6 @@ groups:
           summary: "SSH failed-auth spike"
           description: "auth.log shows an elevated rate of failed SSH authentications / invalid users."
 
-      # Every successful root login. root is the operator's admin/tunnel path and there is no other
-      # SSH-capable account, so each login should be attributable — this fires on the operator's OWN
-      # logins by design (an attributable audit trail); narrow to (password|keyboard-interactive) or
-      # scope by source IP if the mail volume is unwanted.
       - alert: SshRootLoginAccepted
         expr: sum(rate({app="host-auth"} |~ "Accepted (publickey|password|keyboard-interactive) for root " [5m])) > 0
         for: 0m
@@ -279,7 +85,6 @@ groups:
           summary: "Successful SSH root login"
           description: "auth.log shows a successful root login. Expected only for operator admin/tunnel sessions — verify it was you."
 
-      # The only non-root account (deploy) is nologin with no sudo, so any sudo failure is anomalous.
       - alert: SudoAuthFailure
         expr: sum(rate({app="host-auth"} |~ "sudo:.*(authentication failure|NOT in sudoers|command not allowed)" [10m])) > 0
         for: 0m
@@ -298,9 +103,6 @@ groups:
           summary: "Edge 5xx spike"
           description: "The edge access log shows an elevated 5xx rate — catches upstream failures app metrics cannot see."
 
-      # 429s come from the edge limiter (REQ-SEC-023, limit_req/limit_conn in
-      # docker/edge/include/limits.conf) or the backend Bucket4j limiter passing through the edge —
-      # either way a sustained rate means someone is flooding or brute-forcing.
       - alert: EdgeRateLimitSpike
         expr: sum(rate({app="edge"} |~ " 429 " [5m])) > 1
         for: 10m
@@ -310,23 +112,7 @@ groups:
           summary: "Edge rate limiter engaged"
           description: "The edge access log shows a sustained 429 rate — the per-IP limiter (or the backend rate limiter) is rejecting a flood. Check source IPs in the edge stream."
 
-      # A certificate renewal that keeps failing is otherwise silent for weeks (ADR-0162,
-      # REQ-OPS-026). The acme loop swallows a lego failure on purpose — it prints the marker below
-      # and retries on its next pass — so nothing crashes, nothing scrapes, and the only other signal
-      # is CertificateExpiringSoon at 14 days before expiry. Renewal starts 30 days out, so a failure
-      # that begins on day one of that window sits unseen for a fortnight.
-      #
-      # The loop sleeps 12h, so a single pass failing is a Let's Encrypt hiccup and not news. The
-      # threshold is >1 marker in 26h — two CONSECUTIVE passes — and the window is 26h rather than
-      # 24h so two passes exactly 12h apart cannot fall on either side of the boundary and be
-      # counted as one. A restart-looping acme prints far more than two, but that case belongs to
-      # ContainerRestartLoop (critical) and is not what this rule is for.
-      #
-      # warning, not critical: the certificates are valid for weeks at this point, there are ~60
-      # further retries before expiry, and CertificateExpiringSoon remains the hard backstop.
       - alert: AcmeRenewalFailing
-        # Single-quoted: the line filter contains ": ", which an unquoted YAML scalar reads as a
-        # mapping and rejects.
         expr: 'sum(count_over_time({app="acme"} |~ "acme: (renew|initial issuance) failed" [26h])) > 1'
         for: 5m
         labels:
@@ -335,23 +121,6 @@ groups:
           summary: "ACME certificate renewal is failing"
           description: "Two consecutive passes of the acme loop failed to obtain a certificate. The edge keeps serving the current one, which is still valid, but every vhost expires together — check `journalctl CONTAINER_NAME=acme --since -2h` for lego's own error, and that the HTTP-01 challenge path through the edge still answers."
 
-      # sshd_config / authorized_keys tamper: auditd emits a watch event (with the acting auid) on any
-      # write to the sshd config or a root authorized_keys. Fires on the operator's OWN edits too (rare)
-      # — each event carries the auid, so it stays attributable; raise to critical once the config is
-      # stable. Needs the host-auditd stream (auditd installed + log_group=adm). The raw-log key= format
-      # is verified in prod: neither key is hex-encoded, so the plain `key="…"` match is correct.
-      #
-      # type=SYSCALL is REQUIRED, not cosmetic (2026-07-28 fix). A watch hit carries its key= on the
-      # type=SYSCALL record, but auditd ALSO stamps each rule's key= onto the type=CONFIG_CHANGE records
-      # it emits for its own `op=remove_rule` / `op=add_rule` bookkeeping when the daemon restarts and
-      # reloads /etc/audit/rules.d. Without the type filter those reload records look exactly like a
-      # tamper event: the nightly unattended-upgrade of libc6 restarts auditd, so this alert fired at
-      # 04:11:43Z with auid=unset and every watched file's mtime untouched — a monthly false page.
-      #
-      # Note the watches are `-w /root/.ssh/ -p wa` and `-w /etc/ssh/sshd_config.d/ -p wa`, i.e.
-      # DIRECTORY watches: a benign known_hosts append by the operator's own outbound ssh also trips
-      # sshd-authkeys. That stays in scope on purpose — the record carries auid/comm so it is
-      # attributable in one look, and narrowing by comm= would blind the alert to a real backdoor write.
       - alert: AuditdSshTamper
         expr: 'sum(count_over_time({app="host-auditd"} |= `type=SYSCALL` |~ `key="(sshd-config|sshd-authkeys)"` [5m])) > 0'
         for: 0m

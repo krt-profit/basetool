@@ -242,10 +242,6 @@ public class OrgUnitBankApprovalLimitService {
       @Nullable String roleCode,
       @Nullable UUID userId,
       @NotNull BigDecimal amount) {
-    // Serialise concurrent set-limit calls for the same account on its row lock (a plain SELECT FOR
-    // UPDATE that does NOT bump the account @Version) so the find-or-insert below cannot race two
-    // inserts into a V193 partial unique index (uq_bank_appr_limit_*). The lock is released at tx
-    // end.
     bankAccountRepository.findByIdForUpdate(account.getId());
     Optional<BankAccountApprovalLimit> existing =
         switch (kind) {

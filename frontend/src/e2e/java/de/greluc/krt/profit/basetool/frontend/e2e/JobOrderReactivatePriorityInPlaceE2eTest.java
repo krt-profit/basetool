@@ -119,8 +119,6 @@ class JobOrderReactivatePriorityInPlaceE2eTest {
       try {
         E2eSupport.navigate(page, detailUrl);
 
-        // Complete the order: a terminal target opens the warning modal first; only the confirm
-        // click posts and nulls the priority server-side.
         page.locator("#status-select").selectOption("COMPLETED");
         assertThat(page.locator("#status-warning-modal")).isVisible();
         page.waitForResponse(
@@ -130,14 +128,9 @@ class JobOrderReactivatePriorityInPlaceE2eTest {
         assertEquals("COMPLETED", persistedStatus(), "status persists after completion");
         assertEquals(true, persistedPriorityNull(), "a terminal status nulls the priority");
 
-        // Reload so the dropdown carries the refreshed @Version, then mark the live document.
         E2eSupport.navigate(page, detailUrl);
         page.evaluate("() => { window.__krtNoReload = true; }");
 
-        // Reactivate COMPLETED -> IN_PROGRESS: a non-terminal change posts immediately and (the
-        // fix)
-        // re-pulls the header fragment so the freshly assigned priority renders in place. On the
-        // pre-fix path no GET /orders/{id}?fragment=header fires here, so this wait would time out.
         page.waitForResponse(
             response ->
                 response.url().contains("fragment=header")

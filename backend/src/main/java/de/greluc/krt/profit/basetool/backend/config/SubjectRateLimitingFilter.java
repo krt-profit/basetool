@@ -161,8 +161,6 @@ public class SubjectRateLimitingFilter extends OncePerRequestFilter {
     this.problemResponseFactory = problemResponseFactory;
     this.objectMapper = objectMapper;
     this.meterRegistry = meterRegistry;
-    // Bounded so a flood of distinct subjects cannot grow the map without limit — the same reason
-    // the per-IP filter caps its own cache.
     this.buckets =
         Caffeine.newBuilder()
             .expireAfterAccess(BUCKET_EXPIRE_AFTER_ACCESS)
@@ -251,8 +249,6 @@ public class SubjectRateLimitingFilter extends OncePerRequestFilter {
     }
 
     PathContainer path = PathContainer.parsePath(request.getRequestURI());
-    // The export bucket first: it is the tighter of the two, so a looping download is refused
-    // before it spends the account's write budget as well.
     if (spendsFromExportBudget(path)
         && !tryConsume(
             request,
@@ -298,8 +294,6 @@ public class SubjectRateLimitingFilter extends OncePerRequestFilter {
       @NotNull Duration refillPeriod)
       throws IOException {
     ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
-    // Every attempt, so rejections/requests gives the per-subject rejection ratio. Bounded label
-    // only — the subject is never exported, it is unbounded and PII.
     meterRegistry
         .counter(MetricNames.RATELIMIT_REQUESTS, MetricNames.TAG_BUCKET, bucketLabel)
         .increment();
@@ -384,9 +378,6 @@ public class SubjectRateLimitingFilter extends OncePerRequestFilter {
     meterRegistry
         .counter(MetricNames.RATELIMIT_REJECTIONS, MetricNames.TAG_BUCKET, bucketLabel)
         .increment();
-    // WARN, unlike the per-IP limiter's DEBUG: this budget is per authenticated account, so its
-    // volume is bounded by the number of real users and every hit is actionable. The subject is
-    // already in the userId MDC field (REQ-OBS-001) and is never repeated into the message.
     log.warn(
         "Per-subject rate limit exceeded (bucket={}, capacity={} per {}, retryAfter={}s)",
         bucketLabel,
@@ -415,8 +406,6 @@ public class SubjectRateLimitingFilter extends OncePerRequestFilter {
             "rate-limit-exceeded",
             CODE_RATE_LIMIT_EXCEEDED,
             correlationId);
-    // UTF-8 bytes directly: the localized detail carries German umlauts and the servlet writer
-    // would encode them as ISO-8859-1.
     response.getOutputStream().write(objectMapper.writeValueAsBytes(problem));
   }
 }

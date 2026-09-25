@@ -110,22 +110,15 @@ class MissionOrganisationLiveSyncE2eTest {
       Page pageA = contextA.newPage();
       Page pageB = contextB.newPage();
       try {
-        // A lands on the Verwaltung tab where the party-lead form is interactable; B stays on the
-        // default tab, where the overview's #overview-party-lead is visible and must update live.
         E2eSupport.navigate(pageA, baseUrl + "/missions/" + missionId + "?tab=verw");
         pageA.waitForLoadState();
         E2eSupport.navigate(pageB, baseUrl + "/missions/" + missionId);
         pageB.waitForLoadState();
 
-        // B starts with no party lead ("Keine" / none).
         assertThat(pageB.locator("#overview-party-lead")).not().hasText(GUEST_LEAD_NAME);
 
-        // A full reload on B would clear this marker; the live in-place swap leaves it intact.
         pageB.evaluate("window.__krtNoReload = true;");
 
-        // Deterministic wait: an acked mission-room subscription on /ws/sync implies B is
-        // registered
-        // with the relay, so A's subsequent change frame cannot race past it (anchor semantics).
         pageB.waitForCondition(
             () ->
                 Boolean.TRUE.equals(
@@ -135,16 +128,12 @@ class MissionOrganisationLiveSyncE2eTest {
                             + missionId
                             + "') !== -1)")));
 
-        // Context A sets a guest party lead through the Organisation panel form.
         pageA.locator("#party-lead-search-input").fill(GUEST_LEAD_NAME);
         pageA.locator("#party-lead-form button[type='submit']").click();
-        // A's own panel updates in place (sanity: the mutation succeeded).
         assertThat(pageA.locator("#party-lead-display"))
             .containsText(
                 GUEST_LEAD_NAME, new LocatorAssertions.ContainsTextOptions().setTimeout(20_000));
 
-        // The assertion under test: context B — which did nothing — shows the new party lead in its
-        // overview, pushed over the presence WebSocket and applied as an in-place overview swap.
         assertThat(pageB.locator("#overview-party-lead"))
             .containsText(
                 GUEST_LEAD_NAME, new LocatorAssertions.ContainsTextOptions().setTimeout(20_000));

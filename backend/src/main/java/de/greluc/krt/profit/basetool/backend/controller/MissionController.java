@@ -187,10 +187,6 @@ public class MissionController {
             sort,
             Set.of("plannedStartTime", "name", "status", "id"),
             "plannedStartTime");
-    // Every caller MUST go through searchMissions so the org-unit scope (own Staffel OR
-    // is_internal=false organisation-wide) is applied — getAllMissions would call
-    // missionRepository.findAll() unfiltered and leak internal missions of other squadrons to
-    // every authenticated user (MULTI_SQUADRON_PLAN.md section 1).
     Page<Mission> pageResult =
         missionService.searchMissions(
             null,
@@ -279,11 +275,6 @@ public class MissionController {
           + " and @ownerScopeService.canSeeMission(#id)")
   @Transactional(readOnly = true)
   public MissionDto getMissionById(@PathVariable @NotNull UUID id) {
-    // REQ-SEC-007: a member below Logistician reads the roster without its PII. The two throws that
-    // stood here — internal missions and terminal ones refused outright — belonged to the outsider
-    // tier, whose whole audience (anonymous and role-less callers) no longer exists (ADR-0159).
-    // Visibility itself is unchanged and is decided by canSeeMission above, which is where the
-    // internal-mission rule always lived for members.
     return redactForPeer(missionMapper.toDto(missionService.getMissionById(id)));
   }
 
@@ -316,12 +307,6 @@ public class MissionController {
    * @param request create payload
    * @return the persisted DTO
    */
-  // The last mission endpoint that asked only for a login. Everything else on this surface reads
-  // `isAuthenticated() and isMemberOrAbove() and <scope predicate>`, and creation had no scope
-  // predicate to carry - so it was the one caller set the stated invariant did not cover, and the
-  // one an authenticated non-member could still reach. `ROLE_INGEST_GATEWAY` is that shape today
-  // (ADR-0129): authenticated, deliberately not a member. It calls only the two import endpoints
-  // and never this one, so the gate closes a hole rather than a path. Owner decision, 2026-09-07.
   @PostMapping
   @PreAuthorize("isAuthenticated() and @authHelperService.isMemberOrAbove()")
   @Operation(summary = "Create a new mission")
@@ -496,11 +481,6 @@ public class MissionController {
               + " desired job type and the payout preference; omitting it (or either field) keeps"
               + " the pre-2026-09-02 behaviour, including the profile-default payout chain of"
               + " REQ-MISSION-002.")
-  // SecurityConfig falls through to `anyRequest().authenticated()` for this path, but the
-  // explicit `isAuthenticated()` keeps the controller honest if the URL filter is later loosened:
-  // a caller with no JWT reaches the handler and NPEs in `getUserIdFromJwt`.
-  // `canSeeMission` enforces MULTI_SQUADRON_PLAN.md §1: members of another squadron may join
-  // only non-internal missions, own-squadron members + admins may join anything.
   @PreAuthorize(
       "isAuthenticated() and @authHelperService.isMemberOrAbove()"
           + " and @ownerScopeService.canSeeMission(#id)")
@@ -508,8 +488,6 @@ public class MissionController {
       @AuthenticationPrincipal Jwt jwt,
       @PathVariable @NotNull UUID id,
       @RequestBody(required = false) @Valid JoinMissionRequest request) {
-    // Self-enrolment only: the user comes from the token, never from the body. Everything the
-    // body can say is about the caller's own row, which is why it needs no self-vs-manager check.
     MissionDto dto =
         missionMapper.toDto(
             missionService.addParticipant(
@@ -520,11 +498,6 @@ public class MissionController {
                 null,
                 null,
                 request == null ? null : request.payoutPreference()));
-    // REQ-SEC-007. Found by the rewritten peerReadableMissionEndpointsMustRedactPii rule, and it
-    // was a real leak rather than a rule artefact: joining returns the WHOLE Einsatz, roster
-    // included, and the caller here is by definition an ordinary member — the one person on the
-    // mission surface most likely to be below Logistician. The old rule could not see it, because
-    // it selected only gates that lacked isAuthenticated() and this one has always had it.
     return redactForPeer(dto);
   }
 
@@ -567,10 +540,6 @@ public class MissionController {
         responseCode = "409",
         description = "Participant name is ambiguous and matches more than one registered user")
   })
-  // MULTI_SQUADRON_PLAN.md §1: the sign-up view is open cross-staffel only for NON-internal
-  // missions; internal missions of a foreign squadron must reject sign-ups. `canSeeMission`
-  // returns true for own-squadron, admin, and non-internal-anywhere — exactly the matrix we need.
-  // The isAuthenticated() half is REQ-SEC-052's: the URL used to be permitAll.
   @PreAuthorize(
       "isAuthenticated() and @authHelperService.isMemberOrAbove()"
           + " and @ownerScopeService.canSeeMission(#id)")
@@ -589,9 +558,6 @@ public class MissionController {
                 request.comment(),
                 request.orgUnitIds(),
                 request.payoutPreference()));
-    // H-2 / REQ-SEC-007: a member below Logistician gets the peer view — roster visible, PII
-    // stripped. There used to be a stricter tier above this one for anonymous and role-less
-    // callers; ADR-0159 removed that audience, so one tier is all that is left.
     return redactForPeer(dto);
   }
 
@@ -719,9 +685,6 @@ public class MissionController {
   })
   public MissionDto setPartyLead(
       @PathVariable @NotNull UUID id, @RequestBody @Valid @NotNull SetPartyLeadRequest request) {
-    // The participant free-text resolution: a unique member match links the member, several are a
-    // 409, none keeps the external handle. The caller is always a mission manager here
-    // (canManageMission), so the self-vs-manager check the participant add needs is moot.
     ParticipantTarget target =
         participantTargetResolver.resolve(
             request.userId(), request.guestName(), "Party lead name is ambiguous.");
@@ -730,15 +693,6 @@ public class MissionController {
             missionService.setPartyLead(
                 id, target.userId(), target.guestName(), request.version())));
   }
-
-  // -------------------------------------------------------------------------------------
-  // Slim sub-resource endpoints (Option A / multi-user concurrency).
-
-  // They return only the affected slim sub-DTO (or a slim list, or 204 No Content)
-  // instead of the full MissionDto. This lets the frontend run per-sub-aggregate DOM
-  // `data-version` synchronisation without coupling the Mission parent version into
-  // every AJAX round-trip. Their MissionDto-returning predecessors are gone (BE-SIMP-02).
-  // -------------------------------------------------------------------------------------
 
   /**
    * Locates a unit inside a mission aggregate by id, or throws {@link NotFoundException}. Used by
@@ -779,8 +733,6 @@ public class MissionController {
         unit.getCrew().stream().filter(c -> crewId.equals(c.getId())).findFirst(),
         "Crew member not found");
   }
-
-  // --- Units ---
 
   /**
    * Adds a unit and returns only the updated unit list (slim), so the {@code Mission.version} is
@@ -863,8 +815,6 @@ public class MissionController {
     missionService.removeMissionUnit(id, unitId);
     return ResponseEntity.noContent().build();
   }
-
-  // --- Ablauf steps (procedure timeline) ---
 
   /**
    * Appends an Ablauf step and returns the mission's full step list in order (slim). Guarded by the
@@ -982,8 +932,6 @@ public class MissionController {
         .map(missionMapper::toDto)
         .toList();
   }
-
-  // --- Mission goals (Ziele) ---
 
   /**
    * Appends a goal (Ziel) and returns the mission's full goal list in order (slim). Guarded by the
@@ -1105,8 +1053,6 @@ public class MissionController {
         missionService.getSelectableUnitShips(id).stream().map(shipMapper::toDto).toList());
   }
 
-  // --- Crew ---
-
   /**
    * Adds crew and returns only the affected unit's crew list (slim).
    *
@@ -1155,8 +1101,6 @@ public class MissionController {
         request.jobTypeIds() != null ? request.jobTypeIds() : Collections.emptySet();
     var mission =
         missionService.updateCrewInShip(id, missionUnitId, crewId, request.version(), jobTypeIds);
-    // MissionCrewDto carries no nested user — id, participantId, participantName, version and
-    // the job types — so there is nothing for the peer pass to strip from it.
     return missionMapper.toDto(findCrew(findUnit(mission, missionUnitId), crewId));
   }
 
@@ -1180,8 +1124,6 @@ public class MissionController {
     missionService.removeCrewFromShip(id, missionUnitId, crewId);
     return ResponseEntity.noContent().build();
   }
-
-  // --- Participants ---
 
   /**
    * Updates a participant and returns only the updated participant (slim).
@@ -1218,10 +1160,6 @@ public class MissionController {
             request.guestName(),
             request.version(),
             authentication);
-    // REQ-SEC-007 (audit finding C-1): below Logistician the participant comes back as the public
-    // callsign tuple, never an e-mail or a real name — which is exactly what a member editing their
-    // own row on a shared Einsatz should get back, and what a future mapping change must not be
-    // able to widen.
     return redactForPeer(missionMapper.toDto(findParticipant(mission, participantId)));
   }
 
@@ -1244,7 +1182,6 @@ public class MissionController {
   public MissionParticipantDto checkInParticipantSlim(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID participantId) {
     var mission = missionService.checkIn(id, participantId);
-    // REQ-SEC-007: a member below Logistician gets the participant PII redaction.
     return redactForPeer(missionMapper.toDto(findParticipant(mission, participantId)));
   }
 
@@ -1267,7 +1204,6 @@ public class MissionController {
   public MissionParticipantDto checkOutParticipantSlim(
       @PathVariable @NotNull UUID id, @PathVariable @NotNull UUID participantId) {
     var mission = missionService.checkOut(id, participantId);
-    // REQ-SEC-007: a member below Logistician gets the participant PII redaction.
     return redactForPeer(missionMapper.toDto(findParticipant(mission, participantId)));
   }
 
@@ -1293,7 +1229,6 @@ public class MissionController {
       @PathVariable @NotNull UUID participantId,
       @RequestBody @Valid @NotNull UpdatePayoutPreferenceRequest request) {
     var mission = missionService.updatePayoutPreference(id, participantId, request.preference());
-    // REQ-SEC-007: a member below Logistician gets the participant PII redaction.
     return redactForPeer(missionMapper.toDto(findParticipant(mission, participantId)));
   }
 
@@ -1316,9 +1251,6 @@ public class MissionController {
               + " guestName (case-insensitive resolution against registered users). Callers may"
               + " always add themselves; adding anyone else is restricted to"
               + " managers/officers/admins.")
-  // MULTI_SQUADRON_PLAN.md §1: same gate as the legacy `/participants/add` endpoint — only
-  // non-internal missions accept cross-staffel sign-ups. Internal missions of a foreign squadron
-  // are refused here, not at the URL matrix.
   @PreAuthorize(
       "isAuthenticated() and @authHelperService.isMemberOrAbove()"
           + " and @ownerScopeService.canSeeMission(#id)")
@@ -1336,10 +1268,6 @@ public class MissionController {
             request.comment(),
             request.orgUnitIds(),
             request.payoutPreference());
-    // H-5 / REQ-SEC-007: every caller below Logistician gets the peer-redacted user shape — the
-    // full roster, but only the public callsign tuple (username, displayName, rank), never email or
-    // real name. The ArchUnit rule {@code peerReadableMissionEndpointsMustRedactPii} statically
-    // enforces this for any future endpoint returning a PII-carrying mission DTO.
     return redactParticipantsForPeer(
         mission.getParticipants().stream().map(missionMapper::toDto).toList());
   }
@@ -1422,8 +1350,6 @@ public class MissionController {
     return redactParticipantsForPeer(
         missionService.getUnassignedParticipants(id).stream().map(missionMapper::toDto).toList());
   }
-
-  // --- Frequencies ---
 
   /**
    * Upserts a frequency by type; returns only the updated frequency list (slim).
@@ -1512,8 +1438,6 @@ public class MissionController {
     return mission.getFrequencies().stream().map(missionMapper::toDto).toList();
   }
 
-  // --- Managers ---
-
   /**
    * Adds a manager; returns the updated manager list as {@link UserReferenceDto}s (id + label
    * only).
@@ -1595,16 +1519,6 @@ public class MissionController {
         participantTargetResolver.resolve(
             requestedUserId, guestName, "Participant name is ambiguous.");
 
-    // H-1 (2026-05-20 audit): the legacy public add-participant let a non-manager submit a foreign
-    // userId and silently add another registered member as participant. Self-enroll always works;
-    // adding someone else requires canManageMission.
-    //
-    // Deliberately NOT conditioned on `jwt != null` any more. It used to be, because a null JWT
-    // meant "anonymous" and anonymous was refused a line earlier. Since REQ-SEC-052 there is no
-    // anonymous caller, and a null JWT means the token-less acting-member identity the ingest
-    // gateway installs (ADR-0129) — for which the old shape would have skipped this check
-    // entirely and let it name anyone. Fail closed instead: no resolvable caller id means the
-    // participant is somebody else.
     if (target.userId() != null
         && (callerId == null || !target.userId().equals(callerId))
         && !missionSecurityService.canManageMission(id, authentication)) {

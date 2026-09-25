@@ -113,8 +113,6 @@ public final class CatalogPages {
         break;
       }
       items.addAll(response.content());
-      // The backend total is authoritative, but never report less than what was actually
-      // gathered (defends against an endpoint that leaves totalElements unset).
       totalElements = Math.max(response.totalElements(), items.size());
       if (response.content().isEmpty() || page + 1 >= response.totalPages()) {
         break;

@@ -54,9 +54,6 @@ public record AndroidAppLinkProperties(
         List<
                 @Pattern(
                     regexp = "^([0-9A-F]{2}:){31}[0-9A-F]{2}$",
-                    // Literal, not a message-bundle key: this fails at STARTUP and is read by an
-                    // operator in a log, never by a member in a browser. An unresolved key would
-                    // print its own braces at exactly the moment someone needs the answer.
                     message =
                         "must be an upper-case, colon-separated SHA-256 certificate digest, "
                             + "e.g. AB:CD:...:EF (32 pairs)")

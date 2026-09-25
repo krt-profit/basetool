@@ -60,13 +60,11 @@ public class OpenApiCachingConfig {
                           (httpMethod, operation) -> {
                             if (httpMethod.name().equalsIgnoreCase("GET")) {
                               ApiResponses responses = operation.getResponses();
-                              // Document 304 Not Modified
                               responses.addApiResponse(
                                   "304",
                                   new ApiResponse()
                                       .description("Not Modified (ETag/If-None-Match)"));
 
-                              // Add standard caching headers to 200 response
                               ApiResponse ok =
                                   responses.computeIfAbsent(
                                       "200", k -> new ApiResponse().description("OK"));

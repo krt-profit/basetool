@@ -132,17 +132,13 @@ class RefineryOrderLiveSyncE2eTest {
         E2eSupport.navigate(pageB, baseUrl + "/refinery-orders/" + orderId);
         pageB.waitForLoadState();
 
-        // B starts on the seeded value, not the one A is about to save.
         assertThat(pageB.locator("#oreSales"))
             .not()
             .hasAttribute("value", Pattern.compile("^" + NEW_ORE_SALES));
 
-        // A full reload on either page would clear these markers; an in-place swap leaves them.
         pageA.evaluate("window.__krtNoReload = true;");
         pageB.evaluate("window.__krtNoReload = true;");
 
-        // Deterministic wait: B is registered with the relay once its refinery-order:{id} subscribe
-        // is acked (subscribedTopics non-empty), so A's change frame cannot race past it.
         pageB.waitForCondition(
             () ->
                 Boolean.TRUE.equals(
@@ -150,21 +146,9 @@ class RefineryOrderLiveSyncE2eTest {
                         "!!(window.krtLiveSync && window.krtLiveSync.subscribedTopics"
                             + " && window.krtLiveSync.subscribedTopics().length > 0)")));
 
-        // The input-material picker is `required`, but its options come from the long-cached
-        // /api/v1/materials, which need not contain this test's freshly-seeded material — so the
-        // row's pre-selected option can be absent, leaving the picker empty. The browser then
-        // blocks
-        // the submit with a native validation bubble, no POST is issued, and every later assertion
-        // fails for the wrong reason. Pick whatever RAW material the combobox offers, exactly as
-        // RefineryOrderLifecycleE2eTest#editsAnOrderThroughTheUi does. The form carries no
-        // output-material field, so the backend re-infers the output; this test asserts Ore-Sales.
         E2eSupport.selectComboboxFirstOption(
             pageA.locator(".krt-combobox:has(#inputMaterialId_0) .krt-combobox__input"));
 
-        // Context A saves. The fixed footer can intercept the click on the bottom action row, so
-        // drop it first (the same guard the other refinery UI tests use). Waiting on the update
-        // POST's own response makes a submit that never fires — the validation-bubble trap above —
-        // fail here and loudly, instead of silently downgrading into a "peer never synced" failure.
         pageA.evaluate(
             "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
                 + " 'none'; } }");
@@ -175,12 +159,6 @@ class RefineryOrderLiveSyncE2eTest {
                     && "POST".equals(response.request().method()),
             () -> pageA.locator("button[form='refineryOrderMainForm']").click());
 
-        // A's own form is re-rendered in place from the saved state — the save did not navigate to
-        // the list, which is the REQ-FE-001 half of this change. The assertion is on the value
-        // ATTRIBUTE, not the property: `fill` above set only the property, so the attribute can
-        // change to the persisted value ("54321.0", a Double) only by a server re-render of the
-        // `order` fragment. Asserting the property here would pass on the typed-in text alone and
-        // prove nothing.
         assertThat(pageA.locator("#refineryOrderMainForm"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
         assertThat(pageA.locator("#oreSales"))
@@ -193,9 +171,6 @@ class RefineryOrderLiveSyncE2eTest {
             pageA.evaluate("window.__krtNoReload === true"),
             "the acting client's save must be an in-place swap — no navigation, no reload");
 
-        // The assertion under test: context B — which did nothing — shows the new value, pushed
-        // over /ws/sync and applied as an in-place `order` section swap. B never typed, so its
-        // property and attribute both come from the re-rendered fragment.
         assertThat(pageB.locator("#oreSales"))
             .hasAttribute(
                 "value",

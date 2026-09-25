@@ -148,20 +148,11 @@ public class AdminDefaultBlueprintsPageController {
     try {
       String query = q == null ? "" : q;
       int effectiveLimit = limit == null ? 25 : Math.min(200, Math.max(1, limit));
-      // Pass the free-text term as a WebClient URI-template variable so it is percent-encoded
-      // exactly once across the frontend->backend hop; URLEncoder form-encoding (space -> '+')
-      // double-encodes umlauts / reserved chars when re-encoded on the hop, yielding zero matches.
       String uri = "/api/v1/blueprints/products/search?q={q}&limit=" + effectiveLimit;
       List<BlueprintProductDto> result =
           backendApiClient.get(uri, BLUEPRINT_PRODUCT_LIST_TYPE, query);
       return result == null ? Collections.emptyList() : result;
     } catch (Exception e) {
-      // DEBUG, not WARN: this endpoint fires ONE REQUEST PER KEYSTROKE. With the backend down, a
-      // single admin typing a product name produces one line per character — a log-flood vector
-      // triggered accidentally by ordinary use, which REQ-OBS-001 puts at DEBUG. The outage itself
-      // is already carried by basetool_backend_client_errors_total and by the WebClient/resilience
-      // logging, so nothing is lost. The query is user-typed free text and goes through LogSafe so
-      // it cannot inject a forged log line (CWE-117).
       log.debug(
           "Default-blueprint product type-ahead failed for query='{}': {}",
           LogSafe.text(q, MAX_LOGGED_QUERY),

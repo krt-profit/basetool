@@ -168,18 +168,6 @@ public class WebAppManifestController {
    *
    * @see #DEFAULT_NAME
    */
-  /*
-   * German, because DEFAULT_LOCALE is German.
-   *
-   * These three defaults only appear when a bundle key is missing, and the response then carries
-   * `"lang": "de"` with English text, cached for an hour by the Cache-Control this controller sets.
-   * A fallback that contradicts the locale it is served under is worse than the key being absent.
-   *
-   * <p>The value is `messages.properties`' own `pwa.description` — the German one, since that
-   * file is the fallback bundle and German is the primary locale. `pwa.name` and
-   * `pwa.short_name` need no such treatment: they are the product name and are byte-identical in
-   * all three bundles.
-   */
   private static final String DEFAULT_DESCRIPTION =
       "Einsätze, Aufträge, Lager und Raffinerie der Organisation.";
 
@@ -242,15 +230,6 @@ public class WebAppManifestController {
     final var manifest =
         new WebAppManifest(
             root,
-            // The four-arg overload, with a default — NOT the throwing one. This method's contract
-            // is "always 200, never a redirect": ArchitectureTest lists it PUBLIC_BY_DESIGN,
-            // AnonymousSurfaceSweepMvcTest asserts the non-redirect, and it now sits behind a
-            // blackbox module pinned to `valid_status_codes: [200]` with EdgePublicSurfaceNot200
-            // watching. `getMessage(code, args, locale)` throws NoSuchMessageException, so dropping
-            // or renaming one of these three keys in a later bundle edit would turn every anonymous
-            // fetch into a 500 — including the browser's install-time read, which would then name
-            // the home-screen icon after an error page. A fallback keeps the contract; the
-            // key-parity test is what catches the missing key.
             messageSource.getMessage("pwa.name", null, DEFAULT_NAME, resolved),
             messageSource.getMessage("pwa.short_name", null, DEFAULT_SHORT_NAME, resolved),
             messageSource.getMessage("pwa.description", null, DEFAULT_DESCRIPTION, resolved),

@@ -96,7 +96,6 @@ class MissionRepositoryLookupOrderingTest {
    * 2099) planned starts and a matching lower bound so they dominate the shared test container
    * regardless of what other suites have committed.
    */
-  // covers REQ-MISSION-003 — next-mission banner only considers PLANNED/ACTIVE missions
   @Test
   void findFirstByPlannedStartTimeAfterAndStatusIn_skipsTerminalStatusEvenWhenItSortsEarlier() {
     String tag = UUID.randomUUID().toString().substring(0, 8);
@@ -126,7 +125,6 @@ class MissionRepositoryLookupOrderingTest {
    * planned start. This is the core of the home-page banner narrowing: a member must see their own
    * unit's next mission, never the organisation-wide one.
    */
-  // covers REQ-MISSION-008 — banner scoped to the caller's own org unit(s)
   @Test
   void findNextScopedMission_returnsOwnUnitNextSkippingForeignAndTerminal() {
     String tag = UUID.randomUUID().toString().substring(0, 8);
@@ -134,10 +132,8 @@ class MissionRepositoryLookupOrderingTest {
     OrgUnit foreign = newSquadron("Scoped-Foreign-" + tag, "SF" + tag);
 
     Instant lowerBound = Instant.parse("2098-01-01T00:00:00Z");
-    // Foreign public mission with the globally-earliest start — must be excluded by scope.
     saveMission(
         foreign, "Foreign-Earliest", Instant.parse("2099-01-01T00:00:00Z"), "PLANNED", false);
-    // Own terminal mission earlier than the eligible one — must be excluded by status.
     saveMission(mine, "Mine-Terminal", Instant.parse("2099-01-15T00:00:00Z"), "COMPLETED", false);
     UUID mineSoonId =
         saveMission(mine, "Mine-Soon", Instant.parse("2099-02-01T00:00:00Z"), "PLANNED", false);
@@ -154,7 +150,6 @@ class MissionRepositoryLookupOrderingTest {
 
     assertThat(head).extracting(Mission::getId).containsExactly(mineSoonId);
 
-    // A wider page proves the full eligible set is exactly the own unit's live missions in order.
     List<Mission> all =
         missionRepository.findNextScopedMission(
             lowerBound,
@@ -176,14 +171,12 @@ class MissionRepositoryLookupOrderingTest {
    * missions are unconditionally in scope. What is left is the half that describes the query as it
    * now behaves.
    */
-  // covers REQ-MISSION-008 — an own-unit internal mission is banner-eligible
   @Test
   void findNextScopedMission_includesOwnInternalMission() {
     String tag = UUID.randomUUID().toString().substring(0, 8);
     OrgUnit mine = newSquadron("Scoped-Int-" + tag, "SI" + tag);
 
     Instant lowerBound = Instant.parse("2098-01-01T00:00:00Z");
-    // Earlier and internal — the head, because an own-unit internal mission is in scope.
     UUID internalId =
         saveMission(mine, "Mine-Internal", Instant.parse("2099-02-01T00:00:00Z"), "PLANNED", true);
     saveMission(mine, "Mine-Public", Instant.parse("2099-03-01T00:00:00Z"), "PLANNED", false);

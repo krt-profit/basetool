@@ -1,12 +1,6 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
-<!--
-  Test-only harness that exercises every reusable component fragment from
-  fragments/components.html. Rendered by ComponentFragmentsRenderTest through the
-  Spring Thymeleaf engine so a malformed fragment (which only fails at render time,
-  never at build time) is caught by the test suite.
--->
 <div id="harness-button">
     <th:block th:replace="~{fragments/components :: button(label='DELETE', variant='danger', type='submit', extraClass=null)}"></th:block>
 </div>

@@ -71,25 +71,20 @@ class V168BankAreaCartelLinkageMigrationTest {
       insertOrgUnit(jdbc, olId, "ORGANISATIONSLEITUNG", "TEST_V168_OL", "TV8OL", null);
       insertOrgUnit(jdbc, bereichId, "BEREICH", "TEST_V168_BER", "TV8B", olId);
 
-      // AREA linked to its Bereich via the FK (no area_name) — accepted by the relaxed CHECK.
       insertAccount(jdbc, areaAcctId, "KB-V168-1", "Area Profit", "AREA", bereichId, null);
       assertThat(accountCount(jdbc, areaAcctId)).isOne();
       assertThat(orgUnitIdOf(jdbc, areaAcctId)).isEqualTo(bereichId);
 
-      // CARTEL linked to the OL via the FK — accepted.
       insertAccount(jdbc, cartelAcctId, "KB-V168-2", "Kartell", "CARTEL", olId, null);
       assertThat(orgUnitIdOf(jdbc, cartelAcctId)).isEqualTo(olId);
 
-      // Cardinality: a second account for the same Bereich is rejected by uq_bank_account_org_unit.
       assertThatThrownBy(
               () -> insertAccount(jdbc, dupAreaAcctId, "KB-V168-3", "Dup", "AREA", bereichId, null))
           .isInstanceOf(DataAccessException.class);
 
-      // The legacy free-form area_name form (no FK) is still accepted during the soak.
       insertAccount(jdbc, legacyAreaAcctId, "KB-V168-4", "Legacy", "AREA", null, "Legacy-Bereich");
       assertThat(accountCount(jdbc, legacyAreaAcctId)).isOne();
 
-      // An AREA account that carries NEITHER the FK nor an area_name violates the owner-ref CHECK.
       assertThatThrownBy(
               () ->
                   insertAccount(

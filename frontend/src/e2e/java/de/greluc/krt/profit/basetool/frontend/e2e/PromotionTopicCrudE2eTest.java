@@ -118,7 +118,6 @@ class PromotionTopicCrudE2eTest {
         page.waitForLoadState();
         page.evaluate("() => { window.__krtNoReload = true; }");
 
-        // CREATE
         page.locator("[data-trigger='pa-open-create-topic']").first().click();
         Locator createName = page.locator("#ct-name");
         assertThat(createName).isVisible();
@@ -126,7 +125,6 @@ class PromotionTopicCrudE2eTest {
         awaitTopicsRefresh(page, page.locator("[data-trigger='pa-create-topic']").first()::click);
         assertThat(topicNamed(page, "E2E Promo Topic Alpha")).isVisible();
 
-        // EDIT — rename
         topicCard(page, "E2E Promo Topic Alpha")
             .locator("[data-trigger='pa-edit-topic']")
             .first()
@@ -138,7 +136,6 @@ class PromotionTopicCrudE2eTest {
         assertThat(topicNamed(page, "E2E Promo Topic Bravo")).isVisible();
         assertThat(topicNamed(page, "E2E Promo Topic Alpha")).hasCount(0);
 
-        // DELETE
         awaitTopicsRefresh(
             page,
             () -> {
@@ -150,7 +147,6 @@ class PromotionTopicCrudE2eTest {
             });
         assertThat(topicNamed(page, "E2E Promo Topic Bravo")).hasCount(0);
 
-        // No write reloaded the page, and none surfaced an error/conflict.
         assertThat(page.locator(".notification-toast.error-toast")).hasCount(0);
         assertThat(page.locator(".krt-confirm-overlay")).hasCount(0);
         assertEquals(
@@ -163,8 +159,6 @@ class PromotionTopicCrudE2eTest {
       }
     }
   }
-
-  // ---------------------------------------------------------------------- helpers --
 
   /**
    * Opens a new authenticated browser context with HTTPS errors ignored (the stack uses a

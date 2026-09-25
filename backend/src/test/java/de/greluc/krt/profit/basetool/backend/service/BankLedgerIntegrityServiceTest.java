@@ -74,14 +74,11 @@ class BankLedgerIntegrityServiceTest {
 
   @Test
   void verify_passesForALedgerBuiltThroughTheService() {
-    // Given: a clean deposit/transfer history via the guarded service
     bankLedgerService.bookDeposit(
         new BankDepositRequest(account.getId(), holder.getId(), new BigDecimal("500"), "seed"));
 
-    // When
     BankLedgerIntegrityService.IntegrityReport report = integrityService.verify();
 
-    // Then: no violation references our fresh account
     assertNotNull(report);
     assertFalse(
         report.negativeAccountBalances().contains(account.getId()),
@@ -90,7 +87,6 @@ class BankLedgerIntegrityServiceTest {
 
   @Test
   void verify_flagsASyntheticallyCorruptedNegativeBalance() {
-    // Given: a raw negative posting inserted past the no-overdraft guard on an empty account
     BankTransaction tx =
         transactionRepository.save(
             BankTransaction.builder()
@@ -105,10 +101,8 @@ class BankLedgerIntegrityServiceTest {
             .createdAt(Instant.now())
             .build());
 
-    // When
     BankLedgerIntegrityService.IntegrityReport report = integrityService.verify();
 
-    // Then
     assertFalse(report.isSound(), "the corrupted ledger must not be reported sound");
     assertTrue(
         report.negativeAccountBalances().contains(account.getId()),
@@ -118,7 +112,6 @@ class BankLedgerIntegrityServiceTest {
 
   @Test
   void verify_flagsAnUnbalancedTransferTransaction() {
-    // Given: a TRANSFER header with a single non-zeroing leg (legs must sum to zero)
     BankTransaction tx =
         transactionRepository.save(
             BankTransaction.builder()
@@ -133,10 +126,8 @@ class BankLedgerIntegrityServiceTest {
             .createdAt(Instant.now())
             .build());
 
-    // When
     BankLedgerIntegrityService.IntegrityReport report = integrityService.verify();
 
-    // Then
     assertTrue(
         report.unbalancedTransfers().contains(tx.getId()),
         "the one-legged transfer must be flagged as not summing to zero");
@@ -144,7 +135,6 @@ class BankLedgerIntegrityServiceTest {
 
   @Test
   void verify_flagsATransactionWithoutAnAuditRow() {
-    // Given: a DEPOSIT transaction inserted raw, bypassing the audit write (REQ-BANK-012)
     BankTransaction tx =
         transactionRepository.save(
             BankTransaction.builder()
@@ -152,10 +142,8 @@ class BankLedgerIntegrityServiceTest {
                 .createdAt(Instant.now())
                 .build());
 
-    // When
     BankLedgerIntegrityService.IntegrityReport report = integrityService.verify();
 
-    // Then
     assertTrue(
         report.transactionsWithoutAudit().contains(tx.getId()),
         "an audited transaction type without its audit row must be flagged");
@@ -163,8 +151,6 @@ class BankLedgerIntegrityServiceTest {
 
   @Test
   void verify_excludesWipeResetFromTheAuditRowInvariant() {
-    // Given: a WIPE_RESET transaction with no per-transaction audit row — a wipe is audited once
-    // with a summarizing event, not per generated transaction (REQ-BANK-013)
     BankTransaction wipe =
         transactionRepository.save(
             BankTransaction.builder()
@@ -172,10 +158,8 @@ class BankLedgerIntegrityServiceTest {
                 .createdAt(Instant.now())
                 .build());
 
-    // When
     BankLedgerIntegrityService.IntegrityReport report = integrityService.verify();
 
-    // Then
     assertFalse(
         report.transactionsWithoutAudit().contains(wipe.getId()),
         "WIPE_RESET transactions are summarized once, not flagged per row");
@@ -183,9 +167,6 @@ class BankLedgerIntegrityServiceTest {
 
   @Test
   void verify_flagsABrokenAccountReversal() {
-    // Given: an original DEPOSIT with a +100 account leg and a REVERSAL whose account leg (-50)
-    // does not negate it, so the two transactions' account legs do not net to zero for the account
-    // (a genuine account-side mirror would be -100). Inserted raw, past the guarded reversal flow.
     Instant now = Instant.now();
     BankTransaction original =
         transactionRepository.save(
@@ -212,10 +193,8 @@ class BankLedgerIntegrityServiceTest {
             .createdAt(now)
             .build());
 
-    // When
     BankLedgerIntegrityService.IntegrityReport report = integrityService.verify();
 
-    // Then
     assertFalse(report.isSound(), "the corrupted ledger must not be reported sound");
     assertTrue(
         report.brokenReversals().contains(reversal.getId()),
@@ -224,9 +203,6 @@ class BankLedgerIntegrityServiceTest {
 
   @Test
   void verify_flagsABrokenHolderReversal() {
-    // Given: an original DEPOSIT with a +100 holder leg and a REVERSAL whose holder leg (-50) does
-    // not negate it, so the two transactions' holder legs do not net to zero for the holder. Only
-    // holder legs are written, so only the holder-side mirror query can fire.
     Instant now = Instant.now();
     BankTransaction original =
         transactionRepository.save(
@@ -253,10 +229,8 @@ class BankLedgerIntegrityServiceTest {
             .createdAt(now)
             .build());
 
-    // When
     BankLedgerIntegrityService.IntegrityReport report = integrityService.verify();
 
-    // Then
     assertFalse(report.isSound(), "the corrupted ledger must not be reported sound");
     assertTrue(
         report.brokenHolderReversals().contains(reversal.getId()),
@@ -265,8 +239,6 @@ class BankLedgerIntegrityServiceTest {
 
   @Test
   void verify_flagsAnUnbalancedHolderMovement() {
-    // Given: a fee-free HOLDER_TRANSFER (whose holder legs must net to zero) with a single
-    // non-netting +250 holder leg inserted raw, past the balanced-legs service guard.
     Instant now = Instant.now();
     BankTransaction tx =
         transactionRepository.save(
@@ -282,10 +254,8 @@ class BankLedgerIntegrityServiceTest {
             .createdAt(now)
             .build());
 
-    // When
     BankLedgerIntegrityService.IntegrityReport report = integrityService.verify();
 
-    // Then
     assertFalse(report.isSound(), "the corrupted ledger must not be reported sound");
     assertTrue(
         report.unbalancedHolderMovements().contains(tx.getId()),

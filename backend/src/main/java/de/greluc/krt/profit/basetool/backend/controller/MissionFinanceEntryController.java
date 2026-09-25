@@ -115,11 +115,6 @@ public class MissionFinanceEntryController {
             page, Math.min(size, MAX_FINANCE_PAGE_SIZE), sort, ALLOWED_SORT, "createdAt");
     Page<MissionFinanceEntryDto> entries =
         financeEntryService.getEntriesByMission(missionId, pageable);
-    // Audit H-1: canSeeMission (above) blocks cross-squadron reads of internal missions; on top of
-    // that the nested participant PII is stripped for EVERY caller — including Logistician/Officer.
-    // A participant's email may only ever be shown to that user themselves in their own profile, so
-    // it must never travel to a peer through the finance ledger (there is no business need for a
-    // peer's contact data here). The shared MissionPeerRedactor keeps only the public name tuple.
     entries = entries.map(this::redactParticipantPii);
     return PageResponse.of(entries);
   }
@@ -182,10 +177,6 @@ public class MissionFinanceEntryController {
           + " #dto.participantId(), authentication)")
   public MissionFinanceEntryDto createFinanceEntry(
       @RequestBody @Valid MissionFinanceEntryCreateDto dto) {
-    // Strip the nested participant PII so the create response cannot echo a peer's email back to
-    // the
-    // creator (H-1). Defence in depth on top of the email-free UserMapper projection — the
-    // controller boundary enforces it regardless of how the DTO was built.
     return redactParticipantPii(financeEntryService.createEntry(dto));
   }
 
@@ -202,7 +193,6 @@ public class MissionFinanceEntryController {
   @PreAuthorize("isAuthenticated()")
   public MissionFinanceEntryDto updateFinanceEntry(
       @PathVariable UUID entryId, @RequestBody @Valid MissionFinanceEntryUpdateDto dto) {
-    // Strip nested participant PII (email is profile-only; H-1) — mirrors the read / create paths.
     return redactParticipantPii(financeEntryService.updateEntry(entryId, dto));
   }
 
@@ -235,12 +225,6 @@ public class MissionFinanceEntryController {
     if (participant == null || participant.user() == null) {
       return dto;
     }
-    // Delegated, not repeated. The explicit full-field reconstruction is the redactor's whole
-    // safety net: adding a field to MissionParticipantDto is a compile error until somebody decides
-    // whether a peer may see it. A second copy of that reconstruction produces TWO compile errors
-    // for one decision, and answering only the one in MissionPeerRedactor - the file that carries
-    // the class comment explaining why pass-through is the dangerous default - would leak the new
-    // field through every finance-ledger read and create. One copy, one decision.
     MissionParticipantDto redacted = missionPeerRedactor.cleanupParticipantForPeer(participant);
     return new MissionFinanceEntryDto(
         dto.id(), dto.missionId(), redacted, dto.note(), dto.type(), dto.amount(), dto.version());

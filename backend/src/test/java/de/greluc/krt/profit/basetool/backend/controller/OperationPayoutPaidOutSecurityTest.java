@@ -122,9 +122,6 @@ class OperationPayoutPaidOutSecurityTest {
                 .with(jwt().authorities(missionManager())))
         .andExpect(status().isForbidden());
 
-    // Service must not be invoked when the @PreAuthorize denies — the audit trail
-    // would otherwise record a fake "this user toggled the flag" event the user
-    // had no permission to trigger.
     verify(operationPayoutService, never()).setPayoutStatus(any(), any(), any(Boolean.class));
   }
 

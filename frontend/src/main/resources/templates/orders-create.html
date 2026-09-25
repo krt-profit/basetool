@@ -41,8 +41,6 @@
         </div>
 
         <div class="form-container">
-            <!--/* In edit mode the order kind is fixed to ITEM (only item orders are edited via this
-                 page reuse), so the toggle is hidden but the item radio is pre-checked. */-->
             <div class="form-group" th:classappend="${editOrderId != null} ? 'krtm-hidden' : ''">
                 <label th:text="#{orders.create.kind}">Auftragsart</label>
                 <div class="flex-gap-sm krtm-display-flex-gap-1-5rem-7e37">
@@ -92,10 +90,6 @@
                     <div class="material-row" th:each="mat, stat : *{materials}">
                         <div class="form-group flex-2 mb-0">
                             <label th:text="#{orders.create.material}">Material</label>
-                            <!--/* Server-side-search combobox (REQ-FE-016): the marker value wires the
-                                 remote-materials-joborder source, so the full catalog is no longer dumped
-                                 as <option>s. Only the bound row value (edit / validation redisplay) is
-                                 seeded as a single option; the enhancer harvests its label + metadata. */-->
                             <select th:field="*{materials[__${stat.index}__].materialId}" data-testid="order-material-select" data-role="material-select" data-krt-combobox="remote-materials-joborder" required>
                                 <option value="" th:text="#{orders.create.select}">-- Bitte wählen --</option>
                                 <option th:each="m : ${materials}" th:if="${m.id == jobOrderForm.materials[stat.index].materialId}" th:value="${m.id}" th:data-quantity-type="${m.quantityType}" th:text="${m.name}"></option>
@@ -172,15 +166,11 @@
         </div>
     </div>
     
-    <!--/* Template for new min-quality options (650 / Keine), cloned by addMaterialRow() */-->
     <select id="minquality-options-template" class="krtm-display-none-5790">
         <option value="650">650</option>
         <option value="" th:text="#{orders.material.minQuality.none}">Keine</option>
     </select>
 
-    <!--/* Placeholder-only template cloned by addItemLine(); the item options themselves are fetched
-         on demand from the backend (see fetchItemOptions / GET /orders/item-search), so the picker
-         no longer preloads — and silently truncates past an alphabetical cap — the whole catalog. */-->
     <select id="item-options-template" class="krtm-display-none-5790">
         <option value="" th:text="#{orders.create.item.select}">-- Item wählen --</option>
     </select>
@@ -188,14 +178,8 @@
 
 <th:block th:replace="~{fragments/toast :: toast}" />
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
-    /*<![CDATA[*/
-    // Thymeleaf-interpolated i18n strings and server values only; the imperative logic lives in the
-    // orders-create.js page module loaded immediately after this bootstrap (ADR-0069). Keys and
-    // fallbacks are byte-identical to the former inline block; the four raw '[(#{...})]' submit-error
-    // sites were converted to the JS-escaping /*[[#{...}]]*/ comment form (ADR-0069, strictly safer).
     let materialIndex = /*[[${jobOrderForm.materials.size()}]]*/ 1;
 
-    // Unit labels + SCU hint text for the quantity-type-aware material rows.
     const MSG_UNIT_SCU = /*[[#{material.quantity.scu}]]*/ 'SCU';
     const MSG_UNIT_PIECE = /*[[#{material.quantity.piece}]]*/ 'Stueck';
     const MSG_MATERIAL_LABEL = /*[[#{orders.create.material}]]*/ 'Material';
@@ -203,13 +187,11 @@
     const MSG_MINQUALITY_LABEL = /*[[#{orders.create.minQuality}]]*/ 'Min. Qualitaet';
     const SCU_HINT_TEXT = /*[[#{material.scu.hint}]]*/ 'Eingabe in SCU.';
 
-    // SCMDB screenshot-import toasts (hoisted from importFromScmdb()).
     const MSG_SCMDB_SUCCESS = /*[[#{orders.create.scmdb.success}]]*/ 'Materialien erfolgreich extrahiert.';
     const MSG_SCMDB_SOME_UNKNOWN = /*[[#{orders.create.scmdb.error.some_unknown}]]*/ 'einige unbekannt';
     const MSG_SCMDB_NO_MATCH = /*[[#{orders.create.scmdb.error.no_match}]]*/ 'Keine bekannten Materialien im Export gefunden.';
     const MSG_SCMDB_NOT_FOUND = /*[[#{orders.create.scmdb.error.not_found}]]*/ 'Folgende Materialien wurden nicht im System gefunden';
 
-    // Item-order editor labels.
     const ITEM_I18N = {
         item: /*[[#{orders.create.item}]]*/ 'Item',
         blueprint: /*[[#{orders.create.item.blueprint}]]*/ 'Bauplan',
@@ -228,19 +210,13 @@
         searchLoading: /*[[#{orders.create.item.search.loading}]]*/ 'Suche laeuft...',
         producedLocked: /*[[#{orders.create.item.producedLocked}]]*/ 'Bereits {0} Stueck hergestellt.'
     };
-    // Edit mode (item-order edit): the existing lines, injected server-side. Null on the create page.
     const EDIT_ITEMS = /*[[${editItems}]]*/ null;
 
-    // In-place create/edit submit error toasts (#575), converted from the former raw '[(#{...})]'
-    // text-inline form to the JS-escaping /*[[#{...}]]*/ comment form (ADR-0069).
     const MSG_MATERIAL_INVALID = /*[[#{error.joborder.material.invalid}]]*/ 'Invalid material.';
     const MSG_ITEM_INVALID = /*[[#{error.joborder.item.invalid}]]*/ 'Invalid item.';
     const MSG_CREATE_FAILED = /*[[#{error.joborder.create.failed}]]*/ 'Create failed.';
     const MSG_UPDATE_FAILED = /*[[#{error.joborder.update.failed}]]*/ 'Update failed.';
-    /*]]>*/
 </script>
-<!--/* Loaded synchronously (head.html's copy is deferred): orders-create.js builds the edit-mode item
-     lines at parse time and escapes through the shared escapeHtml / escapeAttr (FE-SEC-05). */-->
 <script th:src="@{/js/escape-html.js}" defer th:attr="nonce=${cspNonce}"></script>
 <script th:src="@{/js/orders-create.js}" defer th:attr="nonce=${cspNonce}"></script>
 </body>

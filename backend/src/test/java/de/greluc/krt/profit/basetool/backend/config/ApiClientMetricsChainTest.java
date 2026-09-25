@@ -96,8 +96,6 @@ class ApiClientMetricsChainTest {
   @Test
   @DisplayName("the attribution filter runs before the identity swap, in the chain as built")
   void theAttributionFilterRunsBeforeTheActingMemberSwap() {
-    // The proxy holds several chains — the management-port and monitoring-scrape ones come first
-    // by @Order — so the API chain has to be found by content rather than by position.
     List<Filter> filters =
         filterChainProxy.getFilterChains().stream()
             .map(chain -> chain.getFilters())
@@ -116,9 +114,6 @@ class ApiClientMetricsChainTest {
                 + "and would be counted as anonymous")
         .isLessThan(identitySwap);
 
-    // The other half of the sandwich, and the one this test was missing: BEFORE the bearer filter
-    // there is no SecurityContext at all, so the filter would see every request as anonymous and
-    // count nothing — silently, because "no subject" is a legitimate outcome it skips.
     int authentication =
         indexOf(
             filters,

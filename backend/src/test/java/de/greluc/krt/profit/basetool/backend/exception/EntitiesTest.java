@@ -70,8 +70,6 @@ class EntitiesTest {
 
   @Test
   void require_present_supplierIsNotEvaluated() {
-    // Mirrors orElseThrow's laziness: the message supplier must never run on the happy path, so an
-    // id-suffixed interpolation costs nothing when the entity is present.
     Object value = new Object();
     assertSame(
         value,

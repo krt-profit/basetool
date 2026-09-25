@@ -78,26 +78,16 @@ public class SubjectRateLimiter {
                 RateLimitBuckets.newBucket(
                     properties.capacity(), properties.refillTokens(), properties.refillPeriod()));
     ConsumptionProbe probe = bucket.tryConsumeAndReturnRemaining(1);
-    // Per-bucket evaluation counter (#1041 item 19) — every attempt, so rejections/requests gives
-    // the per-subject rejection ratio. Bounded `subject` literal, never the JWT sub itself.
     meterRegistry
         .counter(MetricNames.RATELIMIT_REQUESTS, MetricNames.TAG_BUCKET, MetricNames.BUCKET_SUBJECT)
         .increment();
     if (!probe.isConsumed()) {
-      // Per-subject 429 (REQ-OBS-011). Labelled by the bounded `subject` bucket literal, never the
-      // JWT sub itself (PII/unbounded).
       meterRegistry
           .counter(
               MetricNames.RATELIMIT_REJECTIONS, MetricNames.TAG_BUCKET, MetricNames.BUCKET_SUBJECT)
           .increment();
       long retryAfterSeconds =
           Math.max(1, TimeUnit.NANOSECONDS.toSeconds(probe.getNanosToWaitForRefill()));
-      // WARN, and deliberately the only rate-limit line at that level: this budget is per
-      // authenticated subject, so its volume is bounded by the number of real users and every hit
-      // is actionable ("why is my extractor being throttled?"). The subject itself is already in
-      // the `userId` MDC field (REQ-OBS-001) and is never repeated into the message. Absence of
-      // this line on a 429 therefore means the coarse per-IP limiter rejected the request — that
-      // one stays at DEBUG because an attacker controls how often it fires.
       log.warn(
           "Per-subject ingest rate limit exceeded (capacity={} per {}, retryAfter={}s)",
           properties.capacity(),

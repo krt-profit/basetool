@@ -86,8 +86,6 @@ class EntitiesRequireRatchetTest {
       }
     }
 
-    // A scan that read nothing would pass vacuously; the migrated call sites prove it read the
-    // tree.
     assertThat(requireCalls).as("Entities.require call sites seen by the scan").isGreaterThan(200);
     assertThat(sites)
         .as(
@@ -120,7 +118,6 @@ class EntitiesRequireRatchetTest {
             HAND_WRITTEN.matcher(
                 "o.orElseThrow(() -> new jakarta.persistence.EntityNotFoundException(\"x\"))"))
         .matches(Matcher::find);
-    // A different exception type is a different contract, not this idiom.
     assertThat(HAND_WRITTEN.matcher("o.orElseThrow(() -> new BadRequestException(\"x\"))"))
         .matches(m -> !m.find());
   }

@@ -156,8 +156,6 @@ class BankAccountDetailMovementModalMvcTest {
     when(backendApiClient.get(
             startsWith("/api/v1/bank/accounts/" + id), eq(BankAccountDetailDto.class)))
         .thenReturn(detail);
-    // The booking-history page read uses the ParameterizedTypeReference overload; leaving it to
-    // return null lets the template render its empty state, which is enough for this guard test.
     when(backendApiClient.get(
             startsWith("/api/v1/bank/accounts/" + id + "/transactions"), anyTypeRef()))
         .thenReturn(null);

@@ -390,13 +390,6 @@ public class AdminSpecialCommandsPageController {
     return "redirect:" + MEMBER_PAGE_BASE + id;
   }
 
-  // In-place (AJAX) twins (#582). Routed ahead of their classic POST->redirect siblings by the
-  // X-Requested-With header (no-JS forms keep their redirect fallback). They return 200 on success
-  // — the list page re-swaps the SK-list fragment and the SK member page re-swaps its member-roster
-  // fragment after a lead toggle, which re-render the correct derived state (active badges, lead
-  // state) and fresh @Version data so the next action does not 409. Conflicts are relayed as
-  // application/problem+json (duplicate/in-use toast, or OPTIMISTIC_LOCK reload-confirm).
-
   /**
    * In-place twin of {@link #createSpecialCommand}.
    *

@@ -182,7 +182,6 @@ class MaterialExchangeRepositoryDataTest {
   @Test
   void findBoard_clampsAmountFilterToRemainingStock() {
     User owner = persistUser("clamp-anbieter");
-    // Stated 200 SCU, but the row has been booked out to 80 SCU since release.
     InventoryItem partly = persistItem(owner, "Titanium", 700, 80.0);
     MaterialExchangeOffer partialOffer =
         persistOffer(partly, owner, MaterialExchangeOfferStatus.ACTIVE, 200.0);
@@ -336,10 +335,9 @@ class MaterialExchangeRepositoryDataTest {
    */
   @Test
   void findBoard_stockBackedItemOffer_quantityClampedToStock() {
-    // covers REQ-MARKET-014
     User owner = persistUser("stock-item");
-    InventoryItem row = persistItemStockRow(owner, "Quantum Drive", 2.0); // booked down to 2
-    MaterialExchangeOffer stockBacked = persistStockBackedItemOffer(row, owner, 6); // stated 6
+    InventoryItem row = persistItemStockRow(owner, "Quantum Drive", 2.0);
+    MaterialExchangeOffer stockBacked = persistStockBackedItemOffer(row, owner, 6);
     entityManager.flush();
 
     var all =
@@ -376,10 +374,9 @@ class MaterialExchangeRepositoryDataTest {
    */
   @Test
   void findBoard_stockBackedItemOffer_offeredBelowStock_usesStatedQuantity() {
-    // covers REQ-MARKET-014
     User owner = persistUser("under-offer");
-    InventoryItem itemRow = persistItemStockRow(owner, "Power Plant", 10.0); // 10 in stock
-    MaterialExchangeOffer understated = persistStockBackedItemOffer(itemRow, owner, 3); // offered 3
+    InventoryItem itemRow = persistItemStockRow(owner, "Power Plant", 10.0);
+    MaterialExchangeOffer understated = persistStockBackedItemOffer(itemRow, owner, 3);
     InventoryItem matRow = persistItem(owner, "Agricium", 500, 4.0);
     MaterialExchangeOffer material =
         persistOffer(matRow, owner, MaterialExchangeOfferStatus.ACTIVE, 4.0);

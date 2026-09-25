@@ -123,8 +123,6 @@ class JobOrderPageControllerRemoveAssigneeMvcTest {
 
     verify(backendApiClient)
         .delete(eq("/api/v1/orders/" + orderId + "/assignees/" + userId), eq(JobOrderDto.class));
-    // BE-PERF-05: the re-rendered section reads no user list (the picker searches on demand,
-    // #1193), so a Logistician's assignee mutation no longer pulls up to 1000 users.
     verify(backendApiClient, never()).get(startsWith("/api/v1/users?"), any(Class.class));
     verify(backendApiClient, never())
         .get(startsWith("/api/v1/users?"), any(ParameterizedTypeReference.class));
@@ -140,8 +138,6 @@ class JobOrderPageControllerRemoveAssigneeMvcTest {
             eq("/api/v1/orders/" + orderId + "/assignees/" + userId), eq(JobOrderDto.class)))
         .thenReturn(orderWithNoAssignees(orderId));
 
-    // The frontend endpoint only requires isAuthenticated(); the backend owns the per-entry
-    // self-or-logistician rule and would return 403 there if violated.
     mockMvc
         .perform(delete("/orders/" + orderId + "/assignees/" + userId).with(csrf()))
         .andExpect(status().isOk())

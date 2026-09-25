@@ -105,8 +105,6 @@ class MissionOwnershipVersionIntegrationTest {
 
   @Test
   void anEchoReadBeforeTheFirstChangeIsStaleAfterIt() {
-    // The lost update the counter exists for: two managers opened the page while it said 0. The
-    // first one's change must leave the second one's 0 behind, or the second overwrites unasked.
     User creator = user("creator3");
     User first = user("first3");
     User second = user("second3");

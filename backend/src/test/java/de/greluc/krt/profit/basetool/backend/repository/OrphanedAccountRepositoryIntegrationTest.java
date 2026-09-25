@@ -124,20 +124,17 @@ class OrphanedAccountRepositoryIntegrationTest {
     return transactionTemplate.execute(status -> userRepository.findById(id).orElseThrow());
   }
 
-  // covers REQ-SEC-059 — the bulk update writes the stamp, which is the whole point of the column
   @Test
   void markMissingUsersStampsWhenTheAbsenceWasObserved() {
     UUID gone = user(true, null);
     UUID present = user(true, null);
     Instant observed = Instant.now().truncatedTo(ChronoUnit.MILLIS);
 
-    // Everybody is in the roster: nothing flips, and no stamp is written.
     transactionTemplate.executeWithoutResult(
         status ->
             assertThat(userRepository.markMissingUsers(rosterWithout(null), observed)).isZero());
     assertThat(reload(gone).getKeycloakAbsentSince()).isNull();
 
-    // `gone` drops out of the roster: it flips, and only it.
     transactionTemplate.executeWithoutResult(
         status ->
             assertThat(userRepository.markMissingUsers(rosterWithout(gone), observed))
@@ -152,8 +149,6 @@ class OrphanedAccountRepositoryIntegrationTest {
     assertThat(untouched.getKeycloakAbsentSince()).isNull();
   }
 
-  // covers REQ-SEC-059 — a second sweep must not push the stamp forward, or the age would only ever
-  // report the sync's own cadence rather than how long the account has really been waiting
   @Test
   void aSecondSweepDoesNotRefreshAnExistingStamp() {
     Instant first = Instant.now().minus(30, ChronoUnit.DAYS).truncatedTo(ChronoUnit.MILLIS);
@@ -166,7 +161,6 @@ class OrphanedAccountRepositoryIntegrationTest {
         .isCloseTo(first, within(1, ChronoUnit.SECONDS));
   }
 
-  // covers REQ-SEC-059 — the two gauge queries read what the collector expects
   @Test
   void theGaugeQueriesSeeOnlyOrphansAndReportTheOldest() {
     Instant older = Instant.now().minus(40, ChronoUnit.DAYS).truncatedTo(ChronoUnit.MILLIS);
@@ -183,14 +177,8 @@ class OrphanedAccountRepositoryIntegrationTest {
         .isBeforeOrEqualTo(older);
   }
 
-  // covers REQ-SEC-059 - a service-account row is not somebody's unfinished deletion
   @Test
   void aServiceAccountRowIsNotCountedAsAnOrphan() {
-    // Production holds exactly one such row and can never clear it: an unfiltered GET /users omits
-    // service accounts, so the roster sync never reports one and nothing calls setInKeycloak(true).
-    // The first exclusion was conditional on app.security.ingest-gateway.client-ids, which defaults
-    // empty -- and empty is exactly the configuration in which the row gets created, because the
-    // machine-identity carve-out is gated on the same property. Unconditional now.
     long before = userRepository.countOrphanedMemberAccounts();
     serviceAccount("service-account-basetool-ingest");
     serviceAccount("SERVICE-ACCOUNT-Basetool-Other");
@@ -200,7 +188,6 @@ class OrphanedAccountRepositoryIntegrationTest {
         .isEqualTo(before);
   }
 
-  // covers REQ-SEC-059 — clearing the stamp is what stops a returning account alerting forever
   @Test
   void clearingTheFlagAlsoClearsTheStamp() {
     UUID returning = user(false, Instant.now().minus(10, ChronoUnit.DAYS));

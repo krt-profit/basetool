@@ -1,16 +1,4 @@
 #!/usr/bin/env bash
-#
-# Self-test for scripts/mint-internal-tls.sh (REQ-SEC-070, ADR-0211).
-#
-# Needs keytool and openssl -- both on the ubuntu-latest runner. Mints into a temp directory with a
-# throwaway password and checks what the production host relies on:
-#   * the files it promises, and nothing else (no CA key left anywhere);
-#   * the keystores are private whatever the caller's umask;
-#   * every leaf chains to the CA, and verifies for EACH of its own names and for no other
-#     service's name -- the property hostname verification turns into a security boundary;
-#   * the truststore holds the CA and no key;
-#   * the refusals: no password, no --out, a service without names, an existing file without --force.
-#
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -18,7 +6,6 @@ MINT="scripts/mint-internal-tls.sh"
 
 tests_run=0
 tests_failed=0
-# check DESCRIPTION COMMAND [ARGS...] -- passes when the command succeeds.
 check() {
   local desc="$1"
   shift
@@ -30,7 +17,6 @@ check() {
     echo "  FAIL - ${desc}"
   fi
 }
-# refute DESCRIPTION COMMAND [ARGS...] -- passes when the command fails.
 refute() {
   local desc="$1"
   shift
@@ -52,9 +38,9 @@ leaf() {
   keytool -exportcert -rfc -alias basetool -keystore "${TMP}/$1.p12" \
     -storepass:env TLS_STORE_PASSWORD >"${TMP}/$1.pem" 2>/dev/null
 }
-# shellcheck disable=SC2317,SC2329  # invoked through check/refute, which shellcheck cannot follow
+# shellcheck disable=SC2317,SC2329
 verifies() { openssl verify -CAfile "${TMP}/ca.crt" "$@" >/dev/null 2>&1; }
-# shellcheck disable=SC2317,SC2329  # invoked through check, like verifies() above
+# shellcheck disable=SC2317,SC2329
 has_ext() { openssl x509 -in "$1" -noout -ext "$2" 2>/dev/null | grep -q "$3"; }
 mint_rc() {
   local rc=0

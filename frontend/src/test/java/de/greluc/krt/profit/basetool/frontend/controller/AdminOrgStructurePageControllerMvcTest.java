@@ -84,9 +84,6 @@ class AdminOrgStructurePageControllerMvcTest {
     mockMvc.perform(get("/admin/org-structure")).andExpect(status().isOk());
   }
 
-  // Renders a full OL -> Bereich -> Staffel chain so the table's th:each, the per-kind parent
-  // selects (OL option for a Bereich, Bereich option for a Staffel) and the SpEL kind/UUID
-  // comparisons are actually exercised — the empty-list case never enters the loop.
   @Test
   @WithMockUser(roles = "ADMIN")
   void page_admin_rendersHierarchyRows() throws Exception {
@@ -109,9 +106,6 @@ class AdminOrgStructurePageControllerMvcTest {
         .andExpect(content().string(containsString("Iridium")));
   }
 
-  // #1235: the two fragment seams that replaced the page's former window.location.reload(). Each
-  // must render ONLY its own section — a selector that silently fell back to the whole page would
-  // paint a full document (sidebar, <header>, the other section) into the swap container.
   @Test
   @WithMockUser(roles = "ADMIN")
   void page_admin_unitsFragment_rendersOnlyTheUnitTable() throws Exception {
@@ -135,7 +129,6 @@ class AdminOrgStructurePageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("org-units-table")))
         .andExpect(content().string(containsString("Bereich Profit")))
-        // The create forms belong to the sibling `forms` section, and no page chrome comes along.
         .andExpect(content().string(org.hamcrest.Matchers.not(containsString("bereich-form"))))
         .andExpect(content().string(org.hamcrest.Matchers.not(containsString("<header"))));
   }
@@ -150,8 +143,6 @@ class AdminOrgStructurePageControllerMvcTest {
         .perform(get("/admin/org-structure").param("fragment", "forms"))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("bereich-form")))
-        // With no OL yet the create-OL form renders too, and both carry their delegated triggers —
-        // the bindings survive a swap only because they are document-delegated (#1235).
         .andExpect(content().string(containsString("os-create-ol")))
         .andExpect(content().string(containsString("os-create-bereich")))
         .andExpect(content().string(org.hamcrest.Matchers.not(containsString("org-units-table"))))
@@ -223,8 +214,6 @@ class AdminOrgStructurePageControllerMvcTest {
         .andExpect(status().isOk());
   }
 
-  // REQ-DATA-007 — a Bereich / OL create and an org-unit re-parent all change the cached
-  // /api/v1/org-units/active-all-kinds picker, so each must evict the CacheDomain.ORG_UNIT cache.
   @Test
   @WithMockUser(roles = "ADMIN")
   void createBereich_ajax_evictsStaticDataCache() throws Exception {

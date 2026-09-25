@@ -44,7 +44,6 @@ class SessionLifetimeUpgradeSuccessHandlerTest {
 
   @Test
   void promotesTheSessionTimeoutToTheAuthenticatedWindowThenDelegates() throws Exception {
-    // Given a request carrying an existing (short-lived, anonymous) session
     HttpServletRequest request = mock(HttpServletRequest.class);
     HttpServletResponse response = mock(HttpServletResponse.class);
     Authentication authentication = mock(Authentication.class);
@@ -55,17 +54,14 @@ class SessionLifetimeUpgradeSuccessHandlerTest {
     SessionLifetimeUpgradeSuccessHandler handler =
         new SessionLifetimeUpgradeSuccessHandler(AUTHENTICATED_TIMEOUT, delegate);
 
-    // When the login succeeds
     handler.onAuthenticationSuccess(request, response, authentication);
 
-    // Then the session gets the 30-day authenticated idle window, then navigation is delegated
     verify(session).setMaxInactiveInterval(Math.toIntExact(AUTHENTICATED_TIMEOUT.toSeconds()));
     verify(delegate).onAuthenticationSuccess(request, response, authentication);
   }
 
   @Test
   void skipsTheBumpWhenNoSessionExistsButStillDelegates() throws Exception {
-    // Given a request without a session (getSession(false) returns null)
     HttpServletRequest request = mock(HttpServletRequest.class);
     HttpServletResponse response = mock(HttpServletResponse.class);
     Authentication authentication = mock(Authentication.class);
@@ -75,17 +71,14 @@ class SessionLifetimeUpgradeSuccessHandlerTest {
     SessionLifetimeUpgradeSuccessHandler handler =
         new SessionLifetimeUpgradeSuccessHandler(AUTHENTICATED_TIMEOUT, delegate);
 
-    // When the login succeeds
     handler.onAuthenticationSuccess(request, response, authentication);
 
-    // Then no throwaway session is created and the delegate still runs
     verify(request, never()).getSession();
     verify(delegate).onAuthenticationSuccess(request, response, authentication);
   }
 
   @Test
   void clampsAnOverlargeTimeoutToTheIntSecondContract() throws Exception {
-    // Given an absurdly large configured window (beyond Integer.MAX_VALUE seconds)
     HttpServletRequest request = mock(HttpServletRequest.class);
     HttpServletResponse response = mock(HttpServletResponse.class);
     Authentication authentication = mock(Authentication.class);
@@ -96,10 +89,8 @@ class SessionLifetimeUpgradeSuccessHandlerTest {
     SessionLifetimeUpgradeSuccessHandler handler =
         new SessionLifetimeUpgradeSuccessHandler(Duration.ofDays(100_000), delegate);
 
-    // When the login succeeds
     handler.onAuthenticationSuccess(request, response, authentication);
 
-    // Then the second count is clamped to Integer.MAX_VALUE rather than overflowing
     verify(session).setMaxInactiveInterval(Integer.MAX_VALUE);
   }
 }

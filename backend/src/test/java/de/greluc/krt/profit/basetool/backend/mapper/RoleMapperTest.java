@@ -34,7 +34,6 @@ class RoleMapperTest {
 
   @Test
   void toDto_shouldMapBasicFieldsAndPermissions() {
-    // Given
     Role role = new Role();
     role.setId(7L);
     role.setName("ADMIN");
@@ -42,10 +41,8 @@ class RoleMapperTest {
     role.setPermissions(new HashSet<>(Set.of("USER_MANAGE", "ROLE_ASSIGN")));
     role.setVersion(2L);
 
-    // When
     RoleDto dto = mapper.toDto(role);
 
-    // Then
     assertNotNull(dto);
     assertEquals(7L, dto.id());
     assertEquals("ADMIN", dto.name());
@@ -56,16 +53,13 @@ class RoleMapperTest {
 
   @Test
   void toDto_withEmptyPermissions_shouldProduceEmptySet() {
-    // Given
     Role role = new Role();
     role.setId(1L);
     role.setName("KRT Member");
     role.setPermissions(new HashSet<>());
 
-    // When
     RoleDto dto = mapper.toDto(role);
 
-    // Then
     assertNotNull(dto.permissions());
     assertTrue(dto.permissions().isEmpty());
   }

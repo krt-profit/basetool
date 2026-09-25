@@ -144,9 +144,6 @@ class JobOrderRepositoryActiveLookupOrderingTest {
     order.addMaterial(JobOrderMaterial.builder().material(matB).amount(5.0).build());
     attachHandover(order, matA);
     UUID orderId = jobOrderRepository.saveAndFlush(order).getId();
-    // Read the lookup cold: without clearing, the just-saved order sits in the L1 persistence cache
-    // and every result-set row resolves back to that single managed instance, hiding the duplicate
-    // roots a fresh production read (findAllActiveReference, cold context) would otherwise return.
     entityManager.clear();
 
     List<JobOrder> active = jobOrderRepository.findAllActiveWithMaterials();
@@ -185,8 +182,6 @@ class JobOrderRepositoryActiveLookupOrderingTest {
     order.addItem(newItemLine(gameItem, blueprint, matB));
     attachHandover(order, matA);
     UUID orderId = jobOrderRepository.saveAndFlush(order).getId();
-    // Read the lookup cold — see the material-order case: an uncleared context would resolve every
-    // row to the cached managed instance and mask the duplicate roots.
     entityManager.clear();
 
     List<JobOrder> active = jobOrderRepository.findAllActiveWithMaterials();

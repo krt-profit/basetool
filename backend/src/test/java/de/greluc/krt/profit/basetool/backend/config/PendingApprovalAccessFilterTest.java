@@ -71,8 +71,6 @@ class PendingApprovalAccessFilterTest {
 
   @BeforeEach
   void setUp() {
-    // Message source returns the caller-supplied default (arg 2) so the assertions run against a
-    // stable, locale-independent body; the i18n wiring itself is covered by the bundle test.
     MessageSource messageSource = mock(MessageSource.class);
     when(messageSource.getMessage(anyString(), any(), anyString(), any()))
         .thenAnswer(invocation -> invocation.getArgument(2));
@@ -247,9 +245,6 @@ class PendingApprovalAccessFilterTest {
 
   @Test
   void pendingUser_isForbidden_incrementsHttpErrorCounter() throws Exception {
-    // REQ-OBS-011: the 403 is written at the filter level, bypassing GlobalExceptionHandler, so it
-    // must increment basetool_http_error_total{code=PENDING_APPROVAL} here
-    // (PendingApprovalBlockSpike).
     authenticateWith(PendingApprovalAccessFilter.PENDING_AUTHORITY);
 
     run("POST", "/api/v1/inventory", mock(FilterChain.class));
@@ -266,10 +261,6 @@ class PendingApprovalAccessFilterTest {
 
   @Test
   void roleLessUser_isCountedAsASubject_notJustAsARequest() throws Exception {
-    // REQ-SEC-053 / REQ-OBS-011: NoRoleBlockSpike reads the SUBJECT gauge, because the refusal
-    // rate cannot separate one member's polling tab from a locked-out membership - and the event
-    // the alert exists for, a realm-side role rename, happens when the request rate is near zero.
-    // Three requests from one subject are one subject.
     UUID subject = UUID.randomUUID();
     authenticateWithJwt(subject.toString(), PendingApprovalAccessFilter.NO_ROLE_AUTHORITY);
 
@@ -282,7 +273,6 @@ class PendingApprovalAccessFilterTest {
 
   @Test
   void roleLessUsers_areCountedSeparately() throws Exception {
-    // The counterpart, so the case above cannot pass because the window counts nothing.
     for (int i = 0; i < 3; i++) {
       authenticateWithJwt(
           UUID.randomUUID().toString(), PendingApprovalAccessFilter.NO_ROLE_AUTHORITY);
@@ -294,8 +284,6 @@ class PendingApprovalAccessFilterTest {
 
   @Test
   void pendingUser_doesNotEnterTheRoleLessWindow() throws Exception {
-    // Two gates, two populations. Sharing a window would report a pending member as a role-less
-    // one and inflate the lockout signal with the approval queue.
     authenticateWithJwt(
         UUID.randomUUID().toString(), PendingApprovalAccessFilter.PENDING_AUTHORITY);
 
@@ -424,8 +412,6 @@ class PendingApprovalAccessFilterTest {
 
   @Test
   void pendingUser_withoutABearerToken_leavesUserIdUnset() throws Exception {
-    // REQ-OBS-004: there is no sub to stamp here, and the principal name is the callsign — so the
-    // key stays unset and the pattern's 'anonymous' default remains the truthful rendering.
     authenticateWith(PendingApprovalAccessFilter.PENDING_AUTHORITY);
 
     UserIdCapturingAppender appender = runBlockedWithCapture();

@@ -139,8 +139,6 @@ public class SessionAttributeRepairFilter extends OncePerRequestFilter implement
     }
     HttpSession session = request.getSession(false);
     if (session == null) {
-      // Invalidated during the request (a logout) or never materialised: the poisoned hash goes
-      // away with the session itself, so there is nothing left to repair.
       return;
     }
     for (String attribute : dropped) {
@@ -148,8 +146,6 @@ public class SessionAttributeRepairFilter extends OncePerRequestFilter implement
         session.removeAttribute(attribute);
         log.debug("Repaired an unreadable session value: attribute='{}'.", attribute);
       } catch (IllegalStateException ex) {
-        // The session was invalidated between the fetch above and this call. Harmless: the whole
-        // hash is being deleted anyway.
         log.debug(
             "Session invalidated before attribute '{}' could be repaired; nothing to do.",
             attribute);

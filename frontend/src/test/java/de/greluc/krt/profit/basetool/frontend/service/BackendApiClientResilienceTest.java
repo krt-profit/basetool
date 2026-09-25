@@ -85,10 +85,6 @@ class BackendApiClientResilienceTest {
             new org.springframework.cache.support.NoOpCacheManager());
   }
 
-  // ---------------------------------------------------------------
-  // GET — every resilience branch
-  // ---------------------------------------------------------------
-
   @Nested
   class GetTests {
 
@@ -110,8 +106,6 @@ class BackendApiClientResilienceTest {
         assertEquals(503, ex.getStatusCode());
         assertEquals(BackendServiceException.CODE_SERVICE_UNAVAILABLE, ex.getProblemCode());
         assertEquals("Backend circuit breaker open", ex.getMessage());
-        // The failure is counted once under the bounded circuit-open reason + GET verb
-        // (REQ-OBS-011).
         assertEquals(
             1.0d,
             meterRegistry
@@ -123,9 +117,6 @@ class BackendApiClientResilienceTest {
                     "GET")
                 .counter()
                 .count());
-        // The circuit-open line is DEBUG, not WARN: it fires for every call blocked while the
-        // breaker stays open, so at WARN a routine backend restart floods the log (issue #1203,
-        // REQ-OBS-001). The reason=circuit_open metric above keeps the count either way.
         assertThat(appender.list)
             .anyMatch(
                 e ->
@@ -156,8 +147,6 @@ class BackendApiClientResilienceTest {
 
     @Test
     void timeoutException_yields504_backendTimeout() {
-      // Wrap the checked TimeoutException — Reactor does this in real life
-      // (RuntimeExceptionWrapper). unwrap() must still find it.
       stubGet(
           webClient,
           "/api/v1/x",
@@ -253,9 +242,6 @@ class BackendApiClientResilienceTest {
 
     @Test
     void clientAuthorizationRequired_yieldsReauthenticationRequiredException() {
-      // The OAuth2 manager throws this when the session has no usable token; it must be
-      // reclassified
-      // (not mapped to a generic 500) so GlobalExceptionHandler can bounce the user to re-login.
       stubGet(webClient, "/api/v1/x", new ClientAuthorizationRequiredException("keycloak"));
 
       assertThrows(
@@ -264,7 +250,6 @@ class BackendApiClientResilienceTest {
 
     @Test
     void wrappedClientAuthorizationException_isUnwrappedToReauthenticationRequired() {
-      // Reactor wraps the cause; the cause-chain walk must still detect the auth failure.
       stubGet(
           webClient,
           "/api/v1/x",
@@ -277,9 +262,6 @@ class BackendApiClientResilienceTest {
 
     @Test
     void theTermsDocumentIsTheOneReadThatGoesOutOnTheAnonymousClient() {
-      // The case used to prove that `isPublic = true` selected this client. The flag is gone
-      // (ADR-0159) and one named method took its place, so what is left to pin is that the method
-      // routes there — and, below, that an ordinary GET does not.
       stubGet(
           termsDocumentClient,
           "/api/v1/terms/document",
@@ -296,9 +278,6 @@ class BackendApiClientResilienceTest {
 
     @Test
     void anOrdinaryGetNeverTouchesTheAnonymousClient() {
-      // The half that would fail silently: a call routed to the wrong client still answers, it
-      // just answers without the caller's token. Stubbing only the authenticated one and letting
-      // the anonymous mock stay untouched makes the mistake a failure rather than a 401 in a log.
       stubGet(
           webClient, "/api/v1/x", new RuntimeException("wrap", new TimeoutException("auth-3s")));
 
@@ -307,16 +286,11 @@ class BackendApiClientResilienceTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // unwrap — cause-chain traversal
-  // ---------------------------------------------------------------
-
   @Nested
   class UnwrapChainTests {
 
     @Test
     void deeplyWrappedTimeoutException_isUnwrapped() {
-      // 3-level wrap: RuntimeException -> RuntimeException -> TimeoutException
       Exception wrapped =
           new RuntimeException(
               "outer", new RuntimeException("middle", new TimeoutException("inner timeout")));
@@ -345,9 +319,6 @@ class BackendApiClientResilienceTest {
 
     @Test
     void selfReferencingCauseChain_doesNotLoopForever() {
-      // A pathological self-referencing throwable: cause==this. The unwrap loop
-      // must terminate cleanly and return the outer throwable, mapped via the
-      // catch-all to UNKNOWN/500.
       SelfCausingException loopy = new SelfCausingException();
       stubGet(webClient, "/api/v1/x", loopy);
 
@@ -358,10 +329,6 @@ class BackendApiClientResilienceTest {
       assertEquals(BackendServiceException.CODE_UNKNOWN, ex.getProblemCode());
     }
   }
-
-  // ---------------------------------------------------------------
-  // POST — spot check that resilience classification works for write ops too
-  // ---------------------------------------------------------------
 
   @Test
   void post_circuitBreakerOpen_yields503() {
@@ -387,20 +354,10 @@ class BackendApiClientResilienceTest {
     assert ex.getMessage().contains("circuit breaker");
   }
 
-  // ---------------------------------------------------------------
-  // clearStaticDataCache — smoke test
-  // ---------------------------------------------------------------
-
   @Test
   void clearStaticDataCache_completesWithoutError() {
     client.clearStaticDataCache();
-    // @CacheEvict is a no-op outside a Spring context; method body only logs.
-    // Calling it must not throw — the smallest reachable assertion.
   }
-
-  // ---------------------------------------------------------------
-  // helpers
-  // ---------------------------------------------------------------
 
   /**
    * Stubs the GET fluent chain on the given WebClient so that {@code
@@ -435,11 +392,6 @@ class BackendApiClientResilienceTest {
     when(headersSpec.retrieve()).thenReturn(respSpec);
     when(respSpec.bodyToMono(bodyType)).thenAnswer(inv -> body);
 
-    // Mockito refuses to "throw checked exception" on a method that doesn't
-    // declare it. Mono.block() only throws RuntimeException — so wrap any
-    // checked exception in a RuntimeException cause chain. The production
-    // unwrap() finds it via getCause() traversal, which matches what Reactor
-    // does in real life.
     RuntimeException toThrowRuntime =
         (toThrow instanceof RuntimeException re) ? re : new RuntimeException("test-wrap", toThrow);
     when(body.block()).thenThrow(toThrowRuntime);

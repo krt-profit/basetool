@@ -163,16 +163,8 @@ class KeycloakHealthIndicatorTest {
     assertNotEquals("", error.toString(), "the recorded error class name must not be empty");
   }
 
-  // ─── Spring constructor-selection guard ─────────────────────────────────
-
   @Test
   void productionConstructor_isAnnotatedAutowired_soSpringCanInstantiate() {
-    // Regression guard: the indicator declares TWO constructors -- the production @Value one and a
-    // package-private test-only one with explicit Duration parameters. Spring 4+ refuses to
-    // auto-select between multiple constructors and falls back to a no-arg default; without that,
-    // it aborts startup with `NoSuchMethodException: <init>()`. The fix is exactly the @Autowired
-    // marker on the production constructor; the test below asserts that marker survives any
-    // future refactor.
     long autowiredCtors =
         Arrays.stream(KeycloakHealthIndicator.class.getDeclaredConstructors())
             .filter(ctor -> ctor.isAnnotationPresent(Autowired.class))

@@ -115,8 +115,6 @@ class DataSubjectRightsAuditIntegrationTest {
   @BeforeEach
   void setUp() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-    // Committed, because audit_event.actor_user_id carries an FK to app_user: an uncommitted actor
-    // would fail the insert for a reason unrelated to the property under test.
     actor = user("ZzzAuditActorZzz");
   }
 
@@ -131,7 +129,6 @@ class DataSubjectRightsAuditIntegrationTest {
         });
   }
 
-  // covers REQ-SEC-058 - the member's own JSON export is served and audited
   @Test
   void selfExportJson_isServedAndAudited() throws Exception {
     mockMvc
@@ -149,7 +146,6 @@ class DataSubjectRightsAuditIntegrationTest {
             });
   }
 
-  // covers REQ-SEC-058 - the member's own PDF export is served and audited
   @Test
   void selfExportPdf_isServedAndAudited() throws Exception {
     mockMvc
@@ -162,14 +158,10 @@ class DataSubjectRightsAuditIntegrationTest {
         .allSatisfy(
             event -> {
               assertThat(event.getDetails()).contains("format=pdf").contains("bySelf=true");
-              // Not rows=-1. The renderer used to assemble the export itself and return only the
-              // bytes, so both PDF endpoints recorded a sentinel where the count belongs -- in the
-              // one payload that answers "how much was disclosed".
               assertThat(event.getDetails()).doesNotContain("rows=-1");
             });
   }
 
-  // covers REQ-SEC-058 - the admin JSON export is served and audited as somebody else's
   @Test
   void adminExportJson_isServedAndAudited() throws Exception {
     mockMvc
@@ -188,7 +180,6 @@ class DataSubjectRightsAuditIntegrationTest {
                 assertThat(event.getDetails()).contains("format=json").contains("bySelf=false"));
   }
 
-  // covers REQ-SEC-058 - the admin PDF export is served and audited
   @Test
   void adminExportPdf_isServedAndAudited() throws Exception {
     mockMvc
@@ -204,12 +195,10 @@ class DataSubjectRightsAuditIntegrationTest {
         .allSatisfy(
             event -> {
               assertThat(event.getDetails()).contains("format=pdf").contains("bySelf=false");
-              // See selfExportPdf_isServedAndAudited: the admin path carried the same sentinel.
               assertThat(event.getDetails()).doesNotContain("rows=-1");
             });
   }
 
-  // covers REQ-SEC-060 - the person search is served and audited without recording the term
   @Test
   void personSearch_isServedAndAudited() throws Exception {
     mockMvc

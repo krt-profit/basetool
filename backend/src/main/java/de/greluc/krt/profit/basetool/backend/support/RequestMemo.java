@@ -103,7 +103,7 @@ public final class RequestMemo {
      * @return {@code raw} typed as {@code T}
      */
     @Nullable
-    @SuppressWarnings("unchecked") // Only RequestMemo writes this attribute, and only as a T.
+    @SuppressWarnings("unchecked")
     private T cast(@Nullable Object raw) {
       return (T) raw;
     }

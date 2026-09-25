@@ -115,9 +115,6 @@ public class DiscordGuildNicknameReader {
       response =
           httpClient.send(buildRequest(url, accessToken), HttpResponse.BodyHandlers.ofString());
     } catch (IOException e) {
-      // Timeout / connection reset / DNS failure / truncated read — fail open (no name). At DEBUG,
-      // not WARN: a missing server nickname is cosmetic and the membership gate has already logged
-      // any real Discord outage at WARN, so this would only duplicate it.
       log.debugf(
           e,
           "Could not fetch the Discord guild nickname (%s); continuing without it.",

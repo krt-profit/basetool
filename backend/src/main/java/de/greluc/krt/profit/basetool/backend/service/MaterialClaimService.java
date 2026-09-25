@@ -290,13 +290,6 @@ public class MaterialClaimService {
    */
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public ClaimDto upsertClaim(@NotNull UUID jobOrderId, @NotNull CreateClaimDto dto) {
-    // Retry the upsert across FRESH transactions. Each attempt is REQUIRES_NEW (see self): a losing
-    // first-claim writer's unique-constraint / @Version violation poisons its own transaction, so
-    // the
-    // only correct retry is a brand-new one. All but the final attempt swallow the race and loop;
-    // the
-    // final attempt lets a persistent race propagate so it maps to a truthful 409, not a pretend
-    // success.
     for (int attempt = 1; attempt < MAX_UPSERT_ATTEMPTS; attempt++) {
       try {
         return self.getObject().upsertClaimWithinTransaction(jobOrderId, dto);
@@ -352,13 +345,6 @@ public class MaterialClaimService {
               + dto.qualityRequirement());
     }
 
-    // Serialise every claim upsert on this order on its aggregate-root (job_order) row BEFORE
-    // summing the bucket's existing claims (REQ-ORDERS-024, ADR-0092). Two DIFFERENT squadrons
-    // racing their first claim on the same bucket would otherwise each read a zero already-claimed
-    // sum under READ COMMITTED (the other's uncommitted INSERT is invisible), both pass the guard
-    // below and both commit — and because uq_material_claim_bucket_org_unit keys per claiming
-    // squadron it never collides across squadrons, so the REQUIRES_NEW retry cannot catch that
-    // cross-squadron overclaim. The row lock releases at this attempt's commit/rollback.
     jobOrderRepository.lockForClaimUpsert(jobOrderId);
 
     double amount = dto.amount();
@@ -402,8 +388,6 @@ public class MaterialClaimService {
 
     boolean isNew = claim.getId() == null;
     MaterialClaim saved = materialClaimRepository.save(claim);
-    // Audit (Phase 7, #347): identifiers + amount only — never names/emails. The request-scoped MDC
-    // (correlationId / userId / orgUnitId) is attached by CorrelationIdFilter.
     log.info(
         "Material claim upserted: order={} material={} quality={} claimingOrgUnit={} amount={}",
         order.getId(),

@@ -78,8 +78,6 @@ class CacheConfigTest {
 
   @Test
   void cacheManagerIsTheCaffeineBackedOne() {
-    // Guards against a future "let's switch to a simple ConcurrentMapCache for tests"
-    // shortcut that would skip the eviction semantics under test in the per-service caching tests.
     assertTrue(
         cacheManager instanceof CaffeineCacheManager,
         "CacheConfig must publish a CaffeineCacheManager — replacing it changes eviction"

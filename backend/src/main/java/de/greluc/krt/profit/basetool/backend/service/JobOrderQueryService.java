@@ -130,22 +130,12 @@ public class JobOrderQueryService {
    */
   public Page<JobOrderDto> getAllJobOrders(
       List<JobOrderStatus> statuses, Collection<UUID> squadronIds, Pageable pageable) {
-    // Viewer-side profit gate: only members of a profit-eligible org unit (or admins) may see the
-    // order queue at all. A non-profit caller gets an empty page instead of the SK-public union, so
-    // the list stays invisible to them — the create flow stays open elsewhere. Mirrors the detail
-    // gate folded into OwnerScopeService.canSeeJobOrder.
     if (!ownerScopeService.canViewJobOrders()) {
       return Page.empty(pageable);
     }
-    // Pass the full enum set when no status filter is requested so the repository's IN clause is
-    // never bound with an empty collection (mirrors searchMissions); the boolean-flag alternative
-    // would still have to bind an empty list, which JPQL renders inconsistently across dialects.
     List<JobOrderStatus> effectiveStatuses =
         (statuses == null || statuses.isEmpty()) ? List.of(JobOrderStatus.values()) : statuses;
     ScopePredicate scope = ownerScopeService.currentScopePredicate();
-    // Null/empty selection disables the squadron display filter. The IN clause is never bound with
-    // an empty collection: a non-empty placeholder is passed when the filter is off (it is
-    // short-circuited by :noSquadronFilter and never matches a real org unit anyway).
     boolean noSquadronFilter = squadronIds == null || squadronIds.isEmpty();
     Collection<UUID> effectiveSquadronIds =
         noSquadronFilter ? Set.of(new UUID(0L, 0L)) : squadronIds;
@@ -159,8 +149,6 @@ public class JobOrderQueryService {
             scope.memberOrgUnitIds(),
             pageable);
 
-    // The whole-page per-row enrichment (batched stock + SK claims, REQ-DATA-003) lives in the
-    // extracted projection service alongside the single-order path, so both behave identically.
     return jobOrderStockProjectionService.mapPageWithStock(page);
   }
 
@@ -201,9 +189,6 @@ public class JobOrderQueryService {
    * @return active job orders the caller may see, as reference DTOs
    */
   public List<JobOrderReferenceDto> findAllActiveReference(boolean withNeeds) {
-    // M-2: mirror the list endpoint's controls. Viewer-side profit gate first (a non-profit member
-    // sees nothing, not even the SK-public union), then per-row visibility scope on the loaded
-    // rows.
     if (!ownerScopeService.canViewJobOrders()) {
       return List.of();
     }
@@ -211,16 +196,9 @@ public class JobOrderQueryService {
         jobOrderRepository.findAllActiveWithMaterials().stream()
             .filter(ownerScopeService::canSeeJobOrder)
             .toList();
-    // One batched read for the whole picker rather than a SUM per (order, material) bucket
-    // (REQ-DATA-003) — and the SAME index the cross-order demand overview sums through, so a
-    // picker figure and that page can never disagree. Skipped entirely when no figure is asked
-    // for: an empty id collection never touches the database.
     List<UUID> needIds = withNeeds ? visible.stream().map(JobOrder::getId).toList() : List.of();
     OrderLinkedStockIndex stockIndex =
         jobOrderStockProjectionService.loadOrderLinkedStockIndex(needIds);
-    // The item sibling of that index. Kept as a plain map rather than a second index type: item
-    // earmarks have no quality floor to reproduce in memory (REQ-INV-029), so summing them is the
-    // whole job. An empty id list short-circuits without touching the database.
     Map<UUID, Map<UUID, Double>> itemStockByOrder =
         needIds.isEmpty() ? Map.of() : loadItemStockIndex(needIds);
     return visible.stream()
@@ -235,12 +213,7 @@ public class JobOrderQueryService {
                     o.getMaterials() != null
                         ? o.getMaterials().stream().map(jobOrderMapper::toDto).toList()
                         : List.of(),
-                    // Both order kinds: ITEM orders have no job_order_material rows, so the picker
-                    // must use the kind-agnostic required-material set to filter correctly (#71
-                    // orphan-link fix, REQ-ORDERS-018).
                     List.copyOf(jobOrderItemService.requiredMaterialIds(o)),
-                    // Game-item sibling (REQ-INV-031): the Lager item-mode picker filters orders
-                    // on the requested game items; empty for MATERIAL orders.
                     List.copyOf(jobOrderItemService.requiredGameItemIds(o)),
                     withNeeds ? materialNeedsOf(o, stockIndex) : List.of(),
                     withNeeds ? gameItemNeedsOf(o, itemStockByOrder) : List.of()))
@@ -268,9 +241,6 @@ public class JobOrderQueryService {
             requirement -> {
               Integer qualityFloor =
                   JobOrderStockProjectionService.qualityFloorFor(requirement.quality());
-              // Round both figures and derive the gap from the ROUNDED pair, exactly as
-              // MaterialDemandRowDto does — otherwise a picker label and the demand overview can
-              // print two different numbers for one bucket.
               double required =
                   QuantityTypeRounding.roundForQuantityType(
                       requirement.requiredAmount(), requirement.material());
@@ -337,8 +307,6 @@ public class JobOrderQueryService {
     if (order.getItems() == null || order.getItems().isEmpty()) {
       return List.of();
     }
-    // gameItem.getId() resolves off the FK without initialising the lazy proxy, so this walk fires
-    // no per-line catalogue query (the same read InventoryAggregationService relies on).
     Map<UUID, int[]> lineTotals = new LinkedHashMap<>();
     for (JobOrderItem line : order.getItems()) {
       if (line.getGameItem() == null) {
@@ -354,7 +322,6 @@ public class JobOrderQueryService {
         (gameItemId, totals) -> {
           int ordered = totals[0];
           int delivered = totals[1];
-          // Item rows hold whole units (REQ-INV-029), so the SCU-typed slice rounds loss-free.
           int allocated = (int) Math.round(earmarked.getOrDefault(gameItemId, 0.0));
           needs.add(
               new JobOrderGameItemNeedDto(
@@ -378,13 +345,6 @@ public class JobOrderQueryService {
     JobOrder jobOrder =
         Entities.require(jobOrderRepository.findById(id), () -> "JobOrder not found: " + id);
     JobOrderDto dto = jobOrderStockProjectionService.mapToDtoWithStock(jobOrder);
-    // Stamp the per-order redaction decision here, computed from the ALREADY-LOADED entity via the
-    // managed-entity gate overload — so the controller no longer re-evaluates canSeeJobOrder(id)
-    // (review finding 4) and the flag lets the frontend key its detail rendering off THIS order
-    // rather than a global capability (review finding 2, REQ-ORDERS-023). The actual field
-    // stripping
-    // still happens at the HTTP boundary (JobOrderController#cleanupJobOrderForRequester) when the
-    // flag is set; a full viewer keeps the complete view.
     return ownerScopeService.canSeeJobOrder(jobOrder) ? dto : dto.withRedacted(true);
   }
 
@@ -400,8 +360,6 @@ public class JobOrderQueryService {
    */
   public List<InventoryItemDto> getInventoryItemsForJobOrderMaterial(
       UUID jobOrderId, UUID materialId) {
-    // Existence guards: load only to surface a 404 for an unknown order / material; the query below
-    // filters by the ids directly, so the entities themselves are not needed (#1256 review).
     Entities.require(
         jobOrderRepository.findById(jobOrderId), () -> "JobOrder not found: " + jobOrderId);
     Entities.require(

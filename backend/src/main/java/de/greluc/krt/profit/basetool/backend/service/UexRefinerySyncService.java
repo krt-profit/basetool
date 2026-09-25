@@ -100,9 +100,6 @@ public class UexRefinerySyncService {
     int added = (int) outcome.results().stream().filter(Boolean::booleanValue).count();
     int updated = outcome.results().size() - added;
     log.info("Finished UEX Refining Methods sync: {} added, {} updated", added, updated);
-    // System-actor summary event (one per run, never per row); actor resolves to "system" as no
-    // security context exists on the scheduled path. AuditService.record is MANDATORY, so it gets
-    // a transaction of its own now that the sync holds none.
     chunkWriter.inNewTransaction(
         () ->
             auditService.record(
@@ -244,7 +241,6 @@ public class UexRefinerySyncService {
       lookups.rememberRow(entry.getKey().parentId(), entry.getKey().terminalId(), id);
       savedIds.put(entry.getKey(), id);
     }
-    // One result per row processed (the pre-2026-09-22 tally counted rows, not distinct pairs).
     return rowKeys.stream().map(savedIds::get).toList();
   }
 }

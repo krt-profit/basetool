@@ -284,8 +284,6 @@ class LazyToOneReadPathsTest {
       stats.clear();
       call(url, seed);
       counts.put(endpoint.getKey(), stats.getPrepareStatementCount());
-      // Warm: served from the caches where the endpoint has one — a cached entity whose lazy
-      // proxy was never initialised fails only here.
       call(url, seed);
     }
     return counts;
@@ -499,7 +497,6 @@ class LazyToOneReadPathsTest {
       }
       missionRepository.flush();
       shipRepository.deleteAllById(shipIds);
-      // Raw materials reference the refined ones, so the raw rows go first.
       materialRepository.deleteAllById(rawMaterialIds);
       materialRepository.flush();
       materialRepository.deleteAllById(materialIds);

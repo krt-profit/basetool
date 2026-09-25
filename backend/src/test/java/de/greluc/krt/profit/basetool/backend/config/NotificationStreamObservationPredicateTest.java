@@ -39,37 +39,29 @@ class NotificationStreamObservationPredicateTest {
 
   @Test
   void shouldSkipHttpServerRequestObservationForStreamEndpoint() {
-    // Given
     ServerRequestObservationContext context = serverContext("/api/v1/notifications/stream");
 
-    // When / Then: the SSE stream is not observed (neither timer sample nor span).
     assertThat(predicate.test("http.server.requests", context)).isFalse();
   }
 
   @Test
   void shouldObserveHttpServerRequestForOtherEndpoints() {
-    // Given
     ServerRequestObservationContext context = serverContext("/api/v1/notifications/recent");
 
-    // When / Then: every non-stream request is observed as usual.
     assertThat(predicate.test("http.server.requests", context)).isTrue();
   }
 
   @Test
   void shouldObserveNonHttpServerRequestObservationsForStreamPath() {
-    // Given: a different observation name that happens to share the stream path in its context.
     ServerRequestObservationContext context = serverContext("/api/v1/notifications/stream");
 
-    // When / Then: only http.server.requests is filtered; other observations pass through.
     assertThat(predicate.test("spring.security.filterchains", context)).isTrue();
   }
 
   @Test
   void shouldObserveWhenContextIsNotAServerRequest() {
-    // Given: a plain observation context (e.g. a client or scheduled observation).
     Observation.Context context = new Observation.Context();
 
-    // When / Then: without a servlet request there is nothing to exclude.
     assertThat(predicate.test("http.server.requests", context)).isTrue();
   }
 

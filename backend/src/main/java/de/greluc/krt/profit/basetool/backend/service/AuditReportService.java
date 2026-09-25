@@ -92,19 +92,9 @@ public class AuditReportService {
                 e ->
                     new AuditLogPdfFormat.Row(
                         e.getOccurredAt(),
-                        // An actor whose handle an Art. 17 request erased renders as the
-                        // placeholder, not as the raw sentinel (REQ-SEC-062). The PDF is read by a
-                        // person; the JSON export keeps the token so two exports stay comparable.
                         HandleAnonymisation.humanise(
                             e.getActorHandle(), label("general.anonymisedHandle")),
-                        // The audit document prints the raw, language-neutral event code (the
-                        // on-screen viewer shows the localized label); this keeps the trail
-                        // unambiguous and avoids duplicating ~50 labels into the backend bundle.
                         e.getEventType().name(),
-                        // Humanised like the actor handle above. A subject label that IS
-                        // a member's name is rewritten by a granted erasure, so raw it
-                        // printed the sentinel next to an actor cell already reading
-                        // "Anonymisiert" (REQ-SEC-062).
                         e.getSubjectLabel() == null
                             ? "—"
                             : HandleAnonymisation.humanise(

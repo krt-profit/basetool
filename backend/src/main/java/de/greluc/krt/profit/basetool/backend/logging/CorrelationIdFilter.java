@@ -120,7 +120,6 @@ public class CorrelationIdFilter extends OncePerRequestFilter implements Ordered
     MDC.put(loggingProperties.userIdMdcKey(), userId);
     MDC.put(loggingProperties.orgUnitIdMdcKey(), orgUnitId);
     response.setHeader(loggingProperties.correlationIdHeader(), correlationId);
-    // Stashed for a later async dispatch of this same request, which runs on another thread.
     request.setAttribute(CORRELATION_ID_ATTRIBUTE, correlationId);
     request.setAttribute(USER_ID_ATTRIBUTE, userId);
     request.setAttribute(ORG_UNIT_ID_ATTRIBUTE, orgUnitId);
@@ -221,11 +220,6 @@ public class CorrelationIdFilter extends OncePerRequestFilter implements Ordered
     if (inbound == null || inbound.isBlank()) {
       return UUID.randomUUID().toString();
     }
-    // Truncate BEFORE validating: `isSafe` walks the string character by character, so a 64 KB
-    // header that fails validation anyway would cost 64 K char scans. Capping to MAX_ID_LENGTH
-    // first bounds that cost to ~128 chars regardless of input size, while keeping the same
-    // accept/reject decision — a value that contains an unsafe char in the prefix would have
-    // failed either way, and a value whose prefix is safe was already what we'd have returned.
     String truncated =
         inbound.length() > MAX_ID_LENGTH ? inbound.substring(0, MAX_ID_LENGTH) : inbound;
     return isSafe(truncated) ? truncated : UUID.randomUUID().toString();
@@ -254,11 +248,6 @@ public class CorrelationIdFilter extends OncePerRequestFilter implements Ordered
 
   @NotNull
   private static String resolveUserId() {
-    // Asked of AuthenticatedSubject, not of the type. An acting-member request (ADR-0129) is
-    // authenticated as a named person with no token behind it; the old instanceof test logged it as
-    // anonymous while orgUnitId on the very same line resolved correctly, so the log contradicted
-    // itself. A misbehaving gateway is the main threat this design carries, and this is the stream
-    // that would attribute it.
     return AuthenticatedSubject.of(SecurityContextHolder.getContext().getAuthentication())
         .orElse(ANONYMOUS);
   }

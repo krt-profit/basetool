@@ -129,29 +129,19 @@ class InventoryItemServicePersonalRebookTest {
     sourceOrgUnit = new Squadron();
     sourceOrgUnit.setId(UUID.randomUUID());
 
-    // The mapper is invoked on the newly persisted row; return a sentinel DTO so the return value
-    // identity can be asserted.
     lenient().when(inventoryItemMapper.toDto(any(InventoryItem.class))).thenReturn(SENTINEL);
-    // The new row is saved and echoed straight back (append-only split mirroring the TRANSFER
-    // branch).
     lenient()
         .when(inventoryItemRepository.save(any(InventoryItem.class)))
         .thenAnswer(inv -> inv.getArgument(0));
   }
-
-  // ---------------------------------------------------------------
-  // Up-front guards
-  // ---------------------------------------------------------------
 
   @Nested
   class GuardTests {
 
     @Test
     void notFound_throws() {
-      // Given
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.empty());
 
-      // When / Then
       assertThrows(
           NotFoundException.class,
           () -> service.rebookPersonal(ITEM_ID, dto(1.0, 1L, null), OWNER_ID, false));
@@ -159,11 +149,9 @@ class InventoryItemServicePersonalRebookTest {
 
     @Test
     void versionMismatch_throwsOptimisticLockingFailure() {
-      // Given
       InventoryItem item = newItem(10.0, 5L, true);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
-      // When / Then
       assertThrows(
           ObjectOptimisticLockingFailureException.class,
           () -> service.rebookPersonal(ITEM_ID, dto(1.0, 99L, null), OWNER_ID, false));
@@ -173,12 +161,10 @@ class InventoryItemServicePersonalRebookTest {
 
     @Test
     void nonOwnerNonAdmin_throwsAccessDenied() {
-      // Given: SECURITY — a normal user rebooking someone else's item -> 403.
       InventoryItem item = newItem(10.0, 1L, true);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
       UUID otherUserId = UUID.randomUUID();
 
-      // When / Then
       assertThrows(
           AccessDeniedException.class,
           () -> service.rebookPersonal(ITEM_ID, dto(1.0, 1L, null), otherUserId, false));
@@ -188,27 +174,22 @@ class InventoryItemServicePersonalRebookTest {
 
     @Test
     void nonOwnerButAdmin_isAllowed() {
-      // Given: an admin may rebook another user's item (owner check bypassed).
       InventoryItem item = newItem(10.0, 1L, true);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
       UUID otherUserId = UUID.randomUUID();
 
-      // When
       InventoryItemDto result =
-          service.rebookPersonal(ITEM_ID, dto(4.0, 1L, null), otherUserId, /* isAdmin= */ true);
+          service.rebookPersonal(ITEM_ID, dto(4.0, 1L, null), otherUserId, true);
 
-      // Then: no exception, the split happened (the new row was saved).
       assertSame(SENTINEL, result);
       verify(inventoryItemRepository).save(any(InventoryItem.class));
     }
 
     @Test
     void zeroAmount_throwsBadRequest() {
-      // Given
       InventoryItem item = newItem(10.0, 1L, true);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
-      // When / Then
       BadRequestException ex =
           assertThrows(
               BadRequestException.class,
@@ -219,11 +200,9 @@ class InventoryItemServicePersonalRebookTest {
 
     @Test
     void negativeAmount_throwsBadRequest() {
-      // Given
       InventoryItem item = newItem(10.0, 1L, true);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
-      // When / Then
       BadRequestException ex =
           assertThrows(
               BadRequestException.class,
@@ -233,11 +212,9 @@ class InventoryItemServicePersonalRebookTest {
 
     @Test
     void amountExceedsAvailable_throwsBadRequest() {
-      // Given
       InventoryItem item = newItem(5.0, 1L, true);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
-      // When / Then
       BadRequestException ex =
           assertThrows(
               BadRequestException.class,
@@ -247,17 +224,12 @@ class InventoryItemServicePersonalRebookTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // De-personalize (source personal=true -> shared)
-  // ---------------------------------------------------------------
-
   @Nested
   class DepersonalizeTests {
 
     @Test
     void partial_savesSharedRowAndDecrementsSource() {
-      // Given: a personal row of 10 units; rebook 4 into the shared squadron pool.
-      InventoryItem item = newItem(10.0, 1L, /* personal= */ true);
+      InventoryItem item = newItem(10.0, 1L, true);
       item.setOwningOrgUnit(sourceOrgUnit);
       Squadron picked = new Squadron();
       picked.setId(UUID.randomUUID());
@@ -266,11 +238,9 @@ class InventoryItemServicePersonalRebookTest {
       when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(owner, pickedId))
           .thenReturn(picked);
 
-      // When
       InventoryItemDto result =
           service.rebookPersonal(ITEM_ID, dto(4.0, 1L, pickedId), OWNER_ID, false);
 
-      // Then: the new row is shared, carries the resolved org unit, and the moved amount.
       assertSame(SENTINEL, result);
       ArgumentCaptor<InventoryItem> saveCaptor = ArgumentCaptor.forClass(InventoryItem.class);
       verify(inventoryItemRepository).save(saveCaptor.capture());
@@ -282,15 +252,11 @@ class InventoryItemServicePersonalRebookTest {
       assertSame(material, newRow.getMaterial());
       assertSame(location, newRow.getLocation());
 
-      // And: the source is decremented and flushed (not deleted).
       assertEquals(6.0, item.getAmount(), "source keeps the remainder");
       verify(inventoryItemRepository).saveAndFlush(item);
       verify(inventoryItemRepository, never()).delete(any());
-      // REQ-MARKET-013: the reduced source row ratchets any active offer down to the remaining 6.0
-      // — pins the rebook clamp call site.
       verify(materialExchangeOfferRepository).clampOfferedAmountToStock(eq(ITEM_ID), eq(6.0));
 
-      // And: the de-personalize audit event is recorded.
       verify(auditService)
           .record(
               eq(AuditEventType.INVENTORY_ITEM_DEPERSONALIZED),
@@ -302,8 +268,7 @@ class InventoryItemServicePersonalRebookTest {
 
     @Test
     void full_deletesSourceAndSavesSharedRow() {
-      // Given: a personal row of 5 units; rebook all 5 into the shared pool.
-      InventoryItem item = newItem(5.0, 1L, /* personal= */ true);
+      InventoryItem item = newItem(5.0, 1L, true);
       item.setOwningOrgUnit(sourceOrgUnit);
       Squadron picked = new Squadron();
       picked.setId(UUID.randomUUID());
@@ -312,10 +277,8 @@ class InventoryItemServicePersonalRebookTest {
       when(ownerScopeService.resolveOrgUnitForPickerOutputNullable(owner, pickedId))
           .thenReturn(picked);
 
-      // When
       service.rebookPersonal(ITEM_ID, dto(5.0, 1L, pickedId), OWNER_ID, false);
 
-      // Then: amount == available -> remaining <= epsilon -> source deleted, new row still saved.
       ArgumentCaptor<InventoryItem> saveCaptor = ArgumentCaptor.forClass(InventoryItem.class);
       verify(inventoryItemRepository).save(saveCaptor.capture());
       assertFalse(saveCaptor.getValue().getPersonal());
@@ -332,26 +295,18 @@ class InventoryItemServicePersonalRebookTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // Personalize (source personal=false -> personal)
-  // ---------------------------------------------------------------
-
   @Nested
   class PersonalizeTests {
 
     @Test
     void partial_carriesSourceOrgUnit_dropsAssociations_andDecrementsSource() {
-      // Given: a shared row of 10 units with no allocations; rebook 4 into the private pool.
-      InventoryItem item = newItem(10.0, 1L, /* personal= */ false);
+      InventoryItem item = newItem(10.0, 1L, false);
       item.setOwningOrgUnit(sourceOrgUnit);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
-      // When
       InventoryItemDto result =
           service.rebookPersonal(ITEM_ID, dto(4.0, 1L, null), OWNER_ID, false);
 
-      // Then: the new row is personal, carries the SOURCE row's org-unit stamp (no resolver call),
-      // and holds no job-order / mission allocations.
       assertSame(SENTINEL, result);
       ArgumentCaptor<InventoryItem> saveCaptor = ArgumentCaptor.forClass(InventoryItem.class);
       verify(inventoryItemRepository).save(saveCaptor.capture());
@@ -365,15 +320,12 @@ class InventoryItemServicePersonalRebookTest {
       assertTrue(newRow.getMissionAllocations().isEmpty(), "personal row never carries a mission");
       assertSame(owner, newRow.getUser());
 
-      // And: the personalize direction never consults the picker resolver.
       verify(ownerScopeService, never()).resolveOrgUnitForPickerOutputNullable(any(), any());
 
-      // And: the source is decremented and flushed (not deleted).
       assertEquals(6.0, item.getAmount(), "source keeps the remainder");
       verify(inventoryItemRepository).saveAndFlush(item);
       verify(inventoryItemRepository, never()).delete(any());
 
-      // And: the personalize audit event is recorded.
       verify(auditService)
           .record(
               eq(AuditEventType.INVENTORY_ITEM_PERSONALIZED),
@@ -385,21 +337,18 @@ class InventoryItemServicePersonalRebookTest {
 
     @Test
     void sourceWithJobOrder_throwsBadRequest_beforeCreatingAnyRow() {
-      // Given: a shared row bound to a job order — personalizing it would lose the assignment.
-      InventoryItem item = newItem(10.0, 1L, /* personal= */ false);
+      InventoryItem item = newItem(10.0, 1L, false);
       JobOrder jobOrder = new JobOrder();
       jobOrder.setId(UUID.randomUUID());
       InventoryAllocations.addJobOrder(item, jobOrder, item.getAmount(), false);
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
-      // When / Then
       BadRequestException ex =
           assertThrows(
               BadRequestException.class,
               () -> service.rebookPersonal(ITEM_ID, dto(4.0, 1L, null), OWNER_ID, false));
       assertEquals(
           "Stock assigned to a job order or mission cannot be marked personal", ex.getMessage());
-      // No row created/deleted: the guard fires before the append-only split.
       verify(inventoryItemRepository, never()).save(any());
       verify(inventoryItemRepository, never()).delete(any());
       verify(auditService, never()).record(any(), any(), any(), any(), any());
@@ -407,14 +356,12 @@ class InventoryItemServicePersonalRebookTest {
 
     @Test
     void sourceWithMission_throwsBadRequest_beforeCreatingAnyRow() {
-      // Given: a shared row bound to a mission — personalizing it would lose the assignment.
-      InventoryItem item = newItem(10.0, 1L, /* personal= */ false);
+      InventoryItem item = newItem(10.0, 1L, false);
       Mission mission = new Mission();
       mission.setId(UUID.randomUUID());
       InventoryAllocations.addMission(item, mission, item.getAmount());
       when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
-      // When / Then
       BadRequestException ex =
           assertThrows(
               BadRequestException.class,
@@ -427,10 +374,6 @@ class InventoryItemServicePersonalRebookTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // helpers
-  // ---------------------------------------------------------------
-
   /**
    * Builds a source inventory row owned by {@link #owner} at {@link #location} for {@link
    * #material}, with the given amount, optimistic-lock version and {@code personal} flag.
@@ -440,14 +383,8 @@ class InventoryItemServicePersonalRebookTest {
    * @param personal the source row's personal flag (drives the rebook direction)
    * @return the populated transient source row
    */
-  // ---------------------------------------------------------------
-  // game-item stock rows (V220, REQ-INV-029)
-  // ---------------------------------------------------------------
-
-  // covers REQ-INV-029 (personal-rebook copies the catalog reference pair as a unit)
   @Test
   void rebook_itemRow_copiesGameItemOntoNewRow() {
-    // Given a shared game-item stock row being personalized
     InventoryItem item = newItem(10.0, 1L, false);
     item.setMaterial(null);
     item.setQuality(null);
@@ -459,12 +396,8 @@ class InventoryItemServicePersonalRebookTest {
     item.setOwningOrgUnit(sourceOrgUnit);
     when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
-    // When — rebook 4 whole units into the personal pool
     service.rebookPersonal(ITEM_ID, dto(4.0, 1L, null), OWNER_ID, false);
 
-    // Then — the new row carries the gameItem alongside null material/quality; without the copy
-    // the split row would violate the XOR CHECK (chk_inventory_item_catalog_xor, V220) -> 500 on
-    // every item Umbuchung.
     ArgumentCaptor<InventoryItem> captor = ArgumentCaptor.forClass(InventoryItem.class);
     verify(inventoryItemRepository, org.mockito.Mockito.atLeastOnce()).save(captor.capture());
     InventoryItem newRow =
@@ -479,10 +412,8 @@ class InventoryItemServicePersonalRebookTest {
     assertEquals(4.0, newRow.getAmount());
   }
 
-  // covers REQ-INV-029 (item rebooks move whole units only)
   @Test
   void rebook_itemRow_fractionalAmount_throwsBadRequest() {
-    // Given a game-item stock row
     InventoryItem item = newItem(10.0, 1L, false);
     item.setMaterial(null);
     item.setQuality(null);
@@ -492,8 +423,6 @@ class InventoryItemServicePersonalRebookTest {
     item.setGameItem(gameItem);
     when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
-    // When / Then — a fractional rebook amount is rejected before any split, and the 400 detail
-    // names the row's actual catalog kind (item stock, not PIECE materials)
     BadRequestException ex =
         assertThrows(
             BadRequestException.class,
@@ -503,11 +432,8 @@ class InventoryItemServicePersonalRebookTest {
     verify(inventoryItemRepository, never()).delete(any());
   }
 
-  // covers REQ-INV-029 (full-depletion escape: a legacy fractional item row can leave its pool)
   @Test
   void rebook_itemRow_legacyFractionalRow_fullDepletion_isAllowed() {
-    // Given a shared game-item row holding a legacy fractional amount (only reachable via legacy
-    // data, but the guard is row-kind driven, so the escape must hold here too)
     InventoryItem item = newItem(1.5, 1L, false);
     item.setMaterial(null);
     item.setQuality(null);
@@ -517,11 +443,8 @@ class InventoryItemServicePersonalRebookTest {
     item.setGameItem(gameItem);
     when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
-    // When — rebook the row's EXACT remaining amount into the personal pool
     InventoryItemDto result = service.rebookPersonal(ITEM_ID, dto(1.5, 1L, null), OWNER_ID, false);
 
-    // Then — the fractional amount is exempt (full depletion): the split row carries 1.5 and the
-    // depleted source is deleted, never flushed
     assertSame(SENTINEL, result);
     ArgumentCaptor<InventoryItem> captor = ArgumentCaptor.forClass(InventoryItem.class);
     verify(inventoryItemRepository).save(captor.capture());
@@ -530,10 +453,8 @@ class InventoryItemServicePersonalRebookTest {
     verify(inventoryItemRepository, never()).saveAndFlush(any());
   }
 
-  // covers REQ-INV-029 (a PARTIAL fractional rebook off a fractional item row still 400s)
   @Test
   void rebook_itemRow_legacyFractionalRow_partialFractionalAmount_throwsBadRequest() {
-    // Given the same legacy fractional item row
     InventoryItem item = newItem(1.5, 1L, false);
     item.setMaterial(null);
     item.setQuality(null);
@@ -543,7 +464,6 @@ class InventoryItemServicePersonalRebookTest {
     item.setGameItem(gameItem);
     when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
-    // When / Then — 0.5 is fractional AND does not deplete the row, so the guard still fires
     BadRequestException ex =
         assertThrows(
             BadRequestException.class,
@@ -553,20 +473,15 @@ class InventoryItemServicePersonalRebookTest {
     verify(inventoryItemRepository, never()).delete(any());
   }
 
-  // covers REQ-INV-029 (full-depletion escape: a legacy fractional PIECE row can leave its pool)
   @Test
   void rebook_pieceMaterial_legacyFractionalRow_fullDepletion_isAllowed() {
-    // Given a shared PIECE-material row holding a legacy fractional amount (created before the
-    // whole-unit guard existed) — without the escape that remainder could never change pools
     InventoryItem item = newItem(1.5, 1L, false);
     item.getMaterial().setQuantityType(QuantityType.PIECE);
     item.setOwningOrgUnit(sourceOrgUnit);
     when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
-    // When — rebook the row's EXACT remaining amount into the personal pool
     InventoryItemDto result = service.rebookPersonal(ITEM_ID, dto(1.5, 1L, null), OWNER_ID, false);
 
-    // Then — exempt from the whole-unit rule: the split row carries 1.5, the source is deleted
     assertSame(SENTINEL, result);
     ArgumentCaptor<InventoryItem> captor = ArgumentCaptor.forClass(InventoryItem.class);
     verify(inventoryItemRepository).save(captor.capture());
@@ -576,15 +491,12 @@ class InventoryItemServicePersonalRebookTest {
     verify(inventoryItemRepository, never()).saveAndFlush(any());
   }
 
-  // covers REQ-INV-029 (a PARTIAL fractional rebook off a fractional PIECE row still 400s)
   @Test
   void rebook_pieceMaterial_legacyFractionalRow_partialFractionalAmount_throwsBadRequest() {
-    // Given the same legacy fractional PIECE row
     InventoryItem item = newItem(1.5, 1L, false);
     item.getMaterial().setQuantityType(QuantityType.PIECE);
     when(inventoryItemRepository.findById(ITEM_ID)).thenReturn(Optional.of(item));
 
-    // When / Then — 0.5 is fractional AND does not deplete the row, so the guard still fires
     BadRequestException ex =
         assertThrows(
             BadRequestException.class,

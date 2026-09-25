@@ -154,7 +154,6 @@ class AdminMissionDataPageControllerMvcTest {
         .thenReturn(freqTypes);
   }
 
-  // covers REQ-FE-002 — the full page renders all three per-section swap-target wrappers.
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_fullPage_rendersAllThreeSwapWrappers() throws Exception {
@@ -169,11 +168,6 @@ class AdminMissionDataPageControllerMvcTest {
         .andExpect(content().string(containsString("id=\"freqtypes-results\"")));
   }
 
-  // covers the .form-group checkbox regression class (PR #1405) — the page-scoped .form-group
-  // input rule tied the global KRT square-checkbox rule at (0,1,1) and, rendering after
-  // styles.css, stretched the job-type modal's leadership/mission-lead checkboxes into full-width
-  // padded bars. Pins the zero-specificity :where() exclusion so the page rule can never
-  // re-capture checkbox/radio inputs (and never outranks the (0,2,0) combobox rule).
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_ShouldExcludeCheckboxesFromFormGroupInputRule() throws Exception {
@@ -188,7 +182,6 @@ class AdminMissionDataPageControllerMvcTest {
                     ".form-group input:where(:not([type='checkbox']):not([type='radio']))")));
   }
 
-  // covers REQ-FE-002 — ?fragment=squadrons-results renders only the squadron table.
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_fragmentSquadrons_rendersOnlySquadronTable() throws Exception {
@@ -206,7 +199,6 @@ class AdminMissionDataPageControllerMvcTest {
         .andExpect(content().string(not(containsString("id=\"add-squadron-btn\""))));
   }
 
-  // covers REQ-FE-002 — ?fragment=jobtypes-results renders only the job-type table.
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_fragmentJobtypes_rendersOnlyJobTable() throws Exception {
@@ -223,8 +215,6 @@ class AdminMissionDataPageControllerMvcTest {
         .andExpect(content().string(not(containsString("id=\"add-jobtype-btn\""))));
   }
 
-  // covers REQ-FE-002 — ?fragment=freqtypes-results renders only the freq table (drag rows
-  // present).
   @Test
   @WithMockUser(roles = "ADMIN")
   void list_fragmentFreqtypes_rendersOnlyFreqTable() throws Exception {
@@ -235,9 +225,6 @@ class AdminMissionDataPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("admin/mission-data :: freqtypes-results"))
         .andExpect(content().string(containsString("Frag FT")))
-        // Prefix match: the row carries additional migrated utility classes after the CSP
-        // inline-style migration (e.g. krtm-cursor-grab-*), so assert the class attribute begins
-        // with draggable-row rather than pinning an exact single-class value.
         .andExpect(content().string(containsString("class=\"draggable-row")))
         .andExpect(content().string(not(containsString("id=\"freqtypes-results\""))))
         .andExpect(content().string(not(containsString("id=\"squadrons-results\""))))
@@ -245,8 +232,6 @@ class AdminMissionDataPageControllerMvcTest {
         .andExpect(content().string(not(containsString("id=\"add-freqtype-btn\""))));
   }
 
-  // covers #582 — the squadron-create twin (X-Requested-With + form params) relays to the backend
-  // and returns 200; the page re-swaps the squadron-results fragment.
   @Test
   @WithMockUser(roles = "ADMIN")
   void createSquadronAjax_withHeader_returns200() throws Exception {
@@ -264,8 +249,6 @@ class AdminMissionDataPageControllerMvcTest {
         .andExpect(status().isOk());
   }
 
-  // covers #582 — the job-type-delete twin (X-Requested-With) returns 200 so the page re-swaps the
-  // job-type fragment in place rather than reloading.
   @Test
   @WithMockUser(roles = "ADMIN")
   void deleteJobTypeAjax_withHeader_returns200() throws Exception {
@@ -280,9 +263,6 @@ class AdminMissionDataPageControllerMvcTest {
         .andExpect(status().isOk());
   }
 
-  // covers #582 — a backend duplicate-name conflict on the squadron create is relayed as the
-  // backend
-  // status (409) so krtFetch toasts the domain message.
   @Test
   @WithMockUser(roles = "ADMIN")
   void createSquadronAjax_backendConflict_relays409() throws Exception {
@@ -303,9 +283,6 @@ class AdminMissionDataPageControllerMvcTest {
         .andExpect(status().isConflict());
   }
 
-  // covers #582 — header routing: the same create URL WITHOUT the header still hits the classic
-  // form
-  // handler and redirects (no-JS fallback preserved).
   @Test
   @WithMockUser(roles = "ADMIN")
   void createSquadron_withoutHeader_redirects() throws Exception {

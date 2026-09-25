@@ -151,11 +151,6 @@ public class OperationPageController {
       Model model,
       @AuthenticationPrincipal OidcUser principal) {
     StringBuilder uri = new StringBuilder("/api/v1/operations/search?");
-    // Every caller-supplied value is a WebClient URI-template variable, so it is percent-encoded
-    // exactly once across the frontend->backend hop (REQ-SEC-051). The period bounds used to be
-    // URLEncoder-encoded INTO the template, which the WebClient then encoded a second time: the
-    // backend received `2026-01-01T00%3A00%3A00Z` literally, could not parse it as an Instant, and
-    // the date filter never worked (FE-SEC-01).
     List<Object> uriVariables = new ArrayList<>();
     if (search != null && !search.isBlank()) {
       uri.append("query={query}&");
@@ -173,8 +168,6 @@ public class OperationPageController {
     uri.append("size=").append(size).append("&");
     uri.append("sort=createdAt,desc&");
 
-    // The "and not anonymous" half is gone with the caller (ADR-0159): every caller here holds
-    // a session, so the archive toggle means what it says.
     if (showPast) {
       uri.append("status=PLANNED&status=ACTIVE&status=COMPLETED&status=CANCELED&");
     } else {
@@ -214,9 +207,6 @@ public class OperationPageController {
    */
   private List<OrgUnitMembershipOptionDto> fetchCallerMembershipOptions() {
     try {
-      // Epic #692 Phase 5: drill-down owner picker — the caller's direct memberships plus their
-      // cascading leadership reach (own Bereich/OL + overseen subordinate Staffeln/SKs). Unchanged
-      // for an ordinary member.
       List<OrgUnitMembershipOptionDto> options =
           backendApiClient.get("/api/v1/users/me/pickable-org-units", PICKABLE_ORG_UNIT_LIST_TYPE);
       return options != null ? options : List.of();
@@ -296,7 +286,6 @@ public class OperationPageController {
       Authentication authentication,
       Model model) {
     if ("missions".equals(fragment)) {
-      // The missions fragment has its own empty-state degradation (never a redirect), kept as-is.
       return missionsFragment(id, page, size, model);
     }
     try {
@@ -336,11 +325,6 @@ public class OperationPageController {
    */
   private void loadFullModel(
       UUID id, Integer page, Integer size, Authentication authentication, Model model) {
-    // #1123: fetch the four independent reads concurrently on virtual threads (ParallelPageLoader
-    // replays the request-scoped context — auth, active-org-unit pin, correlation id, client IP)
-    // instead of blocking through them in series. The finance read is the cheap /finance-summary
-    // roll-up (#1121, the operation-side ADR-0078 gap); each mission's per-entry breakdown loads
-    // lazily via GET /operations/{id}/finance/{missionId} when its panel is expanded.
     CompletableFuture<OperationDto> operationF =
         parallelPageLoader.loadAsync(
             () -> backendApiClient.get("/api/v1/operations/" + id, OperationDto.class));
@@ -372,9 +356,6 @@ public class OperationPageController {
     model.addAttribute("operationPayouts", payoutSummary.payouts());
     model.addAttribute("operationDonationTotal", payoutSummary.totalDonations());
 
-    // Largest per-mission result, so the "Ergebnis je Einsatz" overview bars can be sized
-    // proportionally (BigDecimal.ZERO when there are no positive results — the template then
-    // renders zero-width bars rather than dividing by zero).
     BigDecimal maxMissionResult =
         operationFinance.missions() == null
             ? BigDecimal.ZERO
@@ -385,18 +366,7 @@ public class OperationPageController {
                 .orElse(BigDecimal.ZERO);
     model.addAttribute("operationMaxMissionResult", maxMissionResult);
 
-    // Resolved at the HTTP boundary so the template stays free of inline
-    // role-expression checks. The backend's PUT /api/v1/operations/{id}
-    // requires ROLE_MISSION_MANAGER (or any role that reaches it via the
-    // hierarchy — ADMIN, OFFICER) AND the same role is granted by the
-    // app_user.is_mission_manager flag through the JWT-converter, so the
-    // role check here matches what the backend enforces.
     model.addAttribute("canEdit", hasMissionManagerRole(authentication));
-    // The "Bezahlt"-checkbox is asymmetric: any mission manager can set
-    // it to paid, but only an officer or admin may clear it back to
-    // unpaid. The template uses this flag to disable an already-checked
-    // checkbox for plain mission managers — mirrors the asymmetric
-    // @PreAuthorize on the backend's payouts/paid-out endpoint.
     model.addAttribute("canUnsetPaidOut", hasOfficerOrAdminRole(authentication));
   }
 
@@ -595,11 +565,6 @@ public class OperationPageController {
       backendApiClient.put("/api/v1/operations/" + id, form, Void.class);
       redirectAttributes.addFlashAttribute("successMessage", "operation.update.success");
     } catch (BackendServiceException e) {
-      // #1155: BackendApiClient never lets WebClientResponseException escape — it always rethrows a
-      // parsed BackendServiceException — so the former catch(WebClientResponseException.Conflict)
-      // was
-      // dead and a stale-version 409 flashed the generic error, misleading the losing editor into a
-      // blind retry. Branch on the actual status the client throws.
       if (e.getStatusCode() == 409) {
         log.warn("Optimistic locking failure updating operation: {}", id);
         redirectAttributes.addFlashAttribute("errorMessage", "error.optimistic.locking");
@@ -663,10 +628,6 @@ public class OperationPageController {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
       }
       if (e.getStatusCode() == 409) {
-        // A same-row toggle race that survived the backend's bounded retry. Mirror it as a truthful
-        // 409 instead of collapsing every non-401/403/404 into a 500 — the toggle is a concurrency
-        // conflict, not a server fault, so the client reverts to the current value rather than
-        // showing a generic server-error toast (#1111).
         return ResponseEntity.status(HttpStatus.CONFLICT).build();
       }
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();

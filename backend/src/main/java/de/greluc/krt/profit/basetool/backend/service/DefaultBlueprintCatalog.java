@@ -50,7 +50,5 @@ public final class DefaultBlueprintCatalog {
           "S-38 Pistol",
           "P4-AR Rifle");
 
-  private DefaultBlueprintCatalog() {
-    // Constants holder — not instantiable.
-  }
+  private DefaultBlueprintCatalog() {}
 }

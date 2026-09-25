@@ -103,15 +103,8 @@ public class ScWikiVehicleSyncService {
             "vehicles",
             null,
             null,
-            // A vehicle row carries its whole port / shield / power tree, so this walk asks for a
-            // smaller page than every other endpoint: at the shared 200 the first page alone is
-            // 10.4 MB against the client's 16 MB codec ceiling, and crossing it stops the sync
-            // silently rather than loudly.
             properties.vehiclesPageSize());
     if (result.notModified()) {
-      // Catalogue unchanged since the last sync (ETag 304): nothing to fill, but this is a healthy
-      // run — report the live Wiki-linked ship-type count so an all-304 run is not read as a
-      // zero-item outage (#1182). A genuine empty-200 falls through to isEmpty() and reports 0.
       long live = shipTypeRepository.countLiveScwikiShipTypes();
       log.info(
           "SC Wiki vehicle catalogue unchanged since last sync (304) — reporting {} live"

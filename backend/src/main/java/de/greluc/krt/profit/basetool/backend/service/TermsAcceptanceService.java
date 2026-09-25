@@ -180,17 +180,11 @@ public class TermsAcceptanceService implements TermsConsentCheck {
     try {
       termsAcceptanceRepository.save(acceptance);
     } catch (DataIntegrityViolationException e) {
-      // Another instance recorded the same consent between the check and this insert. The row that
-      // matters exists either way, so treat it as already-accepted rather than surfacing a 500.
-      // NOT cached here: this transaction is now aborted, and whether the other instance's row is
-      // actually committed is not knowable from inside it. The next request re-reads and caches
-      // the truth at the cost of one `exists` query.
       log.debug("Concurrent terms acceptance for the same user and version; keeping the first");
       return false;
     }
     cacheAfterCommit(userId);
     meterRegistry.counter(MetricNames.TERMS_ACCEPTANCES).increment();
-    // No callsign or e-mail (REQ-OBS-004); the sub is already the MDC userId on this request.
     log.info("Terms of Use accepted, version {}", currentVersion());
     return true;
   }

@@ -56,7 +56,6 @@ public record DiscordRegistrationPendingEvent(UUID userId, @Nullable String user
   @Nullable
   @Override
   public UUID actorSub() {
-    // The new (unapproved) user is not an "actor" to exclude; recipients are admins only.
     return null;
   }
 

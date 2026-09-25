@@ -51,9 +51,6 @@ import org.springframework.context.MessageSource;
 class JobOrderItemHandoverReportServiceTest {
 
   @Mock private JobOrderItemHandoverRepository jobOrderItemHandoverRepository;
-  // The report now resolves one label from the bundle: the placeholder an Art. 17 erasure
-  // leaves in a recipient handle (REQ-SEC-062). Without the mock the field is null and
-  // every PDF fails at that lookup.
   @Mock private MessageSource messageSource;
   @InjectMocks private JobOrderItemHandoverReportService service;
 

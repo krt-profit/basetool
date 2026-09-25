@@ -93,24 +93,11 @@ class JobOrderServiceAssigneeAndListTest {
 
   @Mock private AuditService auditService;
 
-  // The stock/claim DTO projection and the assignee lifecycle were extracted to
-  // JobOrderStockProjectionService / JobOrderAssigneeService (L2, #921); real instances (built from
-  // the same mocks) are wired into the CUT via reflection in setUp() — the assignee service also
-  // gets the real projection chained in — so the delegated add/remove/note paths and the list paths
-  // keep exercising the real logic.
   @InjectMocks private JobOrderStockProjectionService jobOrderStockProjectionService;
-  // Constructed in the @BeforeEach rather than by @InjectMocks: the REAL stock projection is one
-  // of its arguments
   private JobOrderAssigneeService jobOrderAssigneeService;
 
-  // Constructed in the @BeforeEach rather than by @InjectMocks: two of its collaborators are real,
-  // co-built services
   private JobOrderService service;
 
-  // Read/write split (#14): the list/reference/detail reads moved to JobOrderQueryService, built
-  // from the same mocks with the real stock projection wired in below.
-  // Constructed in the @BeforeEach rather than by @InjectMocks: the REAL stock projection is one
-  // of its arguments
   private JobOrderQueryService queryService;
 
   private static final UUID JOB_ORDER_ID = UUID.randomUUID();
@@ -118,12 +105,6 @@ class JobOrderServiceAssigneeAndListTest {
 
   @BeforeEach
   void stubMapperEchoingEmptyMaterials() {
-    // Built through the constructor instead of patched in afterwards: these fields are
-    // `private final`, and reflective mutation of a final field is what JEP 500 (JDK 26)
-    // warns about and a later release will refuse. Arg order matches the
-    // @RequiredArgsConstructor field-declaration order of each service.
-    // A `null` argument is a dependency this fixture never reaches -- exactly what
-    // @InjectMocks passed before, only visible now.
     jobOrderAssigneeService =
         new JobOrderAssigneeService(
             jobOrderRepository, userRepository, auditService, jobOrderStockProjectionService);
@@ -133,16 +114,15 @@ class JobOrderServiceAssigneeAndListTest {
             materialRepository,
             inventoryItemRepository,
             jobOrderAssigneeService,
-            null, // orgUnitRepository
-            null, // jobOrderOrgUnitResolver
-            null, // authHelperService
-            null, // eventPublisher
+            null,
+            null,
+            null,
+            null,
             materialClaimService,
             auditService,
             jobOrderItemService,
             jobOrderStockProjectionService,
-            null // jobOrderPriorityService
-            );
+            null);
     queryService =
         new JobOrderQueryService(
             jobOrderRepository,
@@ -153,12 +133,8 @@ class JobOrderServiceAssigneeAndListTest {
             squadronMapper,
             jobOrderItemService,
             jobOrderStockProjectionService,
-            null, // materialRequirementResolver
+            null,
             inventoryItemMapper);
-    // The service routes nearly every return through mapToDtoWithStock(),
-    // which calls jobOrderMapper.toDto(...) and then iterates the result's
-    // materials. Return an empty materials list so we don't have to stub
-    // the stock-aggregation repository call.
     lenient()
         .when(jobOrderMapper.toDto(any(JobOrder.class)))
         .thenAnswer(
@@ -186,39 +162,23 @@ class JobOrderServiceAssigneeAndListTest {
                   null,
                   false);
             });
-    // The paged list path batches stock once per page via findMaterialStockRowsByJobOrderIds
-    // (REQ-DATA-003); default to an empty index so the routing tests need not model stock.
     lenient()
         .when(inventoryItemRepository.findMaterialStockRowsByJobOrderIds(any()))
         .thenReturn(List.of());
-    // The list path also batches SK claims once per page; the routing tests use non-SK orders, so
-    // an empty per-order claim map is the right default.
     lenient().when(materialClaimService.getClaimBucketsForOrders(any())).thenReturn(Map.of());
   }
-
-  // ---------------------------------------------------------------
-  // getAllJobOrders — status-filter routing + visibility scope (Phase 3, #343)
-  // ---------------------------------------------------------------
 
   @Nested
   class GetAllJobOrdersTests {
 
     private final PageRequest pageable = PageRequest.of(0, 10);
-    // The scope predicate is resolved from OwnerScopeService and pushed into the repository query;
-    // every list call must consult it. An admin-all-scope predicate keeps these routing tests
-    // focused on the status/squadron-filter forwarding rather than the scope semantics (those live
-    // in OwnerScopeServiceTest).
     private final ScopePredicate adminAllScope = new ScopePredicate(true, null, Set.of());
 
-    // No status filter → the service passes the full enum set so the repository IN clause is never
-    // bound with an empty collection.
     private final List<JobOrderStatus> allStatuses = List.of(JobOrderStatus.values());
 
     @BeforeEach
     void stubScope() {
       lenient().when(ownerScopeService.currentScopePredicate()).thenReturn(adminAllScope);
-      // These routing tests model a permitted viewer; the profit gate is covered separately in
-      // OwnerScopeServiceTest / JobOrderServiceTest, so let the list reach the repository here.
       lenient().when(ownerScopeService.canViewJobOrders()).thenReturn(true);
     }
 
@@ -321,8 +281,6 @@ class JobOrderServiceAssigneeAndListTest {
 
     @Test
     void nonAdminScope_forwardsMemberUnionToRepository() {
-      // A non-admin member with a two-OrgUnit membership union: the predicate's memberOrgUnitIds
-      // must reach the repository verbatim so the IN-clause scoping applies.
       Page<JobOrder> page = new PageImpl<>(List.of(newJobOrder(JobOrderStatus.OPEN)));
       UUID sqA = UUID.randomUUID();
       UUID sqB = UUID.randomUUID();
@@ -342,10 +300,6 @@ class JobOrderServiceAssigneeAndListTest {
 
     @Test
     void listPath_batchesStockOncePerPageAndAvoidsPerMaterialSum() {
-      // REQ-DATA-003: the paged list must enrich stock with ONE batched query for the whole page,
-      // not the former one-SUM-per-material-per-order fan-out. With two orders on the page the
-      // batch
-      // query is issued exactly once and the per-material aggregate is never called on this path.
       Page<JobOrder> page =
           new PageImpl<>(
               List.of(newJobOrder(JobOrderStatus.OPEN), newJobOrder(JobOrderStatus.IN_PROGRESS)));
@@ -362,11 +316,6 @@ class JobOrderServiceAssigneeAndListTest {
 
     @Test
     void listPath_sumsBatchedStockAtEachBucketsQualityFloor() {
-      // REQ-DATA-003: the list path sums the page-batched stock rows in memory, reproducing the
-      // native COALESCE(SUM(amount), 0) + (:floor IS NULL OR quality >= :floor) semantics for ANY
-      // floor — not just the GOOD/NONE pair. matNoFloor counts every grade; matFloor650 keeps only
-      // quality >= 650. The defensive null-quality / null-amount branches are exercised too (the
-      // columns are NOT NULL in the DB, so they are unreachable in production but must stay safe).
       UUID orderId = JOB_ORDER_ID;
       UUID matNoFloor = UUID.randomUUID();
       UUID matFloor650 = UUID.randomUUID();
@@ -387,12 +336,11 @@ class JobOrderServiceAssigneeAndListTest {
                   new JobOrderMaterialStockRow(orderId, matNoFloor, 300, 10.0),
                   new JobOrderMaterialStockRow(orderId, matNoFloor, null, 5.0),
                   new JobOrderMaterialStockRow(orderId, matNoFloor, 900, 20.0),
-                  new JobOrderMaterialStockRow(
-                      orderId, matNoFloor, 900, null), // null amount skipped
-                  new JobOrderMaterialStockRow(orderId, matFloor650, 640, 7.0), // below floor: out
-                  new JobOrderMaterialStockRow(orderId, matFloor650, 650, 3.0), // boundary: in
-                  new JobOrderMaterialStockRow(orderId, matFloor650, 900, 4.0), // above floor: in
-                  new JobOrderMaterialStockRow(orderId, matFloor650, null, 99.0))); // null q: out
+                  new JobOrderMaterialStockRow(orderId, matNoFloor, 900, null),
+                  new JobOrderMaterialStockRow(orderId, matFloor650, 640, 7.0),
+                  new JobOrderMaterialStockRow(orderId, matFloor650, 650, 3.0),
+                  new JobOrderMaterialStockRow(orderId, matFloor650, 900, 4.0),
+                  new JobOrderMaterialStockRow(orderId, matFloor650, null, 99.0)));
 
       Page<JobOrderDto> result = queryService.getAllJobOrders(null, pageable);
 
@@ -411,10 +359,6 @@ class JobOrderServiceAssigneeAndListTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // findAllActiveReference — null-materials ternary
-  // ---------------------------------------------------------------
-
   @Nested
   class FindAllActiveReferenceTests {
 
@@ -428,7 +372,6 @@ class JobOrderServiceAssigneeAndListTest {
 
     @Test
     void nonProfitMember_getsEmptyListWithoutQueryingRepository() {
-      // M-2: the viewer-side profit gate short-circuits before the repository is even touched.
       when(ownerScopeService.canViewJobOrders()).thenReturn(false);
 
       assertTrue(queryService.findAllActiveReference(false).isEmpty());
@@ -437,8 +380,6 @@ class JobOrderServiceAssigneeAndListTest {
 
     @Test
     void ordersOutOfScope_areFilteredOut() {
-      // M-2: a squadron-private order the caller may not see is dropped from the typeahead so it
-      // cannot enumerate a foreign squadron's order handle + materials.
       JobOrder o = newJobOrder(JobOrderStatus.OPEN);
       when(ownerScopeService.canViewJobOrders()).thenReturn(true);
       when(ownerScopeService.canSeeJobOrder(any(JobOrder.class))).thenReturn(false);
@@ -485,10 +426,6 @@ class JobOrderServiceAssigneeAndListTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // getJobOrderById
-  // ---------------------------------------------------------------
-
   @Nested
   class GetJobOrderByIdTests {
 
@@ -513,10 +450,6 @@ class JobOrderServiceAssigneeAndListTest {
           "the missing id must be part of the message for diagnostics");
     }
   }
-
-  // ---------------------------------------------------------------
-  // addAssignee
-  // ---------------------------------------------------------------
 
   @Nested
   class AddAssigneeTests {
@@ -558,8 +491,6 @@ class JobOrderServiceAssigneeAndListTest {
 
     @Test
     void addingExistingAssignee_isIdempotent() {
-      // A user is an assignee at most once per order; re-adding the same user is a no-op that
-      // skips both the user lookup and the save.
       User user = newUser(USER_ID);
       JobOrder order = newJobOrder(JobOrderStatus.OPEN);
       assigneeEdge(order, user);
@@ -574,10 +505,6 @@ class JobOrderServiceAssigneeAndListTest {
       verify(jobOrderRepository, never()).saveAndFlush(any());
     }
   }
-
-  // ---------------------------------------------------------------
-  // removeAssignee
-  // ---------------------------------------------------------------
 
   @Nested
   class RemoveAssigneeTests {
@@ -599,10 +526,7 @@ class JobOrderServiceAssigneeAndListTest {
 
     @Test
     void removingNonAssignee_isANoOpButStillSaves() {
-      // removeIf finds nothing but does not throw — the save happens regardless. The remove path
-      // no longer looks the user up, so an unknown id is simply a no-op.
       JobOrder order = newJobOrder(JobOrderStatus.OPEN);
-      // no assignee for USER_ID
 
       when(jobOrderRepository.findById(JOB_ORDER_ID)).thenReturn(Optional.of(order));
       when(jobOrderRepository.saveAndFlush(order)).thenReturn(order);
@@ -621,10 +545,6 @@ class JobOrderServiceAssigneeAndListTest {
       verify(jobOrderRepository, never()).saveAndFlush(any());
     }
   }
-
-  // ---------------------------------------------------------------
-  // updateAssigneeNote / deleteAssigneeNote (REQ-ORDERS-013)
-  // ---------------------------------------------------------------
 
   @Nested
   class AssigneeNoteTests {
@@ -698,10 +618,6 @@ class JobOrderServiceAssigneeAndListTest {
       verify(jobOrderRepository, never()).saveAndFlush(any());
     }
   }
-
-  // ---------------------------------------------------------------
-  // helpers
-  // ---------------------------------------------------------------
 
   private JobOrder newJobOrder(JobOrderStatus status) {
     JobOrder o = new JobOrder();

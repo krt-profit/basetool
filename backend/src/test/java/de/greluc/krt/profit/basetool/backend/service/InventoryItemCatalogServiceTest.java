@@ -55,10 +55,8 @@ class InventoryItemCatalogServiceTest {
   @Mock private InventoryItemMapper inventoryItemMapper;
   @InjectMocks private InventoryItemCatalogService service;
 
-  // covers REQ-INV-029 (item-catalog picker: bookable = output of >= 1 active blueprint)
   @Test
   void findBookableItems_projectsRepositoryPageThroughTheMapper() {
-    // Given one bookable game item behind the active-blueprint query
     GameItem drive = new GameItem();
     drive.setId(UUID.randomUUID());
     drive.setName("Quantum Drive");
@@ -69,29 +67,22 @@ class InventoryItemCatalogServiceTest {
     when(blueprintRepository.findItemsWithActiveBlueprint("Quantum", pageable)).thenReturn(page);
     when(inventoryItemMapper.gameItemToReferenceDto(drive)).thenReturn(ref);
 
-    // When
     Page<InventoryGameItemReferenceDto> result = service.findBookableItems(" Quantum ", pageable);
 
-    // Then — the search fragment is stripped and each entity maps to its slim reference DTO
     assertThat(result.getContent()).containsExactly(ref);
     assertThat(result.getTotalElements()).isEqualTo(1L);
     verify(blueprintRepository).findItemsWithActiveBlueprint("Quantum", pageable);
   }
 
-  // covers REQ-INV-029 (blank search binds "" — never null — into the LIKE pattern)
   @Test
   void findBookableItems_blankSearch_bindsEmptyStringNotNull() {
-    // Given a blank search input
     Pageable pageable = PageRequest.of(0, 20);
     when(blueprintRepository.findItemsWithActiveBlueprint(eq(""), eq(pageable)))
         .thenReturn(Page.empty(pageable));
 
-    // When
     service.findBookableItems("   ", pageable);
     service.findBookableItems(null, pageable);
 
-    // Then — both blank and null normalise to "" (a null bind would make PostgreSQL infer bytea
-    // inside LOWER(CONCAT(...)) and fail the picker at runtime)
     verify(blueprintRepository, org.mockito.Mockito.times(2))
         .findItemsWithActiveBlueprint("", pageable);
   }

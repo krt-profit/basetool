@@ -60,10 +60,6 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
  */
 class AdminUexPageControllerTest {
 
-  // ---------------------------------------------------------------------
-  // Override dispatchers
-  // ---------------------------------------------------------------------
-
   @Test
   void updateLoadingDockOverride_routesYesActionForCity() {
     BackendApiClient client = mock(BackendApiClient.class);
@@ -121,8 +117,6 @@ class AdminUexPageControllerTest {
 
   @Test
   void updateLoadingDockOverride_routesYesActionForTerminal() {
-    // The terminals kind now shares the loading-dock dispatcher with the four location kinds —
-    // the consolidation eliminated the bespoke terminals path but kept the same backend URL.
     BackendApiClient client = mock(BackendApiClient.class);
     AdminUexPageController controller = new AdminUexPageController(client);
     RedirectAttributesModelMap attrs = new RedirectAttributesModelMap();
@@ -190,10 +184,6 @@ class AdminUexPageControllerTest {
     verify(client).delete("/api/v1/terminals/" + id + "/auto-load-override", Void.class);
   }
 
-  // ---------------------------------------------------------------------
-  // Terminal visibility toggle: evicts the TERMINAL cache domain
-  // ---------------------------------------------------------------------
-
   @Test
   void toggleTerminalVisibility_evictsTerminalDomainAfterWrite() {
     BackendApiClient client = mock(BackendApiClient.class);
@@ -225,10 +215,6 @@ class AdminUexPageControllerTest {
     verify(client).put(eq("/api/v1/terminals/" + id), any(), eq(Void.class));
     verify(client).evict(CacheDomain.TERMINAL);
   }
-
-  // ---------------------------------------------------------------------
-  // listData: parse + latestUexSync
-  // ---------------------------------------------------------------------
 
   @Test
   void listData_parsesUexMirrorFields_andComputesLatestSyncAttribute() {
@@ -265,8 +251,6 @@ class AdminUexPageControllerTest {
     assertEquals(2L, model.getAttribute("totalTerminals"));
   }
 
-  // covers REQ-ADMIN-001/002 — terminals beyond the first backend page still render, and the
-  // summary totals come from the backend total, not the fetched list size
   @Test
   void listData_concatenatesTerminalPages_andDerivesTotalsFromTotalElements() {
     BackendApiClient client = mock(BackendApiClient.class);
@@ -285,8 +269,6 @@ class AdminUexPageControllerTest {
     stubEmptyPage(client, "/api/v1/space-stations?size=10000&sort=name,asc");
     stubEmptyPage(client, "/api/v1/outposts?size=10000&sort=name,asc");
     stubEmptyPage(client, "/api/v1/pois?size=10000&sort=name,asc");
-    // totalElements deliberately differs from the gathered row count (5 vs 2) so this test can
-    // tell a totalElements-derived total apart from a list-size-derived one (REQ-ADMIN-002).
     String terminalsBase = "/api/v1/terminals?size=10000&sort=name,asc";
     when(client.get(eq(terminalsBase + "&page=0"), anyTypeRef()))
         .thenReturn(new PageResponse<>(List.of(first), 0, 10000, 5, 2, List.of()));
@@ -332,10 +314,6 @@ class AdminUexPageControllerTest {
     assertNull(model.getAttribute("latestUexSync"));
   }
 
-  // ---------------------------------------------------------------------
-  // buildHierarchy: parent-matching + orphans
-  // ---------------------------------------------------------------------
-
   @Test
   void buildHierarchy_matchesTerminalsToCityAndStationByName() {
     AdminUexPageController controller = new AdminUexPageController(mock(BackendApiClient.class));
@@ -371,10 +349,6 @@ class AdminUexPageControllerTest {
 
   @Test
   void buildHierarchy_matchesCaseInsensitively() {
-    // UEX has been known to drift casing between the terminal record's
-    // cityName ("lorville") and the city record's name ("Lorville"); the
-    // match must therefore be case-insensitive or every such terminal would
-    // silently end up on the orphan list.
     AdminUexPageController controller = new AdminUexPageController(mock(BackendApiClient.class));
 
     CityDto lorville =
@@ -390,9 +364,6 @@ class AdminUexPageControllerTest {
 
   @Test
   void buildHierarchy_freeFloatingTerminalsGoToOrphans() {
-    // Terminal with no cityName + no spaceStationName cannot attach to any
-    // parent. Without the orphan bucket the admin would have no way to flip
-    // its overrides — we'd lose the row entirely on the consolidated page.
     AdminUexPageController controller = new AdminUexPageController(mock(BackendApiClient.class));
 
     TerminalDto orphan = terminalIn("Free Float Trade", "Pyro", null, null);
@@ -423,7 +394,6 @@ class AdminUexPageControllerTest {
             List.of(stantonCity, pyroCity), List.of(), List.of(pyroOutpost), List.of(), List.of());
 
     assertEquals(2, systems.size());
-    // TreeMap with case-insensitive ordering → Pyro < Stanton alphabetically.
     assertEquals("Pyro", systems.get(0).name());
     assertEquals(2, systems.get(0).locationCount());
     assertEquals("Stanton", systems.get(1).name());
@@ -432,12 +402,6 @@ class AdminUexPageControllerTest {
 
   @Test
   void buildHierarchy_terminalWithoutMatchingParentRecordGoesToOrphans() {
-    // Terminal claims to live in "Lorville" but no City record exists yet for
-    // that name — realistic when UEX sweeps populated terminals before cities
-    // on a fresh install, or when a parent was retired but the terminal still
-    // references it. The fallback puts the row on the system's orphans list so
-    // the admin can still flip overrides; without it the terminal would simply
-    // vanish from the consolidated page.
     AdminUexPageController controller = new AdminUexPageController(mock(BackendApiClient.class));
 
     TerminalDto term = terminalIn("Lorville TDD", "Stanton", "Lorville", null);
@@ -451,10 +415,6 @@ class AdminUexPageControllerTest {
     assertEquals(1, stanton.orphanTerminals().size());
     assertEquals("Lorville TDD", stanton.orphanTerminals().get(0).name());
   }
-
-  // ---------------------------------------------------------------------
-  // Helpers
-  // ---------------------------------------------------------------------
 
   private static TerminalDto terminalIn(
       String name, String starSystem, String cityName, String stationName) {

@@ -1,20 +1,6 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="de">
 <body>
-<!--/*
-  The Terms of Use text, rendered from the backend document (GET /api/v1/terms/document, ADR-0138)
-  so the public /terms page, the consent gate and the Android app all show ONE source. It used to be
-  52 hardcoded #{terms.*} lookups against this module's message bundle; the wording now lives in the
-  backend bundle and this fragment walks whatever structure the endpoint reports.
-
-  That is the point of looping rather than listing: a clause added to the bundle appears here and in
-  the app with no template change, and neither client can fall behind the wording that consent is
-  actually recorded against. TermsDocumentStructureTest in the backend now carries what
-  TermsTemplateBundleParityTest used to — it asserts that every terms.* key is reachable by the
-  walk, so a mis-numbered key fails the build instead of quietly dropping a clause.
-
-  The caller passes the document as `terms`.
-*/-->
 <th:block th:fragment="termsBody(terms)">
     <p th:text="${terms.intro}">Diese Nutzungsbedingungen regeln die Nutzung des Profit Basetool.</p>
 
@@ -22,8 +8,6 @@
         <h2 th:text="${section.heading}">1. Geltungsbereich und Vertragspartner</h2>
         <th:block th:each="clause : ${section.clauses}">
             <p th:text="${clause.text}">Absatztext dieser Klausel.</p>
-            <!--/* Rendered only when the paragraph actually has bullets, so an ordinary clause does
-                 not emit an empty <ul> for a screen reader to announce as a list of nothing. */-->
             <ul class="krtm-list-style-type-disc-margin-left-2rem-a571"
                 th:if="${!clause.bullets.isEmpty()}">
                 <li th:each="bullet : ${clause.bullets}" th:text="${bullet}">Listenpunkt.</li>
@@ -31,14 +15,6 @@
         </th:block>
     </th:block>
 
-    <!--/*
-      The privacy policy used to be an inline <a> inside the Datenschutz clause. It moved out here
-      because the document is now shared with a client that renders Compose, not HTML: an anchor
-      embedded in a paragraph would either be lost in the app or force the app to parse markup out
-      of a legal text. The clause still names the Datenschutzerklärung in its own words — what
-      changed is that the hyperlink is a page affordance rather than part of the wording, which is
-      also what it always was in substance.
-    */-->
     <p><a th:href="@{/privacy}" th:text="#{privacy.title}">Datenschutzerklärung</a></p>
 
     <br>

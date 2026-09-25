@@ -37,28 +37,22 @@ class AppVersionAdviceTest {
 
   @Test
   void appVersion_withBuildPropertiesPresent_returnsVersionString() {
-    // Given
     Properties props = new Properties();
     props.setProperty("version", "1.2.3");
     BuildProperties buildProperties = new BuildProperties(props);
     AppVersionAdvice advice = new AppVersionAdvice(Optional.of(buildProperties));
 
-    // When
     String version = advice.appVersion();
 
-    // Then
     assertEquals("1.2.3", version, "Should return the version from BuildProperties");
   }
 
   @Test
   void appVersion_withBuildPropertiesAbsent_returnsFallback() {
-    // Given
     AppVersionAdvice advice = new AppVersionAdvice(Optional.empty());
 
-    // When
     String version = advice.appVersion();
 
-    // Then
     assertEquals(
         AppVersionAdvice.FALLBACK_VERSION,
         version,
@@ -67,16 +61,13 @@ class AppVersionAdviceTest {
 
   @Test
   void appVersion_withBlankVersion_returnsFallback() {
-    // Given
     Properties props = new Properties();
     props.setProperty("version", "   ");
     BuildProperties buildProperties = new BuildProperties(props);
     AppVersionAdvice advice = new AppVersionAdvice(Optional.of(buildProperties));
 
-    // When
     String version = advice.appVersion();
 
-    // Then
     assertEquals(
         AppVersionAdvice.FALLBACK_VERSION,
         version,

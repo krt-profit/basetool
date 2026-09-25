@@ -34,61 +34,45 @@ class HomeControllerTest {
 
   @Test
   void home_ShouldUsePreferredUsername_InsteadOfFullName() {
-    // Arrange
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     HomeController controller = new HomeController(backendApiClient);
     Model model = new ConcurrentModel();
     HttpSession session = mock(HttpSession.class);
     OidcUser user = mock(OidcUser.class);
 
-    // Setup User
     when(user.getFullName()).thenReturn("Max Mustermann");
     when(user.getPreferredUsername()).thenReturn("max_muster");
-    // Mock Authorities for admin check
     doReturn(Collections.emptyList()).when(user).getAuthorities();
 
-    // Act
     org.springframework.mock.web.MockHttpServletRequest request =
         new org.springframework.mock.web.MockHttpServletRequest();
     String view = controller.home(model, user, request);
 
-    // Assert
     assertEquals("index", view);
-    // This assertion expects the CHANGE to be made. Currently it would fail (expecting "Max
-    // Mustermann").
-    // I will assert "max_muster" to verify my fix later.
     assertEquals("max_muster", model.getAttribute("username"));
   }
 
   @Test
   void markAnnouncementAsReadAjax_success_returns200() {
-    // Arrange — the in-place twin (epic #571) marks the announcement read and answers 200 so the
-    // home page removes the control without reloading.
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     HomeController controller = new HomeController(backendApiClient);
 
-    // Act
     var response = controller.markAnnouncementAsReadAjax("ann-1");
 
-    // Assert
     assertEquals(200, response.getStatusCode().value());
     verify(backendApiClient).put("/api/v1/users/me/read-announcement/ann-1", null, Void.class);
   }
 
   @Test
   void markAnnouncementAsReadAjax_backendFailure_returns502AndDoesNotThrow() {
-    // Arrange — a failed mark-as-read must never break the page; the twin swallows the error and
-    // answers 502 so the client simply leaves the control in place.
     BackendApiClient backendApiClient = mock(BackendApiClient.class);
     HomeController controller = new HomeController(backendApiClient);
     doThrow(new RuntimeException("backend down"))
         .when(backendApiClient)
         .put(anyString(), any(), any());
 
-    // Act
     var response = controller.markAnnouncementAsReadAjax("ann-1");
 
-    // Assert
     assertEquals(502, response.getStatusCode().value());
   }
 }

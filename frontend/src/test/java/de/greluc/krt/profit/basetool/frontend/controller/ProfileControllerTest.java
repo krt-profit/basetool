@@ -81,14 +81,6 @@ class ProfileControllerTest {
     ReflectionTestUtils.setField(controller, "issuerUri", "https://kc.example.com/realms/iri");
   }
 
-  // ── GET /profile — auth / backend-precedence / claim handling ────────────
-
-  // The "unauthenticated visitor is redirected home" case stood here. The page was never public
-  // in any useful sense — it short-circuited before the backend call — and since ADR-0159 the route
-  // requires a login, so an unauthenticated request meets the OAuth2 entry point and never reaches
-  // the handler. AnonymousSurfaceSweepMvcTest asserts that for /profile along with every other
-  // mapping, which is a stronger statement than this test made.
-
   @Test
   void profile_authenticated_populatesModelFromTokenAndBackendOverride() {
     when(principal.getPreferredUsername()).thenReturn("jdoe");
@@ -119,36 +111,28 @@ class ProfileControllerTest {
     assertEquals("profile", view);
     assertEquals("jdoe", model.getAttribute("username"));
     assertEquals("jdoe@example.com", model.getAttribute("email"));
-    // Backend values must shadow the token values
     assertEquals(7, model.getAttribute("rank"));
     assertEquals("From-Backend", model.getAttribute("description"));
     assertEquals("Backend-DN", model.getAttribute("displayName"));
     assertEquals(4L, model.getAttribute("version"));
     assertEquals(java.time.LocalDate.of(2024, 1, 15), model.getAttribute("joinDate"));
-    // Months between 2024-01-15 and today (>= 16 since today >= 2026-05-13)
     Long months = (Long) model.getAttribute("monthsInSquadron");
     assertNotNull(months);
     assertTrue(months >= 12, "expected at least one year, was " + months);
-    // The Keycloak account URL is built from the issuer
     assertEquals(
         "https://kc.example.com/realms/iri/account", model.getAttribute("keycloakAccountUrl"));
-    // ProfileDescriptionForm is seeded from current model state
     ProfileDescriptionForm form =
         (ProfileDescriptionForm) model.getAttribute("profileDescriptionForm");
     assertNotNull(form);
     assertEquals("From-Backend", form.description());
     assertEquals("Backend-DN", form.displayName());
     assertEquals(4L, form.version());
-    // Default payout preference comes from its own endpoint and seeds the selector form;
-    // the form echoes the same user-row version as the description form.
     assertEquals(PayoutPreference.DONATE, model.getAttribute("defaultPayoutPreference"));
     ProfilePayoutPreferenceForm payoutForm =
         (ProfilePayoutPreferenceForm) model.getAttribute("profilePayoutPreferenceForm");
     assertNotNull(payoutForm);
     assertEquals(PayoutPreference.DONATE, payoutForm.defaultPayoutPreference());
     assertEquals(4L, payoutForm.version());
-    // Global blueprint-sharing flag comes from its own endpoint and seeds the toggle form, echoing
-    // the same user-row version (REQ-INV-018).
     assertEquals(true, model.getAttribute("shareBlueprintsGlobally"));
     ProfileBlueprintSharingForm sharingForm =
         (ProfileBlueprintSharingForm) model.getAttribute("profileBlueprintSharingForm");
@@ -175,24 +159,16 @@ class ProfileControllerTest {
     Model model = new ConcurrentModel();
     String view = controller.profile(model, principal);
 
-    // The controller swallows backend failures so the profile page still
-    // renders. The token claims are the fallback.
     assertEquals("profile", view);
     assertEquals(3, model.getAttribute("rank"));
     assertEquals("From-Token", model.getAttribute("description"));
     assertEquals("JD", model.getAttribute("displayName"));
-    // Payout preference falls back to PAYOUT when its endpoint is unreachable.
     assertEquals(PayoutPreference.PAYOUT, model.getAttribute("defaultPayoutPreference"));
-    // The blueprint-sharing toggle falls back to off when its endpoint is unreachable.
     assertEquals(false, model.getAttribute("shareBlueprintsGlobally"));
   }
 
   @Test
   void profile_multiValueClaim_returnsFirstElement() {
-    // Keycloak returns custom claims as a List when they're declared as
-    // multi-valued in the mapper. The controller's getSingleClaim() helper
-    // must reach in and pull the first element so the template doesn't
-    // render "[CMDR]" with the bracket.
     when(principal.getPreferredUsername()).thenReturn("jdoe");
     when(principal.getAttribute("rank")).thenReturn(List.of(5, 6));
     when(principal.getAttribute("description")).thenReturn(List.of("first", "second"));
@@ -210,8 +186,6 @@ class ProfileControllerTest {
 
   @Test
   void profile_emptyListClaim_returnsList() {
-    // Edge case: an empty list claim must NOT be unwrapped — keep the
-    // list so the template can render an empty state without NPE.
     when(principal.getPreferredUsername()).thenReturn("jdoe");
     when(principal.getAttribute("rank")).thenReturn(List.of());
     when(principal.getAttribute("description")).thenReturn(null);
@@ -244,16 +218,11 @@ class ProfileControllerTest {
 
   @Test
   void profile_authenticated_backendUserMissingDescriptionKey_keepsToken() {
-    // Subtle contract: the controller only overwrites `description` when
-    // the backend response contains the key (even if its value is null —
-    // that's how "the user cleared the field" is encoded). Missing key
-    // means "don't touch".
     when(principal.getPreferredUsername()).thenReturn("jdoe");
     when(principal.getAttribute("rank")).thenReturn(2);
     when(principal.getAttribute("description")).thenReturn("Token-Desc");
     when(principal.getAttribute("displayName")).thenReturn("Token-DN");
 
-    // Backend response missing the description key entirely
     when(backendApiClient.<Map<String, Object>>get(any(String.class), anyTypeRef()))
         .thenReturn(Map.of("rank", 4));
 
@@ -262,7 +231,6 @@ class ProfileControllerTest {
 
     assertEquals("Token-Desc", model.getAttribute("description"));
     assertEquals("Token-DN", model.getAttribute("displayName"));
-    // rank IS overridden because backend's value is non-null
     assertEquals(4, model.getAttribute("rank"));
   }
 
@@ -280,7 +248,6 @@ class ProfileControllerTest {
         .thenReturn(backendUser);
 
     Model model = new ConcurrentModel();
-    // The malformed date must not blow up rendering — it's silently dropped
     assertEquals("profile", controller.profile(model, principal));
     assertNull(model.getAttribute("joinDate"));
     assertNull(model.getAttribute("monthsInSquadron"));
@@ -288,8 +255,6 @@ class ProfileControllerTest {
 
   @Test
   void profile_versionFromBackendAsNumber_isUnboxedToLong() {
-    // Jackson typically deserialises JSON numbers to Integer for small
-    // values — the parseLong helper must promote them to Long.
     when(principal.getPreferredUsername()).thenReturn("jdoe");
     when(principal.getAttribute("rank")).thenReturn(2);
     when(principal.getAttribute("description")).thenReturn(null);
@@ -336,8 +301,6 @@ class ProfileControllerTest {
     assertEquals(0L, model.getAttribute("version"));
   }
 
-  // ── POST /profile/description ───────────────────────────────────────────
-
   @Test
   void updateDescription_happyPath_putsAndRedirectsWithSuccessToast() {
     when(bindingResult.hasErrors()).thenReturn(false);
@@ -361,9 +324,6 @@ class ProfileControllerTest {
 
   @Test
   void updateDescription_nullFields_sendEmptyStrings() {
-    // A non-obvious contract: when the user clears the field, the form
-    // posts a null. The controller MUST send "" (not "null") so the
-    // backend writes an empty string, not a literal "null" four-char value.
     when(bindingResult.hasErrors()).thenReturn(false);
     ProfileDescriptionForm form = new ProfileDescriptionForm(null, null, 1L);
 
@@ -380,7 +340,6 @@ class ProfileControllerTest {
   @Test
   void updateDescription_validationError_rendersProfileViewWithoutBackendCall() {
     when(bindingResult.hasErrors()).thenReturn(true);
-    // Stub the bits the profile() method needs to render
     when(principal.getPreferredUsername()).thenReturn("jdoe");
     when(principal.getAttribute("rank")).thenReturn(1);
     when(principal.getAttribute("description")).thenReturn(null);
@@ -394,8 +353,6 @@ class ProfileControllerTest {
         controller.updateDescription(
             form, bindingResult, new ConcurrentModel(), principal, redirectAttributes);
 
-    // No redirect, no flash attribute — the binding result stays in scope
-    // so the form re-renders inline.
     assertEquals("profile", view);
     verify(backendApiClient, never()).put(any(), any(), any());
     verifyNoInteractions(redirectAttributes);
@@ -405,11 +362,6 @@ class ProfileControllerTest {
   void updateDescription_optimisticLockConflict_setsConcurrencyToast() {
     when(bindingResult.hasErrors()).thenReturn(false);
 
-    // `BackendServiceException.getProblemType()` reads from a wrapped
-    // WebClientResponseException via getResponseBodyAs(ProblemDetail.class),
-    // which needs a configured decoder. Instead of replicating that whole
-    // setup we spy on the exception and stub the discriminator directly —
-    // that's the actual contract the controller relies on.
     BackendServiceException conflict =
         org.mockito.Mockito.spy(
             new BackendServiceException(
@@ -459,12 +411,9 @@ class ProfileControllerTest {
     verify(redirectAttributes).addFlashAttribute("errorToast", "error.profile.update.failed");
   }
 
-  // ── POST /profile/description (AJAX / krtFetch — epic #571) ───────────────
-
   @Test
   void updateDescriptionAjax_happyPath_returns200WithRefreshedVersion() {
     when(bindingResult.hasErrors()).thenReturn(false);
-    // refreshedUserVersion() re-fetches /me for the bumped row version after the write.
     when(backendApiClient.<Map<String, Object>>get(eq("/api/v1/users/me"), anyTypeRef()))
         .thenReturn(Map.of("version", 5L));
 
@@ -484,8 +433,6 @@ class ProfileControllerTest {
   @Test
   void updateDescriptionAjax_optimisticLockConflict_returns409WithOptimisticLockCode() {
     when(bindingResult.hasErrors()).thenReturn(false);
-    // Same spy-on-the-exception trick as the redirect path: stub the discriminator the controller
-    // actually reads instead of replicating the WebClient ProblemDetail decode.
     BackendServiceException conflict =
         org.mockito.Mockito.spy(
             new BackendServiceException(
@@ -521,8 +468,6 @@ class ProfileControllerTest {
     assertEquals("validation-failed", response.getBody().get("detail"));
     verify(backendApiClient, never()).put(any(), any(), any());
   }
-
-  // ── POST /profile/payout-preference ──────────────────────────────────────
 
   @Test
   void updatePayoutPreference_happyPath_putsAndRedirectsWithSuccessToast() {
@@ -581,11 +526,7 @@ class ProfileControllerTest {
 
   @Test
   void updatePayoutPreference_validationError_rendersProfileViewWithoutBackendCall() {
-    // A binding/type-conversion error (e.g. an unparseable version) must re-render the profile
-    // view inline — keeping the BindingResult request-scoped so it never serialises through a
-    // Redis FlashMap — and must NOT issue the PUT or set a toast.
     when(bindingResult.hasErrors()).thenReturn(true);
-    // Stub the bits the re-entrant profile() render needs.
     when(principal.getPreferredUsername()).thenReturn("jdoe");
     when(principal.getAttribute("rank")).thenReturn(1);
     when(principal.getAttribute("description")).thenReturn(null);
@@ -603,8 +544,6 @@ class ProfileControllerTest {
     verify(backendApiClient, never()).put(any(), any(), any());
     verifyNoInteractions(redirectAttributes);
   }
-
-  // ── POST /profile/payout-preference (AJAX / krtFetch — epic #571) ─────────
 
   @Test
   void updatePayoutPreferenceAjax_happyPath_returns200WithRefreshedVersion() {
@@ -667,8 +606,6 @@ class ProfileControllerTest {
     assertEquals("validation-failed", response.getBody().get("detail"));
     verify(backendApiClient, never()).put(any(), any(), any());
   }
-
-  // ── POST /profile/blueprint-sharing (REQ-INV-018) ────────────────────────
 
   @Test
   void updateBlueprintSharing_happyPath_putsAndRedirectsWithSuccessToast() {

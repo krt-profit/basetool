@@ -1,47 +1,5 @@
 ---
-# The section that differs most from the Docker bootstrap, and the one where a wrong number
-# produces a container that starts and then fails in a way that reads like an application fault.
-#
-# Under a user namespace the container's uid is NOT the host's uid. Measured on 2026-09-16 with
-# `podman unshare cat /proc/self/uid_map`, for a user with 100000-165535:
-#
-#     0       1000          1      <- container root = the service user itself
-#     1     100000      65536      <- container uid N = base + N - 1
-#
-# The prose bootstrap tells a human to use `podman unshare chown`, because a hand-computed uid is
-# silently wrong the day the subuid base changes. This role does better: it DERIVES the host uid
-# from basetool_host_subuid_base -- the same variable that grants the range in 20-user.yml, so the two
-# cannot disagree -- and gets real idempotence, which a `command:` wrapping `podman unshare` could
-# not have.
 
-# THREE directories, TWO owners, and getting that wrong is silent until the first deploy.
-#
-# Only the container tree belongs to the service user. The other two belong to the DEPLOY account,
-# because they are the deployer's own: its state (marker, digest pins, rollback snapshots, restic
-# cache, registry config) and its credentials (the GHCR pull token). Read from the Docker
-# production host on 2026-09-18, which is the shape this migration has to reproduce:
-#
-#     /var/iri      root:root       0755      the container data tree
-#     /var/lib/iri  deploy:docker   0755      the deployer's state
-#     /etc/iri      deploy:deploy   0700      the pull token, rclone.conf, backup.env
-#
-# This role gave all three to the service user. Measured on the testing host the same day, the
-# first thing `deploy.sh` does is create its registry config directory, and it could not:
-#
-#     install: cannot change permissions of '/var/lib/iri/.docker': No such file or directory
-#
-# -- because /var/lib/iri was iri-owned and the deploy account has no write there. It could not
-# have read the pull token either. Every deploy on the new host would have failed at that line.
-#
-# /var/iri is the one that legitimately DIFFERS from production: root-owned under Docker, service-
-# user-owned here, because rootless containers write into it through a uid translation. That is
-# the change the migration makes; the other two were not meant to change at all.
-# The service user's uid, read HERE rather than inherited from 22-deploy-user.yml's register.
-# This file is tagged [directories], so `--tags directories` skips that one and leaves the
-# variable undefined -- the run then dies with "'basetool_host_service_uid' is undefined", which
-# says nothing about tags. The third file in this role to need the same self-contained lookup.
-# .env may legitimately not exist yet on a freshly provisioned host -- it is operator-provided and
-# arrives before the first deploy, not before this role.
 - name: Look for the host environment file
   ansible.builtin.stat:
     path: "{{ basetool_host_root_dir }}/code/.env"
@@ -74,10 +32,6 @@
     mode: "0755"
 
 - name: Create the credential directory, owned by the deploy account and closed to everyone else
-  # 0700, not 0755. It holds the GHCR pull token and, on a host that backs up, rclone.conf and
-  # backup.env. The files are 0600, which is what saved this while the directory was world-
-  # traversable -- a mode that makes the file permissions the only thing standing between a
-  # local account and a registry credential.
   ansible.builtin.file:
     path: "{{ basetool_host_token_dir }}"
     state: directory
@@ -100,16 +54,9 @@
     state: directory
     owner: "{{ basetool_host_deploy_user }}"
     group: "{{ basetool_host_deploy_user }}"
-    # 0755, not 0700: node_exporter reads this as the `prometheus` user, and a metric nobody can
-    # read is the same as no metric.
     mode: "0755"
   loop: "{{ basetool_host_deploy_user_dirs }}"
 
-# The backup's own staging tree, and 0700 rather than 0755: it holds pg_dump output, the keystore
-# and the rendered secrets on their way into restic. The Docker host has it deploy:deploy 0700 and
-# this role never created it at all -- the nightly backup died on
-# `mkdir: cannot create directory '/var/iri/backup/staging': Permission denied`, measured on the
-# testing host 2026-09-20, after the runtime detection had already succeeded.
 - name: Create the backup staging tree, readable by nobody else
   ansible.builtin.file:
     path: "{{ basetool_host_root_dir }}/backup"
@@ -118,19 +65,6 @@
     group: "{{ basetool_host_deploy_user }}"
     mode: "0700"
 
-# The subtrees a RELEASE owns end to end, reclaimed recursively.
-#
-# `apply_config_tree` mirrors each of these with rsync, which writes a temp file beside the target
-# and renames it -- so it needs write permission on every directory in the tree, not just the top.
-# A host that was brought up by hand before delivery existed has them owned by the service user,
-# and the mirror fails file by file:
-#
-#     rsync: [receiver] mkstemp "/var/iri/code/docker/maintenance/nginx/.http.conf.wOnPrQ" failed: Permission denied
-#
-# A fresh host never sees this, because the role creates them first. `recurse` is safe precisely
-# because these four carry NO operator content: every byte in them arrives with the config bundle
-# and is overwritten on the next release anyway. The operator's own files under code/ --
-# realm-export.json, .env, the keystore -- are deliberately not in this list.
 - name: Reclaim the subtrees a release owns end to end
   ansible.builtin.file:
     path: "{{ basetool_host_root_dir }}/code/{{ item }}"
@@ -145,16 +79,6 @@
     - quadlet
   when: not ansible_check_mode
 
-# The one directory both accounts need, and the only place a group actually helps.
-#
-# `render-env-d.py` runs as the DEPLOY account and writes one file per service; the units'
-# `EnvironmentFile=` lines are read by the SERVICE USER's systemd (18 of them, measured in the
-# generated units). So deploy writes and iri reads -- and unlike the rest of the config tree these
-# files carry secrets, so world-readable is not an option.
-#
-# SETGID (2750) is what makes it work: the renderer sets a mode and not a group, so without the
-# setgid bit every rendered file would land as deploy:deploy 0640 and the service user's systemd
-# would fail to start the unit on a file it cannot read. With it, new files inherit group iri.
 - name: Create the rendered environment directory, shared between the two accounts
   ansible.builtin.file:
     path: "{{ basetool_host_root_dir }}/code/env.d"
@@ -163,11 +87,6 @@
     group: "{{ basetool_host_service_group }}"
     mode: "2750"
 
-# .env is operator-provided and this role never writes it -- but deploy.sh reads the keystore path
-# out of it, and render-env-d.py renders every env.d file FROM it, both as the deploy account. On
-# the Docker host it is deploy-owned 0640; here it arrived as iri-owned 0600, which the deployer
-# cannot read at all. Repaired rather than recreated: the CONTENT is a secret this role must not
-# touch, and changing the owner of a file does not read it.
 - name: Let the deploy account read the host environment file
   ansible.builtin.file:
     path: "{{ basetool_host_root_dir }}/code/.env"
@@ -180,7 +99,6 @@
   ansible.builtin.file:
     path: "{{ basetool_host_root_dir }}/{{ item.1 }}"
     state: directory
-    # container uid N  ->  host uid  base + N - 1.  Derived, never transcribed.
     owner: "{{ basetool_host_subuid_base + item.0.container_uid - 1 }}"
     group: "{{ basetool_host_subuid_base + item.0.container_uid - 1 }}"
     mode: "0755"
@@ -199,14 +117,6 @@
     label: "{{ item.container_uid }}"
   when: basetool_host_report_uid_map | default(false) | bool
 
-# The deploy user's registry configuration. 0700 because the credential lands in here and nothing
-# else has any business reading it.
-#
-# The path was `.containers` and deploy.sh has always used `.docker` (DOCKER_CONFIG), so this task
-# created a directory nobody read and left the one that is used to be created by the script's own
-# umask. Under Podman the credential does not live here at all -- `rt_login` runs `podman login`
-# AS THE SERVICE USER, so it lands in that user's own store -- but the directory is still created
-# and still has to be writable, because deploy.sh sets DOCKER_CONFIG before it knows the runtime.
 - name: Create the deploy account's registry configuration directory
   ansible.builtin.file:
     path: "{{ basetool_host_state_dir }}/.docker"
@@ -215,17 +125,6 @@
     group: "{{ basetool_host_deploy_user }}"
     mode: "0700"
 
-# Where a RELEASE puts the Quadlet units, and it is deliberately not the service user's home.
-#
-# podman-systemd.unit(5) lists /etc/containers/systemd/users/$(UID) as a rootless search path, and
-# it is the only one of the four that an account other than the owner can write. The alternative
-# was ~iri/.config/containers/systemd, which is 0750 and which the deploy account cannot even
-# traverse -- measured 2026-09-18, where the deployer reported "no Quadlet unit directory" about a
-# directory holding 39 units.
-#
-# Owned by deploy because deploy installs the units and writes the digest-pin drop-ins beside
-# them; 0755 because the service user's Quadlet generator has to read them. Nothing secret is in
-# here: the units name env files, and those are rendered separately under the service user's tree.
 - name: Create the unit directory a release delivers into
   ansible.builtin.file:
     path: "/etc/containers/systemd/users/{{ basetool_host_service_uid }}"
@@ -234,9 +133,6 @@
     group: "{{ basetool_host_deploy_user }}"
     mode: "0755"
 
-# The token itself is operator-provided and this role never writes it. What the role CAN do is
-# refuse to leave a host where the deployer cannot read it -- a state that looks perfect from root
-# and fails on the first timer tick with a registry error that reads like an expired credential.
 - name: Check the deploy account can actually read its registry token
   ansible.builtin.command: "test -r {{ basetool_host_token_dir }}/ghcr-pull-token"
   args:

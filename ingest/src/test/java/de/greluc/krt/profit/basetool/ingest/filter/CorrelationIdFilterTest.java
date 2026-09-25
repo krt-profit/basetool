@@ -101,7 +101,6 @@ class CorrelationIdFilterTest {
 
   @Test
   void rejectsAnUnsafeInboundIdAndMintsAFreshOneInstead() throws Exception {
-    // A CRLF-carrying value would otherwise forge a log line and a response header.
     MockHttpServletRequest request = new MockHttpServletRequest("POST", "/v1/refinery-extract");
     request.addHeader(HEADER, "evil\r\nInjected: 1");
     MdcCapturingChain chain = new MdcCapturingChain();
@@ -136,7 +135,6 @@ class CorrelationIdFilterTest {
 
   @Test
   void clearsBothMdcKeysEvenWhenTheChainThrows() {
-    // Bleed-through onto a pooled or virtual thread is the failure this finally block prevents.
     FilterChain exploding =
         (request, response) -> {
           throw new IllegalStateException("boom");

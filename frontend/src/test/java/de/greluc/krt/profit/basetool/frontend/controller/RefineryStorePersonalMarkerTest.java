@@ -144,7 +144,6 @@ class RefineryStorePersonalMarkerTest {
 
   @Test
   void storeDialog_RendersAPersonalCheckboxBoundToEachOutputRow() throws Exception {
-    // Given: an order with a single output good, so the store dialog builds exactly one row.
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
     RefineryGoodDto good =
@@ -177,7 +176,6 @@ class RefineryStorePersonalMarkerTest {
     when(backendApiClient.get(eq("/api/v1/refinery-orders/" + orderId), eq(RefineryOrderDto.class)))
         .thenReturn(order);
 
-    // When
     String html =
         mockMvc
             .perform(
@@ -187,9 +185,6 @@ class RefineryStorePersonalMarkerTest {
             .getResponse()
             .getContentAsString();
 
-    // Then: the row carries the checkbox, bound to the indexed form path so a split row can be
-    // reindexed by refinery-orders-details.js, plus Spring's hidden marker that makes an unticked
-    // box arrive as false.
     assertThat(html).as("personal checkbox rendered").contains("id=\"storePersonal_0\"");
     assertThat(html).as("bound to the indexed form path").contains("name=\"items[0].personal\"");
     assertThat(html)
@@ -250,7 +245,6 @@ class RefineryStorePersonalMarkerTest {
   @Test
   void storeOrder_PersonalCombinedWithAJobOrder_FlashesTheDedicatedToastAndReopensTheModal()
       throws Exception {
-    // The no-JS fallback must name the actual reason instead of the generic store-failed toast.
     UUID orderId = UUID.randomUUID();
 
     mockMvc

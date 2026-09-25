@@ -33,49 +33,39 @@ class MonitoringScrapePropertiesTest {
 
   @Test
   void shouldBeConfiguredWhenBothValuesArePresent() {
-    // Given
     MonitoringScrapeProperties properties =
         new MonitoringScrapeProperties("metrics-scraper", "test-scrape-password");
 
-    // When / Then
     assertThat(properties.isConfigured()).isTrue();
   }
 
   @Test
   void shouldNotBeConfiguredByDefault() {
-    // Given
     MonitoringScrapeProperties properties =
         BoundProperties.defaults(MonitoringScrapeProperties.class);
 
-    // When / Then: unset env vars bind to empty strings — the fail-closed default.
     assertThat(properties.isConfigured()).isFalse();
   }
 
   @Test
   void shouldNotBeConfiguredWithBlankUsername() {
-    // Given
     MonitoringScrapeProperties properties =
         new MonitoringScrapeProperties("   ", "test-scrape-password");
 
-    // When / Then
     assertThat(properties.isConfigured()).isFalse();
   }
 
   @Test
   void shouldNotBeConfiguredWithBlankPassword() {
-    // Given
     MonitoringScrapeProperties properties = new MonitoringScrapeProperties("metrics-scraper", "");
 
-    // When / Then
     assertThat(properties.isConfigured()).isFalse();
   }
 
   @Test
   void shouldNotBeConfiguredWithNullValues() {
-    // Given
     MonitoringScrapeProperties properties = new MonitoringScrapeProperties(null, null);
 
-    // When / Then
     assertThat(properties.isConfigured()).isFalse();
   }
 

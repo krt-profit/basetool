@@ -183,7 +183,6 @@ class MissionAccessControlTest {
                     .jwt(builder -> builder.subject(memberUser.getId().toString()))
                     .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))));
 
-    // Fetch mission to get participant ID
     Mission m = missionRepository.findById(mission.getId()).orElseThrow();
     MissionParticipant p =
         m.getParticipants().stream()
@@ -216,7 +215,6 @@ class MissionAccessControlTest {
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
 
-    // The member joins
     mockMvc.perform(
         post("/api/v1/missions/" + mission.getId() + "/join")
             .with(
@@ -230,7 +228,6 @@ class MissionAccessControlTest {
     userRepository.save(otherMember);
     saveIridiumMembership(otherMember);
 
-    // Fetch mission to get participant ID
     Mission m = missionRepository.findById(mission.getId()).orElseThrow();
     MissionParticipant p =
         m.getParticipants().stream()
@@ -243,7 +240,6 @@ class MissionAccessControlTest {
             + testJobType.getId()
             + "\", \"comment\": \"Malicious\", \"version\": 0}";
 
-    // The other member tries to edit the first one's row -> forbidden
     mockMvc
         .perform(
             put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId() + "/slim")
@@ -264,7 +260,6 @@ class MissionAccessControlTest {
     mission.setStatus("PLANNED");
     mission = missionRepository.save(mission);
 
-    // The member joins
     mockMvc.perform(
         post("/api/v1/missions/" + mission.getId() + "/join")
             .with(
@@ -272,7 +267,6 @@ class MissionAccessControlTest {
                     .jwt(builder -> builder.subject(memberUser.getId().toString()))
                     .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))));
 
-    // Fetch mission to get participant ID
     Mission m = missionRepository.findById(mission.getId()).orElseThrow();
     MissionParticipant p =
         m.getParticipants().stream()
@@ -285,7 +279,6 @@ class MissionAccessControlTest {
             + testJobType.getId()
             + "\", \"comment\": \"Approved\", \"version\": 0}";
 
-    // Officer updates the member's row
     mockMvc
         .perform(
             put("/api/v1/missions/" + mission.getId() + "/participants/" + p.getId() + "/slim")
@@ -318,7 +311,6 @@ class MissionAccessControlTest {
                     .jwt(builder -> builder.subject(memberUser.getId().toString()))
                     .authorities(new SimpleGrantedAuthority("ROLE_KRT_MEMBER"))));
 
-    // Fetch mission to get participant ID
     Mission m = missionRepository.findById(mission.getId()).orElseThrow();
     MissionParticipant p =
         m.getParticipants().stream()
@@ -326,11 +318,6 @@ class MissionAccessControlTest {
             .findFirst()
             .orElseThrow();
 
-    // The PLANNED job type is the organisation's assignment - it carries the Einsatzleiter
-    // designation - so a self-editing participant who cannot manage the mission is refused it
-    // (audit MEDIUM-9). This test asserted the opposite until then: it drove a role-less setting
-    // their OWN planned job type and expected 200, which is precisely the self-designation the
-    // single-lead rule then held against the real leader.
     String plannedAttempt =
         String.format(
             "{\"desiredMissionJobTypeId\": \"%s\", \"plannedMissionJobTypeId\": \"%s\","
@@ -348,7 +335,6 @@ class MissionAccessControlTest {
                 .content(plannedAttempt))
         .andExpect(status().isForbidden());
 
-    // The rest of the payload is still the participant's own to edit.
     String ownFieldsUpdate =
         String.format(
             "{\"desiredMissionJobTypeId\": \"%s\", \"comment\": \"Full Update\","
@@ -366,7 +352,6 @@ class MissionAccessControlTest {
                 .content(ownFieldsUpdate))
         .andExpect(status().isOk());
 
-    // Verification via Repository
     de.greluc.krt.profit.basetool.backend.model.MissionParticipant participant =
         missionRepository.findById(mission.getId()).orElseThrow().getParticipants().stream()
             .filter(mp1 -> mp1.getUser().getId().equals(memberUser.getId()))

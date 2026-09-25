@@ -90,15 +90,8 @@ public class TermsAcceptancePageController {
         return "redirect:/";
       }
     } catch (BackendServiceException e) {
-      // Show the page rather than an error screen: the gate's job is to obtain consent, and a
-      // backend hiccup on the status read must not make consent impossible to give. A stale "not
-      // accepted" costs the user one extra click; a hard failure costs them the tool.
       log.debug("Terms status could not be read; rendering the consent page anyway.", e);
     }
-    // The document read gets NO such tolerance, and the asymmetry is deliberate. Rendering the
-    // gate without the wording would ask a member to agree to a blank page -- consent to a text
-    // they were never shown is not consent, so a failure here has to surface as an error rather
-    // than as an emptier version of the same page.
     model.addAttribute("terms", backendApiClient.get(TERMS_DOCUMENT_URI, TermsDocumentDto.class));
     return "terms-accept";
   }
@@ -119,14 +112,9 @@ public class TermsAcceptancePageController {
   public @NotNull ResponseEntity<Void> recordAcceptance(@NotNull HttpServletRequest request) {
     try {
       backendApiClient.post(TERMS_ACCEPTANCE_URI, null, Void.class);
-      // Drop the gate's cached "not accepted" immediately rather than waiting for it to expire.
-      // Without this the very next request still reads the stale verdict, which both re-checks the
-      // gate and keeps BackendRoleSyncFilter skipping a sync that would now succeed.
       TermsAcceptanceGateFilter.clearCachedVerdict(request);
       return ResponseEntity.noContent().build();
     } catch (BackendServiceException e) {
-      // Logged at WARN, not DEBUG: unlike the status read this is the user actively trying to get
-      // through the gate, and a failure here locks them out of the whole tool until it is fixed.
       log.warn("Terms acceptance could not be recorded in the backend.", e);
       return ResponseEntity.status(HttpStatus.BAD_GATEWAY).build();
     }

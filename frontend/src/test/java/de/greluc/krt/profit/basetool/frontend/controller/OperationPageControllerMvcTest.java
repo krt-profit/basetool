@@ -103,14 +103,9 @@ class OperationPageControllerMvcTest {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   }
 
-  // ── /operations (list) ──────────────────────────────────────────────────
-
   @Test
   @WithMockUser(roles = "OFFICER")
   void operationsList_rendersOperationStatusViaI18n_inGerman() throws Exception {
-    // Backend returns one operation with the raw enum status. The previous
-    // bug rendered this verbatim in the table cell — we now expect the
-    // German translation "GEPLANT".
     OperationDto op =
         new OperationDto(
             UUID.randomUUID(), "Op Alpha", "First op", "PLANNED", null, 0L, null, null, null);
@@ -123,14 +118,8 @@ class OperationPageControllerMvcTest {
         .perform(get("/operations").locale(Locale.GERMAN))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("GEPLANT")))
-        // Status renders through the design-system .status-pill component with a
-        // status-specific modifier class derived from the (lower-cased) enum.
         .andExpect(content().string(containsString("status-pill")))
         .andExpect(content().string(containsString("status-planned")))
-        // The raw enum name must NOT survive into the table cell.
-        // (The string can still appear in the <option value="PLANNED">
-        // attribute of the create modal, so we assert on the visible
-        // text by looking for the wrapping <td> pattern.)
         .andExpect(content().string(not(containsString(">PLANNED<"))));
   }
 
@@ -145,23 +134,13 @@ class OperationPageControllerMvcTest {
     when(backendApiClient.get(startsWith("/api/v1/operations/search?"), anyTypeRef()))
         .thenReturn(page);
 
-    // English locale resolves to messages_en.properties → "ACTIVE".
-    // Coincidentally the same casing as the backend enum, so this test
-    // can't tell raw-vs-translated apart for English. We still run it
-    // to make sure the lookup does not throw for the EN bundle.
     mockMvc
         .perform(get("/operations").locale(Locale.ENGLISH))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("ACTIVE")))
-        // Active operations carry the success-hued status-pill modifier.
         .andExpect(content().string(containsString("status-active")));
   }
 
-  // Regression guard for the frontend-proxy double-encoding sub-class: the operations list must
-  // forward a multi-word free-text term as a WebClient URI-template variable ({query}), not
-  // URLEncoder it into the URI string, so the backend @RequestParam decodes the exact typed term.
-  // URLEncoder form-encoding (space -> '+') double-encodes across the frontend->backend hop and
-  // yields zero matches. fragment=results keeps the call count to the single search read.
   @Test
   @WithMockUser(roles = "OFFICER")
   void operationsList_passesMultiWordSearchAsUriVariable() throws Exception {
@@ -179,9 +158,6 @@ class OperationPageControllerMvcTest {
     assertEquals("Widget Alpha", termCaptor.getValue());
   }
 
-  // Same guard with an umlaut term: "Müller Größe" encodes to M%C3%BC… under URLEncoder, which the
-  // hop would re-encode to a literal zero-match. As a URI variable the raw term reaches the
-  // backend.
   @Test
   @WithMockUser(roles = "OFFICER")
   void operationsList_passesUmlautSearchAsUriVariable_notFormEncoded() throws Exception {
@@ -200,10 +176,6 @@ class OperationPageControllerMvcTest {
     assertEquals(term, termCaptor.getValue());
   }
 
-  // ── /operations/{id} (detail) ───────────────────────────────────────────
-
-  // ── /operations/{id} (detail) — canEdit-driven form visibility ──────────
-
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
   void operationDetail_readOnlyUser_seesDisabledFormAndNoSaveButton() throws Exception {
@@ -214,11 +186,9 @@ class OperationPageControllerMvcTest {
     mockMvc
         .perform(get("/operations/" + opId).locale(Locale.GERMAN))
         .andExpect(status().isOk())
-        // Form is rendered but inputs are disabled for non-editors.
         .andExpect(content().string(containsString("id=\"operation-form\"")))
         .andExpect(content().string(containsString("id=\"op-name\"")))
         .andExpect(content().string(containsString("disabled")))
-        // No submit button anywhere — Save is gated on canEdit.
         .andExpect(content().string(not(containsString("form=\"operation-form\""))));
   }
 
@@ -233,8 +203,6 @@ class OperationPageControllerMvcTest {
         .perform(get("/operations/" + opId).locale(Locale.GERMAN))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("id=\"operation-form\"")))
-        // The submit button references the form by id — its presence is
-        // the canonical signal that canEdit was true on the model.
         .andExpect(content().string(containsString("form=\"operation-form\"")));
   }
 
@@ -258,16 +226,11 @@ class OperationPageControllerMvcTest {
   void operationDetail_translatesBothOperationAndMissionStatus() throws Exception {
     UUID opId = UUID.randomUUID();
 
-    // Operation: status COMPLETED → German "ABGESCHLOSSEN".
     OperationDto operation =
         new OperationDto(opId, "Completed Op", "", "COMPLETED", null, 0L, null, null, null);
     when(backendApiClient.get(eq("/api/v1/operations/" + opId), eq(OperationDto.class)))
         .thenReturn(operation);
 
-    // Mission inside operation: status CANCELLED (double L on Mission!) →
-    // German "ABGEBROCHEN". This is the second i18n bug-fix-point — the
-    // nested missions table on the operation-detail page used to dump the
-    // raw enum value.
     MissionListDto mission =
         new MissionListDto(
             UUID.randomUUID(),
@@ -292,7 +255,6 @@ class OperationPageControllerMvcTest {
             contains("/api/v1/missions/search?operationId=" + opId), anyTypeRef()))
         .thenReturn(missionsPage);
 
-    // Empty finance/payout stubs so the page renders without NPE.
     when(backendApiClient.get(
             eq("/api/v1/operations/" + opId + "/finance-summary"),
             eq(OperationFinanceSummaryDto.class)))
@@ -306,21 +268,11 @@ class OperationPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("ABGESCHLOSSEN")))
         .andExpect(content().string(containsString("ABGEBROCHEN")))
-        // Raw enum values must not appear as cell content. The
-        // dropdown <option value="..."> attributes still legitimately
-        // carry the enum names, so we look for the closing-tag form
-        // ">VALUE<" which only the visible text matches.
         .andExpect(content().string(not(containsString(">COMPLETED<"))))
         .andExpect(content().string(not(containsString(">CANCELLED<"))))
-        // The nested missions table renders status through the .status-pill
-        // component; the cancelled mission resolves to the danger-hued modifier.
         .andExpect(content().string(containsString("status-cancelled")));
   }
 
-  // covers REQ-FE-002 — an AJAX missions-pager swap (fragment=missions) renders only the embedded
-  // missions sub-table fragment: the mission row + page-nav are present, but the swap-target
-  // wrapper and the other detail columns (outside the fragment) are not. The finance/payout
-  // endpoints are intentionally NOT stubbed — the fragment path must not call them.
   @Test
   @WithMockUser(roles = "OFFICER")
   void operationDetail_fragmentMissions_rendersOnlyMissionsFragment() throws Exception {
@@ -348,7 +300,6 @@ class OperationPageControllerMvcTest {
             null,
             0L,
             0L);
-    // Two pages so the embedded pager renders.
     when(backendApiClient.get(
             contains("/api/v1/missions/search?operationId=" + opId), anyTypeRef()))
         .thenReturn(
@@ -359,14 +310,10 @@ class OperationPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("Frag Mission")))
         .andExpect(content().string(containsString("class=\"pagination\"")))
-        // The page-nav links page the embedded table in place against /operations/{id}.
         .andExpect(content().string(containsString("/operations/" + opId + "?page=1")))
-        // Wrapper div and sibling detail columns live outside the fragment.
         .andExpect(content().string(not(containsString("id=\"op-missions-results\""))))
         .andExpect(content().string(not(containsString("id=\"col-payout\""))));
 
-    // #1123: the missions-fragment path must not pay the finance-summary or payout backend reads
-    // (mirrors the #1104 mission-page fragment-gating guard).
     verify(backendApiClient, never())
         .get(
             eq("/api/v1/operations/" + opId + "/finance-summary"),
@@ -374,11 +321,6 @@ class OperationPageControllerMvcTest {
     verify(backendApiClient, never())
         .get(eq("/api/v1/operations/" + opId + "/payouts"), eq(OperationPayoutSummaryDto.class));
   }
-
-  // ── Live-sync section fragments (REQ-FE-015, ADR-0094) — the peer-refresh swap targets ──────
-  // overview / payout / finance each render only their own fragment and load only the reads that
-  // fragment needs (ADR-0078/ADR-0081 fragment-gating); an unknown fragment or a backend failure
-  // degrades to the inline section error, never a redirect.
 
   @Test
   @WithMockUser(roles = "OFFICER")
@@ -391,9 +333,7 @@ class OperationPageControllerMvcTest {
         .perform(get("/operations/" + opId).param("fragment", "overview").locale(Locale.GERMAN))
         .andExpect(status().isOk())
         .andExpect(view().name("operation-detail :: overviewSection"))
-        // The head-meta carrier the sticky-header patcher reads is inside the fragment.
         .andExpect(content().string(containsString("id=\"operation-head-meta\"")))
-        // The sticky-header shell lives OUTSIDE the fragment and must not be re-rendered.
         .andExpect(content().string(not(containsString("id=\"operation-head-sticky\""))));
   }
 
@@ -412,10 +352,8 @@ class OperationPageControllerMvcTest {
         .perform(get("/operations/" + opId).param("fragment", "payout").locale(Locale.GERMAN))
         .andExpect(status().isOk())
         .andExpect(view().name("operation-detail :: payoutSection"))
-        // The pane shell (with the data attributes) lives outside the swapped fragment.
         .andExpect(content().string(not(containsString("id=\"pane-op-payout\""))));
 
-    // Fragment-gating: the payout fragment must not pay the finance-summary or missions reads.
     verify(backendApiClient, never())
         .get(
             eq("/api/v1/operations/" + opId + "/finance-summary"),
@@ -446,7 +384,6 @@ class OperationPageControllerMvcTest {
         .andExpect(view().name("operation-detail :: financeSection"))
         .andExpect(content().string(not(containsString("id=\"pane-op-fin\""))));
 
-    // Fragment-gating: the finance fragment does not need the operation-detail read.
     verify(backendApiClient, never()).get(eq("/api/v1/operations/" + opId), eq(OperationDto.class));
   }
 
@@ -475,12 +412,6 @@ class OperationPageControllerMvcTest {
         .andExpect(content().string(containsString("Abschnitt konnte nicht aktualisiert werden")));
   }
 
-  // The fragmentError paragraph is a direct child of .tab-panes but is NOT a .tab-pane, and the
-  // page's inline CSS only hides .tab-pane — so while it sat outside a <template> it painted a
-  // stray red "Der Abschnitt konnte nicht aktualisiert werden" line under the tabs on EVERY normal
-  // full-page render, with nothing actually broken. The inert <template> wrapper (mirroring
-  // mission-detail / orders-detail) keeps it out of the rendered page while Thymeleaf still
-  // resolves the th:fragment inside it. These two tests pin both halves.
   @Test
   @WithMockUser(roles = "OFFICER")
   void operationDetail_fullPage_doesNotRenderTheSectionRefreshError() throws Exception {
@@ -496,10 +427,6 @@ class OperationPageControllerMvcTest {
             .getResponse()
             .getContentAsString();
 
-    // A plain not(containsString(...)) cannot express this: the string legitimately survives in two
-    // places the browser never paints — inside the <template> holding the fragment, and in the
-    // inline JS message bootstrap (OPS_DETAIL_MSG.sectionRefreshError, the krtFetch swap-failure
-    // toast). Strip both, and no renderable occurrence may be left.
     String renderable =
         body.replaceAll("(?s)<template[^>]*>.*?</template>", "")
             .replaceAll("(?s)<script[^>]*>.*?</script>", "");
@@ -507,8 +434,6 @@ class OperationPageControllerMvcTest {
     assertFalse(
         renderable.contains(SECTION_REFRESH_ERROR_DE),
         "the fragmentError paragraph must not render on the full operation-detail page");
-    // ...and it is the <template> that keeps it out — the fragment must still be emitted, otherwise
-    // this test would also pass with the fragment deleted outright.
     assertTrue(
         body.contains(SECTION_REFRESH_ERROR_DE),
         "the fragmentError paragraph must still be present (inert) in the page source");
@@ -524,15 +449,10 @@ class OperationPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(view().name("operation-detail :: fragmentError"))
         .andExpect(content().string(containsString(SECTION_REFRESH_ERROR_DE)))
-        // The fragment selector extracts only the <p>: the inert wrapper must not travel into the
-        // swap container (a swapped-in <template> would render nothing at all), and no page chrome
-        // comes with it.
         .andExpect(content().string(not(containsString("<template"))))
         .andExpect(content().string(not(containsString("id=\"operation-form\""))));
   }
 
-  // #1121: the per-mission finance breakdown loads lazily via GET /operations/{id}/finance/{mid}
-  // and is injected into the collapsed <details>. The endpoint renders the financeDetail fragment.
   @Test
   @WithMockUser(roles = "OFFICER")
   void operationMissionFinance_rendersEntryBreakdownFragment() throws Exception {
@@ -558,7 +478,6 @@ class OperationPageControllerMvcTest {
         .perform(get("/operations/" + opId + "/finance/" + missionId).locale(Locale.GERMAN))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("Wave5DetailNote")))
-        // Fragment only — the full-page shell (tab nav) must not be rendered.
         .andExpect(content().string(not(containsString("id=\"pane-op-fin\""))));
   }
 
@@ -584,7 +503,6 @@ class OperationPageControllerMvcTest {
     UUID opId = UUID.randomUUID();
     stubDetailEndpoints(
         opId, new OperationDto(opId, "Op", "", "COMPLETED", null, 0L, null, null, Boolean.FALSE));
-    // Override the (zero) payout stub with a donor row + an operation-wide donation total.
     OperationPayoutDto donor =
         new OperationPayoutDto(
             UUID.randomUUID().toString(),
@@ -606,10 +524,8 @@ class OperationPageControllerMvcTest {
     mockMvc
         .perform(get("/operations/" + opId).locale(Locale.GERMAN))
         .andExpect(status().isOk())
-        // Central donation total surfaces in both the payout panel and the finance panel.
         .andExpect(content().string(containsString("Spenden gesamt")))
         .andExpect(content().string(containsString("Davon gespendet")))
-        // Per-donor donated amount sublabel renders in the payout row.
         .andExpect(content().string(containsString("gespendet")))
         .andExpect(content().string(containsString("350")));
   }
@@ -619,7 +535,6 @@ class OperationPageControllerMvcTest {
   void operationDetail_rendersPreliminaryWarning_whenBackendReportsUnfinishedMissions()
       throws Exception {
     UUID opId = UUID.randomUUID();
-    // Backend signals at least one mission still lacks actualStartTime/EndTime.
     stubDetailEndpoints(
         opId,
         new OperationDto(opId, "Ongoing Op", "", "ACTIVE", null, 0L, null, null, Boolean.TRUE));
@@ -628,8 +543,6 @@ class OperationPageControllerMvcTest {
         .perform(get("/operations/" + opId).locale(Locale.GERMAN))
         .andExpect(status().isOk())
         .andExpect(content().string(containsString("alert-warning")))
-        // Title from the i18n bundle — pin the visible text so a key rename
-        // breaks this test instead of silently dropping the warning.
         .andExpect(content().string(containsString("Vorläufige Werte")));
   }
 
@@ -652,7 +565,6 @@ class OperationPageControllerMvcTest {
   @WithMockUser(roles = "OFFICER")
   void operationDetail_hidesPreliminaryWarning_whenBackendOmitsFlag() throws Exception {
     UUID opId = UUID.randomUUID();
-    // payoutPreliminary == null is treated as "unknown" — banner stays hidden.
     stubDetailEndpoints(
         opId, new OperationDto(opId, "Unknown Op", "", "PLANNED", null, 0L, null, null, null));
 
@@ -661,11 +573,6 @@ class OperationPageControllerMvcTest {
         .andExpect(status().isOk())
         .andExpect(content().string(not(containsString("alert-warning"))));
   }
-
-  // ── /operations/{id}/payouts/paid-out — asymmetric authorization ────────
-  // Plain mission managers can SET paidOut=true, but only ADMIN/OFFICER may
-  // clear it back to false. The SpEL guard returns 403 for a plain mission
-  // manager attempting paidOut=false.
 
   @Test
   @WithMockUser(roles = "MISSION_MANAGER")
@@ -730,14 +637,12 @@ class OperationPageControllerMvcTest {
     UUID opId = UUID.randomUUID();
     UUID participantId = UUID.randomUUID();
 
-    // A same-row toggle race that survived the backend's bounded retry surfaces as a backend 409.
     when(backendApiClient.put(
             eq("/api/v1/operations/" + opId + "/payouts/paid-out"),
             any(),
             eq(OperationPayoutStatusDto.class)))
         .thenThrow(new BackendServiceException("payout toggle race", null, 409));
 
-    // The proxy must mirror it as 409, not collapse it into a 500 (#1111).
     mockMvc
         .perform(
             post("/operations/" + opId + "/payouts/paid-out")
@@ -747,15 +652,10 @@ class OperationPageControllerMvcTest {
         .andExpect(status().isConflict());
   }
 
-  // ── /operations/{id}/update — classic (no-JS) fallback 409 mapping (#1155) ──
-
   @Test
   @WithMockUser(roles = "MISSION_MANAGER")
   void updateOperation_classicForm_maps409ToOptimisticLockingFlash() throws Exception {
     UUID opId = UUID.randomUUID();
-    // A stale-version save: the backend echoes 409, which BackendApiClient surfaces as a
-    // BackendServiceException (never a WebClientResponseException) — the dead catch missed it
-    // (#1155).
     when(backendApiClient.put(eq("/api/v1/operations/" + opId), any(), eq(Void.class)))
         .thenThrow(new BackendServiceException("stale operation version", null, 409));
 
@@ -790,8 +690,6 @@ class OperationPageControllerMvcTest {
         .andExpect(flash().attribute("errorMessage", "operation.update.error"));
   }
 
-  // ── /operations/{id} — canUnsetPaidOut model attribute ─────────────────
-
   @Test
   @WithMockUser(roles = "MISSION_MANAGER")
   void operationDetail_missionManager_rendersCanUnsetPaidOutFalse() throws Exception {
@@ -802,9 +700,6 @@ class OperationPageControllerMvcTest {
     mockMvc
         .perform(get("/operations/" + opId).locale(Locale.GERMAN))
         .andExpect(status().isOk())
-        // Plain mission managers don't get the unset capability — the panel
-        // exposes data-can-unset-paid-out=false so the JS lockout activates
-        // after a successful paidOut=true transition.
         .andExpect(content().string(containsString("data-can-unset-paid-out=\"false\"")));
   }
 

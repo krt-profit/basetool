@@ -61,7 +61,6 @@ class BankBookingHistoryPeriodFilterTest {
 
   @Test
   void periodFilteredHistoryRunsOnPostgresAndFiltersByWindow() {
-    // Given: a fresh account with a single deposit booked "now"
     BankHolder holder = newHolder("period-holder-" + UUID.randomUUID());
     BankAccount account = newAccount("Period Konto " + UUID.randomUUID());
     bankLedgerService.bookDeposit(
@@ -69,8 +68,6 @@ class BankBookingHistoryPeriodFilterTest {
     Instant now = Instant.now();
     Instant ninetyDaysAgo = now.minus(Duration.ofDays(90));
 
-    // When / Then: the default last-90-days window (both bounds non-null) — the exact call that
-    // regressed to a 500 — must execute on Postgres and return the freshly booked posting.
     Page<BankBookingDto> windowed =
         bankAccountService.getBookings(
             account.getId(), PageRequest.of(0, 50), ninetyDaysAgo, now.plusSeconds(60));
@@ -79,7 +76,6 @@ class BankBookingHistoryPeriodFilterTest {
         windowed.getTotalElements(),
         "the last-90-days window includes a deposit booked moments ago");
 
-    // A window entirely in the past excludes the just-booked deposit (the filter actually bites).
     Page<BankBookingDto> pastWindow =
         bankAccountService.getBookings(
             account.getId(),
@@ -89,7 +85,6 @@ class BankBookingHistoryPeriodFilterTest {
     assertEquals(
         0, pastWindow.getTotalElements(), "a bygone window excludes the just-booked deposit");
 
-    // The unbounded (null, null) path — "whole history" — still pages everything.
     Page<BankBookingDto> unbounded =
         bankAccountService.getBookings(account.getId(), PageRequest.of(0, 50), null, null);
     assertEquals(

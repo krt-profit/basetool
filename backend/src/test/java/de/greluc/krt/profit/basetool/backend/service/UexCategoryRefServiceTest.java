@@ -92,9 +92,6 @@ class UexCategoryRefServiceTest {
 
   @Test
   void syncCategories_skipsUnsupportedType_soTheCheckConstraintNeverFires() {
-    // UEX returns 'service'/commodity categories (e.g. id 39, Trading/General) alongside item and
-    // vehicle ones. uex_category.type is constrained to ('item','vehicle') (chk_uex_category_type),
-    // so persisting a 'service' row would abort the whole sweep; it must be skipped before the DB.
     UexCategoryDto item = new UexCategoryDto(3, "item", "Armor", "Helmets", 1, 0);
     UexCategoryDto vehicle = new UexCategoryDto(7, "vehicle", "Systems", "Coolers", 1, 0);
     UexCategoryDto tradingCat = new UexCategoryDto(39, "service", "Trading", "General", 0, 0);
@@ -106,7 +103,6 @@ class UexCategoryRefServiceTest {
 
     service.syncCategories();
 
-    // Only the item + vehicle rows reach the DB; the 'service' row is skipped before findById.
     ArgumentCaptor<UexCategory> saved = ArgumentCaptor.forClass(UexCategory.class);
     verify(repository, times(2)).save(saved.capture());
     verify(repository, never()).findById(39);

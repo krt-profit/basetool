@@ -118,8 +118,6 @@ class LagerLocationFilterE2eTest {
         E2eSupport.navigate(page, baseUrl + "/inventory/my");
         page.waitForLoadState();
 
-        // The tree starts collapsed, so open the seeded material's group: its two location stacks
-        // are the rows the filter has to cut down to one.
         assertThat(page.locator("div.tree-row--group[data-material-id='" + materialId + "']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(RENDER_TIMEOUT_MS));
         page.locator("div.tree-row--group[data-material-id='" + materialId + "']").click();
@@ -128,30 +126,23 @@ class LagerLocationFilterE2eTest {
         assertThat(page.locator("div.tree-row--mid[data-location-id='" + locationBId + "']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(RENDER_TIMEOUT_MS));
 
-        // Every filter panel starts collapsed (REQ-FE-021), so open it before picking.
         if (page.locator("#myFilterPanel").isHidden()) {
           page.locator("[data-testid='lager-filter-toggle']").click();
         }
         assertThat(page.locator("#myFilterPanel")).isVisible();
 
-        // Survives an in-place fragment swap, but not a navigation — this is the no-reload probe.
         page.evaluate("() => { window.__e2eNoReloadMarker = 'kept'; }");
 
         page.locator("#locationHeader").click();
         page.locator("#locationOptions input.locCheck[value='" + locationAId + "']").check();
 
-        // The swapped-in table keeps only the picked location's stack. Counted, not "hidden":
-        // the excluded stack must be gone from the server-rendered fragment altogether, which a
-        // visibility assertion would also accept from a merely collapsed row.
         assertThat(page.locator("div.tree-row--mid[data-location-id='" + locationBId + "']"))
             .hasCount(0, new LocatorAssertions.HasCountOptions().setTimeout(RENDER_TIMEOUT_MS));
         assertThat(page.locator("div.tree-row--mid[data-location-id='" + locationAId + "']"))
             .hasCount(1, new LocatorAssertions.HasCountOptions().setTimeout(RENDER_TIMEOUT_MS));
 
-        // One dimension narrows the view, and the chip that keeps a collapsed panel honest says so.
         assertThat(page.locator(".filter-toggle [data-filter-count-value]")).hasText("1");
 
-        // The excluded location must remain offerable, or the filter would be a one-way door.
         assertThat(page.locator("#locationOptions input.locCheck[value='" + locationBId + "']"))
             .isAttached();
 

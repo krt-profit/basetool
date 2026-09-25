@@ -106,8 +106,6 @@ class MissionControllerLifecycleTest {
   @Mock private MissionSecurityService missionSecurityService;
   @Mock private de.greluc.krt.profit.basetool.backend.service.AuthHelperService authHelperService;
 
-  // Real redactor (not a mock) so the peer-redaction assertions exercise the actual
-  // MissionPeerRedactor logic.
   private final de.greluc.krt.profit.basetool.backend.support.MissionPeerRedactor
       missionPeerRedactor = new de.greluc.krt.profit.basetool.backend.support.MissionPeerRedactor();
 
@@ -128,7 +126,7 @@ class MissionControllerLifecycleTest {
             userService,
             missionMapper,
             userMapper,
-            null, // shipMapper
+            null,
             missionSecurityService,
             authHelperService,
             missionPeerRedactor,
@@ -237,9 +235,9 @@ class MissionControllerLifecycleTest {
         managing,
         managing,
         9L,
-        4L, // coreVersion
-        5L, // scheduleVersion
-        6L, // flagsVersion
+        4L,
+        5L,
+        6L,
         1,
         1,
         null,
@@ -247,12 +245,12 @@ class MissionControllerLifecycleTest {
         null,
         null,
         0L,
-        List.of(), // steps
-        0L, // stepsVersion
-        List.of(), // objectives
-        0L, // objectivesVersion
+        List.of(),
+        0L,
+        List.of(),
+        0L,
         null,
-        null); // meetingPoint
+        null);
   }
 
   /**
@@ -273,7 +271,6 @@ class MissionControllerLifecycleTest {
     when(missionService.searchMissions(
             any(), any(), any(), any(), any(), any(), any(Pageable.class)))
         .thenReturn(page);
-    // Only the crowded mission has participants; the empty one produced no row at all.
     when(missionService.registeredCounts(any())).thenReturn(Map.of(crowded.getId(), 7L));
 
     controller.getAllMissions(null, null, null);
@@ -281,14 +278,9 @@ class MissionControllerLifecycleTest {
     ArgumentCaptor<Long> counts = ArgumentCaptor.forClass(Long.class);
     verify(missionMapper, times(2)).toListDto(any(Mission.class), counts.capture());
     assertThat(counts.getAllValues()).containsExactly(7L, 0L);
-    // One grouped read for the page, not one per row.
     verify(missionService, times(1)).registeredCounts(List.of(crowded.getId(), empty.getId()));
   }
 
-  // ── GET /api/v1/missions (anonymous filtering) ───────────────────────
-
-  // Asserts the deprecated-for-removal MissionService.getAllMissions(Pageable) is never hit;
-  // referencing it in verify(...) triggers an expected, unavoidable [removal] warning.
   @Test
   @SuppressWarnings("removal")
   void getAllMissions_routesThroughSearchMissionsForSquadronScope() {
@@ -312,9 +304,6 @@ class MissionControllerLifecycleTest {
             0L,
             1L);
     Page<Mission> page = new PageImpl<>(List.of(m), PageRequest.of(0, 20), 1);
-    // Post-fix #1: authenticated callers now go through searchMissions so the service-layer
-    // squadron filter (owning OR is_internal=false) is applied. getAllMissions/findAll without
-    // a scope would leak internal missions of foreign squadrons.
     when(missionService.searchMissions(
             org.mockito.ArgumentMatchers.isNull(),
             org.mockito.ArgumentMatchers.isNull(),
@@ -325,8 +314,6 @@ class MissionControllerLifecycleTest {
             any(Pageable.class)))
         .thenReturn(page);
     when(missionMapper.toListDto(eq(m), anyLong())).thenReturn(listDto);
-    // The member check that used to stand here is the @PreAuthorize gate now (REQ-SEC-052), so
-    // every caller reaching the method body is one and there is no second shape to distinguish.
 
     PageResponse<MissionListDto> result = controller.getAllMissions(0, 20, null);
 
@@ -340,19 +327,8 @@ class MissionControllerLifecycleTest {
             org.mockito.ArgumentMatchers.isNull(),
             org.mockito.ArgumentMatchers.isNull(),
             any(Pageable.class));
-    // The legacy unfiltered getAllMissions() path must never be hit for authenticated callers.
     verify(missionService, never()).getAllMissions(any(Pageable.class));
   }
-
-  // Three cases stood here: an outsider's list and search silently restricted to
-  // PLANNED+ACTIVE non-internal missions, and a forbidden status filter answered with an
-  // empty page instead of a 403. The branch they pinned is gone with its audience
-  // (ADR-0159): both endpoints now carry
-  // @PreAuthorize("isAuthenticated() and @authHelperService.isMemberOrAbove()"), so the
-  // caller the restriction existed for is refused before the method runs. What a member may
-  // see is decided in the service's org-unit scope, which OwnerScopeServiceTest covers.
-
-  // ── GET /api/v1/missions/search (anonymous filtering / empty-after-filter) ──
 
   @Test
   void searchMissions_passesStatusFilterVerbatim() {
@@ -384,13 +360,11 @@ class MissionControllerLifecycleTest {
             eq(start),
             eq(end),
             eq(List.of("COMPLETED")),
-            eq(null), // not 'false' — authenticated callers see internals too
+            eq(null),
             eq(operationId),
             any(Pageable.class)))
         .thenReturn(page);
     when(missionMapper.toListDto(eq(m), anyLong())).thenReturn(listDto);
-    // Verbatim for every caller now: the status filter had one other shape, and it belonged to the
-    // outsider the endpoint no longer admits (REQ-SEC-052).
 
     PageResponse<MissionListDto> result =
         controller.searchMissions(
@@ -408,8 +382,6 @@ class MissionControllerLifecycleTest {
             any(Pageable.class));
   }
 
-  // ── GET /api/v1/missions/{id} (peer redaction) ───────────────────────
-
   @Test
   void getMissionById_logisticianCaller_returnsFullDtoUnchanged() {
     UUID id = UUID.randomUUID();
@@ -417,24 +389,12 @@ class MissionControllerLifecycleTest {
     MissionDto full = fullMissionDto(id);
     when(missionService.getMissionById(id)).thenReturn(entity);
     when(missionMapper.toDto(entity)).thenReturn(full);
-    // Logistician or above → no redaction pass. The line used to read isMemberOrAbove: the DTO
-    // was full for every member and redacted only for the outsider tier. With that tier gone the
-    // one surviving distinction is REQ-SEC-007's, which is drawn at Logistician.
     when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
 
     MissionDto result = controller.getMissionById(id);
 
-    // Owner/managers/PII flow through unchanged. Pin the "isSameAs" so a future change that
-    // ALWAYS redacts (e.g. as a "safety net") would surface here as a different identity.
     assertThat(result).isSameAs(full);
   }
-
-  // Three cases stood here: an outsider refused (403) on an internal mission and on a
-  // COMPLETED / CANCELLED one. Both throws lived in the controller and belonged to the
-  // outsider tier. Visibility for a member has always been decided one layer up by
-  // @ownerScopeService.canSeeMission(#id) — own Staffel, or any non-internal mission
-  // organisation-wide — which is where the internal-mission rule still is and where
-  // OwnerScopeServiceTest tests it. A terminal mission was never hidden from a member.
 
   @Test
   void getMissionById_peer_keepsRosterButStripsPii() {
@@ -445,48 +405,27 @@ class MissionControllerLifecycleTest {
     MissionDto full = fullMissionDto(id, false);
     when(missionService.getMissionById(id)).thenReturn(planned);
     when(missionMapper.toDto(planned)).thenReturn(full);
-    // A member below Logistician — the only redacted tier left (REQ-SEC-007).
     when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
 
     MissionDto result = controller.getMissionById(id);
 
-    // Peer redaction (cleanupMissionForPeer): the roster stays, its PII does not. Owner, managers
-    // and the edit flags are cleared; organisation, units, frequencies and the free-text
-    // description stay visible. The description used to be hidden here — that was the outsider
-    // tier's one extra field, and its audience was people outside the organisation. A peer is a
-    // member of it and reads the mission's own text (ADR-0159).
     assertThat(result).isNotNull();
     assertThat(result.name()).isEqualTo("Op Foxglove");
     assertThat(result.status()).isEqualTo("PLANNED");
     assertThat(result.description()).isEqualTo("internal description");
-    // Stripped: owner / managers.
     assertThat(result.owner()).isNull();
     assertThat(result.managers()).isNull();
-    // NOT forced off: the flags are what the CALLER may do, forwarded rather than overwritten. A
-    // MISSION_MANAGER sits below Logistician (the hierarchy puts ADMIN/OFFICER above both roles
-    // but never MISSION_MANAGER above LOGISTICIAN), so forcing them would hide the management
-    // controls from the Einsatz's own manager. Here they are false because this caller is only
-    // READING, which is also why owner and managers are stripped above — the two travel together
-    // since 2026-09-06. MissionPeerRedactorTest owns both directions of that rule.
     assertThat(result.canEdit()).isFalse();
     assertThat(result.canManageManagers()).isFalse();
-    // #1138: the mission economy (inventory / refinery orders) is no longer part of MissionDto —
-    // there is nothing to assert empty here; it is served member-gated at its own endpoints.
-    // The participant roster IS visible to outsiders — but PII is stripped to the public callsign
-    // tuple (username / displayName / rank), never email or roles.
     assertThat(result.participants()).hasSize(1);
     MissionParticipantDto rosterParticipant = result.participants().iterator().next();
     UserDto rosterUser = rosterParticipant.user();
     assertThat(rosterUser.username()).isEqualTo("alice");
     assertThat(rosterUser.email()).isNull();
     assertThat(rosterUser.roles()).isNull();
-    // Payout intent and the free-text comment survive the peer tier: they were stripped for the
-    // outsider (ADR-0034 / REQ-SEC-021), and among members they are what the sign-up sheet is for.
     assertThat(rosterParticipant.payoutPreference()).isEqualTo(PayoutPreference.PAYOUT);
     assertThat(rosterParticipant.comment()).isEqualTo("comment");
   }
-
-  // ── GET /api/v1/missions/next (200 / 204 + redaction) ────────────────
 
   @Test
   void getNextMission_noMission_returns204() {
@@ -503,16 +442,12 @@ class MissionControllerLifecycleTest {
     UUID id = UUID.randomUUID();
     Mission upcoming = new Mission();
     MissionDto full = fullMissionDto(id, false);
-    // A member below Logistician.
     when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
     when(missionService.getNextMission()).thenReturn(Optional.of(upcoming));
     when(missionMapper.toDto(upcoming)).thenReturn(full);
 
     ResponseEntity<MissionDto> response = controller.getNextMission();
 
-    // There is no internal-visibility argument any more. It was false for the outsider tier, whose
-    // whole point was that internal missions must not surface at all; a peer is a member of the
-    // organisation, is scoped by canSeeMission like anyone else, and reads the redacted DTO.
     verify(missionService).getNextMission();
     assertThat(response.getStatusCode().value()).isEqualTo(200);
     assertThat(response.getBody()).isNotNull();
@@ -534,8 +469,6 @@ class MissionControllerLifecycleTest {
     assertThat(response.getBody()).isSameAs(full);
   }
 
-  // ── POST /api/v1/missions/{id}/join ──────────────────────────────────
-
   @Test
   void joinMission_withoutBody_resolvesCallerFromJwt_andKeepsTheDefaultChain() {
     Jwt jwt = jwt("alice-sub");
@@ -547,19 +480,10 @@ class MissionControllerLifecycleTest {
     when(missionService.addParticipant(missionId, callerId, null, null, null, null, null))
         .thenReturn(persisted);
     when(missionMapper.toDto(persisted)).thenReturn(dto);
-    // Logistician, so the response is not redacted and stays identity-comparable. What an
-    // ORDINARY member gets back is the subject of joinMission_member_getsTheRedactedMission().
     when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
 
     MissionDto result = controller.joinMission(jwt, missionId, null);
 
-    // The self-enroll shortcut MUST resolve the caller from the JWT — never accept a userId
-    // from the URL/body. Pin the captured argument to the JWT-derived id.
-    //
-    // The null body is the shipped-client case and the reason the parameter is optional:
-    // REQ-API-009 freezes this operation, so a build that sends nothing must keep working, and
-    // every downstream argument stays null so REQ-MISSION-002's profile-default payout chain
-    // still decides.
     assertThat(result).isSameAs(dto);
     verify(missionService).addParticipant(missionId, callerId, null, null, null, null, null);
   }
@@ -583,9 +507,6 @@ class MissionControllerLifecycleTest {
         controller.joinMission(
             jwt, missionId, new JoinMissionRequest(desiredJobTypeId, PayoutPreference.DONATE));
 
-    // guestName, comment and orgUnitIds stay null on purpose: this body cannot name anybody but
-    // the caller, which is what lets the endpoint skip the self-vs-manager check that
-    // /participants/add needs (ADR-0170).
     assertThat(result).isSameAs(dto);
     verify(missionService)
         .addParticipant(
@@ -606,8 +527,6 @@ class MissionControllerLifecycleTest {
     when(missionMapper.toDto(persisted)).thenReturn(dto);
     when(authHelperService.isLogisticianOrAbove()).thenReturn(true);
 
-    // A member who picks a payout but no Funktion: the unanswered field means "no preference",
-    // never "clear it".
     MissionDto result =
         controller.joinMission(
             jwt, missionId, new JoinMissionRequest(null, PayoutPreference.PAYOUT));
@@ -646,8 +565,6 @@ class MissionControllerLifecycleTest {
     assertThat(result.participants().iterator().next().user().email()).isNull();
   }
 
-  // ── PATCH /api/v1/missions/{id}/core ─────────────────────────────────
-
   @Test
   void patchMissionCore_unpacksRequestRecordInDocumentedArgumentOrder() {
     UUID id = UUID.randomUUID();
@@ -664,18 +581,11 @@ class MissionControllerLifecycleTest {
 
     MissionDto result = controller.patchMissionCore(id, request);
 
-    // The positional service call is the spot where a copy-paste during refactor would
-    // silently swap arguments of identical type (name and description are both Strings; the
-    // section version is a Long that could collide with other longs in scope). The verify-call
-    // pins the EXACT argument order — including {@code operationId} as part of the core section —
-    // so a regression surfaces here instead of in production data.
     assertThat(result).isSameAs(dto);
     verify(missionService)
         .updateCoreSection(
             id, "New name", "New description", "https://cal", "PLANNED", operationId, null, 5L);
   }
-
-  // ── PATCH /api/v1/missions/{id}/schedule ─────────────────────────────
 
   @Test
   void patchMissionSchedule_unpacksAllFiveTimestampsAndVersion() {
@@ -697,15 +607,10 @@ class MissionControllerLifecycleTest {
 
     MissionDto result = controller.patchMissionSchedule(id, request);
 
-    // The five Instant fields are functionally interchangeable from a type perspective — only
-    // their positional order distinguishes them. Verify-call pins it. (Notice: ALL timestamps
-    // are UTC Instants per CLAUDE.md — the test does not mix LocalDateTime in.)
     assertThat(result).isSameAs(dto);
     verify(missionService)
         .updateScheduleSection(id, meeting, plannedStart, plannedEnd, actualStart, actualEnd, 3L);
   }
-
-  // ── PATCH /api/v1/missions/{id}/flags ────────────────────────────────
 
   @Test
   void patchMissionFlags_unpacksIsInternalAndVersion() {
@@ -722,16 +627,10 @@ class MissionControllerLifecycleTest {
     verify(missionService).updateFlagsSection(id, true, 2L);
   }
 
-  // ── PUT /api/v1/missions/{id}/owner (versioned) ──────────────────────
-
   @Test
   void updateMissionOwner_forwardsOwnershipAggregateVersion_notMissionVersion() {
     UUID id = UUID.randomUUID();
     UUID newOwnerId = UUID.randomUUID();
-    // The version here is the *ownership* aggregate version, NOT Mission.version. A test that
-    // accidentally pinned Mission.version (e.g. 9L from the fullMissionDto helper) would silently
-    // mask a regression where the controller forwards the wrong version. Use a deliberately
-    // distinct value (42L) that is unlike anything else in the test setup.
     UpdateMissionOwnerRequest request = new UpdateMissionOwnerRequest(newOwnerId, 42L);
     Mission persisted = new Mission();
     MissionDto dto = fullMissionDto(id);
@@ -743,8 +642,6 @@ class MissionControllerLifecycleTest {
     assertThat(result).isSameAs(dto);
     verify(missionService).updateMissionOwner(id, newOwnerId, 42L);
   }
-
-  // ── GET /api/v1/missions/{id}/participants/unassigned ────────────────
 
   @Test
   void getUnassignedParticipants_mapsServiceListThroughMapper() {
@@ -762,8 +659,6 @@ class MissionControllerLifecycleTest {
     verify(missionMapper).toDto(raw);
   }
 
-  // ── createSubMission forwards request → service → DTO ───────────────
-
   @Test
   void createSubMission_forwardsCreateRequestToServiceAndMapsResult() {
     UUID parentId = UUID.randomUUID();
@@ -777,17 +672,10 @@ class MissionControllerLifecycleTest {
 
     MissionDto result = controller.createSubMission(parentId, request);
 
-    // Audit finding C-3 migration: the controller no longer maps a full MissionDto into a fresh
-    // Mission entity (that path enabled the id/version/owningSquadron mass-assignment vector). It
-    // now forwards the dedicated CreateMissionRequest record straight to the service and only
-    // round-trips back through toDto on the response. The mapper.toEntity(MissionDto) overload was
-    // deleted; this test pins the new, narrower contract.
     assertThat(result).isSameAs(parentDto);
     verify(missionService).addSubMission(parentId, request);
     verify(missionMapper).toDto(persistedParent);
   }
-
-  // ── DELETE /api/v1/missions/{id} ─────────────────────────────────────
 
   @Test
   void deleteMission_returns204_andDelegatesToService() {
@@ -798,8 +686,6 @@ class MissionControllerLifecycleTest {
     assertThat(response.getStatusCode().value()).isEqualTo(204);
     verify(missionService).deleteMission(id);
   }
-
-  // ── PUT /api/v1/missions/{id}/party-lead ─────────────────────────────
 
   @Test
   void setPartyLead_explicitUserId_isForwardedWithoutNameResolution() {
@@ -814,7 +700,6 @@ class MissionControllerLifecycleTest {
     MissionDto result = controller.setPartyLead(id, request);
 
     assertThat(result).isSameAs(dto);
-    // An explicit autocomplete pick must NOT go through the free-text resolution path.
     verify(userService, never()).findMatchesByExactName(any());
     verify(missionService).setPartyLead(id, userId, null, 3L);
   }
@@ -835,8 +720,6 @@ class MissionControllerLifecycleTest {
     MissionDto result = controller.setPartyLead(id, request);
 
     assertThat(result).isSameAs(dto);
-    // Same mechanic as the participant add: a free-text name with a single member match is linked
-    // as a registered party lead and the guest handle is dropped.
     verify(missionService).setPartyLead(id, resolvedId, null, 1L);
   }
 
@@ -853,7 +736,6 @@ class MissionControllerLifecycleTest {
     MissionDto result = controller.setPartyLead(id, request);
 
     assertThat(result).isSameAs(dto);
-    // No registered member matches the free text -> kept as an anonymous guest handle.
     verify(missionService).setPartyLead(id, null, "Stranger", 0L);
   }
 
@@ -871,7 +753,6 @@ class MissionControllerLifecycleTest {
       controller.setPartyLead(id, request);
       org.junit.jupiter.api.Assertions.fail("Expected BusinessConflictException");
     } catch (BusinessConflictException expected) {
-      // ok — an ambiguous name surfaces as 409 before any persistence happens.
     }
 
     verify(missionService, never()).setPartyLead(any(), any(), any(), any());
@@ -889,7 +770,6 @@ class MissionControllerLifecycleTest {
     MissionDto result = controller.setPartyLead(id, request);
 
     assertThat(result).isSameAs(dto);
-    // Neither a userId nor a guest name -> no resolution, the service clears the party lead.
     verify(userService, never()).findMatchesByExactName(any());
     verify(missionService).setPartyLead(id, null, null, 4L);
   }

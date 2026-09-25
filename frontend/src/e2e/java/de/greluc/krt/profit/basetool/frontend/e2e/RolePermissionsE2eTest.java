@@ -82,8 +82,6 @@ class RolePermissionsE2eTest {
     if (STACK.managesStack()) {
       BackendSeeder seeder = new BackendSeeder();
       seeder.ensureIridiumMembership(ADMIN_USER, ADMIN_PASSWORD);
-      // Materialise (first login syncs the app_user row) and home both non-admin roles in IRIDIUM,
-      // so their session has an org context when they open the order detail page.
       seeder.assignStaffelMembership(
           ADMIN_USER,
           ADMIN_PASSWORD,

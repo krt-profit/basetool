@@ -48,7 +48,6 @@ class BlueprintOverviewPageControllerTest {
   @Mock private BackendApiClient backendApiClient;
   @InjectMocks private BlueprintOverviewPageController controller;
 
-  // covers REQ-INV-013 — defaults: page 0, size 50, no search parameter on the backend URI.
   @Test
   void view_populatesOverviewAndPageEnvelope_withDefaults() {
     PageResponse<BlueprintOverviewEntryDto> page =
@@ -73,8 +72,6 @@ class BlueprintOverviewPageControllerTest {
     assertEquals(List.of(10, 50, 100), model.getAttribute("pageSizes"));
   }
 
-  // covers REQ-INV-013 — a size outside the 10/50/100 whitelist falls back to the default 50, so
-  // the query string cannot turn the page into an unbounded fetch again.
   @Test
   void view_nonWhitelistedSize_fallsBackToDefault() {
     when(backendApiClient.get(contains("?page=2&size=50"), anyTypeRef()))
@@ -85,8 +82,6 @@ class BlueprintOverviewPageControllerTest {
     verify(backendApiClient).get(contains("?page=2&size=50"), anyTypeRef());
   }
 
-  // covers REQ-INV-013 — the search is relayed as a URI template variable (percent-encoded by the
-  // WebClient) and echoed back to the model for the filter form.
   @Test
   void view_search_isRelayedAsUriVariable_andEchoedTrimmed() {
     when(backendApiClient.get(contains("&search={search}"), anyTypeRef(), eq("Aurora")))
@@ -100,8 +95,6 @@ class BlueprintOverviewPageControllerTest {
     assertEquals("Aurora", model.getAttribute("search"));
   }
 
-  // covers REQ-FE-002 — an AJAX swap request (fragment=results) renders only the table +
-  // pagination fragment, not the full page, while the model is populated identically.
   @Test
   void view_fragmentResults_returnsResultsFragmentView() {
     when(backendApiClient.get(contains("?page=0&size=50"), anyTypeRef()))
@@ -129,9 +122,6 @@ class BlueprintOverviewPageControllerTest {
 
   @Test
   void owners_relaysProductKey_asUriVariable_andReturnsList() {
-    // The product key is passed as a URI template variable (so the WebClient percent-encodes it),
-    // not concatenated into the path — see BackendApiClient#get(String, ParameterizedTypeReference,
-    // Object...). The raw key therefore arrives as a separate argument, not inside the template.
     when(backendApiClient.get(
             contains("/api/v1/personal-blueprints/overview/owners?productKey={productKey}"),
             anyTypeRef(),

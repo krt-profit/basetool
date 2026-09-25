@@ -64,7 +64,6 @@ class OperationFinanceServiceTest {
 
   @Test
   void shouldCalculateCorrectTotalSumWithFinancesAndRefineryOrders() {
-    // Given
     UUID operationId = UUID.randomUUID();
     Operation operation = new Operation();
     operation.setId(operationId);
@@ -79,7 +78,6 @@ class OperationFinanceServiceTest {
 
     operation.setMissions(Set.of(msn1, msn2));
 
-    // Msn 1: 500 Income, 100 Expense -> +400
     MissionFinanceEntry e1 =
         MissionFinanceEntry.builder()
             .mission(msn1)
@@ -93,12 +91,10 @@ class OperationFinanceServiceTest {
             .type(FinanceType.EXPENSE)
             .build();
 
-    // Msn 1: Refinery Order with 50 expense -> +350 total for msn1
     RefineryOrder ro1 = new RefineryOrder();
     ro1.setMission(msn1);
     ro1.setExpenses(50.0);
 
-    // Msn 2: 200 Expense -> -200
     MissionFinanceEntry e3 =
         MissionFinanceEntry.builder()
             .mission(msn2)
@@ -106,16 +102,12 @@ class OperationFinanceServiceTest {
             .type(FinanceType.EXPENSE)
             .build();
 
-    // Operation Total -> 350 - 200 = 150
-
     when(operationRepository.findById(operationId)).thenReturn(Optional.of(operation));
     when(financeEntryRepository.findAllByMissionIdIn(any())).thenReturn(List.of(e1, e2, e3));
     when(refineryOrderRepository.findByMissionIdIn(any())).thenReturn(List.of(ro1));
 
-    // When
     OperationFinanceDto result = operationFinanceService.getOperationFinances(operationId);
 
-    // Then
     assertEquals(BigDecimal.valueOf(150.0), result.totalSum());
     assertEquals(2, result.missions().size());
 
@@ -136,8 +128,6 @@ class OperationFinanceServiceTest {
 
   @Test
   void shouldUseProfitFromOreSalesMinusExpensesForRefineryOrders() {
-    // Given: ein Raffinerieauftrag mit oreSales > expenses -> positiver Gewinn fliesst in die
-    // Einsatzbilanz ein.
     UUID operationId = UUID.randomUUID();
     Operation operation = new Operation();
     operation.setId(operationId);
@@ -150,33 +140,30 @@ class OperationFinanceServiceTest {
     RefineryOrder profitOrder = new RefineryOrder();
     profitOrder.setMission(msn);
     profitOrder.setExpenses(100.0);
-    profitOrder.setOreSales(450.0); // profit = 350
+    profitOrder.setOreSales(450.0);
 
     RefineryOrder lossOrder = new RefineryOrder();
     lossOrder.setMission(msn);
     lossOrder.setExpenses(200.0);
-    lossOrder.setOreSales(50.0); // profit = -150
+    lossOrder.setOreSales(50.0);
 
     RefineryOrder legacyOrder = new RefineryOrder();
     legacyOrder.setMission(msn);
     legacyOrder.setExpenses(25.0);
-    legacyOrder.setOreSales(null); // Altdaten: oreSales=null -> 0, profit = -25
+    legacyOrder.setOreSales(null);
 
     when(operationRepository.findById(operationId)).thenReturn(Optional.of(operation));
     when(financeEntryRepository.findAllByMissionIdIn(any())).thenReturn(List.of());
     when(refineryOrderRepository.findByMissionIdIn(any()))
         .thenReturn(List.of(profitOrder, lossOrder, legacyOrder));
 
-    // When
     OperationFinanceDto result = operationFinanceService.getOperationFinances(operationId);
 
-    // Then: 350 + (-150) + (-25) = 175
     assertEquals(0, BigDecimal.valueOf(175.0).compareTo(result.totalSum()));
   }
 
   @Test
   void getOperationFinanceSummary_aggregatesPerMissionTotalsFromGroupedQueries() {
-    // Given: two missions; totals come from the grouped SQL aggregates, not a row load-all (#1121).
     UUID operationId = UUID.randomUUID();
     Operation operation = new Operation();
     operation.setId(operationId);
@@ -189,8 +176,6 @@ class OperationFinanceServiceTest {
     operation.setMissions(Set.of(alpha, bravo));
 
     when(operationRepository.findById(operationId)).thenReturn(Optional.of(operation));
-    // Alpha: 500 income - 100 expense + 350 refinery profit = 750.
-    // Bravo: no income (null sum) - 200 expense + no refinery = -200.
     when(financeEntryRepository.aggregateFinanceByMissionIds(any()))
         .thenReturn(
             List.of(
@@ -200,11 +185,9 @@ class OperationFinanceServiceTest {
     when(refineryOrderRepository.aggregateProfitByMissionIds(any()))
         .thenReturn(List.of(new RefineryMissionProfitAggregate(alpha.getId(), 350.0)));
 
-    // When
     OperationFinanceSummaryDto result =
         operationFinanceService.getOperationFinanceSummary(operationId);
 
-    // Then: operation total 750 + (-200) = 550, breakdown ordered by mission name (Alpha, Bravo).
     assertEquals(0, BigDecimal.valueOf(550).compareTo(result.totalSum()));
     assertFalse(result.truncated());
     assertEquals(2, result.missions().size());
@@ -218,7 +201,6 @@ class OperationFinanceServiceTest {
 
   @Test
   void getMissionFinanceDetail_emptyMission_returnsZeroTotalAndEmptyLists() {
-    // Given: a mission of the operation with no finance entries and no refinery orders.
     UUID operationId = UUID.randomUUID();
     Operation operation = new Operation();
     operation.setId(operationId);
@@ -231,11 +213,9 @@ class OperationFinanceServiceTest {
     when(financeEntryRepository.findAllByMissionId(msn.getId())).thenReturn(List.of());
     when(refineryOrderRepository.findByMissionId(msn.getId())).thenReturn(List.of());
 
-    // When
     MissionFinanceSummaryDto result =
         operationFinanceService.getMissionFinanceDetail(operationId, msn.getId());
 
-    // Then
     assertEquals(msn.getId(), result.missionId());
     assertEquals(0, BigDecimal.ZERO.compareTo(result.totalSum()));
     assertTrue(result.entries().isEmpty());
@@ -244,7 +224,6 @@ class OperationFinanceServiceTest {
 
   @Test
   void getMissionFinanceDetail_missionNotPartOfOperation_throwsNotFound() {
-    // Given: the requested mission id is not one of the operation's child missions.
     UUID operationId = UUID.randomUUID();
     Operation operation = new Operation();
     operation.setId(operationId);
@@ -255,7 +234,6 @@ class OperationFinanceServiceTest {
 
     when(operationRepository.findById(operationId)).thenReturn(Optional.of(operation));
 
-    // When / Then
     UUID foreignMissionId = UUID.randomUUID();
     assertThrows(
         NotFoundException.class,

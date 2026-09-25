@@ -95,7 +95,6 @@ class BackendHealthIndicatorTest {
   void setUp() throws Exception {
     server = new MockWebServer();
     server.start();
-    // No trailing slash, like the prod `BACKEND_URL=https://backend:11261`.
     backendUrl = server.url("").toString().replaceAll("/+$", "");
   }
 
@@ -127,9 +126,6 @@ class BackendHealthIndicatorTest {
 
   @Test
   void health_returns_down_when_backend_readiness_responds_503() throws Exception {
-    // Models the realistic chain: backend is reachable but its OWN readiness probe says DOWN
-    // because (e.g.) Keycloak is unreachable from the backend's network position. Spring Boot
-    // serves 503 with body `{"status":"DOWN"}` in that case.
     server.enqueue(
         new MockResponse()
             .setResponseCode(503)
@@ -151,8 +147,6 @@ class BackendHealthIndicatorTest {
 
   @Test
   void health_returns_down_when_backend_readiness_responds_404() {
-    // Models a misconfiguration where BACKEND_URL points at a service that does not expose
-    // /actuator/health/readiness (e.g. wrong port, wrong host, actuator path disabled).
     server.enqueue(new MockResponse().setResponseCode(404));
     BackendHealthIndicator indicator =
         new BackendHealthIndicator(backendUrl, TEST_CONNECT_TIMEOUT, TEST_READ_TIMEOUT);
@@ -185,9 +179,6 @@ class BackendHealthIndicatorTest {
 
   @Test
   void constructor_trims_trailing_slash_so_the_probe_url_has_no_double_slash() throws Exception {
-    // Same MockWebServer, but feed it WITH a trailing slash to verify the constructor's
-    // canonicalisation. Without the trim, the probe would hit `//actuator/health/readiness`
-    // which most servers would respond to with 404.
     String backendUrlWithTrailingSlash = server.url("/").toString();
     server.enqueue(new MockResponse().setResponseCode(200).setBody("{\"status\":\"UP\"}"));
     BackendHealthIndicator indicator =
@@ -205,18 +196,8 @@ class BackendHealthIndicatorTest {
         "trailing slash on BACKEND_URL must not propagate to the probe path");
   }
 
-  // ─── TLS trust policy (audit L-5 follow-up) ─────────────────────────────
-
   @Test
   void prodWithoutBackendTrustBundle_fallsBackToWorkingTrustAllProbe() throws Exception {
-    // Regression for the L-5 follow-up: in prod a MISSING `backend-trust` bundle must fall back to
-    // trust-all (mirroring WebClientConfig), NOT the default JVM trust store -- the latter can
-    // never
-    // validate the backend's self-signed internal cert and silently forced the probe DOWN, flapping
-    // the deploy. MockWebServer is plain HTTP here, so this asserts the prod constructor path
-    // resolves a WORKING probe when getBundle(...) throws NoSuchSslBundleException: it must not
-    // throw
-    // at construction and the probe must function.
     server.enqueue(
         new MockResponse()
             .setResponseCode(200)
@@ -237,13 +218,6 @@ class BackendHealthIndicatorTest {
 
   @Test
   void hostnameAgnosticTrustManager_routesEndpointChecksThroughChainValidation() {
-    // The fix's core: on the JDK HttpClient (which forces HTTPS endpoint identification and ignores
-    // SSLParameters), hostname verification can only be dropped inside the trust manager. This
-    // guard
-    // asserts the Socket/SSLEngine-aware checkServerTrusted overloads -- the ones that would
-    // perform
-    // the hostname check -- delegate to the host-agnostic two-arg variant, so chain validation is
-    // preserved while endpoint identity is not enforced.
     RecordingTrustManager recorder = new RecordingTrustManager();
     BackendHealthIndicator.HostnameAgnosticTrustManager tm =
         new BackendHealthIndicator.HostnameAgnosticTrustManager(recorder);
@@ -269,9 +243,7 @@ class BackendHealthIndicatorTest {
     private int serverTwoArgCalls;
 
     @Override
-    public void checkClientTrusted(X509Certificate[] chain, String authType) {
-      // no-op: the probe is always the TLS client, never the server
-    }
+    public void checkClientTrusted(X509Certificate[] chain, String authType) {}
 
     @Override
     public void checkServerTrusted(X509Certificate[] chain, String authType) {
@@ -284,17 +256,8 @@ class BackendHealthIndicatorTest {
     }
   }
 
-  // ─── Spring constructor-selection guard ─────────────────────────────────
-
   @Test
   void productionConstructor_isAnnotatedAutowired_soSpringCanInstantiate() {
-    // Regression guard: the indicator declares TWO constructors -- the production one (the
-    // @Value-injected app.backend-health-url) and a package-private test-only one with explicit
-    // Duration parameters. Spring 4+ refuses to auto-select between multiple constructors and falls
-    // back
-    // to a no-arg default; without that, it aborts startup with
-    // `NoSuchMethodException: <init>()`. The fix is exactly the @Autowired marker on the
-    // production constructor; the test below asserts that marker survives any future refactor.
     long autowiredCtors =
         Arrays.stream(BackendHealthIndicator.class.getDeclaredConstructors())
             .filter(ctor -> ctor.isAnnotationPresent(Autowired.class))

@@ -1,32 +1,11 @@
 #!/bin/bash
-# =============================================================================
-# Profit Basetool — weekly restore drill (recoverability proof, REQ-OPS-011)
-#
-# A backup you have never restored is a hope, not a backup. This script pulls
-# the LATEST restic snapshot from Nextcloud, restores both database dumps into a
-# THROWAWAY PostgreSQL container, and verifies them with sanity queries. It
-# touches NOTHING in production — its own ephemeral container only. On any
-# failure it exits non-zero so iri-restore-drill.service shows `failed`,
-# journald flags it, and any OnFailure= hook fires.
-#
-# Runs weekly from iri-restore-drill.timer, or manually:
-#   sudo -u deploy /var/iri/code/scripts/restore-drill.sh
-#   sudo -u deploy /var/iri/code/scripts/restore-drill.sh --keep   # don't tear down on success (debug)
-#
-# Verification (a restore that produced an empty/garbage DB must FAIL):
-#   * backend  — flyway_schema_history exists AND has rows (migrations restored)
-#   * backend  — public-schema table count above a floor
-#   * keycloak — table count above a floor
-# =============================================================================
 
 set -euo pipefail
 
-# The shared helpers (log, fail, read_env, write_textfile) and the container-runtime seam (ADR-0163).
 IRI_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source-path=SCRIPTDIR
 # shellcheck source=lib/common.sh
 # shellcheck disable=SC1091
-# repo-lint.yml runs shellcheck without -x, so it cannot follow a sourced file.
 . "${IRI_SCRIPT_DIR}/lib/common.sh"
 # shellcheck source=lib/container-runtime.sh
 # shellcheck disable=SC1091
@@ -36,20 +15,6 @@ STATE_DIR="${IRI_STATE_DIR:-/var/lib/iri}"
 BACKUP_DIR="${IRI_BACKUP_DIR:-/var/iri/backup}"
 WORK_BASE="${BACKUP_DIR}/restore-drill"
 BACKUP_ENV="${IRI_BACKUP_ENV:-/etc/iri/backup.env}"
-# FULLY QUALIFIED, and it has to be: podman on Rocky enforces short-name resolution and refuses
-# without a TTY:
-#
-#     Error: short-name resolution enforced but cannot prompt without a TTY
-#
-# Measured on the testing host 2026-09-20. Every helper read failed that way -- the edge certificate
-# volumes, the redis ACL and the keystore -- and each failure is a best-effort WARN by design, so
-# the backup went on to report success over a snapshot that was missing all of them. Precisely the
-# class the certificate-capture work was about, arriving through the registry instead.
-#
-# And PINNED BY DIGEST, since 2026-09-22 (OPS-SEC-03): read at runtime from db-backend's own unit
-# (`rt_unit_image`, after rt_detect), so the drill restores into exactly the PostgreSQL build
-# production runs -- which is the claim a restore drill makes -- rather than into whatever a floating
-# tag resolved to that Sunday. The tag is only the logged last resort.
 COMPOSE_DIR="${IRI_COMPOSE_DIR:-/var/iri/code}"
 DRILL_IMAGE_FALLBACK="docker.io/library/postgres:18-alpine"
 DRILL_IMAGE="${IRI_DRILL_IMAGE:-}"
@@ -58,18 +23,11 @@ READY_TIMEOUT="${IRI_DRILL_READY_TIMEOUT:-60}"
 MIN_BACKEND_TABLES="${IRI_DRILL_MIN_BACKEND_TABLES:-20}"
 MIN_KEYCLOAK_TABLES="${IRI_DRILL_MIN_KEYCLOAK_TABLES:-20}"
 
-# Monitoring textfile metrics (epic #936). The drill writes its own outcome so Prometheus can alert
-# on drill failure, on any single non-restorable artifact, on staleness (>8d) AND on the metric
-# being absent (never ran) — the systemd failed-unit signal alone cannot tell "failed" from "never
-# ran". Per-artifact status (0=not restorable, 1=ok); the DB pair drives last-success, the monitoring
-# artifacts are reported independently so a missing Grafana/secrets artifact alerts on its own.
 START_EPOCH="$(date +%s)"
 OK_DB_BACKEND=0
 OK_DB_KEYCLOAK=0
 OK_GRAFANA_SQLITE=0
 OK_MONITORING_SECRETS=0
-# The non-database restore surface. A host whose databases restore perfectly still
-# does not come up without these -- see the checks further down.
 OK_EDGE_CERTS=0
 OK_ACME_STATE=0
 OK_REDIS_ACL=0
@@ -77,12 +35,7 @@ OK_REDIS_ACL=0
 KEEP=false
 [[ "${1:-}" == "--keep" ]] && KEEP=true
 
-# log, fail and write_textfile are lib/common.sh's.
-
-# Writes the restore-drill textfile metric atomically. last_success bumps only when BOTH DB dumps
-# restored (the drill's core recoverability proof); a failed run preserves the previous last_success
-# so it reads as staleness/artifact_ok=0 rather than the metric vanishing (reserved for "never ran").
-# shellcheck disable=SC2317,SC2329  # invoked indirectly via the EXIT trap (cleanup), like cleanup() below
+# shellcheck disable=SC2317,SC2329
 write_drill_metrics() {
   local now dur prev
   now="$(date +%s)"
@@ -114,7 +67,6 @@ write_drill_metrics() {
   } | write_textfile restore_drill.prom || true
 }
 
-# --- Pre-flight -------------------------------------------------------------
 [[ -f "${BACKUP_ENV}" ]] || fail "missing ${BACKUP_ENV}"
 rt_detect
 rt_wait_for_startup
@@ -134,7 +86,7 @@ export RESTIC_CACHE_DIR="${RESTIC_CACHE_DIR:-${STATE_DIR}/restic-cache}"
 mkdir -p "${RESTIC_CACHE_DIR}" "${WORK_BASE}"
 
 set -a
-# shellcheck source=/dev/null  # operator-provided host file, not in the repo
+# shellcheck source=/dev/null
 . "${BACKUP_ENV}"
 set +a
 [[ -n "${RESTIC_REPOSITORY:-}" ]] || fail "RESTIC_REPOSITORY not set in ${BACKUP_ENV}"
@@ -144,12 +96,10 @@ WORK="${WORK_BASE}/${TS}"
 mkdir -p "${WORK}"
 chmod 700 "${WORK}"
 
-# shellcheck disable=SC2317  # cleanup runs indirectly via the EXIT trap set below
+# shellcheck disable=SC2317
 cleanup() {
   local rc=$?
   rt_rm_force "${CONTAINER}"
-  # Always emit the outcome metric — on success AND on any failure path — so absent() means "never
-  # ran", not "failed once".
   write_drill_metrics
   if [[ "${KEEP}" == "true" && "${rc}" -eq 0 ]]; then
     log "--keep: leaving restored dumps at ${WORK}"
@@ -160,7 +110,6 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# --- Restore the latest snapshot's dumps ------------------------------------
 log "restoring latest snapshot dumps from ${RESTIC_REPOSITORY}"
 restic restore latest --tag basetool \
   --include '*/krt_basetool.dump' --include '*/keycloak.dump' \
@@ -170,20 +119,7 @@ restic restore latest --tag basetool \
   --target "${WORK}" \
   || fail "restic restore failed"
 
-# --- The artifacts a restore needs and no query can miss --------------------
-#
-# The drill used to restore two dumps into a throwaway Postgres and call that
-# recoverability. It is not the whole claim: a host whose databases restore
-# perfectly still does not come up if the certificates are gone (re-issuing runs
-# into Let's Encrypt's five-duplicates-per-week limit for this SAN set) or if the
-# redis ACL is gone (redis refuses to start without the file its --aclfile names,
-# ADR-0088, and a hand-written replacement missing a `default` line leaves it
-# wide open).
-#
-# Neither was in the backup until 2026-09-18, and the drill was green throughout,
-# because it never looked. It looks now — presence only, never content, so
-# nothing here can print a key.
-check_artifact() { # <glob> <flag-variable> <what it is> <what its absence costs>
+check_artifact() {
   local found
   found="$(find "${WORK}" -name "$1" -size +0c -print -quit 2>/dev/null)"
   if [[ -n "${found}" ]]; then
@@ -207,7 +143,6 @@ KEYCLOAK_DUMP="$(find "${WORK}" -name keycloak.dump -print -quit)"
 [[ -s "${KEYCLOAK_DUMP:-}" ]] || fail "keycloak dump not found in restored snapshot"
 log "restored: $(du -h "${BACKEND_DUMP}" | cut -f1) backend, $(du -h "${KEYCLOAK_DUMP}" | cut -f1) keycloak"
 
-# --- Spin a throwaway Postgres + restore into it ----------------------------
 rt_rm_force "${CONTAINER}"
 log "starting throwaway Postgres (${DRILL_IMAGE})"
 rt_run_detached "${CONTAINER}" "${DRILL_IMAGE}" \
@@ -234,7 +169,6 @@ rt_cp_to "${KEYCLOAK_DUMP}" "${CONTAINER}" /tmp/keycloak.dump
 dexec pg_restore -U drill -d keycloak --no-owner --no-privileges /tmp/keycloak.dump \
   || log "WARN: pg_restore (keycloak) reported non-fatal errors — verifying anyway"
 
-# --- Verify (the actual proof) ----------------------------------------------
 q() { dexec psql -U drill -d "$1" -tAc "$2" | tr -d '[:space:]'; }
 
 FLYWAY_ROWS="$(q krt_basetool "select count(*) from flyway_schema_history" 2>/dev/null || echo 0)"
@@ -258,11 +192,6 @@ else
   ok=false
 fi
 
-# --- Monitoring artifacts (epic #936): are the Grafana SQLite DB + the monitoring secrets archive
-# restorable? These are reported independently (their own artifact_ok metric + alert) and do NOT gate
-# the DB-recoverability proof, so a not-yet-captured monitoring artifact never masks a DB failure and
-# vice versa. Absent from the snapshot (e.g. the first drill before the monitoring stack's first
-# backup) reads as artifact_ok=0 — the runbook sequences a backup before the first post-rollout drill.
 GRAFANA_DB="$(find "${WORK}" -name grafana.db -print -quit 2>/dev/null || true)"
 if [[ -s "${GRAFANA_DB:-}" ]] && head -c 16 "${GRAFANA_DB}" 2>/dev/null | grep -q "SQLite format 3"; then
   OK_GRAFANA_SQLITE=1

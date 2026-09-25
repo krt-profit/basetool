@@ -100,10 +100,6 @@ class TerminalControllerTest {
 
   @Test
   void updateTerminal_onlyPropagatesHiddenFlag_notFullDto() {
-    // SECURITY-ADJACENT: the controller's contract is "only `hidden` is mutable
-    // through this endpoint" (see inline comment in TerminalController). A
-    // refactor that switched to `service.update(id, fullDto)` would silently
-    // let admins rewrite UEX-imported fields. This test pins the contract.
     UUID id = UUID.randomUUID();
     TerminalDto request =
         new TerminalDto(
@@ -148,7 +144,6 @@ class TerminalControllerTest {
 
     assertSame(response, result);
     verify(service).updateTerminalVisibility(id, true);
-    // Critically: the FULL DTO is NEVER forwarded — only the boolean.
     verify(service, never()).getTerminal(any());
   }
 
@@ -166,8 +161,6 @@ class TerminalControllerTest {
 
     verify(service).updateTerminalVisibility(id, false);
   }
-
-  // ── PATCH/DELETE /{id}/loading-dock and /{id}/auto-load ─────────────────
 
   @Test
   void setLoadingDockOverride_forwardsValueAndReturnsDto() {

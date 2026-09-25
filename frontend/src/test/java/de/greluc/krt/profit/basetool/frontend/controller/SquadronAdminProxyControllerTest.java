@@ -53,15 +53,11 @@ class SquadronAdminProxyControllerTest {
 
   @Test
   void setPromotionEnabled_forwardsPatch_thenEvictsStaticDataCache() {
-    // Given
     UUID id = UUID.randomUUID();
     Map<String, Object> body = Map.of("enabled", true);
 
-    // When
     ResponseEntity<Void> response = controller.setPromotionEnabled(id, body);
 
-    // Then — 204. Eviction runs AFTER the write so the cleared cache repopulates from the
-    // already-mutated backend state, never the reverse (which would re-cache stale data).
     assertEquals(204, response.getStatusCode().value());
     InOrder inOrder = inOrder(backendApiClient);
     inOrder
@@ -73,14 +69,11 @@ class SquadronAdminProxyControllerTest {
 
   @Test
   void setProfitEligible_forwardsPatch_thenEvictsStaticDataCache() {
-    // Given
     UUID id = UUID.randomUUID();
     Map<String, Object> body = Map.of("eligible", false);
 
-    // When
     ResponseEntity<Void> response = controller.setProfitEligible(id, body);
 
-    // Then
     assertEquals(204, response.getStatusCode().value());
     InOrder inOrder = inOrder(backendApiClient);
     inOrder

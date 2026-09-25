@@ -82,7 +82,6 @@ class MissionUniqueIndexBackstopTest {
 
     MissionParticipant second = persistGuestParticipant(mission, "Lead B");
     second.setMissionLeadParticipant(true);
-    // uq_mission_participant_single_lead (mission_id) WHERE is_mission_lead_participant (#1113).
     assertThrows(
         DataIntegrityViolationException.class,
         () -> missionParticipantRepository.saveAndFlush(second));
@@ -90,8 +89,6 @@ class MissionUniqueIndexBackstopTest {
 
   @Test
   void einsatzleiterInADifferentMission_isAllowed() {
-    // The constraint is per-mission, not global: two missions may each have their own
-    // Einsatzleiter.
     MissionParticipant a = persistGuestParticipant(persistPlannedMission("Lead M1"), "Lead A");
     a.setMissionLeadParticipant(true);
     missionParticipantRepository.saveAndFlush(a);
@@ -120,8 +117,6 @@ class MissionUniqueIndexBackstopTest {
     MissionCrew secondCrew = new MissionCrew();
     secondCrew.setMissionUnit(unit);
     secondCrew.setParticipant(participant);
-    // uq_mission_crew_participant (mission_participant_id) — a participant sits in one crew
-    // (#1132).
     assertThrows(
         DataIntegrityViolationException.class,
         () -> missionCrewRepository.saveAndFlush(secondCrew));

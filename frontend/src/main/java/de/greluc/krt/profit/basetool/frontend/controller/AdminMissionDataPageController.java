@@ -174,9 +174,6 @@ public class AdminMissionDataPageController {
     if (freqsCatalog != null) {
       model.addAttribute("frequencyTypes", freqsCatalog.items());
     }
-    // Per-section flags, not one page-wide OR: each results fragment carries its own banner so
-    // the include-inactive AJAX swap (REQ-FE-002) re-evaluates truncation without a full reload,
-    // and a truncated job-type walk never banners the unaffected squadron/frequency sections.
     model.addAttribute("jobTypesTruncated", jobTypesCatalog != null && jobTypesCatalog.truncated());
     model.addAttribute(
         "squadronsTruncated", squadronsCatalog != null && squadronsCatalog.truncated());
@@ -323,8 +320,6 @@ public class AdminMissionDataPageController {
       Model model,
       RedirectAttributes redirectAttributes) {
     if (bindingResult.hasErrors()) {
-      // Render directly; the BindingResult stays request-scoped so it never goes
-      // through a Redis-serialised FlashMap (see RedisSessionConfig).
       model.addAttribute("openModal", "jobtype-modal");
       model.addAttribute("modalAction", "/admin/mission-data/job-types");
       return listData(false, false, false, null, model);
@@ -784,14 +779,6 @@ public class AdminMissionDataPageController {
       return ResponseEntity.status(500).build();
     }
   }
-
-  // In-place (AJAX) twins (#582). Each is routed ahead of its classic POST->redirect sibling by
-  // the X-Requested-With header, so the no-JS forms keep their redirect fallback. They return 200
-  // on success — the page re-swaps the affected section fragment (the same fragment the
-  // include-inactive filter swaps), which re-renders the correct derived state (active badges,
-  // ordering) and fresh @Version data attributes. A backend conflict is relayed as
-  // application/problem+json so krtFetch toasts the domain message (duplicate / in-use) or offers
-  // the reload-confirm (OPTIMISTIC_LOCK).
 
   /**
    * In-place twin of {@link #createJobType}.

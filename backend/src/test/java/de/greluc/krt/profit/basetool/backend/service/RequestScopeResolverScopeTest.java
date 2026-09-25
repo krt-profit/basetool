@@ -100,19 +100,8 @@ class RequestScopeResolverScopeTest {
 
     @Test
     void currentScopePredicate_unauthenticatedCaller_throwsRatherThanScopingToNothing() {
-      // It used to return the all-empty predicate, which the repository fragments read as "no rows
-      // except the organisation-wide escape" — a plausible answer, and the reason an endpoint that
-      // lost its gate would have looked like it was working. Since ADR-0159 nothing anonymous
-      // reaches a scoped read, so an empty predicate could only come from a forgotten gate.
       when(authHelper.isAuthenticated()).thenReturn(false);
 
-      // The TYPE is part of the contract, not an implementation detail. An IllegalStateException
-      // — which this used to throw — is mapped by GlobalExceptionHandler to a 400 that echoes the
-      // message, so a lost gate would have answered the caller "reaching this means an endpoint
-      // lost its gate" under a status blaming their request. A Spring Security exception lands on
-      // the 401 UNAUTHENTICATED path: generic body, DEBUG log, no stack trace, no 5xx alert.
-      // (That it IS an AuthenticationException is the type hierarchy's job, not this test's -
-      // asserting it here is a tautology CodeQL rightly flags.)
       AuthenticationCredentialsNotFoundException thrown =
           assertThrows(
               AuthenticationCredentialsNotFoundException.class, resolver::currentScopePredicate);
@@ -122,7 +111,6 @@ class RequestScopeResolverScopeTest {
 
     @Test
     void currentScopePredicate_authenticatedCaller_stillAnswers() {
-      // The counterpart, so the case above cannot pass because the method throws for everyone.
       when(authHelper.isAuthenticated()).thenReturn(true);
       when(authHelper.isAdmin()).thenReturn(true);
       when(request.getHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
@@ -136,8 +124,6 @@ class RequestScopeResolverScopeTest {
 
     @Test
     void adminNoPin_returnsNull() {
-      // Admin without an active pin: the cross-staffel unfiltered user list — null, never an empty
-      // set (which would blank the whole picker).
       when(authHelper.isAdmin()).thenReturn(true);
       when(request.getHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER)).thenReturn(null);
 
@@ -146,7 +132,6 @@ class RequestScopeResolverScopeTest {
 
     @Test
     void adminPin_returnsSingletonPin() {
-      // Admin pinned to one Staffel narrows the list to exactly that Staffel.
       when(authHelper.isAdmin()).thenReturn(true);
       when(request.getHeader(RequestScopeResolver.ACTIVE_ORG_UNIT_HEADER))
           .thenReturn(SQUADRON_B_ID.toString());
@@ -156,8 +141,6 @@ class RequestScopeResolverScopeTest {
 
     @Test
     void nonAdminTwoStaffeln_noPin_returnsUnionOfBoth() {
-      // REQ-ORG-017: a dual-Staffel officer without a pin sees the UNION of both Staffeln — a
-      // regression to a single Staffel would hide half of their own members from the user list.
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(CALLER_ID));
       when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(CALLER_ID, OrgUnitKind.SQUADRON))
@@ -173,8 +156,6 @@ class RequestScopeResolverScopeTest {
 
     @Test
     void nonAdminTwoStaffeln_matchingPin_returnsSingleton() {
-      // A pin that matches one of the caller's own Staffeln narrows the union to that singleton —
-      // returning the full union for a pinned caller would leak the other Staffel's users.
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(CALLER_ID));
       when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(CALLER_ID, OrgUnitKind.SQUADRON))
@@ -190,8 +171,6 @@ class RequestScopeResolverScopeTest {
 
     @Test
     void nonAdminNoStaffel_returnsNull() {
-      // A Staffel-less leader/guest collapses to the legacy "unfiltered" null (not an empty set),
-      // so the full picker list stays visible.
       when(authHelper.isAdmin()).thenReturn(false);
       when(authHelper.currentUserId()).thenReturn(Optional.of(CALLER_ID));
       when(orgUnitMembershipRepository.findAllByIdUserIdAndKind(CALLER_ID, OrgUnitKind.SQUADRON))
@@ -209,7 +188,6 @@ class RequestScopeResolverScopeTest {
 
     @Test
     void memberOfBereichItself_true() {
-      // A direct member of the Bereich (the Bereichsleitung) qualifies for the AREA_MEMBERS view.
       when(orgUnitRepository.findChildOrgUnitIds(BEREICH_ID)).thenReturn(List.of(CHILD_STAFFEL_ID));
       when(authHelper.currentUserId()).thenReturn(Optional.of(CALLER_ID));
       when(orgUnitMembershipRepository.findAllByIdUserId(CALLER_ID))
@@ -220,8 +198,6 @@ class RequestScopeResolverScopeTest {
 
     @Test
     void memberOfChildStaffel_true() {
-      // A member of a child Staffel of the Bereich also qualifies — dropping the child lookup would
-      // wrongly deny every Staffel/SK member the AREA_MEMBERS balance view and cascade limit.
       when(orgUnitRepository.findChildOrgUnitIds(BEREICH_ID)).thenReturn(List.of(CHILD_STAFFEL_ID));
       when(authHelper.currentUserId()).thenReturn(Optional.of(CALLER_ID));
       when(orgUnitMembershipRepository.findAllByIdUserId(CALLER_ID))
@@ -232,9 +208,6 @@ class RequestScopeResolverScopeTest {
 
     @Test
     void memberOfUnrelatedUnit_false() {
-      // A member of a Staffel that is neither the Bereich itself nor one of its children is denied
-      // —
-      // ignoring the bereichId scoping would leak a foreign Bereichskonto balance.
       when(orgUnitRepository.findChildOrgUnitIds(BEREICH_ID)).thenReturn(List.of(CHILD_STAFFEL_ID));
       when(authHelper.currentUserId()).thenReturn(Optional.of(CALLER_ID));
       when(orgUnitMembershipRepository.findAllByIdUserId(CALLER_ID))

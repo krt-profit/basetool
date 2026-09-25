@@ -100,8 +100,6 @@ public class JobOrderStockProjectionService {
                   materialId, orderId, floor);
           return stock != null ? stock : 0.0;
         };
-    // Lambda (not a bound method reference) so the claim service is dereferenced lazily, only when
-    // the resolver actually runs — i.e. for SK orders — mirroring the original conditional call.
     return mapToDtoWithStock(
         jobOrder, stockResolver, order -> materialClaimService.getClaimBucketsForOrder(order));
   }
@@ -123,11 +121,6 @@ public class JobOrderStockProjectionService {
       JobOrder jobOrder, StockResolver stockResolver, ClaimResolver claimResolver) {
     JobOrderDto baseDto = jobOrderMapper.toDto(jobOrder);
 
-    // Phase 5 (#345): on a public SK order, every material/aggregated bucket carries the
-    // per-squadron
-    // claims + open-remaining; private (squadron) orders carry none (claims empty, openAmount
-    // null),
-    // so the detail UI renders no claim columns for them.
     Map<String, ClaimBucketDto> claimByBucket =
         isSpecialCommandResponsible(jobOrder)
             ? claimResolver.claimsFor(jobOrder).stream()
@@ -152,8 +145,6 @@ public class JobOrderStockProjectionService {
                       stock,
                       matDto.amount(),
                       matDto.minQuality());
-                  // MATERIAL bucket quality mirrors aggregateMaterials(): a 650-floor is GOOD,
-                  // "Keine" (null minQuality) is NONE.
                   String qualityName =
                       matDto.minQuality() != null
                           ? QualityRequirement.GOOD.name()
@@ -201,8 +192,6 @@ public class JobOrderStockProjectionService {
         baseDto.createdAt(),
         baseDto.version(),
         baseDto.canEdit(),
-        // The full projection is never redacted; the per-order redaction decision is stamped later
-        // by the read path (JobOrderService.getJobOrderById) via JobOrderDto#withRedacted.
         false);
   }
 

@@ -156,21 +156,12 @@ public class SecurityConfig {
    * @param sslBundles the registered SSL bundles
    * @return the Nimbus decoder (validators are attached by the caller)
    */
-  // Package-private (not private) so SecurityConfigInternalJwksDecoderTest can assert the
-  // internal-JWKS path accepts a non-RS256 (ES256) token — the REQ-SEC-024 algorithm-set fix.
   static NimbusJwtDecoder buildDecoder(String issuerUri, String jwkSetUri, SslBundles sslBundles) {
     if (!StringUtils.hasText(jwkSetUri)) {
       return NimbusJwtDecoder.withIssuerLocation(issuerUri).build();
     }
     NimbusJwtDecoder.JwkSetUriJwtDecoderBuilder builder =
         NimbusJwtDecoder.withJwkSetUri(jwkSetUri)
-            // withJwkSetUri defaults to RS256-ONLY, whereas withIssuerLocation derives the accepted
-            // algorithm set from the live JWKS. Restore the full asymmetric set so enabling
-            // internal
-            // JWKS cannot 401 every token the moment the realm signs with PS*/ES* (REQ-SEC-024).
-            // SignatureAlgorithm carries only asymmetric algorithms (no HMAC), so widening it
-            // cannot
-            // open an algorithm-confusion attack — the signature is still verified against the JWK.
             .jwsAlgorithms(
                 algorithms -> algorithms.addAll(EnumSet.allOf(SignatureAlgorithm.class)));
     ClientHttpRequestFactory trusted =
@@ -223,12 +214,6 @@ public class SecurityConfig {
       ClientIdentityProperties clientIdentityProperties,
       IngestProperties ingestProperties)
       throws Exception {
-    // CSRF stays ENABLED (never disabled) so the gateway carries no weaker posture than the
-    // backend. Every real endpoint (/v1/**) is JSON + bearer-token only on a stateless chain with
-    // no session cookie, so it can never be driven from a CSRF-vulnerable browser flow — those
-    // paths are ignored exactly like the backend's bearer API. The cookie repository never issues a
-    // session, and no other state-changing browser endpoint exists, so the CSRF machinery is inert
-    // here while keeping the static-analysis posture clean.
     SecurityProblemResponseHandler securityProblems =
         new SecurityProblemResponseHandler(objectMapper, meterRegistry, loggingProperties);
     CookieCsrfTokenRepository csrfRepo = CookieCsrfTokenRepository.withHttpOnlyFalse();
@@ -241,9 +226,6 @@ public class SecurityConfig {
         .cors(cors -> cors.configurationSource(corsConfigurationSource()))
         .headers(
             headers -> {
-              // The gateway serves only JSON — no document context exists, so every fetch
-              // directive inherits 'none'. frame-ancestors/base-uri/form-action are
-              // defence-in-depth against an injected document.
               headers.contentSecurityPolicy(
                   csp ->
                       csp.policyDirectives(
@@ -257,17 +239,10 @@ public class SecurityConfig {
             auth ->
                 auth.requestMatchers("/actuator/health", "/actuator/health/**")
                     .permitAll()
-                    // springdoc serves /v3/api-docs in non-prod only (prod sets api-docs.enabled
-                    // = false → 404); harmless to permit here.
                     .requestMatchers("/v3/api-docs/**")
                     .permitAll()
                     .anyRequest()
                     .authenticated())
-        // REQ-API-004: give the filter-level 401/403 the same problem+json shape (stable `code` +
-        // `correlationId`) as every other ingest error, and a log line — Spring Security's defaults
-        // answer with an empty body and log nothing. Installed BOTH globally and on the resource
-        // server: the latter has its own entry point which would otherwise win for bearer requests,
-        // which is every real request here.
         .exceptionHandling(
             exceptions ->
                 exceptions
@@ -276,83 +251,24 @@ public class SecurityConfig {
         .oauth2ResourceServer(
             oauth2 ->
                 oauth2
-                    // Both schemes, deliberately (ADR-0129, REQ-INGEST-012).
-                    //
-                    // `.dPoP(...)` installs its own AuthenticationFilter behind
-                    // `matchesDPoPRequest`, so it COEXISTS with the bearer filter rather than
-                    // replacing it. That is what makes the migration flag-day-free: an extractor
-                    // still sending a plain unbound bearer keeps working while the DPoP-capable
-                    // build rolls out.
-                    //
-                    // Accepting DPoP is now correct because the gateway stopped relaying the
-                    // caller's token. It validates the proof here — the one internet-facing hop,
-                    // where sender-constraining actually pays because the party that validates the
-                    // token is the party that consumes it — and calls the backend under its own
-                    // service-account identity instead (BackendImportClient). Relaying made the two
-                    // mutually exclusive: a DPoP-bound token is rejected outright by a resource
-                    // server presented with it as a bearer, which is what broke every send from
-                    // 2026-08-03.
-                    //
-                    // NOTE the filter-ordering consequence handled further down: UserIdMdcFilter
-                    // and ClientIdentityFilter are anchored on AuthenticationFilter, not on
-                    // BearerTokenAuthenticationFilter, or the REQ-INGEST-011 allowlist is silently
-                    // skipped for every DPoP request.
                     .dPoP(
                         dpop ->
-                            dpop
-                                // htu comes from configuration, not from the request — see
-                                // PublicUriDpopAuthenticationConverter. Spring compares it with a
-                                // bare String.equals against a URL Tomcat assembles from the
-                                // proxy's forwarded headers, so a proxy that omits
-                                // X-Forwarded-Port breaks every proof in production while every
-                                // test stays green.
-                                .authenticationConverter(
+                            dpop.authenticationConverter(
                                     new PublicUriDpopAuthenticationConverter(
                                         ingestProperties.publicBaseUrl()))
-                                // The stock DPoPAuthenticationEntryPoint answers a bodyless 401
-                                // and bypasses SecurityProblemResponseHandler — so a rejected
-                                // proof would carry no problem body AND increment no
-                                // basetool_ingest_auth_failures_total series. Route it through the
-                                // module's own handler instead, or the most likely failure of this
-                                // whole change is the one we cannot see (REQ-OBS-011).
                                 .authenticationFailureHandler(
                                     new org.springframework.security.web.authentication
                                         .AuthenticationEntryPointFailureHandler(securityProblems)))
                     .jwt(jwt -> {})
                     .authenticationEntryPoint(securityProblems)
                     .accessDeniedHandler(securityProblems))
-        // REQ-SEC-024: re-map an identity-provider-unreachable failure (JWKS timeout / 5xx /
-        // Docker-DNS strand) escaping the bearer-token filter as a re-thrown
-        // AuthenticationServiceException to a retryable 503 instead of an opaque 500. Installed
-        // before the bearer-token filter so its try/catch wraps that filter; a genuine 401 never
-        // reaches it.
         .addFilterBefore(
             new IdentityProviderUnavailableFilter(objectMapper, meterRegistry, loggingProperties),
             org.springframework.security.oauth2.server.resource.web.authentication
                 .BearerTokenAuthenticationFilter.class)
-        // REQ-OBS-001/-002: refine the `userId` MDC field from `anonymous` to the caller's JWT
-        // `sub`. Installed AFTER the LAST authentication filter in the chain — that is the first
-        // point at which the SecurityContext is populated for EITHER scheme; the shared servlet
-        // filters all run earlier and would only ever see an empty context. CorrelationIdFilter
-        // seeds and clears the key (see its Javadoc).
-        //
-        // Anchored on AuthenticationFilter, NOT on BearerTokenAuthenticationFilter. Since
-        // `.dPoP(...)` above, a DPoP-scheme request is authenticated by a SEPARATE
-        // AuthenticationFilter that `FilterOrderRegistration` places two slots AFTER the bearer
-        // filter. Anchored on the bearer filter, this and the client-identity gate below would run
-        // BEFORE authentication on every DPoP request — against an empty context. The MDC would
-        // stay `anonymous`, and, far worse, ClientIdentityFilter would find no JWT, return early,
-        // and skip the REQ-INGEST-011 allowlist entirely while `.anyRequest().authenticated()`
-        // still passed the request. Fail-open, silent, and invisible to every existing test
-        // (ADR-0129).
         .addFilterAfter(
             new UserIdMdcFilter(loggingProperties),
             org.springframework.security.web.authentication.AuthenticationFilter.class)
-        // REQ-INGEST-011: the client-identity gate (azp allowlist + ingest scope).
-        // Installed AFTER UserIdMdcFilter, not merely after the bearer filter, so its WARN lines
-        // already carry the acting subject in the `userId` MDC field and never have to repeat it
-        // (REQ-OBS-002/-004). Every check inside is inert until configured, so this is a no-op on a
-        // deployment that has not run the Keycloak setup yet.
         .addFilterAfter(
             new ClientIdentityFilter(
                 clientIdentityProperties, meterRegistry, objectMapper, loggingProperties),

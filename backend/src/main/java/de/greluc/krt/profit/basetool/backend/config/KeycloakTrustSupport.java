@@ -57,9 +57,7 @@ public final class KeycloakTrustSupport {
    */
   public static final String KEYCLOAK_TRUST_BUNDLE = "keycloak-trust";
 
-  private KeycloakTrustSupport() {
-    // Utility holder — not instantiable.
-  }
+  private KeycloakTrustSupport() {}
 
   /**
    * Builds a truststore-pinned {@link ClientHttpRequestFactory} from the named SSL bundle, or

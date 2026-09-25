@@ -110,27 +110,14 @@ class MaterialsPageControllerMvcTest {
     mockMvc
         .perform(get("/materials"))
         .andExpect(status().isOk())
-        // The click/grouping handlers moved into static/js/materials.js (ADR-0069); pin that the
-        // page loads the module. If the render truncated mid-stream (the bug this test exists to
-        // prevent), the th:src tag near the end of the body would disappear from the output.
         .andExpect(content().string(containsString("src=\"/js/materials.js\"")))
-        // The category-grouping view toggle and both views (grouped accordion + flat grid) must
-        // render. The flat grid materialises the shared material-card fragment, so a broken
-        // fragment reference would 500 the render before any of these strings appear.
         .andExpect(content().string(containsString("data-trigger=\"materials-toggle-grouping\"")))
         .andExpect(content().string(containsString("id=\"materialsGrouped\"")))
         .andExpect(content().string(containsString("id=\"materialsFlat\"")))
-        // Rendering must not abort mid-stream. A truncated response stops at the substituted
-        // expression value (e.g. ["Aluminum"]) and never emits the closing </body></html> pair.
         .andExpect(content().string(containsString("</body>")))
         .andExpect(content().string(containsString("</html>")))
-        // The datalist that carries the autocomplete names must have rendered with the material as
-        // an option — that's the data source the surrounding script now reads from.
         .andExpect(content().string(containsString("<datalist id=\"materialNames-data\">")))
         .andExpect(content().string(containsString("<option value=\"Aluminum\">")))
-        // covers the .form-group checkbox regression class (PR #1405): the page-scoped rule must
-        // carry the :where() exclusion so it can never capture a checkbox/radio (the grouping
-        // toggle sits right next to the filter's .form-group) and stretch it into a padded bar.
         .andExpect(
             PageStylesheets.content(
                 containsString(
@@ -199,9 +186,6 @@ class MaterialsPageControllerMvcTest {
             200,
             true,
             true);
-    // The detail price list is page-walked (CatalogPages.fetchAll); a totalPages=1 response ends
-    // the
-    // walk after page 0 (REQ-UI-015).
     PageResponse<MaterialPriceDto> pricesPage =
         new PageResponse<>(List.of(priceDto), 0, 10000, 1, 1, List.of());
 
@@ -215,20 +199,11 @@ class MaterialsPageControllerMvcTest {
     mockMvc
         .perform(get("/materials/" + id))
         .andExpect(status().isOk())
-        // Post-datalist binding: the filter/sort handlers moved into static/js/material-detail.js
-        // (ADR-0069); pin that the page loads the module. If the render truncated, the th:src tag
-        // near the end of the body would disappear from the output.
         .andExpect(content().string(containsString("src=\"/js/material-detail.js\"")))
-        // Rendering completion marker: the truncation aborts before </body></html>.
         .andExpect(content().string(containsString("</body>")))
         .andExpect(content().string(containsString("</html>")))
-        // The datalist that carries the terminal names must be rendered with the price's terminal
-        // as an option — that's the data source the surrounding script now reads from.
         .andExpect(content().string(containsString("id=\"terminalNames-data\"")))
         .andExpect(content().string(containsString("value=\"Area18\"")))
-        // covers the .form-group checkbox regression class (PR #1405): the page-scoped rule must
-        // carry the :where() exclusion so it can never capture a checkbox/radio and stretch it into
-        // a full-width padded bar (it ties the global KRT square rule and renders after it).
         .andExpect(
             PageStylesheets.content(
                 containsString(

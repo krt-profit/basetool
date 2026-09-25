@@ -120,16 +120,9 @@ class RefineryOrderStoreE2eTest {
       try {
         E2eSupport.navigate(page, baseUrl + "/refinery-orders/" + orderId);
         page.waitForLoadState();
-        // The Einlagern button is rendered only for an editable OPEN/IN_PROGRESS order; clicking it
-        // reveals the store modal, which the detail controller pre-fills from the order's goods
-        // (amount, quality, the order's location, the current user) — so a bare submit is valid.
         page.locator("[data-trigger='rod-open-store']").click();
         assertThat(page.locator("#storeModal"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
-        // Drop the fixed footer so the modal's submit is clickable, then wait for the store POST's
-        // own response. E2eSupport#clickSubmitClearingFooter is deliberately NOT used here: it
-        // waits for a settled post-submit *navigation* document, and since #1238 a successful store
-        // performs none — it re-renders in place — so that helper would hang out its full timeout.
         page.evaluate(
             "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
                 + " 'none'; } }");
@@ -138,10 +131,6 @@ class RefineryOrderStoreE2eTest {
                 response.url().contains("/refinery-orders/" + orderId + "/store")
                     && "POST".equals(response.request().method()),
             () -> page.locator("#storeForm button[type='submit']").click());
-        // A successful store STAYS on the detail page (REQ-FE-001): the modal closes and the
-        // `order` section is re-rendered from the now-COMPLETED order, which drops the Einlagern
-        // button its status gate no longer satisfies. That button disappearing is the success
-        // signal — a validation/backend failure keeps the modal open with the button intact.
         assertThat(page.locator("#storeModal"))
             .not()
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
@@ -201,10 +190,6 @@ class RefineryOrderStoreE2eTest {
     String items = seeder.getBody(USERNAME, PASSWORD, "/api/v1/inventory/material/" + materialId);
     assertTrue(items.contains(note), "the stored Lager row carries the note from the store dialog");
   }
-
-  // --------------------------------------------------------------------------------------------
-  // Helpers
-  // --------------------------------------------------------------------------------------------
 
   /**
    * Reports whether the calling admin sees any shared stock of {@code materialId} in the global

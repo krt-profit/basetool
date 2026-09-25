@@ -475,7 +475,6 @@ public class RefineryImportService {
             .map(g -> g.inputQuantity() != null ? g.inputQuantity().longValue() : 0L)
             .toList();
     long sumRefineOn = refineOnQuantities.stream().mapToLong(Long::longValue).sum();
-    // The tolerance absorbs the ±1 display rounding every visible row may carry.
     long tolerance = sourceGoods.size();
     boolean anyRowExceeds = refineOnQuantities.stream().anyMatch(qty -> qty > toRefineTotal + 1);
     if (sumRefineOn > toRefineTotal + tolerance || anyRowExceeds) {
@@ -561,9 +560,6 @@ public class RefineryImportService {
         materialExternalAliasService.resolveMaterialByAlias(
             MaterialExternalAliasSource.REFINERY_SCREEN, rawName);
     if (viaAlias != null) {
-      // The alias table accepts any material, but the draft must never pre-select one the
-      // create path rejects (§7.3 candidate-gate mirror) — a mis-curated alias falls through
-      // to the remaining stages instead.
       if (viaAlias.getId() != null && context.candidateIds().contains(viaAlias.getId())) {
         return MaterialMatch.exact(viaAlias);
       }
@@ -575,8 +571,6 @@ public class RefineryImportService {
     }
 
     if (canonical.length() >= MIN_PARTIAL_MATCH_LENGTH) {
-      // Keyed by material id so a material reachable both through its own name and through an
-      // alias counts as ONE hit — uniqueness is judged across the union of both anchor sets.
       Map<UUID, Material> partial = new LinkedHashMap<>();
       for (Material candidate : context.candidates()) {
         String candidateCanonical = MaterialNameCanonicalizer.canonicalCore(candidate.getName());
@@ -599,9 +593,6 @@ public class RefineryImportService {
     if (fuzzyKey == null || fuzzyKey.isEmpty()) {
       return MaterialMatch.unmatched(null);
     }
-    // Rank the candidate materials directly through the generic fuzzy matcher (keyed on each
-    // material's fuzzyKey) — no throwaway ResolvedProduct wrappers, and the Match carries the
-    // Material itself, so there is no name round-trip back through byName.
     List<BlueprintFuzzyMatcher.Scored<Material>> ranked =
         fuzzyMatcher.topMatches(
             fuzzyKey,

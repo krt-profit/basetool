@@ -112,8 +112,6 @@ class DtoOpenApiContractTest {
       JsonNode schema = schemas.path(record.getSimpleName());
       JsonNode properties = schema.path("properties");
       if (schema.isMissingNode() || properties.isMissingNode() || !properties.isObject()) {
-        // No same-named schema, or a schema without a flat property map (enum / allOf). Nothing to
-        // assert against — these are intentionally out of scope (see class Javadoc).
         continue;
       }
       matched++;
@@ -166,15 +164,6 @@ class DtoOpenApiContractTest {
 
     for (Class<?> type : frontendDtoEnums()) {
       Set<String> mirror = enumConstantNames(type);
-      // SpringDoc inlines enum types into each using property (no shared component schema), so
-      // match
-      // by value rather than by name: the backend enum this mirror reflects is an inline enum set
-      // that contains every mirror constant. Prefer an EXACT match first — a complete mirror of a
-      // small backend enum whose values happen to be a subset of a larger one (e.g.
-      // InventoryAllocationDimension {JOB_ORDER, MISSION} ⊂ AuditDomain) must bind to its own enum,
-      // not the superset — then fall back to the largest superset, so an INCOMPLETE mirror of a
-      // bigger enum still fails the coverage assert. No superset ⇒ the mirror reflects no emitted
-      // enum (request-only / frontend-only view model) ⇒ nothing to assert against.
       Set<String> backend =
           backendEnums.stream()
               .filter(mirror::equals)
@@ -337,7 +326,6 @@ class DtoOpenApiContractTest {
         }
       }
     } catch (ReflectiveOperationException ignored) {
-      // Fall through to the component name.
     }
     return component.getName();
   }

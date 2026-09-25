@@ -1,28 +1,4 @@
 ---
-# The operational scripts and the units that drive them.
-#
-# WHY THIS IS PROVISIONING AND NOT DELIVERY. ADR-0188 draws the line at what a
-# RELEASE carries: images, unit files for the stack, configuration bundles. These
-# are none of those. `deploy.sh`'s own header calls itself "a manual bootstrap
-# concern" and explains why it is deliberately NOT in the config bundle: a
-# deployer that updates itself mid-run is a self-update hazard. Since ADR-0188
-# the bootstrap IS this role, so the bootstrap's own tools belong to it.
-#
-# The test ADR-0188 sets is whether this turns provisioning into a second
-# delivery loop. It does not: the role is operator-driven and never scheduled,
-# runs in full only against a host that is not serving yet and afterwards only
-# for a deliberate, owner-approved, tag-limited host change (ansible/README.md),
-# and these files carry no image digest and no application version. They are
-# tooling.
-#
-# WHAT IT FIXES. Measured 2026-09-18: `/var/iri/code/scripts/` does not exist on
-# the testing host at all, so `deploy.sh`, `backup.sh` and `restore-drill.sh`
-# have never been there -- and the plan names "deploy.sh reaches the host by no
-# automated path" as an open problem. A host that never received them is a
-# harder failure than one whose copy is stale.
-#
-# WHAT IT DOES NOT DO: it does not START anything. The timers are installed and
-# enabled for the next boot; the first deploy is an operator's decision.
 
 - name: Create the script directory
   ansible.builtin.file:
@@ -30,8 +6,6 @@
     state: directory
     owner: root
     group: root
-    # 0755: readable by the deploy user that runs them, writable only by root.
-    # Deploy must not be able to rewrite its own deployer.
     mode: "0755"
 
 - name: Install the operational scripts
@@ -47,25 +21,9 @@
     - restore-drill.sh
     - container-cleanup.sh
     - lib/container-runtime.sh
-    # log, fail, read_env and the atomic textfile write the four scripts share (OPS-SIMP-04). Every
-    # one of them sources it, so a host with the new scripts and without this file cannot run any.
     - lib/common.sh
-    # The renderer deploy.sh calls when the config bundle carries env.d templates. It belongs
-    # here and not in the bundle for the same reason deploy.sh does: it is tooling the deployer
-    # invokes, and a release that could replace the tool running it is a self-update hazard.
-    #
-    # Its counterpart generate-quadlet.py is deliberately NOT here. That one runs in CI and writes
-    # the units into the repository, where they are drift-checked and committed; the host receives
-    # the RESULT through the config bundle and has no business generating anything.
     - render-env-d.py
-    # The Redis ACL renderer (REQ-SEC-068, ADR-0207): one ACL user per service, rendered with
-    # SHA-256 hashes from the rules template installed beside it. Run by the OPERATOR, never by
-    # deploy.sh -- writing the ACL of a live session store is a decision, not a deploy step.
     - render-redis-acl.py
-    # The internal TLS minter (REQ-SEC-070, ADR-0211): a private CA, one leaf per service, a
-    # CA-only truststore, the CA key destroyed at the end. POSIX sh + keytool, run by the OPERATOR
-    # through the backend image (the host has no JDK) -- minting the stack's identities is a
-    # decision, never a deploy step (docs/deployment.md, "Internal TLS").
     - mint-internal-tls.sh
 
 - name: Install the Redis ACL rules template
@@ -74,20 +32,8 @@
     dest: "{{ basetool_host_root_dir }}/code/scripts/redis-users.acl.tmpl"
     owner: root
     group: root
-    # A template, not a program; it holds rules and placeholders, never a secret.
     mode: "0644"
 
-# --- Retire the units this role used to install -------------------------------------------------
-#
-# This role INSTALLS; it has no general removal pass, so a renamed unit would simply gain a sibling.
-# iri-docker-cleanup was renamed to iri-container-cleanup (ADR-0194) because the script called
-# `docker` directly and this host has no docker binary. Without the four tasks below, a host that
-# has run this role before keeps the OLD timer enabled and failing every Saturday, next to the new
-# one that works -- which is the half-finished rename the ADR itself warns about.
-#
-# The old log file is deliberately NOT removed: deleting an operator's logs is not this role's
-# business, and logrotate ages it out. (Alloy watched it beside the new one during the transition;
-# that second path was dropped on 2026-09-22 once both hosts had run this role.)
 - name: Find out whether the retired cleanup units are present
   ansible.builtin.stat:
     path: "/etc/systemd/system/{{ item }}"
@@ -97,8 +43,6 @@
     - iri-docker-cleanup.service
 
 - name: Stop and disable the retired cleanup timer
-  # Guarded on the unit FILE rather than on systemd's opinion: `systemctl disable` on a unit that
-  # does not exist fails, and a fresh host must not be a failed run.
   ansible.builtin.systemd_service:
     name: "{{ item.item }}"
     state: stopped
@@ -124,15 +68,6 @@
     state: absent
 
 - name: Install the systemd units and their timers
-  # Copied verbatim. The units carry no Docker-specific directive any more: both
-  # `Group=docker` and `Requires=docker.service` were removed AT THE SOURCE, with
-  # the reasoning in the unit files themselves.
-  #
-  # An earlier version of this file copied them and then stripped those lines with
-  # `lineinfile`, which made the two tasks fight on every single run -- the copy
-  # restored the line, the lineinfile removed it, and `changed` never reached
-  # zero. Idempotence is the property this role is judged on; a task that churns
-  # forever also fires the daemon-reload handler forever.
   ansible.builtin.copy:
     src: "{{ basetool_host_scripts_src }}/{{ item }}"
     dest: "/etc/systemd/system/{{ item }}"
@@ -160,13 +95,6 @@
   loop: "{{ basetool_host_deploy_account_units }}"
 
 - name: Install the sandbox the deploy-account units share
-  # ONE file, installed beside each of the four units (OPS-SIMP-03). The hardening they share --
-  # ProtectSystem=strict, ProtectHome=read-only, PrivateTmp and the kernel protections, with the
-  # measured reasons NoNewPrivileges and RestrictNamespaces are absent -- was copied into each unit
-  # and had begun to drift. A drop-in per unit rather than a prefix drop-in (`iri-.service.d`)
-  # because the prefix would also reach the three ROOT units (iri-container-metrics,
-  # iri-cert-expiry, iri-host-updates-metrics), and `ProtectHome=read-only` from a drop-in would
-  # WEAKEN their own `ProtectHome=true`.
   ansible.builtin.copy:
     src: "{{ basetool_host_scripts_src }}/iri-deploy-account-sandbox.conf"
     dest: "/etc/systemd/system/{{ item }}.d/10-deploy-account-sandbox.conf"
@@ -176,9 +104,6 @@
   loop: "{{ basetool_host_deploy_account_units }}"
   notify: Reload systemd for the operational units
 
-# The service user's uid, looked up HERE and not taken from 22-deploy-user.yml's fact: this file is
-# tagged [scripts], and `--tags scripts` alone skips that file and would leave the variable
-# undefined -- the same trap, and the same fix, as 27-observability.yml's lookup.
 - name: Read the service user's uid for the ordering drop-in
   ansible.builtin.getent:
     database: passwd
@@ -197,10 +122,6 @@
     basetool_host_service_uid: "{{ ansible_facts.getent_passwd[basetool_host_service_user][1] }}"
 
 - name: Order the deploy-account units after the service user's manager
-  # So each job's sandbox is built after the service user's runtime is mounted, and can see it.
-  # Measured 2026-09-25: a job that started first saw the bare mount point for its whole run and
-  # failed "no lingering user could be found"; the reasoning, and why After= alone, is in the
-  # template. A drop-in per unit for the same reason as the sandbox above.
   ansible.builtin.template:
     src: iri-deploy-account-order.conf.j2
     dest: "/etc/systemd/system/{{ item }}.d/20-service-user.conf"
@@ -223,11 +144,6 @@
     - { src: iri-restore-drill.logrotate, dest: iri-restore-drill }
     - { src: iri-container-cleanup.logrotate, dest: iri-container-cleanup }
 
-# The two flocks the units coordinate through. /var/lock is a tmpfs whose mode differs between
-# distributions -- world-writable on the Ubuntu Docker host, root-only on Rocky -- so on the new
-# platform the deploy account cannot create its own lock and every tick dies with "Permission
-# denied" on a path the scripts have used since the Docker deployment. tmpfiles is the mechanism
-# for a directory that is re-created at boot.
 - name: Install the lock files the operational units coordinate through
   ansible.builtin.copy:
     src: "{{ basetool_host_scripts_src }}/iri-locks.tmpfiles"
@@ -248,12 +164,6 @@
   ansible.builtin.meta: flush_handlers
 
 - name: Confirm systemd accepts every unit it was just given
-  # `systemd-analyze verify` parses a unit the way the manager does -- an unknown
-  # directive, a missing User=, a group that does not exist. Installing four units
-  # and discovering at the first timer firing that one of them refuses to start is
-  # exactly the failure this whole file exists to prevent.
-  # The drop-ins above are read with the unit, so this also proves the shared sandbox and the
-  # ordering on the service user's manager parse.
   ansible.builtin.command: "systemd-analyze verify /etc/systemd/system/{{ item }}"
   register: basetool_host_unit_verify
   changed_when: false
@@ -266,9 +176,6 @@
   when: not ansible_check_mode
 
 - name: Enable the timers for the next boot, without starting them
-  # `enabled` and not `started`: the first deploy on a fresh host is a decision,
-  # not a side effect of provisioning it. The timer fires on the next boot, or
-  # when an operator starts it.
   ansible.builtin.systemd_service:
     name: "{{ item }}"
     enabled: true

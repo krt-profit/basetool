@@ -76,7 +76,6 @@ class DataExportProxyControllerTest {
     server = new MockWebServer();
     server.start();
     WebClient webClient = WebClient.builder().baseUrl(server.url("/").toString()).build();
-    // A generous export timeout: these tests assert the proxy's wrapping, not its bound.
     controller =
         new DataExportProxyController(
             webClient,
@@ -97,7 +96,6 @@ class DataExportProxyControllerTest {
     try {
       server.shutdown();
     } catch (Exception ignored) {
-      // already shut down in the test that simulates a connection failure
     }
   }
 
@@ -138,9 +136,6 @@ class DataExportProxyControllerTest {
 
   @Test
   void adminPdf_relaysTheSubjectIdAndNamesTheFileAfterIt() throws Exception {
-    // The id, deliberately, and never the handle: an admin has to be able to tell two concurrent
-    // requests' files apart, and a pseudonymous identifier does that without putting a name into a
-    // filename.
     server.enqueue(okResponse("application/pdf"));
 
     String disposition = disposition(controller.adminPdf(SUBJECT));

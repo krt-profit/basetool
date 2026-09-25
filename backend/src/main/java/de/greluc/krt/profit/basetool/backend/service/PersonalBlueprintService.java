@@ -251,13 +251,6 @@ public class PersonalBlueprintService {
                     entity.getProductName(), 0, List.of(), List.of()));
   }
 
-  // ---------------------------------------------------------------------------------
-  // Admin-scoped variants (#327, Phase 7). The ADMIN role is enforced at the controller
-  // boundary; these methods take the target sub / id directly. List / add / batch reuse
-  // the owner-scoped methods with the target sub; update / delete resolve by id alone
-  // (admins are trusted to know the id) and log the owner sub for the audit trail.
-  // ---------------------------------------------------------------------------------
-
   /**
    * Admin-scoped list of a target user's owned blueprints. Delegates to {@link #listOwn}; the ADMIN
    * gate lives on the controller.
@@ -283,9 +276,6 @@ public class PersonalBlueprintService {
   public PersonalBlueprintResponse addForUser(
       @NotNull UUID targetSub, @NotNull PersonalBlueprintCreateRequest request) {
     PersonalBlueprintResponse response = add(targetSub, request);
-    // The raw, client-supplied key — not the resolved product's — so it goes through LogSafe: a
-    // member could otherwise paste a newline plus a fake log prefix and forge a second line
-    // (CWE-117). 255 mirrors the column and the DTO's @Size.
     log.info(
         "Admin added blueprint productKey='{}' ownerUserId={}",
         LogSafe.text(request.productKey(), 255),

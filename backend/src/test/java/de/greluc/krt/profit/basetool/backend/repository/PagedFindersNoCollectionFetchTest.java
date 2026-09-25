@@ -82,10 +82,6 @@ class PagedFindersNoCollectionFetchTest {
 
   @Test
   void gateIsLive_aPagedCollectionFetchThatMustPageInMemoryFails() {
-    // Hibernate 7 pushes most paged collection fetches into a derived table, so a plain
-    // "LEFT JOIN FETCH u.roles" + setMaxResults no longer pages in memory and would not trip the
-    // gate (verified 2026-09-22: it passed silently). Ordering by the fetched collection before
-    // the owner is one of the shapes it cannot push down; that one must fail, not warn.
     assertThrows(
         RuntimeException.class,
         () ->
@@ -122,7 +118,7 @@ class PagedFindersNoCollectionFetchTest {
                       "paged-", "paged-", PAGE)
                   .getContent(),
               User::getRoles);
-          userRepository.findEvaluatableMembers(null, PAGE); // must not throw
+          userRepository.findEvaluatableMembers(null, PAGE);
           assertUnfetched(
               missionRepository
                   .searchMissions(

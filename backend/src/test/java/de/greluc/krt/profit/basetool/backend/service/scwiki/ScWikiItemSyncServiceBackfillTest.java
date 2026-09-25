@@ -105,11 +105,6 @@ class ScWikiItemSyncServiceBackfillTest {
     config.putAll(Map.of("item-sync-enabled", true, "sync-all-items", true));
     rebuild();
     lenient().when(syncReportService.beginRun()).thenReturn(UUID.randomUUID());
-    // fetchAllPagesResult returns a FetchResult record (not a List), so Mockito's unstubbed default
-    // is null rather than an empty list. Restore the old "unstubbed endpoint -> empty page"
-    // behaviour that stubPass relies on: Mode B pages every kind endpoint, and a test stubs only
-    // the
-    // one(s) it cares about — the rest must resolve to an empty, non-304 page, not NPE (#1182).
     lenient()
         .when(scWikiClient.fetchAllPagesResult(any(), any(), any(), any(), any()))
         .thenReturn(ScWikiClient.FetchResult.of(List.of()));
@@ -134,15 +129,12 @@ class ScWikiItemSyncServiceBackfillTest {
     lenient().when(self.getObject()).thenReturn(service);
   }
 
-  // ---- mode selection -------------------------------------------------------------------------
-
   @Test
   void syncItems_dispatchesToBackfill_whenSyncAllItemsTrue() {
     stubPass(WEAPONS, itemDto(UUID.randomUUID(), "Behring P4-AR"));
 
     service.syncItems();
 
-    // Mode B walks list endpoints; it must never fall back to the per-UUID closure fetch.
     verify(scWikiClient, never()).fetchOne(any(), any(), any());
     verify(scWikiClient).fetchAllPagesResult(eq(WEAPONS), any(), any(), any(), any());
   }
@@ -175,10 +167,6 @@ class ScWikiItemSyncServiceBackfillTest {
 
   @Test
   void backfill_everyPassNotModified_reportsLiveCount_andSkipsSweep() {
-    // Every kind endpoint + the residual /api/items come back 304 (unchanged) — a fully-cached,
-    // healthy backfill that upserts nothing. It must report the live Wiki-linked game_item count,
-    // NOT 0, so an all-304 run is not read as a zero-item outage (#1182). A genuine empty-200 (no
-    // 304) still reports 0 and correctly fires.
     when(scWikiClient.fetchAllPagesResult(any(), any(), any(), any(), any()))
         .thenReturn(ScWikiClient.FetchResult.unchanged());
     when(gameItemRepository.countLiveScwikiItems()).thenReturn(9000L);
@@ -187,18 +175,11 @@ class ScWikiItemSyncServiceBackfillTest {
 
     assertEquals(9000, written, "an all-304 backfill must report the live item count, not 0");
     verify(gameItemRepository, never()).save(any());
-    // A 304 pass never enumerates the pool, so the cross-kind orphan sweep stays suppressed.
     verify(gameItemRepository, never()).markScwikiDeletedExcept(any(), any());
-    // ...and it is counted as `not_modified`, not `incomplete` and not `no_rows`: this run is
-    // healthy. Getting that split wrong would make the counter non-zero every night and therefore
-    // unalertable — which is why the reason tag exists at all rather than a bare count. It must
-    // also not collapse into `no_rows`, which is what a total upstream outage looks like.
     assertEquals(1.0, sweepSkips(MetricNames.SWEEP_SKIP_NOT_MODIFIED));
     assertEquals(0.0, sweepSkips(MetricNames.SWEEP_SKIP_INCOMPLETE));
     assertEquals(0.0, sweepSkips(MetricNames.SWEEP_SKIP_NO_ROWS));
   }
-
-  // ---- per-endpoint kind derivation + WIKI_ONLY creation ---------------------------------------
 
   @Test
   void backfill_derivesKindFromSourceEndpoint_andCreatesWikiOnlyRows() {
@@ -215,7 +196,6 @@ class ScWikiItemSyncServiceBackfillTest {
     assertEquals(GameItemSourceSystem.WIKI_ONLY, saved.get(armorUuid).getSourceSystems());
     assertEquals(GameItemKind.WEAPON, saved.get(weaponUuid).getKind());
     assertEquals(GameItemSourceSystem.WIKI_ONLY, saved.get(weaponUuid).getSourceSystems());
-    // The new row records a CREATED_WIKI_ONLY finding.
     verify(syncReportService)
         .logScwikiEvent(
             any(),
@@ -237,8 +217,6 @@ class ScWikiItemSyncServiceBackfillTest {
     assertEquals(GameItemKind.GENERIC, captureSaves().get(cargoUuid).getKind());
   }
 
-  // ---- existing-row flip + canonical-field protection ------------------------------------------
-
   @Test
   void backfill_flipsUexOnlyToBoth_andFillsWikiColumns_withoutOverwritingCanonicalFields() {
     UUID uuid = UUID.randomUUID();
@@ -257,10 +235,10 @@ class ScWikiItemSyncServiceBackfillTest {
 
     GameItem result = captureSaves().get(uuid);
     assertEquals(GameItemSourceSystem.BOTH, result.getSourceSystems());
-    assertEquals(GameItemKind.VEHICLE_ITEM, result.getKind()); // GENERIC upgraded
-    assertEquals("UEX Canonical Name", result.getName()); // UEX name preserved
-    assertSame(uexMfr, result.getManufacturer()); // UEX manufacturer sticky
-    assertEquals("classif", result.getClassification()); // Wiki column filled
+    assertEquals(GameItemKind.VEHICLE_ITEM, result.getKind());
+    assertEquals("UEX Canonical Name", result.getName());
+    assertSame(uexMfr, result.getManufacturer());
+    assertEquals("classif", result.getClassification());
   }
 
   @Test
@@ -272,7 +250,6 @@ class ScWikiItemSyncServiceBackfillTest {
     existing.setKind(GameItemKind.VEHICLE_WEAPON);
     existing.setSourceSystems(GameItemSourceSystem.UEX_ONLY);
 
-    // The vehicle-items pass would assign VEHICLE_ITEM, which is LESS specific than VEHICLE_WEAPON.
     stubPass(VEHICLE_ITEMS, itemDto(uuid, "Cannon"));
     when(gameItemRepository.findByExternalUuid(uuid)).thenReturn(Optional.of(existing));
 
@@ -280,8 +257,6 @@ class ScWikiItemSyncServiceBackfillTest {
 
     assertEquals(GameItemKind.VEHICLE_WEAPON, captureSaves().get(uuid).getKind());
   }
-
-  // ---- §3.4 sanity-cap guard ------------------------------------------------------------------
 
   @Test
   void backfill_skipsKindPassThatExceedsSanityCap_butStillRunsOtherPasses() {
@@ -291,7 +266,6 @@ class ScWikiItemSyncServiceBackfillTest {
     UUID b = UUID.randomUUID();
     UUID c = UUID.randomUUID();
     UUID weaponUuid = UUID.randomUUID();
-    // Armor comes back pool-sized (3 > cap 2) — the §3.4 full-pool quirk; it must be skipped whole.
     lenient()
         .when(scWikiClient.fetchAllPagesResult(eq(ARMOR), any(), any(), any(), any()))
         .thenReturn(
@@ -305,11 +279,8 @@ class ScWikiItemSyncServiceBackfillTest {
     Map<UUID, GameItem> saved = captureSaves();
     assertNull(saved.get(a), "capped armor rows must not be ingested");
     assertEquals(GameItemKind.WEAPON, saved.get(weaponUuid).getKind());
-    // A capped pass counts as a failure → orphan sweep is suppressed.
     verify(gameItemRepository, never()).markScwikiDeletedExcept(any(), any());
   }
-
-  // ---- junk-name guard ------------------------------------------------------------------------
 
   @Test
   void backfill_skipsJunkNamedNewRows_andLogsSkipJunk() {
@@ -324,8 +295,6 @@ class ScWikiItemSyncServiceBackfillTest {
         .logScwikiEvent(
             any(), eq(SyncEventType.SKIP_JUNK), eq("game_item"), eq(uuid), any(), any());
   }
-
-  // ---- manufacturer resolution for new rows ----------------------------------------------------
 
   @Test
   void backfill_resolvesManufacturerForNewRow_byNameAgainstExistingRowsOnly() {
@@ -356,8 +325,6 @@ class ScWikiItemSyncServiceBackfillTest {
     verify(manufacturerRepository, never()).save(any());
   }
 
-  // ---- cross-kind orphan sweep gating ----------------------------------------------------------
-
   @Test
   void backfill_runsOrphanSweep_onlyWhenEveryPassReturnedData() {
     stubPass(WEAPON_ATTACHMENTS, itemDto(UUID.randomUUID(), "Scope"));
@@ -372,16 +339,12 @@ class ScWikiItemSyncServiceBackfillTest {
 
     service.syncItems();
 
-    // All eight passes (7 kinds + GENERIC residual) returned data → the cross-kind sweep fires.
     verify(gameItemRepository).markScwikiDeletedExcept(any(), any());
-    // A run that actually swept must not register the counter at all. Registered-and-zero and
-    // absent are different things to the alert rule: absent cannot false-fire.
     assertNull(meterRegistry.find(MetricNames.CATALOGUE_ORPHAN_SWEEP_SKIPPED).counter());
   }
 
   @Test
   void backfill_skipsOrphanSweep_whenOneKindReturnsEmpty() {
-    // All passes but FOOD return data; FOOD is left unstubbed → empty → suppresses the sweep.
     stubPass(WEAPON_ATTACHMENTS, itemDto(UUID.randomUUID(), "Scope"));
     stubPass(WEAPONS, itemDto(UUID.randomUUID(), "Rifle"));
     stubPass(VEHICLE_WEAPONS, itemDto(UUID.randomUUID(), "Cannon"));
@@ -394,20 +357,12 @@ class ScWikiItemSyncServiceBackfillTest {
     service.syncItems();
 
     verify(gameItemRepository, never()).markScwikiDeletedExcept(any(), any());
-    // The stand-down is right; being unable to see it was the gap. `business.yml` said in as many
-    // words that no metric existed for it, so a sweep that had not run for weeks read exactly like
-    // one running cleanly every night.
     assertEquals(1.0, sweepSkips(MetricNames.SWEEP_SKIP_INCOMPLETE));
   }
 
   @Test
   void
       backfill_runsOrphanSweep_whenAKindPassIsIncomplete_butTheResidualCensusCoversEveryRowItSaw() {
-    // The live shape this rule exists for (ADR-0195): /api/vehicle-items comes back INCOMPLETE on
-    // EVERY run, because its paginator orders on a non-unique key and rows tie across a page
-    // boundary — an upstream defect with no client-side remedy. Under the strict gate that stood
-    // the item sweep down permanently. The residual /api/items pass walks the same pool and CAN
-    // vouch for it, so the rows the kind pass missed are accounted for and the census stands.
     ScWikiItemDto scope = itemDto(UUID.randomUUID(), "Scope");
     ScWikiItemDto rifle = itemDto(UUID.randomUUID(), "Rifle");
     ScWikiItemDto cannon = itemDto(UUID.randomUUID(), "Cannon");
@@ -429,16 +384,11 @@ class ScWikiItemSyncServiceBackfillTest {
     service.syncItems();
 
     verify(gameItemRepository).markScwikiDeletedExcept(any(), any());
-    // A run that actually swept registers no stand-down counter at all — absent, not zero.
     assertNull(meterRegistry.find(MetricNames.CATALOGUE_ORPHAN_SWEEP_SKIPPED).counter());
   }
 
   @Test
   void backfill_skipsOrphanSweep_whenAnIncompleteKindPassSawARowOutsideTheResidualPool() {
-    // The relaxation above is VERIFIED, not assumed. A kind endpoint serving a row that
-    // /api/items does not list means the pool is not a superset after all, so the residual census
-    // cannot answer for that kind and the strict gate decides. Sweeping here would tombstone the
-    // rows the incomplete walk never fetched — the unrecoverable direction.
     ScWikiItemDto scope = itemDto(UUID.randomUUID(), "Scope");
     ScWikiItemDto rifle = itemDto(UUID.randomUUID(), "Rifle");
     ScWikiItemDto cannon = itemDto(UUID.randomUUID(), "Cannon");
@@ -454,7 +404,6 @@ class ScWikiItemSyncServiceBackfillTest {
     stubPass(ARMOR, helmet);
     stubPass(CLOTHES, jacket);
     stubPass(FOOD, ration);
-    // Same pool as the test above, minus `cooler` — the one row the incomplete kind pass saw.
     stubPassRows(ITEMS, scope, rifle, cannon, helmet, jacket, ration, crate);
     when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
 
@@ -466,8 +415,6 @@ class ScWikiItemSyncServiceBackfillTest {
 
   @Test
   void backfill_skipsOrphanSweep_whenTheResidualPassItselfCannotVouchForItsCensus() {
-    // Every kind pass is clean, but /api/items came back INCOMPLETE — so there is no complete pool
-    // to fall back on and nothing may be tombstoned, however healthy the kind passes look.
     stubPass(WEAPON_ATTACHMENTS, itemDto(UUID.randomUUID(), "Scope"));
     stubPass(WEAPONS, itemDto(UUID.randomUUID(), "Rifle"));
     stubPass(VEHICLE_WEAPONS, itemDto(UUID.randomUUID(), "Cannon"));
@@ -501,12 +448,8 @@ class ScWikiItemSyncServiceBackfillTest {
         .sum();
   }
 
-  // ---- per-item transaction isolation ----------------------------------------------------------
-
   @Test
   void backfill_isolatesPerItem_oneDeadlockDoesNotAbortThePass() {
-    // Same per-item isolation as the closure mode: a lock failure on one row must not abort the
-    // pass — every other row in the page still persists in its own REQUIRES_NEW transaction.
     UUID deadlocked = UUID.randomUUID();
     UUID healthy = UUID.randomUUID();
     lenient()
@@ -533,8 +476,6 @@ class ScWikiItemSyncServiceBackfillTest {
         "the healthy row persists despite the sibling row deadlocking");
   }
 
-  // ---- Weg-2 uuid-less UEX reconciliation ------------------------------------------------------
-
   @Test
   void backfill_reconcilesUuidlessUexRowByName_insteadOfCreatingADuplicate() {
     UUID wikiUuid = UUID.randomUUID();
@@ -545,13 +486,10 @@ class ScWikiItemSyncServiceBackfillTest {
         .thenReturn(List.of(uexRow));
     when(gameItemRepository.findByExternalUuid(any())).thenReturn(Optional.empty());
     when(gameItemRepository.findById(uexRowId)).thenReturn(Optional.of(uexRow));
-    // The Wiki item shares the name (the helper's slug differs, so the name branch resolves it).
     stubPass(VEHICLE_ITEMS, itemDto(wikiUuid, "Avionics Blade"));
 
     service.syncItems();
 
-    // The existing uuid-less UEX row absorbed the Wiki uuid and flipped to BOTH — no duplicate
-    // WIKI_ONLY row, and its Wiki columns are now filled.
     GameItem merged = captureSaves().get(wikiUuid);
     assertSame(uexRow, merged);
     assertEquals(GameItemSourceSystem.BOTH, merged.getSourceSystems());
@@ -576,7 +514,6 @@ class ScWikiItemSyncServiceBackfillTest {
 
     service.syncItems();
 
-    // The shared name is ambiguous → excluded from the index → no merge; a WIKI_ONLY row is made.
     assertEquals(GameItemSourceSystem.WIKI_ONLY, captureSaves().get(wikiUuid).getSourceSystems());
     verify(gameItemRepository, never()).findById(any());
     verify(syncReportService, never())
@@ -593,7 +530,6 @@ class ScWikiItemSyncServiceBackfillTest {
 
     service.syncItems();
 
-    // Flag off → the uuid-less index is never even queried and a WIKI_ONLY row is created.
     assertEquals(GameItemSourceSystem.WIKI_ONLY, captureSaves().get(wikiUuid).getSourceSystems());
     verify(gameItemRepository, never()).findByExternalUuidIsNullAndSourceSystems(any());
     verify(gameItemRepository, never()).findById(any());
@@ -619,12 +555,9 @@ class ScWikiItemSyncServiceBackfillTest {
     service.syncItems();
 
     Map<UUID, GameItem> saved = captureSaves();
-    // The first twin merged into the UEX row; the second could not re-consume it → WIKI_ONLY.
     assertEquals(GameItemSourceSystem.BOTH, saved.get(firstWiki).getSourceSystems());
     assertEquals(GameItemSourceSystem.WIKI_ONLY, saved.get(secondWiki).getSourceSystems());
   }
-
-  // ---- helpers ---------------------------------------------------------------------------------
 
   /**
    * Stubs the 5-arg {@code fetchAllPages} for a single endpoint to return exactly the given row.
@@ -633,8 +566,6 @@ class ScWikiItemSyncServiceBackfillTest {
    * @param row the single row the pass returns
    */
   private void stubPass(String endpoint, ScWikiItemDto row) {
-    // Lenient: Mode B always pages every endpoint, so the per-endpoint stubs that a given test does
-    // not exercise (other kinds return the default empty list) must not trip strict stubbing.
     lenient()
         .when(scWikiClient.fetchAllPagesResult(eq(endpoint), any(), any(), any(), any()))
         .thenReturn(ScWikiClient.FetchResult.of(List.of(row)));

@@ -73,11 +73,6 @@ public class TermsDocumentController {
   @NotNull
   @GetMapping
   @PreAuthorize("permitAll()")
-  // REQ-SEC-052: the ONLY two operations in the document that answer without a token, and the
-  // only two carrying an empty `security` list. The global requirement declared in OpenApiConfig
-  // applies to every other operation; an empty list here overrides it, so a generated client does
-  // not attach a bearer it may not have yet — and OpenApiAnonymousOperationsTest asserts that
-  // exactly these two carry it.
   @SecurityRequirements
   @Operation(
       summary = "The Terms-of-Use wording in force",

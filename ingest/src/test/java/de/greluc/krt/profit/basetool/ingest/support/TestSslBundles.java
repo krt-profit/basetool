@@ -32,9 +32,7 @@ import org.springframework.boot.ssl.SslStoreBundle;
  */
 public final class TestSslBundles {
 
-  private TestSslBundles() {
-    // Test-support holder — not instantiable.
-  }
+  private TestSslBundles() {}
 
   /**
    * Builds an {@link SslBundles} registry containing exactly one bundle whose truststore is {@code

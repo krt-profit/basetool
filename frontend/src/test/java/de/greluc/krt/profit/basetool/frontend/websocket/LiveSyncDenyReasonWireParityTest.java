@@ -62,10 +62,6 @@ class LiveSyncDenyReasonWireParityTest {
   @Test
   void clientTreatsOnlyTheIndeterminateReasonAsRetryable() throws IOException {
     String js = readResource("/static/js/krt-live-sync.js");
-    // The authorization deny is a real permission verdict and must stay terminal: the client must
-    // not branch on it at all. A literal 'authz' appearing in the module would mean someone taught
-    // the client to react to it, which is the point at which a denied room starts re-subscribing in
-    // a loop against a backend that will keep refusing it.
     assertThat(js)
         .as(
             "krt-live-sync.js must not branch on the terminal '%s' deny reason",

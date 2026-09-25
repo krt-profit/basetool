@@ -49,10 +49,6 @@ import org.springframework.web.context.WebApplicationContext;
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
-// REQ-SEC-052: the participant writes these cases exercise require a login. The rows they
-// create are EXTERNAL participants now (ADR-0159, decision D4) — a named person without an
-// account, recorded by a member who can see the Einsatz — which is the same row shape and a
-// different author.
 @org.springframework.security.test.context.support.WithMockUser(roles = "KRT_MEMBER")
 class MissionUnitCrewTest {
 
@@ -87,7 +83,6 @@ class MissionUnitCrewTest {
     officerUser.setId(UUID.randomUUID());
     officerUser.setUsername("officer_crew");
     userRepository.save(officerUser);
-    // Post-R9 D3 (V101): home Staffel via membership row.
     OrgUnitMembership iridiumMembership = new OrgUnitMembership();
     iridiumMembership.setId(new OrgUnitMembershipId(officerUser.getId(), Squadron.IRIDIUM_ID));
     iridiumMembership.setUser(officerUser);
@@ -96,7 +91,7 @@ class MissionUnitCrewTest {
 
     ShipType shipType = new ShipType();
     shipType.setName("Test Type");
-    shipType.setManufacturer(null); // Assuming manufacturer is optional or I need to check
+    shipType.setManufacturer(null);
     shipTypeRepository.save(shipType);
 
     ship = new Ship();
@@ -122,7 +117,6 @@ class MissionUnitCrewTest {
     unit.setName("Test Unit");
     mission.getAssignedUnits().add(unit);
     mission = missionRepository.save(mission);
-    // Refresh unit ID
     unit = mission.getAssignedUnits().iterator().next();
 
     crewJob = new JobType();
@@ -138,7 +132,6 @@ class MissionUnitCrewTest {
 
   @Test
   void testAssignGuestAsCrew() throws Exception {
-    // 1. Add Guest Participant
     Squadron sq = squadronRepository.findAll().iterator().next();
     String joinJson =
         String.format(
@@ -159,7 +152,6 @@ class MissionUnitCrewTest {
             .findFirst()
             .orElseThrow();
 
-    // 2. Assign Guest as Crew
     String assignJson =
         String.format(
             "{\"participantId\": \"%s\", \"jobTypeIds\": [\"%s\"]}",
@@ -181,7 +173,6 @@ class MissionUnitCrewTest {
                 .content(assignJson))
         .andExpect(status().isOk());
 
-    // Verify
     updatedMission = missionRepository.findById(mission.getId()).orElseThrow();
     MissionUnit updatedUnit =
         updatedMission.getAssignedUnits().stream()
@@ -214,10 +205,6 @@ class MissionUnitCrewTest {
 
   @Test
   void testGetAllShips_Member_Forbidden() throws Exception {
-    // The hangar is Logistician-and-above. This used to issue the request anonymously and expect a
-    // 401; the class carries a plain member now (REQ-SEC-052), so the same refusal arrives at the
-    // method gate as a 403. The anonymous refusal itself is swept for every path at once by
-    // AnonymousSurfaceSweepTest — it is not this case's job any more.
     mockMvc.perform(get("/api/v1/hangar/ships")).andExpect(status().isForbidden());
   }
 }

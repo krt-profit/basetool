@@ -1,14 +1,3 @@
-/*
- * Materials Overview matrix styling.
- *
- * Extracted from the inline \3c style> block in templates/materials-overview.html so the
- * planet tint table can live in one auditable place rather than being inlined into the
- * template. The hex values for the planet-tint headers and the column box-shadows are
- * intentionally bespoke (not part of the global token set) because they encode the
- * canonical Star Citizen planet hues; promoting them to global CSS variables would
- * pollute :root with 48 single-use tokens.
- */
-
 @layer base, components, page, migration, utilities;
 
 @layer page {
@@ -39,17 +28,6 @@
         background-clip: padding-box;
     }
 
-    /*
- * Planet-system tints. Terminal columns are grouped by their effective UEX planet (direct,
- * via parent moon, or via like-named orbit). The full tint sits behind the header text;
- * each body cell carries a 2px inset left-stripe in the same hue so the column stays
- * visually anchored to its planet without colouring the price cells.
- *
- * Canonical Star Citizen planets get hand-picked tints; unknown planets fall back to one
- * of twelve HSL-derived buckets (`planet-hash-0` .. `planet-hash-11`) computed in
- * `PlanetColorResolver`. `planet-unknown` intentionally has no rule — terminals without a
- * parent planet (jump points, raw Lagrange) keep the default neutral header.
- */
     .matrix-table th.col-terminal.planet-hurston {
         background-color: var(--krt-planet-hurston);
     }
@@ -255,14 +233,6 @@
         font-size: var(--fs-sm);
     }
 
-    /*
- * Uniform body-row height — required by the virtual scroller in /js/materials-matrix.js. It maps
- * scroll offset to row index and sizes the top/bottom spacer rows from a single row height, so
- * every flattened row (category header or material row) must be the same height. A price cell can
- * stack a sell line over a buy line, so we pin the height tall enough for two lines and centre the
- * content; single-price and header rows then match. The script measures this height at runtime, so
- * the literal value here only has to be uniform and large enough for two lines.
- */
     .matrix-table tbody td {
         height: 42px;
         padding-top: 0.2rem;
@@ -283,11 +253,6 @@
         color: var(--color-danger-text);
     }
 
-    /*
- * Spacer rows pad the virtual scroll height above and below the rendered window. Their single
- * colspan cell must not inherit the fixed body-row height, the cell borders/padding, or the
- * sticky first-column treatment from `td:first-child`; its height is set inline by the script.
- */
     .matrix-table tbody tr.row-spacer td {
         position: static;
         height: auto;
@@ -296,7 +261,6 @@
         background: transparent;
     }
 
-    /* Category (kind) header row, rendered inside the virtual body. */
     .matrix-table tbody tr.row-kind {
         background-color: var(--color-surface-input);
         cursor: pointer;
@@ -316,7 +280,6 @@
         text-align: center;
     }
 
-    /* First (material-name) cell of a material row. */
     .matrix-table td.mtx-name-cell {
         padding-left: 2rem;
         text-align: left;
@@ -327,7 +290,6 @@
         font-weight: bold;
     }
 
-    /* Colgroup column widths — table-layout: fixed reads these to size the columns. */
     .matrix-table col.mtx-col-first {
         width: 250px;
     }
@@ -336,7 +298,6 @@
         width: 120px;
     }
 
-    /* Loading placeholder and empty-result states. */
     .matrix-loading {
         padding: 1rem;
         color: var(--color-gray-2-text);
@@ -382,31 +343,12 @@
         box-sizing: border-box;
     }
 
-    /*
- * The matrix scrolls internally (sticky header row + sticky first column).
- * Its height is capped to the space between the sticky page header and the
- * fixed footer (`.krt-footer` in styles.css, `position: fixed; bottom: 0`)
- * so the wrapper's own horizontal scrollbar — pinned to its bottom edge —
- * never disappears behind the footer. `--krt-footer-height` is published by
- * sidebar.html JS (falls back to 5rem before DOMContentLoaded); the extra
- * ~25rem reserves the sticky header, the greeting block and the filter row
- * that sit above the table at top-of-page scroll. `max(...)` floors the
- * height so the grid never collapses on very short viewports.
- */
     .table-wrapper {
         overflow: auto;
-        /* The viewport term and its `dvh` fallback are `--krt-panel-viewport-rest` in styles.css;
-       25rem is this panel's own reserve for the chrome above it. */
         max-height: max(16rem, calc(var(--krt-panel-viewport-rest) - 25rem));
         border: 1px solid var(--color-gray-3);
     }
 
-    /*
- * Override the global `main { max-width: 1200px }` (and its ultra-wide 1600px bump in
- * styles.css) for this page only. The matrix is a data grid, not long-form text, so
- * capping its width wastes screen real estate on large monitors. The 80ch p-cap from
- * styles.css still applies to any paragraphs inside.
- */
     main.materials-overview-main {
         max-width: none;
     }

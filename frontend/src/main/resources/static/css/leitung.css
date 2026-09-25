@@ -12,7 +12,6 @@
 
 @layer page {
     .leitung-intro {
-        /* No colour of its own: `.greeting p` has always set it (FE-MOD-02). */
         margin: 0.5rem 0 0;
     }
 

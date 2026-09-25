@@ -143,7 +143,6 @@ class AsyncDispatchMdcTest {
   @BeforeEach
   void setUp() {
     probeLogger = (Logger) LoggerFactory.getLogger(StreamController.class);
-    // Whatever a Spring context earlier in this JVM configured, the probe's INFO line is captured.
     probeLogger.setLevel(Level.INFO);
     appender = new ListAppender<>();
     appender.start();
@@ -177,7 +176,6 @@ class AsyncDispatchMdcTest {
             .andExpect(request().asyncStarted())
             .andReturn();
 
-    // Everything the async pass could re-derive a value from is taken away or changed.
     SecurityContextHolder.clearContext();
     session.setAttribute(MeFrontendController.ACTIVE_ORG_UNIT_SESSION_KEY, UUID.randomUUID());
     controller.pending().setErrorResult(new IllegalStateException("upstream stream closed"));
@@ -201,7 +199,6 @@ class AsyncDispatchMdcTest {
     String minted = initial.getResponse().getHeader(HEADER);
     assertThat(minted).as("the initial dispatch minted an id").matches("[0-9a-f-]{36}");
 
-    // A header on the async pass is still the client's; it must not replace the stashed id.
     MockHttpServletRequest sameRequest = (MockHttpServletRequest) initial.getRequest();
     sameRequest.removeHeader(HEADER);
     sameRequest.addHeader(HEADER, "forged-on-the-async-pass");

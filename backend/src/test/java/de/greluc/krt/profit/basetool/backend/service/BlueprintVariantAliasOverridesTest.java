@@ -45,8 +45,6 @@ class BlueprintVariantAliasOverridesTest {
 
   @Test
   void unregisteredKeyPassesThroughUnchanged() {
-    // The self-healing guarantee: anything not explicitly registered is returned verbatim, so the
-    // conservative structural family key always wins when no curated entry applies.
     String key = "fresnel energy lmg";
     assertSame(key, overrides.canonical(key));
     assertEquals("novian crossbow", overrides.canonical("novian crossbow"));
@@ -54,7 +52,6 @@ class BlueprintVariantAliasOverridesTest {
 
   @Test
   void canonicalTargetsAreStableFixedPoints() {
-    // Applying the alias to an already-canonical key is idempotent (no alias chains).
     assertEquals("pulse laser pistol", overrides.canonical("pulse laser pistol"));
     assertEquals("salvo frag pistol", overrides.canonical("salvo frag pistol"));
     assertEquals("arclight pistol", overrides.canonical("arclight pistol"));

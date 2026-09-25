@@ -122,14 +122,12 @@ class SpecialCommandSecurityServiceTest {
 
   @Test
   void nonAdmin_leadOfDifferentSc_doesNotCarryOver() {
-    // The caller is Lead of Bravo, asking about Alpha — must be denied.
     lenient().when(authHelperService.isAdmin()).thenReturn(false);
     when(authHelperService.currentUserId()).thenReturn(Optional.of(USER_ID));
     when(membershipRepository.findById(new OrgUnitMembershipId(USER_ID, SC_ALPHA)))
         .thenReturn(Optional.empty());
 
     assertFalse(securityService.canManageMembers(SC_ALPHA, authenticatedMember));
-    // No need to stub SC_BRAVO — we never check it.
   }
 
   @Test

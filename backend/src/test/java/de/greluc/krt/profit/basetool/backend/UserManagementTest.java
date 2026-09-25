@@ -143,12 +143,6 @@ class UserManagementTest {
 
   @Test
   void deleteUser_withDiscordApprovalAudit_succeedsAndClearsAudit() {
-    // Regression (epic #720 / V173): an approved, since-removed Discord registration could not be
-    // hard-deleted — the user_approval_event FK carries no ON DELETE clause, so removing the
-    // app_user row failed with a DataIntegrityViolation (user_approval_event_user_id_fkey -> 409).
-    // The delete must now clear the approval audit first, so it succeeds end-to-end.
-
-    // An admin must exist as the reassignment target for the deleted user's owned data.
     Role adminRole =
         roleRepository
             .findByNameIgnoreCase("ADMIN")
@@ -160,7 +154,6 @@ class UserManagementTest {
     admin.setRoles(Set.of(adminRole));
     userRepository.save(admin);
 
-    // The to-be-deleted account: removed from Keycloak, with an approval-audit row referencing it.
     User target = new User();
     UUID targetId = UUID.randomUUID();
     target.setId(targetId);
@@ -173,7 +166,6 @@ class UserManagementTest {
     userRepository.flush();
 
     userDeletionService.deleteUser(targetId);
-    // Before the fix the scheduled app_user delete threw on flush; it must now succeed.
     assertDoesNotThrow(userRepository::flush);
 
     assertTrue(userRepository.findById(targetId).isEmpty(), "the deleted user must be gone");

@@ -72,12 +72,6 @@ public class ResilienceEventLogger {
                                 e.getStateTransition().getFromState(),
                                 e.getStateTransition().getToState()))
                     .onCallNotPermitted(
-                        // DEBUG, not WARN: this fires for every call blocked by an already-open
-                        // breaker for the whole open window. The one-time OPEN state transition
-                        // above carries the WARN; the per-call rejection is metered as circuit_open
-                        // at the BackendApiClient boundary. At WARN a routine backend restart
-                        // floods
-                        // the log with identical lines (issue #1203).
                         e -> log.debug("CircuitBreaker[{}] call not permitted", cb.getName()))
                     .onError(
                         e ->

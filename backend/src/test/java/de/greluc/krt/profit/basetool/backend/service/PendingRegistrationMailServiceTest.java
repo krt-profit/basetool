@@ -139,7 +139,6 @@ class PendingRegistrationMailServiceTest {
                   .contains("Newbie")
                   .contains(messageSource.getMessage("email.signoff", null, Locale.GERMAN));
             });
-    // Each admin is greeted by their own effective name.
     assertThat(sent.get(0).body()).contains("Maverick");
     assertThat(sent.get(1).body()).contains("Iceman");
   }

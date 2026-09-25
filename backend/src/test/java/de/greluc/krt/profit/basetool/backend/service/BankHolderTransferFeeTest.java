@@ -82,26 +82,20 @@ class BankHolderTransferFeeTest {
 
   @Test
   void feeBearingUmbuchung_debitsSourceGrossCreditsDestAndDebitsCartel() {
-    // Given (REQ-BANK-031, #998): a CARTEL account funded with 100 to bear the fee
     BankAccount cartel = newCartelAccount();
     fund(cartel, "100");
 
-    // When: A hands 1000 of custody to B — fee = round(1000 * 0.005) = 5
     BankTransactionDto tx =
         bankLedgerService.bookHolderTransfer(
             new BankHolderTransferRequest(
                 holderA.getId(), holderB.getId(), new BigDecimal("1000"), "Schichtwechsel"));
 
-    // Then: source holder debited the gross 1005, destination credited 1000, the CARTEL account
-    // debited exactly the fee 5 (100 -> 95); transfer_fee = 5.
     assertEquals(0, storedFee(tx).compareTo(new BigDecimal("5")));
     assertEquals(
         0, holderTotal(holderA).compareTo(new BigDecimal("-1005")), "source bears the fee");
     assertEquals(
         0, holderTotal(holderB).compareTo(new BigDecimal("1000")), "destination gets 1000");
     assertEquals(0, balance(cartel).compareTo(new BigDecimal("95")), "CARTEL debited the fee 5");
-    // The single CARTEL account leg nets to -fee; the two holder legs net to -fee (integrity
-    // holds).
     List<BankCounterLeg> accountLegs = postingRepository.findLegsByTransactionIds(List.of(tx.id()));
     assertEquals(1, accountLegs.size(), "one CARTEL account leg");
     assertEquals(
@@ -114,13 +108,11 @@ class BankHolderTransferFeeTest {
         0,
         sum(holderLegs.stream().map(BankHolderLeg::amount).toList())
             .compareTo(new BigDecimal("-5")));
-    // The integrity sweep accepts the fee-bearing Umbuchung (no false-fire).
     assertTrue(integrityService.verify().isSound(), "integrity sweep stays sound");
   }
 
   @Test
   void feeBearingUmbuchung_rejectsWhenCartelAccountMissing() {
-    // Given: no CARTEL account exists. When / Then: a fee-bearing Umbuchung is refused.
     BankConflictException ex =
         assertThrows(
             BankConflictException.class,
@@ -133,12 +125,10 @@ class BankHolderTransferFeeTest {
 
   @Test
   void feeBearingUmbuchung_rejectsWhenCartelAccountClosed() {
-    // Given: the CARTEL account is CLOSED
     BankAccount cartel = newCartelAccount();
     cartel.setStatus(BankAccountStatus.CLOSED);
     accountRepository.save(cartel);
 
-    // When / Then: the fee cannot be charged to a closed CARTEL account
     BankConflictException ex =
         assertThrows(
             BankConflictException.class,
@@ -151,11 +141,9 @@ class BankHolderTransferFeeTest {
 
   @Test
   void feeBearingUmbuchung_rejectsWhenCartelWouldOverdraw() {
-    // Given: the CARTEL account holds only 2 — less than the fee 5
     BankAccount cartel = newCartelAccount();
     fund(cartel, "2");
 
-    // When / Then: the fee would drive the CARTEL account negative, so the Umbuchung is refused
     BankConflictException ex =
         assertThrows(
             BankConflictException.class,
@@ -169,7 +157,6 @@ class BankHolderTransferFeeTest {
 
   @Test
   void reversalOfFeeBearingUmbuchung_negatesAllThreeLegsAndStaysSound() {
-    // Given: a booked fee-bearing Umbuchung (CARTEL 95, A -1005, B +1000)
     BankAccount cartel = newCartelAccount();
     fund(cartel, "100");
     BankTransactionDto umbuchung =
@@ -177,18 +164,13 @@ class BankHolderTransferFeeTest {
             new BankHolderTransferRequest(
                 holderA.getId(), holderB.getId(), new BigDecimal("1000"), null));
 
-    // When: the Umbuchung is reversed
     bankLedgerService.reverseTransaction(umbuchung.id(), "correction");
 
-    // Then: all three legs (both holder legs + the CARTEL account leg) are negated — CARTEL back to
-    // 100, both holders back to zero — and the ledger stays sound.
     assertEquals(0, balance(cartel).compareTo(new BigDecimal("100")), "CARTEL restored");
     assertEquals(0, holderTotal(holderA).signum(), "source restored");
     assertEquals(0, holderTotal(holderB).signum(), "destination restored");
     assertTrue(integrityService.verify().isSound());
   }
-
-  // ---- fixtures --------------------------------------------------------------------------------
 
   /**
    * Creates the persisted, active singleton CARTEL account (no org unit / area name, V168 CHECK).

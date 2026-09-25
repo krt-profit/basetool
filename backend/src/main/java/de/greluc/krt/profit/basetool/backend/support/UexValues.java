@@ -69,9 +69,6 @@ public final class UexValues {
     if (!StringUtils.hasText(crew)) {
       return CrewRange.UNKNOWN;
     }
-    // split(-1) keeps trailing empties, so "1," stays a two-bound value with an unparseable second
-    // bound (-> UNKNOWN) instead of silently collapsing to the single-value form, and "," does not
-    // yield an empty array whose parts[0] would throw past the NumberFormatException catch.
     String[] parts = crew.split(",", -1);
     try {
       int min = Integer.parseInt(parts[0].trim());

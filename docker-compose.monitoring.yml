@@ -1,160 +1,23 @@
-# =============================================================================================
-# Profit Basetool — operations monitoring stack (epic #936, ADR-0072, REQ-OBS-005..011).
-#
-# A DEDICATED compose project, deliberately NOT a profile of docker-compose.yml: this fully
-# decouples monitoring from the 5-minute app-deploy loop (no --remove-orphans risk; a flapping
-# monitoring healthcheck can never trigger an app-stack rollback). deploy.sh brings it up with a
-# NON-GATING step (IRI_MONITORING_ENABLED=true) AFTER the app stack is healthy — a monitoring
-# failure logs but never rolls back the apps.
-#
-# Image pins are the latest stable lines verified 2026-07 against the official release pages (owner
-# version directive), and every one of them is DIGEST-pinned as required by ADR-0072. This file used
-# to say Dependabot "adds @sha256 digests afterwards"; it does not and structurally cannot -
-# Dependabot MAINTAINS a digest that is already there and never introduces one, so all thirteen
-# references sat on mutable tags while the comment claimed otherwise. Resolve a new digest with
-# `skopeo inspect --no-tags docker://<repo>:<tag>` (or `docker buildx imagetools inspect`) and move it
-# in the same commit as the tag. Contains ZERO secrets — every credential is a host-side file
-# under /var/iri/monitoring/secrets/ or an .env value, provisioned by
-# docs/archive/MONITORING_ROLLOUT_RUNBOOK.md.
-#
-# Transport (REQ-OBS-008): the apps are scraped over HTTPS with the pinned public CA; everything
-# else inside the isolated monitoring networks is plain HTTP by the owner-approved carve-out.
-# =============================================================================================
-
 x-mon-logging: &mon-logging
   driver: json-file
   options:
     max-size: "10m"
     max-file: "5"
 
-# Shared hardening (epic #936): drop privilege escalation, cap the pid table, and set a POSITIVE
-# oom_score_adj so the kernel sacrifices monitoring BEFORE the apps/DBs under memory pressure.
-# read_only rootfs is deferred to Phase-3 per-image tuning (verified on the test stack) to avoid
-# startup regressions here. cap_drop is applied per-service.
 x-mon-base: &mon-base
   restart: unless-stopped
   logging: *mon-logging
   security_opt:
     - no-new-privileges:true
   oom_score_adj: 500
-  # Zombie-reaping init (tini) as PID 1 for EVERY monitoring service — class-level protection,
-  # deliberately not per-service (REQ-OPS-019). Rationale: none of these images ships an init, so
-  # whichever process the image starts becomes PID 1, and Go/C binaries do not `wait()` on orphans.
-  # Any child that outlives its parent then lingers as a `<defunct>` and permanently occupies one of
-  # the `pids: 512` slots each service carries below. The known trigger is a healthcheck that fetches
-  # an `https://` URL: BusyBox `wget` forks an `ssl_client` TLS helper per probe, which is exactly how
-  # grafana reached 512/512 pids with 493 unreaped zombies on 2026-07-26 — refusing every fork,
-  # `unhealthy` for two days (the same defect as the 2026-07-12 ingest OOM that put `init: true` on
-  # the JVM app services in docker-compose.yml).
-  #
-  # Applied to the shared anchor rather than to grafana alone so the trap cannot be re-armed: today
-  # only grafana probes over TLS and alertmanager uses plain `http://` (no fork), but switching any
-  # service to HTTPS, or adding a new one with a forking probe, would otherwise silently reintroduce
-  # a ~4h-to-exhaustion leak. tini needs no capability, is compatible with `no-new-privileges` +
-  # `cap_drop: [ALL]`, and forwards signals, so graceful shutdown and `stop_grace_period` are
-  # unchanged. The runtime backstop for any *other* task leak is ContainerPidsHigh, which is
-  # cap-relative and unscoped by name (infrastructure.yml, REQ-OBS-014).
   init: true
 
-# =============================================================================================
-# GO SERVICE MEMORY SIZING — why every Go service below carries GOMEMLIMIT
-# =============================================================================================
-# Every service in this file is a Go program. GOMEMLIMIT makes the
-# runtime aware of its cgroup ceiling: without it the GC sizes the heap off GOGC alone (target 2x live
-# heap) and the scavenger returns arena pages only lazily, so a concurrency spike can RATCHET the
-# anonymous footprint up and leave it there until the container is recreated. `blackbox-exporter` hit
-# exactly that (2026-07-31: 97-100% of 32M on a 9.8 MiB live heap, ContainerWorkingSetHigh mailing
-# daily; 95.3% of the limit was genuinely ANONYMOUS memory). Every service here now carries one.
-#
-# READ THIS BEFORE USING A CONTAINER-MEMORY ALERT AS SIZING EVIDENCE. Until 2026-08-02 that alert was
-# `ContainerWorkingSetHigh`, and it was NOT an OOM predictor — an earlier revision of this block drew
-# the wrong conclusion from it. It is now `ContainerMemoryHigh` and keys off `container_memory_rss`
-# instead, for the reason below:
-#
-#   container_memory_working_set_bytes  =  anon  +  ACTIVE file pages  (+ kernel)
-#
-# The file-page term includes the service's own memory-mapped BINARY, which is clean, file-backed and
-# trivially reclaimable — the kernel evicts it under pressure and re-reads it from disk. It can never
-# cause an OOM, but it counts fully toward the alert's ratio. On the small exporters it is roughly HALF
-# the working set (alertmanager: 23.2 MiB anon + 24.5 MiB mapped = its 45.6 MiB "95% of limit"; the
-# 32M exporters map 9.5-16 MiB of binary each). Measured 7-day peaks, anon vs working set:
-#
-#   blackbox 95.3% / ~100%   alertmanager 48.3% / 95.0%   alloy 40.5% / 94.8%
-#   node-exporter 33.4% / 83.8%   loki 68.0% / 80.2%   both postgres-exporters ~42% / ~78%
-#
-# So on the metric that actually predicts OOM, blackbox-exporter was the ONLY service anywhere near its
-# limit. The rest were reporting their binaries. Page cache also grows to fill whatever cgroup limit it
-# is given, which is why raising a limit can never resolve a working-set alert driven by it — see the
-# four-bump history in the `alloy` block below.
-#
-# HOW TO SIZE A GO SERVICE (full recipe in monitoring/README.md -> "Container memory sizing"):
-#   1. Size against `container_memory_rss` (anonymous), NOT the working set.
-#   2. Budget the mapped binary separately: it is a fixed per-image cost, not a load-dependent one.
-#   3. GOMEMLIMIT = 75% of the limit, cross-checked to sit well above the measured live heap
-#      (`go_memstats_heap_alloc_bytes`) — everything below is >=3.7x, so the GC is never pinned.
-#   4. Do NOT compare `go_memstats_sys_bytes` against the limit: that is reserved address space and
-#      runs far above resident memory (tempo: 436.8 reserved vs a 272.6 MiB working set). The resident
-#      figure is `go_memstats_sys_bytes - go_memstats_heap_released_bytes`.
-# Re-derive when changing a limit. A percentage alone is not a budget.
-#
-# 2026-08-03 (#937) re-measurement of every service here against the same 7-day method: all nine
-# GOMEMLIMIT values hold, `blackbox-exporter` now reads **47.6 % anon** on its 64M limit (down from
-# 95.3 % on 32M — the bump plus GOMEMLIMIT=44MiB worked), and **no memory limit in this file
-# changed**. Only two carry notes worth re-reading: `tempo` (live heap doubled to 466.8 MiB, now
-# just 1.65x under its budget — the tightest ratio here) and `prometheus` (the deliberate 88 %
-# exception, re-confirmed at 4.0x). Both are documented in their own blocks.
-# =============================================================================================
-#
-# ---------------------------------------------------------------------------------------------
-# WHY NO SERVICE IN THIS FILE CARRIES A CPU LIMIT — a deliberate asymmetry with the app stack
-# ---------------------------------------------------------------------------------------------
-# Every service in docker-compose.yml has a `cpus:` quota; nothing here does. That asymmetry was
-# checked, not overlooked (#937, 2026-08-03). Measured over 7 days, all 21 containers on the host
-# together averaged **0.256 cores — 3.2 % of the 8 vCPU** — and this whole stack contributed well
-# under half of it. The one eye-catching number is `blackbox-exporter`, whose 5-minute-averaged
-# peak hit **2.62 cores**, by far the largest single reading on the host; its 7-day AVERAGE is
-# 0.021 cores, i.e. that is a probe burst lasting minutes per week, not a workload.
-#
-# Adding quotas here would buy nothing (there is no contention to arbitrate) and would cost the
-# thing a monitoring stack must not lose: a throttled exporter or a throttled Prometheus produces
-# GAPS in the very series used to diagnose an incident, and it does so exactly when the host is
-# busiest. The protection against a monitoring runaway is the memory limit plus `oom_score_adj`,
-# which already sacrifices these containers before any app container. Note also that CFS
-# throttling is per-cgroup against its OWN quota, so an unlimited container here can never be the
-# cause of an app container's throttling — the two are independent.
-# ---------------------------------------------------------------------------------------------
-
 services:
-  # ------------------------------------------------------------------------------------------
-  # Prometheus — metrics DB. 180d retention + 40GB cap; admin API (for the weekly TSDB snapshot)
-  # behind web.config basic auth. No Docker healthcheck: the web server is auth-protected, so the
-  # self-scrape `up` metric + the TargetDown alert are its liveness signal.
-  # ------------------------------------------------------------------------------------------
   prometheus:
     <<: *mon-base
     container_name: prometheus
     image: prom/prometheus:v3.14.0@sha256:5ce7540c3c00ef4ab0c9d2c995c6a5b9c421f44b4a115d97a2c7af3b1c21cbb0
     cap_drop: [ALL]
-    # GOMEMLIMIT (Go soft memory limit): as the Go heap nears this, the runtime GC gets aggressive
-    # to stay under it, so a WAL-replay / peak spike trades CPU for memory instead of hitting the
-    # 1024M cgroup HARD limit below and being OOM-killed. Held ~12% under the hard limit to leave
-    # room for mmap'd chunks and non-heap runtime memory (neither counts toward GOMEMLIMIT). Keep in
-    # step with the memory limit in deploy.resources below.
-    #
-    # NOTE (2026-08-02 sizing sweep): 900MiB is 88% of the 1024M limit — the loosest ratio in this file
-    # and above the 75% the other nine Go services now use, which means that IF Prometheus ever grew
-    # into its GOMEMLIMIT its anonymous memory would land straight on the 90% ContainerMemoryHigh line.
-    # Deliberately left alone: measured live heap is 157.4 MiB against a 7-day working-set peak of
-    # 446.4 MiB (43.6%), so it is nowhere near that ceiling and tightening it would only risk GC
-    # pressure during WAL replay. Re-derive it (75% -> 768MiB) if the retention or cardinality budget
-    # is ever raised.
-    #
-    # #937 re-check (2026-08-03, 7-day peaks): live heap **225.1 MiB**, resident **336.0 MiB**,
-    # `rss` 32.8 % of the limit. The exception is RE-CONFIRMED and stays — this ceiling is 4.0x the
-    # live heap, so the "if Prometheus ever grew into its GOMEMLIMIT" caveat above remains
-    # hypothetical, and the 180-day retention target is exactly the workload whose WAL replay the
-    # extra 13 points of headroom exist for. Note the live heap grew 157.4 -> 225.1 MiB as the
-    # archive filled, so re-read this one when retention or cardinality changes, not on a schedule.
     environment:
       GOMEMLIMIT: "900MiB"
     command:
@@ -164,15 +27,6 @@ services:
       - --storage.tsdb.retention.size=40GB
       - --web.enable-admin-api
       - --web.config.file=/etc/prometheus/web.yml
-      # NO --web.enable-lifecycle (removed 2026-09-22, OPS-SEC-07). It opened POST /-/reload and
-      # /-/quit, and nothing uses either: deploy.sh applies a config change by RECREATING the
-      # container, because the single-file bind mounts are inode-pinned and a reload would re-read
-      # the old file. An endpoint nobody calls is only attack surface -- /-/quit stops the
-      # monitoring plane for anyone holding the web password. The admin API above stays (ADR-0072):
-      # the weekly TSDB snapshot in backup.sh needs it.
-      # (#1041 item 22a) Accept the Tempo metrics-generator's remote_write of the service-graph
-      # series (traces_service_graph_*). Off by default in Prometheus 3.x. The receiver sits on the
-      # same basic-auth-protected web listener, so the generator authenticates as the `grafana` user.
       - --web.enable-remote-write-receiver
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
@@ -185,47 +39,23 @@ services:
     deploy:
       resources:
         limits:
-          # 180d/40GB TSDB scraping ~20+ targets: the in-memory head plus WAL replay on restart
-          # spike past the old 512M cap (the container rode its limit right after a restart).
-          # Raised to 1024M for replay / peak headroom; oom_score_adj=500 still sacrifices this
-          # before the apps, and the 16 GB host has room.
           memory: 1024M
           pids: 512
     networks:
       - net-monitoring-core
       - net-monitoring-scrape
 
-  # ------------------------------------------------------------------------------------------
-  # Grafana — the ONLY monitoring UI. Own TLS cert, Keycloak OIDC (realm role Admin), hardened.
-  # ------------------------------------------------------------------------------------------
   grafana:
     <<: *mon-base
     container_name: grafana
-    # OSS variant (README/runbook posture). grafana/grafana-oss can lag the Enterprise `grafana/grafana`
-    # repo on patch tags: 13.1.0 exists ONLY for grafana/grafana, so a Dependabot bump to
-    # grafana-oss:13.1.0 pinned a tag that does not exist and broke every Grafana `--force-recreate`
-    # ("not found"). Pin to the newest tag actually published for grafana-oss (13.0.2); do NOT switch to
-    # grafana/grafana. Dependabot advances this forward once the OSS repo publishes a newer tag.
-    # Re-verified 2026-08-09: grafana/grafana is on v13.1.3, but the grafana-oss repo still publishes
-    # NOTHING in the 13.1.x line — 13.0.2 remains its newest tag. Do not take a version from the
-    # GitHub release feed; the only authority for this pin is what grafana-oss has actually pushed
-    # (`curl -s 'https://hub.docker.com/v2/repositories/grafana/grafana-oss/tags?name=13.'`).
     image: grafana/grafana-oss:13.0.2@sha256:5dad0df181cb644a14e13617b913b261a54f7d4fd4510721dba420929f35bea2
     cap_drop: [ALL]
     environment:
-      # GOMEMLIMIT — see the GO SERVICE MEMORY SIZING block above. 768MiB = 75% of the 1024M limit.
-      # Grafana is the ONE Go service here with no `go_*` metrics to verify against: Prometheus does
-      # not scrape it (no `grafana` job in prometheus.yml — its own /metrics is behind the OIDC-gated
-      # server), so this is sized from the container working set alone (7-day peak 528.7 MiB = 51.6%).
-      # Grafana also forks plugin subprocesses whose memory the Go runtime does NOT manage and
-      # GOMEMLIMIT does NOT bound, so keep the margin here wider than the exporters' if it is ever
-      # retuned. Add a scrape job first if this service ever needs a real budget.
       GOMEMLIMIT: "768MiB"
       GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-https://grafana.profit-base.online/}
       GF_SERVER_PROTOCOL: https
       GF_SERVER_CERT_FILE: /etc/grafana/certs/grafana.crt
       GF_SERVER_CERT_KEY: /etc/grafana/certs/grafana.key
-      # Hardening: basic auth / anonymous / sign-up off; secure cookies; no gravatar/telemetry.
       GF_AUTH_BASIC_ENABLED: "false"
       GF_AUTH_ANONYMOUS_ENABLED: "false"
       GF_USERS_ALLOW_SIGN_UP: "false"
@@ -236,34 +66,13 @@ services:
       GF_ANALYTICS_REPORTING_ENABLED: "false"
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
       GF_ANALYTICS_FEEDBACK_LINKS_ENABLED: "false"
-      # Break-glass admin — seeds ONLY on first boot (empty DB); rotate via `grafana cli` (runbook).
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD must be set for the monitoring stack}
-      # Keycloak OIDC (PKCE). role_attribute_strict denies login without the Admin realm role.
-      # Needs the "User Realm Role" mapper with "Add to ID token" ON (runbook + realm-config).
       GF_AUTH_GENERIC_OAUTH_ENABLED: "true"
       GF_AUTH_GENERIC_OAUTH_NAME: Keycloak
       GF_AUTH_GENERIC_OAUTH_CLIENT_ID: ${GRAFANA_OAUTH_CLIENT_ID:-grafana}
       GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET: ${GRAFANA_OAUTH_CLIENT_SECRET:?GRAFANA_OAUTH_CLIENT_SECRET must be set for the monitoring stack}
       GF_AUTH_GENERIC_OAUTH_SCOPES: "openid email profile"
-      # DERIVED from the same single source as the app stack, not restated three times (ADR-0167).
-      #
-      # Grafana's generic_oauth provider has no discovery option — it takes the three endpoints
-      # literally — so the realm URL used to appear here three times, in three places that could each
-      # drift alone. They now share one `${IRI_KEYCLOAK_HOSTNAME:-...}` expansion, which is exactly
-      # the variable docker-compose.yml derives the apps' issuer from. Move the identity domain and
-      # all three follow, along with the issuer, in one edit.
-      #
-      # It reaches this file because BOTH compose projects run with the same project directory —
-      # `docker compose -p iri-monitoring --project-directory /var/iri/code` (MONITORING_ROLLOUT_
-      # RUNBOOK) — and compose reads `.env` from there. So one value in one .env feeds the app stack
-      # and this one. A monitoring stack started from somewhere else simply gets the production
-      # default, which is what it got before this change.
-      #
-      # The `/auth` path lives in the variable itself (ADR-0166), so it is NOT repeated below; the
-      # realm segment is. scripts/check-keycloak-issuer.py asserts all three still agree with the
-      # issuer the apps validate, which is the property that matters: a Grafana pointed at a
-      # different realm than the one minting the tokens fails login with nothing wrong in any log.
       GF_AUTH_GENERIC_OAUTH_AUTH_URL: ${IRI_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/iri/protocol/openid-connect/auth
       GF_AUTH_GENERIC_OAUTH_TOKEN_URL: ${IRI_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/iri/protocol/openid-connect/token
       GF_AUTH_GENERIC_OAUTH_API_URL: ${IRI_KEYCLOAK_HOSTNAME:-https://profit-base.online/auth}/realms/iri/protocol/openid-connect/userinfo
@@ -273,7 +82,6 @@ services:
       GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH: "contains(realm_access.roles[*], 'Admin') && 'GrafanaAdmin' || ''"
       GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_STRICT: "true"
       GF_AUTH_GENERIC_OAUTH_ALLOW_ASSIGN_GRAFANA_ADMIN: "true"
-      # Consumed by the provisioned Prometheus datasource (basic auth to the auth-protected API).
       PROMETHEUS_WEB_PASSWORD: ${PROMETHEUS_WEB_PASSWORD:?PROMETHEUS_WEB_PASSWORD must be set for the monitoring stack}
     volumes:
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
@@ -281,12 +89,6 @@ services:
       - /var/iri/monitoring/certs/grafana.crt:/etc/grafana/certs/grafana.crt:ro
       - /var/iri/monitoring/certs/grafana.key:/etc/grafana/certs/grafana.key:ro
       - /var/iri/monitoring/data/grafana:/var/lib/grafana
-    # This is the ONE monitoring service whose probe forks: BusyBox `wget` spawns an `ssl_client` TLS
-    # helper for the https:// fetch below, one per 30s, which reparents to the Grafana Go server (PID
-    # 1, never `wait()`s). Unreaped it filled the `pids: 512` cap on 2026-07-26 — 493 zombies,
-    # pids.current 512/512, pids.events max=7445, every fork refused, `unhealthy` for two days.
-    # The reaper comes from `init: true` on the shared *mon-base anchor above; that is a deliberate
-    # class-level guarantee, not an incidental inheritance — dropping it re-arms this leak in ~4h.
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null --no-check-certificate https://localhost:3000/api/health || exit 1"]
       interval: 30s
@@ -296,49 +98,25 @@ services:
     deploy:
       resources:
         limits:
-          # Grafana 13 grows to ~500 MB+ under active dashboard use (bleve full-text indexes for
-          # folders/dashboards/playlists/repositories + OIDC sessions + bundled-plugin processes).
-          # 192M AND 512M both OOM-cycled it on the production host (95%+ usage -> SIGKILL -> restart
-          # loop, ~every 5 min). 1G gives real headroom on the 16 GB host.
           memory: 1024M
           pids: 512
     networks:
       - net-monitoring-core
-      # Reachable by NPM for the public grafana.profit-base.online host WITHOUT joining NPM to the
-      # closed net-monitoring-core: a dedicated proxy net shared by ONLY NPM (app stack) + Grafana.
       - net-proxy-grafana
 
-  # ------------------------------------------------------------------------------------------
-  # Loki — log store (31d, compactor retention). Ruler pushes log-based alerts to Alertmanager.
-  # ------------------------------------------------------------------------------------------
   loki:
     <<: *mon-base
     container_name: loki
     image: grafana/loki:3.7.8@sha256:1107dd5274e0ada47e42472b7a7e71f3b2a2fe878878108f3e2f9e51528f0193
     cap_drop: [ALL]
-    # GOMEMLIMIT — see the GO SERVICE MEMORY SIZING block above. 288MiB = 75% of the 384M limit;
-    # measured live heap 76.7 MiB, so the ceiling is ~3.8x actual demand. Loki is the one place where
-    # the working-set reading and the anonymous one broadly agree (80.2% vs 68.0%) — it maps 90.9 MiB
-    # of binary but genuinely uses 261.3 MiB anon, the largest real footprint of the unbudgeted set.
     environment:
       GOMEMLIMIT: "288MiB"
     command: -config.file=/etc/loki/loki-config.yml
-    # Docker's default 10s stop-grace SIGKILLs Loki ~20s into its dskit graceful shutdown
-    # (server.graceful_shutdown_timeout default 30s; loki-config.yml does not override it),
-    # truncating the ingester's chunk flush / WAL and forcing a replay — with possible loss of
-    # recently-ingested log lines — on the next start. A `deploy.sh --force-recreate loki` (the
-    # routine way to apply a loki-config.yml change past the inode-pinned single-file bind mount)
-    # hits exactly this. 45s clears the 30s drain with margin; mirrors the tempo grace below and
-    # the app-compose DB(60s)/JVM(30s) grace periods (ADR-0072 amendment 2026-07-12). Prometheus
-    # is deliberately left on the 10s default (crash-safe WAL replay by design).
     stop_grace_period: 45s
     volumes:
       - ./monitoring/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
       - ./monitoring/loki/rules:/etc/loki/rules:ro
       - /var/iri/monitoring/data/loki:/loki
-    # No Docker healthcheck: the Loki image is distroless (no shell/wget), so a CMD-SHELL probe can
-    # never run and would pin the container to (unhealthy) despite a healthy process. Liveness comes
-    # from the Prometheus `up` metric on the loki scrape target (meta-monitoring), per the design note.
     deploy:
       resources:
         limits:
@@ -347,185 +125,33 @@ services:
     networks:
       - net-monitoring-core
 
-  # ------------------------------------------------------------------------------------------
-  # Tempo — trace store (14d), monolithic (-target=all, no Kafka).
-  # Pinned to the 3.x line (3.0.2): Tempo 3.0 is a breaking architecture rewrite (live-store +
-  # backend-scheduler/worker replace the removed 2.x ingester/compactor), migrated and config-verified
-  # for this deployment in #1036. We stay MONOLITHIC on the local filesystem backend — all components
-  # run in one process and NO Kafka is required (Kafka is a microservices-only requirement in 3.x); our
-  # span volume is far below Grafana's microservices threshold (ADR-0076, extends ADR-0072). The
-  # rewritten monolithic config in tempo.yaml passes `tempo -config.verify`. The existing vParquet4
-  # data dir is kept across the upgrade (3.0 reads 2.x RF3 blocks).
-  # ------------------------------------------------------------------------------------------
   tempo:
     <<: *mon-base
     container_name: tempo
     image: grafana/tempo:3.0.3@sha256:0296560ac66f8a3600d7fb3014a52c189d4d9c3549ad6ff441bf2409855d68d5
     cap_drop: [ALL]
-    # -config.expand-env: expand ${PROMETHEUS_WEB_PASSWORD} in tempo.yaml so the metrics-generator's
-    # remote_write can basic-auth to Prometheus as the shared `grafana` user (#1041 item 22a).
     command: ["-target=all", "-config.expand-env=true", "-config.file=/etc/tempo/tempo.yaml"]
     environment:
-      # GOMEMLIMIT — see the GO SERVICE MEMORY SIZING block above. 768MiB = 75% of the 1G limit.
-      # Tempo is also the clearest illustration of why `sys_bytes` must not be compared against the
-      # limit directly: 436.8 MiB reserved versus a 272.6 MiB working set at the same instant —
-      # 164 MiB of that is scavenged-back arena.
-      #
-      # #937 re-measurement (2026-08-03, 7-day peaks) — KEPT at 768MiB, but the margin is now the
-      # narrowest in the stack and worth knowing: live heap **466.8 MiB**, resident 551.8 MiB. That
-      # is only **1.65x** below this ceiling, against the >= 3.7x every other Go service holds, and
-      # it has more than doubled since the 208.8 MiB reading above — the service-graph
-      # metrics-generator processes every span, so the live heap tracks trace volume, not time.
-      # It is still the correct value (the GC has 300 MiB of room before it starts working hard,
-      # and resident sits at 54 % of the container), but tempo is THE service to re-measure first
-      # whenever tracing volume changes — raise the limit and re-derive 75 % of it, never re-apply
-      # a percentage to a limit that did not move.
-      #
-      # #1705 re-measurement (2026-08-29, 7-day) — STILL 768MiB, and the reading above is now
-      # corrected on two counts.
-      #
-      # (1) "Live heap approaching GOMEMLIMIT" largely measures its own ceiling. The 7d heap peak is
-      # 641.6 MiB = 83.5 % of this value, worse than the 1.65x the note above worried about — but
-      # `heap_alloc` is a SAWTOOTH (live heap plus everything allocated since the last collection),
-      # and how high it may climb before Go collects is decided by GOMEMLIMIT itself. Between the 7d
-      # floor and median the heap moved +228 % while the span rate moved +39 %: a figure that tripled
-      # while its supposed driver moved by a third is not being driven by it. This is the same trap
-      # the sys_bytes note two paragraphs up warns about, one metric over.
-      #
-      # (2) The heap did not "track trace volume" — it stepped with the IMAGE. Resident peaks per
-      # container generation: 3.0.2 -> 479.8 / 486.0 / 523.1 MiB, 3.0.3 -> 595.3 / 665.3 MiB. All
-      # three old generations below 525, both new ones above 595: a ~27 % step at the version
-      # boundary, not a volume curve. Re-check this at the next tempo bump before reading a rise as
-      # traffic.
-      #
-      # The number that decides an OOM is the resident set against the CONTAINER limit, not the heap
-      # against this one — see the `memory:` note below.
       GOMEMLIMIT: "768MiB"
-      # Consumed by the metrics-generator remote_write basic_auth (reuses the Prometheus `grafana`
-      # web-auth user — owner decision, #1041 item 22a). Same value Grafana uses for its datasource.
       PROMETHEUS_WEB_PASSWORD: ${PROMETHEUS_WEB_PASSWORD:?PROMETHEUS_WEB_PASSWORD must be set for the monitoring stack}
-    # Same 10s-default < 30s-drain mismatch as Loki above: Docker's default 10s stop-grace
-    # SIGKILLs Tempo ~20s into its dskit graceful shutdown (server.graceful_shutdown_timeout
-    # default 30s; tempo.yaml does not override it), truncating the live-store WAL and forcing a
-    # replay on restart — the failure mode behind the 2026-07-12 TempoWritePathFailing incident,
-    # since a `--force-recreate tempo` mid-flush is the routine config-apply path. 45s clears the
-    # drain (ADR-0072 amendment 2026-07-12).
     stop_grace_period: 45s
     volumes:
       - ./monitoring/tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
       - /var/iri/monitoring/data/tempo:/var/tempo
-    # No Docker healthcheck: the Tempo image is distroless (no shell/wget) — same rationale as Loki.
-    # Liveness = the Prometheus `up` metric on the tempo scrape target (meta-monitoring).
     deploy:
       resources:
         limits:
-          # Under active trace ingestion (Keycloak OTLP spans) the monolithic Tempo OOM-cycles,
-          # flapping the TargetDown liveness alert (Prometheus can't scrape tempo:3200 -> critical
-          # page). History: former 256M cap -> RSS ~326M -> raised to 512M. Then the service-graph
-          # metrics-generator (#1041 item 22a) was enabled, which processes EVERY span to build the
-          # graph and is a significant new memory driver, pushing the working set past 512M and
-          # resuming the OOM flap. Raised 512M -> 1G: the 16 GB host has ample headroom and 1G clears
-          # the metrics-generator working set with margin.
-          #
-          # #937 CLOSED the deferred fine-tune this line used to point at, with a measurement rather
-          # than a guess: over the 7 days ending 2026-08-03 the resident peak was **551.8 MiB = 54 %
-          # of this limit** and `rss` peaked at 49.2 %. The 1G is correct and stays — it is neither
-          # the OOM risk the 512M was nor dead capacity worth reclaiming (the stack now sits
-          # 1.97 GiB under the host budget without touching it). See the GOMEMLIMIT note above for
-          # why tempo is nonetheless the service to re-measure first.
-          #
-          # #1705 re-measured it (7 days ending 2026-08-29): `rss` peak **665.3 MiB = 65.0 %** of
-          # this limit, mean 221.6 MiB = 21.6 %, working set peak 819.5 MiB = 80.0 %. The peak rose
-          # 20.6 % against #937 and headroom fell 46 % -> 35 %, so the direction is real — but rss is
-          # what an OOM kill is decided on, ContainerMemoryHigh guards it at 90 %, and 65 % is not
-          # that. STAYS at 1G. Read the working-set figure the way ContainerMemoryHigh was amended to
-          # (2026-08-02): it counts the mapped binary and is not the OOM predictor.
-          #
-          # #1705 also settled the question that was open against this limit — whether trace sampling
-          # should be reduced to buy headroom. It should not, and the deciding number is CPU, not
-          # memory: tempo's ENTIRE container CPU over those 7 days is 0.0181 cores, 1.81 % of ONE
-          # core. Whatever share of that is GC is bounded above by it, so there is no cost to buy
-          # back and nothing to trade trace fidelity for. Sampling stays at 1.0.
           memory: 1G
           pids: 512
     networks:
       - net-monitoring-core
 
-  # ------------------------------------------------------------------------------------------
-  # Alloy — log shipper + OTLP collector. Receives app/Keycloak spans on the scrape net, forwards
-  # to Tempo on the core net; ships logs to Loki. On the production host it is a HOST service reading
-  # the journal (generate-quadlet.py); this service definition serves the local stacks.
-  # ------------------------------------------------------------------------------------------
   alloy:
     <<: *mon-base
     container_name: alloy
     image: grafana/alloy:v1.19.2@sha256:b8ec653c44235fbe910879145dac3597d66b0aaecf60bcbbe82580767771a839
-    # 1.18.0 (taken 2026-07-28) also pulled in Prometheus 3.12 and otel-collector 0.153 upstream, and
-    # 1.19.2 (taken 2026-08-31) carried that on to Prometheus 3.13.2 and otel-collector 0.158.0. If the
-    # working set drifts up after such a bump with NO config change of ours, that dependency jump is the
-    # first suspect before the "Alloy-side leak" verdict at the end of the sizing note below — and the
-    # fix is still to re-derive GOMEMLIMIT from the budget, never to re-apply a percentage.
-    # 1.19.0 carried three upstream breaking changes; none reach us. We declare no `prometheus.write.queue`
-    # (removed), no `prometheus.operator.servicemonitors` (its file-access default flipped) and no
-    # memory-limiter processor (its metrics were renamed), and `alloy validate` passes on 1.19.2. Re-run
-    # that check on the next minor rather than assuming this one still holds.
-    # READ ITS OUTPUT, NOT ITS EXIT CODE: `alloy validate` exits 0 even when validation fails
-    # (measured on 1.19.2, 2026-09-20 -- a config naming a component that does not exist prints
-    # "Error: validation failed" on stderr and still returns 0). Anything that gates on `$?` here is
-    # a check that cannot fail. Gate on the output being empty instead.
-    # Runs as root to reach its own storage dir and read privileged host logs, but with ALL caps
-    # dropped. Instead of restoring CAP_DAC_OVERRIDE we grant two supplementary groups (least
-    # privilege, no capability bypass): GID 473 = the image's `alloy` group that owns /var/lib/alloy
-    # (mode 0770) so root can traverse into the mounted data subdir; GID 4 = `adm` so it can read the
-    # syslog:adm-owned /var/log/auth.log. Re-verify both GIDs if the alloy base image ever changes.
     cap_drop: [ALL]
     group_add: ["473", "4"]
-    # GOMEMLIMIT is a SOFT cap that makes the Go GC reclaim and return memory to the OS BEFORE the
-    # cgroup OOM-kills Alloy. It must sit DELIBERATELY BELOW the 90% container-memory alert line, NOT
-    # at it: GOMEMLIMIT bounds the Go runtime's managed memory, but container_memory_working_set_bytes
-    # ALSO counts non-runtime RSS (page cache from the ~8 file tailers + docker log source, MADV_FREE
-    # pages the kernel has not yet reclaimed). The prior 230MiB was ~90% of the old 256M hard limit —
-    # the SAME ratio as the alert — so the managed target plus that off-heap overhead parked the working
-    # set right on the 90% line and ContainerWorkingSetHigh fired chronically (2026-07-15).
-    #
-    # 2026-07-25: 384M/300MiB ALSO paged, and the reason is an arithmetic error worth spelling out —
-    # the "~78% of the limit" rule above sizes GOMEMLIMIT as a pure RATIO, but the non-Go overhead it
-    # has to leave room for is an ABSOLUTE constant, not a proportional slice. Measured on prod:
-    # working set 347 MiB while GOMEMLIMIT was 300 MiB, so that overhead is ~47 MiB — another ~12% at a
-    # 384M limit, which is why 78% + 12% = 90% parked Alloy exactly ON the alert line (observed >90%
-    # sustained, and 90.4% at the 2026-07-25T02:00Z snapshot).
-    #
-    # Size it as a BUDGET, the same way the three app JVMs are sized (see the JVM CONTAINER SIZING
-    # block in docker-compose.yml): working_set ~= GOMEMLIMIT + 47 MiB must land <= ~80% of the limit.
-    # At 512M that gives GOMEMLIMIT <= 363 MiB, hence 360MiB -> 407 MiB = ~80%. This deliberately
-    # undershoots the "512M / 400MiB" the 2026-07-15 note suggested, which lands at ~87% and would have
-    # left only 3 points of margin — the very mistake being fixed here. 360MiB still relieves the Go
-    # runtime by ~20% over the 300MiB it is currently GC-pinned at. GOMEMLIMIT is a SOFT ceiling the GC
-    # only reaches if the live heap demands it (GOGC targets 2x live first), so raising it does not
-    # force Alloy to consume it. When changing the limit, re-derive from the budget — never re-apply a
-    # percentage.
-    #
-    # 2026-08-02 — THE "THIRD RECURRENCE = LEAK" VERDICT BELOW WAS INVESTIGATED AND IS **NOT** A LEAK.
-    # Alloy read 94.8% of this limit on a 7-day working-set peak, which under the old rule would have
-    # condemned it. A 21-day decomposition says otherwise:
-    #
-    #   container_memory_rss        flat 190-217 MB for the whole window, THROUGH the climb
-    #   go_goroutines               flat ~397, then LOWER (~370) — no tailer-reconnect churn
-    #   go_memstats_heap_alloc      154 MiB against this 360MiB GOMEMLIMIT — the runtime is on budget
-    #   container_memory_mapped_file  0-2 MB for 19 days, then 182.5 MiB in ONE 6h window on 07-31
-    #
-    # The whole excess is the memory-mapped Alloy binary. It appeared when the v1.18.0 image bump
-    # (4ea97210c, merged 07-28) reached prod with the 07-31 release deploy: page cache is charged to the
-    # cgroup that FIRST faults a page in, so after a fresh pull the container running the new binary is
-    # billed for it, where the long-resident old image's pages had been billed to the pull. Same memory
-    # as before, different cgroup — and clean file-backed pages the kernel reclaims on demand, so it is
-    # not an OOM risk at all. Alloy's ACTUAL anonymous usage is 40.5% of this limit.
-    #
-    # Do NOT raise the limit a fourth time, and do not chase a leak here either. The four-bump history
-    # (192->256->384->512M) is the signature of chasing a working-set number that partly measures a
-    # binary: page cache expands to fill whatever limit it is given, so the ratio always creeps back.
-    # If this alerts again, check `container_memory_rss` FIRST — see the GO SERVICE MEMORY SIZING block
-    # at the top of this file.
     environment:
       GOMEMLIMIT: "360MiB"
     command:
@@ -536,7 +162,6 @@ services:
     volumes:
       - ./monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro
       - /var/iri/monitoring/data/alloy:/var/lib/alloy/data
-      # Log sources (read-only). App JSON is masked at source; NPM access + host auth.log keep IPs.
       - /var/iri/backend/log:/logs/backend:ro
       - /var/iri/frontend/log:/logs/frontend:ro
       - /var/iri/ingest/log:/logs/ingest:ro
@@ -545,51 +170,22 @@ services:
     deploy:
       resources:
         limits:
-          # 512M (was 384M, 256M, orig 192M): ADR-0095 (2026-07-12) added the three busiest apps' full
-          # stdout/stderr via loki.source.docker + RE2 masking on top of the OTLP receiver+exporter and
-          # ~8 file tailers, raising Alloy's steady-state working set without a compensating limit bump —
-          # so it kept riding >90% of 256M and tripped ContainerWorkingSetHigh (2026-07-15). The 384M
-          # follow-up did NOT hold: it paged again 2026-07-24/25 with no new Alloy workload since (the
-          # only config change was a `stage.drop`), i.e. Alloy was GC-pinned AT its 300MiB GOMEMLIMIT and
-          # the constant ~47 MiB non-Go overhead pushed the total onto the 90% line. See the GOMEMLIMIT
-          # comment above for the measured budget arithmetic that replaces the old percentage rule;
-          # 512M/360MiB targets a ~80% working set. If this recurs a THIRD time with no added workload,
-          # stop bumping and treat it as an Alloy-side leak (check for loki.source.docker
-          # tailer-reconnect churn: "could not transfer logs: unexpected EOF") rather than a sizing
-          # shortfall.
           memory: 512M
           pids: 512
     networks:
       - net-monitoring-core
       - net-monitoring-scrape
 
-  # ------------------------------------------------------------------------------------------
-  # Alertmanager — SMTP routing + the Watchdog heartbeat to healthchecks.io. The config is rendered
-  # from alertmanager.yml.tmpl by the runbook (Alertmanager does not expand env vars) to
-  # /var/iri/monitoring/secrets/alertmanager.yml.
-  # ------------------------------------------------------------------------------------------
   alertmanager:
     <<: *mon-base
     container_name: alertmanager
     image: quay.io/prometheus/alertmanager:v0.34.1@sha256:e9733bafb1bdef9b00e25a21f8f99dc26a22224bf16641ad754d1649f4c3357a
     cap_drop: [ALL]
-    # GOMEMLIMIT — see the GO SERVICE MEMORY SIZING block above. 36MiB = 75% of the 48M limit;
-    # measured live heap 7.7 MiB, so the ceiling is ~4.7x actual demand. Preventive, not remedial:
-    # alertmanager READ 95.0% of its limit at the 2026-08-02 sweep, but the decomposition puts 24.5 MiB
-    # of that 45.6 MiB peak in its mapped binary and only 23.2 MiB (48.3%) in anonymous memory. Its 48M
-    # limit is tight for a Go binary of this size, but it is not close to OOM and needs no more RAM.
     environment:
       GOMEMLIMIT: "36MiB"
     command:
       - --config.file=/etc/alertmanager/alertmanager.yml
       - --storage.path=/alertmanager
-      # Notification-log retention. This is what remembers "this alert was already mailed", and it
-      # bounds repeat_interval from below: entries older than this are garbage-collected, after
-      # which a still-firing alert is treated as never-notified and mails again. The default is 120h
-      # (5d), so the config's 720h (30d) "one mail per event" would silently have degraded into a
-      # five-day cadence. 744h = 31d, one day of headroom. Raise it with repeat_interval or neither.
-      # Cost is a handful of tiny nflog entries on the existing bind mount — not a memory concern at
-      # this alert volume, and the mount makes it survive a restart.
       - --data.retention=744h
     volumes:
       - /var/iri/monitoring/secrets/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
@@ -608,19 +204,11 @@ services:
     networks:
       - net-monitoring-core
 
-  # ------------------------------------------------------------------------------------------
-  # node_exporter — host metrics + systemd collector + textfile collector (ops-automation metrics).
-  # Needs the host namespaces, so it is intentionally the least-isolated monitoring service.
-  # ------------------------------------------------------------------------------------------
   node-exporter:
     <<: *mon-base
     container_name: node-exporter
     image: quay.io/prometheus/node-exporter:v1.12.1@sha256:1b4e4438faca4dd7e001dd445d161a4a2091b0fededa84093b3a8dfeae1f1be0
     pid: host
-    # GOMEMLIMIT — see the GO SERVICE MEMORY SIZING block above. 24MiB = 75% of the 32M limit;
-    # measured live heap 2.6 MiB, so the ceiling is ~9.2x actual demand — the widest margin here,
-    # because this exporter genuinely needs almost nothing. Preventive: its 83.8% working-set peak
-    # decomposes to 10.7 MiB anon (33.4%) + 13.5 MiB mapped binary, so it was never near OOM.
     environment:
       GOMEMLIMIT: "24MiB"
     command:
@@ -630,23 +218,6 @@ services:
       - --no-collector.wifi
     volumes:
       - /:/host:ro,rslave
-      # The systemd collector does NOT read the filesystem: it talks to systemd over dbus on
-      # /run/systemd/private, and --path.rootfs does not redirect a socket path. Without this
-      # mount the collector finds no socket, emits nothing, and says so nowhere -- which is how
-      # `node_systemd_unit_state` came to have ZERO series in production (read 2026-08-29), so the
-      # `SystemdUnitFailed` rule in alerts/infrastructure.yml has never been able to fire. A failed
-      # iri-deploy / iri-backup / iri-restore-drill unit alerted through the textfile metrics only,
-      # never through this path (REQ-OBS-014: a dead alert reads as coverage, which is worse than
-      # no alert).
-      #
-      # VERIFY AFTER APPLYING, and do not assume the mount alone is enough: this image runs as
-      # `nobody` (65534) and /run/systemd/private is mode 0600 root:root, so the collector may
-      # still be unable to open it. Check with
-      #   curl -s <node-exporter>:9100/metrics | grep -c node_systemd_unit_state
-      # A zero there means the socket is mounted but unreadable, and the remaining options are to
-      # run this one service as root -- which costs part of the hardening posture the rest of this
-      # file sets -- or to retire the rule. Do not leave it silently at zero: that is the state
-      # this comment exists to end.
       - /run/systemd/private:/run/systemd/private:ro
     deploy:
       resources:
@@ -656,32 +227,6 @@ services:
     networks:
       - net-monitoring-scrape
 
-  # cAdvisor and the docker-socket-proxy were removed on 2026-09-22 (OPS-SIMP-02). Neither could
-  # run on the rootless Podman host -- cAdvisor's rootless support is closed upstream as not planned,
-  # and there is no Docker socket to proxy -- so generate-quadlet.py had deleted them from every unit
-  # set since the cutover, and here they only described a Docker host that is retired. Their series
-  # come from prometheus-podman-exporter and scripts/cgroup-container-metrics.py (arc42 §7.3).
-
-  # ------------------------------------------------------------------------------------------
-  # postgres_exporter ×2 — one per DB, dedicated pg_monitor-only user. Each bridges into the app
-  # data net to reach its DB AND the scrape net so Prometheus can scrape it (keeps the DBs off the
-  # broad scrape net — no new lateral path). sslmode=disable: the DBs serve plain on isolated nets.
-  #
-  # --no-collector.stat_replication: the exporter's default-enabled `stat_replication` collector runs
-  # `SELECT …, slot_name, … FROM pg_stat_replication`, but pg_stat_replication has NO slot_name column
-  # (it lives in pg_stat_replication_slots / pg_stat_wal_receiver) — an upstream bug still present on
-  # v0.20.0 and main. On every scrape both DBs logged `ERROR: column "slot_name" does not exist`,
-  # spamming Loki. These are single-instance DBs with no streaming replicas, so the metric is dead
-  # weight anyway; the flag (kingpin-only, no envar) disables the broken query. The valid `replication`
-  # / `replication_slots` collectors stay on.
-  #
-  # --collector.database_wraparound + --collector.long_running_transactions (#1041 item 13): both are
-  # default-OFF built-in collectors. They add pg_database_wraparound_age_datfrozenxid_seconds (an XID
-  # AGE COUNT despite the _seconds name — the SQL is age(datfrozenxid)) and
-  # pg_long_running_transactions_oldest_timestamp_seconds (genuinely seconds), backing the wraparound /
-  # long-transaction alerts. Read-only queries against pg_database / pg_stat_activity — no extra grants
-  # beyond the existing pg_monitor role. Recreate both exporter containers on deploy to pick up the flags.
-  # ------------------------------------------------------------------------------------------
   postgres-exporter-backend:
     <<: *mon-base
     container_name: postgres-exporter-backend
@@ -692,10 +237,6 @@ services:
       - --collector.database_wraparound
       - --collector.long_running_transactions
     environment:
-      # GOMEMLIMIT — see the GO SERVICE MEMORY SIZING block above. 24MiB = 75% of the 32M limit;
-      # measured live heap 3.6 MiB, so the ceiling is ~6.7x actual demand. Preventive: its 77.9%
-      # working-set peak is 13.6 MiB anon (42.4%) plus a 9.5 MiB mapped binary — NOT the blackbox
-      # ratchet, which an earlier revision of this comment wrongly claimed.
       GOMEMLIMIT: "24MiB"
       DATA_SOURCE_NAME: "postgresql://${PG_EXPORTER_USER:-monitoring}:${PG_EXPORTER_BACKEND_PASSWORD:?PG_EXPORTER_BACKEND_PASSWORD must be set}@db-backend:15432/${POSTGRES_DB:?POSTGRES_DB must be set}?sslmode=disable"
     deploy:
@@ -712,17 +253,11 @@ services:
     container_name: postgres-exporter-keycloak
     image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1@sha256:ac5ec343104fae0e2d84a27bb8d69b38430a11910c5382cad85d478d2bab713e
     cap_drop: [ALL]
-    # --no-collector.stat_replication: see the backend exporter above — upstream slot_name bug.
-    # --collector.database_wraparound + --collector.long_running_transactions: see the backend exporter.
     command:
       - --no-collector.stat_replication
       - --collector.database_wraparound
       - --collector.long_running_transactions
     environment:
-      # GOMEMLIMIT — see the GO SERVICE MEMORY SIZING block above. Same image, same limit and the same
-      # 3.4 MiB live heap as the backend exporter, so the same 24MiB (75% of 32M, ~7.1x the heap). It
-      # sat lower at the sweep (working-set peak 54.8%, anon 42.3%) only because the Keycloak DB is
-      # quieter — and it maps just 3.1 MiB of binary against the backend exporter's 9.5 MiB.
       GOMEMLIMIT: "24MiB"
       DATA_SOURCE_NAME: "postgresql://${PG_EXPORTER_USER:-monitoring}:${PG_EXPORTER_KEYCLOAK_PASSWORD:?PG_EXPORTER_KEYCLOAK_PASSWORD must be set}@db-keycloak:15433/${KC_POSTGRES_DB:?KC_POSTGRES_DB must be set}?sslmode=disable"
     deploy:
@@ -734,23 +269,12 @@ services:
       - net-monitoring-scrape
       - net-db-keycloak
 
-  # ------------------------------------------------------------------------------------------
-  # redis_exporter — dedicated ACL user (read-only monitoring commands, no key access — the session
-  # store with OAuth2 refresh tokens stays unreadable). Bridges into net-redis-frontend to reach it.
-  # ------------------------------------------------------------------------------------------
   redis-exporter:
     <<: *mon-base
     container_name: redis-exporter
     image: oliver006/redis_exporter:v1.91.1@sha256:c67a432dba6b4ae30f471e3c77cf14a289133bbeeb89abb0bb03e6092efb2836
     cap_drop: [ALL]
     environment:
-      # GOMEMLIMIT — see the GO SERVICE MEMORY SIZING block above. 24MiB = 75% of the 32M limit.
-      # This exporter ships with the Go collector DISABLED, so there is no go_memstats_* series to
-      # verify the ratio against (confirmed at the 2026-08-02 sweep: the `redis` job returns container
-      # metrics but no go_*). Sized from the cgroup counters instead: 12.8 MiB anon (40.0% of the limit)
-      # plus a 9.5 MiB mapped binary make up its 77.2% working-set peak — the same shape as the two
-      # postgres-exporters, which is why it gets their value. Preventive, like theirs.
-      # If this ever needs a real budget, enable the Go collector first rather than guessing again.
       GOMEMLIMIT: "24MiB"
       REDIS_ADDR: redis://redis:6379
       REDIS_USER: ${REDIS_EXPORTER_USER:-monitoring}
@@ -764,96 +288,38 @@ services:
       - net-monitoring-scrape
       - net-redis-frontend
 
-  # ------------------------------------------------------------------------------------------
-  # blackbox_exporter — HTTPS probes + certificate expiry for the public endpoints. Needs egress.
-  # ------------------------------------------------------------------------------------------
   blackbox-exporter:
     <<: *mon-base
     container_name: blackbox-exporter
     image: prom/blackbox-exporter:v0.28.0@sha256:e753ff9f3fc458d02cca5eddab5a77e1c175eee484a8925ac7d524f04366c2fc
     cap_drop: [ALL]
-    # GOMEMLIMIT, same soft-cap rationale as prometheus/alloy above: without it the Go runtime has no
-    # idea a cgroup ceiling exists. It sizes the heap off GOGC alone (target 2x live heap) and returns
-    # arena pages only lazily via the scavenger, so every concurrency spike RATCHETS the working set up
-    # and it never comes back down. Measured on prod 2026-08-02T05:51Z while ContainerWorkingSetHigh was
-    # firing: live heap 9.8 MiB, GC target 14.4 MiB, 21 goroutines, 18 fds — yet go_memstats_sys_bytes
-    # 31.3 MiB against a 32 MiB limit. The process did not NEED the memory, the runtime simply kept it.
-    # The climb is visible as ~0.5 MB/day per container life, restarting near 26 MB after each recreate.
-    #
-    # Sized against the measured Go footprint (method + numbers in monitoring/README.md -> "Container
-    # memory sizing" -> "Go services"): working_set tracks the runtime's RESIDENT memory, which is what
-    # GOMEMLIMIT bounds — `go_memstats_sys_bytes - go_memstats_heap_released_bytes`, NOT `sys_bytes`
-    # alone (that is reserved address space and runs far above the working set: 31.3 vs 23.4 MiB here).
-    # GOMEMLIMIT is set at 75% of the limit with the remainder as margin: 44MiB of 64M, expected
-    # working set ~48 MiB = 75%, well under the 90% alert line. 44MiB is also ~4.5x the measured live
-    # heap (9.8 MiB), so the GC is never pinned at the ceiling in steady state — it only clamps the
-    # probe pile-ups that caused the 2026-07-31 step.
-    #
-    # This service is the one where the alert was RIGHT. The plane-wide decomposition that reclassified
-    # every other working-set alert as mapped-binary noise confirms blackbox instead: its 7-day peak was
-    # 30.5 MiB of ANONYMOUS memory against the 32 MiB limit (95.3%) — by far the highest anon ratio in
-    # the stack, with everything else under 70%. The 16.0 MiB it maps peaks separately, at container
-    # start. So the extra RAM here is genuinely needed; for the other eight Go services it was not.
     environment:
       GOMEMLIMIT: "44MiB"
     command:
       - --config.file=/etc/blackbox/blackbox.yml
     volumes:
       - ./monitoring/blackbox/blackbox.yml:/etc/blackbox/blackbox.yml:ro
-      # Basetool CA for the https_internal module (#1041 item 8) — validates the app keystore.p12
-      # cert chain so probe_ssl_earliest_cert_expiry drives CertificateExpiringSoon on the internal
-      # certs. Same host-side CA that Prometheus mounts for its HTTPS app scrapes.
       - /var/iri/monitoring/certs/basetool-ca.crt:/etc/blackbox/certs/basetool-ca.crt:ro
     deploy:
       resources:
         limits:
-          # 64M (was 32M, unchanged since the stack was built 2026-07-04): the original budget was a
-          # guess made when this exporter probed a handful of targets. It now serves 23 targets across
-          # 12 jobs every 30s — HTTPS with cert-chain validation, DNS, and the ip6-pinned variants — and
-          # its steady state had crept to 26-28.6 MiB, i.e. 78-85% of 32M with no room for a spike. On
-          # 2026-07-31 probes started running into their deadlines (DNS on 1.1.1.1 at exactly its 5.000s
-          # module timeout, ingest 9.74s of 10s); overlapping probes took goroutines from a 21-day-stable
-          # 23-24 up to 52, each holding its own TLS/DNS buffers, and the working set stepped to 97-100%
-          # and stayed there. Ruled out first: no leak (goroutines and fds return to baseline), no cgroup
-          # OOM kill (container_oom_events_total = 0), no host pressure (10-11 GB MemAvailable across the
-          # whole 21-day window). See the GOMEMLIMIT budget arithmetic above.
           memory: 64M
           pids: 512
     networks:
       - net-monitoring-core
       - net-monitoring-scrape
-      # Dedicated IPv6 egress (net-blackbox-v6, defined below): the other two nets are IPv4-only, so the
-      # ip6-pinned probes need this to reach the edge over v6 — makes EdgeIpv6Unreachable a true signal
-      # instead of a structural false positive (issue #1252).
       - net-blackbox-v6
 
 networks:
-  # Shared boundary net, created and owned by the app stack (docker-compose.yml); referenced here by
-  # its fixed name. Prometheus scrapes the apps + keycloak here and Alloy receives their OTLP spans.
   net-monitoring-scrape:
     external: true
     name: net-monitoring-scrape
-  # Dedicated NPM<->Grafana proxy net, created and owned by the app stack (docker-compose.yml, where
-  # NPM lives). Lets NPM re-encrypt the public grafana.profit-base.online host to grafana:3000 without
-  # ever joining the closed net-monitoring-core.
   net-proxy-grafana:
     external: true
     name: net-proxy-grafana
-  # Monitoring-only backbone (Prometheus/Alertmanager/Loki/Tempo/Grafana/exporters). App containers
-  # are NEVER members. Not `internal` because alertmanager (SMTP + healthchecks.io) and blackbox
-  # need internet egress.
   net-monitoring-core:
     name: net-monitoring-core
     driver: bridge
-  # Dedicated IPv6 egress net for blackbox-exporter ONLY (issue #1252). The two nets it otherwise
-  # joins — net-monitoring-core (here) and the external net-monitoring-scrape — are both IPv4-only, so
-  # the container had NO v6 route: every ip6-pinned probe (http_2xx_ipv6 / http_2xx_or_401_ipv6, no v4
-  # fallback) CONNECT-failed -> probe_success=0 -> a STRUCTURALLY false EdgeIpv6Unreachable, even though
-  # the public edge answers fine over IPv6 (host has working v6; the vhosts carry AAAA). This net gives
-  # the exporter real v6 egress so the probe tests the actual edge and the alert becomes a true signal.
-  # ULA subnet (RFC 4193); egress works via the host's global IPv6 + Docker's IPv6 masquerade for the
-  # private range (auto on Docker 27+, no /etc/docker/daemon.json change needed — verified http=200 from
-  # a throwaway container on such a net). Blackbox-only, keeping the v6 surface minimal.
   net-blackbox-v6:
     name: net-blackbox-v6
     driver: bridge
@@ -861,8 +327,6 @@ networks:
     ipam:
       config:
         - subnet: fd00:bb::/64
-  # App-owned data nets (created by docker-compose.yml), referenced so the exporters reach the
-  # DBs/Redis without putting them on the broad scrape net.
   net-db-backend:
     external: true
     name: net-db-backend

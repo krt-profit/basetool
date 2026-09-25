@@ -82,7 +82,6 @@ class BankPermissionsE2eTest {
   private static Browser browser;
   private static BackendSeeder seeder;
 
-  // Two accounts: the employee is granted on the first only.
   private static String grantedAccountId;
   private static String ungrantedAccountId;
 
@@ -95,7 +94,6 @@ class BankPermissionsE2eTest {
     }
     seeder = new BackendSeeder();
 
-    // Materialise the employee's user row so its synced BANK_EMPLOYEE role makes it grant-eligible.
     String employeeId = seeder.getUserId(EMPLOYEE_USER, EMPLOYEE_PASSWORD);
 
     grantedAccountId =
@@ -120,13 +118,10 @@ class BankPermissionsE2eTest {
   /** Management sees every account in the paged list; the employee sees only the granted one. */
   @Test
   void accountVisibilityFollowsGrantsNotOrgMembership() {
-    // Management: both accounts present.
     String mgmtList = seeder.getBody(MGMT_USER, MGMT_PASSWORD, "/api/v1/bank/accounts?size=500");
     assertTrue(mgmtList.contains(grantedAccountId), "management sees the granted account");
     assertTrue(mgmtList.contains(ungrantedAccountId), "management sees the ungranted account");
 
-    // Employee (no squadron): only the granted account in the list, and a 403 on the ungranted
-    // account's detail — independence proven without any org membership.
     String employeeList =
         seeder.getBody(EMPLOYEE_USER, EMPLOYEE_PASSWORD, "/api/v1/bank/accounts?size=500");
     assertTrue(employeeList.contains(grantedAccountId), "employee sees the granted account");
@@ -212,8 +207,6 @@ class BankPermissionsE2eTest {
         E2eSupport.login(page, baseUrl, PLAIN_MEMBER_USER, PLAIN_MEMBER_PASSWORD);
         E2eSupport.navigate(page, baseUrl + "/bank");
         page.waitForLoadState();
-        // The bank dashboard greeting/cards are never rendered for a non-bank member; the bank
-        // sidebar group is likewise absent.
         assertThat(page.locator("[data-testid='bank-account-card']")).hasCount(0);
         assertThat(page.locator("[data-testid='nav-bank']")).hasCount(0);
       } catch (RuntimeException | AssertionError failure) {
@@ -234,12 +227,9 @@ class BankPermissionsE2eTest {
         E2eSupport.login(page, baseUrl, MGMT_USER, MGMT_PASSWORD);
         E2eSupport.navigate(page, baseUrl + "/bank");
         page.waitForLoadState();
-        // The direct-booking Kontobewegung CTA and the management-only three-month report render on
-        // the dashboard header; Verwaltung / Berechtigungen moved to the sidebar.
         assertThat(page.locator("[data-testid='bank-movement-open']"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(20_000));
         assertThat(page.locator("[data-testid='bank-report-download']")).isVisible();
-        // At least the two seeded accounts render as cards.
         assertTrue(
             page.locator("[data-testid='bank-account-card']").count() >= 2,
             "management dashboard shows the seeded account cards");

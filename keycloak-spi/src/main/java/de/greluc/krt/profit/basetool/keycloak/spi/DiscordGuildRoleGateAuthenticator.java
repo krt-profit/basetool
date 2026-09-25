@@ -129,19 +129,14 @@ public class DiscordGuildRoleGateAuthenticator implements Authenticator {
       return;
     }
 
-    // The ONE guild-member read of this login (KC-PERF-01). It used to be two here: the roles,
-    // then the same endpoint again for the nickname, on top of the identity provider's own read,
-    // so a first login spent three calls of the user's Discord rate-limit budget on one object.
     DiscordMembershipChecker.MemberLookup lookup =
         checker.lookup(apiBaseUrl, guildId, roleId, brokered.accessToken());
     if (lookup.result() != DiscordMembershipChecker.Result.ALLOWED) {
-      // Coarse reason only — never the token, payload or any Discord id.
       log.infof("Discord membership gate denied login (reason=%s).", lookup.result());
       deny(context, ERROR_MESSAGE_KEY);
       return;
     }
 
-    // Membership confirmed. Now the fail-open duplicate-account guard (REQ-SEC-022).
     if (accountAlreadyExists(context, lookup.memberBody(), brokered)) {
       log.info(
           "Discord first-login denied: a Basetool account already exists for this identity; "
@@ -171,9 +166,6 @@ public class DiscordGuildRoleGateAuthenticator implements Authenticator {
       @NotNull AuthenticationFlowContext context,
       @Nullable String memberBody,
       @NotNull Brokered brokered) {
-    // ADR-0036: an already-authenticated session means an existing account is LINKING Discord, not
-    // registering. Skip — otherwise the precheck would match the very account being linked and
-    // wrongly deny a legitimate link.
     if (isAccountLinking(context)) {
       return false;
     }
@@ -181,14 +173,12 @@ public class DiscordGuildRoleGateAuthenticator implements Authenticator {
     String url = backendPrecheckUrl();
     String secret = backendSharedSecret();
     if (url == null || !isHttps(url) || secret == null || secret.isBlank()) {
-      // Feature off, or a non-HTTPS URL we refuse to call — fail open (HTTPS only, never HTTP).
       return false;
     }
 
     String serverNickname = DiscordGuildNicknameReader.extractNick(memberBody).orElse(null);
     BackendAccountChecker.Result existence =
         backendChecker.check(url, secret, brokered.username(), brokered.email(), serverNickname);
-    // Fail open: only a confident EXISTS denies; NOT_EXISTS and UNKNOWN allow.
     return existence == BackendAccountChecker.Result.EXISTS;
   }
 
@@ -282,14 +272,10 @@ public class DiscordGuildRoleGateAuthenticator implements Authenticator {
   }
 
   @Override
-  public void action(AuthenticationFlowContext context) {
-    // Non-interactive: authenticate() terminates with success/failure, so this is never reached.
-  }
+  public void action(AuthenticationFlowContext context) {}
 
   @Override
   public boolean requiresUser() {
-    // The gate inspects the brokered Discord identity, not a local Keycloak user (which may not yet
-    // exist during first-broker login), so no pre-existing user is required.
     return false;
   }
 
@@ -299,14 +285,10 @@ public class DiscordGuildRoleGateAuthenticator implements Authenticator {
   }
 
   @Override
-  public void setRequiredActions(KeycloakSession session, RealmModel realm, UserModel user) {
-    // The gate neither sets nor clears required actions.
-  }
+  public void setRequiredActions(KeycloakSession session, RealmModel realm, UserModel user) {}
 
   @Override
-  public void close() {
-    // Stateless; nothing to release.
-  }
+  public void close() {}
 
   /**
    * The brokered Discord identity fields the gate needs: the federated access token plus the

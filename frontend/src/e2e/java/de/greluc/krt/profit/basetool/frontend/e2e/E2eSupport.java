@@ -303,10 +303,6 @@ final class E2eSupport {
    * @throws TimeoutError if the login does not complete within {@link #LOGIN_MAX_ATTEMPTS} attempts
    */
   static void login(Page page, String baseUrl, String username, String password) {
-    // Attempts 1..N-1 retry on a timeout; the final attempt runs uncaught so a persistent
-    // failure propagates rather than being swallowed. Structuring it this way keeps the loop
-    // condition the genuine bound (instead of an in-body throw that the linter — rightly —
-    // flags as making the condition always true).
     for (int attempt = 1; attempt < LOGIN_MAX_ATTEMPTS; attempt++) {
       try {
         attemptLogin(page, baseUrl, username, password);
@@ -546,16 +542,9 @@ final class E2eSupport {
           if (!request.isNavigationRequest() || !"document".equals(request.resourceType())) {
             return false;
           }
-          // Post/Redirect/Get happy path: the app answers the POST with a 3xx and the browser
-          // follows it with a GET for the post-submit document. Waiting for that GET's response —
-          // not the POST's 3xx — means the redirect has fully committed, so the caller's next
-          // navigate(...) has no in-flight redirect GET to abort.
           if ("GET".equals(request.method())) {
             return true;
           }
-          // Defensive: a submit that renders its own document (no redirect) settles on the POST
-          // response itself, so accept any non-3xx POST document too rather than hang waiting for
-          // a redirect that will never arrive.
           int status = response.status();
           return "POST".equals(request.method()) && (status < 300 || status >= 400);
         },
@@ -599,9 +588,6 @@ final class E2eSupport {
    */
   static Response navigate(Page page, String url) {
     Page.NavigateOptions options = new Page.NavigateOptions().setTimeout(NAVIGATE_TIMEOUT_MILLIS);
-    // Attempts 1..N-1 retry a transient abort or timeout; the final attempt (below the loop) runs
-    // uncaught, so a persistent failure propagates with its real error — mirrors
-    // login()/attemptLogin.
     for (int attempt = 1; attempt < NAVIGATE_MAX_ATTEMPTS; attempt++) {
       try {
         return page.navigate(url, options);
@@ -620,13 +606,6 @@ final class E2eSupport {
             url,
             String.valueOf(abort.getMessage()).lines().findFirst().orElse("navigation aborted"));
       }
-      // Let the reset stream tear down and the page fall back to its prior, already-loaded document
-      // before re-issuing the GET. The settle runs between attempts, outside the catch, so it can
-      // never mask the abort/timeout it follows. The load-state wait is best-effort and explicitly
-      // bounded: the next attempt issues a fresh GET that establishes its own load state, so a
-      // settle that itself outruns the timeout on a contended runner must not become the test's
-      // failure — swallow that TimeoutError and retry. Only the final attempt (below the loop)
-      // propagates a genuine navigation failure.
       page.waitForTimeout(NAVIGATE_RETRY_BACKOFF_MILLIS);
       try {
         page.waitForLoadState(

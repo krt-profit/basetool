@@ -90,8 +90,6 @@ class NotificationCenterE2eTest {
     browser = E2eSupport.launchBrowser(playwright, STACK.managesStack());
     if (STACK.managesStack()) {
       BackendSeeder seeder = new BackendSeeder();
-      // Log the admin in first so its Admin realm role is mirrored into user_roles before the event
-      // fires — the JOB_ORDER_CREATED rule's ROLE-ADMIN selector resolves recipients from that.
       seeder.getUserId(ADMIN_USER, ADMIN_PASSWORD);
       String materialId =
           seeder.ensureJobOrderMaterial(ADMIN_USER, ADMIN_PASSWORD, "E2E Notif Material");
@@ -139,11 +137,6 @@ class NotificationCenterE2eTest {
         page.waitForLoadState();
         page.evaluate("() => { window.__krtNoReload = true; }");
 
-        // Target the exact notification for the seeded order. The display id is always numeric, so
-        // it is interpolated directly (NOT via Pattern.quote, whose Java \Q…\E fences are not valid
-        // JS regex quoting once Playwright serialises the pattern to its driver). The negative
-        // lookahead avoids a shorter id matching a longer one, e.g. #1 must not match #12 on the
-        // shared stack where sibling suites also create orders.
         Locator row =
             page.locator(
                 "#notification-page-list .notification-item",
@@ -174,8 +167,6 @@ class NotificationCenterE2eTest {
       }
     }
   }
-
-  // ---------------------------------------------------------------------- helpers --
 
   /**
    * Opens a new authenticated browser context with HTTPS errors ignored (the stack uses a

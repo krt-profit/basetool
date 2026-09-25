@@ -69,8 +69,6 @@ class SystemControllerTest {
     assertEquals("v2", response.version());
     assertEquals("pong", response.message());
 
-    // Timestamp must be a fresh UTC Instant (no timezone arithmetic) —
-    // verifies the CLAUDE.md "All times in UTC" rule at the boundary.
     assertNotNull(response.timestamp());
     assertFalse(
         response.timestamp().isBefore(before), "Timestamp must be at-or-after the call started");

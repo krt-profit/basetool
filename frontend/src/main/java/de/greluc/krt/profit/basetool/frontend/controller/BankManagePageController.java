@@ -108,10 +108,6 @@ public class BankManagePageController {
       @AuthenticationPrincipal OidcUser principal,
       Model model) {
     boolean management = hasRole(authentication, Roles.authority(Roles.BANK_MANAGEMENT));
-    // The account-management table is now truly paginated (REQ-BANK-053, ADR-0106): the former
-    // unbounded size=500 preload silently dropped every account past 500. The backend already sorts
-    // by name (stable via the id tiebreaker), so the page content keeps the A→Z ordering without a
-    // client re-sort. The pager re-renders the manageBody fragment in place (REQ-FE-005).
     int effectiveSize = size == null || !PAGE_SIZES.contains(size) ? DEFAULT_PAGE_SIZE : size;
     int effectivePage = page == null || page < 0 ? 0 : page;
     PageResponse<BankAccountDto> accounts =
@@ -132,25 +128,8 @@ public class BankManagePageController {
     model.addAttribute("accountsPaginationBaseUrl", "/bank/manage?tab=konten");
     model.addAttribute("holders", holders == null ? List.<BankHolderDto>of() : holders);
     model.addAttribute("management", management);
-    // The KRT account (singleton CARTEL) for the Bankleitung-only "KRT-Freigaben" tab
-    // (REQ-BANK-047), where the two 3-stage thresholds T1/T2 are edited; null until a KRT account
-    // exists. Fetched by its own type-filtered one-row search rather than scanned out of the (now
-    // paged) accounts list, where the singleton might not sit on the current page.
     model.addAttribute("cartelAccount", management ? fetchCartelAccount() : null);
-    // The caller's own user id (OIDC sub) so the holder tab can link only the caller's own holder
-    // row to its history; management links every row (REQ-BANK-032). The real per-holder gate is
-    // server-side (canSeeHolder) — this only governs which links the UI renders.
-    // NOTE: authentication.getName() returns the preferred_username (the frontend OAuth2
-    // user-name-attribute), NOT the Keycloak sub — comparing it against the holder's userId
-    // (== app_user.id == sub) never matched, so a plain bank employee never saw the link to their
-    // own holder. CurrentUser.userIdText is the id that equals BankHolderDto.userId; same
-    // fix as the mission participant self-edit carve-out (MissionPageController#authUserId).
     model.addAttribute("selfUserId", CurrentUser.userIdText(principal));
-    // Halter is the default-open tab (it sits first/left in the tab nav); ?tab=konten opens the
-    // accounts tab and ?tab=krt-freigaben the Bankleitung-only KRT approval-thresholds tab
-    // (REQ-BANK-047) — the latter only for a management caller, so a plain employee forcing the
-    // query
-    // param falls back to Halter and never sees the KRT-thresholds panel.
     String activeTab;
     if (management && "krt-freigaben".equalsIgnoreCase(tab)) {
       activeTab = "krt-freigaben";
@@ -164,11 +143,6 @@ public class BankManagePageController {
       return "bank-manage :: manageBody";
     }
 
-    // The org-unit lookup feeds the management-only non-special account-creation modal (it links a
-    // Bereich/OL). An employee may only create SPECIAL accounts (no org unit), so that
-    // management-gated backend read is skipped for a plain employee (REQ-BANK-030). The
-    // holder-registration modal's user picker is now a server-side search combobox (#1193,
-    // data-krt-combobox="remote-bank-users"), so no full user roster is loaded here.
     if (management) {
       List<OrgUnitMembershipOptionDto> orgUnits =
           backendApiClient.getCached(
@@ -178,9 +152,6 @@ public class BankManagePageController {
     } else {
       model.addAttribute("orgUnits", List.<OrgUnitMembershipOptionDto>of());
     }
-    // No transfer-fee rate is fetched here: the only booking modal on this page is the
-    // holder→holder
-    // Umbuchung, which is fee-free (REQ-BANK-031, ADR-0052), so it needs no live fee preview.
     return "bank-manage";
   }
 

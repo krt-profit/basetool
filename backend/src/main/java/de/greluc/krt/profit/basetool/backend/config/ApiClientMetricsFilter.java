@@ -95,10 +95,6 @@ public class ApiClientMetricsFilter extends OncePerRequestFilter {
       @NotNull FilterChain chain)
       throws ServletException, IOException {
     Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-    // Anonymous callers are deliberately not counted: they have no client identity to attribute,
-    // and a series that lumped every guest request under one literal would only dilute the ratio
-    // this metric exists to show. "Has a subject" is asked through the seam rather than through an
-    // instanceof, so a future authentication type cannot silently drop out of the count (ADR-0129).
     if (AuthenticatedSubject.of(authentication).isPresent()) {
       meterRegistry
           .counter(

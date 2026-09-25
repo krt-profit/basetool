@@ -381,10 +381,6 @@ public class JobOrderController {
   @Operation(
       summary = "Create a new job order",
       description = "Creates a job order. Requires an authenticated member (ADR-0149).")
-  // ADR-0149 closed the anonymous create at the URL matrix; this method gate and the guest
-  // redaction below it stayed behind, still saying the opposite in a PUBLISHED contract. Harmless
-  // on its own - the matrix decides, and the edge-deny probe asserts the 401 - but a later
-  // "consistency" pass could as easily have widened the matrix to match the annotation.
   @PreAuthorize("isAuthenticated()")
   public JobOrderDto createJobOrder(@RequestBody @Valid CreateJobOrderDto dto) {
     return jobOrderService.createJobOrder(dto);
@@ -406,8 +402,6 @@ public class JobOrderController {
       description =
           "Creates an item-based job order; the required materials are derived from each ordered"
               + " item's blueprint.")
-  // Same as the material-order create above: ADR-0149 requires a login, so the permitAll() method
-  // gate and the anonymous redaction that followed it are gone.
   @PreAuthorize("isAuthenticated()")
   public JobOrderDto createItemJobOrder(@RequestBody @Valid CreateJobOrderItemRequestDto dto) {
     return jobOrderService.createItemJobOrder(dto);
@@ -512,11 +506,6 @@ public class JobOrderController {
         dto.type(),
         dto.countBlueprintsWithVariants(),
         redactMaterialProgress(dto.materials()),
-        // Item lines pass through in full — deliberately lighter than the material-progress
-        // redaction above. An ITEM order's per-line deliveredAmount + derived material breakdown
-        // are
-        // the requester's OWN order fulfilment (no processing-side stock/claims, no member PII), so
-        // the Auftraggeber may see them (REQ-ORDERS-023; confirmed in the #1186 security review).
         dto.items(),
         Collections.emptyList(),
         Collections.emptyList(),
@@ -524,11 +513,7 @@ public class JobOrderController {
         Collections.emptyList(),
         dto.createdAt(),
         dto.version(),
-        // Redaction hides the order's contents from a requester-only viewer; it says nothing about
-        // whether they may edit it. Carry the server's answer through rather than dropping it.
         dto.canEdit(),
-        // This IS the requesting-owner redacted view — carry the flag so the client renders the
-        // limited template regardless of its global capabilities (review finding 2).
         true);
   }
 
@@ -702,17 +687,7 @@ public class JobOrderController {
   @Transactional(readOnly = true)
   public JobOrderDto getJobOrderById(@PathVariable UUID id) {
     JobOrderDto dto = jobOrderQueryService.getJobOrderById(id);
-    // The service already stamped the per-order redaction decision (computed from the loaded
-    // entity,
-    // so no second canSeeJobOrder load here — review finding 4). A requester-only viewer's DTO
-    // carries redacted=true; strip the processing-side surfaces (Bearbeiter section, materials
-    // summary, collection progress) at this HTTP boundary. A full viewer keeps the complete view.
     JobOrderDto tiered = dto.redacted() ? cleanupJobOrderForRequester(dto) : dto;
-    // The assignee chips render effectiveName and nothing else, but the nested UserDto carried the
-    // full member record - roles, permissions, description, joinDate, discordLinked - to every
-    // viewer, including a member of another Staffel reading through the SK public escape. The same
-    // caller asking GET /api/v1/users/{id} for the same person gets the peer shape unconditionally
-    // (audit finding H-3), so this door was the wider one.
     return tiered.withAssignees(UserDtoRedaction.toPeerShapedAssignees(tiered.assignees()));
   }
 

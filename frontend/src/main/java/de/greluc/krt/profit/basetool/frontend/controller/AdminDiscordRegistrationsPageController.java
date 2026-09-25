@@ -107,9 +107,6 @@ public class AdminDiscordRegistrationsPageController {
       model.addAttribute("error", "error.admin.discordRegistrations.load");
       model.addAttribute("registrations", List.of());
     }
-    // Read the rejected list under its own guard rather than inside the block above: it is the
-    // secondary surface, and a failure there (a backend that predates ?status=, say, during a
-    // rolling deploy) must not blank out the pending queue that is this page's primary job.
     model.addAttribute("rejected", loadRejected());
     return "admin/discord-registrations";
   }

@@ -138,8 +138,6 @@ public class RoleService {
   @CacheEvict(cacheNames = CacheConfig.ROLES_CACHE, allEntries = true)
   public Role updatePermissions(@NotNull String roleName, @NotNull Set<String> permissions) {
     Role role = Entities.require(roleRepository.findByName(roleName), "Role not found");
-    // Snapshot BEFORE the setter: setPermissions replaces the ElementCollection wholesale, after
-    // which the previous grant is gone from memory as well as from the row.
     Set<String> previous = new HashSet<>(role.getPermissions());
     role.setPermissions(permissions);
     Role saved = roleRepository.save(role);

@@ -30,9 +30,6 @@
            th:text="#{admin.audit.subtitle}">Jede Aktivit&auml;t, l&uuml;ckenlos protokolliert.</p>
     </div>
 
-    <!--/* Nine-way area switcher (REQ-AUDIT-001): bank + the eight generic areas. Each tab is a plain
-         link so the active tab survives a full reload; filtering + paging within a tab swap in
-         place via audit-log.js. */-->
     <nav class="tab-nav mt-2" role="tablist" th:aria-label="#{admin.audit.title}" data-testid="audit-tabs">
         <a th:each="d : ${domains}" class="tab"
            th:classappend="${d == activeDomain} ? 'active' : ''"
@@ -47,9 +44,6 @@
         <p th:text="#{${error}}">Fehler beim Laden.</p>
     </div>
 
-    <!--/* Filter bar: period (split datetime), actor, event type. Filtering + paging are in-place via
-         audit-log.js (krtFetch.swap); the GET form is the no-JS fallback. The hidden domain field
-         keeps the active tab across swaps. */-->
     <form id="audit-filter-form" method="get" th:action="@{/admin/audit-log}" class="bank-filterbar mt-2 no-track">
         <input type="hidden" name="domain" th:value="${activeDomain}">
         <div class="bank-form-row datetime-split-group" data-datetime-filter-role="start">
@@ -82,8 +76,6 @@
                         th:text="#{${eventKeyPrefix + et}}">Ereignis</option>
             </select>
         </div>
-        <!--/* Originating-client filter (REQ-AUDIT-005): on every tab, the bank included -- both
-             trails record the value through the one ClientAttribution seam. */-->
         <div class="bank-form-row">
             <label for="audit-client" th:text="#{admin.audit.filter.client}">Client</label>
             <select id="audit-client" name="clientId" data-testid="audit-filter-client">
@@ -136,9 +128,6 @@
                                   th:text="#{${e.eventLabelKey()}}">Ereignis</span>
                         </td>
                         <td th:text="${@handles.display(e.subject())}">&mdash;</td>
-                        <!--/* Falls back to the raw client id rather than a missing-key marker: an
-                             unlabelled value means the deployment renamed a client, and the id
-                             itself is the useful answer. */-->
                         <td data-testid="audit-row-client"
                             th:text="${e.clientId() != null ? (#messages.msgOrNull('admin.audit.client.' + e.clientId()) ?: e.clientId()) : '—'}">&mdash;</td>
                         <td class="bank-note-cell" th:text="${e.details()}" th:title="${e.details()}">Details</td>
@@ -156,9 +145,6 @@
         </div>
     </div>
 
-    <!--/* Period PDF export (REQ-AUDIT-001): a period picker -> backend PDF via the proxy, downloaded
-         as a blob (no native dialogs; errors render inline). The endpoint is the active tab's proxy
-         path; audit-log.js reads the synced from/to hidden inputs and fetches the blob. */-->
     <div th:replace="~{fragments/modal-wrapper :: modal(modalId='audit-export-modal', titleKey='admin.audit.export.title', variant=null, body=~{::.audit-download-form})}">
         <form class="audit-download-form no-track"
                   th:attr="data-endpoint=${exportEndpoint},data-filename='audit-' + ${activeDomain} + '.pdf',data-period-required=#{admin.audit.export.periodRequired},data-download-error=#{admin.audit.export.error}">
@@ -201,13 +187,6 @@
             </form>
     </div>
 
-    <!--/* Period retention purge (REQ-AUDIT-004): deletes the active tab's audit entries older than a
-         cutoff. A prominent warning recommends exporting a PDF/JSON backup first; the deletion is
-         irreversible and itself audit-logged. No native dialogs; validation + the deleted-count
-         result render inline (audit-log.js, via krtFetch.write DELETE).
-         The ceiling note below is REQ-AUDIT-006: an automatic sweep also removes rows past a
-         configured age, so an admin who finds entries gone without having purged is told why here
-         rather than having to guess. */-->
     <div th:replace="~{fragments/modal-wrapper :: modal(modalId='audit-purge-modal', titleKey='admin.audit.purge.title', variant=null, body=~{::.audit-purge-form})}">
             <form class="audit-purge-form no-track"
                   th:attr="data-endpoint=${purgeEndpoint},data-period-required=#{admin.audit.purge.beforeRequired},data-delete-error=#{admin.audit.purge.error},data-success-template=#{admin.audit.purge.success}">

@@ -92,27 +92,15 @@ public class AdminPersonSearchPageController {
 
     if (term.length() >= 3) {
       try {
-        // The term goes as a URI-template variable so it is percent-encoded exactly once across
-        // the frontend->backend hop (REQ-FE-016). URLEncoder here was encoded twice: WebClient's
-        // default TEMPLATE_AND_VALUES mode re-encodes each '%' to '%25', the backend's
-        // @RequestParam
-        // then held the literal escape sequence, escapeLikeWildcards escaped those '%' into '\%',
-        // and ILIKE matched nothing. Plain ASCII terms were unaffected, which is why it sat
-        // unnoticed -- and a search for a name with an umlaut reported no mentions at all, which on
-        // this surface is the one answer that must never be wrong (REQ-SEC-060).
         PersonSearchResultDto result =
             backendApiClient.get("/api/v1/admin/person-search?q={q}", RESULT_TYPE, term);
         model.addAttribute("hits", result == null ? List.of() : result.hits());
         model.addAttribute("truncated", result != null && result.truncated());
-        // Reported separately from the overall cap, which almost never fires: 75 targets at 25
-        // hits each means a name occurring 40 times in ONE column produced a union total far
-        // below 300 and truncated == false, so the page said the list was complete.
         model.addAttribute(
             "cappedColumns",
             result == null || result.cappedColumns() == null ? List.of() : result.cappedColumns());
         model.addAttribute("searched", true);
       } catch (BackendServiceException e) {
-        // No term in the message: see the class comment.
         log.debug("Person search failed with status {}", e.getStatusCode());
         model.addAttribute("error", "admin.personSearch.error.load");
       } catch (Exception e) {

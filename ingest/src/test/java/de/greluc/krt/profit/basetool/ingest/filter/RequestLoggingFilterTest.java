@@ -90,8 +90,6 @@ class RequestLoggingFilterTest {
 
   @Test
   void escalatesToWarnOnceTheSlowRequestThresholdIsCrossed() throws Exception {
-    // A zero-millisecond threshold makes every request "slow", so the WARN branch is exercised
-    // without sleeping (REQ-OBS-001).
     MockHttpServletResponse response = new MockHttpServletResponse();
     response.setStatus(200);
 
@@ -111,8 +109,6 @@ class RequestLoggingFilterTest {
 
   @Test
   void stillLogsTheAccessLineWhenTheChainThrows() {
-    // The line is emitted from a finally block, so an exploding downstream filter must not swallow
-    // it — that is what keeps a 500 attributable.
     MockHttpServletResponse response = new MockHttpServletResponse();
     response.setStatus(500);
     MockFilterChain exploding =
@@ -134,7 +130,6 @@ class RequestLoggingFilterTest {
                 new RequestLoggingFilter(TestLoggingProperties.defaults())
                     .doFilter(ingestRequest(), response, exploding);
               } catch (IllegalStateException expected) {
-                // Propagated to the container as usual; the access line must exist regardless.
               }
             });
 

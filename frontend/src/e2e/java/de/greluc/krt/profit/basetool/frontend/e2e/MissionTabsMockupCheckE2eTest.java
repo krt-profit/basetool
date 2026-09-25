@@ -107,7 +107,6 @@ class MissionTabsMockupCheckE2eTest {
                 .setPath(Paths.get("build", "e2e", "tab-" + tab + ".png")));
       }
 
-      // Probe the chip-select rendering on the crew board.
       E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=crew");
       page.waitForLoadState();
       Locator chip = page.locator(".crew-role-select").first();
@@ -123,7 +122,6 @@ class MissionTabsMockupCheckE2eTest {
         System.out.println("[mockup-check] no chip-select found");
       }
 
-      // Finance pane probe: which mock sections rendered for an admin?
       E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=fin");
       page.waitForLoadState();
       Object finProbe =
@@ -135,7 +133,6 @@ class MissionTabsMockupCheckE2eTest {
                   + " pageWidth: document.querySelector('.page-wrapper').offsetWidth })");
       System.out.println("[mockup-check] fin probe: " + finProbe);
 
-      // One real drag&drop: first pool row onto the first unit zone.
       E2eSupport.navigate(page, baseUrl + "/missions/" + missionId + "?tab=crew");
       page.waitForLoadState();
       int poolBefore = page.locator("#board-pool .person-row").count();
@@ -155,9 +152,6 @@ class MissionTabsMockupCheckE2eTest {
                 .setPath(Paths.get("build", "e2e", "tab-crew-after-drag.png")));
       }
 
-      // Drag a unit row OUT onto the section header (not a drop-zone): releasing over
-      // no unit returns the participant to the "Ohne Einheit" pool, mirroring a pool
-      // drop. This is the long-board unassign gesture — no need to scroll to the pool.
       Locator unitRow = page.locator(".board-units .drop-zone .person-row").first();
       if (unitRow.count() > 0) {
         int poolBeforeRemove = page.locator("#board-pool .person-row").count();

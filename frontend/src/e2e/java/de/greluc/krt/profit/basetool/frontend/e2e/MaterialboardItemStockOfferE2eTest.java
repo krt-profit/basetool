@@ -121,19 +121,8 @@ class MaterialboardItemStockOfferE2eTest {
         assertThat(pickerInput)
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
 
-        // The picker defaults to Material (REQ-MARKET-002); pick the Item kind so the stock-backed
-        // game-item rows are the ones the combobox lists.
         page.locator("#mb-modal [data-mb-kind-radio][value=\"ITEM\"]").check();
 
-        // Type the item name and gate on the debounced /releasable-items?q=… query it fires,
-        // so the picker list has settled before we touch it. The picker REPLACES the
-        // [data-mb-picker-list] innerHTML when that response renders; clicking an option
-        // mid-replacement detaches it, and the click retried to its 10s timeout on the
-        // timing-sensitive Firefox shard (chromium/webkit won the race). Waiting for the
-        // filtered response means the render has run and — via the JS pickerSeq guard that
-        // drops any late initial-query response — no further re-render follows, so the
-        // resolved option is stable when clicked. The modal-open query carries no q=, so the
-        // predicate matches only the typed search.
         page.waitForResponse(
             response ->
                 response.url().contains("/materialboerse/releasable-items")
@@ -146,8 +135,6 @@ class MaterialboardItemStockOfferE2eTest {
         assertThat(option).isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
         option.click();
 
-        // Picking a game-item row enables the amount field (whole units); offer 5 of the 20 in
-        // stock.
         Locator amount = page.locator("#mb-modal [data-mb-amount]");
         assertThat(amount).isEnabled(new LocatorAssertions.IsEnabledOptions().setTimeout(10_000));
         amount.fill("5");
@@ -156,7 +143,6 @@ class MaterialboardItemStockOfferE2eTest {
         assertThat(page.locator("#mb-modal"))
             .isHidden(new LocatorAssertions.IsHiddenOptions().setTimeout(10_000));
 
-        // The board now carries the stock-backed item offer: the item name and its "Item" kind tag.
         assertThat(page.getByText(ITEM_NAME).first())
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
         assertThat(page.locator(".mb-kind-tag").first())

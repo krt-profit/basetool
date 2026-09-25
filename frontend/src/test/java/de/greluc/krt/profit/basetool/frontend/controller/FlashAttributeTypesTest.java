@@ -88,8 +88,6 @@ class FlashAttributeTypesTest {
 
   @Test
   void theParserSeesEveryShapeTheOldCodeUsed() {
-    // The guard on the guard: the two forms AdminPersonalInventoryPageController used until
-    // 2026-09-23, split over lines the way the formatter writes them, plus an innocent neighbour.
     String source =
         """
         redirectAttributes.addFlashAttribute(

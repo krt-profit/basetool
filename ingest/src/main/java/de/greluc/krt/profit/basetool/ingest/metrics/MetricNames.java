@@ -375,7 +375,5 @@ public final class MetricNames {
   /** Tag key: which ingest client gate {@link #INGEST_GATE_ENFORCING} describes. */
   public static final String TAG_GATE = "gate";
 
-  private MetricNames() {
-    // Constants holder — not instantiable.
-  }
+  private MetricNames() {}
 }

@@ -211,8 +211,6 @@ public class HangarService {
                 types, scope.adminAllScope(), scope.activeOrgUnitId(), scope.memberOrgUnitIds())
             : Collections.emptyList();
 
-    // Index the ships by their type once (O(ships)) instead of re-scanning the whole list per
-    // ship-type row (the former O(types × ships) filter inside the page map).
     Map<UUID, List<Ship>> shipsByType =
         ships.stream().collect(Collectors.groupingBy(s -> s.getShipType().getId()));
 

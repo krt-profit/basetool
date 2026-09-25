@@ -78,17 +78,13 @@ class MissionFinanceEntryServiceTest {
   @Mock private RefineryOrderRepository refineryOrderRepository;
   @Mock private MissionMapper missionMapper;
 
-  // Constructor-injected but not exercised in these tests; declared so
   @Mock private AuditService auditService;
-  // @InjectMocks satisfies the constructor signature without an NPE.
 
   @InjectMocks private MissionFinanceEntryService service;
 
   private static final UUID MISSION_ID = UUID.randomUUID();
   private static final UUID PARTICIPANT_ID = UUID.randomUUID();
   private static final UUID ENTRY_ID = UUID.randomUUID();
-
-  // --- getEntriesByMission -------------------------------------------------
 
   @Test
   void getEntriesByMission_mapsRepositoryPage_throughMissionMapper() {
@@ -109,8 +105,6 @@ class MissionFinanceEntryServiceTest {
     assertSame(dto, result.getContent().get(0));
   }
 
-  // --- calculateTotalSum ---------------------------------------------------
-
   @Nested
   class CalculateTotalSumTests {
 
@@ -124,7 +118,7 @@ class MissionFinanceEntryServiceTest {
     @Test
     void singleIncomeEntry_isAdded() {
       stubEntries(entry(FinanceType.INCOME, new BigDecimal("250.00")));
-      stubRefineryOrders(); // none
+      stubRefineryOrders();
 
       assertEquals(new BigDecimal("250.00"), service.calculateTotalSum(MISSION_ID));
     }
@@ -150,7 +144,6 @@ class MissionFinanceEntryServiceTest {
 
     @Test
     void refineryOrderProfit_isAddedToTotal() {
-      // Profit = oreSales(1000) - expenses(200) - otherExpenses(50) = 750
       stubEntries();
       stubRefineryOrders(refineryOrder(1000.0, 200.0, 50.0));
 
@@ -159,7 +152,6 @@ class MissionFinanceEntryServiceTest {
 
     @Test
     void refineryOrderLoss_isAddedAsNegative() {
-      // Profit = 100 - 300 - 50 = -250
       stubEntries();
       stubRefineryOrders(refineryOrder(100.0, 300.0, 50.0));
 
@@ -168,10 +160,6 @@ class MissionFinanceEntryServiceTest {
 
     @Test
     void refineryOrderWithZeroProfit_isSkipped() {
-      // Profit = 500 - 300 - 200 = 0 -> should not call BigDecimal.add at all.
-      // We verify by adding a real entry with a non-trivial scale, then
-      // confirming the result has the entry's scale rather than the
-      // double-conversion scale of a zero-profit refinery order.
       stubEntries(entry(FinanceType.INCOME, new BigDecimal("100.0000")));
       stubRefineryOrders(refineryOrder(500.0, 300.0, 200.0));
 
@@ -186,7 +174,6 @@ class MissionFinanceEntryServiceTest {
 
     @Test
     void nullOreSales_isTreatedAsZero() {
-      // Profit = null(0) - 100 - 0 = -100
       stubEntries();
       stubRefineryOrders(refineryOrder(null, 100.0, null));
 
@@ -195,7 +182,6 @@ class MissionFinanceEntryServiceTest {
 
     @Test
     void nullExpenses_isTreatedAsZero() {
-      // Profit = 500 - null(0) - 50 = 450
       stubEntries();
       stubRefineryOrders(refineryOrder(500.0, null, 50.0));
 
@@ -204,7 +190,6 @@ class MissionFinanceEntryServiceTest {
 
     @Test
     void nullOtherExpenses_isTreatedAsZero() {
-      // Profit = 500 - 100 - null(0) = 400
       stubEntries();
       stubRefineryOrders(refineryOrder(500.0, 100.0, null));
 
@@ -223,11 +208,10 @@ class MissionFinanceEntryServiceTest {
     void multipleRefineryOrders_profitsAccumulate() {
       stubEntries(entry(FinanceType.EXPENSE, new BigDecimal("100")));
       stubRefineryOrders(
-          refineryOrder(1000.0, 100.0, 0.0), // +900
-          refineryOrder(0.0, 50.0, 0.0), // -50
-          refineryOrder(200.0, 100.0, 50.0)); // +50
+          refineryOrder(1000.0, 100.0, 0.0),
+          refineryOrder(0.0, 50.0, 0.0),
+          refineryOrder(200.0, 100.0, 50.0));
 
-      // -100 + 900 - 50 + 50 = 800
       assertEquals(new BigDecimal("800.0"), service.calculateTotalSum(MISSION_ID));
     }
 
@@ -251,7 +235,6 @@ class MissionFinanceEntryServiceTest {
     @Test
     void calculateTotals_foldsRefineryExpensesIntoBucket_butProfitIntoTotal() {
       stubEntries(entry(FinanceType.INCOME, new BigDecimal("1000")));
-      // profit = 500 - 300 - 50 = 150 (into total); raw expenses 300 (> 0 -> into expense bucket)
       stubRefineryOrders(refineryOrder(500.0, 300.0, 50.0));
 
       MissionFinanceTotalsDto totals = service.calculateTotals(MISSION_ID);
@@ -282,11 +265,6 @@ class MissionFinanceEntryServiceTest {
     }
 
     private void stubEntries(MissionFinanceEntry... entries) {
-      // calculateTotals now reads a SQL aggregate instead of the row list, so translate the given
-      // entries into the equivalent per-type aggregate (keeping the cases expressed as concrete
-      // entries). A SQL SUM over no rows is NULL, so leave the sum null when a type is absent —
-      // that
-      // exercises the service's coalesce-to-zero path; entry amounts' scales are preserved.
       BigDecimal incomeSum = null;
       long incomeCount = 0L;
       BigDecimal expenseSum = null;
@@ -317,8 +295,6 @@ class MissionFinanceEntryServiceTest {
     }
   }
 
-  // --- createEntry ---------------------------------------------------------
-
   @Nested
   class CreateEntryTests {
 
@@ -345,9 +321,6 @@ class MissionFinanceEntryServiceTest {
 
     @Test
     void throwsBadRequest_whenParticipantBelongsToDifferentMission() {
-      // Cross-mission injection guard: tying a participant from mission B to a
-      // ledger entry on mission A would let an attacker bill costs onto someone
-      // else's mission.
       Mission requestedMission = mission(MISSION_ID);
       Mission otherMission = mission(UUID.randomUUID());
       MissionParticipant alienParticipant = new MissionParticipant();
@@ -368,7 +341,6 @@ class MissionFinanceEntryServiceTest {
       MissionParticipant p = participant(PARTICIPANT_ID, m);
       when(missionRepository.findById(MISSION_ID)).thenReturn(Optional.of(m));
       when(participantRepository.findById(PARTICIPANT_ID)).thenReturn(Optional.of(p));
-      // Echo back whatever the service builds — captures it for verification.
       when(financeEntryRepository.save(any(MissionFinanceEntry.class)))
           .thenAnswer(inv -> inv.getArgument(0));
       MissionFinanceEntryDto outDto =
@@ -388,7 +360,6 @@ class MissionFinanceEntryServiceTest {
       assertEquals("note", saved.getNote());
       assertEquals(FinanceType.INCOME, saved.getType());
       assertEquals(new BigDecimal("123.45"), saved.getAmount());
-      // REQ-AUDIT-001: a finance-entry create records exactly one MISSION_FINANCE_ENTRY_CREATED.
       verify(auditService, times(1))
           .record(
               eq(
@@ -400,8 +371,6 @@ class MissionFinanceEntryServiceTest {
               any());
     }
   }
-
-  // --- updateEntry ---------------------------------------------------------
 
   @Nested
   class UpdateEntryTests {
@@ -431,10 +400,6 @@ class MissionFinanceEntryServiceTest {
       BusinessConflictException ex =
           assertThrows(
               BusinessConflictException.class, () -> service.updateEntry(ENTRY_ID, staleDto));
-      // i18n-key path: the throw site passes a literal English string here,
-      // not a key. Both behaviours are valid (GlobalExceptionHandler#resolveDetail
-      // passes literals through verbatim), so we just lock in the rough shape
-      // of the message rather than the exact text.
       assert ex.getMessage().contains("updated by someone else");
       verify(financeEntryRepository, never()).save(any());
     }
@@ -471,8 +436,6 @@ class MissionFinanceEntryServiceTest {
     }
   }
 
-  // --- deleteEntry ---------------------------------------------------------
-
   @Nested
   class DeleteEntryTests {
 
@@ -494,8 +457,6 @@ class MissionFinanceEntryServiceTest {
       verify(financeEntryRepository, times(1)).delete(entry);
     }
   }
-
-  // ---- helpers ------------------------------------------------------------
 
   private static MissionFinanceEntry entry(FinanceType type, BigDecimal amount) {
     MissionFinanceEntry e = new MissionFinanceEntry();

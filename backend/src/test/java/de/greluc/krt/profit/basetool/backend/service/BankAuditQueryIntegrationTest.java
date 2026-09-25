@@ -65,26 +65,21 @@ class BankAuditQueryIntegrationTest {
 
   @Test
   void getEvents_withAllNullFilters_runsAndReturnsAPage() {
-    // Given a booking so at least one audit row exists
     seedDepositAuditRow();
     PageRequest pageable = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "occurredAt"));
 
-    // When — every filter absent, exactly the admin viewer's default call
     Page<BankAuditEventDto> page =
         bankAuditService.getEvents(null, null, null, null, null, null, pageable);
 
-    // Then it does not throw and yields the seeded event
     assertNotNull(page);
     assertTrue(page.getTotalElements() >= 1, "the seeded deposit produced an audit row");
   }
 
   @Test
   void getEvents_withEveryFilterSet_runsWithoutTypeInferenceError() {
-    // Given
     seedDepositAuditRow();
     PageRequest pageable = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "occurredAt"));
 
-    // When — every filter populated (the other branch of each CAST guard)
     Page<BankAuditEventDto> page =
         bankAuditService.getEvents(
             Instant.now().minus(1, ChronoUnit.DAYS),
@@ -95,41 +90,30 @@ class BankAuditQueryIntegrationTest {
             "basetool-android",
             pageable);
 
-    // Then the query executes (the random ids simply match nothing)
     assertNotNull(page);
   }
 
   @Test
   void getEvents_clientFilter_selectsOnlyThatClientsRows() {
-    // REQ-AUDIT-005 / GHSA-2vq5-8p8w-5r64: the bank half of the same guarantee. Two rows differing
-    // ONLY in their client -- same event type, same actor, no account -- so a filter that silently
-    // did nothing would still look right on a one-row fixture and fails here.
     seedAuditRowFrom("basetool-frontend");
     seedAuditRowFrom("basetool-android");
     PageRequest pageable = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "occurredAt"));
 
-    // When
     Page<BankAuditEventDto> fromApp =
         bankAuditService.getEvents(null, null, null, null, null, "basetool-android", pageable);
 
-    // Then
     assertEquals(1, fromApp.getTotalElements());
     assertEquals("basetool-android", fromApp.getContent().getFirst().clientId());
   }
 
   @Test
   void getEvents_blankClientFilter_meansNoFilterRatherThanNoMatches() {
-    // The viewer's "all clients" option submits the select's empty value rather than omitting the
-    // parameter. Passed through it would match rows whose client_id is literally '' -- none -- and
-    // read to the admin as "this log has no events" instead of as "no filter".
     seedAuditRowFrom("basetool-frontend");
     PageRequest pageable = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "occurredAt"));
 
-    // When
     Page<BankAuditEventDto> unfiltered =
         bankAuditService.getEvents(null, null, null, null, null, "  ", pageable);
 
-    // Then
     assertTrue(unfiltered.getTotalElements() >= 1, "a blank client filter must not exclude rows");
   }
 

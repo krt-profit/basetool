@@ -144,14 +144,10 @@ class MissionSectionLockConcurrencyTest {
   void concurrentCoreAndScheduleEdits_bothSucceed_withoutCrossSection409() throws Exception {
     final UUID missionId = persistPlannedMission("Concurrent Cross Section");
     final Long rowVersionBefore = missionRepository.findById(missionId).orElseThrow().getVersion();
-    // Truncate to millis: Postgres timestamptz keeps microsecond precision, so a raw nanosecond
-    // Instant.now() would not equal the value read back after the round-trip.
     final Instant plannedStart =
         Instant.now().plus(1, ChronoUnit.DAYS).truncatedTo(ChronoUnit.MILLIS);
     final Instant plannedEnd = plannedStart.plus(2, ChronoUnit.HOURS);
 
-    // Thread 0 edits the core section, thread 1 edits the (disjoint) schedule section. Both echo
-    // version 0 for their OWN counter, so neither may 409 the other.
     RaceResult result =
         race(
             2,

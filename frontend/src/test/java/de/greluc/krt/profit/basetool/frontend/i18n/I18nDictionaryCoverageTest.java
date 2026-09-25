@@ -92,7 +92,6 @@ class I18nDictionaryCoverageTest {
         }
         Matcher dictName = DICT_NAME.matcher(js);
         while (dictName.find()) {
-          // The config block the name belongs to ends at its sections map.
           int end = js.indexOf("sections:", dictName.end());
           Matcher configKey =
               CONFIG_KEY.matcher(js.substring(dictName.end(), end < 0 ? js.length() : end));
@@ -137,7 +136,6 @@ class I18nDictionaryCoverageTest {
           : "no template emits " + key;
     }
     if (key.indexOf('.') < 0 && key.indexOf('[') < 0) {
-      // A bare global a bootstrap assigns on its own (window.MSG_X = /*[[#{…}]]*/ …).
       Pattern global = Pattern.compile("\\b" + Pattern.quote(key) + "\\s*=[^=]");
       return templates.values().stream().anyMatch(t -> global.matcher(t).find())
           ? null
@@ -154,8 +152,6 @@ class I18nDictionaryCoverageTest {
       property = key.substring(key.lastIndexOf('.') + 1);
     }
     Pattern declaration = Pattern.compile("\\b" + Pattern.quote(name) + "\\s*=\\s*\\{");
-    // A dictionary a fragment and its host page both contribute to is merged with
-    // Object.assign(window.NAME || {}, {...}); its entries count across all contributors.
     Pattern merge = Pattern.compile("\\b" + Pattern.quote(name) + "\\s*=\\s*Object\\.assign\\(");
     Pattern entry =
         Pattern.compile(
@@ -219,9 +215,6 @@ class I18nDictionaryCoverageTest {
    */
   @Test
   void noScriptFallsBackToALiteralDefault() throws IOException {
-    // A literal that reads like UI text (a capital letter or a space, and a letter) right after
-    // `||`. Selectors, keys and field names never match; the two data fallbacks that are not UI
-    // text are listed explicitly.
     Pattern fallback =
         Pattern.compile(
             "\\|\\|\\s*'([^'\\n]*[A-ZÄÖÜ ][^'\\n]*)'|\\|\\|\\s*'([A-Za-zäöüß][^'\\n]*)'");
@@ -235,9 +228,6 @@ class I18nDictionaryCoverageTest {
         Matcher m = fallback.matcher(js);
         while (m.find()) {
           String literal = m.group(1) != null ? m.group(1) : m.group(2);
-          // Not UI text: identifiers, enum constants and HTTP verbs, MIME types, CSS values and
-          // download file names (the server's Content-Disposition name wins; the literal only
-          // names a file on disk).
           if (literal.matches("[a-z][\\w\\-]*")
               || literal.matches("[A-Z][A-Z_]*")
               || literal.matches("accountId|application/json")

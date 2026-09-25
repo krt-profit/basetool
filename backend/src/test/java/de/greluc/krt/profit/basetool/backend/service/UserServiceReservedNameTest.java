@@ -70,8 +70,6 @@ class UserServiceReservedNameTest {
   @BeforeEach
   void setUp() {
     userRepository = mock(UserRepository.class);
-    // Only the collaborator these two paths touch; nothing else in the graph is reached, so the
-    // rest is passed as null deliberately rather than mocked (backend/CLAUDE.md, test fixtures).
     service = new UserService(userRepository, null, null, null, null);
     self = new User();
     self.setId(SELF);
@@ -80,7 +78,6 @@ class UserServiceReservedNameTest {
     when(userRepository.saveAndFlush(any(User.class))).thenAnswer(i -> i.getArgument(0));
   }
 
-  // covers REQ-SEC-062 - the sentinel's uniqueness is enforced, not asserted in a comment
   @Test
   void theErasureSentinelIsRejected() {
     assertThatThrownBy(
@@ -89,7 +86,6 @@ class UserServiceReservedNameTest {
         .hasMessageContaining("reserved");
   }
 
-  // covers REQ-SEC-062 - and case is not a way round it, because the erasure matches either way
   @Test
   void theSentinelIsRejectedInAnyCase() {
     assertThatThrownBy(
@@ -105,7 +101,6 @@ class UserServiceReservedNameTest {
         .isInstanceOf(IllegalArgumentException.class);
   }
 
-  // covers REQ-SEC-062 - a member cannot aim the eraser at somebody else by taking their name
   @Test
   void anotherLiveAccountsNameIsRejected() {
     when(userRepository.existsOtherAccountWithName(eq("valkyrie"), eq(SELF))).thenReturn(true);
@@ -115,7 +110,6 @@ class UserServiceReservedNameTest {
         .hasMessageContaining("already in use");
   }
 
-  // covers REQ-SEC-062 - the check is lower-cased, or it would be sidestepped by typing case
   @Test
   void theCollisionCheckIsCaseInsensitive() {
     when(userRepository.existsOtherAccountWithName(any(), any())).thenReturn(false);
@@ -134,7 +128,6 @@ class UserServiceReservedNameTest {
     assertThat(self.getDisplayName()).isEqualTo("NobodyElse");
   }
 
-  // covers REQ-SEC-062 - clearing the field is not a collision with anything
   @Test
   void aBlankNameClearsTheFieldWithoutAskingTheDatabase() {
     assertThatCode(() -> service.updateUserDescription(SELF, null, "   ", null))

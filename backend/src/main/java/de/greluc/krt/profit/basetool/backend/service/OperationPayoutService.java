@@ -235,10 +235,6 @@ public class OperationPayoutService {
               .getOrDefault(key, BigDecimal.ZERO)
               .setScale(2, RoundingMode.HALF_UP);
       boolean donating = pref == PayoutPreference.DONATE;
-      // Full pool share earned by attendance: a PAYOUT participant receives it as shareAmount, a
-      // DONATE participant forgoes it (shareAmount = 0) and contributes it to the org. That
-      // contributed slice is surfaced as donatedAmount and summed into totalDonations.
-      // Computed once so the PAYOUT/DONATE split cannot drift apart.
       BigDecimal fullShare =
           totalSum
               .multiply(BigDecimal.valueOf(percentage))
@@ -247,22 +243,8 @@ public class OperationPayoutService {
       BigDecimal shareAmount = donating ? zeroShare : fullShare;
       BigDecimal donatedAmount = donating ? fullShare : zeroShare;
       BigDecimal grossPayout = personalExpenses.add(shareAmount);
-      // Star Citizen banking deducts a small percentage from any aUEC transfer to the recipient —
-      // model that here so the displayed Auszahlungsbetrag is what actually lands in the
-      // participant's mobiGlas. The rate is loaded once per call from system_setting (see
-      // resolveTransferFeeRate) so officers/admins can adjust it without a redeploy. Rounded
-      // HALF_UP to match the other monetary fields. Negative gross would produce a negative fee
-      // mathematically; in practice grossPayout is always >= 0 (expenses are positive, share is
-      // >= 0), so HALF_UP rounding here mirrors the rest of the pipeline.
       BigDecimal transferFee =
           grossPayout.multiply(transferFeeRate).setScale(2, RoundingMode.HALF_UP);
-      // Kaufmaennisch (HALF_UP) auf ganze aUEC runden: Star Citizen kennt im mobiGlas keine
-      // Nachkommastellen, jeder Transfer landet als Integer beim Empfaenger. Damit der angezeigte
-      // Auszahlungsbetrag dem entspricht, was der Mission Manager tatsaechlich anweisen muss,
-      // rundet das Backend hier final auf scale 0. Die Sub-Labels (Auslagen, Ueberweisungsgebuehr)
-      // behalten ihre 2 Nachkommastellen — sie bleiben transparenter Breakdown, nicht der "Pay X"-
-      // Betrag — was geringfuegige Diskrepanzen beim Nachrechnen erlaubt, dafuer aber den Hauptwert
-      // glatt haelt.
       BigDecimal payoutAmount = grossPayout.subtract(transferFee).setScale(0, RoundingMode.HALF_UP);
 
       OperationPayoutStatus status = statusByKey.get(key);
@@ -289,15 +271,6 @@ public class OperationPayoutService {
               paidOutByName));
     }
 
-    // nullsLast, because a null name is a CONTRACT value here and not an accident:
-    // OperationPayoutDto documents participantName as null exactly when the account behind the row
-    // was hard-deleted (REQ-DATA-008), which is how the clients know to draw their deleted-user
-    // placeholder. String.CASE_INSENSITIVE_ORDER throws on null, so sorting with it alone took the
-    // whole endpoint down with a 500 for every caller of an operation that contained one such
-    // participant -- and since the Operation screen builds its head from this read, that blanked
-    // the entire screen in both clients (found in production, 2026-09-08).
-    //
-    // Deleted rows sort to the end rather than the front: they are the ones nobody can act on.
     result.sort(
         Comparator.comparing(
             OperationPayoutDto::participantName,
@@ -358,9 +331,6 @@ public class OperationPayoutService {
     if (ownerScopeService.canSeeOperationLedger(operationId)) {
       return payouts;
     }
-    // The participant key is the user id for a registered member (OperationPayoutCalculator
-    // #participantKey); an escape-only caller is always registered, since the escape requires an
-    // authenticated participation row.
     String ownKey = authHelperService.currentUserId().map(UUID::toString).orElse(null);
     if (ownKey == null) {
       return List.of();
@@ -398,12 +368,6 @@ public class OperationPayoutService {
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public OperationPayoutStatusDto setPayoutStatus(
       @NotNull UUID operationId, @NotNull String participantKey, boolean paidOut) {
-    // Retry the toggle across FRESH transactions. Each attempt is REQUIRES_NEW (see self): a losing
-    // writer's constraint / version violation poisons its own transaction, so the only correct
-    // retry
-    // is a brand-new one. All but the final attempt swallow the race and loop; the final attempt
-    // lets
-    // a persistent race propagate so the proxy surfaces a truthful 409, not a pretend success.
     for (int attempt = 1; attempt < MAX_PAYOUT_TOGGLE_ATTEMPTS; attempt++) {
       try {
         return self.getObject()
@@ -439,19 +403,11 @@ public class OperationPayoutService {
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public OperationPayoutStatusDto setPayoutStatusWithinTransaction(
       @NotNull UUID operationId, @NotNull String participantKey, boolean paidOut) {
-    // Load the operation with its mission-participant graph (bounded by participant count, NOT the
-    // finance ledger) to validate the key and attach the status row to a managed operation. The
-    // paid-out toggle does NOT re-run the full payout computation (the double finance/refinery
-    // load-all + the money math) — flipping the flag never changes any amount, so the caller
-    // patches
-    // just the "Bezahlt" cell from the returned status block (#1121, operation-side ADR-0078 gap).
     Operation operation =
         Entities.require(
             operationRepository.findWithMissionsAndParticipantsById(operationId),
             "Operation not found");
 
-    // Same key set the read path exposes (both derive from computeParticipationBreakdown), so the
-    // 404-on-unknown-participant behavior is preserved without re-running getOperationPayouts.
     Set<String> validKeys =
         OperationPayoutCalculator.computeParticipationBreakdown(operation)
             .participantNames()
@@ -478,9 +434,6 @@ public class OperationPayoutService {
       User actor = userService.getCurrentUser().orElse(null);
       status.setPaidOutByUser(actor);
     }
-    // Note: when toggling back to paidOut=false we deliberately keep paidOutAt / paidOutByUser as
-    // the last "was paid" trace — see V78 migration's column comments. The frontend renders the
-    // current paidOut flag, the audit fields are only inspected when paidOut=true.
 
     payoutStatusRepository.save(status);
     auditService.record(

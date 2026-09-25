@@ -61,9 +61,6 @@ public record AccountDeletionRequestDeclinedEvent(UUID userId) implements Notifi
   @Nullable
   @Override
   public UUID actorSub() {
-    // The acting admin is not carried: excluding them would be meaningless here (the sole recipient
-    // is the member) and naming them would tell the member which admin refused, which is the
-    // controller's decision to communicate, not the notification engine's.
     return null;
   }
 
@@ -89,8 +86,6 @@ public record AccountDeletionRequestDeclinedEvent(UUID userId) implements Notifi
   @Unmodifiable
   @Override
   public Map<String, String> renderParams() {
-    // The message names no one and quotes nothing: "your deletion request was declined; the reason
-    // is on your profile page".
     return Map.of();
   }
 

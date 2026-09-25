@@ -39,10 +39,6 @@ import org.junit.jupiter.api.Test;
  */
 class PiiMaskerTest {
 
-  // ---------------------------------------------------------------
-  // Trivial inputs — early returns
-  // ---------------------------------------------------------------
-
   @Nested
   class EarlyReturnTests {
 
@@ -58,10 +54,6 @@ class PiiMaskerTest {
 
     @Test
     void inputWithoutPii_returnedAsIs() {
-      // The whole branch where matcher.find() is false on the first call
-      // is its own short-circuit — verify it's exercised AND that no
-      // accidental allocation/copy happens by checking identity (the
-      // implementation returns the same reference).
       String safe = "hello world without any sensitive content";
       assertSame(
           safe,
@@ -70,22 +62,14 @@ class PiiMaskerTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // JWT pattern
-  // ---------------------------------------------------------------
-
   @Nested
   class JwtMaskingTests {
 
     @Test
     void singleJwt_isReplacedByPlaceholder() {
-      // Minimal valid-shaped JWT: eyJ<5+chars>.eyJ<5+chars>.<5+chars>
       String input = "Authorization header: eyJabcde.eyJfghij.signature1234";
       String masked = PiiMasker.mask(input);
 
-      // Note the "Authorization" keyword ALSO triggers the keyword-token rule,
-      // so the test must accept any masked output where the raw JWT no longer
-      // appears. Use the assertion below.
       assertFalse(
           masked.contains("eyJabcde"), "raw JWT prefix must not survive masking: " + masked);
       assertFalse(
@@ -100,8 +84,6 @@ class PiiMaskerTest {
 
     @Test
     void realShapedJwt_replacedExactly() {
-      // A realistic HS256 token rather than the minimal shape above - carried over from the
-      // former ingest copy of this test.
       String jwt =
           "eyJhbGciOiJIUzI1NiIsInR5cCI.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZ"
               + ".SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c";
@@ -110,8 +92,6 @@ class PiiMaskerTest {
 
     @Test
     void shortJwtSegments_doNotMatch() {
-      // Each segment must be at least 5 characters. "eyJ12.eyJ34.56" is below
-      // the minimum-segment length and MUST NOT be matched as a JWT.
       String input = "eyJ12.eyJ34.56";
       assertEquals(
           input,
@@ -122,15 +102,9 @@ class PiiMaskerTest {
     @Test
     void jwtEmbeddedInSentence_replacedInPlace() {
       String masked = PiiMasker.mask("got token eyJabcde.eyJfghij.signature1234 OK");
-      // The "token" keyword triggers keyword masking; the bare JWT past the keyword
-      // is what we care about. The masked output must NOT contain the literal JWT.
       assertFalse(masked.contains("eyJabcde.eyJfghij.signature1234"));
     }
   }
-
-  // ---------------------------------------------------------------
-  // Email pattern
-  // ---------------------------------------------------------------
 
   @Nested
   class EmailMaskingTests {
@@ -142,7 +116,6 @@ class PiiMaskerTest {
 
     @Test
     void emailWithPlusAndDot_isReplaced() {
-      // The class explicitly supports the local-part characters in RFC 5322.
       assertEquals("***@***.***", PiiMasker.mask("alice.lid+notes@example.co.uk"));
     }
 
@@ -154,16 +127,12 @@ class PiiMaskerTest {
 
     @Test
     void atSignWithoutTld_leftAloneWithoutQuadraticBacktracking() {
-      // The domain pattern requires a TLD label; a bare '@' string is not an address and must not
-      // be mangled. This is also the shape that used to backtrack quadratically (security audit
-      // L5) - carried over from the former ingest copy of this test.
       String line = "queue@" + "a".repeat(200);
       assertEquals(line, PiiMasker.mask(line));
     }
 
     @Test
     void singleLetterTld_doesNotMatch() {
-      // The pattern requires at least 2 letters in the TLD.
       String input = "wrong: alice@example.x";
       assertEquals(
           input,
@@ -171,10 +140,6 @@ class PiiMaskerTest {
           "TLDs shorter than 2 chars must not match the email pattern");
     }
   }
-
-  // ---------------------------------------------------------------
-  // Keyword + token pattern
-  // ---------------------------------------------------------------
 
   @Nested
   class KeywordTokenTests {
@@ -194,8 +159,6 @@ class PiiMaskerTest {
 
     @Test
     void base64Token_secretReplacedInFull_keywordKept() {
-      // L6: the value class covers the standard-base64 alphabet (+, /, =), so a base64 secret is
-      // masked in full rather than truncated at the first +/=/ with the tail leaked verbatim.
       assertEquals("token=***", PiiMasker.mask("token=ab+cd/ef12=="));
       assertEquals("bearer ***", PiiMasker.mask("bearer aGVsbG8+d29ybGQ/Zm9v=="));
     }
@@ -214,8 +177,6 @@ class PiiMaskerTest {
 
     @Test
     void authorizationWithBearer_keywordAndPrefixKept_valueReplaced() {
-      // The keyword group captures "authorization Bearer " (with trailing space),
-      // and the value is the actual secret.
       String masked = PiiMasker.mask("Authorization: Bearer abcDEF12345");
       assertEquals(
           "Authorization: Bearer ***",
@@ -231,10 +192,6 @@ class PiiMaskerTest {
       assertEquals("Token: ***", PiiMasker.mask("Token: abc12345"));
     }
   }
-
-  // ---------------------------------------------------------------
-  // Mixed input — multiple PII kinds in one string
-  // ---------------------------------------------------------------
 
   @Nested
   class MixedTests {
@@ -258,18 +215,11 @@ class PiiMaskerTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // JSON safety — must NOT break surrounding quotes/backslashes
-  // ---------------------------------------------------------------
-
   @Nested
   class JsonSafetyTests {
 
     @Test
     void emailInsideJsonString_surroundingQuotesIntact() {
-      // The class docstring promises the masker on top of serialized JSON
-      // leaves the JSON syntactically valid. Verify by feeding a JSON
-      // fragment and ensuring the surrounding quotes survive.
       String json = "{\"email\":\"alice@example.com\",\"id\":1}";
       String masked = PiiMasker.mask(json);
 
@@ -286,15 +236,9 @@ class PiiMaskerTest {
 
     @Test
     void backslashInInput_notInjectedByReplacement() {
-      // Matcher.appendReplacement treats backslash specially. The Javadoc
-      // promises NO backslashes in the replacement text. Confirm by feeding
-      // a benign string with no PII and asserting it survives unchanged
-      // even though the keyword + Matcher.quoteReplacement path is exercised.
       String input = "path = C:\\Users\\token: abc123";
       String masked = PiiMasker.mask(input);
 
-      // The keyword "token: " triggers the keyword path. The value "abc123"
-      // is replaced. The surrounding backslashes must be preserved.
       assertTrue(
           masked.contains("C:\\Users\\"),
           "preceding backslashes in the input must survive intact: " + masked);
@@ -303,26 +247,17 @@ class PiiMaskerTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // Whitespace insensitivity
-  // ---------------------------------------------------------------
-
   @Nested
   class FuzzyMatchingTests {
 
     @Test
     void bearerWithLotsOfSpaces() {
-      // The pattern allows variable whitespace between "bearer" and the value.
-      // \s+ for bearer (at least one space).
       assertEquals("Bearer ***", PiiMasker.mask("Bearer abc"));
-      assertEquals("Bearer  ***", PiiMasker.mask("Bearer  abc")); // 2 spaces
+      assertEquals("Bearer  ***", PiiMasker.mask("Bearer  abc"));
     }
 
     @Test
     void tokenWithoutSeparator_isNotMasked() {
-      // The keyword now requires a real separator (":", "=" or whitespace). Without one it is not
-      // a keyword introducing a value, it is part of an identifier — and treating it as a keyword
-      // ate the identifier and everything after it. See the stack-frame regression below.
       assertEquals(
           "tokenabc",
           PiiMasker.mask("tokenabc"),
@@ -330,23 +265,11 @@ class PiiMaskerTest {
     }
   }
 
-  // ---------------------------------------------------------------
-  // Identifiers that merely CONTAIN a keyword — must survive intact
-  // ---------------------------------------------------------------
-
   @Nested
   class KeywordInsideIdentifierTests {
 
     @Test
     void stackFrameCarryingTokenInAClassName_survivesIntact() {
-      // Observed in production: a frame like this reached the centralized log as
-      // "BearerToken***(BearerToken***:60)" because the separator between keyword and value was
-      // optional, so "Token" matched and swallowed the rest of the identifier. A stack trace whose
-      // frames are truncated at every "Token"/"Authorization" is unusable during triage.
-      //
-      // The frame that produced the incident named GuestEditTokenContextFilter, a class ADR-0159
-      // deleted. The example is a Spring Security frame that exists and appears in this app's own
-      // traces, so a reader can reproduce it instead of grepping for a class that is gone.
       String frame =
           "at org.springframework.security.oauth2.server.resource.web.authentication."
               + "BearerTokenAuthenticationFilter.doFilterInternal"
@@ -370,8 +293,6 @@ class PiiMaskerTest {
 
     @Test
     void keywordSuffixedIdentifierStillMasksItsValue() {
-      // The narrowing is about the separator, not about where the keyword sits: a camelCase field
-      // name ending in "Token" followed by "=" is still a secret assignment and stays masked.
       assertEquals("guestEditToken=***", PiiMasker.mask("guestEditToken=abcDEF123"));
     }
   }

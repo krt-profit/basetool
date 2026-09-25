@@ -61,8 +61,6 @@ class OrderHierarchyVisibilityTest {
   @BeforeEach
   void setup() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-    // The officer/logistician callers here are non-admins, so the order-detail profit gate would
-    // otherwise redirect to /orders/create. Stub the capability as a profit-eligible viewer.
     when(backendApiClient.get(LayoutResponses.PATH, LayoutContextLoader.MeLayoutResponse.class))
         .thenReturn(LayoutResponses.capabilities(true, true, true));
   }
@@ -71,8 +69,6 @@ class OrderHierarchyVisibilityTest {
   void orderDetail_AsOfficer_ShouldShowLogisticianButtons() throws Exception {
     UUID orderId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
-    // Erforderlich:
-    // UUID,Integer,String,String,Integer,String,List<JobOrderMaterialDto>,List<UserDto>,Instant,Long
     JobOrderDto order =
         new JobOrderDto(
             orderId,
@@ -102,9 +98,6 @@ class OrderHierarchyVisibilityTest {
             eq("/api/v1/users/me"),
             eq(de.greluc.krt.profit.basetool.frontend.model.dto.UserDto.class)))
         .thenReturn(null);
-    // REQ-FE-016: the job-order material catalog stays a server-side model attribute (it gates
-    // the edit modal's per-row seed option), but the page must not dump it as preloaded
-    // <option>s — the order has no material lines, so no catalog name may render at all.
     MaterialDto distinctMaterial =
         new MaterialDto(
             UUID.randomUUID(),
@@ -152,21 +145,13 @@ class OrderHierarchyVisibilityTest {
                     org.springframework.security.test.web.servlet.request
                         .SecurityMockMvcRequestPostProcessors.authentication(authToken)))
         .andExpect(status().isOk())
-        .andExpect(
-            content()
-                .string(
-                    org.hamcrest.Matchers.containsString(
-                        "Bearbeiten"))) // The edit button for LOGISTICIAN
-        // REQ-FE-016: the edit modal's material picker (live rows AND the inert
-        // #edit-material-row-template new rows are cloned from) opts into the
-        // server-side-search combobox enhancement via the remote-materials-joborder source key.
+        .andExpect(content().string(org.hamcrest.Matchers.containsString("Bearbeiten")))
         .andExpect(
             content()
                 .string(
                     org.hamcrest.Matchers.containsString(
                         "data-role=\"material-select\""
                             + " data-krt-combobox=\"remote-materials-joborder\"")))
-        // ... and the catalog is no longer dumped into the page as a preloaded option list.
         .andExpect(
             content()
                 .string(

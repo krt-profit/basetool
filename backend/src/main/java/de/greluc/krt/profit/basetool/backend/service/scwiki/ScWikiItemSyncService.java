@@ -176,9 +176,6 @@ public class ScWikiItemSyncService {
     int deferred = 0;
 
     for (UUID uuid : targets) {
-      // Pace + fetch OUTSIDE any transaction so no game_item write lock is ever held across the
-      // HTTP round-trip. The per-item DB write runs in its own REQUIRES_NEW transaction (via the
-      // self proxy), so a deadlock rolls back only that item and the loop continues with the rest.
       scWikiClient.paceForRateLimit();
       try {
         ScWikiItemDto dto =
@@ -194,10 +191,6 @@ public class ScWikiItemSyncService {
           missing++;
         }
       } catch (OptimisticLockingFailureException e) {
-        // Expected transient race: a concurrent sync (typically the parallel UEX game_item sync)
-        // updated the same row between this REQUIRES_NEW transaction's read and commit. The row is
-        // refreshed on the next scheduled closure run, so this is a benign skip — logged at WARN
-        // without a stack trace, not as an ERROR.
         deferred++;
         log.warn("Optimistic lock collision filling SC Wiki item {}; deferring to next run", uuid);
       } catch (Exception e) {
@@ -326,8 +319,6 @@ public class ScWikiItemSyncService {
     for (KindPass pass : kindPasses()) {
       allPassesSucceeded &= runKindPass(pass, ctx).succeeded();
     }
-    // §6.3.1 catch-all: everything not claimed by a kind endpoint becomes GENERIC. Exempt from the
-    // sanity cap — it legitimately returns the whole pool.
     KindPassResult residual =
         runKindPass(
             new KindPass(properties.itemsEndpoint(), GameItemKind.GENERIC, null, false), ctx);
@@ -373,10 +364,6 @@ public class ScWikiItemSyncService {
 
     int written = ctx.created + ctx.linked + ctx.reconciled;
     if (written == 0 && ctx.notModifiedPasses > 0) {
-      // Nothing written, but at least one pass came back 304 (catalogue unchanged) — a fully-cached
-      // healthy run, not an outage. Report the live Wiki-linked game_item count so an all-304
-      // backfill is not read as a zero-item outage (#1182). A run with no 304 at all (a genuine
-      // empty-200) keeps written==0 and correctly reports 0.
       long live = gameItemRepository.countLiveScwikiItems();
       log.info(
           "SC Wiki item backfill: every fetched kind pass was unchanged (304) and nothing was"
@@ -463,12 +450,6 @@ public class ScWikiItemSyncService {
         scWikiClient.fetchAllPagesResult(pass.endpoint(), ITEM_PAGE_TYPE, label, null, filters);
 
     if (result.notModified()) {
-      // This kind endpoint is unchanged since the last sync (ETag 304): nothing to ingest, and the
-      // pool was NOT enumerated — so the cross-kind orphan sweep must still be suppressed
-      // (failedPasses++). Record it as a 304 as well so a run where EVERY fetched pass was
-      // unchanged
-      // reports the live Wiki-linked item count rather than 0 (#1182), instead of reading as a
-      // zero-item outage.
       log.debug(
           "Wiki kind pass {} ({}) unchanged since last sync (304) — skipping ingest; no orphan"
               + " sweep this run.",
@@ -501,10 +482,6 @@ public class ScWikiItemSyncService {
       ctx.failedPasses++;
       return KindPassResult.notEnumerated();
     }
-    // An INCOMPLETE walk (a page failed, the pagination metadata went missing on a full page, or
-    // meta.total disagreed with the merged rows) still yields real rows, so the ingest loop below
-    // runs — but the pass reports failure so the cross-kind orphan sweep stands down. The items on
-    // the pages that were never fetched must not be tombstoned for never having been fetched.
     final boolean complete = result.complete();
     if (!complete) {
       log.warn(
@@ -516,22 +493,16 @@ public class ScWikiItemSyncService {
       ctx.failedPasses++;
     }
 
-    // Every UUID this pass was served, kept apart from ctx.seen: the shared set records which pass
-    // CLAIMED a row, while the residual-census check needs to know which rows a pass actually
-    // enumerated — including the ones a more-specific kind pass had already taken.
     Set<UUID> enumerated = HashSet.newHashSet(fetched.size());
     for (ScWikiItemDto dto : fetched) {
       if (dto.uuid() == null) {
-        continue; // an id-less row identifies nothing and can vouch for nothing
+        continue;
       }
       enumerated.add(dto.uuid());
       if (!ctx.seen.add(dto.uuid())) {
-        continue; // already claimed by an earlier (more-specific) pass
+        continue;
       }
       try {
-        // Resolve the manufacturer and the Weg-2 reconciliation candidate from the in-memory caches
-        // OUTSIDE the write transaction, then persist the row in its own REQUIRES_NEW transaction
-        // (via the self proxy) so a deadlock rolls back only this row and the pass keeps going.
         Manufacturer resolvedManufacturer = ctx.resolveManufacturer(dto.manufacturer());
         UUID reconcileUexId = ctx.resolveUuidlessUexMatch(dto);
         BackfillOutcome outcome =
@@ -549,8 +520,6 @@ public class ScWikiItemSyncService {
           ctx.skipped++;
         }
       } catch (OptimisticLockingFailureException e) {
-        // Expected transient race with the parallel UEX game_item sync (see syncItemsClosure); the
-        // row is refreshed on the next run, so defer it with a WARN rather than an ERROR.
         ctx.deferred++;
         log.warn(
             "Optimistic lock collision upserting SC Wiki item {} ({}); deferring to next run",
@@ -663,7 +632,6 @@ public class ScWikiItemSyncService {
                 + " created.");
         return BackfillOutcome.SKIPPED;
       }
-      // Weg-2: fold this Wiki item into the uuid-less UEX row matched by slug/name (null → skip).
       if (reconcileUexId != null
           && reconcileIntoUexRow(reconcileUexId, dto, passKind, runId, now) != null) {
         return BackfillOutcome.RECONCILED;
@@ -790,8 +758,6 @@ public class ScWikiItemSyncService {
     item.setRarity(dto.rarity());
     item.setMass(dto.mass());
     if (dto.dimension() != null) {
-      // width/height/length are the Wiki's own axis names; the local columns are x/y/z in that
-      // order (GameItem.dimensionX = width). Binding x/y/z here wrote null for every item.
       item.setDimensionX(dto.dimension().width());
       item.setDimensionY(dto.dimension().height());
       item.setDimensionZ(dto.dimension().length());
@@ -1084,10 +1050,6 @@ public class ScWikiItemSyncService {
    */
   private static String sweepSkipReason(BackfillContext ctx) {
     if (ctx.notModifiedPasses > 0 && ctx.failedPasses == ctx.notModifiedPasses) {
-      // Every pass that did not enumerate answered 304: a fully-cached, healthy run. Tested first
-      // on purpose — such a run also leaves `seen` empty, so checking emptiness first would file
-      // the healthiest possible outcome under the same reason as a total upstream outage, and the
-      // alert built on it could then never distinguish the two.
       return MetricNames.SWEEP_SKIP_NOT_MODIFIED;
     }
     if (ctx.seen.isEmpty()) {

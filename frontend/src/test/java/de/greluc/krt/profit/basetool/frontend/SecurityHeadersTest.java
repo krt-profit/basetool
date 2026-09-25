@@ -38,8 +38,6 @@ import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.reactive.function.client.WebClient;
 
 @SpringBootTest
-// REQ-SEC-052: every route these cases exercise requires a login now, so the class carries a
-// principal. What each case asserts is unchanged — only the caller is.
 @org.springframework.security.test.context.support.WithMockUser
 class SecurityHeadersTest {
 
@@ -95,22 +93,16 @@ class SecurityHeadersTest {
             .getHeader("Content-Security-Policy");
 
     assertThat(csp).as("Content-Security-Policy header").isNotNull();
-    // Nonce embedded in style-src — the placeholder is replaced per request, so we only assert
-    // the prefix + the nonce-pattern.
     assertThat(csp)
         .as("style-src must be nonce-gated, not 'unsafe-inline'")
         .containsPattern("style-src 'self' 'nonce-[A-Za-z0-9_-]+'");
     assertThat(csp)
         .as("style-src must NOT carry 'unsafe-inline' (would defeat the nonce gate)")
         .doesNotContain("style-src 'self' 'unsafe-inline'");
-    // style-src-attr is now 'none': all inline style="" attributes were migrated out of the
-    // templates (static -> inline-migration.css classes; dynamic -> th:classappend classes /
-    // data-krtm-width applied via the CSSOM), so an injected inline style attribute is blocked.
     assertThat(csp)
         .as("style-src-attr locked to 'none' — no inline style attributes remain")
         .contains("style-src-attr 'none'")
         .doesNotContain("style-src-attr 'unsafe-inline'");
-    // script-src stays nonce-gated as before — regression-pin.
     assertThat(csp).contains("script-src 'nonce-").contains("'strict-dynamic'");
   }
 

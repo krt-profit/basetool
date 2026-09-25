@@ -94,8 +94,6 @@ public class JobTypeController {
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public JobTypeDto createJobType(@RequestBody @Valid JobTypeDto jobTypeDto) {
     JobType toCreate = jobTypeMapper.toEntity(jobTypeDto);
-    // L-7: strip client-supplied id/version so create cannot become a merge()-UPSERT of another
-    // row.
     toCreate.setId(null);
     toCreate.setVersion(null);
     return jobTypeMapper.toDto(jobTypeService.createJobType(toCreate));

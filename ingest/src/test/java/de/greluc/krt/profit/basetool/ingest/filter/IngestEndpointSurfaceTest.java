@@ -116,8 +116,6 @@ class IngestEndpointSurfaceTest {
 
   @Test
   void theEnumerationIsNotVacuous() {
-    // A sweep that enumerates nothing passes every assertion it makes; read the raw patterns once
-    // more to prove the enumeration really reached the dispatcher's ingest mappings.
     assertThat(EndpointEnumeration.patterns(context, HttpMethod.POST))
         .contains("/v1/refinery-extract", "/v1/blueprint-preview");
   }

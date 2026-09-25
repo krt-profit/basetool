@@ -95,10 +95,6 @@ public class UserSyncService {
    */
   public int syncFromKeycloak() {
     log.info("Starting scheduled user sync from Keycloak...");
-    // Role-indexed + incremental-Discord inputs, both resolved from local state before the fetch:
-    // the mappable role names bound the role-membership queries, and the already-linked ids let the
-    // fetch skip the per-user federated-identity read for the linked majority (5000-account
-    // hardening — see KeycloakService#fetchUsers).
     Set<String> roleNames = userReconciliationService.getMappableRoleNames();
     Set<UUID> knownDiscordLinkedIds = userReconciliationService.getKnownDiscordLinkedUserIds();
     List<KeycloakUserDto> users = keycloakService.fetchUsers(roleNames, knownDiscordLinkedIds);
@@ -109,14 +105,6 @@ public class UserSyncService {
 
     int count = 0;
     int failed = 0;
-    // Presence, not success. These ids are what Keycloak just reported it holds, and presence is
-    // the only thing markMissingUsers is entitled to reason about: a local row is flagged as gone
-    // because the directory stopped listing it, never because reconciling it happened to throw.
-    // Collecting the ids *after* a successful syncUser conflated the two, so a single failing user
-    // was soft-deleted while present and enabled upstream -- and the member administration, which
-    // reads the flag as presence, then offered an admin the hard-delete action on an active member
-    // (#1825). The completeness prerequisite of REQ-SEC-043 is unchanged and still carries the
-    // guarantee at the other end: an empty fetch is a skip, never a wipe.
     Set<UUID> presentInKeycloak = new HashSet<>();
     for (KeycloakUserDto user : users) {
       presentInKeycloak.add(user.id());
@@ -126,20 +114,10 @@ public class UserSyncService {
       } catch (Exception e) {
         failed++;
         meterRegistry.counter(MetricNames.USER_SYNC_FAILURES).increment();
-        // Audit finding M-4 (2026-05-20): Keycloak {@code username} can be email-shaped (caught by
-        // PiiMasker) or a real-name handle (not caught). Log the JWT-sub UUID instead — sufficient
-        // to correlate with the user row on the next sync run, and free of PII.
         log.error("Failed to sync user {}", user.id(), e);
       }
     }
-    // Soft-deleting members is the most consequential write of the whole run, and it used to happen
-    // between two unrelated lines with the affected-row count discarded — a mass-disappearance
-    // (upstream deletion, a realm misconfiguration) left no trace whatsoever. Report it: INFO for
-    // the ordinary trickle of leavers, WARN once a single run flags more than
-    // MISSING_USERS_WARN_THRESHOLD accounts. Counts only — no handles (REQ-OBS-004).
     if (failed > 0) {
-      // One line per run beside the individual stack traces: those say what broke, this says how
-      // much of the roster did not reconcile. Counts only, never ids or handles (REQ-OBS-004).
       log.warn("User sync could not reconcile {} of {} fetched users.", failed, users.size());
     }
     int flaggedMissing = userReconciliationService.markMissingUsers(presentInKeycloak);
@@ -151,15 +129,9 @@ public class UserSyncService {
       log.info(
           "User sync flagged {} local users as no longer present in Keycloak.", flaggedMissing);
     }
-    // One aggregate line per run for the role mapping (how many accounts had their roles rewritten,
-    // and how many of those landed on the Guest catch-all).
     userReconciliationService.logRoleSyncSummary();
     log.info("User sync finished. Synced {} users.", count);
 
-    // After the roster is reconciled, keep the bank-holder registry in sync (REQ-BANK-029): every
-    // bank-role user becomes an active holder; a role-managed holder whose user lost the role is
-    // auto-deactivated. Isolated in its own transaction and swallowed on failure so a bank-side
-    // hiccup never aborts the core user sync.
     try {
       bankHolderReconciliationService.reconcileAll();
     } catch (Exception e) {

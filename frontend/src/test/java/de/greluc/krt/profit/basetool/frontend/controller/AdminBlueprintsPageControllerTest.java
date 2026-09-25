@@ -44,8 +44,6 @@ class AdminBlueprintsPageControllerTest {
     AdminBlueprintsPageController controller = new AdminBlueprintsPageController(backendApiClient);
     PageResponse<BlueprintDto> page =
         new PageResponse<>(List.of(minimalDto()), 0, 25, 1, 1, List.of());
-    // A present search term is forwarded as a URI-template variable ({search}); eq("omni") pins the
-    // raw value passed as the third (URI-variable) argument.
     when(backendApiClient.get(anyString(), anyTypeRef(), eq("omni"))).thenReturn(page);
     Model model = new ConcurrentModel();
 
@@ -57,8 +55,6 @@ class AdminBlueprintsPageControllerTest {
     assertEquals(1, model.getAttribute("totalPages"));
   }
 
-  // covers REQ-FE-002 — an AJAX swap request (fragment=results) renders only the toolbar + table +
-  // pager fragment, with the model populated identically.
   @Test
   void listBlueprints_fragmentResults_returnsResultsFragmentView() {
     BackendApiClient backendApiClient = mock(BackendApiClient.class);

@@ -244,24 +244,10 @@ class ArchitectureTest {
    * authentication" across the codebase.
    */
   private static final java.util.Set<String> SECURITY_CONTEXT_HOLDER_EXCEPTIONS =
-      java.util.Set.of(
-          // The dedicated auth-helper service. Centralises the SecurityContextHolder
-          // read so the rest of the codebase can consult the current authentication
-          // through a constructor-injected dependency. THIS is the seam — every other
-          // service/controller/mapper must depend on AuthHelperService instead of
-          // touching SecurityContextHolder directly.
-          "de.greluc.krt.profit.basetool.backend.service.AuthHelperService");
+      java.util.Set.of("de.greluc.krt.profit.basetool.backend.service.AuthHelperService");
 
   @Test
   void serviceLayerShouldNotReachIntoSecurityContext() {
-    // Reasoning: business logic in the service layer must rely on the @PreAuthorize
-    // boundary at the controller (or the service method itself, when the rule is
-    // role-based) instead of pulling the JWT subject straight from
-    // SecurityContextHolder. Otherwise the same service method behaves differently
-    // depending on which thread invokes it (Spring scheduling, async, message
-    // listeners) and the data-isolation rules become testable only through full
-    // Spring context tests. The single allowed escape valve is AuthHelperService;
-    // nothing else inside the business-service package should bypass that.
     noClasses()
         .that()
         .resideInAPackage("..backend.service..")
@@ -279,14 +265,6 @@ class ArchitectureTest {
 
   @Test
   void controllerLayerShouldNotReachIntoSecurityContext() {
-    // Reasoning: same rationale as serviceLayerShouldNotReachIntoSecurityContext —
-    // controllers used to inline role-hierarchy checks via
-    // `SecurityContextHolder.getContext().getAuthentication()` (see
-    // JobOrderController#verifyAssigneeAccess, InventoryItemController#isLogisticianOrAbove
-    // and RefineryOrderController#isLogisticianOrAbove before the refactor). The rule
-    // now forbids that pattern across the controller package; controllers must
-    // either accept the authentication as a method parameter (via @AuthenticationPrincipal
-    // or `Authentication authentication`) or delegate the lookup to AuthHelperService.
     noClasses()
         .that()
         .resideInAPackage("..backend.controller..")
@@ -302,20 +280,6 @@ class ArchitectureTest {
 
   @Test
   void identityMustBeReadThroughTheSeamNotTheAuthenticationType() {
-    // Reasoning: this rule exists because the ingest gateway's identity swap (ADR-0129) introduced
-    // a SECOND authentication type, and every consumer that branched on `instanceof
-    // JwtAuthenticationToken` silently split into two camps. CurrentUserArgumentResolver failed
-    // closed (403 before the handler ran); TermsAcceptanceAccessFilter failed OPEN — it returned
-    // "no user", which in that filter means "let the request through", so the consent gate
-    // (REQ-SEC-028) stopped applying to exactly the path it had just been extended to cover.
-    // Neither was visible in a test, because both types satisfy every type-agnostic consumer.
-    //
-    // The type is not the identity. Anything asking "who is calling" asks support.
-    // AuthenticatedSubject, which reads the subject from a JWT principal when there is one and
-    // otherwise only from an authentication that opts in via SubjectAuthentication — never from
-    // getName(), which is a callsign (REQ-OBS-004). Only code with a genuine question about the
-    // TOKEN (its claims, its binding) may name the token type — and there is exactly one such
-    // place.
     noClasses()
         .that()
         .doNotHaveFullyQualifiedName(AUTHENTICATION_SEAM[0])
@@ -335,15 +299,6 @@ class ArchitectureTest {
 
   @Test
   void mapperLayerShouldNotReachIntoSecurityContext() {
-    // Reasoning: MapStruct mappers are supposed to be pure transformers. Reaching
-    // into SecurityContextHolder from a resolver method (as MissionMapper did before
-    // the refactor) couples DTO shaping to the request-scoped security context and
-    // makes the mapper untestable without a full Spring security setup. If a mapper
-    // needs to know "is the caller authenticated / may they edit this", it must depend
-    // on a dependency-leaf SPI (e.g. support.MissionViewerAccess, implemented in the
-    // service layer) — never on SecurityContextHolder directly, and (since ADR-0047's
-    // cycle cleanup) never on the service layer directly either, which would re-close
-    // the mapper <-> service package cycle the leaf interface was introduced to break.
     noClasses()
         .that()
         .resideInAPackage("..backend.mapper..")
@@ -359,14 +314,6 @@ class ArchitectureTest {
 
   @Test
   void controllerMethodsShouldNotReturnJpaEntities() {
-    // Reasoning: CLAUDE.md is explicit — "Never expose JPA entities at controller
-    // boundaries." A leaked entity drags in Hibernate lazy-loading semantics across
-    // the HTTP boundary (Jackson serialising a proxy triggers the famous
-    // LazyInitializationException) AND can expose internal columns to the client.
-    // The check is intentionally narrow: ArchUnit can only inspect the *raw* return
-    // type, so `ResponseEntity<User>` would not be caught by `haveRawReturnType(...)`.
-    // In this codebase entity-returning controller methods would still be visible
-    // here because the convention is to return the entity directly, not wrap it.
     noMethods()
         .that()
         .areDeclaredInClassesThat()
@@ -383,16 +330,6 @@ class ArchitectureTest {
 
   @Test
   void toOneAssociationsAreDeclaredLazy() {
-    // Reasoning (BE-PERF-11, 2026-09-23): a @ManyToOne / @OneToOne without an explicit fetch is
-    // EAGER by the JPA default, and 38 of them were. Every load of the owner then dragged the whole
-    // reachable graph along — a price-sync chunk pulled Material -> refined Material -> category
-    // for
-    // every row, a hangar list every ship's owner with its roles — whether the caller read it or
-    // not. All of them are LAZY now; a read that needs an association fetches it deliberately (an
-    // @EntityGraph, a JOIN FETCH, or the batch loader inside the caller's transaction), and a
-    // cached
-    // entity is completed by support.CachedEntityGraphs before the cache stores it. This rule keeps
-    // a new association from silently reintroducing the default.
     fields()
         .that()
         .areAnnotatedWith(ManyToOne.class)
@@ -407,16 +344,6 @@ class ArchitectureTest {
 
   @Test
   void controllersMustNotInjectTheLazyMembershipMapper() {
-    // Reasoning: OrgUnitMembershipMapper.toDto reads user.effectiveName through the LAZY user
-    // association. With open-in-view disabled, a controller that maps the entity to its DTO
-    // response after the service transaction committed throws LazyInitializationException — the
-    // write succeeds but the response 500s (the shipped /organisation/leitung "assign
-    // Kommandoleiter" regression). ADR-0067 therefore moved the membership DTO projection into
-    // OrgUnitMembershipService's own transactions; this rule pins the new invariant by keeping
-    // the mapper out of the controller layer entirely, replacing the retired
-    // controllersUsingTheLazyMembershipMapperMustBeTransactional rule (which only demanded a
-    // class-level @Transactional around controller-side mapping and became vacuous once no
-    // controller injected the mapper anymore).
     noClasses()
         .that()
         .areAnnotatedWith("org.springframework.web.bind.annotation.RestController")
@@ -435,17 +362,6 @@ class ArchitectureTest {
 
   @Test
   void everyRestControllerShouldDeclareAtLeastOneAuthorisationAnnotation() {
-    // Reasoning: every @RestController must make at least one explicit authorisation
-    // decision somewhere — either a class-level @PreAuthorize or at least one
-    // method-level @PreAuthorize. The weaker form (class-level) is sufficient to
-    // catch the worst regression case: a controller that ships with zero auth
-    // annotations and silently falls through to SecurityConfig's catch-all.
-    //
-    // We deliberately do NOT require every handler method to be annotated: the codebase mixes
-    // the two patterns ("controller-level @PreAuthorize covers everything" vs. "method-level
-    // @PreAuthorize per endpoint"), and a class-level gate genuinely covers its methods. What is
-    // no longer accepted is a controller with no gate at all relying on a permitAll matcher two
-    // folders away — readEndpointsMustDeclareAnAuthorisationAnnotation below closes that.
     classes()
         .that()
         .areAnnotatedWith("org.springframework.web.bind.annotation.RestController")
@@ -555,17 +471,6 @@ class ArchitectureTest {
 
   @Test
   void orgUnitBankSettingsMutationsMustCallAnAuthorizationHelper() {
-    // Security review (INFO regression guard): the org-unit bank settings mutations (balance
-    // target, view-visibility grants, per-tier approval limits) are authorized ONLY by an in-body
-    // require* helper — the controller and the frontend proxy both gate merely on
-    // isAuthenticated(),
-    // with no @PreAuthorize predicate and no annotation at the boundary. That is correct today
-    // (every mutation calls its requireCan* helper), but a future mutation that dropped the check
-    // would ship reachable by ANY authenticated member, with no failing gate to catch it. This rule
-    // pins the invariant: every public OrgUnitBankAccessService method that returns the settings
-    // DTO
-    // and mutates (set/add/remove/clear) MUST invoke a requireCan* authorization helper, so a
-    // dropped check fails the build instead of shipping fail-open.
     methods()
         .that()
         .areDeclaredInClassesThat()
@@ -587,12 +492,6 @@ class ArchitectureTest {
 
   @Test
   void controllerLayerShouldNotDependOnRepositoryLayer() {
-    // Reasoning: CLAUDE.md prescribes a strict controller → service → repository layering.
-    // A controller injecting a Spring Data repository directly skips the service layer where
-    // multi-user data isolation, transactional boundaries and the @PreAuthorize logic live —
-    // and once that shortcut exists, it tends to multiply. Forbidding the dependency at the
-    // package level (controllers must not even see repositories) makes the layering breach
-    // visible at compile time instead of in a long code review.
     noClasses()
         .that()
         .resideInAPackage("..backend.controller..")
@@ -608,26 +507,6 @@ class ArchitectureTest {
 
   @Test
   void controllerLayerMustNotWriteAuditRowsDirectly() {
-    // Reasoning: AuditService.record is @Transactional(propagation = MANDATORY) — writing the
-    // audit row in the same transaction as the mutation is what makes the trail gap-free, and the
-    // propagation is the guard that says so. A controller has no transaction of its own
-    // (open-in-view is false, and nothing wraps the handler), so the call throws
-    // IllegalTransactionStateException and the endpoint 500s.
-    //
-    // This is not hypothetical: the three GDPR controllers added in #1920 each called it straight
-    // from a handler, and all five endpoints 500'd. It survived review because the MockMvc gate
-    // matrices declare @MockitoBean AuditService — replacing the bean also removes the
-    // transactional proxy, so the propagation is never exercised and the tests stay green.
-    // A compile-time-visible rule is the only thing that catches the next one.
-    //
-    // Deliberately a call-site rule, not a package dependency: AuditAdminController and
-    // BankAdminController both legitimately inject their audit service to QUERY the trail for the
-    // admin viewer and to run the retention purge. Reading is fine; writing is the service layer's
-    // job.
-    //
-    // Both trails are covered. BankAuditService.record carries the same MANDATORY propagation and
-    // no controller calls it today — which is the moment to fence it, not after the second
-    // occurrence.
     noClasses()
         .that()
         .resideInAPackage("..backend.controller..")
@@ -661,12 +540,6 @@ class ArchitectureTest {
 
   @Test
   void supportPackageMustStayADependencyLeaf() {
-    // Reasoning: the `support` package holds cross-layer collaborators (e.g.
-    // StaffelMembershipResolver) that BOTH the `mapper` and the `service` layer reuse. For that
-    // sharing to be safe it must stay a dependency LEAF — depending only downward on `model` /
-    // `repository` — so it can never sit on both ends of a package cycle. Forbidding any dependency
-    // on the orchestration / web layers (which themselves depend on `support`) keeps the graph
-    // acyclic by construction.
     noClasses()
         .that()
         .resideInAPackage("..backend.support..")
@@ -693,20 +566,6 @@ class ArchitectureTest {
 
   @Test
   void backendPackagesShouldBeFreeOfDependencyCycles() {
-    // Reasoning: a package dependency cycle (slice A -> slice B -> ... -> slice A) is the
-    // structural
-    // smell behind "everything depends on everything" — it defeats layering, makes the build order
-    // ambiguous, blocks extracting a package into its own module, and lets an innocent-looking edit
-    // close a loop that ripples across unrelated subsystems. The backend was made fully acyclic
-    // (ADR-0047): the per-first-segment slices (config, service, controller, mapper, model,
-    // repository, exception, integration, event, filter, validation, support, …) form a DAG. This
-    // rule pins that — any new cross-package edge that re-introduces a cycle (a mapper importing a
-    // service, `support` importing upward, a config @Component reaching into service, …) fails
-    // here.
-    // Shared, dependency-free collaborators belong in the `support` leaf (see
-    // supportPackageMustStayADependencyLeaf); a layer that needs a peer's behaviour without owning
-    // the dependency direction inverts it through a leaf interface (e.g. MaterialPieceTypeLookup,
-    // MissionViewerAccess).
     slices()
         .matching("de.greluc.krt.profit.basetool.backend.(*)..")
         .should()
@@ -720,13 +579,6 @@ class ArchitectureTest {
 
   @Test
   void mapperLayerShouldNotDependOnServiceLayer() {
-    // Directional, clear-message guard pinning one edge of
-    // backendPackagesShouldBeFreeOfDependencyCycles. The service layer already depends on the
-    // mapper
-    // layer (services map entities to DTOs through the mappers), so a mapper depending back on a
-    // service re-closes the mapper <-> service package cycle ADR-0047 removed. A mapper that needs
-    // caller-aware behaviour depends on a dependency-leaf SPI instead (e.g.
-    // support.MissionViewerAccess), implemented in the service layer.
     noClasses()
         .that()
         .resideInAPackage("..backend.mapper..")
@@ -742,11 +594,6 @@ class ArchitectureTest {
 
   @Test
   void integrationLayerShouldNotDependOnServiceLayer() {
-    // integration is the low-level external-API client layer (UexClient, ScWikiClient); the service
-    // layer orchestrates those clients, so service -> integration is the only legal direction. The
-    // SC-Wiki sync orchestrators that used to live here (and import services) moved to
-    // service.scwiki (ADR-0047); a new integration -> service edge would re-close the
-    // integration <-> service cycle.
     noClasses()
         .that()
         .resideInAPackage("..backend.integration..")
@@ -762,10 +609,6 @@ class ArchitectureTest {
 
   @Test
   void eventLayerShouldNotDependOnServiceLayer() {
-    // The event package holds after-commit domain-event payload records (data only); the listeners
-    // and producers that consume services live in the service layer (service -> event is the legal
-    // direction). NotificationEventListener moved to service (ADR-0047), so an event -> service
-    // edge would re-close the event <-> service package cycle.
     noClasses()
         .that()
         .resideInAPackage("..backend.event..")
@@ -781,11 +624,6 @@ class ArchitectureTest {
 
   @Test
   void validationLayerMustStayADependencyLeaf() {
-    // model.dto carries the bean-validation constraint annotations (model -> validation), so the
-    // validation package must stay a dependency leaf: a validation -> model / repository / service
-    // edge would re-close the model <-> validation (and model -> validation -> repository -> model)
-    // cycles ADR-0047 removed. A validator that needs domain data depends on a leaf SPI instead
-    // (e.g. validation.MaterialPieceTypeLookup, implemented by the service layer).
     noClasses()
         .that()
         .resideInAPackage("..backend.validation..")
@@ -802,12 +640,6 @@ class ArchitectureTest {
 
   @Test
   void controllerMethodsShouldNotExposeJpaEntitiesInGenericWrappers() {
-    // Reasoning: complements `controllerMethodsShouldNotReturnJpaEntities()`. That sister rule
-    // only inspects the *raw* return type, so a method that returns `ResponseEntity<User>` or
-    // `Page<Mission>` slips through — even though the JPA entity still ends up serialised on
-    // the wire with all the lazy-loading / column-leak risks CLAUDE.md warns about. This rule
-    // walks the actual generic type arguments of the known wrapper types
-    // ({@link #ENTITY_GENERIC_WRAPPERS}) and rejects any wrapper carrying a {@code @Entity}.
     methods()
         .that()
         .areDeclaredInClassesThat()
@@ -823,21 +655,6 @@ class ArchitectureTest {
 
   @Test
   void mutatingServiceMethodsInReadOnlyClassesNeedExplicitTransactional() {
-    // Reasoning: many services declare a class-level @Transactional(readOnly = true) so that
-    // their query methods inherit a read-only transaction by default. Mutating methods on such
-    // a class MUST override that with their own @Transactional, otherwise the JPA writes
-    // either fail (Postgres refuses INSERT/UPDATE under SET TRANSACTION READ ONLY) or, worse,
-    // silently no-op because the persistence context is never flushed. Forgetting this
-    // override is a subtle bug that does not surface in `application-dev.yml` (some drivers
-    // tolerate it) but breaks in prod.
-    //
-    // The rule fires when:
-    //   * the declaring class carries @Transactional(readOnly = true), AND
-    //   * the method name starts with a mutating prefix (see MUTATING_METHOD_PREFIXES), AND
-    //   * the method itself is not annotated with @Transactional.
-    // It does NOT inspect the method body, so the heuristic relies on the project's naming
-    // convention (createX/updateX/deleteX/addX/removeX/…). False positives can be silenced
-    // by simply annotating the method with @Transactional(readOnly = true) explicitly.
     classes()
         .that()
         .resideInAPackage("..backend.service..")
@@ -851,16 +668,6 @@ class ArchitectureTest {
 
   @Test
   void repositoriesMustNotDeclareNoArgFindAll() {
-    // Reasoning: M-9 from the performance audit. A repository that overrides the inherited
-    // {@code List<T> findAll()} typically does so to attach an {@code @EntityGraph} — which
-    // means it intends to load every row WITH its eager-fetched collections in one shot.
-    // That is a latency / OOM bomb the moment the table grows: an unbounded result set joined
-    // against multiple collections produces a Cartesian explosion, and there is no pagination
-    // gate to catch it. Every read path through our repositories must go through
-    // {@code findAll(Pageable)}, a scoped query method (e.g. {@code searchMissions}), or a
-    // {@code findById} lookup. The inherited {@code CrudRepository.findAll()} cannot be
-    // blocked here (it lives on the parent interface), but at least our own code must not
-    // re-declare it — this rule fails the build the moment someone adds the override back.
     methods()
         .that()
         .areDeclaredInClassesThat()
@@ -873,10 +680,6 @@ class ArchitectureTest {
         .because(
             "Repositories must not override no-arg findAll() (M-9 from the performance "
                 + "audit). Use findAll(Pageable) or a scoped query method instead.")
-        // The intended steady state is zero matches: nothing in our repository package
-        // re-declares no-arg findAll(). ArchUnit fails empty `should` clauses by default
-        // ("did your rule actually run?"), so opt out — the inverse `noMethods` framing
-        // would also work but reads worse with the custom violation message above.
         .allowEmptyShould(true)
         .check(CLASSES);
   }
@@ -897,17 +700,6 @@ class ArchitectureTest {
 
   @Test
   void writeEndpointsMustDeclareAnAuthorisationAnnotation() {
-    // Reasoning: tightens `everyRestControllerShouldDeclareAtLeastOneAuthorisationAnnotation`
-    // from "the class declares *some* @PreAuthorize" to "every state-changing endpoint
-    // (@PostMapping/@PutMapping/@DeleteMapping/@PatchMapping) carries explicit authorisation",
-    // either inline on the method or class-wide. The previous, weaker form let a brand-new
-    // write endpoint slip through without an explicit decision as long as some other method
-    // on the same controller had a @PreAuthorize — exactly the regression case that hides a
-    // missing auth check behind an unrelated annotation.
-    //
-    // Public endpoints are allowed but must be EXPLICIT: annotate them with
-    // @PreAuthorize("permitAll()") so the decision is visible at the method level instead of
-    // hiding two folders away in SecurityConfig's requestMatchers list.
     methods()
         .that()
         .areDeclaredInClassesThat()
@@ -925,10 +717,6 @@ class ArchitectureTest {
                 + "next to the handler instead of buried in SecurityConfig.")
         .check(CLASSES);
   }
-
-  // ---------------------------------------------------------------------------------
-  // Helpers
-  // ---------------------------------------------------------------------------------
 
   private static String allowedClassNamesRegex() {
     return SECURITY_CONTEXT_HOLDER_EXCEPTIONS.stream()
@@ -1173,46 +961,19 @@ class ArchitectureTest {
    */
   @Test
   void staffelScopedServicesMustWireOwnerScopeOrAuthHelper() {
-    // JobOrderHandoverService is intentionally excluded — its access gate lives on the parent
-    // order's controller endpoint (@ownerScopeService.canEditJobOrder), and it injects
-    // AuthHelperService anyway for the audit stamp on the handover record, verified by its own unit
-    // tests rather than by this rule. The list/detail visibility scoping that JobOrderService wired
-    // for Phase 3 (#343) moved into JobOrderQueryService (audit Thema 7, #14): it pushes
-    // OwnerScopeService into every read (SK-public vs squadron-private), so it is whitelisted
-    // below.
-    // JobOrderService itself stays whitelisted via AuthHelperService, which its writes still wire.
     Set<String> staffelScopedServiceNames =
         Set.of(
             "MissionService",
             "InventoryItemService",
-            // L2 split (#921): the org-unit scoping the facade used to carry moved into these two
-            // extracted services — InventoryAggregationService runs every scoped read
-            // (currentScopePredicate on the aggregated / grouped / flat / drilldown views) and
-            // InventoryCheckoutService the scoped global wipe. The facade now only wires
-            // OwnerScopeService for the create-time stamp, so both must be whitelisted here or a
-            // maintainer dropping the dependency would silently un-scope every squadron-wide
-            // inventory read across org units without failing the build.
             "InventoryAggregationService",
             "InventoryCheckoutService",
             "RefineryOrderService",
             "HangarService",
             "OperationService",
             "JobOrderService",
-            // Read/write split (#14): the list/detail visibility scoping moved into the query half.
             "JobOrderQueryService",
-            // Phase 4 (#344): material claims gate on the claiming squadron's scope
-            // (AuthHelperService.canEditOrgUnit) + the responsible-SK authority
-            // (OwnerScopeService.hasRoleInOrgUnit), so the service must wire both.
             "MaterialClaimService",
-            // #364: the blueprint availability overview filters the aggregate to the caller's
-            // oversight org units via OwnerScopeService.currentOversightScope().
             "PersonalBlueprintOverviewService",
-            // Epic #692 Phase 6 (REQ-BANK-027): the org-unit-aware bank seam scopes the F1
-            // balance view + F2 booking requests through OwnerScopeService
-            // (currentOversightScope / currentOwnLevelOversightScope). Whitelisted so a
-            // maintainer who drops that dependency — silently un-scoping the bank seam — fails
-            // the build. It is also the sole sanctioned OwnerScope↔bank bridge, pinned by
-            // orgUnitAwareBankSeamIsContainedToOneClass.
             "OrgUnitBankAccessService");
 
     String authHelper = "de.greluc.krt.profit.basetool.backend.service.AuthHelperService";
@@ -1283,16 +1044,7 @@ class ArchitectureTest {
             "HangarController",
             "InventoryItemController",
             "RefineryOrderController",
-            // R6.a — SPEZIALKOMMANDO_PLAN.md §8.1 extension.
-            // SpecialCommandController's writes are all ADMIN-gated (R5.a); only the single-row
-            // read shares the canManageMembers gate, and reads sit outside this rule. Adding it
-            // to the whitelist
-            // makes the audit's reach explicit and would catch a future maintainer who relaxes
-            // any endpoint to a non-admin gate without wiring the owner-scope check.
             "SpecialCommandController",
-            // SpecialCommandMembershipController is admin-or-Lead-gated via
-            // @specialCommandSecurityService.canManageMembers (R5.b); the Lead-toggle endpoint
-            // is admin-only. The accepted-gate set below widens to recognise that bean.
             "SpecialCommandMembershipController");
 
     noMethods()
@@ -1310,12 +1062,6 @@ class ArchitectureTest {
                 "are a modify-mapping annotation (POST/PUT/PATCH/DELETE)") {
               @Override
               public boolean test(JavaAnnotation<?> annotation) {
-                // POST is included alongside PUT/PATCH/DELETE because POST /{id}/<action> can
-                // mutate a specific resource (e.g. /inventory/{id}/book-out,
-                // /refinery-orders/{id}/store, /missions/{id}/join) — without a squadron gate a
-                // Logistician of squadron A could trigger the action on a squadron-B resource.
-                // The inner check filters out POSTs whose path does not target a primary resource
-                // id so create / bulk / administrative endpoints are not falsely flagged.
                 String fqcn = annotation.getRawType().getFullName();
                 return POST_MAPPING.equals(fqcn)
                     || PUT_MAPPING.equals(fqcn)
@@ -1330,13 +1076,6 @@ class ArchitectureTest {
                 "gate on @ownerScopeService in the @PreAuthorize SpEL expression") {
               @Override
               public void check(JavaMethod method, ConditionEvents events) {
-                // Skip endpoints that do not target a specific resource id in their path. The
-                // condition is two-fold:
-                //   * the method must accept a UUID @PathVariable (a primary-resource id), AND
-                //   * the request mapping path must literally contain "{id}" (the canonical
-                //     placeholder for the aggregate root's id; avoids false positives on
-                //     administrative endpoints like POST /users/{userId}/ships where the path
-                //     variable is a related user, not the aggregate id being mutated).
                 boolean takesResourceIdPathVariable =
                     method.getParameters().stream()
                         .anyMatch(
@@ -1354,29 +1093,9 @@ class ArchitectureTest {
                 JavaAnnotation<?> ann = method.getAnnotationOfType(PRE_AUTHORIZE);
                 String value =
                     ann.tryGetExplicitlyDeclaredProperty("value").map(Object::toString).orElse("");
-                // Accepted gate references (R3 narrowed the set back to one canonical name after
-                // the shim was deleted; R6.a widened it to also accept the Spezialkommando
-                // membership gate):
-                //   - @ownerScopeService.canSee*/canEdit*/canSeeOrgUnit/canEditOrgUnit — the
-                //     plan-aligned org-unit-scope check introduced in R2.c and the only accepted
-                //     scope-resolver since the SquadronScopeService shim was deleted in R3;
-                //   - @missionSecurityService.canManage*/canAccessParticipant/canChangeOwner —
-                //     mission-aggregate gate that itself folds in canEditMission() for elevated
-                //     authorities (see MissionSecurityService — squadron-scope-aware as of the
-                //     Phase 6 follow-up);
-                //   - @specialCommandSecurityService.canManageMembers — Spezialkommando
-                //     membership gate (R5.b / SPEZIALKOMMANDO_PLAN.md §6.1): admin-or-Lead of
-                //     the exact SK whose id sits in the path. A Lead of a different SK does
-                //     not carry over, so the gate is per-aggregate-row just like the
-                //     ownerScopeService.canEdit* family;
-                //   - hasRole('ADMIN') alone — admin always passes the squadron filter, no extra
-                //     scope check needed (MULTI_SQUADRON_PLAN.md section 1).
                 boolean hasOwnerScope = value.contains("ownerScopeService");
                 boolean hasMissionSecurity = value.contains("missionSecurityService");
                 boolean hasSpecialCommandSecurity = value.contains("specialCommandSecurityService");
-                // Epic #800 (REQ-ROLE-004): the delegated appointment authoriser is a per-org-unit
-                // gate (it keys the verdict on the caller's rank on the exact unit in the path), so
-                // it is an accepted scope gate exactly like the specialCommandSecurity bean.
                 boolean hasOrgRoleManagement = value.contains("orgRoleManagementSecurityService");
                 boolean hasAdminOnly =
                     value.contains("hasRole('ADMIN')") && !value.contains("hasAnyRole(");
@@ -1428,9 +1147,6 @@ class ArchitectureTest {
    */
   @Test
   void peerReadableMissionEndpointsMustRedactPii() {
-    // failOnEmptyShould is on (ArchUnit 1.5.0), but a rule that silently narrows to zero members
-    // reads as a pass in every report format that matters. Assert the selection explicitly, with
-    // the number stated, so shrinking it is a decision somebody has to write down.
     long selected =
         CLASSES.stream()
             .filter(c -> c.getPackageName().contains(".backend.controller"))
@@ -1507,27 +1223,6 @@ class ArchitectureTest {
         JavaAnnotation<?> ann = method.getAnnotationOfType(PRE_AUTHORIZE);
         String value =
             ann.tryGetExplicitlyDeclaredProperty("value").map(Object::toString).orElse("");
-        // PEER-REACHABLE IS THE DEFAULT; THE GATE HAS TO EARN THE EXEMPTION. Until 2026-09-07
-        // this was an ALLOW-LIST of five scope predicates — canSeeMission, canAccessParticipant,
-        // canManageMission, canManageManagers, canChangeOwner — which meant a handler whose gate
-        // named none of them was invisible to the rule rather than caught by it. createMission is
-        // exactly that shape: `isAuthenticated()` alone, returning a full MissionDto to the member
-        // who just created the Einsatz. Deleting its redaction call left the build green while
-        // POST /api/v1/missions handed that member every participant's e-mail, real name, roles
-        // and permissions — the same blind-by-construction failure the 2026-09-06 rewrite removed
-        // one layer up, surviving in the selector instead of in the exemptions.
-        //
-        // canManageMission, canManageManagers and canChangeOwner were once listed as EXEMPTIONS
-        // here, on the premise that "a gate that already requires leadership returns the
-        // unredacted aggregate on purpose". That premise is false, and the 2026-09-06 review is
-        // what established it: all three fall through to isOwnerOrManager, which grants on
-        // mission.getOwner() or membership of getManagers() without consulting a role at all — and
-        // the role hierarchy declares no MISSION_MANAGER > LOGISTICIAN edge either. Creating a
-        // mission makes you its owner, so a plain KRT_MEMBER passes them.
-        //
-        // What genuinely cannot admit a member below Logistician is a gate naming a role or an
-        // authority: the hierarchy is what decides those, and it puts nobody below LOGISTICIAN
-        // above it. That is the whole exemption, and a new gate is caught until it says so.
         return !value.contains("hasRole(")
             && !value.contains("hasAnyRole(")
             && !value.contains("hasAuthority(")
@@ -1681,10 +1376,6 @@ class ArchitectureTest {
         if (callsHelper) {
           return;
         }
-        // Method references (e.g. `stream.map(this::cleanupParticipantForPeer)`) are compiled
-        // into a synthetic invokedynamic call site whose target is reachable via the bootstrap.
-        // ArchUnit exposes that as a separate access kind — fall back to the broader call set so
-        // the rule does not false-positive on the slim endpoint's stream pattern.
         boolean referencesHelper =
             method.getAccessesFromSelf().stream()
                 .map(access -> access.getTarget().getName())
@@ -1692,17 +1383,6 @@ class ArchitectureTest {
         if (referencesHelper) {
           return;
         }
-        // One level of same-class indirection counts. Twenty-three handlers route their return
-        // through MissionController#redactForPeer rather than repeating the same four-line
-        // isLogisticianOrAbove block, and a rule that forced the copy would be arguing for worse
-        // code than it protects. The hop is bounded on purpose: only a private helper of the very
-        // same controller, so the redaction stays visible in the file the reviewer is reading.
-        //
-        // AND THE HELPER MUST REDACT THE TYPE THIS HANDLER RETURNS. The hop used to accept any
-        // same-class method that mentioned any cleanup…ForPeer name, without ever relating the two
-        // — so with five such helpers in MissionController, a handler returning MissionDto
-        // satisfied the rule by calling redactShipsForPeer on an unrelated list of ships. A rule
-        // that can be satisfied by redacting something else is not checking the return value.
         Set<String> protectedByHandler = protectedDtosOf(method);
         boolean callsALocalHelperThatRedacts =
             method.getMethodCallsFromSelf().stream()
@@ -1781,41 +1461,29 @@ class ArchitectureTest {
    */
   private static final Set<String> FORBIDDEN_MISSION_REQUEST_COMPONENTS =
       Set.of(
-          // Identity / global version — set by the persistence layer.
           "id",
           "version",
           "coreVersion",
           "scheduleVersion",
           "flagsVersion",
-          // Owner — stamped from the authenticated principal in createMission.
           "owner",
           "ownerId",
-          // Managers — managed via dedicated /missions/{id}/managers endpoints.
           "managers",
-          // Owning squadron — derived from owner.squadron / scope (createMission) or parent
-          // (addSubMission); never the body.
           "owningSquadron",
           "owningSquadronId",
           "squadronId",
           "squadron",
-          // Owning OrgUnit — object-form references blocked (R6.a /
-          // SPEZIALKOMMANDO_PLAN.md §8.3). The plain UUID variant {@code owningOrgUnitId} is
-          // intentionally allowed as the picker output (R5.d.d); only the JPA-entity-form
-          // references are server-managed and must never be bound from the request body.
           "owningOrgUnit",
           "creatingOrgUnit",
           "requestingOrgUnit",
-          // Parent — for sub-missions, taken from the path variable; never the body.
           "parent",
           "parentId",
-          // Sub-aggregate collections have their own write endpoints.
           "participants",
           "assignedUnits",
           "frequencies",
           "subMissions",
           "inventoryEntries",
           "refineryOrders",
-          // Computed-on-response projections.
           "canEdit",
           "canManageManagers",
           "checkedInParticipants",
@@ -1834,7 +1502,6 @@ class ArchitectureTest {
                         .contains(com.tngtech.archunit.core.domain.JavaModifier.STATIC))
             .map(f -> f.getName())
             .filter(FORBIDDEN_MISSION_REQUEST_COMPONENTS::contains)
-            // `version` is the optimistic-lock token on UpdateMissionRequest — legitimate there.
             .filter(name -> !(isUpdateDto && "version".equals(name)))
             .forEach(
                 name ->
@@ -1851,10 +1518,6 @@ class ArchitectureTest {
       }
     };
   }
-
-  // ---------------------------------------------------------------------------------
-  // Multi-user signup concurrency guards
-  // ---------------------------------------------------------------------------------
 
   private static final String OPTIMISTIC_LOCK = "org.hibernate.annotations.OptimisticLock";
   private static final String MISSION_FQN = "de.greluc.krt.profit.basetool.backend.model.Mission";
@@ -2109,15 +1772,9 @@ class ArchitectureTest {
             new ArchCondition<JavaClass>("inject ScWikiClient") {
               @Override
               public void check(JavaClass javaClass, ConditionEvents events) {
-                // Skip nested helper types (e.g. a private result record inside a sync service):
-                // the rule targets the top-level sync beans that actually talk to the Wiki, not
-                // their inner value holders.
                 if (javaClass.getEnclosingClass().isPresent()) {
                   return;
                 }
-                // Skip curated pure-helper beans that encode SC-Wiki domain knowledge but make no
-                // HTTP call (see SCWIKI_CLIENT_INJECTION_EXEMPT_SIMPLE_NAMES) — they have no client
-                // dependency to inject and belong beside the sync services that consume them.
                 if (SCWIKI_CLIENT_INJECTION_EXEMPT_SIMPLE_NAMES.contains(
                     javaClass.getSimpleName())) {
                   return;
@@ -2137,9 +1794,6 @@ class ArchitectureTest {
                 }
               }
             })
-        // R1 has ScWikiClient + ScWikiScheduler in the package; the latter satisfies the rule.
-        // Allowing empty here keeps the guard intact when R9 / hypothetical refactors move all
-        // sync services out of the package, leaving only the client behind.
         .allowEmptyShould(true)
         .check(CLASSES);
   }
@@ -2378,29 +2032,6 @@ class ArchitectureTest {
             "de.greluc.krt.profit.basetool.backend.repository.BankTransactionRepository",
             "de.greluc.krt.profit.basetool.backend.repository.BankPostingRepository",
             "de.greluc.krt.profit.basetool.backend.repository.BankHolderPostingRepository");
-    // The single named exception, approved by @greluc on 2026-09-16 (ADR-0183, REQ-SEC-062).
-    //
-    // A granted Art. 17 request replaces the member's handle in `bank_transaction`
-    // .counterparty_handle with a placeholder. That is an UPDATE on a ledger table, which this rule
-    // forbids — so the exception is by METHOD NAME, not by relaxing the rule: every other
-    // @Modifying method on these repositories still fails, including one with this exact name on a
-    // different ledger repository.
-    //
-    // Why it is admissible at all: the rule exists so a ledger CORRECTION cannot be made by update
-    // (corrections are reversal transactions, REQ-BANK-004). This changes no booking fact — not an
-    // amount, not an account, not a date, not a posting row — only a denormalised display column
-    // carrying a name. The alternatives were weighed and rejected: leaving the booking history out
-    // of the erasure would contradict the privacy policy, which names „Buchungseinträge" as
-    // something an Art. 17 request can reach; and a reversal-plus-rebooking pair would double every
-    // affected member's ledger rows and disturb balance history for a name change.
-    //
-    // ADR-0010's insert-only consequence is therefore amended, and ADR-0183 records that amendment
-    // rather than leaving it to be inferred from this test.
-    // Fully qualified, not by bare method name. The predicate consulted input.getName() only, so a
-    // @Modifying method that happened to be called anonymiseCounterpartyHandle on
-    // BankPostingRepository or BankHolderPostingRepository would have inherited the exemption
-    // silently -- and those are the tables carrying amounts. The approval was for one method on one
-    // repository; the check now says so.
     Set<String> approvedLedgerMutations =
         Set.of(
             "de.greluc.krt.profit.basetool.backend.repository.BankTransactionRepository"

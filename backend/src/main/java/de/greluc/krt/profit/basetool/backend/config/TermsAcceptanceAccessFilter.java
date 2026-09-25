@@ -110,18 +110,9 @@ public class TermsAcceptanceAccessFilter extends OncePerRequestFilter {
    */
   private static final List<PathPattern> EXEMPT_PATHS =
       List.of(
-          // The consent resource and its sub-resources — refusing these makes the block permanent
-          // for everyone, because no request would be left that could record consent.
           PATH_PARSER.parse("/api/v1/terms"),
           PATH_PARSER.parse("/api/v1/terms/**"),
-          // Lets a caller who is ALSO pending approval be routed to the waiting page instead.
           PATH_PARSER.parse("/api/v1/users/me/registration-status"),
-          // REQ-SEC-052: the second of the two reads that answer without any token. The terms
-          // wording above is already exempt via /api/v1/terms/**; this one is not covered by any
-          // pattern here and needs naming. The Android app attaches its bearer to every call once
-          // a session exists, so an unconsented member asking whether their build is still served
-          // would otherwise be refused — and the forced-update gate exists precisely for the case
-          // where the member cannot get through the flow that would let them consent.
           PATH_PARSER.parse("/api/v1/app/version-policy"));
 
   /** App-wide correlation-id response header. */
@@ -171,18 +162,9 @@ public class TermsAcceptanceAccessFilter extends OncePerRequestFilter {
     if (!API_SCOPE.matches(path) || EXEMPT_PATHS.stream().anyMatch(p -> p.matches(path))) {
       return null;
     }
-    // Asked of AuthenticatedSubject, not of the type — and this one failed OPEN. A request the
-    // ingest gateway makes on behalf of a member carries no token (ADR-0129), so the old
-    // `instanceof JwtAuthenticationToken` test found none and returned null, which here means "let
-    // through". The consent gate silently stopped applying to the one path REQ-SEC-028 was extended
-    // to cover. A type check that waves callers through is the worst kind to get wrong.
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();
     UUID userId = AuthenticatedSubject.idOf(auth).orElse(null);
     if (userId == null) {
-      // No subject the seam recognises as a member id. NOT because a service account's `sub` looks
-      // different - a Keycloak service-account subject IS a UUID - but because the seam resolves a
-      // subject to a LOCAL member and a service account has no member row. Either way it is not a
-      // person who can accept anything; the audience and scope checks govern those callers.
       return null;
     }
     return termsConsentCheck.hasAcceptedCurrentTerms(userId) ? null : userId;
@@ -198,8 +180,6 @@ public class TermsAcceptanceAccessFilter extends OncePerRequestFilter {
    */
   private void writeForbidden(HttpServletRequest request, HttpServletResponse response, UUID userId)
       throws IOException {
-    // Counted as a distinct subject, not just as a request. See MetricNames.TERMS_REFUSED_SUBJECTS:
-    // the refusal rate alone cannot separate a locked-out membership from one client retrying.
     refusedSubjects.record(userId);
     boolean owned = stampUserId(userId);
     try {
@@ -236,9 +216,6 @@ public class TermsAcceptanceAccessFilter extends OncePerRequestFilter {
   private void writeForbiddenBody(HttpServletRequest request, HttpServletResponse response)
       throws IOException {
     String correlationId = UUID.randomUUID().toString();
-    // DEBUG, not WARN: after a terms change this fires once per request for everyone who has not
-    // accepted yet, which is the feature working, not an incident. The metric below is the
-    // monitoring signal.
     log.debug(
         "Consent missing; refused {} {} [correlationId={}]",
         request.getMethod(),
@@ -249,9 +226,6 @@ public class TermsAcceptanceAccessFilter extends OncePerRequestFilter {
         .counter(MetricNames.HTTP_ERROR, MetricNames.TAG_CODE, CODE_TERMS_NOT_ACCEPTED)
         .increment();
 
-    // Declared here rather than at the top of the method so each sits next to its use
-    // (Checkstyle VariableDeclarationUsageDistance). LocaleContextHolder is not populated this
-    // early in the filter chain, so the request's own Accept-Language is the authoritative source.
     Locale locale = request.getLocale();
     String title =
         messageSource.getMessage("problem.terms_not_accepted.title", null, "Forbidden", locale);

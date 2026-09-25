@@ -99,8 +99,6 @@ public class LiveSyncSubscriptionAuthorizer {
   @NotNull
   private Verdict evaluate(@NotNull LiveSyncTopic topic) {
     if (!authHelperService.isMemberOrAbove()) {
-      // Every room in this registry is member-facing; a role-less account has no business in any of
-      // them, and checking it once here keeps each branch below to its own resource question.
       return Verdict.refuse(MetricNames.SUBSCRIBE_DENY_AUTHZ);
     }
     try {
@@ -117,8 +115,6 @@ public class LiveSyncSubscriptionAuthorizer {
       return allowed ? Verdict.permit() : Verdict.refuse(MetricNames.SUBSCRIBE_DENY_AUTHZ);
     } catch (RuntimeException e) {
       log.debug("Live-sync subscribe refused for {} after a failed check", topic.canonical(), e);
-      // Counted apart from an ordinary refusal: a rising rate here is an infrastructure signal,
-      // not members hitting permission boundaries, and the two are indistinguishable once merged.
       return Verdict.refuse(MetricNames.SUBSCRIBE_DENY_CHECK_FAILED);
     }
   }

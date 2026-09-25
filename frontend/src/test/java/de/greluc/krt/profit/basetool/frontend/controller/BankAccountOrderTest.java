@@ -37,37 +37,28 @@ class BankAccountOrderTest {
 
   @Test
   void byName_ordersCaseInsensitivelyAndAlphabetically() {
-    // Given mixed-case names in arbitrary order.
     List<String> input = List.of("banana", "Apple", "cherry", "apple");
 
-    // When ordered by name.
     List<String> ordered = BankAccountOrder.byName(input, Function.identity());
 
-    // Then A→Z ignoring case; the two equal-ignoring-case entries keep their input order (stable).
     assertEquals(List.of("Apple", "apple", "banana", "cherry"), ordered);
   }
 
   @Test
   void byName_treatsNullNameAsEmptyAndSortsItFirst() {
-    // Given a list where one element yields a null name.
     List<String> input = Arrays.asList("b", null, "a");
 
-    // When ordered (a null name must not throw).
     List<String> ordered = BankAccountOrder.byName(input, Function.identity());
 
-    // Then the null (== "") sorts ahead of the real names.
     assertEquals(Arrays.asList(null, "a", "b"), ordered);
   }
 
   @Test
   void byName_doesNotMutateTheInputList() {
-    // Given a mutable input list in unsorted order.
     List<String> input = new ArrayList<>(List.of("c", "a", "b"));
 
-    // When ordered.
     BankAccountOrder.byName(input, Function.identity());
 
-    // Then the original list is left exactly as it was (a new list is returned).
     assertEquals(List.of("c", "a", "b"), input);
   }
 }

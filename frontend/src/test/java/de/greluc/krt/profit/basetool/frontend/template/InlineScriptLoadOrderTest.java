@@ -157,7 +157,6 @@ class InlineScriptLoadOrderTest {
 
   @Test
   void theCheckSeesATopLevelCallAndAnIife() {
-    // The guard's own sanity check against the exact shapes it replaced.
     assertThat(topLevelCalls("function bind() { window.krtFetch.bindSwap({}); }\nbind();"))
         .containsExactly("bind");
     assertThat(topLevelCalls("(function () { if (!window.krtFetch) { return; } })();"))

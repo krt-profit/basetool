@@ -43,22 +43,16 @@ class AuditDetailsTest {
 
   @Test
   void singlePair_matchesConcatenation() {
-    // Given
     SampleStatus status = SampleStatus.PLANNED;
-    // When
     String built = AuditDetails.of("status", status).toString();
-    // Then
     assertEquals("status=" + status, built, "single pair must equal the + concatenation");
     assertEquals("status=PLANNED", built);
   }
 
   @Test
   void multiplePairs_matchConcatenation() {
-    // Given
     SampleStatus status = SampleStatus.ACTIVE;
-    // When
     String built = AuditDetails.of("section", "full").with("status", status).toString();
-    // Then
     assertEquals("section=full status=" + status, built);
     assertEquals("section=full status=ACTIVE", built);
   }
@@ -72,9 +66,7 @@ class AuditDetailsTest {
 
   @Test
   void uuidValue_rendersLikeConcatenation() {
-    // Given
     UUID id = UUID.fromString("00000000-0000-0000-0000-000000000001");
-    // Then
     assertEquals("participant=" + id, AuditDetails.of("participant", id).toString());
     assertEquals(
         "participant=00000000-0000-0000-0000-000000000001",
@@ -83,9 +75,7 @@ class AuditDetailsTest {
 
   @Test
   void intValue_rendersLikeConcatenation() {
-    // Given
     int size = 7;
-    // Then — an autoboxed int stringifies identically to the primitive + concatenation
     assertEquals("materials=" + size, AuditDetails.of("materials", size).toString());
     assertEquals("materials=7", AuditDetails.of("materials", size).toString());
   }
@@ -105,31 +95,24 @@ class AuditDetailsTest {
 
   @Test
   void nullValue_rendersAsLiteralNullLikeConcatenation() {
-    // Given
     UUID nothing = null;
-    // Then — String.valueOf(null) is "null", identical to "k=" + (Object) null
     assertEquals("participant=" + nothing, AuditDetails.of("participant", nothing).toString());
     assertEquals("participant=null", AuditDetails.of("participant", nothing).toString());
   }
 
   @Test
   void ternaryValue_rendersLikeConcatenation() {
-    // Given — the participant "type" ternary from MissionParticipantService. It reads `external`
-    // since ADR-0159 renamed the tier; this case mirrors the call site, so it moves with it.
     UUID finalUserId = null;
-    // When
     String built =
         AuditDetails.of("participant", "p1")
             .with("type", finalUserId != null ? "user" : "external")
             .toString();
-    // Then
     assertEquals("participant=p1 type=" + (finalUserId != null ? "user" : "external"), built);
     assertEquals("participant=p1 type=external", built);
   }
 
   @Test
   void longChain_matchesConcatenation() {
-    // Given — a five-key payload mirroring INVENTORY_ITEM_CREATED
     String built =
         AuditDetails.of("qty", 3)
             .with("q", "HIGH")
@@ -137,15 +120,11 @@ class AuditDetailsTest {
             .with("jobOrder", "jo1")
             .with("mission", "m1")
             .toString();
-    // Then
     assertEquals("qty=3 q=HIGH personal=true jobOrder=jo1 mission=m1", built);
   }
 
   @Test
   void valueContainingSpace_isNotAltered() {
-    // The builder never trims/quotes/rejects value content — it must stay byte-identical to
-    // concatenation even for an (illegitimate) free-text value, so migration can never change
-    // bytes.
     assertEquals("note=two words", AuditDetails.of("note", "two words").toString());
   }
 
@@ -164,10 +143,8 @@ class AuditDetailsTest {
 
   @Test
   void charSequenceContract_delegatesToRenderedPayload() {
-    // Given — a two-key payload rendering to "section=full status=ACTIVE"
     AuditDetails details = AuditDetails.of("section", "full").with("status", SampleStatus.ACTIVE);
     String rendered = "section=full status=ACTIVE";
-    // Then — length/charAt/subSequence mirror the rendered string, so it is a faithful CharSequence
     assertEquals(rendered.length(), details.length());
     assertEquals(rendered.charAt(0), details.charAt(0));
     assertEquals("section", details.subSequence(0, 7).toString());
@@ -175,8 +152,6 @@ class AuditDetailsTest {
 
   @Test
   void usableAsCharSequence_matchesRenderedContent() {
-    // The seam: record(...) accepts the composer as a CharSequence and renders it. A String's
-    // contentEquals confirms the composer carries exactly the expected characters.
     CharSequence details = AuditDetails.of("count", 3);
     assertTrue("count=3".contentEquals(details), "composer must be a CharSequence of its payload");
   }

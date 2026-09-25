@@ -112,8 +112,6 @@ class P4kImportJobServiceTest {
     return job;
   }
 
-  // ────────────────────────────────────────────────────────── create preview ──
-
   @Test
   void createPreviewJob_persistsPendingJobAndPayload() {
     stubSaveAssignsId();
@@ -144,8 +142,6 @@ class P4kImportJobServiceTest {
     verify(jobRepository, never()).save(any());
     verify(payloadRepository, never()).save(any());
   }
-
-  // ──────────────────────────────────────────────────────── create apply ──
 
   @Test
   void createApplyJob_fromSucceededPreview_copiesPayloadAndLinksPreview() {
@@ -209,8 +205,6 @@ class P4kImportJobServiceTest {
         () -> service.createApplyJob(previewId, false, UUID.randomUUID()));
   }
 
-  // ──────────────────────────────────────────────────── lifecycle transitions ──
-
   @Test
   void markRunning_setsStatusAndStartedAt() {
     UUID id = UUID.randomUUID();
@@ -257,8 +251,6 @@ class P4kImportJobServiceTest {
         0.0, terminalCount(MetricNames.OUTCOME_SUCCEEDED, P4kImportJobKind.PREVIEW.name()));
   }
 
-  // ──────────────────────────────────────────────────── payload + prune ──
-
   @Test
   void deletePayload_deletesOnlyWhenPresent() {
     UUID id = UUID.randomUUID();
@@ -280,8 +272,6 @@ class P4kImportJobServiceTest {
     when(jobRepository.deleteByCreatedAtBefore(any())).thenReturn(3);
     assertEquals(3, service.pruneOldJobs());
   }
-
-  // ──────────────────────────────────────────────────── startup reconcile ──
 
   @Test
   void failOrphanedJobs_flipsPendingAndRunningToFailed() {

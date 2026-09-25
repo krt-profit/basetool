@@ -115,11 +115,6 @@ public final class FleetExportParser {
   public static @NotNull List<FleetImportEntry> parse(
       @NotNull ObjectMapper objectMapper, @NotNull MultipartFile file) {
     List<FleetImportEntry> entries = parseEntries(objectMapper, file);
-    // The byte cap bounds the parse; it does not bound the work AFTER it. HangarImportService walks
-    // every entry and inserts one Ship row per counted unit inside a single transaction, so an
-    // 8 MiB upload of minimal records turns into an unbounded insert loop holding one connection
-    // for its whole run - the same shape as the blueprint import's per-entry fuzzy scan. A real
-    // fleet export is in the hundreds.
     if (entries.size() > MAX_IMPORT_ENTRIES) {
       throw new BadRequestException(
           "The uploaded ship list carries "
@@ -140,8 +135,6 @@ public final class FleetExportParser {
    */
   private static @NotNull List<FleetImportEntry> parseEntries(
       @NotNull ObjectMapper objectMapper, @NotNull MultipartFile file) {
-    // Reject an oversized upload BEFORE readTree builds the in-memory tree (security audit
-    // gap-fill). getSize() reflects the buffered multipart length, so this never reads the body.
     if (file.getSize() > MAX_IMPORT_BYTES) {
       throw new BadRequestException(
           "The uploaded ship-list file is too large (limit "
@@ -152,15 +145,11 @@ public final class FleetExportParser {
     try {
       root = objectMapper.readTree(file.getInputStream());
     } catch (IOException | JacksonException e) {
-      // IOException covers the multipart stream; JacksonException (unchecked in Jackson 3) covers a
-      // malformed JSON body — both must surface as a 400, not bubble up as a 500.
       log.debug("Hangar import: failed to parse JSON", e);
       throw new BadRequestException(
           "The uploaded file could not be parsed as a valid ship-list JSON.");
     }
 
-    // StarJump FleetViewer exports use an object root with a canvasItems array, unlike the two
-    // array-based formats — branch on it before the array contract below.
     if (root != null && root.isObject() && isStarjumpFleetviewer(root)) {
       return parseStarjumpEntries(objectMapper, root);
     }

@@ -171,15 +171,9 @@ public class JobOrderWriteController {
               lines,
               form.getVersion());
       backendApiClient.post("/api/v1/orders/items", dto, JobOrderDto.class);
-      // Server-side queue poke (REQ-FE-015). The original reason was a guest create with no
-      // socket; there are no guest creates any more (ADR-0149), but a session is not a socket —
-      // a submit from a page whose socket dropped is the ordinary case — so the poke stays here.
       liveSyncLocalBus.publish("orders", ORDERS_QUEUE_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.create");
 
-      // A member of a non-profit unit cannot browse the queue, so keep them on the create form
-      // (with the success toast) instead of bouncing them to a list they may not see. The
-      // anonymous half of this condition went with the caller (ADR-0159).
       if (!canViewJobOrders) {
         return "redirect:/orders/create"
             + (form.getSource() != null ? "?source=" + form.getSource() : "");
@@ -393,15 +387,9 @@ public class JobOrderWriteController {
               materials,
               form.getVersion());
       backendApiClient.post("/api/v1/orders", dto, JobOrderDto.class);
-      // Server-side queue poke (REQ-FE-015). The original reason was a guest create with no
-      // socket; there are no guest creates any more (ADR-0149), but a session is not a socket —
-      // a submit from a page whose socket dropped is the ordinary case — so the poke stays here.
       liveSyncLocalBus.publish("orders", ORDERS_QUEUE_SECTION);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.create");
 
-      // A member of a non-profit unit cannot browse the queue, so keep them on the create form
-      // (with the success toast) instead of bouncing them to a list they may not see. The
-      // anonymous half of this condition went with the caller (ADR-0159).
       if (!canViewJobOrders) {
         return "redirect:/orders/create"
             + (form.getSource() != null ? "?source=" + form.getSource() : "");
@@ -409,7 +397,6 @@ public class JobOrderWriteController {
       if ("index".equals(form.getSource())) {
         return "redirect:/orders";
       }
-      // fallback
       return "redirect:/orders";
     } catch (Exception e) {
       log.error("Failed to create order", e);
@@ -629,9 +616,6 @@ public class JobOrderWriteController {
   @ResponseBody
   public org.springframework.http.ResponseEntity<Object> upsertClaim(
       @PathVariable UUID id, @RequestBody CreateClaimDto dto) {
-    // Mirrors every backend status faithfully, including a 409 that survived the backend's bounded
-    // claim-upsert retry — its RFC 7807 code is preserved (via propagateBackendError inside relay)
-    // so the client toasts/reloads correctly instead of the race being collapsed into a 500.
     return relay(
         log,
         "upsert claim on order " + id,
@@ -959,12 +943,6 @@ public class JobOrderWriteController {
         return "redirect:/orders/" + id;
       }
 
-      // The frontend hidden input transmits the handover time as a UTC ISO-Instant (e.g.
-      // "2026-04-25T10:04:00.000Z") that is produced client-side from the user's browser-local
-      // date/time inputs by datetime-splitter.js. Parsing as Instant preserves the absolute
-      // point in time and avoids timezone drift (previously LocalDateTime.parse threw on the
-      // trailing "Z" and silently fell back to Instant.now(), which not only ignored the user
-      // input but also produced wrong displayed times for users in DST/non-UTC zones).
       Instant handoverTime = Instant.now();
       String rawHandoverTime = form.getHandoverTime();
       if (rawHandoverTime != null && !rawHandoverTime.isBlank()) {
@@ -977,8 +955,6 @@ public class JobOrderWriteController {
                     .atZone(ZoneId.systemDefault())
                     .toInstant();
           } catch (Exception elocal) {
-            // Client-supplied free text straight off the form: sanitise before it reaches the
-            // logger so an embedded newline cannot forge a second log line (CWE-117).
             log.warn(
                 "Could not parse handoverTime {}, using now()", LogSafe.text(rawHandoverTime, 64));
           }
@@ -992,9 +968,6 @@ public class JobOrderWriteController {
       backendApiClient.post("/api/v1/orders/" + id + "/handovers", dto, JobOrderHandoverDto.class);
       redirectAttributes.addFlashAttribute("successToast", "success.joborder.handover");
     } catch (BackendServiceException bse) {
-      // Backend already returned an RFC7807 Problem+JSON response. Log status, problem code,
-      // correlationId and field errors so a 400 VALIDATION_FAILED can be diagnosed from the
-      // frontend log without having to reproduce the request. No PII (rejected values) is logged.
       de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging.warn(
           log, "POST /api/v1/orders/{id}/handovers", id, bse);
       redirectAttributes.addFlashAttribute("errorToast", "error.joborder.handover.failed");
@@ -1049,9 +1022,6 @@ public class JobOrderWriteController {
         return "redirect:/orders/" + id;
       }
 
-      // handoverTime arrives as a client-produced UTC ISO-Instant (see orders-detail.html); parse
-      // as Instant to preserve the absolute point in time, falling back to local-datetime parsing
-      // and finally now() so a malformed value never blocks the handover. Mirrors createHandover.
       Instant handoverTime = Instant.now();
       String rawHandoverTime = form.getHandoverTime();
       if (rawHandoverTime != null && !rawHandoverTime.isBlank()) {
@@ -1064,8 +1034,6 @@ public class JobOrderWriteController {
                     .atZone(ZoneId.systemDefault())
                     .toInstant();
           } catch (Exception elocal) {
-            // Client-supplied free text straight off the form: sanitise before it reaches the
-            // logger so an embedded newline cannot forge a second log line (CWE-117).
             log.warn(
                 "Could not parse item handoverTime {}, using now()",
                 LogSafe.text(rawHandoverTime, 64));
@@ -1113,8 +1081,6 @@ public class JobOrderWriteController {
               .atZone(ZoneId.systemDefault())
               .toInstant();
         } catch (Exception elocal) {
-          // Client-supplied free text straight off the form: sanitise before it reaches the
-          // logger so an embedded newline cannot forge a second log line (CWE-117).
           log.warn("Could not parse handoverTime {}, using now()", LogSafe.text(raw, 64));
         }
       }
@@ -1537,8 +1503,6 @@ public class JobOrderWriteController {
     if (fromToken != null) {
       return fromToken;
     }
-    // Only reached for a subject that is not a UUID -- the backend refuses such a token at its own
-    // seam, so this is a floor rather than a supported state.
     try {
       UserDto me = backendApiClient.get("/api/v1/users/me", UserDto.class);
       return me != null ? me.id() : null;
@@ -1569,8 +1533,6 @@ public class JobOrderWriteController {
 
     Collection<? extends GrantedAuthority> reachableAuthorities =
         roleHierarchy.getReachableGrantedAuthorities(authorities);
-    // REQ-OBS-004: log a stable short pseudonym, never principal.getName() (the Keycloak
-    // preferred_username handle, which PiiMasker does not scrub).
     log.debug(
         "JobOrder: Checking logistician status for user u-{}. Original authorities: {}."
             + " Reachable authorities: {}",

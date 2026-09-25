@@ -89,8 +89,6 @@ public class JobOrderMaterialRequirementResolver {
       if (line.getMaterial() == null) {
         continue;
       }
-      // A MATERIAL line's bucket quality mirrors aggregateMaterials(): a stored 650-floor is GOOD,
-      // "Keine" (null minQuality) is NONE — so both kinds land in the same bucket for one material.
       QualityRequirement quality =
           line.getMinQuality() != null ? QualityRequirement.GOOD : QualityRequirement.NONE;
       requirements.add(

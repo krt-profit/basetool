@@ -131,7 +131,6 @@ public final class BankBalanceChart {
         max = point.balance();
       }
     }
-    // Fold the target into the visible range so the dashed target line never falls off the chart.
     BigDecimal loValue = target != null && target.compareTo(min) < 0 ? target : min;
     BigDecimal hiValue = target != null && target.compareTo(max) > 0 ? target : max;
     double loBound = loValue.doubleValue();

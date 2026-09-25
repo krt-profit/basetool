@@ -80,9 +80,6 @@ class UexClientTest {
 
     properties =
         BoundProperties.bind(UexProperties.class, Map.of("api-url", server.url("/").toString()));
-    // All endpoints stay at their default paths — the production defaults
-    // already match the public UEX 2.0 API surface and are validated as
-    // part of property-binding tests.
 
     meterRegistry = new SimpleMeterRegistry();
     client =
@@ -168,11 +165,8 @@ class UexClientTest {
             .count());
   }
 
-  // ─── getCommodities ─────────────────────────────────────────────────────
-
   @Test
   void getCommodities_happyPath_returnsParsedList() throws Exception {
-    // Given
     server.enqueue(
         new MockResponse()
             .setResponseCode(200)
@@ -188,10 +182,8 @@ class UexClientTest {
                 }
                 """));
 
-    // When
     List<UexCommodityDto> commodities = client.getCommodities().data();
 
-    // Then
     assertEquals(2, commodities.size());
     assertEquals("Gold", commodities.get(0).name());
     assertEquals("Quantanium", commodities.get(1).name());
@@ -205,16 +197,12 @@ class UexClientTest {
 
   @Test
   void getCommodities_serverError_returnsEmptyListInsteadOfThrowing() {
-    // Given — a 5xx that the fallback must swallow
     server.enqueue(new MockResponse().setResponseCode(500).setBody("upstream exploded"));
 
-    // When
     List<UexCommodityDto> commodities = client.getCommodities().data();
 
-    // Then
     assertNotNull(commodities, "fallback must return empty list, not null");
     assertTrue(commodities.isEmpty());
-    // The swallowed upstream failure must still leave a metric trail (REQ-OBS-011, #1041 item 2).
     assertEquals(
         1.0,
         meterRegistry
@@ -228,38 +216,30 @@ class UexClientTest {
 
   @Test
   void getCommodities_connectionDropped_returnsEmptyList() {
-    // Given — simulate a network blip
     server.enqueue(new MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_DURING_REQUEST_BODY));
 
-    // When
     List<UexCommodityDto> commodities = client.getCommodities().data();
 
-    // Then
     assertNotNull(commodities);
     assertTrue(commodities.isEmpty());
   }
 
   @Test
   void getCommodities_emptyDataArray_returnsEmptyList() {
-    // Given — API returned a 200 but no items
     server.enqueue(
         new MockResponse()
             .setResponseCode(200)
             .setHeader("Content-Type", "application/json")
             .setBody("{\"status\":\"ok\",\"data\":[]}"));
 
-    // When
     List<UexCommodityDto> commodities = client.getCommodities().data();
 
-    // Then
     assertNotNull(commodities);
     assertTrue(commodities.isEmpty());
   }
 
   @Test
   void getCommodities_nullDataEnvelope_returnsEmptyListWithoutLoggingAnError() {
-    // UEX sometimes returns {"status":"ok","data":null} for an empty category; the old
-    // .map(UexResponseDto::data) emitted null and Reactor rejected it with a logged NPE.
     Logger uexLog = (Logger) LoggerFactory.getLogger(UexClient.class);
     ListAppender<ILoggingEvent> appender = new ListAppender<>();
     appender.start();
@@ -278,8 +258,6 @@ class UexClientTest {
       uexLog.detachAppender(appender);
     }
   }
-
-  // ─── getCommoditiesPricesAll ────────────────────────────────────────────
 
   @Test
   void getCommoditiesPricesAll_happyPath_returnsParsedList() throws Exception {
@@ -304,8 +282,6 @@ class UexClientTest {
     assertTrue(client.getCommoditiesPricesAll().data().isEmpty());
   }
 
-  // ─── getStarSystems ─────────────────────────────────────────────────────
-
   @Test
   void getStarSystems_happyPath_returnsParsedList() throws Exception {
     server.enqueue(
@@ -329,14 +305,6 @@ class UexClientTest {
     server.enqueue(new MockResponse().setResponseCode(404));
     assertTrue(client.getStarSystems().data().isEmpty());
   }
-
-  // ─── Endpoint sanity (URIs and empty-fallback) ─────────────────────────
-  // These tests make sure all the smaller "list everything" endpoints hit
-  // the right URI on the wire. We don't need separate happy-path schema
-  // assertions for every Dto type — UexResponseDto<T> is generic and
-  // Jackson's record-binding is already exercised by the three big ones
-  // above. Each call gets an empty-data response so the fallback path
-  // doesn't fire.
 
   @Test
   void getCompanies_hitsCorrectEndpoint() throws Exception {
@@ -408,21 +376,13 @@ class UexClientTest {
     assertHitsEndpoint(client::getRefineriesYields, "/refineries_yields");
   }
 
-  // ─── ETag conditional GET (M-5) ─────────────────────────────────────────
-  // The fetchList helper captures the response ETag and replays it as
-  // If-None-Match on the next request to the same endpoint. A 304 short-
-  // circuits with an empty list (sync services treat that as "skip this
-  // run"). A 200 with a new ETag overwrites the stored value so the next
-  // call uses the fresh one. The behaviour is per-endpoint, so star-system
-  // and commodity ETags do not interfere.
-
   @Test
   void firstCall_sendsNoIfNoneMatch_andRemembersResponseEtag() throws Exception {
     server.enqueue(jsonOk("{\"status\":\"ok\",\"data\":[]}").setHeader("ETag", "\"abc-123\""));
     server.enqueue(new MockResponse().setResponseCode(304).setHeader("ETag", "\"abc-123\""));
 
-    client.getCommodities(); // primes the ETag store
-    List<UexCommodityDto> second = client.getCommodities().data(); // replays the ETag
+    client.getCommodities();
+    List<UexCommodityDto> second = client.getCommodities().data();
 
     RecordedRequest first = server.takeRequest(1, TimeUnit.SECONDS);
     assertNotNull(first);
@@ -441,11 +401,6 @@ class UexClientTest {
 
   @Test
   void notModifiedResponse_returnsEmptyListWithoutDecodingBody() {
-    // 304 responses carry no body. The helper must not try to parse one
-    // (the previous .retrieve().bodyToMono(...) chain would have thrown a
-    // DecodingException on the missing body and dropped to the fallback,
-    // which still returned empty - this test pins the explicit short-circuit
-    // so the cleaner path stays intact).
     server.enqueue(new MockResponse().setResponseCode(304));
 
     List<UexCommodityDto> result = client.getCommodities().data();
@@ -460,11 +415,11 @@ class UexClientTest {
     server.enqueue(jsonOk("{\"status\":\"ok\",\"data\":[]}").setHeader("ETag", "\"v2\""));
     server.enqueue(new MockResponse().setResponseCode(304).setHeader("ETag", "\"v2\""));
 
-    client.getCommodities(); // stores v1
-    client.getCommodities(); // sends v1, server returns 200 + v2 → stores v2
-    client.getCommodities(); // sends v2
+    client.getCommodities();
+    client.getCommodities();
+    client.getCommodities();
 
-    server.takeRequest(1, TimeUnit.SECONDS); // discard the first
+    server.takeRequest(1, TimeUnit.SECONDS);
     RecordedRequest secondReq = server.takeRequest(1, TimeUnit.SECONDS);
     assertEquals("\"v1\"", secondReq.getHeader("If-None-Match"));
     RecordedRequest thirdReq = server.takeRequest(1, TimeUnit.SECONDS);
@@ -479,10 +434,10 @@ class UexClientTest {
     server.enqueue(jsonOk("{\"status\":\"ok\",\"data\":[]}").setHeader("ETag", "\"star-sys-1\""));
     server.enqueue(jsonOk("{\"status\":\"ok\",\"data\":[]}"));
 
-    client.getStarSystems(); // stores ETag under /star_systems
-    client.getCommodities(); // /commodities — different key, no ETag
+    client.getStarSystems();
+    client.getCommodities();
 
-    server.takeRequest(1, TimeUnit.SECONDS); // star_systems
+    server.takeRequest(1, TimeUnit.SECONDS);
     RecordedRequest commoditiesReq = server.takeRequest(1, TimeUnit.SECONDS);
     assertNull(
         commoditiesReq.getHeader("If-None-Match"),
@@ -495,27 +450,21 @@ class UexClientTest {
     server.enqueue(new MockResponse().setResponseCode(500));
     server.enqueue(new MockResponse().setResponseCode(304).setHeader("ETag", "\"keep-me\""));
 
-    client.getCommodities(); // stores keep-me
-    List<UexCommodityDto> midError = client.getCommodities().data(); // 500 - fallback empty
-    List<UexCommodityDto> thirdCall = client.getCommodities().data(); // should still send keep-me
+    client.getCommodities();
+    List<UexCommodityDto> midError = client.getCommodities().data();
+    List<UexCommodityDto> thirdCall = client.getCommodities().data();
 
     assertTrue(midError.isEmpty(), "5xx must still surface as empty list");
     assertTrue(thirdCall.isEmpty(), "subsequent 304 also yields empty list");
 
-    server.takeRequest(1, TimeUnit.SECONDS); // first
-    server.takeRequest(1, TimeUnit.SECONDS); // mid error - request was issued, response was 500
+    server.takeRequest(1, TimeUnit.SECONDS);
+    server.takeRequest(1, TimeUnit.SECONDS);
     RecordedRequest thirdReq = server.takeRequest(1, TimeUnit.SECONDS);
     assertEquals(
         "\"keep-me\"",
         thirdReq.getHeader("If-None-Match"),
         "a server error in between must not clear the stored ETag (it was not invalidated)");
   }
-
-  // ─── getItemsForCategory (304 outcome) ──────────────────────────────────
-  // getItemsForCategory returns the full FetchResult (not a bare list) so
-  // UexItemSyncService can tell a healthy unchanged catalogue (empty data,
-  // notModified=true) apart from an empty-200 outage (empty data,
-  // notModified=false) — the distinction that keeps SyncZeroItems honest.
 
   @Test
   void getItemsForCategory_freshResponse_returnsDataFlaggedModified() throws Exception {
@@ -536,20 +485,18 @@ class UexClientTest {
 
   @Test
   void getItemsForCategory_unchanged304_returnsEmptyDataFlaggedNotModified() throws Exception {
-    // First call primes the ETag; the second gets a 304 and must surface notModified=true so the
-    // sync service reports the unchanged catalogue as healthy (non-zero items), not as an outage.
     server.enqueue(
         jsonOk("{\"status\":\"ok\",\"data\":[{\"id\":42,\"name\":\"Helmet\"}]}")
             .setHeader("ETag", "\"cat3-v1\""));
     server.enqueue(new MockResponse().setResponseCode(304).setHeader("ETag", "\"cat3-v1\""));
 
-    client.getItemsForCategory(3); // primes the ETag
+    client.getItemsForCategory(3);
     UexClient.FetchResult<UexItemDto> second = client.getItemsForCategory(3);
 
     assertTrue(second.notModified(), "a 304 must be flagged notModified");
     assertTrue(second.data().isEmpty(), "a 304 carries no rows");
 
-    server.takeRequest(1, TimeUnit.SECONDS); // discard the first
+    server.takeRequest(1, TimeUnit.SECONDS);
     RecordedRequest secondReq = server.takeRequest(1, TimeUnit.SECONDS);
     assertEquals(
         "\"cat3-v1\"",
@@ -559,8 +506,6 @@ class UexClientTest {
 
   @Test
   void getItemsForCategory_empty200_returnsEmptyDataFlaggedModified() {
-    // An empty-200 (genuine catalogue outage) must NOT be flagged notModified — that is what lets
-    // the sync service report 0 items and trip SyncZeroItems on a real outage.
     server.enqueue(jsonOk("{\"status\":\"ok\",\"data\":[]}"));
 
     UexClient.FetchResult<UexItemDto> result = client.getItemsForCategory(7);
@@ -568,17 +513,6 @@ class UexClientTest {
     assertFalse(result.notModified(), "an empty-200 must not be mistaken for an unchanged 304");
     assertTrue(result.data().isEmpty());
   }
-
-  // ─── envelope audit + completion logging (H6) ───────────────────────────
-  // Before this, a non-"ok" envelope status had no reader at all and the 304 branch logged at DEBUG
-  // — dead in production. The outcomes were indistinguishable at the call site, which is why 19
-  // endpoints emitted the same alarming "No X received from UEX API" WARN for a perfectly healthy
-  // unchanged feed.
-  //
-  // H6 also counted an absent `data` array as a fetch error; that half was reverted on 2026-08-03
-  // because UEX uses `data: null` for an empty result set (see the test below), so it fired
-  // ExternalFetchErrors twice per sync run with no upstream fault behind it. `status` is the only
-  // field the upstream self-reports on, so it is the only one the audit keys off.
 
   @Test
   void healthy200_logsCompletionInfoWithRowCountAndEnvelopeStatus() {
@@ -600,12 +534,6 @@ class UexClientTest {
 
   @Test
   void nullDataUnderOkStatus_isAnEmptyResultSetAndDoesNotCount() {
-    // The live API answers a query that legitimately matches nothing with exactly this envelope —
-    // verified against api.uexcorp.space for /items?id_category=12 (Clothing/Jumpsuits) and 69
-    // (Consumable/Consumable), two real but permanently empty categories the item sweep walks on
-    // every run. A genuine rejection comes back the other way round (empty ARRAY under a 400), so
-    // counting absent data as a fetch error only ever booked false positives: two per sync run,
-    // which is what fired ExternalFetchErrors in production on 2026-08-03.
     List<ILoggingEvent> events =
         captureUexLog(
             () -> server.enqueue(jsonOk("{\"status\":\"ok\",\"data\":null,\"message\":\"\"}")),
@@ -629,8 +557,6 @@ class UexClientTest {
 
   @Test
   void nullDataUnderNonOkStatus_stillWarnsAndCounts() {
-    // The status field, not the absent data, is what UEX uses to self-report — so an envelope that
-    // admits a problem must keep counting even when it carries no rows to be short of.
     List<ILoggingEvent> events =
         captureUexLog(
             () -> server.enqueue(jsonOk("{\"status\":\"error\",\"data\":null}")),
@@ -671,9 +597,6 @@ class UexClientTest {
 
   @Test
   void blankEnvelopeStatus_isNotTreatedAsAnAnomaly() {
-    // No code ever read `status` before, so we cannot claim every endpoint populates it. Treating
-    // its absence as a fault would WARN on every endpoint of every sweep to report something we
-    // have never observed.
     List<ILoggingEvent> events =
         captureUexLog(
             () -> server.enqueue(jsonOk("{\"data\":[{\"id\":1,\"name\":\"Gold\"}]}")),
@@ -687,8 +610,6 @@ class UexClientTest {
 
   @Test
   void notModified_isLoggedAtInfoNotDebug() {
-    // DEBUG is off in production, so a DEBUG-only 304 line left an all-304 night looking exactly
-    // like an outage in the log.
     List<ILoggingEvent> events =
         captureUexLog(
             () -> {
@@ -706,8 +627,6 @@ class UexClientTest {
     assertEquals(Level.INFO, unchanged.getLevel(), "an unchanged feed is healthy — INFO, not WARN");
     assertEquals(0.0, fetchErrorCount(), "a 304 is not a fetch error");
   }
-
-  // ─── helpers ────────────────────────────────────────────────────────────
 
   /**
    * Runs {@code arrange} then {@code call} with a {@link ListAppender} attached to the {@link

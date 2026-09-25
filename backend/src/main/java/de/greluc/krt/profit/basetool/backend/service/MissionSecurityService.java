@@ -94,21 +94,6 @@ public class MissionSecurityService {
     }
 
     if (p.getUser() == null) {
-      // An EXTERNAL row — a named person without an account, recorded by somebody else. Editing
-      // and removing it is the mission leadership's (ADR-0159, decision D4), because the row
-      // carries no creator to bind a self-edit to: there is no `user` to compare a subject
-      // against, and the id alone proves nothing (the roster exposes participant ids to every
-      // member who can see the mission).
-      //
-      // This branch used to accept a per-row capability token (REQ-SEC-018, header
-      // `X-Guest-Edit-Token`) so the anonymous creator of a guest sign-up could edit their own
-      // row. There is no anonymous sign-up left to mint one for, and V239 dropped the column that
-      // stored its hash. Note what the token needed alongside it to be safe: a `canSeeMission`
-      // re-check, because the capability otherwise outlived the surface that granted it — a guest
-      // who signed up while the mission was public kept PUT / DELETE / check-in after it was
-      // flipped to internal or reached COMPLETED, and back-dating a settled operation moved real
-      // money away from every other participant. `canManageMission` carries that scope check
-      // inherently, so nothing is lost by the simplification.
       return canManageMission(missionId, authentication);
     }
 
@@ -116,31 +101,15 @@ public class MissionSecurityService {
       return false;
     }
 
-    // Handle anonymous authentication correctly
     if ("anonymousUser".equals(authentication.getPrincipal())) {
       return false;
     }
 
-    // Self-edit first: the participant's own linked user may always manage their row. Checked
-    // before
-    // the scope gate so a member editing their own participation never needs mission-management
-    // rights — and so the common self-edit path does not load the mission aggregate at all.
     UUID currentUserId = userService.getCurrentUser().map(User::getId).orElse(null);
     if (currentUserId != null && p.getUser().getId().equals(currentUserId)) {
       return true;
     }
 
-    // Managing ANOTHER user's participant row is a mission write, so it must pass the same
-    // owning-OrgUnit scope gate as every other mission write: canManageMission only admits an
-    // elevated mission role (MISSION_MANAGER / OFFICER) when ownerScopeService.canEditMission also
-    // passes, plus ADMIN and the mission owner / co-managers. An earlier version instead
-    // short-circuited on the bare ROLE_MISSION_MANAGER authority, which CustomJwtGrantedAuthorities
-    // Converter grants as the OR-union over ALL of a caller's memberships — letting a mission
-    // manager
-    // of squadron A check in/out, remove, or flip the payout preference of participants on squadron
-    // B's internal missions (security audit AUTHZ-1; REQ-ORG-009 / MULTI_SQUADRON_PLAN.md section
-    // 1:
-    // editing is the owning OrgUnit's prerogative).
     return canManageMission(missionId, authentication);
   }
 
@@ -223,29 +192,18 @@ public class MissionSecurityService {
     Collection<? extends GrantedAuthority> reachable =
         roleHierarchy.getReachableGrantedAuthorities(authentication.getAuthorities());
 
-    // ADMIN bypasses every gate (system-wide oversight across squadrons; see
-    // MULTI_SQUADRON_PLAN.md section 1).
     boolean isAdmin =
         reachable.stream().anyMatch(a -> a.getAuthority().equals(Roles.authority(Roles.ADMIN)));
     if (isAdmin) {
       return true;
     }
 
-    // Security audit H1: an OFFICER may edit/delete a finance entry ONLY of a mission within their
-    // own owning-OrgUnit scope. ROLE_OFFICER is a flat, cross-squadron realm authority, so without
-    // the additional ownerScopeService.canEditMission gate a bare officer could mutate the payout
-    // ledger of another squadron's (even internal) mission — the exact cross-tenant write the
-    // sibling mission-write gates (canManageMission line 219, canManageManagers line 272,
-    // canChangeOwner line 324) were already hardened against under audit AUTHZ-1
-    // (MULTI_SQUADRON_PLAN.md section 1: editing is the owning OrgUnit's prerogative). This was the
-    // one mission write left with the global-OFFICER short-circuit.
     boolean isOfficer =
         reachable.stream().anyMatch(a -> a.getAuthority().equals(Roles.authority(Roles.OFFICER)));
     if (isOfficer && ownerScopeService.canEditMission(entry.getMission().getId())) {
       return true;
     }
 
-    // Must be the owner of the entry (if the participant has a linked user account)
     UUID currentUserId = userService.getCurrentUser().map(User::getId).orElse(null);
     if (currentUserId == null
         || entry.getParticipant().getUser() == null
@@ -253,7 +211,6 @@ public class MissionSecurityService {
       return false;
     }
 
-    // Must be a registered participant of this mission
     return missionParticipantRepository
         .findByMissionIdAndUserId(entry.getMission().getId(), currentUserId)
         .isPresent();
@@ -274,12 +231,6 @@ public class MissionSecurityService {
       return false;
     }
 
-    // An AnonymousAuthenticationToken IS authenticated and carries ROLE_ANONYMOUS, so the check
-    // above does not catch it — every sibling gate in this class spells the principal test out for
-    // that reason (canChangeOwner:422, canAccessParticipant). This one did not, and it is now the
-    // gate an external participant row hangs off (ADR-0159, D4). Nothing reaches it anonymously
-    // today because the URL matrix refuses first, but a gate that depends on a matrix entry
-    // elsewhere being right is one deletion away from being wrong.
     if ("anonymousUser".equals(authentication.getPrincipal())) {
       return false;
     }
@@ -288,16 +239,10 @@ public class MissionSecurityService {
         roleHierarchy.getReachableGrantedAuthorities(authentication.getAuthorities());
     boolean isAdmin =
         reachable.stream().anyMatch(a -> a.getAuthority().equals(Roles.authority(Roles.ADMIN)));
-    // ROLE_ADMIN bypasses every gate (admin always sees / edits across squadrons; see
-    // MULTI_SQUADRON_PLAN.md section 1).
     if (isAdmin) {
       return true;
     }
 
-    // Elevated mission roles (MISSION_MANAGER, OFFICER, MISSION_MANAGE) need to ADDITIONALLY
-    // pass the squadron-scope check on the target mission — otherwise an Officer or
-    // Mission-Manager from squadron A could edit missions of squadron B
-    // (MULTI_SQUADRON_PLAN.md section 1: editing is the owning squadron's prerogative).
     boolean hasElevatedMissionAuthority =
         reachable.stream()
             .anyMatch(
@@ -310,8 +255,6 @@ public class MissionSecurityService {
       return true;
     }
 
-    // Owner/manager fall-through reads only owner + managers, never the roster: use the
-    // via em.find so the gate loads no roster and never auto-flushes (#1139).
     return missionRepository
         .findByIdForAuthorization(missionId)
         .map(mission -> isOwnerOrManager(mission, authentication))
@@ -350,9 +293,6 @@ public class MissionSecurityService {
       return true;
     }
 
-    // Elevated mission roles need an additional squadron-scope check before they may edit the
-    // manager list of a mission that does not belong to their squadron
-    // (MULTI_SQUADRON_PLAN.md section 1).
     boolean hasElevatedAuthority =
         reachable.stream()
             .anyMatch(
@@ -370,7 +310,6 @@ public class MissionSecurityService {
       return true;
     }
 
-    // Owner/manager fall-through reads only owner + managers via em.find (#1139): no roster load.
     return missionRepository
         .findByIdForAuthorization(missionId)
         .map(
@@ -413,8 +352,6 @@ public class MissionSecurityService {
     if (isAdmin) {
       return true;
     }
-    // Officer: same squadron-scope gate as canManageMission. Without it an officer from
-    // squadron A could transfer ownership of squadron B's missions.
     boolean isOfficer =
         reachable.stream().anyMatch(a -> a.getAuthority().equals(Roles.authority(Roles.OFFICER)));
     if (isOfficer && ownerScopeService.canEditMission(missionId)) {
@@ -425,7 +362,6 @@ public class MissionSecurityService {
     if (userId == null) {
       return false;
     }
-    // Owner check reads only owner via em.find (#1139): no roster load.
     return missionRepository
         .findByIdForAuthorization(missionId)
         .map(Mission::getOwner)
@@ -491,12 +427,10 @@ public class MissionSecurityService {
       return false;
     }
 
-    // Check if user is owner
     if (mission.getOwner() != null && mission.getOwner().getId().equals(userId)) {
       return true;
     }
 
-    // Check if user is in managers list
     return mission.getManagers().stream().anyMatch(user -> user.getId().equals(userId));
   }
 }

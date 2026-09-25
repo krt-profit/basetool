@@ -51,8 +51,6 @@ public class PromotionProxyController {
 
   private final BackendApiClient backendApiClient;
 
-  // --- Topics ---
-
   /**
    * Forwards a "create promotion topic" request to the backend.
    *
@@ -91,8 +89,6 @@ public class PromotionProxyController {
     backendApiClient.delete("/api/v1/promotion/topics/" + id, Void.class);
     return ResponseEntity.noContent().build();
   }
-
-  // --- Categories ---
 
   /**
    * Forwards a "create promotion category" request to the backend.
@@ -133,8 +129,6 @@ public class PromotionProxyController {
     return ResponseEntity.noContent().build();
   }
 
-  // --- Rank Requirements ---
-
   /**
    * Forwards a "create rank requirement" request to the backend.
    *
@@ -173,8 +167,6 @@ public class PromotionProxyController {
     backendApiClient.delete("/api/v1/promotion/rank-requirements/" + id, Void.class);
     return ResponseEntity.noContent().build();
   }
-
-  // --- Level Contents ---
 
   /**
    * Forwards a "create level content" request to the backend.
@@ -215,8 +207,6 @@ public class PromotionProxyController {
     return ResponseEntity.noContent().build();
   }
 
-  // --- Evaluations ---
-
   /**
    * Forwards an "upsert member evaluation" request to the backend. Personal evaluations are not
    * routed through this endpoint – the manage page targets a {@code (userId, categoryId)} pair so
@@ -233,14 +223,6 @@ public class PromotionProxyController {
       @PathVariable @NotNull UUID userId,
       @PathVariable @NotNull UUID categoryId,
       @RequestBody @NotNull Map<String, Object> body) {
-    // userId is a Keycloak sub, which Keycloak issues as a UUID — and the backend's
-    // MemberEvaluationController already declares it `@PathVariable UUID userId`, so a non-UUID
-    // could never have reached the evaluation anyway. Binding it as a UUID here rather than as a
-    // String is what makes the relayed path safe: `buildAndExpand(...)` does NOT encode (it returns
-    // RAW UriComponents, so `toUriString()` emits the expanded value verbatim), which the earlier
-    // comment on this call site claimed it did. A UUID cannot express `?`, `#`, `&` or `/`, so the
-    // expansion has nothing left to reshape, and the caller now gets a 400 at this seam instead of
-    // one hop later.
     String uri =
         org.springframework.web.util.UriComponentsBuilder.fromPath(
                 "/api/v1/promotion/evaluations/user/{userId}/category/{categoryId}")

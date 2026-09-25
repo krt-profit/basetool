@@ -114,25 +114,16 @@ class MissionParticipantCountE2eTest {
         E2eSupport.navigate(page, baseUrl + "/missions/" + missionId);
         page.waitForLoadState();
 
-        // Precondition: a freshly created mission has no participants.
         assertThat(page.locator("#facts-registered")).hasText("0");
         assertThat(page.locator("#tab-crew .tab-count")).hasText("0/0");
 
-        // A full reload would clear this marker; the in-place crew swap leaves it intact.
         page.evaluate("window.__krtNoReload = true;");
 
-        // Add a guest via the modal. The authenticated add form's name input is
-        // #participant-search-
-        // input; a distinctive name resolves to no realm user, so userId stays empty and the entry
-        // is a guest.
         page.locator("#add-participant-btn").click();
         assertThat(page.locator("#participant-modal")).isVisible();
         page.locator("#participant-search-input").fill(GUEST_PARTICIPANT_NAME);
         page.locator("#add-participant-form button[type='submit']").click();
 
-        // The fix: the participant write re-swaps the crew board and a krt:swapped listener patches
-        // the out-of-fragment header counts. Web-first wait for them to reflect the new
-        // participant.
         assertThat(page.locator("#facts-registered"))
             .hasText("1", new LocatorAssertions.HasTextOptions().setTimeout(20_000));
         assertThat(page.locator("#tab-crew .tab-count")).hasText("0/1");

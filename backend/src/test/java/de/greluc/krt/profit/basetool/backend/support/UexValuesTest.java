@@ -55,15 +55,12 @@ class UexValuesTest {
   @Test
   @DisplayName("a reversed pair never yields a max below its min")
   void reversedPair_isNormalised() {
-    // Not seen in the live feed, but a max below the min would be a nonsense range to store and
-    // would read as a data-entry error rather than as the upstream typo it is.
     assertEquals(new CrewRange(3, 3), UexValues.parseCrew("3,1"));
   }
 
   @Test
   @DisplayName("absent, blank and unparseable crews leave BOTH bounds null")
   void unparseable_yieldsNoBounds() {
-    // Half a range is not a fact UEX stated: "1 to ?" must not be stored as a crew of 1.
     for (String raw : new String[] {null, "", "   ", "x", "1,x", "1,", ","}) {
       CrewRange range = UexValues.parseCrew(raw);
       assertNull(range.min(), "min for '" + raw + "'");

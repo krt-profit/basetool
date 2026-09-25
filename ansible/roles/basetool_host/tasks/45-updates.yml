@@ -1,65 +1,32 @@
 ---
-# Unattended SECURITY updates, and the signal that says whether they are happening (OPS-SEC-01,
-# REQ-OPS-032, ADR-0199).
-#
-# WHY. Nothing installed or enabled any unattended patching on this host until 2026-09-22 -- the
-# bootstrap's own "what is still unwritten" list named `dnf-automatic` and it never came. The retired
-# Ubuntu host had unattended-upgrades, so the cutover was a silent regression: the kernel, openssh,
-# haproxy, glibc and the host-native node_exporter and alloy received no fix unless somebody ran
-# `dnf upgrade` by hand. The container images are patched through their own path (Dependabot and
-# the release pipeline); this is the host underneath them.
-#
-# WHAT, AND WHAT NOT.
-#   * `upgrade_type = security`: advisories only, never a feature update.
-#   * The container runtime is excluded (defaults: basetool_host_updates_exclude), by the owner's
-#     decision -- podman and its companions move on a tested maintenance, testing host first.
-#   * `reboot = never`: a kernel fix needs a reboot, and a reboot of the one production host is an
-#     owner decision. What this role adds instead is the SIGNAL -- basetool_host_reboot_required and
-#     HostRebootRequired -- so an installed-but-inactive fix cannot sit unnoticed.
-#
-# ORDER. After 40-selinux.yml, like 27-observability.yml and for the same reason: dnf-automatic's
-# ExecStopPost= and the boot unit both exec a script out of /var/iri/code/scripts, which systemd
-# refuses (203/EXEC) until that directory carries bin_t.
 
 - name: Install dnf-automatic and needs-restarting
   ansible.builtin.dnf:
     name:
       - dnf-automatic
-      # `needs-restarting -r` lives in the dnf plugins; it is what answers "is a reboot due".
       - dnf-plugins-core
     state: present
 
 - name: Configure dnf-automatic for security advisories only
-  # The WHOLE file, not a handful of lineinfile edits into the packaged one: every setting that
-  # decides what happens to production unattended is then visible in one reviewed place, and a
-  # package update that changes a shipped default cannot change our behaviour behind our back.
   ansible.builtin.copy:
     dest: /etc/dnf/automatic.conf
     owner: root
     group: root
     mode: "0644"
     content: |
-      # Managed by the basetool_host Ansible role (tasks/45-updates.yml). Do not edit by hand.
       [commands]
-      # Security advisories only; never a feature update.
       upgrade_type = security
-      # The timer below decides when; a second random sleep inside the window would only blur it.
       random_sleep = 0
       network_online_timeout = 60
       download_updates = yes
       apply_updates = yes
-      # A reboot of the one production host is an owner decision. basetool_host_reboot_required and
-      # the HostRebootRequired alert say when one is due.
       reboot = never
 
       [emitters]
-      # To the journal. Alloy ships the journal, so every run's list of packages reaches Loki.
       emit_via = stdio
 
       [base]
       debuglevel = 1
-      # The container runtime moves on a tested maintenance, never unattended (owner decision,
-      # 2026-09-22). Globs, so podman-* does not reach prometheus-podman-exporter.
       exclude = {{ basetool_host_updates_exclude | join(' ') }}
 
 - name: Make room for the timer and service drop-ins
@@ -74,16 +41,12 @@
     - dnf-automatic.service.d
 
 - name: Move the timer into the window nothing else uses
-  # The packaged timer fires at 06:00 with up to an hour of random delay, which on a bad day runs
-  # into the restore drill's Sunday 05:30 start. The empty OnCalendar= clears the packaged value
-  # rather than adding a second trigger beside it.
   ansible.builtin.copy:
     dest: /etc/systemd/system/dnf-automatic.timer.d/10-basetool-window.conf
     owner: root
     group: root
     mode: "0644"
     content: |
-      # Managed by the basetool_host Ansible role (tasks/45-updates.yml). Do not edit by hand.
       [Timer]
       OnCalendar=
       OnCalendar={{ basetool_host_updates_on_calendar }}
@@ -92,16 +55,12 @@
   notify: Reload systemd for the operational units
 
 - name: Record every run's outcome for Prometheus
-  # ExecStopPost= runs after the service whatever its result, and systemd hands it $SERVICE_RESULT --
-  # so the run records itself, success or failure, instead of something inferring it later. The
-  # leading `-` keeps a metrics hiccup from turning a successful patch run into a failed unit.
   ansible.builtin.copy:
     dest: /etc/systemd/system/dnf-automatic.service.d/20-basetool-metrics.conf
     owner: root
     group: root
     mode: "0644"
     content: |
-      # Managed by the basetool_host Ansible role (tasks/45-updates.yml). Do not edit by hand.
       [Service]
       ExecStopPost=-{{ basetool_host_root_dir }}/code/scripts/host-updates-metrics.sh
   notify: Reload systemd for the operational units
@@ -137,10 +96,6 @@
   when: not ansible_check_mode
 
 - name: Enable the security-update timer and the boot refresh
-  # STARTED as well as enabled, unlike the deploy and backup timers: the timer's first trigger is
-  # tomorrow's window, not now, and a host that is patched from the day it is provisioned is the
-  # point. The boot unit is only enabled -- it runs at the next boot; the first reading is taken
-  # below.
   ansible.builtin.systemd_service:
     name: "{{ item.name }}"
     enabled: true
@@ -157,8 +112,6 @@
   register: basetool_host_updates_metrics_file
 
 - name: Take the first reading now rather than at the next boot
-  # Conditional for the same reason as the certificate collector in 27-observability.yml: the unit is
-  # a oneshot without RemainAfterExit, so an unconditional start would report `changed` on every play.
   ansible.builtin.systemd_service:
     name: iri-host-updates-metrics.service
     state: started

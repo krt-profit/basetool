@@ -80,9 +80,6 @@ class DelegatedAppointmentControllerSecurityTest {
   }
 
   private OrgUnitMembershipDto dtoStub() {
-    // The squadron-rank endpoints now return the service's DTO projection (assignSquadronRankDto),
-    // so the mocked service yields a DTO directly (L4, #923). This gate matrix only asserts the
-    // status, so a minimal DTO with null display fields is sufficient.
     return new OrgUnitMembershipDto(
         targetUser, null, squadronId, null, false, false, false, null, 1L);
   }
@@ -95,8 +92,6 @@ class DelegatedAppointmentControllerSecurityTest {
     }
     return jwt().jwt(j -> j.subject(UUID.randomUUID().toString())).authorities(auths);
   }
-
-  // --- squadron rank (PUT /api/v1/squadrons/{squadronId}/ranks/{userId}) ----
 
   @Test
   void assignSquadronRank_nonLeader_isForbidden() throws Exception {
@@ -137,8 +132,6 @@ class DelegatedAppointmentControllerSecurityTest {
         .andExpect(status().isOk());
   }
 
-  // --- Kommandogruppe create (POST /api/v1/squadrons/{squadronId}/kommando-groups) --
-
   @Test
   void createKommandoGroup_nonLeader_isForbidden() throws Exception {
     mockMvc
@@ -163,8 +156,6 @@ class DelegatedAppointmentControllerSecurityTest {
                 .with(member("ROLE_OFFICER")))
         .andExpect(status().isOk());
   }
-
-  // --- Bereich role (POST /api/v1/org-hierarchy/bereiche/{id}/members) ------
 
   @Test
   void addBereichRole_nonLeader_isForbidden() throws Exception {

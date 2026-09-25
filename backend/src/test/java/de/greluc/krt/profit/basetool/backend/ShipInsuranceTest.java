@@ -87,9 +87,6 @@ class ShipInsuranceTest {
     user.setId(UUID.randomUUID());
     user.setUsername("pilot1");
     userRepository.save(user);
-    // Post-R9 D3 (V101): the owner resolver requires the target user to have at least one org-
-    // unit membership before stamping. Anchor to V80-seeded IRIDIUM via org_unit_membership —
-    // the legacy app_user.squadron_id column was dropped.
     OrgUnitMembership iridiumMembership = new OrgUnitMembership();
     iridiumMembership.setId(new OrgUnitMembershipId(user.getId(), Squadron.IRIDIUM_ID));
     iridiumMembership.setUser(user);

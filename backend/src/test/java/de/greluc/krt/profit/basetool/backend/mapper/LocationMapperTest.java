@@ -33,7 +33,6 @@ class LocationMapperTest {
 
   @Test
   void toDto_shouldMapExposedFields() {
-    // Given
     UUID id = UUID.randomUUID();
     Location entity = new Location();
     entity.setId(id);
@@ -43,10 +42,8 @@ class LocationMapperTest {
     entity.setHomeLocation(true);
     entity.setVersion(3L);
 
-    // When
     LocationDto dto = mapper.toDto(entity);
 
-    // Then
     assertNotNull(dto);
     assertEquals(id, dto.id());
     assertEquals("Port Olisar", dto.name());
@@ -58,14 +55,11 @@ class LocationMapperTest {
 
   @Test
   void toEntity_shouldMapExposedFields() {
-    // Given
     UUID id = UUID.randomUUID();
     LocationDto dto = new LocationDto(id, "Lorville", "Hurston city", true, true, 1L);
 
-    // When
     Location entity = mapper.toEntity(dto);
 
-    // Then
     assertNotNull(entity);
     assertEquals(id, entity.getId());
     assertEquals("Lorville", entity.getName());
@@ -73,27 +67,22 @@ class LocationMapperTest {
     assertTrue(entity.getHidden());
     assertTrue(entity.getHomeLocation());
     assertEquals(1L, entity.getVersion());
-    // Unmapped relations stay null (mapper ignores them)
     assertNull(entity.getCity());
     assertNull(entity.getSpaceStation());
   }
 
   @Test
   void stripServerManaged_shouldClearIdAndVersion() {
-    // Given
     Location entity = new Location();
     entity.setId(UUID.randomUUID());
     entity.setVersion(5L);
     entity.setName("Untainted");
 
-    // When
     Location stripped = LocationMapper.stripServerManaged(entity);
 
-    // Then
     assertSame(entity, stripped, "stripServerManaged must mutate and return the same instance");
     assertNull(stripped.getId());
     assertNull(stripped.getVersion());
-    // Other fields must remain untouched
     assertEquals("Untainted", stripped.getName());
   }
 

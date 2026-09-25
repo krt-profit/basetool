@@ -109,32 +109,22 @@ class MaterialsCategoryEmptyStateInPlaceE2eTest {
         E2eSupport.navigate(page, baseUrl + "/admin/materials");
         page.waitForLoadState();
 
-        // A full navigation wipes this marker, so its survival proves both writes stayed in place.
-        // The position:fixed footer can cover the bottom controls, so it is dropped out of the way.
         page.evaluate("() => { window.__krtNoReload = true; }");
         page.evaluate(
             "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
                 + " 'none'; } }");
 
-        // Create one category in place (the create swaps the placeholder for the new row).
         page.locator("form[data-category-create] input[name='name']").fill(categoryName);
         page.waitForResponse(
             response ->
                 response.url().endsWith("/admin/materials/categories")
                     && "POST".equals(response.request().method()),
             () -> page.locator("form[data-category-create] button[type='submit']").click());
-        // Scope to category-management rows: addCategoryOption() also injects the new name as an
-        // <option> into every material-row category dropdown, so a bare tr+hasText(name) matches
-        // many rows and trips Playwright strict mode. Only the JS-built category row carries
-        // data-category-row.
         Locator newRow =
             page.locator("tr[data-category-row]")
                 .filter(new Locator.FilterOptions().setHasText(categoryName));
         assertThat(newRow).isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
 
-        // Delete it: the delete form is data-krt-confirm, so a KRT confirm overlay opens; confirm
-        // it
-        // and wait on the DELETE POST so the backend has provably answered.
         newRow.locator("button[type='submit']").click();
         page.waitForResponse(
             response ->
@@ -143,8 +133,6 @@ class MaterialsCategoryEmptyStateInPlaceE2eTest {
                     && "POST".equals(response.request().method()),
             () -> page.locator(".krt-confirm-ok").click());
 
-        // The placeholder row must be restored in place and the created row must be gone, with no
-        // full reload (the marker survives).
         assertThat(page.locator("[data-category-empty]"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
         assertThat(

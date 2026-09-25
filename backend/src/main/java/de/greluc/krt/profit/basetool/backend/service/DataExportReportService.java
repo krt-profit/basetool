@@ -54,16 +54,6 @@ public class DataExportReportService {
    * @param export the member's assembled export
    * @return the PDF bytes
    */
-  /*
-   * The document prints four sections in full and reduces the other twenty-two to a row count, so
-   * it is assembled from rows it then discards. A COUNT(*) variant per section would read less --
-   * and would double the statement registry, put the PDF's counts on a different query and a
-   * different moment from the JSON's (two exports of one account would stop being comparable), and
-   * give the two export coverage gates a set of statements they do not check. For a legal request
-   * that arrives a few times a year, on a document whose whole point is to stay short, that is the
-   * wrong trade. Noted 2026-09-17 after the cost was raised in review; the caller assembles the
-   * export once and both the audit count and the document come out of that one object.
-   */
   public byte @NotNull [] renderPdf(@NotNull DataExportService.DataExport export) {
     return DataExportPdfFormat.render(export, this::label);
   }

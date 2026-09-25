@@ -97,7 +97,6 @@ public class RedisLiveSyncFanout implements LiveSyncFanout, MessageListener {
   public void publish(@NotNull LiveSyncTopic topic, @NotNull List<String> sections) {
     transport.publish(
         root -> {
-          // v, topic, origin, sections — the order a frontend instance writes.
           root.put("v", PAYLOAD_VERSION);
           root.put("topic", topic.canonical());
           root.put("origin", transport.instanceId());
@@ -139,10 +138,6 @@ public class RedisLiveSyncFanout implements LiveSyncFanout, MessageListener {
   private void deliver(@NotNull JsonNode root) {
     LiveSyncTopic topic = LiveSyncTopic.parse(text(root, "topic"));
     if (topic == null) {
-      // A room this backend does not serve — a frontend staff room, or a newer peer's class.
-      // Counted apart from the error series on purpose: the staff rooms ride this same channel,
-      // so this trickles steadily, and putting it under errors would leave a permanent non-zero
-      // rate beneath the alert that watches them.
       meterRegistry
           .counter(
               MetricNames.LIVESYNC_REDIS_SKIPPED,

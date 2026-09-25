@@ -135,12 +135,6 @@ public class BankPageController {
     if ("bankGrid".equals(fragment)) {
       return "bank-dashboard :: bankGrid";
     }
-    // Full-page render only: assemble the direct-booking "Kontobewegung" modal's data
-    // (REQ-BANK-023, #997). The CTA + modal live OUTSIDE the swapped bankGrid fragment, so a
-    // view-toggle swap never re-reads these; a successful booking re-renders the grid in place.
-    // canBook (whether to offer the modal at all) is derived from the already-loaded dashboard
-    // rather than a separate account fetch: the modal's source/destination account pickers are now
-    // server-side search comboboxes (REQ-FE-017, ADR-0106), so no account roster is preloaded.
     boolean canBook =
         dashboard != null
             && dashboard.accounts() != null
@@ -237,26 +231,10 @@ public class BankPageController {
         holders == null
             ? List.<BankHolderDto>of()
             : holders.stream().filter(BankHolderDto::active).toList());
-    // The transfer-destination picker (REQ-BANK-040) on the always-present booking modal is now a
-    // server-side account-search combobox (remote-bank-accounts, REQ-FE-017/ADR-0106) that fetches
-    // matching active accounts on demand, so no transfer-target roster is preloaded here; a
-    // same-account transfer stays rejected by the backend (REQ-BANK-006).
-    // The deposit/withdrawal counterparty picker (Einzahler / Empfänger, REQ-BANK-044) on the
-    // always-present booking modals is a server-side searchable combobox (remote-bank-users, #1193
-    // follow-up) that queries /users/search-bank on demand, so no user roster is preloaded here.
-    // Approval limits are read-only on this surface (REQ-BANK-041) — they are configured only in
-    // the
-    // org-unit bank — so no user lookup is needed for a limit editor either.
-    // All active org units (all kinds) feed the external-counterparty unit picklist (REQ-BANK-044,
-    // #994): an external Einzahler/Empfänger may be attributed to any org unit, not just a tool
-    // user's own memberships. isAuthenticated on the backend, so a bank employee may read it.
     List<OrgUnitMembershipOptionDto> allOrgUnits =
         backendApiClient.get("/api/v1/org-units/active-all-kinds", ORG_UNIT_OPTION_LIST);
     model.addAttribute(
         "allOrgUnits", allOrgUnits == null ? List.<OrgUnitMembershipOptionDto>of() : allOrgUnits);
-    // The in-game transfer-fee rate (ADR-0052, REQ-BANK-033) drives the live "Gebühr / wird
-    // abgebucht" preview in the withdraw/transfer modals (bank.js). It rides on <main>, which
-    // survives the accountBody swap, so it is fetched once on the full-page render.
     model.addAttribute("transferFeeRate", fetchTransferFeeRate());
     if ("accountBody".equals(fragment)) {
       return "bank-account-detail :: accountBody";

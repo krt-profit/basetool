@@ -77,9 +77,6 @@ class WebClientCborNegotiationTest {
 
     RecordedRequest request = server.takeRequest();
 
-    // The order IS the negotiation: Spring serves the first acceptable type it has a converter
-    // for. JSON second is not a formality -- it is what keeps a response the backend types itself
-    // (an RFC 7807 problem, a PDF export) readable.
     assertThat(request.getHeader("Accept")).isEqualTo("application/cbor, application/json");
   }
 
@@ -95,8 +92,6 @@ class WebClientCborNegotiationTest {
         .bodyToMono(String.class)
         .block(Duration.ofSeconds(10));
 
-    // Byte for byte the header this client sent before 2026-09-10, which is what makes
-    // `app.http.codec=JSON` a way back rather than a different third behaviour.
     assertThat(server.takeRequest().getHeader("Accept")).isEqualTo("application/json");
   }
 

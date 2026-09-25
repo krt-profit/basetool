@@ -171,8 +171,6 @@ public class UexItemSyncService {
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public int syncItems() {
     log.info("Starting synchronization of UEX items...");
-    // final: the run id is captured at the start of the run but first used in the summary event at
-    // the end, past the category loop — VariableDeclarationUsageDistance allows the gap when final.
     final UUID runId = syncReportService.beginRun();
     List<UexCategory> categories = categoryRefService.syncCategories();
 
@@ -184,9 +182,6 @@ public class UexItemSyncService {
     boolean anyCategoryUnchanged = false;
     int incompleteCategories = 0;
     Instant now = Instant.now();
-    // One query per lookup table for the whole run instead of up to three lookups per item
-    // (BE-PERF-09). Ids only: the map outlives the transaction that read it, and each per-item
-    // transaction turns an id back into a reference with getReferenceById.
     ItemLookups lookups = chunkWriter.inNewTransaction(this::loadItemLookups);
 
     for (UexCategory category : categories) {
@@ -198,19 +193,9 @@ public class UexItemSyncService {
       }
       UexClient.FetchResult<UexItemDto> fetched = uexClient.getItemsForCategory(category.getId());
       if (!fetched.complete()) {
-        // This category did not answer (transport / non-2xx / decode failure, a non-ok envelope
-        // status, or a 304). Every one of those degrades to an EMPTY list — the same shape a
-        // legitimately empty category returns — so the seen-id set below is missing this
-        // category's items for a reason that is NOT "UEX dropped them", and the sweep must stand
-        // down for the whole run (REQ-DATA-014). Counted before the 304 branch so both reasons
-        // land here.
         incompleteCategories++;
       }
       if (fetched.notModified()) {
-        // UEX served this category from the conditional-GET cache (304 Not Modified): its items are
-        // unchanged since the last sync — a HEALTHY no-op, not an empty catalogue. Remember it so a
-        // fully-cached run still reports a non-zero item tally (see the return below); reporting 0
-        // would be indistinguishable from the empty-200 outage the SyncZeroItems alert targets.
         anyCategoryUnchanged = true;
         log.debug(
             "UEX category {} ({}/{}) unchanged since last sync (304 Not Modified)",
@@ -240,11 +225,6 @@ public class UexItemSyncService {
             if (item.getUexItemId() != null) {
               seenUexItemIds.add(item.getUexItemId());
             }
-            // A row that keeps external_uuid null although UEX shipped a parseable uuid is a
-            // shared-uuid sibling whose uuid another game_item already owns — the expected,
-            // permanent steady state for a base item + its skins (REQ-DATA-005). Tally these so
-            // the run summary reports one aggregate count instead of a per-row WARN on every sync
-            // (issue #1205).
             if (item.getExternalUuid() == null && UexValues.parseUuid(dto.uuid()) != null) {
               sharedUuidDeclined++;
             }
@@ -266,13 +246,6 @@ public class UexItemSyncService {
           "Skipping orphan sweep — no UEX item was processed across {} category response(s).",
           categoriesProcessed);
     } else if (incompleteCategories > 0) {
-      // At least one category could not vouch for its rows — it failed, self-reported a non-ok
-      // envelope, or was served from the 304 cache. Either way seenUexItemIds is an INCOMPLETE view
-      // of the catalogue: that category's items are absent from it because they were never
-      // enumerated, NOT because UEX dropped them. Running markUexDeletedExcept now would
-      // soft-delete every one of them (up to ~500 rows for the largest category) until the next
-      // healthy run re-upserts them and clears uex_deleted_at. Orphan detection is delayed by a
-      // cycle; nothing is wrongly deleted (REQ-DATA-014).
       log.warn(
           "Skipping orphan sweep — {} item(s) seen but {} category fetch(es) came back incomplete"
               + " (failed, non-ok envelope or 304), so the seen-set is not a census of the"
@@ -280,7 +253,6 @@ public class UexItemSyncService {
           seenUexItemIds.size(),
           incompleteCategories);
     } else {
-      // A bulk update needs a transaction, and the run no longer holds one (BE-PERF-09).
       marked =
           chunkWriter.inNewTransaction(
               () -> gameItemRepository.markUexDeletedExcept(seenUexItemIds, now));
@@ -289,8 +261,6 @@ public class UexItemSyncService {
       }
     }
 
-    // Decode the encoded query parameter for cleaner log output - the actual HTTP request was
-    // built with the encoded form by UexClient.
     String reportLabel = UriUtils.decode("UEX item sync", "UTF-8");
     log.info(
         "Finished {}: {} categories visited, {} items upserted ({} new, {} updated), {} shared-uuid"
@@ -302,7 +272,6 @@ public class UexItemSyncService {
         itemsProcessed - itemsCreated,
         sharedUuidDeclined);
 
-    // One always-emitted SYNC_RUN_SUMMARY row per run, so the run shows on the admin UEX tab.
     syncReportService.logUexEvent(
         runId,
         SyncEventType.SYNC_RUN_SUMMARY,
@@ -319,13 +288,6 @@ public class UexItemSyncService {
                 sharedUuidDeclined));
     syncReportService.pruneRuns(SyncSourceSystem.UEX);
 
-    // basetool_scheduled_job_items_total (SyncZeroItems, #1041 item 2) must stay non-zero on a
-    // HEALTHY run. When the whole item catalogue is unchanged, every category comes back 304 and
-    // the
-    // run upserts nothing — so the raw upsert tally (0) would look exactly like the empty-200
-    // catalogue outage the alert targets. When at least one category was served from the 304 cache
-    // and nothing was upserted, report the live catalogue size instead; a genuine empty-200 (no 304
-    // at all) still reports 0 and correctly trips the alert.
     if (itemsProcessed == 0 && anyCategoryUnchanged) {
       long liveCatalogue = gameItemRepository.countLiveUexItems();
       log.info(
@@ -397,23 +359,10 @@ public class UexItemSyncService {
 
     UUID externalUuid = UexValues.parseUuid(dto.uuid());
     if (item.getExternalUuid() == null && externalUuid != null) {
-      // R2 first write for a row UEX exposes with a UUID (R3 slug-fallback may later backfill rows
-      // where UEX returned an empty uuid — the ~30% case). Claim the uuid only if no other row
-      // already owns it: UEX gives a base weapon and its skins ONE shared in-game uuid (e.g. ids
-      // 879/5457/5458) while external_uuid is UNIQUE. A brand-new row's uuid is free by
-      // construction (resolveExistingItem just missed on it), but a row resolved by uex_item_id can
-      // be asked to backfill a uuid a *different* row already holds — setting it would hit
-      // uk_game_item_external_uuid (the prod failure on item 4752, the "Pulse Greycat Laser Pistol"
-      // skin). Leave external_uuid null in that case so the row keeps its uex_item_id key and every
-      // other UEX column still syncs (REQ-DATA-005).
       Optional<GameItem> uuidOwner =
           newRow ? Optional.empty() : gameItemRepository.findByExternalUuid(externalUuid);
       if (uuidOwner.isPresent()) {
         GameItem owner = uuidOwner.orElseThrow();
-        // Expected, permanent steady state — not a fault: UEX gives a base item and its skins one
-        // shared in-game uuid, but external_uuid is UNIQUE, so this sibling can never own it.
-        // Logged at DEBUG (not WARN) because it recurs every sync and no admin action can resolve
-        // it; the caller reports one aggregate sharedUuidDeclined count in the run summary (#1205).
         log.debug(
             "UEX item {} shares uuid={} with game_item id={} (uex_item_id={}); keeping"
                 + " external_uuid null to avoid uk_game_item_external_uuid collision",
@@ -427,8 +376,6 @@ public class UexItemSyncService {
     } else if (item.getExternalUuid() != null
         && externalUuid != null
         && !item.getExternalUuid().equals(externalUuid)) {
-      // UEX provided a UUID that disagrees with the one already stored — keep the existing key
-      // (Wiki side may have written it) and log so the admin can investigate.
       log.warn(
           "UEX item {} carries uuid={} but local row already has external_uuid={}",
           dto.id(),
@@ -437,10 +384,6 @@ public class UexItemSyncService {
     }
 
     item.setName(dto.name());
-    // §6.3.1 more-specific-wins: never downgrade a kind a previous (Wiki or UEX) pass already set
-    // to something specific. A cross-listed paint that Wiki filed as VEHICLE_ITEM must not become
-    // GENERIC just because UEX catalogues the same external_uuid under a Liveries category. New
-    // rows start at GENERIC, so the merge leaves the freshly-derived kind intact.
     item.setKind(GameItemKind.mergeMoreSpecific(item.getKind(), deriveKind(category)));
     item.setManufacturer(resolveManufacturer(dto, lookups));
     item.setUexItemId(dto.id());
@@ -464,7 +407,6 @@ public class UexItemSyncService {
     item.setUexDeletedAt(null);
     item.setUexGameVersionSeen(dto.gameVersion());
 
-    // Promote source_systems UEX_ONLY -> BOTH when Wiki has already written this row (R4+).
     if (item.getSourceSystems() == GameItemSourceSystem.WIKI_ONLY) {
       item.setSourceSystems(GameItemSourceSystem.BOTH);
     }

@@ -133,7 +133,6 @@ public class OrgUnitContextAdvice {
       }
     }
     if (authHelper.isAdmin()) {
-      // Admin without an active session pin → all-scopes mode, no badge.
       return null;
     }
     return layoutContextLoader.load(request).activeOrgUnitId();
@@ -213,18 +212,7 @@ public class OrgUnitContextAdvice {
     if (!authHelper.isAuthenticated() || !LayoutContextLoader.needsLayoutModel(request)) {
       return List.of();
     }
-    // R5.e: kept identical to the pre-R5.e semantics — load the full Squadron catalogue for
-    // every authenticated caller. The {@link #activeSquadron} dereference and the per-squadron
-    // {@code promotionEnabled} gate downstream both read from this list, so a non-admin narrowing
-    // would break the {@code activeSquadron} resolution for non-admin pages. The new sidebar
-    // switcher reads {@link #availableOrgUnits} instead — the two attributes coexist with disjoint
-    // purposes.
     try {
-      // Slow-changing global catalogue, identical URI for every caller — route through the
-      // CacheDomain.SQUADRON cache (same entry the page controllers already cache, evicted on
-      // admin squadron and SK mutations, 2-hour backstop TTL) so this advice does not re-fetch it
-      // on every authenticated render and shares the cached entry with the admin switcher's
-      // identical call below (REQ-DATA-007).
       PageResponse<SquadronDto> page =
           backendApiClient.getCached(CachedCatalog.SQUADRONS, SQUADRON_PAGE);
       return page != null && page.content() != null ? page.content() : List.of();

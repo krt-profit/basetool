@@ -125,8 +125,6 @@ class RefineryOrderStoreJobOrderDropdownTest {
             1L,
             null);
 
-    // Both are ITEM orders: empty MATERIAL-lines list, distinguished only by requiredMaterialIds —
-    // exactly the case the old materials-based filter could not handle.
     JobOrderReferenceDto matching =
         new JobOrderReferenceDto(
             matchingOrderId,

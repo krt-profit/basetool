@@ -126,15 +126,12 @@ class ComboboxBlurRestoresValueE2eTest {
         Locator textbox = page.locator(".krt-combobox:has(#materialId) .krt-combobox__input");
         Locator hidden = page.locator("#materialId");
 
-        // Commit a real pick: the hidden input holds the id, the textbox the option label.
         E2eSupport.selectComboboxFirstOption(textbox);
         String pickedValue = hidden.inputValue();
         String pickedLabel = textbox.inputValue();
         assertFalse(pickedValue.isBlank(), "picking an option must set the submitted value");
         assertFalse(pickedLabel.isBlank(), "picking an option must show its label");
 
-        // Overwrite the committed label with text that matches nothing. focus() selects the whole
-        // label, so this is the one-keystroke case a user hits by accident.
         textbox.click();
         textbox.fill(NON_MATCHING_TEXT);
         assertEquals(
@@ -142,8 +139,6 @@ class ComboboxBlurRestoresValueE2eTest {
             hidden.inputValue(),
             "non-matching text must clear the submitted value (reconcile's guard)");
 
-        // Blur onto a neutral field on the same form. The handler is debounced by 150 ms, so wait
-        // for the restored value rather than reading it straight away.
         page.locator("#amount").click();
         page.waitForFunction(
             "expected => {"

@@ -131,9 +131,6 @@ public class BlueprintCraftabilityService {
       withRefinery = slicesPerMaterial(merged);
     }
 
-    // Resolve, once for the whole owned set, which PIECE-counted ITEM ingredients bridge to a
-    // material (the hand-mined gems the wiki models as items); a craftable sub-assembly or an
-    // unresolved item stays absent and is reported "not evaluated".
     Map<UUID, Material> itemBridges = resolveItemBridges(recipes.values());
 
     List<BlueprintCraftabilityDto> out = new ArrayList<>(owned.size());
@@ -182,18 +179,12 @@ public class BlueprintCraftabilityService {
     if (itemGameItemIds.isEmpty()) {
       return Map.of();
     }
-    // A craftable ITEM (the output of an active blueprint) is a genuine sub-assembly, not a raw
-    // material — it is excluded exactly as the job-order bridge excludes it.
     Set<UUID> craftable =
         new HashSet<>(blueprintRepository.findCraftableOutputItemIds(itemGameItemIds));
     List<UUID> bridgeable = itemGameItemIds.stream().filter(id -> !craftable.contains(id)).toList();
     if (bridgeable.isEmpty()) {
       return Map.of();
     }
-    // Load the bridgeable game items for their canonical names, then resolve each name to a
-    // material
-    // (case-insensitive). Using the resolved game item's name keeps the match identical to the
-    // job-order bridge's resolveItemMaterial.
     Map<UUID, String> nameByGameItemId = new LinkedHashMap<>();
     Set<String> lowerNames = new LinkedHashSet<>();
     for (GameItem item : gameItemRepository.findAllById(bridgeable)) {
@@ -206,11 +197,6 @@ public class BlueprintCraftabilityService {
     if (lowerNames.isEmpty()) {
       return Map.of();
     }
-    // The batched name match folds the candidate names in Java (Locale.ROOT) while the column is
-    // folded by the DB's LOWER() — these agree for the ASCII commodity/gem names this bridges (the
-    // only names it ever sees), so the resolved row matches the all-DB fold the job-order bridge
-    // (JobOrderItemService.resolveItemMaterial) uses; a non-ASCII name could differ, hence the
-    // ASCII-scoped note on MaterialRepository.findByNameInIgnoreCase.
     Map<String, Material> materialByLowerName = new HashMap<>();
     for (Material material : materialRepository.findByNameInIgnoreCase(lowerNames)) {
       if (material.getName() != null) {
@@ -254,9 +240,6 @@ public class BlueprintCraftabilityService {
     List<BlueprintIngredient> flat = recipe.getIngredients();
     boolean hasUnevaluatedItem = false;
 
-    // Aggregate the material requirement per material (a material used in several slots is pooled;
-    // its floor is the strictest of the slots' floors). A requirement comes from a RESOURCE line or
-    // from a PIECE-counted ITEM line bridged to a material (ADR-0046).
     Map<UUID, MaterialRequirement> requirements = new LinkedHashMap<>();
     for (BlueprintIngredient ingredient : flat) {
       Material material;
@@ -268,10 +251,6 @@ public class BlueprintCraftabilityService {
         }
         rawRequired = ingredient.getQuantityScu() == null ? 0.0d : ingredient.getQuantityScu();
       } else {
-        // ITEM line: a non-craftable component the wiki counts in pieces is bridged to its PIECE
-        // material and evaluated as that requirement (its per-craft quantity is the whole-unit
-        // count); a craftable sub-assembly or an unresolved item carries no material and is flagged
-        // "not evaluated".
         material = bridgedItemMaterial(ingredient, itemBridges);
         if (material == null || material.getId() == null) {
           hasUnevaluatedItem = true;
@@ -282,11 +261,6 @@ public class BlueprintCraftabilityService {
       if (rawRequired <= 0.0d) {
         continue;
       }
-      // A PIECE-quantity material's per-craft requirement is a whole piece count, rounded exactly
-      // as
-      // JobOrderItemService.roundForQuantityType does — so the recipe never demands a fractional
-      // piece and the craftable count stays in step with the rest of the app. SCU materials keep
-      // their fractional requirement.
       QuantityType quantityType = material.getQuantityType();
       double required = QuantityTypeRounding.roundForQuantityType(rawRequired, quantityType);
       if (required <= 0.0d) {
@@ -302,8 +276,6 @@ public class BlueprintCraftabilityService {
     }
 
     if (requirements.isEmpty()) {
-      // No RESOURCE and no bridged ITEM requirement (ITEM-only sub-assembly / unresolved recipe):
-      // craftability cannot be assessed.
       return new BlueprintCraftabilityDto(
           blueprintId, true, hasUnevaluatedItem, false, 0, 0, null, null, List.of(), List.of());
     }

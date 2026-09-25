@@ -74,8 +74,6 @@ public class JobOrderHandoverReportProxyController {
               .uri("/api/v1/orders/" + jobOrderId + "/handovers/" + handoverId + "/report")
               .headers(
                   h -> {
-                    // Forward the user's IANA time zone to the backend so the PDF renders the
-                    // handover date/time in the user's local zone (not the backend server's zone).
                     if (userTimeZone != null && !userTimeZone.isBlank()) {
                       h.set("X-User-Time-Zone", userTimeZone);
                     }

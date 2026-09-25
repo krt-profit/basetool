@@ -81,8 +81,6 @@ class UexRefinerySyncServiceTest {
 
   @InjectMocks private UexRefinerySyncService service;
 
-  // ── syncRefiningMethods ────────────────────────────────────────────────
-
   @Test
   void syncRefiningMethods_emptyResponse_abortsWithoutSaving() {
     when(uexClient.getRefineriesMethods()).thenReturn(List.of());
@@ -117,7 +115,6 @@ class UexRefinerySyncServiceTest {
 
   @Test
   void syncRefiningMethods_updatesExistingMethodInPlace_preservingId() {
-    // Given an existing row matched by name, with stale ratings
     UUID existingId = UUID.randomUUID();
     RefiningMethod existing = new RefiningMethod();
     existing.setId(existingId);
@@ -151,14 +148,12 @@ class UexRefinerySyncServiceTest {
 
     service.syncRefiningMethods();
 
-    // Name-less rows are pre-filtered, never reach the repo
     verify(refiningMethodRepository, never()).findByName(any());
     verify(refiningMethodRepository, never()).save(any());
   }
 
   @Test
   void syncRefiningMethods_processesMixedBatch() {
-    // Given — one new, one update, one skipped
     UexRefiningMethodDto fresh = new UexRefiningMethodDto(1, "Fresh", "F", 1, 1, 1);
     UexRefiningMethodDto existing = new UexRefiningMethodDto(2, "Existing", "E", 2, 2, 2);
     UexRefiningMethodDto skipped = new UexRefiningMethodDto(3, "", null, 0, 0, 0);
@@ -175,11 +170,8 @@ class UexRefinerySyncServiceTest {
 
     service.syncRefiningMethods();
 
-    // Exactly two saves; the blank-name row never reached the repo
     verify(refiningMethodRepository, times(2)).save(any(RefiningMethod.class));
   }
-
-  // ── syncRefineryYields ─────────────────────────────────────────────────
 
   @Test
   void syncRefineryYields_emptyResponse_abortsWithoutSaving() {
@@ -273,7 +265,6 @@ class UexRefinerySyncServiceTest {
 
     service.syncRefineryYields();
 
-    // No row reached the repository
     verify(materialRepository, never()).findByIdCommodity(any());
     verify(terminalRepository, never()).findByIdTerminal(any());
     verify(refineryYieldRepository, never()).save(any());
@@ -289,9 +280,6 @@ class UexRefinerySyncServiceTest {
 
     service.syncRefineryYields();
 
-    // No yield saved because the upstream commodity is not in our DB.
-    // Yields are NEVER allowed to auto-create a placeholder material —
-    // the commodity catalog is the source of truth.
     verify(refineryYieldRepository, never()).save(any());
   }
 
@@ -315,7 +303,6 @@ class UexRefinerySyncServiceTest {
 
   @Test
   void syncRefineryYields_processesMixedBatch() {
-    // Given — one new yield, one orphan (terminal unknown), one skipped (null value)
     UUID materialId = UUID.randomUUID();
     UUID terminalId = UUID.randomUUID();
     Material material = new Material();
@@ -339,16 +326,11 @@ class UexRefinerySyncServiceTest {
 
     service.syncRefineryYields();
 
-    // Exactly one save — only the good row reached the repo
     verify(refineryYieldRepository, times(1)).save(any());
   }
 
-  // ── audit-summary events (REQ-AUDIT-001) ───────────────────────────────
-
   @Test
   void syncRefiningMethods_recordsAuditSummary() {
-    // Given — a mixed batch of exactly one create, one update and one skipped (blank-name) row,
-    // so the summary must carry added=1 updated=1.
     UexRefiningMethodDto fresh = new UexRefiningMethodDto(1, "Fresh", "F", 1, 1, 1);
     UexRefiningMethodDto existing = new UexRefiningMethodDto(2, "Existing", "E", 2, 2, 2);
     UexRefiningMethodDto skipped = new UexRefiningMethodDto(3, "", null, 0, 0, 0);
@@ -365,7 +347,6 @@ class UexRefinerySyncServiceTest {
 
     service.syncRefiningMethods();
 
-    // Exactly one system-actor summary event (id/label/target all null), with the per-run counts.
     verify(auditService)
         .record(
             eq(AuditEventType.REFINERY_METHODS_SYNCED),
@@ -378,7 +359,6 @@ class UexRefinerySyncServiceTest {
 
   @Test
   void syncRefineryYields_recordsAuditSummary() {
-    // Given — a single upsertable yield, so the summary must carry processed=1.
     UUID materialId = UUID.randomUUID();
     UUID terminalId = UUID.randomUUID();
     Material material = new Material();
@@ -416,7 +396,6 @@ class UexRefinerySyncServiceTest {
 
     service.syncRefiningMethods();
 
-    // The empty-response early return must never emit a summary event.
     verifyNoInteractions(auditService);
   }
 

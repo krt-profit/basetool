@@ -116,21 +116,17 @@ class MaterialboardQuantityFieldExclusivityE2eTest {
         page.waitForLoadState();
         page.waitForFunction("() => typeof window.krtMaterialRelease === 'object'");
 
-        // Material release: amount field shown, item-quantity field hidden (the shipped bug).
         page.locator("[data-mb-open-release]").first().click();
         assertThat(page.locator("#mb-modal"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
         assertThat(page.locator("#mb-modal [data-mb-amount-block]"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));
-        // The regression discriminator: pre-fix this block was visible because the author
-        // .mb-modal-qty display:flex outranked the UA [hidden] { display:none } rule.
         assertThat(page.locator("#mb-modal [data-mb-qty-block]"))
             .isHidden(new LocatorAssertions.IsHiddenOptions().setTimeout(10_000));
         page.locator("#mb-modal [data-mb-modal-close]").first().click();
         assertThat(page.locator("#mb-modal"))
             .isHidden(new LocatorAssertions.IsHiddenOptions().setTimeout(10_000));
 
-        // Item offer: item-quantity field shown, amount field hidden (the inverse).
         page.locator("[data-mb-open-item]").first().click();
         assertThat(page.locator("#mb-modal"))
             .isVisible(new LocatorAssertions.IsVisibleOptions().setTimeout(10_000));

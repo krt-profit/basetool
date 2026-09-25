@@ -142,8 +142,6 @@ public class BankManagementReportService {
         krt.document().add(empty);
       }
 
-      // Each account starts on its own page so a section never shares a page with the previous
-      // account's tail (REQ-BANK-015 readability); the first follows the title/period meta.
       boolean firstAccount = true;
       for (BankAccount account : accounts) {
         if (!firstAccount) {
@@ -192,7 +190,6 @@ public class BankManagementReportService {
             ? Map.of()
             : bankHolderPostingRepository.findHolderLegsByTransactionIds(txIds).stream()
                 .collect(Collectors.groupingBy(BankHolderLeg::transactionId));
-    // Account legs back the "Gegenseite" column's transfer counter-account (REQ-BANK-044).
     final Map<UUID, List<BankCounterLeg>> accountLegsByTx =
         txIds.isEmpty()
             ? Map.of()
@@ -229,7 +226,6 @@ public class BankManagementReportService {
         summary, label("pdf.bank.report.closing"), BankPdfFormat.amount(closing));
     krt.document().add(summary);
 
-    // Balance-over-time chart: the running balance across the three-month window as a step line.
     KrtPdfSupport.addSectionHeader(krt, label("pdf.bank.report.chart"));
     krt.document()
         .add(
@@ -237,9 +233,6 @@ public class BankManagementReportService {
                 krt.writer(), opening, rows, from, to, dateOnly.format(from), dateOnly.format(to)));
     krt.document().add(new Paragraph(" "));
 
-    // The Begründung + Notiz of each booking move into an indented sub-row beneath it
-    // (REQ-BANK-045,
-    // reason first) so the five main columns stay wide enough to never wrap.
     PdfPTable table = new PdfPTable(5);
     table.setWidthPercentage(100);
     table.setWidths(new float[] {1.5f, 1.2f, 1.5f, 1.9f, 1.2f});
@@ -263,10 +256,6 @@ public class BankManagementReportService {
                   row.amount().signum());
       KrtPdfSupport.addTableCell(table, stamp.format(row.createdAt()), bg, false);
       KrtPdfSupport.addTableCell(table, label("pdf.bank.type." + row.type().name()), bg, false);
-      // Humanised like the Gegenpartei column below, and for the same reason: bank_holder.user_id
-      // is ON DELETE SET NULL, so after a deletion the display name falls back to the handle
-      // snapshot -- which a granted erasure has rewritten. Raw, that printed #ANONYMISED# in the
-      // Halter column while the next column on the same row read "Anonymisiert" (REQ-SEC-062).
       KrtPdfSupport.addTableCell(
           table,
           HandleAnonymisation.humanise(holder, label("general.anonymisedHandle")),
@@ -280,7 +269,6 @@ public class BankManagementReportService {
       KrtPdfSupport.addTableCell(table, BankPdfFormat.signedAmount(row.amount()), bg, true);
       String reason = row.justification() != null ? row.justification() : "";
       String note = row.note() != null ? row.note() : "";
-      // The management report is a Bankleitung-only artifact, so the internal staff note is kept.
       String staffNote = row.staffNote() != null ? row.staffNote() : "";
       if (!reason.isEmpty() || !note.isEmpty() || !staffNote.isEmpty()) {
         KrtPdfSupport.addDetailSubRow(
@@ -315,9 +303,6 @@ public class BankManagementReportService {
         if (row.counterpartyHandle() == null) {
           yield "";
         }
-        // A counterparty whose handle an Art. 17 request erased renders as the placeholder rather
-        // than as the raw sentinel (REQ-SEC-062). The booking itself is untouched -- amount, date
-        // and account all stand; only the name is gone.
         String handle = HandleAnonymisation.humanise(row.counterpartyHandle(), anonymisedLabel);
         yield row.counterpartyOrgUnitName() == null
             ? handle

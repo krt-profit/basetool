@@ -1,27 +1,6 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
-<!--/*
-  The profile page's "delete account" card (REQ-SEC-061, ADR-0181), as a fragment so
-  profile.js can swap it in place after the member raises or withdraws a request
-  (REQ-FE-001) rather than reloading the page. The proxy controller renders exactly this
-  fragment for GET /profile/deletion-request?fragment=card.
-
-  Four mutually exclusive states, all decided server-side:
-    * no request, or a withdrawn one -> offer to raise a new one
-    * PENDING                        -> show it, offer to withdraw
-    * DECLINED                       -> offer to raise a new one AND show the recorded
-                                        reason, which Art. 12(4) obliges the controller
-                                        to tell the requester
-    * could not be loaded            -> say so, and offer nothing
-
-  The fourth state is a correction. A backend failure used to render as the no-request
-  state, which means a DECLINED request -- the one state that carries the refusal reason
-  the member has a right to be told -- could vanish from the page with no indication that
-  anything had gone wrong. "I cannot show you this right now" is the honest answer, and
-  suppressing the actions with it stops the member raising a second request on top of one
-  they cannot see.
-*/-->
 <div th:fragment="card">
     <div class="card card--inset" id="profile-deletion-card"
          th:attr="data-status=${deletionRequest != null ? deletionRequest.status : ''}">

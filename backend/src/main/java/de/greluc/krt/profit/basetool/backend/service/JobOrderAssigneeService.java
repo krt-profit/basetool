@@ -193,7 +193,6 @@ public class JobOrderAssigneeService {
     String trimmed = StringNormalization.trimToNull(note);
     assignee.setNote(trimmed);
     JobOrder saved = jobOrderRepository.saveAndFlush(jobOrder);
-    // PII: the note body is user free text — record only its presence/length, never the content.
     if (trimmed != null) {
       auditService.record(
           AuditEventType.JOB_ORDER_ASSIGNEE_NOTE_SET,

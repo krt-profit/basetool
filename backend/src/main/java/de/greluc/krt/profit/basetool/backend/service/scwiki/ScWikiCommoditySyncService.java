@@ -144,9 +144,6 @@ public class ScWikiCommoditySyncService {
             new ParameterizedTypeReference<ScWikiResponseDto<ScWikiCommodityDto>>() {},
             "commodities");
     if (fetchResult.notModified()) {
-      // Catalogue unchanged since the last sync (ETag 304): nothing to merge, but this is a healthy
-      // run — report the live linked-material count so an all-304 run is not read as a zero-item
-      // outage (#1182). A genuine empty-200 falls through to the isEmpty() branch and reports 0.
       long live = materialRepository.countLiveScwikiMaterials();
       log.info(
           "SC Wiki commodity catalogue unchanged since last sync (304) — reporting {} live linked"
@@ -212,10 +209,6 @@ public class ScWikiCommoditySyncService {
     if (seenScwikiUuids.isEmpty()) {
       log.warn("Skipping orphan sweep — no SC Wiki commodity was merged this run.");
     } else if (!fetchResult.complete()) {
-      // The page walk could not vouch for the census (a page failed, the pagination metadata went
-      // missing on a full page, or meta.total disagreed with the merged rows). The uuids we did see
-      // are real, but everything on the pages we never fetched would be tombstoned for the wrong
-      // reason. Defer orphan detection to the next complete run.
       log.warn(
           "Skipping the material scwiki_deleted sweep: the Wiki commodity page walk did not"
               + " enumerate the whole feed this run, so the {} uuid(s) it saw are not a complete"
@@ -261,13 +254,11 @@ public class ScWikiCommoditySyncService {
    */
   private ResolveResult resolve(
       @NotNull ScWikiCommodityDto dto, Map<String, List<Material>> canonicalIndex, UUID runId) {
-    // 1. by Wiki UUID (set on a previous sync).
     Optional<Material> byUuid = materialRepository.findByScwikiUuid(dto.uuid());
     if (byUuid.isPresent()) {
       return ResolveResult.matched(byUuid.orElseThrow());
     }
 
-    // 2. by alias table (seeded §4.1/§4.2 + admin-curated).
     Material byAlias =
         aliasService.resolveMaterialByAlias(MaterialExternalAliasSource.SCWIKI, dto.name());
     if (byAlias != null) {
@@ -280,7 +271,6 @@ public class ScWikiCommoditySyncService {
       return ResolveResult.matched(byAlias);
     }
 
-    // 3. exact name.
     if (StringUtils.hasText(dto.name())) {
       Optional<Material> byName = materialRepository.findByName(dto.name());
       if (byName.isPresent()) {
@@ -288,7 +278,6 @@ public class ScWikiCommoditySyncService {
       }
     }
 
-    // 4. canonical (qualifier-stripped) name, restricted to materials without a Wiki UUID yet.
     String canon = canonicalName(dto.name());
     if (canon != null && !canon.isBlank()) {
       List<Material> candidates = canonicalIndex.getOrDefault(canon, List.of());
@@ -308,7 +297,6 @@ public class ScWikiCommoditySyncService {
       }
     }
 
-    // 5/6. no match → caller creates a WIKI_ONLY row.
     return ResolveResult.createNew();
   }
 

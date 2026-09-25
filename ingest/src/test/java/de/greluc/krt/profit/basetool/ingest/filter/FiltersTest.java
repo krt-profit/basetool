@@ -108,7 +108,6 @@ class FiltersTest {
     assertThat(response.getContentType()).startsWith(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
     assertThat(response.getContentAsString()).contains("PAYLOAD_TOO_LARGE");
     assertThat(chain.getRequest()).isNull();
-    // REQ-OBS-011: the 413 reject increments the (previously absent) detection counter.
     assertThat(meterRegistry.counter(MetricNames.INGEST_PAYLOAD_REJECTED).count()).isEqualTo(1.0);
   }
 
@@ -128,7 +127,6 @@ class FiltersTest {
 
   @Test
   void sizeFilterRejectsOversizedChunkedPayloadWith413() throws Exception {
-    // INGEST-DOS-1: a chunked body (no Content-Length) over the cap must still be rejected.
     IngestProperties properties = TestProperties.ingest("max-payload-bytes", "10");
     PayloadSizeLimitFilter filter =
         new PayloadSizeLimitFilter(
@@ -154,7 +152,6 @@ class FiltersTest {
 
     filter.doFilter(chunkedIngestRequest(50), response, chain);
 
-    // The within-cap chunked body is buffered and re-served unchanged to the controller.
     assertThat(chain.getRequest()).isNotNull();
     assertThat(chain.getRequest().getInputStream().readAllBytes()).hasSize(50);
   }
@@ -183,8 +180,6 @@ class FiltersTest {
 
   @Test
   void sizeFilterReportsAChunkedRejectAsDeclaredMinusOne() throws Exception {
-    // The stream is abandoned the moment the cap is crossed, so -1 is the honest value — and it is
-    // itself the diagnostic: the body arrived without a Content-Length.
     IngestProperties properties = TestProperties.ingest("max-payload-bytes", "10");
     PayloadSizeLimitFilter filter =
         new PayloadSizeLimitFilter(
@@ -206,8 +201,6 @@ class FiltersTest {
 
   @Test
   void rateLimitFilterLogsThePerIpRejectAtDebugWithoutTheClientAddress() throws Exception {
-    // DEBUG, not WARN: an attacker decides how often the pre-auth limiter fires, so a higher level
-    // would be a log-flood vector. The client IP stays out — app logs are PII-free (REQ-OBS-004).
     RateLimitProperties properties =
         TestProperties.rateLimit("ip-capacity", "1", "ip-refill-tokens", "1");
     RateLimitingFilter filter =
@@ -255,7 +248,6 @@ class FiltersTest {
     assertThat(blocked.getContentAsString()).contains("RATE_LIMITED");
     assertThat(blocked.getHeader("Retry-After")).isNotNull();
     assertThat(secondChain.getRequest()).isNull();
-    // The pre-auth rejection is counted once under the bounded `ip` bucket (REQ-OBS-011).
     assertThat(
             meterRegistry
                 .get(MetricNames.RATELIMIT_REJECTIONS)

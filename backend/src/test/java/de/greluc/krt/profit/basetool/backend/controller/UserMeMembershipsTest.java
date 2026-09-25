@@ -121,8 +121,6 @@ class UserMeMembershipsTest {
   @Test
   @DisplayName("an authenticated account with no roles is served, not refused")
   void aRolelessAccountIsServed() throws Exception {
-    // The app's switcher renders on the shell around every screen. A 403 here for a member whose
-    // only fault is having no unit yet would break the frame rather than one list.
     mockMvc
         .perform(get("/api/v1/users/me/memberships").with(callerJwt()))
         .andExpect(status().isOk());

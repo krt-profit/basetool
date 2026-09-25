@@ -55,28 +55,22 @@ class MissionExpansionTest {
 
   @Test
   void testMissionExpansion() {
-    // 1. Create User
     User user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername("pilot1");
     user.setEmail("pilot@test.com");
     final User savedUser = userRepository.save(user);
 
-    // 1b. Create ShipType
     ShipType fighter = new ShipType();
     fighter.setName("Fighter");
     fighter = shipTypeRepository.save(fighter);
 
-    // 2. Create Ship
     Ship ship = new Ship();
     ship.setName("Test Ship");
     ship.setShipType(fighter);
     ship.setOwner(savedUser);
     ship = shipRepository.save(ship);
 
-    // 3. Create Mission — uses the new CreateMissionRequest record (audit finding C-3 migration:
-    // the legacy createMission(Mission) signature is gone, no caller can smuggle id/version/
-    // owningSquadron through the create path anymore).
     Mission mission =
         missionService.createMission(
             new de.greluc.krt.profit.basetool.backend.model.dto.request.CreateMissionRequest(
@@ -94,8 +88,6 @@ class MissionExpansionTest {
                 null,
                 null));
 
-    // 4. Add Participant first — a unit's ship must belong to a registered participant, so the
-    // ship owner has to be signed up before the ship can be assigned to the unit.
     mission =
         missionService.addParticipant(
             mission.getId(), savedUser.getId(), null, null, null, null, null);
@@ -105,7 +97,6 @@ class MissionExpansionTest {
             .findFirst()
             .orElseThrow();
 
-    // 4b. Add Ship to Mission
     mission =
         missionService.addUnitToMission(
             mission.getId(),
@@ -122,7 +113,6 @@ class MissionExpansionTest {
     MissionUnit missionShip = mission.getAssignedUnits().iterator().next();
     assertEquals(ship.getId(), missionShip.getShip().getId());
 
-    // 5. Add Crew to Ship
     JobType pilot = new JobType();
     pilot.setName("Pilot");
     pilot.setArchetype(JobTypeArchetype.CREW);
@@ -138,7 +128,6 @@ class MissionExpansionTest {
         missionService.addCrewToShip(
             mission.getId(), missionShip.getId(), participant.getId(), jobTypeIds);
 
-    // Verify
     Mission updatedMission = missionRepository.findById(mission.getId()).orElseThrow();
     assertEquals(1, updatedMission.getAssignedUnits().size());
     MissionUnit updatedMissionShip = updatedMission.getAssignedUnits().iterator().next();

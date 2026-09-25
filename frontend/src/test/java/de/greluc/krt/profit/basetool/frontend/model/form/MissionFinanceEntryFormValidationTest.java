@@ -33,8 +33,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-// covers REQ-MISSION-001 (client-form whole-aUEC enforcement) - see
-// docs/specs/whole-number-amounts.md
 /**
  * Bean Validation tests for {@link MissionFinanceEntryForm}, the create/edit form backing the
  * mission-finance modals. They pin the whole-aUEC input rule (REQ-MISSION-001): the form rejects a

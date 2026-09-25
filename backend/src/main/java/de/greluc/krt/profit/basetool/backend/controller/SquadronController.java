@@ -102,8 +102,6 @@ public class SquadronController {
   @PreAuthorize(Roles.HAS_ROLE_ADMIN)
   public SquadronDto createSquadron(@RequestBody @Valid SquadronDto squadron) {
     var toCreate = squadronMapper.toEntity(squadron);
-    // L-7: strip client-supplied id/version so create cannot become a merge()-UPSERT of another
-    // row.
     toCreate.setId(null);
     toCreate.setVersion(null);
     return squadronMapper.toDto(squadronService.createSquadron(toCreate));

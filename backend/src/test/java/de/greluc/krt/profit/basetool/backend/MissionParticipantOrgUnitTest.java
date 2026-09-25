@@ -162,10 +162,6 @@ class MissionParticipantOrgUnitTest {
 
   @Test
   void guest_anonymousCaller_submittedOrgUnitsAreHonored() {
-    // A guest's org-unit affiliation is mission-scoped roster metadata, not an authority grant, so
-    // anyone who may add the guest may label it with any Staffel or SK. This @SpringBootTest runs
-    // without an authenticated SecurityContext (an anonymous sign-up), and both submitted ids — a
-    // Staffel and an SK the caller has no relationship with — are kept verbatim.
     Mission updated =
         missionService.addParticipant(
             mission.getId(),

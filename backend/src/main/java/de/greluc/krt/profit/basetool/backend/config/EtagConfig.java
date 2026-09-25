@@ -70,7 +70,6 @@ public class EtagConfig {
       ShallowEtagHeaderFilter shallowEtagFilter) {
     FilterRegistrationBean<ShallowEtagHeaderFilter> filter = new FilterRegistrationBean<>();
     filter.setFilter(shallowEtagFilter);
-    // Ensure ETag is applied early so conditional requests can be short-circuited
     filter.setOrder(Ordered.HIGHEST_PRECEDENCE + 10);
     filter.addUrlPatterns("/*");
     return filter;

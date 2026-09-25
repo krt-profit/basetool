@@ -106,8 +106,6 @@ class InventoryDeleteAllProxyControllerTest {
 
   @Test
   void deleteAllGlobalInventory_onConnectionFailure_wrapsAs500() throws Exception {
-    // Shutdown the server before the call so the WebClient gets a
-    // connect/read failure (NOT a WebClientResponseException).
     server.shutdown();
 
     ResponseStatusException ex =
@@ -119,8 +117,6 @@ class InventoryDeleteAllProxyControllerTest {
         "Non-HTTP failures must be re-thrown as a 500 (sanitised — no upstream stack trace)");
     assertTrue(ex.getReason() != null && ex.getReason().toLowerCase().contains("unexpected"));
 
-    // Tear down was a no-op; bring the field back to a clean state so AfterEach's
-    // shutdown is a no-op too.
     server = new MockWebServer();
     server.start();
   }

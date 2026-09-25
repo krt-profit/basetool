@@ -108,8 +108,6 @@ class MeLayoutSingleTransactionTest {
 
   @Test
   void theSeparateCallsOpenSeveral_soTheCounterSeesTheDifference() {
-    // The contrast that makes the assertion above mean something: asked one by one, the same
-    // answers cost more than one transaction.
     Statistics stats = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
     stats.setStatisticsEnabled(true);
     stats.clear();

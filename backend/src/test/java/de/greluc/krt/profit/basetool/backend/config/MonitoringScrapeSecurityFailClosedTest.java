@@ -57,14 +57,11 @@ class MonitoringScrapeSecurityFailClosedTest {
 
   @Test
   void shouldDenyAnonymousRequestWhenNoCredentialsConfigured() throws Exception {
-    // Given / When / Then
     mockMvc.perform(get(PROMETHEUS)).andExpect(status().isForbidden());
   }
 
   @Test
   void shouldDenyEvenWellFormedBasicCredentialsWhenNoneConfigured() throws Exception {
-    // Given / When / Then: without configured credentials no authentication mechanism exists on
-    // the chain — presented basic credentials must not open the endpoint.
     mockMvc
         .perform(get(PROMETHEUS).with(httpBasic("metrics-scraper", "any-password")))
         .andExpect(status().isForbidden());
@@ -72,7 +69,6 @@ class MonitoringScrapeSecurityFailClosedTest {
 
   @Test
   void shouldKeepHealthEndpointPublic() throws Exception {
-    // Given / When / Then: the fail-closed scrape chain must not affect the Docker HEALTHCHECK.
     mockMvc.perform(get("/actuator/health")).andExpect(status().isOk());
   }
 }

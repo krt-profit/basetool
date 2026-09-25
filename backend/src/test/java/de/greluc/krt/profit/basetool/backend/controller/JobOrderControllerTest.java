@@ -154,8 +154,6 @@ class JobOrderControllerTest {
         false);
   }
 
-  // ── POST /api/v1/orders (authenticated since ADR-0149) ──────────────
-
   @Test
   void createJobOrder_passesTheServiceResultThroughUnredacted() {
     CreateJobOrderDto request = new CreateJobOrderDto(null, null, "alice", null, List.of(), null);
@@ -164,20 +162,9 @@ class JobOrderControllerTest {
 
     JobOrderDto result = controller.createJobOrder(request);
 
-    // ADR-0149 requires a login for the create, so there is no anonymous branch left to redact for
-    // - the sibling test that drove `jwt == null` through the guest acknowledgement is gone with
-    // the code it covered. The method gate said permitAll() until 2026-08-30 while the URL matrix
-    // said authenticated(); harmless, because the matrix decides, but a "consistency" pass could
-    // have widened the matrix to match the annotation instead of the other way round.
-    //
-    // Pinning the pass-through also confirms the controller touches neither the JWT helper nor the
-    // role helper on this path, so a future refactor cannot sneak in "let's just record the
-    // creator's id" without breaking this test.
     assertThat(result).isSameAs(created);
     verifyNoInteractions(userService, authHelperService);
   }
-
-  // ── GET /api/v1/orders/{id}/item-blueprint-owners ────────────────────
 
   @Test
   void getItemBlueprintOwners_delegatesToServiceAndReturnsResult() {
@@ -188,13 +175,9 @@ class JobOrderControllerTest {
 
     JobOrderItemBlueprintOwnersDto result = controller.getItemBlueprintOwners(id);
 
-    // The members-only gate lives in @PreAuthorize (canSeeJobOrderBlueprintOwners, covered by
-    // OwnerScopeServiceTest); the controller method itself is a thin pass-through to the service.
     assertThat(result).isSameAs(coverage);
     verify(jobOrderItemBlueprintOwnersService).getBlueprintOwners(id);
   }
-
-  // ── GET /api/v1/orders (list) ────────────────────────────────────────
 
   @Test
   void getAllJobOrders_forwardsStatusFilterAndPageable() {
@@ -227,9 +210,6 @@ class JobOrderControllerTest {
     PageResponse<JobOrderDto> result =
         controller.getAllJobOrders(null, null, 0, 20, "priority,asc");
 
-    // The status filter MUST reach the service as null when absent — coercing it to an empty list
-    // here would produce SQL "WHERE status IN ()" which never matches any row, leaving the queue
-    // page perpetually empty. Pin the verbatim null pass-through.
     assertThat(result.content()).containsExactly(dto);
     verify(jobOrderQueryService).getAllJobOrders(eq(null), eq(null), any(Pageable.class));
   }
@@ -247,18 +227,12 @@ class JobOrderControllerTest {
         controller.getAllJobOrders(
             List.of(JobOrderStatus.OPEN), squadronIds, 0, 20, "priority,asc");
 
-    // The repeatable squadronId params MUST reach the service verbatim — the orders-index
-    // multi-squadron picker (REQ-ORDERS-027) relies on this pass-through to narrow the scoped union
-    // to the selected squadrons on the responsible- or requesting-side match.
     assertThat(result.content()).containsExactly(dto);
     verify(jobOrderQueryService)
         .getAllJobOrders(eq(List.of(JobOrderStatus.OPEN)), eq(squadronIds), any(Pageable.class));
   }
 
-  // ── GET /api/v1/orders/material-demand ───────────────────────────────
-
   @Test
-  // covers REQ-ORDERS-034
   void getMaterialDemand_returnsTheAggregatedOverviewUnchanged() {
     MaterialDemandOverviewDto overview =
         new MaterialDemandOverviewDto(
@@ -269,13 +243,9 @@ class JobOrderControllerTest {
 
     MaterialDemandOverviewDto result = controller.getMaterialDemand();
 
-    // The endpoint is a thin pass-through: the scope gate and the aggregation both live in the
-    // service, so the controller must neither filter nor reshape the projection.
     assertThat(result).isSameAs(overview);
     verify(jobOrderMaterialDemandService).getMaterialDemandOverview();
   }
-
-  // ── GET /api/v1/orders/lookup ────────────────────────────────────────
 
   @Test
   void lookupJobOrders_delegatesToServiceReferenceQuery() {
@@ -299,20 +269,10 @@ class JobOrderControllerTest {
     verify(jobOrderQueryService).findAllActiveReference(false);
   }
 
-  // ── GET /api/v1/orders/{id} ──────────────────────────────────────────
-
   @Test
   void getJobOrderById_fullViewerKeepsEveryFieldButPeerShapesTheAssignees() {
     UUID id = UUID.randomUUID();
-    // The service stamps the per-order redaction decision; a full viewer's DTO carries
-    // redacted=false, so the controller applies no tier redaction and re-evaluates no gate.
-    //
-    // It does peer-shape the nested assignee users, unconditionally (audit LOW-2): the chips render
-    // effectiveName, while the nested UserDto used to carry roles, permissions, description,
-    // joinDate and discordLinked to every viewer of the order - including a member of another
-    // Staffel reading through the SK public escape, who gets the peer shape for the very same
-    // person from GET /api/v1/users/{id}.
-    JobOrderDto dto = jobOrderDto(id); // redacted=false
+    JobOrderDto dto = jobOrderDto(id);
     when(jobOrderQueryService.getJobOrderById(id)).thenReturn(dto);
 
     JobOrderDto result = controller.getJobOrderById(id);
@@ -336,12 +296,6 @@ class JobOrderControllerTest {
 
   @Test
   void getJobOrderById_requesterOnlyViewer_redactsProgressAssigneesAndAggregates() {
-    // REQ-ORDERS-023: the service stamps redacted=true on a requester-only viewer's DTO, so the
-    // controller redacts — Bearbeiter, aggregated materials and handovers/item-handovers emptied,
-    // each material line's collection progress (currentStock/claims/openAmount) stripped — while
-    // the
-    // ordered facts (line id/min-quality/amount/version, items, handle, comment, version) and the
-    // redacted flag survive in position (field-order guard).
     UUID id = UUID.randomUUID();
     UUID matLineId = UUID.randomUUID();
     de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto matLine =
@@ -360,25 +314,23 @@ class JobOrderControllerTest {
             JobOrderType.MATERIAL,
             true,
             List.of(matLine),
-            java.util.Collections.singletonList(null), // items — pass through (own-order progress)
-            java.util.Collections.singletonList(null), // aggregatedMaterials — redacted
-            java.util.Collections.singletonList(null), // assignees (Bearbeiter/PII) — redacted
-            java.util.Collections.singletonList(null), // handovers — redacted
-            java.util.Collections.singletonList(null), // itemHandovers — redacted
+            java.util.Collections.singletonList(null),
+            java.util.Collections.singletonList(null),
+            java.util.Collections.singletonList(null),
+            java.util.Collections.singletonList(null),
+            java.util.Collections.singletonList(null),
             Instant.parse("2026-01-01T00:00:00Z"),
             9L,
             null,
-            true); // the service already decided this is a requester-only (redacted) view
+            true);
     when(jobOrderQueryService.getJobOrderById(id)).thenReturn(full);
 
     JobOrderDto result = controller.getJobOrderById(id);
 
-    // Member-identifying / processing-side collections are emptied ...
     assertThat(result.assignees()).isEmpty();
     assertThat(result.aggregatedMaterials()).isEmpty();
     assertThat(result.handovers()).isEmpty();
     assertThat(result.itemHandovers()).isEmpty();
-    // ... each material line keeps what was ordered but loses the fulfilment progress ...
     assertThat(result.materials()).hasSize(1);
     de.greluc.krt.profit.basetool.backend.model.dto.JobOrderMaterialDto redacted =
         result.materials().get(0);
@@ -389,17 +341,13 @@ class JobOrderControllerTest {
     assertThat(redacted.currentStock()).isNull();
     assertThat(redacted.openAmount()).isNull();
     assertThat(redacted.claims()).isEmpty();
-    // ... items pass through (the Auftraggeber may see their own order's item fulfilment) ...
     assertThat(result.items()).hasSize(1);
-    // ... and the ordered facts + version survive in the right positions.
     assertThat(result.id()).isEqualTo(id);
     assertThat(result.displayId()).isEqualTo(42);
     assertThat(result.handle()).isEqualTo("alice");
     assertThat(result.comment()).isEqualTo("deliver to ArcCorp");
     assertThat(result.version()).isEqualTo(9L);
-    // The redacted flag is carried through so the client renders the limited template (finding 2).
     assertThat(result.redacted()).isTrue();
-    // The controller keys off the DTO's flag; it does NOT re-evaluate the gate (finding 4).
     verify(ownerScopeService, never()).canSeeJobOrder(any(UUID.class));
   }
 
@@ -426,7 +374,6 @@ class JobOrderControllerTest {
 
   @Test
   void getInventoryItemsForJobOrderMaterial_responsibleSideViewer_delegatesUnredacted() {
-    // covers REQ-ORDERS-029
     UUID jobOrderId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
     InventoryItemDto inv = sampleInventoryItem();
@@ -443,7 +390,6 @@ class JobOrderControllerTest {
 
   @Test
   void getInventoryItemsForJobOrderMaterial_requestingSideViewer_redactsOwners() {
-    // covers REQ-ORDERS-029
     UUID jobOrderId = UUID.randomUUID();
     UUID materialId = UUID.randomUUID();
     List<InventoryItemDto> raw = List.of(sampleInventoryItem());
@@ -462,7 +408,6 @@ class JobOrderControllerTest {
 
   @Test
   void getOrphanedLinkedInventory_requestingSideViewer_redactsOwners() {
-    // covers REQ-ORDERS-029
     UUID jobOrderId = UUID.randomUUID();
     List<InventoryItemDto> raw = List.of(sampleInventoryItem());
     List<InventoryItemDto> redacted = List.of(sampleInventoryItem());
@@ -476,8 +421,6 @@ class JobOrderControllerTest {
     verify(inventoryOwnerRedactor).redactInventoryItems(raw);
   }
 
-  // ── PUT /api/v1/orders/{id}/status ───────────────────────────────────
-
   @Test
   void updateJobOrderStatus_forwardsBodyVersionToService() {
     UUID id = UUID.randomUUID();
@@ -487,15 +430,9 @@ class JobOrderControllerTest {
 
     JobOrderDto result = controller.updateJobOrderStatus(id, dto);
 
-    // The request body's version field is the optimistic-locking key — the controller must pass
-    // the whole DTO verbatim so the service can compare the expected version against the
-    // persisted aggregate. The completeJobOrderWithinTransaction pattern (CLAUDE.md) depends on
-    // this round-trip working.
     assertThat(result).isSameAs(persisted);
     verify(jobOrderService).updateJobOrderStatus(id, dto);
   }
-
-  // ── PUT /api/v1/orders/{id}/priority ─────────────────────────────────
 
   @Test
   void updateJobOrderPriority_forwardsRequestParamToService() {
@@ -509,8 +446,6 @@ class JobOrderControllerTest {
     verify(jobOrderService).updateJobOrderPriority(id, 3);
   }
 
-  // ── PATCH /api/v1/orders/{id}/blueprint-variant-counting ─────────────
-
   @Test
   void updateBlueprintVariantCounting_forwardsModeAndVersionToService() {
     UUID id = UUID.randomUUID();
@@ -520,13 +455,9 @@ class JobOrderControllerTest {
 
     JobOrderDto result = controller.updateBlueprintVariantCounting(id, dto);
 
-    // The controller unboxes the mode + forwards the optimistic-lock version verbatim so the
-    // service can guard a concurrent edit; mirrors the status round-trip above.
     assertThat(result).isSameAs(persisted);
     verify(jobOrderService).updateBlueprintVariantCounting(id, false, 7L);
   }
-
-  // ── PUT /api/v1/orders/{id} (full update) ────────────────────────────
 
   @Test
   void updateJobOrder_forwardsBodyToService() {
@@ -540,8 +471,6 @@ class JobOrderControllerTest {
     assertThat(result).isSameAs(persisted);
   }
 
-  // ── DELETE /api/v1/orders/{id} ───────────────────────────────────────
-
   @Test
   void deleteJobOrder_delegatesToService() {
     UUID id = UUID.randomUUID();
@@ -550,8 +479,6 @@ class JobOrderControllerTest {
 
     verify(jobOrderService).deleteJobOrder(id);
   }
-
-  // ── DELETE /api/v1/orders/{jobOrderId}/materials/{materialId} ────────
 
   @Test
   void unlinkMaterial_delegatesBothPathParameters() {
@@ -563,8 +490,6 @@ class JobOrderControllerTest {
     verify(jobOrderService).unlinkMaterial(jobOrderId, materialId);
   }
 
-  // ── DELETE /api/v1/orders/{jobOrderId}/inventory/{inventoryItemId}/unlink ─
-
   @Test
   void unlinkInventoryItem_delegatesBothPathParameters() {
     UUID jobOrderId = UUID.randomUUID();
@@ -574,8 +499,6 @@ class JobOrderControllerTest {
 
     verify(jobOrderService).unlinkInventoryItem(jobOrderId, inventoryItemId);
   }
-
-  // ── POST /api/v1/orders/{id}/assignees/{userId} ──────────────────────
 
   @Test
   void addAssignee_self_doesNotConsultRoleHelper() {
@@ -588,10 +511,6 @@ class JobOrderControllerTest {
 
     JobOrderDto result = controller.addAssignee(jobOrderId, callerId, jwt);
 
-    // Self-assignment short-circuits before the role helper is touched. This matters because
-    // hasReachableRole() walks the role hierarchy and is more expensive than a UUID compare —
-    // pin the order so a refactor that "simplifies" the if-chain doesn't accidentally make the
-    // role lookup the only gate (and let everyone block themselves on hierarchy misconfig).
     assertThat(result).isSameAs(persisted);
     verify(authHelperService, never()).isLogisticianOrAbove();
   }
@@ -621,17 +540,10 @@ class JobOrderControllerTest {
     when(userService.getUserIdFromJwt(jwt)).thenReturn(callerId);
     when(authHelperService.isLogisticianOrAbove()).thenReturn(false);
 
-    // The 403 path lives in the CONTROLLER, not in the service. Moving it into the service
-    // would force a SecurityContextHolder read inside business logic and break the ArchUnit
-    // rule. The test pins (1) the AccessDeniedException type — RFC 7807 problem mapping
-    // depends on it — and (2) the fact that the service is NEVER called for the forbidden
-    // case.
     assertThatThrownBy(() -> controller.addAssignee(jobOrderId, targetUserId, jwt))
         .isInstanceOf(AccessDeniedException.class);
     verify(jobOrderService, never()).addAssignee(any(), any());
   }
-
-  // ── DELETE /api/v1/orders/{id}/assignees/{userId} ────────────────────
 
   @Test
   void removeAssignee_self_doesNotConsultRoleHelper() {
@@ -677,8 +589,6 @@ class JobOrderControllerTest {
         .isInstanceOf(AccessDeniedException.class);
     verify(jobOrderService, never()).removeAssignee(any(), any());
   }
-
-  // ── PUT/DELETE /api/v1/orders/{id}/assignees/{userId}/note ───────────
 
   @Test
   void setAssigneeNote_self_doesNotConsultRoleHelper() {
@@ -747,8 +657,6 @@ class JobOrderControllerTest {
     verify(jobOrderService, never()).deleteAssigneeNote(any(), any(), any());
   }
 
-  // ── POST /api/v1/orders/{id}/handovers ───────────────────────────────
-
   @Test
   void createHandover_delegatesToHandoverServiceWithBody() {
     UUID jobOrderId = UUID.randomUUID();
@@ -774,14 +682,10 @@ class JobOrderControllerTest {
     verify(jobOrderHandoverService).createHandover(jobOrderId, dto);
   }
 
-  // ── POST /api/v1/orders/{id}/items/{itemId}/production ───────────────
-
   @Test
   void bookProduction_delegatesToService() {
     UUID jobOrderId = UUID.randomUUID();
     UUID itemId = UUID.randomUUID();
-    // bookIn is required since the REQ-INV-032 flip (@NotNull, enforced by @Valid at the API
-    // boundary), so the pass-through payload carries a complete block.
     JobOrderItemProductionCreateDto dto =
         new JobOrderItemProductionCreateDto(
             3,
@@ -797,21 +701,15 @@ class JobOrderControllerTest {
 
     JobOrderItemDto result = controller.bookProduction(jobOrderId, itemId, dto);
 
-    // The Herstellung endpoint (REQ-ORDERS-025) is a thin pass-through: the LOGISTICIAN+ /
-    // canEditJobOrder gate lives in @PreAuthorize, and the whole allocation/optimistic-lock
-    // machinery lives in JobOrderItemProductionService. The controller must forward both path
-    // ids and the body verbatim and return the refreshed item-line DTO unchanged.
     assertThat(result).isSameAs(persisted);
     verify(jobOrderItemProductionService).bookProduction(jobOrderId, itemId, dto);
   }
-
-  // ── GET /api/v1/orders/{jobOrderId}/handovers/{handoverId}/report ────
 
   @Test
   void downloadHandoverReport_validTimeZone_passedToService() {
     UUID jobOrderId = UUID.randomUUID();
     UUID handoverId = UUID.randomUUID();
-    byte[] pdf = new byte[] {0x25, 0x50, 0x44, 0x46}; // %PDF
+    byte[] pdf = new byte[] {0x25, 0x50, 0x44, 0x46};
     when(jobOrderHandoverReportService.generateHandoverReport(
             eq(jobOrderId), eq(handoverId), eq(java.time.ZoneId.of("Europe/Berlin"))))
         .thenReturn(pdf);
@@ -824,16 +722,9 @@ class JobOrderControllerTest {
     assertThat(response.getBody()).isSameAs(pdf);
     HttpHeaders headers = response.getHeaders();
     assertThat(headers.getContentType()).isEqualTo(MediaType.APPLICATION_PDF);
-    // Content-Disposition pin: filename must include the job-order id so admins can grep
-    // downloaded files by order; missing this lets the test catch a regression that hardcodes
-    // a generic filename.
     assertThat(headers.getContentDisposition().getFilename())
         .isEqualTo("uebergabeprotokoll-" + jobOrderId + ".pdf");
   }
-
-  // The X-User-Time-Zone parse-and-fall-back-to-UTC contract (blank/invalid zone -> null) now lives
-  // in UserZoneArgumentResolver and is pinned by UserZoneArgumentResolverTest; the controller only
-  // forwards the already-resolved ZoneId, exercised by the null pass-through case below.
 
   @Test
   void downloadHandoverReport_nullTimeZoneHeader_passedAsNull() {
@@ -850,8 +741,6 @@ class JobOrderControllerTest {
     verify(jobOrderHandoverReportService).generateHandoverReport(jobOrderId, handoverId, null);
   }
 
-  // ── POST /api/v1/orders/{jobOrderId}/handovers/report/preview ────────
-
   @Test
   void previewHandoverReport_returnsPdfWithPreviewFilename() {
     UUID jobOrderId = UUID.randomUUID();
@@ -867,9 +756,6 @@ class JobOrderControllerTest {
     assertThat(response.getBody()).isSameAs(pdf);
     HttpHeaders headers = response.getHeaders();
     assertThat(headers.getContentType()).isEqualTo(MediaType.APPLICATION_PDF);
-    // Preview filename is intentionally GENERIC (no job-order id) — the preview is rendered from
-    // unsaved data so there is no canonical id to embed yet. The test pins the exact string so a
-    // future "let's always include the job-order id" refactor surfaces here.
     assertThat(headers.getContentDisposition().getFilename())
         .isEqualTo("uebergabeprotokoll-vorschau.pdf");
   }

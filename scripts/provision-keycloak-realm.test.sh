@@ -4,23 +4,6 @@
 # Copyright (C) 2026 Lucas Greuloch
 #
 # SPDX-License-Identifier: GPL-3.0-only
-#
-# Regression tests for scripts/provision-keycloak-realm.py.
-#
-# Drives the provisioner against a stub that impersonates kcadm and keeps a small Keycloak realm in
-# a JSON file, so the suite runs in seconds with no Docker, no Keycloak and no network. The stub is
-# stateful on purpose: every write is reflected in what the next read returns, so "a second run
-# changes nothing" is a real assertion rather than a frozen fixture agreeing with itself.
-#
-# Three behaviours of the real server are modelled because the script's correctness depends on them:
-#   * creating a client attaches the realm's DEFAULT client scopes, whatever the payload says;
-#   * while `krt-mobile-dpop-policy` is attached, `update clients/<id>` of a client holding the
-#     marker role is refused with `invalid_client_metadata` (ADR-0131, experiment E1);
-#   * a confidential client gets a generated secret, which the stub makes recognisable so the
-#     suite can assert it is never printed and never sent back.
-#
-# Usage:
-#   scripts/provision-keycloak-realm.test.sh
 
 set -euo pipefail
 
@@ -41,10 +24,6 @@ tests_failed=0
 ORIGIN="https://testing.example"
 SECRET_MARKER="STUB-GENERATED-SECRET-must-never-be-printed"
 
-# Writes the stub and an initial realm into state dir $1. $2 selects the starting realm:
-#   empty    - built-ins only, one foreign client policy and profile, one app role missing
-#   testing  - the shape the testing realm had on 2026-09-22: frontend and backend-service only,
-#              no audience scopes, plus objects production does not have
 make_stub() {
   local state="$1" flavour="$2"
   mkdir -p "$state"
@@ -147,8 +126,6 @@ if flavour == "testing":
 (state / "state.json").write_text(json.dumps(data, indent=2), encoding="utf-8")
 SEED
 
-  # The stub is Python rather than a shell script: the provisioner spawns it through subprocess,
-  # and a shebanged shell script is not directly executable on a Windows developer machine.
   cat >"${state}/kcadm_stub.py" <<'STUB'
 """A small, stateful kcadm impersonator.
 
@@ -178,40 +155,32 @@ if body is not None:
     with (state_dir / "bodies.log").open("a", encoding="utf-8") as sink:
         sink.write(f"{verb} {path} {json.dumps(body, sort_keys=True)}\n")
 
-
 def save():
     path_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
-
 
 def new_id(prefix):
     data["counter"] += 1
     return f"{prefix}-{data['counter']}"
 
-
 def out(value):
     sys.stdout.write(json.dumps(value))
     sys.exit(0)
-
 
 def fail(message):
     sys.stderr.write(message + "\n")
     sys.exit(1)
 
-
 def client(uuid):
     return next(c for c in data["clients"] if c["id"] == uuid)
 
-
 def scope_by_id(sid):
     return next(s for s in data["scopes"] if s["id"] == sid)
-
 
 def policy_freezes(uuid):
     marker = any(r["name"] == "dpop-refresh-only" for r in data["client_roles"].get(uuid, []))
     attached = any(p.get("name") == "krt-mobile-dpop-policy"
                    for p in data["policies"]["policies"])
     return marker and attached
-
 
 parts = path.split("/")
 
@@ -266,7 +235,6 @@ if verb == "create":
         if rep.get("publicClient") is False:
             rep["secret"] = os.environ.get("STUB_SECRET", "STUB-GENERATED-SECRET-must-never-be-printed")
         data["clients"].append(rep)
-        # Like Keycloak: the realm defaults, not the payload's lists.
         data["client_default_scopes"][uuid] = list(data["realm_default_scopes"])
         data["client_optional_scopes"][uuid] = list(data["realm_optional_scopes"])
         if rep.get("serviceAccountsEnabled"):
@@ -373,16 +341,10 @@ fail(f"stub: unexpected verb {verb}")
 STUB
 }
 
-# The stub's path goes to a CHILD python through --kcadm-command, so it has to be a path that child
-# can open. On Windows the interpreter is native while this shell is MSYS, and the two disagree on
-# `/tmp`; `cygpath -m` yields C:/Users/... which both accept. On Linux and in CI there is no
-# cygpath and the path passes through untouched (the same helper as the mobile provisioner's tests).
 to_child_path() {
   if command -v cygpath >/dev/null 2>&1; then cygpath -m "$1"; else printf '%s' "$1"; fi
 }
 
-# Runs the provisioner against the stub in state dir $1; extra arguments pass through. Echoes the
-# combined output; the exit code is written to ${state}/rc so callers can keep `set -e`.
 run_provisioner() {
   local state="$1"; shift
   local rc=0
@@ -392,8 +354,6 @@ run_provisioner() {
   echo "$rc" >"${state}/rc"
 }
 
-# Evaluates a Python expression against the stub's state; `d` is the realm, `client(id)` finds a
-# client by clientId, `scope_names(kind, id)` lists a client's scopes. Prints the result.
 query() {
   local state="$1" expr="$2"
   STUB_STATE="$state" EXPR="$expr" "$PYTHON" -c '
@@ -438,9 +398,7 @@ assert_not_contains() {
 
 writes_in() { grep -cE '^(create|update|delete) ' "$1/calls.log" || true; }
 
-# ---------------------------------------------------------------------------
 echo "1. a dry run writes nothing and says what it would do"
-# ---------------------------------------------------------------------------
 state="$(mktemp -d)"
 make_stub "$state" empty
 before="$(cat "${state}/state.json")"
@@ -454,9 +412,7 @@ assert_contains "$output" "~ revokeRefreshToken: true -> false" "the plan names 
 assert_contains "$output" "IRI_INGEST_SERVICE_ACCOUNT_CLIENT_SECRET" "the plan says which .env value needs the new secret"
 rm -rf "$state"
 
-# ---------------------------------------------------------------------------
 echo "2. from an empty realm, --apply builds the production shape"
-# ---------------------------------------------------------------------------
 state="$(mktemp -d)"
 make_stub "$state" empty
 output="$(run_provisioner "$state" --apply)"
@@ -505,9 +461,7 @@ assert_not_contains "$output" "$SECRET_MARKER" "no generated client secret is pr
 assert_contains "$output" "-> Credentials" "the operator is told where to read the secret"
 rm -rf "$state"
 
-# ---------------------------------------------------------------------------
 echo "3. a second --apply changes nothing"
-# ---------------------------------------------------------------------------
 state="$(mktemp -d)"
 make_stub "$state" empty
 run_provisioner "$state" --apply >/dev/null
@@ -521,11 +475,7 @@ output="$(run_provisioner "$state")"
 assert_eq "$(cat "${state}/rc")" "0" "a dry run against the shaped realm exits 0"
 rm -rf "$state"
 
-# ---------------------------------------------------------------------------
 echo "4. an Android edit detaches the DPoP policy first and re-attaches it last"
-# ---------------------------------------------------------------------------
-# Keycloak refuses every update of the client while the policy is attached; the stub does too, so a
-# wrong order fails the apply outright rather than only an ordering assertion.
 state="$(mktemp -d)"
 make_stub "$state" empty
 run_provisioner "$state" --apply >/dev/null
@@ -554,7 +504,6 @@ fi
 assert_eq "$(query "$state" "sorted(p['name'] for p in d['policies']['policies'])")" \
   "['a-later-policy', 'krt-mobile-dpop-policy', 'someone-elses-policy']" "every foreign policy survives the detach/re-attach"
 assert_eq "$(query "$state" "client('basetool-android')['attributes']['pkce.code.challenge.method']")" "S256" "the drift is corrected"
-# A change that does NOT touch the frozen client must not detach anything.
 STUB_STATE="$state" "$PYTHON" -c '
 import json, os, pathlib
 p = pathlib.Path(os.environ["STUB_STATE"]) / "state.json"
@@ -564,8 +513,6 @@ p.write_text(json.dumps(d), encoding="utf-8")
 '
 run_provisioner "$state" --apply >/dev/null
 assert_eq "$(grep -c '^update client-policies/policies' "${state}/calls.log" || true)" "0" "an unrelated client edit leaves the policy attached"
-# A realm role added to the app's scope by hand is taken back (REQ-SEC-035) — the one scope this
-# script converges in both directions — while the policy stays attached around it.
 STUB_STATE="$state" "$PYTHON" -c '
 import json, os, pathlib
 p = pathlib.Path(os.environ["STUB_STATE"]) / "state.json"
@@ -582,9 +529,7 @@ assert_eq "$(query "$state" "sorted(r['name'] for r in d['client_scope_mappings'
 assert_eq "$(query "$state" "'krt-mobile-dpop-policy' in [p['name'] for p in d['policies']['policies']]")" "True" "and the policy is attached afterwards"
 rm -rf "$state"
 
-# ---------------------------------------------------------------------------
 echo "5. objects only the target realm has are reported, never deleted"
-# ---------------------------------------------------------------------------
 state="$(mktemp -d)"
 make_stub "$state" testing
 output="$(run_provisioner "$state" --apply)"
@@ -612,10 +557,7 @@ assert_not_contains "$output" "$SECRET_MARKER" "the existing secret is never pri
 assert_not_contains "$(cat "${state}/bodies.log")" "$SECRET_MARKER" "the existing secret is in no payload"
 rm -rf "$state"
 
-# ---------------------------------------------------------------------------
 echo "6. service-account roles an identity cannot read are handed to the operator"
-# ---------------------------------------------------------------------------
-# The provisioning client deliberately lacks manage-users/view-users, so role mappings answer 403.
 state="$(mktemp -d)"
 make_stub "$state" testing
 STUB_STATE="$state" "$PYTHON" -c '
@@ -632,9 +574,7 @@ assert_contains "$output" "Service account roles -> Assign role" "and where to g
 assert_eq "$(query "$state" "client('basetool-sc-extractor') is not None")" "True" "everything else was still applied"
 rm -rf "$state"
 
-# ---------------------------------------------------------------------------
 echo "7. --grafana-origin manages the grafana client; a malformed origin is refused"
-# ---------------------------------------------------------------------------
 state="$(mktemp -d)"
 make_stub "$state" empty
 run_provisioner "$state" --apply --grafana-origin https://grafana.testing.example >/dev/null
@@ -645,13 +585,7 @@ output="$(KCADM_STUB_STATE="$state" "$PYTHON" "$PROVISIONER" --public-origin "ht
 assert_contains "$output" "no path and no trailing slash" "a trailing slash is refused before anything is read"
 rm -rf "$state"
 
-# ---------------------------------------------------------------------------
 echo "8. the three retirements of 2026-09-22 converge away from a realm in the old production shape"
-# ---------------------------------------------------------------------------
-# Owner decisions (ADR-0202 amendment): the extractor's code flow and loopback redirects, the two
-# ingest scopes on the app, and the frontend's compose-internal origin. They are the only entries
-# besides REQ-SEC-035 / ADR-0131 that converge in BOTH directions, so the plan against a realm
-# that still has them must remove exactly these and nothing else.
 state="$(mktemp -d)"
 make_stub "$state" empty
 run_provisioner "$state" --apply >/dev/null
@@ -672,7 +606,6 @@ d["client_default_scopes"][app] += [ids["extractor-ingest"], ids["extractor-inge
 p.write_text(json.dumps(d), encoding="utf-8")
 '
 output="$(run_provisioner "$state")"
-# Only the plan: the report section that follows it uses the same `  - ` bullet.
 planned="$(printf '%s\n' "$output" | sed '/^\[only on this realm/,$d' | grep -E '^  [-+~=] ' | sort)"
 expected="$(printf '%s\n' \
   "  + attach policy 'krt-mobile-dpop-policy' (merged by name; every other policy carried forward)" \
@@ -703,11 +636,7 @@ assert_contains "$output" "No changes" "a second apply is empty"
 assert_eq "$(writes_in "$state")" "0" "and sends no write"
 rm -rf "$state"
 
-# ---------------------------------------------------------------------------
 echo "9. without --frontend-client the frontend's client type is never touched (ADR-0001)"
-# ---------------------------------------------------------------------------
-# The rollout is the owner's. A run in between -- or after it -- must neither flip production's
-# frontend to confidential nor flip it back to public.
 state="$(mktemp -d)"
 make_stub "$state" empty
 run_provisioner "$state" --apply >/dev/null
@@ -728,9 +657,7 @@ assert_not_contains "$output" "publicClient" "no plan line touches the client ty
 assert_not_contains "$output" "ROLLED-OUT-SECRET" "the stored secret is never printed"
 rm -rf "$state"
 
-# ---------------------------------------------------------------------------
 echo "10. --frontend-client confidential without the secret in the environment refuses"
-# ---------------------------------------------------------------------------
 state="$(mktemp -d)"
 make_stub "$state" empty
 run_provisioner "$state" --apply >/dev/null
@@ -742,9 +669,7 @@ assert_contains "$output" "KEYCLOAK_FRONTEND_CLIENT_SECRET" "the refusal names t
 assert_eq "$(cat "${state}/state.json")" "$before" "nothing is written"
 rm -rf "$state"
 
-# ---------------------------------------------------------------------------
 echo "11. --frontend-client confidential switches the client with the operator's secret, once"
-# ---------------------------------------------------------------------------
 state="$(mktemp -d)"
 make_stub "$state" empty
 run_provisioner "$state" --apply >/dev/null
@@ -765,9 +690,7 @@ assert_contains "$output" "No changes" "once confidential, a later run changes n
 assert_eq "$(query "$state" "client('basetool-frontend')['secret']")" "OPERATOR-SECRET-must-never-be-printed" "and never rewrites the secret"
 rm -rf "$state"
 
-# ---------------------------------------------------------------------------
 echo "12. --frontend-client public is the rollback, and sends no secret"
-# ---------------------------------------------------------------------------
 state="$(mktemp -d)"
 make_stub "$state" empty
 run_provisioner "$state" --apply >/dev/null
@@ -779,7 +702,6 @@ assert_eq "$(query "$state" "client('basetool-frontend')['publicClient']")" "Tru
 assert_eq "$([[ -f "${state}/SECRET_SENT_BACK" ]] && echo sent || echo none)" "none" "no secret travels on the rollback"
 rm -rf "$state"
 
-# ---------------------------------------------------------------------------
 echo
 if [[ $tests_failed -gt 0 ]]; then
   echo "FAILED: ${tests_failed} of ${tests_run} assertions"

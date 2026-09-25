@@ -205,8 +205,6 @@ class MessageBundleConsistencyTest {
 
     try (Stream<Path> templates = Files.walk(Path.of("src/main/resources/templates"))) {
       for (Path template : templates.filter(f -> f.toString().endsWith(".html")).toList()) {
-        // Comments are stripped first: fragments/components.html documents its own call shape in
-        // an HTML comment, keys and all, and a key nobody renders is not a key anybody misses.
         String body =
             COMMENT.matcher(Files.readString(template, StandardCharsets.UTF_8)).replaceAll("");
         Matcher matcher = key.matcher(body);

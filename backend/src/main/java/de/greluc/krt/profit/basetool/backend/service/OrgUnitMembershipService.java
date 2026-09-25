@@ -146,16 +146,10 @@ public class OrgUnitMembershipService {
     OrgUnitMembership membership = new OrgUnitMembership();
     membership.setId(new OrgUnitMembershipId(userId, sc.getId()));
     membership.setUser(user);
-    // The kind column is managed by the V95 sync_org_unit_membership_kind trigger
-    // (insertable=false on the @Column mapping). We mirror the value on the in-memory entity so
-    // the immediate DTO mapping reads the right discriminator without re-fetching the row.
     membership.setKind(OrgUnitKind.SPECIAL_COMMAND);
     membership.setJoinedAt(Instant.now());
     OrgUnitMembership saved = membershipRepository.save(membership);
 
-    // First org-unit membership for this user → their ownerless-personal inventory adopts this SK
-    // (the auto-promote lifecycle policy). No-op when the user already had memberships or owns no
-    // ownerless inventory.
     if (wasMembershipless) {
       inventoryReconciler.onUserGainedFirstOrgUnit(userId, sc);
     }
@@ -184,19 +178,11 @@ public class OrgUnitMembershipService {
     if (!membershipRepository.existsById(id)) {
       throw new NotFoundException("Membership not found");
     }
-    // Removing an SK member who is the SK-Lead drops the SK account's derived responsible holder,
-    // so
-    // snapshot before the delete and re-diff after it (REQ-BANK-034, ADR-0070).
     final Map<UUID, Set<UUID>> responsibleBefore =
         orgUnitBankResponsibilityServiceProvider.getObject().snapshotResponsibleHolders(sc.getId());
     membershipRepository.deleteById(id);
-    // Drop any mirrored SK chart seat (an SK-Leiter losing the membership) in the same transaction
-    // so no stale seat lingers (REQ-ROLE-006).
     orgChartService.mirrorRemoveUnitSeat(sc.getId(), userId);
 
-    // Last org-unit membership removed → the user's org-stamped inventory falls back to
-    // ownerless-personal (the auto-demote lifecycle policy). The count query auto-flushes the
-    // delete first, so it reflects the just-removed row.
     if (membershipRepository.countByIdUserId(userId) == 0) {
       inventoryReconciler.onUserLostLastOrgUnit(userId);
     }
@@ -249,31 +235,18 @@ public class OrgUnitMembershipService {
       m = new OrgUnitMembership();
       m.setId(new OrgUnitMembershipId(userId, bereichId));
       m.setUser(user);
-      // kind is trigger-managed (insertable=false); mirror it so the in-memory row is consistent.
       m.setKind(OrgUnitKind.BEREICH);
       m.setJoinedAt(Instant.now());
     }
-    // Snapshot the Bereich account's (and, for a Profit Bereich, the CARTEL/CARTEL_BANK accounts')
-    // derived responsible holder(s) before the role changes, to audit the change (REQ-BANK-034,
-    // ADR-0070). Bank access is confined to the seam; the ObjectProvider breaks the DI cycle.
     final Map<UUID, Set<UUID>> responsibleBefore =
         orgUnitBankResponsibilityServiceProvider.getObject().snapshotResponsibleHolders(bereichId);
-    // The unified rank is the sole source of truth (epic #800, REQ-ROLE-001); the legacy boolean
-    // leadership flags (is_bereichsleiter / -koordinator / -operator) were dropped in the Phase 5
-    // cleanup (V187).
     m.setRole(
         switch (role) {
           case LEITER -> MembershipRole.BEREICHSLEITER;
           case KOORDINATOR -> MembershipRole.BEREICHSKOORDINATOR;
           case OPERATOR -> MembershipRole.BEREICHSOPERATOR;
         });
-    // saveAndFlush (not save): on the upsert-onto-existing-row branch this is an UPDATE, so without
-    // an explicit flush the @Version increment would land after the controller maps the response
-    // and the caller would get a stale version. Flushing also surfaces the V165 trigger as a clean
-    // in-transaction failure rather than at commit.
     OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
-    // Mirror the account-linked seat onto the descriptive chart in the same transaction
-    // (REQ-ROLE-006); the chart still grants nothing.
     orgChartService.mirrorBereichRole(bereich.getId(), userId, role);
     final boolean firstGrant = previousRole == null || previousRole == MembershipRole.MEMBER;
     auditService.record(
@@ -304,7 +277,6 @@ public class OrgUnitMembershipService {
     final Map<UUID, Set<UUID>> responsibleBefore =
         orgUnitBankResponsibilityServiceProvider.getObject().snapshotResponsibleHolders(bereichId);
     membershipRepository.delete(m);
-    // Remove the mirrored chart seat in the same transaction (REQ-ROLE-006).
     orgChartService.mirrorRemoveUnitSeat(bereichId, userId);
     auditService.record(
         AuditEventType.ROLE_REVOKED,
@@ -352,20 +324,12 @@ public class OrgUnitMembershipService {
     m.setUser(user);
     m.setKind(OrgUnitKind.ORGANISATIONSLEITUNG);
     m.setJoinedAt(Instant.now());
-    // Snapshot the CARTEL account's collegial responsible holders (all OL members) before the add,
-    // to audit the change (REQ-BANK-034, ADR-0070).
     final Map<UUID, Set<UUID>> responsibleBefore =
         orgUnitBankResponsibilityServiceProvider
             .getObject()
             .snapshotResponsibleHolders(organisationsleitungId);
-    // The unified rank is the sole source of truth (epic #800, REQ-ROLE-001); is_ol_member was
-    // dropped in the Phase 5 cleanup (V187).
     m.setRole(MembershipRole.OL_MEMBER);
-    // saveAndFlush for parity with addBereichLeader: surfaces the V165 trigger as a clean
-    // in-transaction failure and keeps the flushed @Version in the response under the
-    // class-@Transactional controller.
     final OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
-    // Mirror the OL seat onto the descriptive chart in the same transaction (REQ-ROLE-006).
     orgChartService.mirrorOlMember(ol.getId(), userId);
     auditService.record(
         AuditEventType.ROLE_GRANTED,
@@ -398,10 +362,7 @@ public class OrgUnitMembershipService {
             .getObject()
             .snapshotResponsibleHolders(organisationsleitungId);
     membershipRepository.delete(m);
-    // Remove the mirrored OL chart seat in the same transaction (REQ-ROLE-006).
     orgChartService.mirrorRemoveUnitSeat(organisationsleitungId, userId);
-    // If the removed member held the Grand Admiral post, vacate it too — the designation must never
-    // point at a non-member (REQ-ORG-021).
     orgUnitRepository
         .findById(organisationsleitungId)
         .filter(
@@ -442,7 +403,6 @@ public class OrgUnitMembershipService {
   public void setGrandAdmiral(@NotNull UUID organisationsleitungId, @NotNull UUID userId) {
     Organisationsleitung ol = requireOrganisationsleitung(organisationsleitungId);
     Entities.require(userRepository.findPlainById(userId), "User not found");
-    // Auto-promote to OL member first when needed; an existing OL member is left untouched.
     if (!membershipRepository.existsByIdUserIdAndIdOrgUnitId(userId, organisationsleitungId)) {
       addOlMember(organisationsleitungId, userId);
     }
@@ -451,7 +411,6 @@ public class OrgUnitMembershipService {
       return;
     }
     ol.setGrandAdmiralUserId(userId);
-    // An account Grand Admiral supersedes any free-text one (account XOR free-text, REQ-ORG-020).
     ol.setGrandAdmiralDisplayName(null);
     orgUnitRepository.saveAndFlush(ol);
     if (previous != null) {
@@ -489,8 +448,6 @@ public class OrgUnitMembershipService {
     ol.setGrandAdmiralUserId(null);
     ol.setGrandAdmiralDisplayName(null);
     orgUnitRepository.saveAndFlush(ol);
-    // Only the account designation is a membership-relevant event; a free-text Grand Admiral is a
-    // descriptive chart holder that grants nothing, so its removal is not audited (REQ-AUDIT-001).
     if (previousUser != null) {
       auditService.record(
           AuditEventType.ROLE_CHANGED,
@@ -573,9 +530,6 @@ public class OrgUnitMembershipService {
     if (request.isMissionManager() != null) {
       m.setMissionManager(request.isMissionManager());
     }
-    // saveAndFlush (not save): the DTO wrapper maps the response inside this transaction, and
-    // without an explicit flush the @Version bump would land at commit — after the mapping — so
-    // the client would echo the stale pre-bump version and 409 on its next edit (REQ-FE-003).
     OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
     recordCapabilityFlagsChanged(specialCommandId, userId, saved);
     return saved;
@@ -617,8 +571,6 @@ public class OrgUnitMembershipService {
     if (request.isMissionManager() != null) {
       m.setMissionManager(request.isMissionManager());
     }
-    // saveAndFlush (not save): flush before the DTO wrapper maps the response so the client gets
-    // the bumped @Version, not the stale pre-flush one (REQ-FE-003).
     OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
     auditService.record(
         AuditEventType.CAPABILITY_FLAGS_CHANGED,
@@ -678,15 +630,12 @@ public class OrgUnitMembershipService {
     if (distinctIds.size() > 2) {
       throw new BadRequestException("A user may belong to at most two Staffeln (REQ-ORG-017)");
     }
-    // REQ-ORG-017: a silo leader (SK-Leiter / Bereichsleitung / OL) belongs to no Staffel. Reject a
-    // Staffel assignment with a clean 400 before the V165 DB trigger turns it into a 500.
     if (!desired.isEmpty() && userHoldsLeadershipRole(user.getId())) {
       throw new BadRequestException(
           "User holds a leadership role (SK-Lead/Bereichsleitung/OL) and cannot be assigned to a"
               + " Staffel — remove the leadership role first (REQ-ORG-017)");
     }
 
-    // Resolve every desired squadron up front so an unknown id fails before any row is mutated.
     Map<UUID, Squadron> targetSquadrons = new LinkedHashMap<>();
     for (UUID id : distinctIds) {
       Squadron sq =
@@ -703,18 +652,11 @@ public class OrgUnitMembershipService {
       currentById.put(m.getId().getOrgUnitId(), m);
     }
 
-    // 1. Removals: current Staffel memberships not in the desired set. Delete + flush BEFORE any
-    // insert so the V164 counting trigger sees the post-removal state.
     List<OrgUnitMembership> toRemove =
         currentStaffel.stream()
             .filter(m -> !distinctIds.contains(m.getId().getOrgUnitId()))
             .toList();
     if (!toRemove.isEmpty()) {
-      // A removed Staffel membership that carried the Staffelleiter rank drops that Staffel
-      // account's
-      // derived responsible holder — snapshot the affected accounts before the delete and re-diff
-      // after it (REQ-BANK-034, ADR-0070). A Staffel is never a Profit Bereich, so there is no
-      // ripple.
       final Map<UUID, Set<UUID>> responsibleBefore = new LinkedHashMap<>();
       for (OrgUnitMembership removed : toRemove) {
         responsibleBefore.putAll(
@@ -726,8 +668,6 @@ public class OrgUnitMembershipService {
       membershipRepository.flush();
       for (OrgUnitMembership removed : toRemove) {
         recordStaffelMembershipRevoked(removed.getId().getOrgUnitId(), user.getId());
-        // A squadron rank held on the removed row leaves a stale chart seat — clear it
-        // (REQ-ROLE-006).
         orgChartService.mirrorRemoveSquadronRank(removed.getId().getOrgUnitId(), user.getId());
       }
       orgUnitBankResponsibilityServiceProvider
@@ -735,7 +675,6 @@ public class OrgUnitMembershipService {
           .recordResponsibleHolderChanges(responsibleBefore);
     }
 
-    // 2. Additions + in-place flag patches.
     List<Squadron> addedSquadrons = new ArrayList<>();
     for (MembershipDeltaRequest.StaffelChange change : desired) {
       UUID squadronId = change.squadronId();
@@ -771,12 +710,6 @@ public class OrgUnitMembershipService {
       }
     }
 
-    // 3. Inventory lifecycle: a first-ever membership adopts the name-sorted PRIMARY of the newly
-    // added Staffeln (REQ-ORG-017) — not the request-order-first — so the inventory's owning
-    // Staffel
-    // matches the deterministic primary every other surface (UserDto.squadron, the create-time
-    // auto-stamp, officer oversight) derives from the same name sort. The last membership removed
-    // demotes the org-stamped inventory back to ownerless-personal.
     if (membershipsBefore == 0 && !addedSquadrons.isEmpty()) {
       Squadron primaryAdded =
           addedSquadrons.stream()
@@ -807,28 +740,17 @@ public class OrgUnitMembershipService {
       @NotNull MembershipLeadToggleRequest request) {
     OrgUnitMembership m = loadMembership(specialCommandId, userId);
     assertVersionMatches(m, request.version());
-    // REQ-ORG-017: an SK-Leiter holds no Staffel membership. Reject promoting a user who still
-    // belongs to a Staffel with a clean 400 before the V165 DB trigger turns it into a 500.
     if (request.isLead() && userHoldsStaffelMembership(userId)) {
       throw new BadRequestException(
           "User belongs to a Staffel and cannot be made an SK lead — remove the Staffel membership"
               + " first (REQ-ORG-017)");
     }
-    // Snapshot the SK account's derived responsible holder (its SK-Lead) before the toggle, to
-    // audit
-    // the change (REQ-BANK-034, ADR-0070).
     final Map<UUID, Set<UUID>> responsibleBefore =
         orgUnitBankResponsibilityServiceProvider
             .getObject()
             .snapshotResponsibleHolders(specialCommandId);
-    // The unified rank is the sole source of truth (epic #800, REQ-ROLE-001); is_lead was dropped
-    // in
-    // the Phase 5 cleanup (V187). The request's isLead boolean is the API verb (promote/demote).
     m.setRole(request.isLead() ? MembershipRole.SK_LEAD : MembershipRole.MEMBER);
-    // saveAndFlush (not save): flush before the DTO wrapper maps the response so the client gets
-    // the bumped @Version, not the stale pre-flush one (REQ-FE-003).
     final OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
-    // Mirror the SK-Leiter seat onto the descriptive chart in the same transaction (REQ-ROLE-006).
     orgChartService.mirrorSkLead(specialCommandId, userId, request.isLead());
     auditService.record(
         request.isLead() ? AuditEventType.ROLE_GRANTED : AuditEventType.ROLE_REVOKED,
@@ -886,16 +808,11 @@ public class OrgUnitMembershipService {
     assertSquadronRankCardinality(squadronId, userId, rank, group);
 
     final MembershipRole previousRole = m.getRole();
-    // Snapshot the Staffel account's derived responsible holder (its Staffelleiter) before the rank
-    // change, to audit a change of the account holder (REQ-BANK-034, ADR-0070). Only a
-    // Staffelleiter assignment/clearing actually moves the set; the seam no-ops otherwise.
     final Map<UUID, Set<UUID>> responsibleBefore =
         orgUnitBankResponsibilityServiceProvider.getObject().snapshotResponsibleHolders(squadronId);
     m.setRole(rank);
     m.setKommandoGroup(group);
     final OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
-    // Mirror the squadron seat onto the descriptive chart in the same transaction (REQ-ROLE-006):
-    // Staffelleiter / Kommandoleiter (vacates+fills the group node) / stellv. / Ensign.
     orgChartService.mirrorSquadronRank(squadronId, userId, rank, group);
 
     final boolean firstGrant = previousRole == MembershipRole.MEMBER;
@@ -936,15 +853,11 @@ public class OrgUnitMembershipService {
     if (!previousRole.isSquadronRank()) {
       throw new BadRequestException("Member holds no squadron rank to remove");
     }
-    // Snapshot the Staffel account's derived responsible holder before clearing the rank, to audit
-    // a
-    // Staffelleiter (account holder) change (REQ-BANK-034, ADR-0070).
     final Map<UUID, Set<UUID>> responsibleBefore =
         orgUnitBankResponsibilityServiceProvider.getObject().snapshotResponsibleHolders(squadronId);
     m.setRole(MembershipRole.MEMBER);
     m.setKommandoGroup(null);
     final OrgUnitMembership saved = membershipRepository.saveAndFlush(m);
-    // Clear the mirrored squadron chart seat in the same transaction (REQ-ROLE-006).
     orgChartService.mirrorRemoveSquadronRank(squadronId, userId);
     auditService.record(
         AuditEventType.ROLE_REVOKED,
@@ -957,25 +870,6 @@ public class OrgUnitMembershipService {
         .recordResponsibleHolderChanges(responsibleBefore);
     return saved;
   }
-
-  // -------------------------------------------------------------------------------------------
-  // Controller-facing DTO projections (L4, #923, ADR-0067)
-  //
-  // These map the just-persisted membership to its OrgUnitMembershipDto response *inside* the
-  // service transaction, so the membership controllers no longer need a class-level
-  // @Transactional to keep the persistence session open for the lazy user.effectiveName read
-  // the mapper performs. The entity-returning methods above stay authoritative for internal
-  // callers (UserService reuses the managed addMember row to flip flags in-place) and for the
-  // full-fidelity unit tests, because OrgUnitMembershipDto is a lossy projection (it carries
-  // only isLead, not the full role) and could not verify an assigned squadron rank.
-  //
-  // Each write wrapper is @Transactional so the (self-invoked) write and the mapping share one
-  // read-write transaction, and the underlying entity methods persist with saveAndFlush so the
-  // mapped DTO carries the bumped @Version (REQ-FE-003). Two ArchitectureTest rules pin this
-  // seam: mutatingServiceMethodsInReadOnlyClassesNeedExplicitTransactional (write wrappers must
-  // escape the class readOnly default) and controllersMustNotInjectTheLazyMembershipMapper
-  // (DTO projection stays in this service; no controller maps the entity itself).
-  // -------------------------------------------------------------------------------------------
 
   /**
    * DTO projection of {@link #addMember(UUID, UUID)}: adds the user and returns the persisted

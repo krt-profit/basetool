@@ -75,9 +75,6 @@ class MissionListLiveSyncPublishTest {
 
   @Test
   void missionsListTopic_isDistinctFromTheMissionDetailRoom() {
-    // The `mission`/`missions` stem repeats the `order`/`orders` shape. If the two ever collapsed
-    // onto one class, mission-detail presence frames (pseudonymous ids + callsigns) would be
-    // relayed into a room the list page joins with no presence gate at all.
     assertThat(LiveSyncTopicClass.MISSIONS_LIST.prefix()).isEqualTo("missions");
     assertThat(LiveSyncTopicClass.MISSIONS_LIST.allowedSections()).containsExactlyElementsOf(LIST);
     assertThat(LiveSyncTopicClass.MISSIONS_LIST.presenceEnabled()).isFalse();
@@ -98,8 +95,6 @@ class MissionListLiveSyncPublishTest {
 
   @Test
   void deleteMission_onBackendFailure_doesNotPublish() {
-    // The mission is still there; telling peers otherwise makes every open list re-fetch for
-    // nothing and — worse — reads as a successful delete in the relay metrics.
     UUID id = UUID.randomUUID();
     doThrow(new RuntimeException("backend down")).when(backendApiClient).delete(anyString(), any());
 

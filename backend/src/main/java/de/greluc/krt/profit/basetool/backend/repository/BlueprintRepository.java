@@ -188,13 +188,6 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
    * @param pageable page request (whitelisted sort)
    * @return a page of orderable game items
    */
-  // GameItem is the query ROOT (not Blueprint) so the caller's whitelisted Pageable sort on
-  // `name` resolves against gi.name — selecting b.outputItem with a Blueprint root made Spring
-  // Data append `order by b.name`, which Blueprint has no attribute for (UnknownPathException).
-  // The EXISTS subquery also dedups naturally, so no DISTINCT is needed. {@code q} must be
-  // non-null (the caller passes "" for "no filter"): a NULL bind into LOWER(CONCAT(...)) makes
-  // PostgreSQL infer bytea and fail with {@code function lower(bytea) does not exist}; an empty
-  // string matches every row via the {@code %%} pattern.
   @Query(
       value =
           """
@@ -230,12 +223,6 @@ public interface BlueprintRepository extends JpaRepository<Blueprint, UUID> {
    *     controller default's tiebreaker for equal-named UEX variants)
    * @return a page of game items with at least one active blueprint
    */
-  // Mirrors findOrderableItems: GameItem is the query ROOT so the whitelisted `name` sort
-  // resolves against gi.name, and the EXISTS subquery dedups without DISTINCT. The manufacturer
-  // is eager-fetched via JOIN FETCH rather than @EntityGraph: Spring Data resolves an
-  // @EntityGraph against the repository's domain type (Blueprint), where a `manufacturer`
-  // attribute does not exist, so the annotation form throws at runtime for this foreign-root
-  // query.
   @Query(
       value =
           """

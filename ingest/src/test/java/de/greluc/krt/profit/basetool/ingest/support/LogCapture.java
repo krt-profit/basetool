@@ -37,9 +37,7 @@ import org.slf4j.LoggerFactory;
  */
 public final class LogCapture {
 
-  private LogCapture() {
-    // Test-support holder — not instantiable.
-  }
+  private LogCapture() {}
 
   /** A block of test code that may throw a checked exception. */
   @FunctionalInterface

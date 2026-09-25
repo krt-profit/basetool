@@ -1,14 +1,3 @@
-# logrotate(8) configuration for /var/log/iri-restore-drill.log.
-#
-# Installed to /etc/logrotate.d/iri-restore-drill (root:root 0644) by
-# ansible/roles/basetool_host/tasks/25-scripts.yml — not by hand.
-#
-# `copytruncate` is required because iri-restore-drill.service appends via
-# `StandardOutput=append:...`, holding the fd open across logrotate's run.
-#
-# logrotate ignores `create` when `copytruncate` is set: the live file stays in
-# place and keeps whatever owner and mode it already has.
-
 /var/log/iri-restore-drill.log {
     monthly
     rotate 12

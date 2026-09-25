@@ -72,53 +72,43 @@ class MaterialServiceTest {
 
   @Test
   void findAllReference_returnsTheCompleteUnboundedProjection() {
-    // Given
     MaterialReferenceDto ref =
         new MaterialReferenceDto(UUID.randomUUID(), "Agricium", QuantityType.SCU);
     when(materialRepository.findAllReference()).thenReturn(List.of(ref));
 
-    // When
     List<MaterialReferenceDto> result = materialService.findAllReference();
 
-    // Then
     assertEquals(List.of(ref), result);
     verify(materialRepository).findAllReference();
   }
 
   @Test
   void searchPicker_escapesTheFragmentAndForwardsTheFilterFlags() {
-    // Given
     Material agricium = new Material();
     agricium.setName("Agricium 100%");
     PageRequest pageable = PageRequest.of(0, 25);
     when(materialRepository.searchPicker("100\\%", true, MaterialType.RAW, false, pageable))
         .thenReturn(new PageImpl<>(List.of(agricium)));
 
-    // When
     Page<Material> result = materialService.searchPicker("100%", true, false, pageable);
 
-    // Then
     assertEquals(List.of(agricium), result.getContent());
     verify(materialRepository).searchPicker("100\\%", true, MaterialType.RAW, false, pageable);
   }
 
   @Test
   void searchPicker_passesNullThroughAsTheNoFilterMarkerAndRawOnlyFlag() {
-    // Given
     PageRequest pageable = PageRequest.of(0, 25);
     when(materialRepository.searchPicker(null, false, MaterialType.RAW, true, pageable))
         .thenReturn(new PageImpl<>(List.of()));
 
-    // When
     materialService.searchPicker(null, false, true, pageable);
 
-    // Then
     verify(materialRepository).searchPicker(null, false, MaterialType.RAW, true, pageable);
   }
 
   @Test
   void getMaterialPriceOverview_ShouldReturnPageOfOverviews() {
-    // Arrange
     String nameFilter = "Gold";
     PageRequest pageRequest = PageRequest.of(0, 10);
     MaterialPriceOverviewDto dto =
@@ -137,11 +127,9 @@ class MaterialServiceTest {
     when(materialRepository.getMaterialPriceOverview(nameFilter, pageRequest))
         .thenReturn(expectedPage);
 
-    // Act
     Page<MaterialPriceOverviewDto> result =
         materialService.getMaterialPriceOverview(nameFilter, pageRequest);
 
-    // Assert
     assertEquals(1, result.getTotalElements());
     assertEquals("Gold", result.getContent().get(0).name());
     assertEquals(new BigDecimal("5.0"), result.getContent().get(0).minPriceBuy());
@@ -149,7 +137,6 @@ class MaterialServiceTest {
 
   @Test
   void getMaterialPrices_ShouldReturnPageOfPrices() {
-    // Arrange
     UUID materialId = UUID.randomUUID();
     PageRequest pageRequest = PageRequest.of(0, 10);
     MaterialPriceDto dto =
@@ -167,10 +154,8 @@ class MaterialServiceTest {
     when(materialPriceRepository.findPricesByMaterialId(materialId, pageRequest))
         .thenReturn(expectedPage);
 
-    // Act
     Page<MaterialPriceDto> result = materialService.getMaterialPrices(materialId, pageRequest);
 
-    // Assert
     assertEquals(1, result.getTotalElements());
     assertEquals("Area18", result.getContent().get(0).terminalName());
     assertEquals(new BigDecimal("5.0"), result.getContent().get(0).priceBuy());
@@ -178,19 +163,16 @@ class MaterialServiceTest {
 
   @Test
   void getMatrixItems_passesFilterArgumentsThrough() {
-    // Arrange — a concrete selection must reach the repository verbatim (ADR-0105, REQ-UI-014).
     PageRequest pageRequest = PageRequest.of(0, 100000);
     Page<MaterialMatrixItemDto> expected = new PageImpl<>(List.of());
     when(materialPriceRepository.findMatrixItems(
             List.of("Aluminum"), List.of("Stanton"), Boolean.TRUE, null, pageRequest))
         .thenReturn(expected);
 
-    // Act
     Page<MaterialMatrixItemDto> result =
         materialService.getMatrixItems(
             List.of("Aluminum"), List.of("Stanton"), Boolean.TRUE, null, pageRequest);
 
-    // Assert
     assertSame(expected, result);
     verify(materialPriceRepository)
         .findMatrixItems(List.of("Aluminum"), List.of("Stanton"), Boolean.TRUE, null, pageRequest);
@@ -198,22 +180,17 @@ class MaterialServiceTest {
 
   @Test
   void getMatrixItems_normalisesEmptyCollectionsToNull() {
-    // Arrange — an empty IN selection must become null so the repository's `:param IS NULL OR
-    // x IN :param` idiom never emits an invalid `IN ()` (ADR-0105).
     PageRequest pageRequest = PageRequest.of(0, 100000);
     when(materialPriceRepository.findMatrixItems(null, null, null, null, pageRequest))
         .thenReturn(new PageImpl<>(List.of()));
 
-    // Act
     materialService.getMatrixItems(List.of(), List.of(), null, null, pageRequest);
 
-    // Assert — both empty lists were collapsed to null; the boolean nulls pass through unchanged.
     verify(materialPriceRepository).findMatrixItems(null, null, null, null, pageRequest);
   }
 
   @Test
   void getAllJobOrderMaterials_ShouldReturnOnlyJobOrderMaterials() {
-    // Given
     Material mat1 = new Material();
     mat1.setId(UUID.randomUUID());
     mat1.setName("Agricium");
@@ -227,10 +204,8 @@ class MaterialServiceTest {
     when(materialRepository.findAllByIsJobOrderTrueAndIsVisibleTrueOrderByNameAsc())
         .thenReturn(List.of(mat1, mat2));
 
-    // When
     List<Material> result = materialService.getAllJobOrderMaterials();
 
-    // Then
     assertEquals(2, result.size());
     assertEquals("Agricium", result.get(0).getName());
     assertEquals("Bexalite", result.get(1).getName());
@@ -239,7 +214,6 @@ class MaterialServiceTest {
 
   @Test
   void getVisibleMaterials_delegatesToVisibleOnlyRepositoryQuery() {
-    // Given
     PageRequest pageRequest = PageRequest.of(0, 10);
     Material visible = new Material();
     visible.setId(UUID.randomUUID());
@@ -247,21 +221,16 @@ class MaterialServiceTest {
     Page<Material> expected = new PageImpl<>(List.of(visible));
     when(materialRepository.findByIsVisibleTrue(pageRequest)).thenReturn(expected);
 
-    // When
     Page<Material> result = materialService.getVisibleMaterials(pageRequest);
 
-    // Then — the trading catalog path must go through the is_visible-filtered query, never findAll
     assertEquals(1, result.getTotalElements());
     assertEquals("Agricium", result.getContent().get(0).getName());
     verify(materialRepository).findByIsVisibleTrue(pageRequest);
     verify(materialRepository, never()).findAll(any(PageRequest.class));
   }
 
-  // ─── updateMaterial visibility toggle ──────────────────────────────────
-
   @Test
   void updateMaterial_appliesVisibilityToggle() {
-    // Given an existing visible material and an update flipping it to hidden
     UUID id = UUID.randomUUID();
     Material existing = new Material();
     existing.setId(id);
@@ -279,16 +248,13 @@ class MaterialServiceTest {
     when(materialRepository.findById(id)).thenReturn(Optional.of(existing));
     when(materialRepository.save(any(Material.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    // When
     Material saved = materialService.updateMaterial(id, update);
 
-    // Then
     assertEquals(Boolean.FALSE, saved.getIsVisible(), "admin can hide a reviewed commodity");
   }
 
   @Test
   void updateMaterial_nullVisibility_keepsExistingValue() {
-    // Given an existing hidden material and an update DTO that omits isVisible (null)
     UUID id = UUID.randomUUID();
     Material existing = new Material();
     existing.setId(id);
@@ -300,24 +266,19 @@ class MaterialServiceTest {
     Material update = new Material();
     update.setName("Ace Interceptor Helmet");
     update.setType(MaterialType.NO_REFINE);
-    update.setIsVisible(null); // unrelated edit (e.g. category) must not null the NOT NULL column
+    update.setIsVisible(null);
     update.setVersion(1L);
 
     when(materialRepository.findById(id)).thenReturn(Optional.of(existing));
     when(materialRepository.save(any(Material.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    // When
     Material saved = materialService.updateMaterial(id, update);
 
-    // Then — the null-guard preserves the stored visibility
     assertEquals(Boolean.FALSE, saved.getIsVisible(), "null isVisible must not overwrite the row");
   }
 
-  // ─── createMaterial ─────────────────────────────────────────────────────
-
   @Test
   void createMaterial_setsSourceSystemsManual_andPersists() {
-    // Given a minimal payload without category/refined references
     MaterialCreateDto dto =
         new MaterialCreateDto(
             "Raw Ouratite", "RAW", "SCU", "manual", null, null, true, false, false, false, false);
@@ -329,10 +290,8 @@ class MaterialServiceTest {
               return m;
             });
 
-    // When
     Material saved = materialService.createMaterial(dto);
 
-    // Then — server-side stamped provenance, scalars copied over verbatim, no FK lookup attempted
     ArgumentCaptor<Material> cap = ArgumentCaptor.forClass(Material.class);
     verify(materialRepository).save(cap.capture());
     Material captured = cap.getValue();
@@ -354,7 +313,6 @@ class MaterialServiceTest {
 
   @Test
   void createMaterial_resolvesRefinedAndCategoryByIds() {
-    // Given a refined target + a category that both exist in the database
     UUID refinedId = UUID.randomUUID();
     UUID categoryId = UUID.randomUUID();
     Material refinedTarget = new Material();
@@ -382,10 +340,8 @@ class MaterialServiceTest {
     when(materialCategoryRepository.findById(categoryId)).thenReturn(Optional.of(categoryRow));
     when(materialRepository.save(any(Material.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    // When
     materialService.createMaterial(dto);
 
-    // Then — the captured entity points at the looked-up rows, not new ones
     ArgumentCaptor<Material> cap = ArgumentCaptor.forClass(Material.class);
     verify(materialRepository).save(cap.capture());
     assertSame(refinedTarget, cap.getValue().getRefinedMaterial());
@@ -414,7 +370,6 @@ class MaterialServiceTest {
 
   @Test
   void createMaterial_refinedOnNonRawMaterial_throwsBadRequest() {
-    // type=NO_REFINE, isManualRawMaterial=false, but caller sets refinedMaterialId → reject
     MaterialCreateDto dto =
         new MaterialCreateDto(
             "X", "NO_REFINE", "SCU", null, UUID.randomUUID(), null, false, null, null, null, null);
@@ -430,7 +385,6 @@ class MaterialServiceTest {
 
   @Test
   void createMaterial_refinedAllowed_whenIsManualRawMaterialTrue_evenIfTypeIsNotRaw() {
-    // type=NO_REFINE but isManualRawMaterial=true → refinedMaterialId must be honoured
     UUID refinedId = UUID.randomUUID();
     Material refinedTarget = new Material();
     refinedTarget.setId(refinedId);
