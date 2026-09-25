@@ -255,8 +255,9 @@ and `https://keycloak:18443` both authenticate.
 And since the rootless-Podman cutover (2026-09-22) the container belongs to the service user `iri`
 and runs with a **read-only root filesystem**, so kcadm cannot write its default session file
 (`/opt/keycloak/.keycloak/kcadm.config`): every call goes through `sudo -u iri podman exec` and
-carries `--config` pointing at the unit's writable tmpfs. That was derived from the generated unit,
-not yet exercised on the production host; the helper and its reasoning are in
+carries `--config` pointing at the unit's writable tmpfs. That was derived from the generated unit
+and first exercised on the production host on 2026-09-25 (the owner's session for the confidential
+frontend client, steps 1–2 below typed interactively); the helper and its reasoning are in
 [`KEYCLOAK_HARDENING_RUNBOOK.md` § 0.4](../KEYCLOAK_HARDENING_RUNBOOK.md#04-open-a-session). The
 provisioning script is not deployed to the host (copy it over), and its default prefix is
 `docker exec`, so pass `--kcadm-command` as below. Run everything as root, from `/`.
@@ -271,6 +272,8 @@ KCADM="sudo -u iri podman exec -i keycloak sh -c 'exec /opt/keycloak/bin/kcadm.s
 #    `-it` provides; without one kcadm refuses with "Console is not active". The password is
 #    KC_HTTPS_KEY_STORE_PASSWORD in the container's environment (rendered from
 #    SERVER_SSL_KEY_STORE_PASSWORD in the host .env).
+#    After the internal-TLS step-3 release (#2036) this path is Keycloak's OWN leaf keystore -- see
+#    the note after this block.
 sudo -u iri podman exec -it keycloak /opt/keycloak/bin/kcadm.sh config truststore \
     --trustpass - /run/secrets/keystore.p12 --config "$KCCFG"
 
@@ -302,6 +305,27 @@ The session file lives on a tmpfs, and under Quadlet every restart is a recreate
 any restart or deploy of keycloak clears it — which is also why step 6 costs nothing. On a local
 Docker Compose stack the root filesystem is writable: plain `docker exec keycloak
 /opt/keycloak/bin/kcadm.sh …` without `--config`, and the script's default prefix, work there.
+
+> [!warning] Step 1's truststore after the internal-TLS step-3 release (#2036) — open question
+> *(added 2026-09-25)* Until #2036's release is deployed, `/run/secrets/keystore.p12` in the
+> keycloak container is the **shared** self-signed keystore, and step 1 works as written — it did on
+> production on 2026-09-25. From that release on, `quadlet/systemd/keycloak.container` mounts
+> `/var/iri/secrets/tls/keycloak.p12` at that path — Keycloak's **own leaf**, signed by the internal
+> CA — and mounts **no** truststore at all (unlike backend, frontend and ingest, which get
+> `/run/secrets/internal-truststore.p12`). Two consequences, neither verified yet:
+>
+> - Step 1 unchanged probably still works: the JDK trusts the certificate of a key entry in a
+>   truststore — that is why the shared keystore worked — and kcadm talks to Keycloak itself at
+>   `https://localhost:18443`, whose leaf names `localhost`. The password is the same
+>   (`KC_HTTPS_KEY_STORE_PASSWORD`; the mint used it for every store).
+> - If it fails with a PKIX error, give kcadm the CA-only truststore through the tmpfs the session
+>   file already uses — `sudo -u iri podman exec -i keycloak sh -c 'cat > /opt/keycloak/data/tmp/truststore.p12' < /var/iri/secrets/tls/truststore.p12`,
+>   then `config truststore --trustpass - /opt/keycloak/data/tmp/truststore.p12` — and delete it in
+>   step 6 with the session file. That is a write into the container like the session file itself.
+>
+> Whether the keycloak unit should mount the CA-only truststore like the three apps, so kcadm has a
+> proper anchor, is an open doc/code question. The same step appears in
+> [`KEYCLOAK_HARDENING_RUNBOOK.md` § 0.4](../KEYCLOAK_HARDENING_RUNBOOK.md#04-open-a-session).
 
 ### Why a service account and not the admin user
 

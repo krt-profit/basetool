@@ -21,19 +21,27 @@ package de.greluc.krt.profit.basetool.frontend.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
 import lombok.Getter;
 import lombok.Setter;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
+import org.springframework.data.redis.connection.RedisConnection;
+import org.springframework.data.redis.connection.RedisServerCommands;
 import org.springframework.session.FindByIndexNameSessionRepository;
 import org.springframework.session.FlushMode;
 import org.springframework.session.Session;
@@ -178,6 +186,81 @@ class RedisSessionConfigTest {
     ReflectionTestUtils.setField(config, "configureKeyspaceNotifications", false);
 
     assertThat(config.configureRedisAction()).isSameAs(ConfigureRedisAction.NO_OP);
+  }
+
+  /**
+   * The AOT switch wins over the username: switched off, even a per-service ACL user gets {@code
+   * NO_OP}, so the training run opens no connection whatever {@code REDIS_USERNAME} says.
+   */
+  @Test
+  void keyspaceActionIsNoOpWhenSwitchedOffUnderANamedUserToo() {
+    RedisSessionConfig config = new RedisSessionConfig();
+    ReflectionTestUtils.setField(config, "configureKeyspaceNotifications", false);
+    ReflectionTestUtils.setField(config, "redisUsername", "basetool-frontend");
+
+    assertThat(config.configureRedisAction()).isSameAs(ConfigureRedisAction.NO_OP);
+  }
+
+  /**
+   * Under the shared {@code default} user — no username, a blank one, or {@code default} spelled
+   * out — the startup step is the pre-rollout one, and it still sends Spring Session's {@code
+   * CONFIG GET notify-keyspace-events} (and no {@code PING}).
+   *
+   * @param username the configured {@code spring.data.redis.username}; {@code <null>} is unset.
+   */
+  @ParameterizedTest(name = "username=[{0}]")
+  @NullAndEmptySource
+  @ValueSource(strings = {"   ", "default", " default "})
+  void underTheSharedDefaultUserTheConfigPathIsUnchanged(String username) {
+    RedisSessionConfig config = new RedisSessionConfig();
+    ReflectionTestUtils.setField(config, "configureKeyspaceNotifications", true);
+    ReflectionTestUtils.setField(config, "redisUsername", username);
+    RedisConnection connection = mock(RedisConnection.class);
+    RedisServerCommands server = mock(RedisServerCommands.class);
+    when(connection.serverCommands()).thenReturn(server);
+    Properties current = new Properties();
+    current.setProperty("notify-keyspace-events", "Egx");
+    when(server.getConfig("notify-keyspace-events")).thenReturn(current);
+
+    ConfigureRedisAction action = config.configureRedisAction();
+    action.configure(connection);
+
+    assertThat(action).isInstanceOf(TolerantKeyspaceNotificationsAction.class);
+    verify(server).getConfig("notify-keyspace-events");
+    verify(connection, never()).ping();
+  }
+
+  /**
+   * The 2026-09-25 production finding: under the frontend's own ACL user the startup step must send
+   * no {@code CONFIG} at all — every refused {@code CONFIG GET} is counted by Redis and fed {@code
+   * RedisAclDenials} on each restart — and must still prove the store answers, with a {@code PING}
+   * its {@code +@connection} allows.
+   *
+   * @param username a per-service ACL user, including one a relaxed {@code .env} padded.
+   */
+  @ParameterizedTest(name = "username=[{0}]")
+  @ValueSource(strings = {"basetool-frontend", " basetool-frontend ", "Default"})
+  void underANamedAclUserNoConfigIsSentButAPingIs(String username) {
+    RedisSessionConfig config = new RedisSessionConfig();
+    ReflectionTestUtils.setField(config, "configureKeyspaceNotifications", true);
+    ReflectionTestUtils.setField(config, "redisUsername", username);
+    RedisConnection connection = mock(RedisConnection.class);
+    when(connection.ping()).thenReturn("PONG");
+    // Stubbed so the pre-fix action would run to completion and be caught by the verification
+    // below, rather than stop at a null.
+    RedisServerCommands server = mock(RedisServerCommands.class);
+    when(connection.serverCommands()).thenReturn(server);
+    Properties current = new Properties();
+    current.setProperty("notify-keyspace-events", "Egx");
+    when(server.getConfig("notify-keyspace-events")).thenReturn(current);
+
+    ConfigureRedisAction action = config.configureRedisAction();
+    action.configure(connection);
+
+    verify(connection, never()).serverCommands();
+    verify(connection).ping();
+    verifyNoMoreInteractions(connection, server);
+    assertThat(action).isInstanceOf(ServerConfiguredKeyspaceNotificationsAction.class);
   }
 
   /**

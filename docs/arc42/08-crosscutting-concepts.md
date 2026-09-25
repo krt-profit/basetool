@@ -27,12 +27,13 @@ Beyond roles there are three mechanisms that are easy to miss:
 - **Each service reaches Redis as its own ACL user** — `basetool-frontend`, `-backend` and `-ingest`,
   each confined to its own keys and channels, with `default` switched off at the end of the rollout
   (REQ-SEC-068, ADR-0207). The ACL is rendered from a committed template with hashes, never
-  passwords, and the E2E stack runs against it.
+  passwords, and the E2E stack runs against it. Production completed the rollout on 2026-09-25.
 - **Internal TLS: one leaf per service, one CA, the name checked** — a private CA whose key is
   destroyed at mint time signs a leaf for backend, frontend, ingest and Keycloak; clients pin the
   CA and verify the hostname (REQ-SEC-070, ADR-0211). Shipped inert behind
   `INTERNAL_TLS_VERIFY_HOSTNAME` and fallback mounts; the committed test material already has the
-  shape (ADR-0139 amendment 1).
+  shape (ADR-0139 amendment 1). Production: hostname verification on and the material minted
+  (2026-09-25); serving the leaves waits for the `PATH_VARS` release.
 
 Authority: [`security-and-access.md`](../specs/security-and-access.md) (`REQ-SEC-*`),
 [`ROLES_AND_PERMISSIONS.md`](../../ROLES_AND_PERMISSIONS.md), `ArchitectureTest`.
@@ -175,6 +176,11 @@ Authority: [`audit.md`](../specs/audit.md) (`REQ-AUDIT-001`).
 One access-log line per request; MDC carrying `correlationId`, `userId` and `orgUnitId`, propagated
 across module boundaries; JSON logging in production. Business metrics are `basetool_*` with
 bounded labels. **Never log names, e-mail addresses or tokens** — unconditionally.
+
+The MDC is a `ThreadLocal`, so it is bound per **dispatch**, not per request: a servlet async
+dispatch (an SSE stream's completion, a `DeferredResult`) runs on another container thread, and
+the filters that own the fields re-bind there what the initial dispatch resolved, from request
+attributes, without resolving anything afresh (since 2026-09-25, `REQ-OBS-001`).
 
 Monitoring moves with every feature: a new scheduled job needs task metrics, a new audited area its
 event counter, a new status enum its queue gauge, a new public surface its probe. A renamed or

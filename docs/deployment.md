@@ -210,7 +210,8 @@ Shapes and locations only. Values live on the host and in the off-site backup, n
 | `/var/iri/code/.env` | `deploy:deploy 0640` | every environment value the stack reads | the role repairs owner/mode; `deploy.sh` reads it, `render-env-d.py` renders `env.d/` from it. Keep it **LF**: a CRLF file hands the pre-flight a path ending in `\r` (`required file missing` for a file that exists). |
 | `/var/iri/code/env.d/<svc>.env` | `deploy:iri 0640`, dir `2750` | per-service environment, one closed allow-list each | **generated** on every config change; never edit — edit `.env` |
 | `/var/iri/secrets/keystore.p12` | `root:110000 0640` + ACL `u:100999:r`, `u:iri:r` | the shared internal TLS keystore (backend, frontend, ingest, keycloak) | ACL for keycloak and for the backup helper; see [rotation](#internal-keystore-and-certificate-rotation) |
-| `/var/iri/secrets/tls/` | `iri:iri 0755`; `<svc>.p12` `0640` (apps `root:110000` + ACL `u:iri:r`, keycloak `root:root` + ACL `u:100999:r`, `u:iri:r`); `truststore.p12`, `ca.crt` `root:root 0644` | the per-service internal TLS material (REQ-SEC-070) — **absent until the rollout** | minted by the owner with `mint-internal-tls.sh`; see [Internal TLS](#internal-tls-per-service-certificates-from-a-private-ca) |
+| `/var/iri/secrets/tls/` | `iri:iri 0755`; `<svc>.p12` `0640` (apps `root:110000` + ACL `u:iri:r`, keycloak `root:root` + ACL `u:100999:r`, `u:iri:r`); `truststore.p12`, `ca.crt` `root:root 0644` | the per-service internal TLS material (REQ-SEC-070) — absent on a host until its rollout step 2; **present on production since 2026-09-25**, nothing mounts it before step 3 | minted by the owner with `mint-internal-tls.sh`; see [Internal TLS](#internal-tls-per-service-certificates-from-a-private-ca) |
+| `/var/iri/secrets/backend-truststore.p12` | `root:root 0644` (public certificates only) | PKCS#12 trust store for the Keycloak SPI's account-existence precheck (REQ-SEC-022): alias `backend` = the shared certificate, alias `internal-ca` = `/var/iri/secrets/tls/ca.crt` | mounted into keycloak at the path `.env`'s `KRT_BACKEND_TRUSTSTORE_PATH` names (`/run/secrets/backend-truststore.p12` on production) by the hand-installed drop-in `keycloak.container.d/50-backend-truststore.conf`; built 2026-09-25 — see [`DISCORD_KEYCLOAK_SETUP.md` §7.3](keycloak/DISCORD_KEYCLOAK_SETUP.md#73-truststore-for-the-backend-certificate). **Neither the file nor the drop-in is captured by `backup.sh`**: a host rebuilt from backup must rebuild both |
 | `/var/iri/code/realm-export.json` | `root:100999` + ACL `u:iri:r` | Keycloak realm seed, bind-mounted into keycloak | only seeds an empty realm; the live realm is in `db-keycloak` |
 | `/var/iri/redis/users.acl` | `root:root 0644` | Redis ACL, one user per service, **rendered** by `render-redis-acl.py` (SHA-256 hashes, no password) and **with** a `user default …` line | without that line redis resets `default` to `nopass`; check `grep -c '^user default ' …` = 1 — see [The Redis ACL](#the-redis-acl) |
 | `/etc/iri/ghcr-pull-token` | `deploy:deploy 0600`, dir `0700` | classic PAT, `read:packages` only | optional sidecar `ghcr-pull-token.expiry` (ISO date) |
@@ -249,39 +250,84 @@ exactly the pre-rollout behaviour. The server carries `--notify-keyspace-events 
 frontend no longer needs `CONFIG`, and the unit's health probe is an unauthenticated `PING` that
 accepts `NOAUTH`, so it does not care which users exist.
 
+**On production the rollout is done** (2026-09-25, steps 2–5 at ~15:47–15:51 UTC with
+`iri-deploy.timer` stopped, exactly as below): six users, backend and frontend connected as their
+own users (ingest connects on demand), `REDIS_DEFAULT_USER=off`. Verified: an unauthenticated
+`PING` answers `NOAUTH`, a password-only `AUTH` answers `WRONGPASS … user is disabled`, the unit's
+health check is healthy and the exporter reports `redis_up 1`. A release rollback now needs
+`default` back **on** first (see *Rollback* below).
+
+> [!note] A refused `CONFIG GET` per frontend start — on 1.11.0 only, gone once #2067 is released
+> On release 1.11.0 the frontend's `TolerantKeyspaceNotificationsAction` still runs Spring
+> Session's `CONFIG GET notify-keyspace-events` at every start under its own user; the ACL refuses it
+> by design and the action carries on. It shows in `ACL LOG` as `reason=command`,
+> `context=toplevel`, object `config|get`, user `basetool-frontend` — measured on production
+> 2026-09-25 at a count of **2 per frontend start** — and increments
+> `redis_acl_access_denied_cmd_total`; `RedisAclDenials` did not fire for it that day. #2067
+> (merged 2026-09-25) sends a `PING` instead under a named user, so from the release that carries it
+> **no** refusal is expected at all. Until then that one entry is benign; any other `ACL LOG` entry —
+> another user, another command, a `key` or `channel` reason, an `auth` refusal — is a real finding.
+
 **Render and apply** (as root, from `/`; `${UCTL}` / `${UPOD}` from
 [Shell conventions](#shell-conventions-used-below)):
 
 ```bash
 cd /
 cp -p /var/iri/redis/users.acl /var/iri/redis/users.acl.backup-$(date +%Y%m%d-%H%M%S)
+# Render NEXT TO the live file, never onto it -- see "Why .new and cat" below.
 /var/iri/code/scripts/render-redis-acl.py --env /var/iri/code/.env \
-  --template /var/iri/code/scripts/redis-users.acl.tmpl --out /var/iri/redis/users.acl
-chown root:root /var/iri/redis/users.acl && chmod 0644 /var/iri/redis/users.acl
-restorecon -F /var/iri/redis/users.acl
-grep -c '^user default ' /var/iri/redis/users.acl                 # must be 1
-grep -c '>' /var/iri/redis/users.acl                               # must be 0: hashes only
+  --template /var/iri/code/scripts/redis-users.acl.tmpl --out /var/iri/redis/users.acl.new
+grep -c '^user default ' /var/iri/redis/users.acl.new             # must be 1
+grep -c '>' /var/iri/redis/users.acl.new                           # must be 0: hashes only
+cat /var/iri/redis/users.acl.new > /var/iri/redis/users.acl && rm /var/iri/redis/users.acl.new
+stat -c '%U:%G %a' /var/iri/redis/users.acl                        # root:root 644, unchanged
 # live and atomic -- a malformed file is rejected and the running ACL stays. As `admin` once the
 # rendered file has been loaded at least once; the very first load authenticates as `default`
 # (drop `--user admin`), because the hand-written file before it has no admin user.
 ${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --user admin ACL LOAD'   # OK
+${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --user admin ACL USERS'  # the users the render printed
 ```
 
 `ACL LOAD` needs no restart and signs nobody out. `check-conformance.py --only redis-requires-auth`
 still proves an unauthenticated `PING` is refused.
+
+**Why `.new` and `cat`** *(corrected 2026-09-25)*. The unit mounts the single file
+(`Volume=/var/iri/redis/users.acl:/etc/redis/users.acl:ro`), and a single-file bind mount follows
+the **inode**, not the name. `render-redis-acl.py` writes atomically — a temporary file renamed over
+the target, i.e. a **new** inode — so rendering straight onto the live path would leave the
+container on the old inode, and `ACL LOAD` would quietly reload the **old** rules (the same reason
+`grafana.crt` needs an edge restart after a re-mint). Writing the checked result into the existing
+file with `cat … >` keeps the inode, its owner, mode and SELinux label, so no `chown`/`restorecon`
+is needed and the running container sees the new content. The `ACL USERS` line is the proof: if it
+still lists the old set, the content did not reach the container — `${UCTL} restart redis.service`
+then loads it from the mount (it also restarts `frontend` and `ingest`, which `Requires=` redis;
+sessions survive in the AOF).
 
 > [!warning] Read the ACL log by field, never whole
 > `redis-cli ACL LOG` answers what was refused and by whom — and its `object` field is the key or
 > channel, which for a session key **is a session id**. Print the usernames and reasons only:
 > `${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --user admin ACL LOG 20' | awk 'p{print; p=0} /^(username|reason|context)$/{printf "%s: ", $0; p=1}'`.
 
-**Rotating a password** is `.env` + render + `ACL LOAD` + restarting the one service that uses it
+**No service is refused anything in normal operation — a restart included.** Under its own user
+the frontend's startup check is a `PING` and it sends no `CONFIG`; only with an empty
+`REDIS_FRONTEND_USERNAME` (i.e. as `default`) does it still run Spring Session's `CONFIG GET` /
+`CONFIG SET`. So an `ACL LOG` entry, and every `RedisAclDenials`, is a finding to chase, never
+restart noise. *(Since 2026-09-25: before that fix the frontend's `CONFIG GET` was refused on every
+start under `basetool-frontend` — the `config|get` entries production's `ACL LOG` showed after the
+rollout. They stop with the release carrying it; an older one still produces them, harmlessly.)*
+
+**Rotating a password** is `.env` + render (the `.new` + `cat` block above) + `ACL LOAD` + restarting the one service that uses it
 (`render-env-d.py` first, so its `env.d` file carries the new value). Rotating `REDIS_PASSWORD`
 touches `default`/`admin` and the redis unit's own environment: render both, `ACL LOAD`, then
 `${UCTL} restart redis.service` so the container sees the new `REDIS_PASSWORD` for the next `ACL
 LOAD`.
 
 ##### Rollout: one ACL user per service (needs the owner's yes)
+
+> [!note] Production: steps 1–5 done on 2026-09-25
+> Step 1 with the 1.11.0 role run (~11:5x UTC), steps 2–5 at ~15:47–15:51 UTC in one sitting with
+> the deploy timer stopped; the render went through `.new` + `cat` (inode kept) and the first
+> `ACL LOAD` authenticated as `default`. The procedure stays for the testing host and a rebuilt one.
 
 Merging and deploying REQ-SEC-068 changes no credential. The deploy restarts `redis` once — its
 unit gained `--notify-keyspace-events Egx` and the credential-free health probe — and every
@@ -291,6 +337,19 @@ can be stopped and rolled back on its own.
 1. **Install the renderer** (from WSL): `ansible-playbook site.yml --limit production --tags scripts
    --check --diff`, then without `--check --diff`. Verify
    `ls -l /var/iri/code/scripts/render-redis-acl.py /var/iri/code/scripts/redis-users.acl.tmpl`.
+
+> [!warning] Steps 2–4 are one sitting, with the deploy timer stopped *(corrected 2026-09-25)*
+> Step 2 is **not** inert. The env templates pick each service's password with
+> `REDIS_PASSWORD=${REDIS_<SVC>_PASSWORD:-${REDIS_PASSWORD…}}` — whether or not its
+> `REDIS_<SVC>_USERNAME` is set. So from the moment the three passwords are in `.env`, **any**
+> `env.d/` render hands each application its new password with no username: a password-only `AUTH`
+> as `default` with the wrong password, `WRONGPASS`, and the service goes unhealthy on its next
+> restart. `deploy.sh` re-renders `env.d/` on every config change, so a deploy tick between step 2
+> and step 4 is exactly that render. Hence: `systemctl stop iri-deploy.timer` before step 2, run
+> steps 2–4 back to back, and `systemctl start iri-deploy.timer` only after step 4 verified (or after
+> a rollback). And never add the three passwords before the release carrying REQ-SEC-068 (1.11.0)
+> is live.
+
 2. **Three new passwords into `.env`**, generated on the host so they never cross a terminal:
 
    ```bash
@@ -305,6 +364,12 @@ can be stopped and rolled back on its own.
 
 3. **Render with `default` still on, and load it** — the block above, first load without `--user
    admin`. Nothing changes for the applications yet; `admin` and the three service users now exist.
+   Before rendering, confirm that `.env`'s `REDIS_EXPORTER_PASSWORD` is the password the hand-written
+   file gives `monitoring` — the render re-derives that user's hash from `.env`, and a mismatch takes
+   `redis-exporter` down (`redis_up == 0`). Compare digests, never the values:
+   `grep '^user monitoring ' /var/iri/redis/users.acl | grep -o '>[^ ]*' | cut -c2- | tr -d '\n' | sha256sum`
+   against `sed -n 's/^REDIS_EXPORTER_PASSWORD=//p' /var/iri/code/.env | tr -d '"\n' | sha256sum` —
+   the two sums must be equal; if they differ, stop and settle which one is right first.
    Check: `${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --user admin ACL
    USERS'` lists all six.
 4. **Move the applications**, one at a time, watching each come back healthy:
@@ -322,7 +387,8 @@ can be stopped and rolled back on its own.
    Verify: `${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --user admin CLIENT
    LIST' | grep -o 'user=[^ ]*' | sort | uniq -c` shows the three service users and no application
    on `default`; `RedisAclDenials` stays silent; log in, open a mission (live sync), run one
-   refinery import.
+   refinery import. On 1.11.0, `ACL LOG` shows the frontend's refused `config|get` from its
+   restart (see the note above; gone once #2067 is released); nothing else.
 5. **Switch `default` off**: append `REDIS_DEFAULT_USER=off` to `.env`, render, `ACL LOAD` as
    `admin`. Verify `${UPOD} exec redis sh -c 'redis-cli ping'` answers `NOAUTH`,
    `${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli ping'` (password-only, i.e.
@@ -330,10 +396,14 @@ can be stopped and rolled back on its own.
    and `redis-exporter` still scrapes (`redis_up == 1`).
 
 **Rollback**, from any step: step 5 — set `REDIS_DEFAULT_USER=on` (or delete the line), render,
-`ACL LOAD`. Step 4 — delete the three `REDIS_*_USERNAME` lines, render `env.d/`, restart the three
-services: they are back on `default`. Step 3 — `cp -p` the `users.acl.backup-*` back and `ACL LOAD`
-(authenticating as `default`). The passwords may stay in `.env`; nothing reads them without the
-usernames.
+`ACL LOAD`. Step 4 — delete the three `REDIS_*_USERNAME` lines **and** the three
+`REDIS_{FRONTEND,BACKEND,INGEST}_PASSWORD` lines, render `env.d/`, restart the three services: they
+are back on `default` with the shared password. Step 3 — `cat` the `users.acl.backup-*` back into
+`users.acl` (keeping the inode, as above) and `ACL LOAD` (authenticating as `default`); step 2 —
+delete the three password lines. *(Corrected 2026-09-25: this used to say the passwords may stay in
+`.env` because nothing reads them without the usernames — the templates read them either way, see
+the warning above.)* **A release rollback** to a version before REQ-SEC-068 (1.10.0 or older) needs
+`default` **on** first: its health check and its applications authenticate as `default`.
 
 ---
 
@@ -373,7 +443,7 @@ a privately signed edge, the JVM truststore (`20-jvm-truststore.conf`). `check-c
 | `/var/iri/code/scripts/` | the role | `deploy.sh`, `backup.sh`, `restore-drill.sh`, `container-cleanup.sh`, `lib/container-runtime.sh`, `render-env-d.py`, `render-redis-acl.py`, `mint-internal-tls.sh`, the two collectors — `root:root 0755`, so `deploy` cannot rewrite its own deployer |
 | `/etc/containers/systemd/users/<iri-uid>/` | `deploy.sh` | the 39 units, plus `<svc>.container.d/10-digest-pin.conf` (the release's digest) and the role's host drop-ins |
 | `/var/iri/code/env.d/` | `deploy.sh` via `render-env-d.py` | one rendered environment file per service |
-| `/var/lib/iri/` | `deploy.sh` | digest-pin record and its predecessor, `last-deployed.digests`, backoff records, `config-stage/`, `config-previous/`, `config-blocked.marker`, `edge/` and `monitoring-reload/` snapshots |
+| `/var/lib/iri/` | `deploy.sh` | digest-pin record and its predecessor, `last-deployed.digests`, backoff records, `config-stage/`, `config-previous/`, `config-blocked.marker`, `config-apply.incomplete` (only while a config apply is unfinished or could not be undone), `edge/` and `monitoring-reload/` snapshots |
 
 `~iri/.config/containers/systemd/` must stay **empty**: Quadlet searches it before the delivery
 directory, so a unit of the same name there silently shadows every release.
@@ -440,6 +510,11 @@ Nothing is deployed yet: `:stable` still names the previous release.
 
 ### Promoting to production
 
+> [!note] A release whose PRs need more than this path gets its own runbook
+> When a release carries host steps, ordering constraints or switches beyond the promotion below,
+> they are collected per release from an audit of its PRs: **1.11.0** →
+> [`RELEASE_1.11.0_PRODUCTION_RUNBOOK.md`](RELEASE_1.11.0_PRODUCTION_RUNBOOK.md).
+
 ```bash
 gh workflow run promote.yml -f version=1.9.3
 ```
@@ -475,20 +550,42 @@ Within about five minutes the timer fires `deploy.sh`, which:
    wrong image) is logged as `drift: …` and re-applied. A sick container on the **right** image gets
    a targeted restart of that service only, never a release rollback (ADR-0083);
 3. otherwise **cosign-verifies every digest** (REQ-OPS-015) — a failure aborts before anything is
-   pulled or staged — and writes the digest-pin record and the per-service pin drop-ins;
+   pulled or staged;
 4. if the config digest moved: extracts the bundle, asserts it carries no secret, applies the
-   stateful-infra gate (below), snapshots the live tree to `config-previous/`, mirrors the new tree
-   into `/var/iri/code`, **renders `env.d/`**, installs changed units and stops-then-removes units
-   the release no longer names;
-5. pulls the three app images, restarts every application service whose pin or unit changed,
-   starts the rest of the application stack, and waits for health; then stages a moved provider
-   JAR and restarts keycloak alone;
+   stateful-infra gate (below), **checks that `deploy` owns and can write every directory it is
+   about to mirror into** (and the compose directory, the unit directory and `env.d/`), snapshots
+   the live tree to `config-previous/`, mirrors the new tree into `/var/iri/code`, **renders
+   `env.d/`**, installs changed units and stops-then-removes units the release no longer names;
+5. writes the digest-pin record and the per-service pin drop-ins — after the config, so a release
+   the stateful-infra gate holds back leaves no pin behind — pulls the three app images, restarts
+   every application service whose pin or unit changed, starts the rest of the application stack,
+   and waits for health; then stages a moved provider JAR and restarts keycloak — which, through
+   `Requires=`, restarts backend, frontend and ingest with it (see
+   [Driving the stack](#driving-the-stack); *corrected 2026-09-25*, this said "keycloak alone");
 6. on success writes the marker, clears the failure records, reconciles the monitoring units and
    the edge (config drift or renewed certificates → edge recreate), and prunes dangling images older
    than 30 days;
 7. on a health failure restores the previous config tree, the previous units **and** the previous
    pin drop-ins, restarts, records an exponential backoff for that target (600 s doubling, capped
    at 6 h; `--force` bypasses it) and exits non-zero — `DeployRolledBack` / `DeployFailed`.
+
+A failure in steps 4–5 **before** the health gate — the pre-flight, the extraction, a mirror, the
+`env.d` render, the unit install, the pull — is recorded the same way: a `FATAL: deploy aborted
+before the health gate — step '…' failed (exit N)` line, the previous config tree, units and pin put
+back if this run had changed them, the same backoff record, and `basetool_deploy_last_failure_timestamp`
+(`DeployFailed`). Nothing has been restarted at that point, so the stack keeps running the previous
+release. If the restore itself fails the log says the tree is **INCONSISTENT**, and
+`/var/lib/iri/config-apply.incomplete` stays, which stops the next tick from snapshotting the
+half-applied tree over `config-previous/`.
+
+> [!warning] Until 2026-09-25 such a failure was silent
+> A command failing under `set -e` ended the run with no FATAL line, no metric, no backoff and no
+> restore. With v1.11.0 a root-owned `/var/iri/code/docker/acme` failed the acme mirror (`rsync …
+> mkstemp … Permission denied (13)`, exit 23) on every tick from 12:25 to 12:35 after three other
+> subtrees had already been mirrored; `deploy.prom` kept `basetool_deploy_last_failure_timestamp 0`,
+> `DeployFailed` never fired, and production stayed on the old release until someone looked. The
+> second of those ticks also snapshotted the half-mirrored tree as `config-previous/` and saved the
+> first tick's new pin as the rollback anchor.
 
 Read the result in `/var/log/iri-deploy.log`, or off-host in Grafana → Explore → Loki with
 `{app="ops-deploy"}`. **Not** `journalctl -u iri-deploy.service`: the unit's `StandardOutput=append:`
@@ -551,6 +648,24 @@ ${UCTL} start frontend.service
 ${UPOD} exec -it db-backend sh                       # a shell in a running container
 ```
 
+> [!warning] A restart travels along `Requires=` — `restart keycloak.service` is a full outage
+> systemd restarts every unit that `Requires=` the one you restart. The units say:
+> `keycloak` requires `db-keycloak`; `backend` requires `db-backend` and `keycloak`; `frontend`
+> requires `backend`, `keycloak` and `redis`; `ingest` requires `backend` and `redis`. So:
+>
+> | You restart | Also restarted |
+> |---|---|
+> | `keycloak.service` | backend, frontend, ingest — **the whole app** |
+> | `db-keycloak.service` | keycloak, and through it backend, frontend, ingest |
+> | `db-backend.service` | backend, frontend, ingest |
+> | `backend.service` | frontend, ingest |
+> | `redis.service` | frontend, ingest (sessions survive in the AOF) |
+>
+> Measured on production 2026-09-25: a `restart keycloak.service` at 15:52:40 UTC took the app down
+> until 15:54:50 — about **two minutes**, 175 maintenance-page 502/503/504 answers at the edge;
+> frontend and ingest were briefly `failed` and came back by `Restart=always`. Treat every Keycloak
+> restart as planned downtime, and do not restart the dependents again afterwards "to be sure".
+
 The application stack, in dependency order, is `db-backend db-keycloak redis keycloak backend ingest
 frontend edge`, plus `acme`. The monitoring units are `prometheus loki tempo grafana alertmanager
 blackbox-exporter postgres-exporter-backend postgres-exporter-keycloak redis-exporter`; `alloy` and
@@ -570,7 +685,8 @@ systemctl start iri-deploy.timer
 
 **Reboot.** `iri` lingers and every unit is `WantedBy=default.target`, so the stack starts at boot
 without a login; haproxy and the timers are enabled. The first deploy tick follows five minutes
-later.
+later. Expect four failed `iri-*` units right after the boot — see *Host patching* in
+[Updating the operational scripts and units](#updating-the-operational-scripts-and-units).
 
 ### Logs
 
@@ -596,6 +712,14 @@ theme, `monitoring/` or `quadlet/` rides the same path as an app release: regene
 compose changed (`generate-quadlet.py`), merge, cut a release, promote. The next tick stages the
 bundle, installs the changed units and restarts exactly the application services whose definition
 moved. Dependabot's image-pin bumps take this path too.
+
+The subtrees a release owns — `docker/` (edge, acme, maintenance), `keycloak-theme/`, `monitoring/`
+and `quadlet/` under `/var/iri/code` — must be owned by `deploy` all the way down, because the mirror
+(`rsync -rlpt --delete`) creates a temp file in every directory it updates and sets each directory's
+mode and mtime. A directory created by hand as root blocks every config change. Since 2026-09-25
+`deploy.sh` checks this before it changes anything and refuses with one line naming the directory
+(`PRE-FLIGHT: … is not owned or not writable by deploy`); the fix is in
+[Troubleshooting](#troubleshooting). The role's `--tags directories` reclaims exactly these four.
 
 > [!note] Monitoring and `acme` units are restarted like the rest — fixed 2026-09-22
 > Every unit a release re-defines is **restarted**, every other one merely **started**: the nine
@@ -681,6 +805,11 @@ public issuer, so tokens do not change. Until 2026-09-23 `application-prod.yml` 
 nothing passed it to the container, so this could not be switched on in production; the release
 carrying the wiring passes it **empty**, which keeps today's issuer-location decoder exactly.
 
+> [!note] Applied on production 2026-09-25 (~15:38 UTC, #2038)
+> Exactly as below: the `.env` line, the render (only `env.d/backend.env` changed), the backend
+> restart — healthy in 11 s. Afterwards no `JWKS` / `PKIX` / `No subject alternative` line, an
+> authenticated `/api/v1/users/me` answered `200`, and no `401` followed.
+
 **What changes when it is set:** the key fetch no longer hairpins through the edge, so an edge or
 public-DNS blip can no longer fail token validation, and the accepted signature algorithms widen
 from what the live JWKS advertises to the full asymmetric set. Members notice nothing. Only the
@@ -719,6 +848,15 @@ settings until it is removed and recreated. `deploy.sh` does not do that on its 
 full-stack outage behind an automatic tick). Take it as a maintenance, testing host first, with the
 members of the changed networks stopped. For the 2026-09-22 change that made the data networks
 `Internal=true` (ADR-0162):
+
+> [!note] Applied on production 2026-09-25 (#1992), testing host not yet
+> The owner chose production directly. The block below ran as written: members stopped 16:21:46 UTC,
+> all five networks recreated `internal=true`, everything up again 16:24:00 — a full outage of about
+> **2.5 minutes** (the edge served 166 maintenance-page 5xx). Checked afterwards: all ten members
+> healthy; `db-backend`, `db-keycloak` and `redis` have no default route (`/proc/net/route`), while
+> `backend` and `keycloak` keep theirs through their other networks (Keycloak still reaches Discord);
+> `backend` resolves `db-backend`; both exporters report `pg_up 1` / `redis_up 1`. The testing host
+> still runs the old networks.
 
 ```bash
 systemctl stop iri-deploy.timer
@@ -765,7 +903,10 @@ failure back, but catching it in review is cheaper.
 
 Delivered automatically (REQ-OPS-007, ADR-0055): when `basetool-keycloak-spi:stable` moves,
 `deploy.sh` stages `keycloak-spi.jar` into `/var/iri/code/keycloak/providers/` after the stack is
-healthy and restarts keycloak alone; a failure restores the previous JAR. The JAR is Java-21
+healthy and restarts keycloak; a failure restores the previous JAR. *(Corrected 2026-09-25: this
+said "restarts keycloak alone". The restart is `systemctl --user restart keycloak.service`, and
+backend, frontend and ingest `Requires=` keycloak, so they restart with it — see
+[Driving the stack](#driving-the-stack).)* The JAR is Java-21
 bytecode for Keycloak's JVM. The Discord realm setup is a one-time step in
 [`keycloak/DISCORD_KEYCLOAK_SETUP.md`](keycloak/DISCORD_KEYCLOAK_SETUP.md).
 
@@ -775,7 +916,7 @@ Manual fallback only:
 ./gradlew :keycloak-spi:jar                                   # on a build machine
 install -o deploy -g deploy -m 0644 keycloak-spi-<version>.jar /var/iri/code/keycloak/providers/keycloak-spi.jar
 restorecon -F /var/iri/code/keycloak/providers/keycloak-spi.jar
-${UCTL} restart keycloak.service
+${UCTL} restart keycloak.service      # ~2 min full outage: restarts backend, frontend, ingest too
 ${UPOD} logs --since 2m keycloak | grep -iE 'error|exception|provider' | head
 ```
 
@@ -797,7 +938,10 @@ On production an `--apply` is a gated write like any other.
 `--frontend-client public|confidential`; a run without it leaves the type as it is. The switch to
 confidential is a two-step owner rollout with no login window — the frontend receives
 `KEYCLOAK_FRONTEND_CLIENT_SECRET` first, then the provisioner flips Keycloak with the same value:
-[`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md).
+[`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md). **Production
+is confidential since 2026-09-25** (both steps applied), so every production provisioner run passes
+`--frontend-client confidential` with the secret from `.env`, and a release rollback to 1.10.0 or
+older needs `--frontend-client public --apply` first — through a new provisioner session.
 
 The backend refuses to start under `prod` without `IRI_BACKEND_EXPECTED_AUDIENCES`, and the
 frontend's token carries that audience only once the realm is in shape — so on a host whose realm
@@ -822,6 +966,22 @@ raises `HostRebootRequired`; take it as a maintenance — the stack comes back o
 units are `WantedBy=default.target` and `iri` lingers. The runtime (podman, crun, conmon, netavark,
 aardvark-dns, containers-common, passt) is updated by hand, testing host first:
 `dnf upgrade --security podman crun conmon netavark aardvark-dns containers-common passt`.
+
+> [!warning] Known after-reboot effect: four failed `iri-*` units (open follow-up)
+> Production was rebooted for kernel 6.12.0-211.58.1 on 2026-09-25 at 15:56 UTC; all 18 containers
+> were back healthy by 15:59 and `basetool_host_reboot_required` went to 0. But at 15:57:30 the
+> **services** `iri-deploy`, `iri-backup`, `iri-restore-drill` and `iri-container-cleanup` were
+> started — their timers' `LastTrigger` did not move, and all four timers are `Persistent=yes` — and
+> each failed within a second. `deploy.sh` logged
+> `FATAL: podman is installed but no lingering user could be found that owns the containers (looked in /var/lib/systemd/linger)`,
+> although `/var/lib/systemd/linger/iri` has existed since 2026-09-18; logind came up at 15:57:27
+> and `user@<iri uid>.service` at 15:57:30. The line carries no "after waiting …" clause, so
+> `rt_detect` did not wait: read against `scripts/lib/container-runtime.sh`, either the runtime
+> directory already existed and the `podman ps` probe failed anyway, or the user lookup failed —
+> neither is a case the boot-time wait covers (arc42 §7.4b). The root cause is not established. **The stack is unaffected**; the
+> units stay `failed` (and `SystemdUnitFailed` may page) until their next regular tick, which
+> succeeds. The code fix is an open follow-up; until it lands, after a reboot check
+> `systemctl --failed` and read the four logs before assuming anything else broke.
 
 Confirm by content, never by mtime:
 `sha256sum /var/iri/code/scripts/deploy.sh` against `git show origin/main:scripts/deploy.sh | sha256sum`.
@@ -875,8 +1035,16 @@ step 3). Since 2026-09-23 the edge can verify that hop too, pinning that very ce
 Grafana upstream's only anchor and checking the name `grafana` (`include/upstream-grafana-tls.conf`,
 REQ-OBS-008). It is behind **`EDGE_GRAFANA_UPSTREAM_VERIFY`**, `off` by default, so the release that
 carries it changes nothing but one read-only mount: the edge now mounts `grafana.crt`, the same file
-Grafana itself needs to start, and `deploy.sh` refuses a release whose edge unit names a missing
-one.
+Grafana itself needs to start. `deploy.sh`'s mount pre-flight reads the units **already installed**
+at the start of a tick (before the tick installs the incoming bundle's), so it does not stop the
+release that *adds* this mount: with the file missing, that release fails at the edge's start and
+the health gate rolls it back; only later ticks refuse it up front *(corrected 2026-09-25)*. The
+file exists wherever Grafana runs, and on production it was confirmed on 2026-09-25.
+
+> [!note] Applied on production 2026-09-25 (~15:40 UTC, #2039)
+> Exactly as below. The edge logged `Grafana's upstream certificate is verified (pinned)` and
+> Grafana's `/api/health` answered `200`. The re-mint rule at the end of this section now applies
+> to production.
 
 **Precondition** (read-only): the certificate names `grafana`.
 
@@ -991,6 +1159,20 @@ needs @greluc's explicit yes, in chat, per step.** Nothing here happens by itsel
 ships this is inert, and the switches are host files the owner creates and host variables the owner
 sets.
 
+> [!note] Where production stands (2026-09-25)
+> - **Step 0** — done with the 1.11.0 role run (~11:5x UTC).
+> - **Step 1** — done ~15:40 UTC. The pre-check gave `Verification: OK` for all four services;
+>   `INTERNAL_TLS_VERIFY_HOSTNAME=true`, frontend and ingest restarted healthy.
+> - **Step 2** — 2a–2e done ~15:52 UTC exactly as written: the mint printed `The CA key no longer
+>   exists.`; `/var/iri/secrets/tls` holds `backend.p12 ca.crt frontend.p12 ingest.p12 keycloak.p12
+>   legacy-shared.crt truststore.p12`; `basetool-ca.crt` carries two anchors; edge, Prometheus and
+>   blackbox restarted with no edge verify error. **2f** turned up a pre-existing defect — the SPI
+>   truststore `.env` named had never existed — and was done by building it (see 2f below and
+>   [`DISCORD_KEYCLOAK_SETUP.md` §7.3](keycloak/DISCORD_KEYCLOAK_SETUP.md#73-truststore-for-the-backend-certificate)).
+> - **Step 3** — open on production: the release that flips `PATH_VARS` (#2036) is merged to
+>   `main` (2026-09-25) and reaches production with the next promoted release.
+> - **Step 4** — open, a day after step 3 without TLS errors.
+
 **Why.** The shared `/var/iri/secrets/keystore.p12` is the identity of backend, frontend, ingest and
 Keycloak at once, and — self-signed — also the anchor every one of them trusts. A key read out of
 the internet-facing ingest container is therefore the backend's and Keycloak's key too. After the
@@ -1005,10 +1187,11 @@ and every new switch defaults to today's behaviour:
 | `INTERNAL_TLS_VERIFY_HOSTNAME` | host `.env` → `env.d` (frontend, ingest) | `false` | `true` |
 | `IRI_BACKEND_KEYSTORE_HOST_PATH` / `_FRONTEND_` / `_INGEST_` / `_KEYCLOAK_` | baked into the units by `generate-quadlet.py` (`PATH_VARS`) | `/var/iri/secrets/keystore.p12` | `/var/iri/secrets/tls/<service>.p12` |
 | `IRI_INTERNAL_TRUSTSTORE_HOST_PATH` → `/run/secrets/internal-truststore.p12` | baked, as above | `/var/iri/secrets/keystore.p12` | `/var/iri/secrets/tls/truststore.p12` |
+| `IRI_TRUSTSTORE_HOST_PATH` → `/run/secrets/truststore.p12` (REQ-OPS-022's JVM-truststore default; production's JVM truststore is the role's separate `jvm-truststore.p12` drop-in) | baked, as above | `/var/iri/secrets/keystore.p12` — the shared **private key**, mounted into all three apps | `/var/iri/secrets/tls/truststore.p12`, so no container holds the old key |
 | `/var/iri/monitoring/certs/basetool-ca.crt` (edge, Prometheus, blackbox) | host file | the shared certificate | the internal CA |
-| `/var/iri/secrets/backend-truststore.p12` (Keycloak SPI precheck, if configured) | host file | the backend's shared certificate | the internal CA |
+| `/var/iri/secrets/backend-truststore.p12` (Keycloak SPI precheck, if configured) | host file + a hand-installed keycloak drop-in | the backend's shared certificate (alias `backend`) | the internal CA only (alias `internal-ca`; both from step 2f to step 4) |
 
-The four `*_KEYSTORE_HOST_PATH` and the truststore path are **baked**: setting them in `.env` does
+The four `*_KEYSTORE_HOST_PATH` and the two truststore paths are **baked**: setting them in `.env` does
 nothing on the Podman host (`check-conformance.py` → `env-reaches-the-units` says so). They move with
 the follow-up release that flips `PATH_VARS`, and that release must not be promoted before step 2.
 
@@ -1035,7 +1218,9 @@ ansible-playbook site.yml --limit production --tags scripts --check --diff
 ansible-playbook site.yml --limit production --tags scripts
 ```
 
-Expected: `mint-internal-tls.sh`, `deploy.sh`, `backup.sh` changed under `/var/iri/code/scripts/`.
+Expected: `mint-internal-tls.sh`, `deploy.sh`, `backup.sh` changed under `/var/iri/code/scripts/`,
+plus `render-redis-acl.py` and `redis-users.acl.tmpl` if the Redis ACL renderer
+([The Redis ACL](#the-redis-acl)) was not installed before — the same run installs both.
 Rollback: re-run the role from the previous commit.
 
 ### Step 1 — check the names (independent of everything else)
@@ -1117,9 +1302,8 @@ cat /var/iri/secrets/tls/ca.crt /var/iri/secrets/tls/legacy-shared.crt > /var/ir
 restorecon -F /var/iri/monitoring/certs/basetool-ca.crt
 ${UCTL} restart edge.service prometheus.service blackbox-exporter.service
 
-# 2f. Only if the Keycloak SPI precheck is configured (KRT_BACKEND_TRUSTSTORE_PATH in .env): add the
-#     CA to its truststore the same way (docs/keycloak/DISCORD_KEYCLOAK_SETUP.md §7.3), then
-#     ${UCTL} restart keycloak.service
+# 2f. Only if the Keycloak SPI precheck is configured (KRT_BACKEND_TRUSTSTORE_PATH in .env) --
+#     see "Step 2f" below: it may have to BUILD the truststore, not just extend it.
 ```
 
 Expected: the mint prints `The CA key no longer exists.`; `ls` shows `backend.p12 ca.crt
@@ -1129,11 +1313,85 @@ put the old certificate back into `basetool-ca.crt` (`cp /var/iri/secrets/tls/le
 /var/iri/monitoring/certs/basetool-ca.crt`), restart the same three units; `/var/iri/secrets/tls`
 may stay, nothing mounts it yet.
 
+#### Step 2f — the Keycloak SPI precheck's truststore
+
+The account-existence precheck (REQ-SEC-022) calls the backend from inside Keycloak and trusts it
+through its own PKCS#12 store, named by `.env`'s `KRT_BACKEND_TRUSTSTORE_PATH` (a path **inside**
+the keycloak container) and mounted there by a drop-in the operator installs
+([`DISCORD_KEYCLOAK_SETUP.md` §7.3](keycloak/DISCORD_KEYCLOAK_SETUP.md#73-truststore-for-the-backend-certificate)).
+Check first, read-only, that the store really exists — **do not assume it**:
+
+```bash
+sed -n 's/^KRT_BACKEND_TRUSTSTORE_PATH=//p' /var/iri/code/.env          # empty: skip 2f entirely
+ls -l /var/iri/secrets/backend-truststore.p12
+ls -l /etc/containers/systemd/users/${IRI_UID}/keycloak.container.d/
+journalctl CONTAINER_NAME=keycloak --since -7d -o cat | grep -c 'Failed to load the backend truststore'   # must be 0
+```
+
+> [!warning] Found on production 2026-09-25: the variable was set, the store never existed
+> `.env` named `/run/secrets/backend-truststore.p12` (with a password), but no such file was on the
+> host and no drop-in mounted one, so Keycloak logged
+> `WARN [BackendTrustSupport] Failed to load the backend truststore; the Discord account-existence precheck will fail open until it is fixed.: java.nio.file.NoSuchFileException: /run/secrets/backend-truststore.p12`
+> at every start, over at least seven days of log history: the duplicate-account guard was **failing
+> open on production**. Fixed ~15:52 UTC the same day by building the store with **both** entries
+> and installing the drop-in, as below; no truststore warning since.
+
+**If the store is missing**, build it with both entries — alias `backend` = the current shared
+certificate (what the backend serves until step 3), alias `internal-ca` = the new CA (what it
+serves from step 3) — through the backend image's `keytool`, with the password `.env` already
+holds, in a scratch directory the rootless container can write to, then install it root-owned.
+**As run on production 2026-09-25 (~15:52 UTC)**, as root from `/`, after step 2, with `IRI_UID`,
+`UCTL` and `UPOD` from the prelude:
+
+```bash
+T=/var/iri/secrets/tls
+# a scratch dir the rootless container (root in it = iri on the host) can write into; /root is not traversable for iri
+W=$(mktemp -d /var/iri/secrets/.kc-trust.XXXXXX)
+cp "$T/legacy-shared.crt" "$T/ca.crt" "$W/"; chown -R iri:iri "$W"; chmod 0700 "$W"; chmod 0644 "$W"/*.crt
+IMG=$(${UPOD} container inspect backend --format '{{.ImageName}}')
+export KRT_TS_PASSWORD="$(sed -n 's/^KRT_BACKEND_TRUSTSTORE_PASSWORD=//p' /var/iri/code/.env | tail -1)"
+[ -n "$KRT_TS_PASSWORD" ] || { echo "KRT_BACKEND_TRUSTSTORE_PASSWORD is empty"; exit 1; }
+for a in backend:legacy-shared.crt internal-ca:ca.crt; do
+  sudo --preserve-env=KRT_TS_PASSWORD -u iri podman run --rm --user 0 -e KRT_TS_PASSWORD \
+    --entrypoint keytool -v "$W":/work "${IMG}" -importcert -noprompt -storetype PKCS12 \
+    -alias "${a%%:*}" -file "/work/${a##*:}" -keystore /work/backend-truststore.p12 \
+    -storepass:env KRT_TS_PASSWORD
+done
+unset KRT_TS_PASSWORD
+install -o root -g root -m 0644 "$W/backend-truststore.p12" /var/iri/secrets/backend-truststore.p12
+restorecon -F /var/iri/secrets/backend-truststore.p12
+rm -rf "$W"
+D=/etc/containers/systemd/users/${IRI_UID}/keycloak.container.d
+printf '[Container]\nVolume=/var/iri/secrets/backend-truststore.p12:/run/secrets/backend-truststore.p12:ro\n' > "$D/50-backend-truststore.conf"
+chown deploy:deploy "$D/50-backend-truststore.conf"; chmod 0644 "$D/50-backend-truststore.conf"
+${UCTL} daemon-reload && ${UCTL} restart keycloak.service   # restarts backend, frontend, ingest too (Requires=) -- ~2 min outage
+```
+
+Output on production: `Certificate was added to keystore` twice; the drop-in landed beside the
+existing `30-log-driver.conf`. Two things the block takes for granted that another host may not
+have: the drop-in directory `$D` already existed on production (create it first with
+`install -d -o deploy -g deploy -m 0755 "$D"` where it does not), and the mount target
+`/run/secrets/backend-truststore.p12` is production's `KRT_BACKEND_TRUSTSTORE_PATH` — on any host
+it must be exactly what that variable names.
+
+**If the store exists**, add only the CA the same way (one `-importcert` with `-alias internal-ca`
+on a working copy in such a scratch directory, then `install` it back), and restart keycloak.
+
+Verify: `journalctl CONTAINER_NAME=keycloak --since -5m -o cat | grep -c 'Failed to load the backend truststore'`
+is `0`, and `${UPOD} exec keycloak ls /run/secrets` lists `backend-truststore.p12` (both held on
+production since 2026-09-25). The drop-in survives every release (`deploy.sh` never touches a
+`.container.d/`), but **neither it nor the store is in the backup**. **Rollback:** remove the
+drop-in, `daemon-reload`, restart keycloak — the precheck fails open again, which is where it was.
+
 ### Step 3 — serve the new certificates
 
 Merge and promote the follow-up release that bakes the step-2 files into the units (`PATH_VARS`) —
-its `deploy.sh` pre-flight refuses the release if any of the files is missing, before anything is
-applied. The deploy recreates backend, frontend, ingest and Keycloak on their own leaves; the
+**only after step 2 has put every file in place**. The `deploy.sh` mount pre-flight reads the units
+already installed at the start of the tick, not the incoming ones, so it does **not** refuse this
+release before applying it: a missing file makes the containers fail to start and the health gate
+roll the release back (and later ticks then refuse it). Check the files by hand first
+(`ls -l /var/iri/secrets/tls/`) *(corrected 2026-09-25: this used to say the pre-flight refuses the
+release before anything is applied)*. The deploy recreates backend, frontend, ingest and Keycloak on their own leaves; the
 truststore still carries the old certificate, so the restart order does not matter.
 
 Verify:
@@ -1150,6 +1408,13 @@ curl -fsS https://profit-base.online/auth/realms/iri/.well-known/openid-configur
 ```
 
 Expected: `Verification: OK` against **the CA alone**, and each `subject=` names its own service.
+
+**kcadm after step 3** *(added 2026-09-25)*: the documented kcadm session trusts
+`/run/secrets/keystore.p12` inside the keycloak container. From this release on, that path is
+Keycloak's own leaf keystore, and the keycloak unit mounts no truststore. The session probably keeps
+working, but nobody has verified it; the fallback, and whether keycloak should mount the CA-only
+truststore, are an open question in
+[`keycloak/README.md` → *Runbook — provisioning the mobile client*](keycloak/README.md#runbook--provisioning-the-mobile-client-basetool-android).
 **Rollback:** re-promote the previous release (the old units mount the shared keystore, which is
 untouched and still trusted by every client).
 
@@ -1171,10 +1436,16 @@ ${UCTL} restart backend.service ingest.service frontend.service
 systemctl start iri-cert-expiry.service      # the metric now reports the CA's own expiry
 ```
 
-Also drop the old entry from the SPI truststore if 2f was done. From here on, **the old
-`keystore.p12` is no longer a trust anchor anywhere**; keep it until the next backup has captured
-`/var/iri/secrets/tls`, then remove it. **Rollback:** re-import `legacy-shared.crt` as in 2c, rebuild
-the bundle as in 2e, restart the same units.
+Also drop the old entry from the SPI truststore if 2f was done: `keytool -delete -alias backend`
+on a working copy in a scratch directory (as in 2f), `install` it back, then
+`${UCTL} restart keycloak.service` — which restarts backend, frontend and ingest as well, so it can
+take the place of the app restart above rather than follow it. From here on, **the old
+`keystore.p12` is no longer a trust anchor anywhere**, and since step 3 no unit mounts it any more
+(the step-3 release also moved the REQ-OPS-022 `/run/secrets/truststore.p12` mount onto the CA-only
+truststore), so no container holds the old key. **Leave the file in place** anyway: it is what the
+rollback of step 3 — the previous release — mounts. Confirm the next nightly backup carries
+`config/internal-tls.tar`. **Rollback:** re-import `legacy-shared.crt` as in 2c, rebuild the bundle
+as in 2e, restart the same units.
 
 **Rotation after the rollout** is a re-mint: all leaves and the CA together, into a fresh directory,
 then the same widening (old CA as second anchor) → switch → narrowing. No single leaf can be
@@ -1248,7 +1519,7 @@ restorecon -F /var/iri/monitoring/certs/basetool-ca.crt
 openssl x509 -in /var/iri/monitoring/certs/basetool-ca.crt -noout -subject -enddate -ext subjectAltName
 
 # 6. Restart every consumer; each blocks until healthy.
-${UCTL} restart keycloak.service backend.service ingest.service frontend.service edge.service
+${UCTL} restart keycloak.service backend.service ingest.service frontend.service edge.service   # a full outage (Requires=)
 ${UCTL} restart prometheus.service blackbox-exporter.service
 systemctl start iri-cert-expiry.service          # re-read the certificate files now, not at 03:40
 
@@ -1391,6 +1662,7 @@ goes.
 | nothing answers on 80/443 | `systemctl status haproxy`, `firewall-cmd --list-all` | haproxy not started (fresh host), or a firewall layer — probe from a third machine |
 | Stack comes back after a manual stop | `drift:` lines in the deploy log | the drift check (REQ-OPS-013); stop the timer first |
 | `CARVE-OUT: postgres/Keycloak image pin changed` | the deploy log, `config-blocked.marker` | a gated upgrade — see [Stateful-infra upgrades](#stateful-infra-upgrades) |
+| Deploy stuck on a config apply: `PRE-FLIGHT: … is not owned or not writable by deploy`, or `FATAL: deploy aborted before the health gate — step 'mirror …' failed (exit 23)` after an `rsync: … mkstemp … Permission denied (13)`; `DeployFailed` fires, then `target failed Nx; in backoff window` | the deploy log, `find /var/iri/code/{docker,keycloak-theme,monitoring,quadlet} ! -user deploy` | a release-owned subtree (here `docker/acme`, 2026-09-25) was created or copied as root. Fix the owner — `chown -R deploy:deploy /var/iri/code/docker` (or the subtree named), or the role with `--tags directories` — then `sudo -u deploy /var/iri/code/scripts/deploy.sh --force` to skip the backoff. If the log also says **INCONSISTENT**, the restore failed too: the same fix, then `--force`; `config-previous/` was kept |
 | A promoted unit change is ignored | `ls ~iri/.config/containers/systemd/` | a hand-placed unit of the same name shadows the delivered one |
 | Monitoring config changes never load | the deploy log (`IRI_MONITORING_ENABLED != 'true'`) | set `IRI_MONITORING_ENABLED=true` in `.env`; `MonitoringReconcileDisabled` fires meanwhile |
 

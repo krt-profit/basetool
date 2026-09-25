@@ -241,18 +241,25 @@ READ_ONLY: dict[str, dict[str, Any]] = {
     "ingest": {},
 }
 
-#: The per-service keystores and the internal truststore (REQ-SEC-070, ADR-0211) are baked
-#: to the SHARED keystore on purpose: that is what production mounts until the owner has minted
-#: /var/iri/secrets/tls/ on the host. The rollout flips these five to the files in that directory
-#: (docs/deployment.md, "Internal TLS"); a unit naming a file the host lacks would not start.
+#: The per-service keystores and the internal truststore (REQ-SEC-070, ADR-0211) point at the
+#: material the owner minted into /var/iri/secrets/tls/ in step 2 of the rollout
+#: (docs/deployment.md, "Internal TLS"). A release carrying these must not be promoted to a host
+#: without that directory: deploy.sh refuses it before anything is applied, because a unit naming
+#: a file the host lacks would not start.
+#:
+#: IRI_TRUSTSTORE_HOST_PATH (the REQ-OPS-022 JVM-truststore mount, /run/secrets/truststore.p12)
+#: moves to the CA-only truststore as well. Its old source was the shared keystore -- private key
+#: included -- mounted into all three apps, which would have left the old key in every container
+#: after the switch. Production's JVM truststore is the role's separate jvm-truststore.p12 drop-in,
+#: so nothing reads this mount there; the shared keystore stays on the host only as the rollback.
 PATH_VARS = {
     "IRI_KEYSTORE_HOST_PATH": "/var/iri/secrets/keystore.p12",
-    "IRI_BACKEND_KEYSTORE_HOST_PATH": "/var/iri/secrets/keystore.p12",
-    "IRI_FRONTEND_KEYSTORE_HOST_PATH": "/var/iri/secrets/keystore.p12",
-    "IRI_INGEST_KEYSTORE_HOST_PATH": "/var/iri/secrets/keystore.p12",
-    "IRI_KEYCLOAK_KEYSTORE_HOST_PATH": "/var/iri/secrets/keystore.p12",
-    "IRI_INTERNAL_TRUSTSTORE_HOST_PATH": "/var/iri/secrets/keystore.p12",
-    "IRI_TRUSTSTORE_HOST_PATH": "/var/iri/secrets/keystore.p12",
+    "IRI_BACKEND_KEYSTORE_HOST_PATH": "/var/iri/secrets/tls/backend.p12",
+    "IRI_FRONTEND_KEYSTORE_HOST_PATH": "/var/iri/secrets/tls/frontend.p12",
+    "IRI_INGEST_KEYSTORE_HOST_PATH": "/var/iri/secrets/tls/ingest.p12",
+    "IRI_KEYCLOAK_KEYSTORE_HOST_PATH": "/var/iri/secrets/tls/keycloak.p12",
+    "IRI_INTERNAL_TRUSTSTORE_HOST_PATH": "/var/iri/secrets/tls/truststore.p12",
+    "IRI_TRUSTSTORE_HOST_PATH": "/var/iri/secrets/tls/truststore.p12",
     "IRI_REDIS_ACL_HOST_PATH": "/var/iri/redis/users.acl",
     "IRI_UPSTREAM_CA_HOST_PATH": "/var/iri/monitoring/certs/basetool-ca.crt",
     "IRI_GRAFANA_UPSTREAM_CERT_HOST_PATH": "/var/iri/monitoring/certs/grafana.crt",

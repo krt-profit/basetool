@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.exception;
 
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import jakarta.servlet.http.HttpServletRequest;
+import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -28,6 +29,7 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.catalina.connector.ClientAbortException;
 import org.apache.tomcat.util.http.InvalidParameterException;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.MDC;
@@ -43,6 +45,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
@@ -547,6 +550,45 @@ public class GlobalExceptionHandler {
     page.addObject("status", String.valueOf(status.value()));
     page.addObject("errorCode", code);
     return page;
+  }
+
+  /**
+   * A client that went away while the response was still being written. Not an error, and
+   * deliberately answered with <em>nothing at all</em> (REQ-OBS-001, REQ-NOTIF-010).
+   *
+   * <p>Written after it reached the production log: 33 {@code ERROR} lines in two minutes on {@code
+   * GET /notifications/stream} right after the v1.11.0 deploy (2026-09-25). The notification relay
+   * holds an {@code SseEmitter} open for up to 30 minutes, and every ordinary way a browser leaves
+   * closes it mid-write — a navigation, a closed tab, a window handed to the login flow. The relay
+   * then completes its emitter; Spring flushes a response that already failed, raises {@link
+   * AsyncRequestNotUsableException}, sets it as the async result and dispatches it back here.
+   * Before this handler existed it fell through to {@link #handleException}, which cost two lines
+   * per disconnect: that handler's {@code ERROR} with a full stack trace — feeding {@code
+   * logback_events_total{level="error"}} and {@code LogbackErrorSpike} — and Tomcat's {@code
+   * Servlet.service() … threw exception}, because rendering the error page into the dead response
+   * raised the same exception again. Those lines render {@code userId} as {@code anonymous} because
+   * the async dispatch runs without the request thread's MDC, not because the caller was.
+   *
+   * <p>{@link ClientAbortException} is the same fact on a plain, non-async response: Tomcat's word
+   * for "the client closed the connection while we were writing the body".
+   *
+   * <p><strong>The {@code void} return type is the fix, not an oversight.</strong> It tells Spring
+   * the exception is handled and leaves the response untouched: there is no connection left to
+   * write to, and trying to write one is what produced the second line. The backend's handler of
+   * the same name makes the same choice. {@code DEBUG} rather than {@code INFO}: a disconnect
+   * carries nothing a reader would act on, and an SSE page produces one per viewer per navigation.
+   *
+   * @param ex the disconnect, kept only for the debug line's exception type
+   * @param request the current request, for the method and URI in the debug line
+   */
+  @ExceptionHandler({AsyncRequestNotUsableException.class, ClientAbortException.class})
+  public void handleDisconnectedClient(
+      @NotNull IOException ex, @NotNull HttpServletRequest request) {
+    log.debug(
+        "Client disconnected from {} {} [exception={}]",
+        request.getMethod(),
+        request.getRequestURI(),
+        ex.getClass().getSimpleName());
   }
 
   /**

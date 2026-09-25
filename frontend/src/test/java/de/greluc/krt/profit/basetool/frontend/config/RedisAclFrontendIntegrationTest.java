@@ -63,6 +63,7 @@ import org.springframework.session.FindByIndexNameSessionRepository;
 import org.springframework.session.FlushMode;
 import org.springframework.session.data.redis.RedisIndexedSessionRepository;
 import org.springframework.session.data.redis.RedisIndexedSessionRepository.RedisSession;
+import org.springframework.session.data.redis.config.ConfigureRedisAction;
 import org.springframework.session.events.SessionCreatedEvent;
 import org.springframework.session.events.SessionDeletedEvent;
 import org.testcontainers.containers.GenericContainer;
@@ -197,6 +198,55 @@ class RedisAclFrontendIntegrationTest {
           .contains("g")
           .contains("x");
     }
+  }
+
+  /**
+   * The 2026-09-25 production finding, end to end against the real ACL: the startup step the
+   * frontend picks for its own user moves {@code INFO}'s {@code acl_access_denied_cmd} — the
+   * counter behind {@code redis_acl_access_denied_cmd_total} and {@code RedisAclDenials} — not at
+   * all, while the {@code CONFIG} step of before moves it on every start.
+   */
+  @Test
+  void theStartupStepPickedForTheFrontendUserIsNeverRefused() {
+    LettuceConnectionFactory factory =
+        connect(RedisAclTemplate.FRONTEND_USER, "REDIS_FRONTEND_PASSWORD");
+    StringRedisTemplate admin = template(connect(RedisAclTemplate.ADMIN_USER, "REDIS_PASSWORD"));
+
+    long before = deniedCommands(admin);
+    try (RedisConnection connection = factory.getConnection()) {
+      RedisSessionConfig.selectConfigureRedisAction(true, RedisAclTemplate.FRONTEND_USER)
+          .configure(connection);
+    }
+    assertThat(deniedCommands(admin))
+        .as("refused commands after the startup step under basetool-frontend")
+        .isEqualTo(before);
+
+    try (RedisConnection connection = factory.getConnection()) {
+      new TolerantKeyspaceNotificationsAction().configure(connection);
+    }
+    assertThat(deniedCommands(admin))
+        .as("the CONFIG GET of before is refused and counted")
+        .isEqualTo(before + 1);
+  }
+
+  /**
+   * Dropping {@code CONFIG} did not drop the fail-fast start (ADR-0084): with a wrong password the
+   * startup step under the frontend's user still throws, so the context refresh fails.
+   */
+  @Test
+  void theStartupStepForTheFrontendUserStillFailsOnWrongCredentials() {
+    LettuceConnectionFactory factory =
+        connectWithUsername(RedisAclTemplate.FRONTEND_USER, "not-the-frontend-password");
+    ConfigureRedisAction action =
+        RedisSessionConfig.selectConfigureRedisAction(true, RedisAclTemplate.FRONTEND_USER);
+
+    assertThatThrownBy(
+            () -> {
+              try (RedisConnection connection = factory.getConnection()) {
+                action.configure(connection);
+              }
+            })
+        .isInstanceOf(DataAccessException.class);
   }
 
   @Test
@@ -338,6 +388,7 @@ class RedisAclFrontendIntegrationTest {
     "basetool-frontend, SUBSCRIBE __keyevent@0__:expired, true",
     "basetool-frontend, PUBLISH basetool:livesync:changed m, true",
     "basetool-frontend, INFO server, true",
+    "basetool-frontend, PING, true",
     "basetool-frontend, GET ingest:handoff-index:sub, false",
     "basetool-frontend, SET other:key v, false",
     "basetool-frontend, PUBLISH basetool:notify:published m, false",
@@ -394,6 +445,21 @@ class RedisAclFrontendIntegrationTest {
             : String.valueOf(reply);
 
     assertThat("OK".equals(verdict)).as("%s: %s -> %s", user, command, verdict).isEqualTo(allowed);
+  }
+
+  /**
+   * Reads how many commands Redis has refused under its ACL since it started.
+   *
+   * @param admin a template authenticated as {@code admin}, which may run {@code INFO}.
+   * @return {@code INFO stats}' {@code acl_access_denied_cmd}.
+   */
+  private static long deniedCommands(StringRedisTemplate admin) {
+    Properties stats =
+        admin.execute(
+            (org.springframework.data.redis.core.RedisCallback<Properties>)
+                connection -> connection.serverCommands().info("stats"));
+    assertThat(stats).isNotNull();
+    return Long.parseLong(stats.getProperty("acl_access_denied_cmd", "0").strip());
   }
 
   /**

@@ -252,6 +252,10 @@ groups:
       # of our services trying its luck. INFO's acl_access_denied_* counters, verified against the
       # pinned redis_exporter on 2026-09-23. Held for five minutes so one stray probe cannot page,
       # while a misconfigured service -- which fails on every connection attempt -- always will.
+      # On release 1.11.0 one refusal is benign: every frontend start runs Spring Session's CONFIG GET
+      # (TolerantKeyspaceNotificationsAction), the ACL refuses it by design -- two cmd denials per
+      # start on production, 2026-09-25 -- and this rule did not fire for it that day. #2067 sends a
+      # PING instead under a named user, so from the release carrying it no refusal is expected.
       - alert: RedisAclDenials
         expr: >-
           (sum(increase(redis_acl_access_denied_auth_total[5m])) or vector(0))
@@ -265,6 +269,10 @@ groups:
         annotations:
           summary: "Redis is refusing authentication or commands under its ACL ({{ $value | printf \"%.0f\" }} in 5m)"
           description: "Redis counted ACL refusals (INFO acl_access_denied_auth/cmd/key/channel). With one ACL user per service (REQ-SEC-068) that is a service whose REDIS_<SVC>_PASSWORD does not match the rendered /var/iri/redis/users.acl, a rule in scripts/redis-users.acl.tmpl too narrow for what the service does, or a client that is none of ours. Run `redis-cli ACL LOG 20` inside the redis container as the admin user and read the username, reason and context fields only — the object field can carry a session key, i.e. a session id. See docs/deployment.md, The Redis ACL."
+      # No service of ours is refused anything in normal operation, a restart included: since
+      # 2026-09-25 the frontend sends no CONFIG at startup under its own user (a PING instead), so
+      # the one refusal a correctly configured deployment used to produce -- config|get, once per
+      # frontend start -- is gone, and every count above is a finding.
 
       - alert: CertificateExpiringSoon
         expr: (probe_ssl_earliest_cert_expiry - time()) < 14 * 24 * 3600

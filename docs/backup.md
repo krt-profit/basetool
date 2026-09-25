@@ -39,6 +39,14 @@ staging directory `…/staging/<UTC timestamp>/`:
 | Monitoring plane (ADR-0072)    | `monitoring/grafana.db`, `monitoring/secrets.tar.gz`, `monitoring/alertmanager.tar.gz` | Grafana SQLite (brief `grafana` stop for a consistent copy), `/var/iri/monitoring/{secrets,certs}`, Alertmanager silences + notification log |
 | Prometheus TSDB (Sundays only) | `monitoring/prometheus-tsdb-snapshot.tar.gz` | admin-API snapshot via a throwaway curl container on `net-monitoring-core` |
 
+**Not captured, and needed after a host rebuild** *(added 2026-09-25)*: the Keycloak SPI's
+`/var/iri/secrets/backend-truststore.p12` and the drop-in that mounts it,
+`/etc/containers/systemd/users/<iri uid>/keycloak.container.d/50-backend-truststore.conf`. Both hold
+public material only and are rebuilt, not restored —
+[`DISCORD_KEYCLOAK_SETUP.md` §7.3](keycloak/DISCORD_KEYCLOAK_SETUP.md#73-truststore-for-the-backend-certificate).
+Without them `.env`'s `KRT_BACKEND_TRUSTSTORE_PATH` points at nothing and the Discord
+duplicate-account precheck fails open (the state production was in until 2026-09-25).
+
 Root-owned files and named volumes are read through a throwaway **helper container**
 (`IRI_BACKUP_HELPER_IMAGE`, default `docker.io/library/postgres:18-alpine`). If you override it,
 **qualify it fully**: rootless Podman on Rocky enforces short-name resolution and refuses a short

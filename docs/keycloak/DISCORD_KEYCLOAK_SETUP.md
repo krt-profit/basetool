@@ -61,7 +61,9 @@ The Discord identity provider, its mappers and the membership gate ship as one J
 
 **On production there is nothing to do.** The JAR is a promotable artifact (ADR-0055,
 `basetool-keycloak-spi`): `deploy.sh` stages `keycloak-spi.jar` whenever a new one is promoted and
-restarts keycloak alone, restoring the previous JAR on failure. The manual fallback (build, install
+restarts keycloak, restoring the previous JAR on failure. *(Corrected 2026-09-25: this said
+"keycloak alone" — backend, frontend and ingest `Requires=` keycloak and restart with it; see the
+warning in §3d.)* The manual fallback (build, install
 as `deploy` `0644` — Keycloak runs as container uid 1000 and must read it — `restorecon`, restart)
 is in [`deployment.md` → *Keycloak provider JAR*](../deployment.md#keycloak-provider-jar).
 
@@ -180,6 +182,13 @@ gate.
      --env /var/iri/code/.env --templates /var/iri/code/quadlet/env.d --out /var/iri/code/env.d
    ${UCTL} restart keycloak.service
    ```
+
+   > [!warning] Restarting Keycloak restarts the whole app
+   > `backend` `Requires=` keycloak, `frontend` requires backend and keycloak, `ingest` requires
+   > backend — so systemd restarts all three with it. Measured on production 2026-09-25: about
+   > **two minutes** of maintenance page (15:52:40–15:54:50 UTC, 175 edge 502/503/504s; frontend
+   > and ingest briefly `failed`, back by `Restart=always`). Plan every Keycloak restart in this
+   > file as downtime ([`deployment.md` → *Driving the stack*](../deployment.md#driving-the-stack)).
 
 2. **Attribute importer mapper.** On the Discord IdP → **Mappers** → **Add mapper**:
 
@@ -321,26 +330,57 @@ keytool -importcert -noprompt \
   -alias backend -file backend.crt
 ```
 
-Mount it read-only into the keycloak container and point `KRT_BACKEND_TRUSTSTORE_PATH` at it
-(`/opt/keycloak/conf/backend-truststore.p12`). The environment variables are plumbed already; the
-mount is deliberately left to the operator so a deployment without the precheck is unaffected.
+Mount it read-only into the keycloak container **at exactly the path `KRT_BACKEND_TRUSTSTORE_PATH`
+names** — the variable and the mount target are one fact written twice, and nothing checks that
+they agree. On production the variable is `/run/secrets/backend-truststore.p12`, so that is the
+mount target there; `/opt/keycloak/conf/backend-truststore.p12` works equally well as long as the
+variable says the same. The environment variables are plumbed already; the mount is deliberately
+left to the operator so a deployment without the precheck is unaffected.
+
+> [!warning] Corrected 2026-09-25 — on production this step had never been done
+> Production's `.env` set `KRT_BACKEND_TRUSTSTORE_PATH=/run/secrets/backend-truststore.p12` and a
+> password, but no truststore existed on the host and no drop-in mounted one. Keycloak logged
+> `Failed to load the backend truststore; the Discord account-existence precheck will fail open until it is fixed.`
+> (`NoSuchFileException`) at every start, over at least seven days of history, so the duplicate-account
+> guard (REQ-SEC-022) was failing open. It was fixed on 2026-09-25 ~15:52 UTC with the commands
+> below. This section also used to mount to `/opt/keycloak/conf/…` while production's variable
+> named `/run/secrets/…` — following it verbatim would have mounted the file where the SPI does not
+> look.
 
 On the **production** (rootless Podman) host the mount is a Quadlet **drop-in** beside the generated
-unit — `deploy.sh` never touches a unit's `.container.d/` directory, so it survives every release.
-The truststore holds only the backend's public certificate, so it may be world-readable; Keycloak
-reads it as container uid 1000 (host uid 100999):
+unit — `deploy.sh` never touches a unit's `.container.d/` directory, so it survives every release
+(production's keycloak drop-in directory also holds `30-log-driver.conf`). The truststore holds only
+public certificates, so it may be world-readable; Keycloak reads it as container uid 1000 (host uid
+100999). The install and the drop-in, **as run on production 2026-09-25** (as root; `$W` is the
+scratch directory the store was built in, `IRI_UID=$(id -u iri)`):
 
 ```bash
-install -o root -g root -m 0644 backend-truststore.p12 /var/iri/secrets/backend-truststore.p12
+install -o root -g root -m 0644 "$W/backend-truststore.p12" /var/iri/secrets/backend-truststore.p12
 restorecon -F /var/iri/secrets/backend-truststore.p12
-D=/etc/containers/systemd/users/$(id -u iri)/keycloak.container.d
-install -d -m 0755 "$D"
-printf '[Container]\nVolume=/var/iri/secrets/backend-truststore.p12:/opt/keycloak/conf/backend-truststore.p12:ro\n' \
-  > "$D/50-backend-truststore.conf"
-${UCTL} daemon-reload && ${UCTL} restart keycloak.service
+rm -rf "$W"
+D=/etc/containers/systemd/users/${IRI_UID}/keycloak.container.d
+printf '[Container]\nVolume=/var/iri/secrets/backend-truststore.p12:/run/secrets/backend-truststore.p12:ro\n' > "$D/50-backend-truststore.conf"
+chown deploy:deploy "$D/50-backend-truststore.conf"; chmod 0644 "$D/50-backend-truststore.conf"
+${UCTL} daemon-reload && ${UCTL} restart keycloak.service   # restarts backend, frontend, ingest too (Requires=) -- ~2 min outage, see §3d
 ```
 
-On a local Docker Compose stack, use a compose override instead:
+`$D` already existed on production (it holds `30-log-driver.conf`); on a host where it does not,
+create it first with `install -d -o deploy -g deploy -m 0755 "$D"`. Afterwards
+`${UPOD} exec keycloak ls /run/secrets` lists `backend-truststore.p12`.
+
+The host has no JDK: the store is built through the backend image's `keytool` in a scratch
+directory the rootless container can write to. The full block as run, build included, is
+[`deployment.md` → *Step 2f*](../deployment.md#step-2f--the-keycloak-spi-prechecks-truststore).
+**Neither the store nor the drop-in is captured by `backup.sh`**; a host rebuilt from backup needs
+this section again.
+
+**Verify** — the Keycloak startup log must not contain the load failure:
+
+```bash
+journalctl CONTAINER_NAME=keycloak --since -5m -o cat | grep -c 'Failed to load the backend truststore'   # 0
+```
+
+On a local Docker Compose stack, use a compose override instead (mount target = the variable):
 
 ```yaml
 services:
@@ -349,23 +389,31 @@ services:
       - /var/iri/secrets/backend-truststore.p12:/opt/keycloak/conf/backend-truststore.p12:ro
 ```
 
-If the truststore is missing or wrong, the HTTPS call fails the handshake and the precheck simply
-fails open (the login proceeds to the normal PENDING queue). Rotate the secret by changing it on both
+If the truststore is missing or wrong, the precheck simply fails open (the login proceeds to the
+normal PENDING queue) — silently for the member, so the log is the only witness: a missing or
+unreadable store is the `Failed to load the backend truststore` `WARN` at every Keycloak start, a
+wrong one an `Account-existence probe could not reach the backend (…)` `WARN` per first login. Rotate the secret by changing it on both
 services; rebuild the truststore when the backend certificate is rotated.
 
 **After the per-service internal TLS rollout** (REQ-SEC-070) the backend serves a leaf of the
 internal CA, so the truststore holds **the CA** instead of a backend certificate — import
-`/var/iri/secrets/tls/ca.crt` under its own alias (`-alias internal-ca`) next to the old entry in
-step 2 of the rollout, and delete the old entry in step 4
+`/var/iri/secrets/tls/ca.crt` under its own alias (`-alias internal-ca`) next to the old entry
+(alias `backend`) in step 2 of the rollout, and delete the `backend` entry in step 4
 ([`deployment.md` → *Internal TLS*](../deployment.md#internal-tls-per-service-certificates-from-a-private-ca)).
-From then on a re-mint changes the CA, and this truststore with it.
+From then on a re-mint changes the CA, and this truststore with it. Production's store carries both
+entries since 2026-09-25 (it was built with them, step 2f).
 
 ### 7.4 Verify
 
+- The Keycloak startup log carries **no** `Failed to load the backend truststore` line
+  (`journalctl CONTAINER_NAME=keycloak --since -5m -o cat | grep -c 'Failed to load the backend truststore'`
+  → `0`). Without this check a misconfigured precheck looks exactly like a working one with no
+  collisions to deny.
 - A new Discord login whose username / server nickname / e-mail matches an existing account → denied
   with the "account already exists, link instead" page; no session, no new account.
 - A new, non-colliding Discord login → lands PENDING as before.
-- Unset `KRT_BACKEND_PRECHECK_URL` (and re-render `env.d`, restart keycloak) → the precheck is
+- Unset `KRT_BACKEND_PRECHECK_URL` (and re-render `env.d`, restart keycloak — a full app restart,
+  see §3d) → the precheck is
   skipped (fail-open), colliding logins land PENDING.
 - Linking Discord to an existing account from the Account Console still works (the precheck is skipped
   for an already-authenticated session).

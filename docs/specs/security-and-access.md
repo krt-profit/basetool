@@ -1218,6 +1218,10 @@ from masquerading as an application outage (the failure mode that drove the fron
   auto-configured decoder in place instead of failing the context at boot.
 - [x] The backend's production environment passes `KEYCLOAK_JWK_SET_URI`, empty unless the host
   sets `IRI_BACKEND_KEYCLOAK_JWK_SET_URI` (`JwkSetUriNamespaceTest`).
+- [x] Production fetches the JWKS internally. _(2026-09-25 ~15:38 UTC, owner-approved, per
+  [`deployment.md` → *Internal JWKS for the backend*](../deployment.md#internal-jwks-for-the-backend):
+  only `env.d/backend.env` changed, the backend was healthy in 11 s, no JWKS/PKIX/SAN line, an
+  authenticated `/api/v1/users/me` answered `200` and no `401` followed.)_
 - [ ] A JWKS timeout / 5xx / DNS failure yields `503` + `Retry-After` (not `500`), logged at WARN
   and counted on `basetool_http_error_total{code="SERVICE_UNAVAILABLE"}`.
 - [ ] An expired/invalid bearer token still yields `401`; a caller lacking the required role still
@@ -1286,9 +1290,10 @@ sibling subdomain and no plain-http response can plant or overwrite the session 
 into a session-fixation). All three conditions already held; the prefix makes the browser enforce
 them. It also makes them load-bearing: a `domain:`, a non-root `path:` or `secure: false` in any
 profile would not weaken the cookie quietly — the browser would drop it and every login would fail.
-The rename dropped every live session once, at the deploy that shipped it: the old `SESSION` cookie
-names nothing the app reads any more, so each member signed in again exactly once. The owner approved
-that trade.
+The rename drops every live session once, at the deploy that ships it — release **1.11.0**, not yet
+on production as of 2026-09-25: the old `SESSION` cookie names nothing the app reads any more, so
+each member signs in again exactly once (the Redis entries behind the old cookies simply age out;
+no flush). The owner approved that trade.
 
 **Acceptance**
 
@@ -4684,8 +4689,17 @@ its service does:
   `REDIS_<SVC>_USERNAME` is set; empty, it sends a password-only `AUTH` with the shared
   `REDIS_PASSWORD`, which is `default`, exactly as before.
 - **Nothing depends on the ACL state that must not.** The server carries `--notify-keyspace-events
-  Egx` (the frontend's `TolerantKeyspaceNotificationsAction` logs a `CONFIG` refusal instead of
-  failing), and the health probe is an unauthenticated `PING` accepting `NOAUTH`.
+  Egx`, and the health probe is an unauthenticated `PING` accepting `NOAUTH`.
+- **A correctly configured service sends no command its user is refused — at startup included.**
+  The frontend picks Spring Session's startup step from `spring.data.redis.username`: with none (or
+  `default`) it runs the `CONFIG GET` / `CONFIG SET` of before (`TolerantKeyspaceNotificationsAction`,
+  which still only logs a `NOPERM`); with its own user it sends a `PING` and **no `CONFIG`**
+  (`ServerConfiguredKeyspaceNotificationsAction`). Either way an unreachable store or a refused
+  credential fails the start (ADR-0084), and with
+  `app.session.configure-keyspace-notifications=false` (the image build's AOT run) nothing is sent.
+  So a refusal counted by `RedisAclDenials` is always a finding, never a restart. *(Added
+  2026-09-25: until then the frontend's `CONFIG GET` was refused on every start under its own user,
+  which production's `ACL LOG` showed as `config|get` for `basetool-frontend` after the rollout.)*
 - A new key prefix or channel is a template change, re-rendered and `ACL LOAD`ed on the host.
 
 **Acceptance**
@@ -4695,19 +4709,37 @@ its service does:
   publishes and receives on both channels; a handoff is consumed; `SCAN` and `INFO` answer.
 - [ ] The backend's notification fan-out and live-sync channel work under its user; the gateway's
   real staging, cap eviction included, works under its user.
+- [ ] The frontend's startup step under its own user leaves `acl_access_denied_cmd` unchanged and
+  sends no `CONFIG`; under `default` it still sends `CONFIG GET`; switched off it sends nothing; a
+  wrong password still fails it.
 - [ ] `ACL DRYRUN` refuses, per user, every foreign key, foreign channel, `CONFIG`, `KEYS`,
   `FLUSHALL`/`FLUSHDB`, `SCAN` for backend, ingest and monitoring, and `ACL` for every non-admin user.
 - [ ] A password-only `AUTH` works while `default` is on and fails once it is off.
 - [ ] The committed E2E ACL equals the template rendered with the E2E passwords, and the E2E stack
   runs every application on its own user with `default` off.
 - [ ] Refusals are alerted on (`RedisAclDenials`).
+- [x] Production runs every application on its own user with `default` off. _(2026-09-25, rollout
+  steps 2–5 at ~15:47–15:51 UTC, owner-approved: six users; backend and frontend connected as their
+  own users, ingest connects on demand; `REDIS_DEFAULT_USER=off` — an unauthenticated `PING` gets
+  `NOAUTH`, a password-only `AUTH` gets `WRONGPASS … user is disabled`, the health check is
+  healthy, `redis_up 1`.)_
+
+**Known on 1.11.0, gone once #2067 is released:** the 1.11.0 frontend's
+`TolerantKeyspaceNotificationsAction` still issues `CONFIG GET` at every start, and the ACL refuses
+it — two `ACL LOG` entries per start (`reason=command`, `config|get`, user `basetool-frontend`),
+counted in `redis_acl_access_denied_cmd_total`; `RedisAclDenials` did not fire for it on
+2026-09-25. The rule above (#2067) removes it. A release rollback to 1.10.0 or older now needs
+`REDIS_DEFAULT_USER=on` first.
 
 **Enforced by:** `RedisAclFrontendIntegrationTest` (real Spring Session, live sync, handoff, the
-`ACL DRYRUN` matrix for all users, the committed E2E ACL), `RedisAclBackendIntegrationTest`,
+`ACL DRYRUN` matrix for all users, the committed E2E ACL, the startup step's refusal count),
+`RedisSessionConfigTest`, `ServerConfiguredKeyspaceNotificationsActionTest`,
+`RedisAclBackendIntegrationTest`,
 `RedisAclIngestIntegrationTest`, `render-redis-acl.py --selftest` (`repo-lint.yml`), the E2E suite
 (`docker-compose.e2e.yml`, `E2eStackExtension`, `IngestHandoffE2eTest`) ·
 `monitoring/prometheus/tests/redis_acl_denials_test.yml` · **Code:** `scripts/redis-users.acl.tmpl`,
-`scripts/render-redis-acl.py`, `TolerantKeyspaceNotificationsAction`, the three apps'
+`scripts/render-redis-acl.py`, `RedisSessionConfig.selectConfigureRedisAction`,
+`ServerConfiguredKeyspaceNotificationsAction`, `TolerantKeyspaceNotificationsAction`, the three apps'
 `spring.data.redis.username` · **Monitoring:** `RedisAclDenials` · **Runbook:**
 [`deployment.md` → *The Redis ACL*](../deployment.md#the-redis-acl) · **ADR:** [ADR-0207](../adr/0207-each-service-reaches-redis-as-its-own-acl-user.md) ·
 **Related:** REQ-SEC-025, REQ-OPS-018
@@ -4742,6 +4774,14 @@ pattern is **PKCE + client secret**, never one instead of the other.
   variable is refused and writes nothing; `confidential` with it switches once and never rewrites the
   secret; `public` switches back without sending one.
 - [ ] Every E2E login goes through the confidential client.
+- [x] Production rollout step 1: the frontend holds the secret. _(2026-09-25, owner-approved:
+  `KEYCLOAK_FRONTEND_CLIENT_SECRET` generated on the host, frontend restarted, log `OAuth2 client
+  'keycloak' is CONFIDENTIAL`.)_
+- [x] Production rollout step 2: Keycloak's `basetool-frontend` is confidential with the same
+  secret. _(2026-09-25 16:15 UTC, owner-approved: the provisioner's `--frontend-client confidential`
+  dry run planned only `publicClient: true -> false` and the secret, `--apply` succeeded and a
+  second run planned nothing; no `invalid_client` since and a fresh login works —
+  [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](../OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md).)_
 
 **Enforced by:** `FrontendClientAuthenticationConfigTest` (Boot's real OAuth2 client
 auto-configuration, both modes, blank secret) · `CurrentRegistrationAuthorizedClientRepositoryTest`
@@ -4775,9 +4815,11 @@ production rollout reaches step by step:
   (`RestClientConfig`) verify the backend's hostname, which ADR-0204 §6 had switched off for the
   relay. The backend's Keycloak client, the edge, Prometheus and the blackbox exporter verified
   already. `dev` and `test` are unaffected.
-- **Safe to ship before the rollout.** Every per-service mount falls back to the shared keystore
-  and `INTERNAL_TLS_VERIFY_HOSTNAME` defaults to `false`, so a release carrying this changes nothing
-  until the owner mints the material and flips the switches (runbook below).
+- **Shipped in two releases.** The first was inert: every per-service mount fell back to the shared
+  keystore and `INTERNAL_TLS_VERIFY_HOSTNAME` defaulted to `false`. The second — rollout step 3 —
+  bakes the Quadlet units to `/var/iri/secrets/tls/<service>.p12` and the CA-only truststore and
+  defaults the switch to `true`; it may only be promoted to a host where step 2 has run (runbook
+  below). Compose stacks keep the fallbacks.
 - **The committed test material has the same shape** (ADR-0139 amendment 1).
 
 **Acceptance**
@@ -4792,6 +4834,13 @@ production rollout reaches step by step:
   point; the deploy pre-flight refuses a release whose units mount any PKCS#12 the host lacks.
 - [ ] The E2E stack serves each app on its own leaf, and the seeder reaches the backend through the
   CA-only truststore with the hostname checked.
+
+**Production rollout (2026-09-25, owner-approved):** step 1 (`INTERNAL_TLS_VERIFY_HOSTNAME=true`,
+all four services `Verification: OK` beforehand) ~15:40 UTC; step 2 (mint, the widened
+truststore and `basetool-ca.crt` with two anchors) ~15:52 UTC, and with it the Keycloak SPI
+truststore, which turned out never to have existed (REQ-SEC-022's production note). **Open:** step 3,
+the release that flips `PATH_VARS` (#2036, merged the same day, not yet promoted), and step 4. Until step 3 every service still serves the
+shared certificate.
 
 **Enforced by:** `scripts/mint-internal-tls.test.sh` (`repo-lint.yml`) · `RestClientConfigTest`
 (ingest) · `BackendHostnameVerificationTest` · `BackendHealthIndicatorHostnameTest` ·

@@ -202,7 +202,7 @@ section above.
 | **RedisMemoryHigh** | Redis used >85% of its maxmemory. Under `noeviction` the ceiling makes new logins/session writes fail. Check for session growth or a leak on the Redis dashboard. |
 | **RedisEvictions** | Redis evicted keys — impossible under `noeviction`. Someone changed `maxmemory-policy`, which silently logs users out. Restore `noeviction` and find what changed the config. |
 | **RedisConnectionsRejected** | `maxclients` reached — a connection leak or client storm. Check Lettuce pool usage and the Redis client list. |
-| **RedisAclDenials** | Redis refused an `AUTH` or a command under its ACL for five minutes (`acl_access_denied_auth/cmd/key/channel`). With one ACL user per service (REQ-SEC-068) that is a `REDIS_<SVC>_PASSWORD` not matching the rendered `users.acl`, a template rule too narrow for what the service does, or a foreign client. Read `ACL LOG` by field only — its `object` can be a session id ([`docs/deployment.md`](../docs/deployment.md#the-redis-acl)). |
+| **RedisAclDenials** | Redis refused an `AUTH` or a command under its ACL for five minutes (`acl_access_denied_auth/cmd/key/channel`). With one ACL user per service (REQ-SEC-068) that is a `REDIS_<SVC>_PASSWORD` not matching the rendered `users.acl`, a template rule too narrow for what the service does, or a foreign client. Read `ACL LOG` by field only — its `object` can be a session id ([`docs/deployment.md`](../docs/deployment.md#the-redis-acl)). **Not a cause on release 1.11.0 only:** `basetool-frontend` refused `config\|get` (`reason=command`) twice per frontend start — its keyspace-notification check, refused by design; it did not fire the alert on 2026-09-25. From the release carrying #2067 the frontend sends a `PING` instead and no refusal is expected. |
 | **CertificateExpiringSoon** | A **served** certificate is near expiry. Public edge certificates: the `acme` unit renews them into the `edge-certs` volume and `deploy.sh`'s `reconcile_edge` restarts the edge within one tick — check `{app="acme"}` in Loki and `AcmeRenewalFailing`. Internal certificates (`keystore.p12` on the apps and Keycloak, Grafana's own leaf): rotate per [`docs/deployment.md`](../docs/deployment.md) (keystore rotation). |
 | **CertificateFileExpiringSoon** | A CA-issued certificate **file** under `/var/iri/monitoring/certs` expires in under 14 days. No listener serves it, so no probe sees it; the labels name `path`, `subject` and `issuer`. Re-issue it, put the file in place, restart what reads it, then re-read with `sudo systemctl start iri-cert-expiry.service`. |
 | **SelfSignedCertificateExpiring** | A **self-signed** certificate file expires in under 90 days — in practice `basetool-ca.crt`, the internal trust anchor. 90 days because replacing a root means re-issuing everything it signed and rolling the anchor through the edge's `proxy_ssl_trusted_certificate` and the blackbox `https_internal` module together. Start the rotation now. Grafana's self-signed leaf lands here too and is a one-file job. |
@@ -415,13 +415,14 @@ instead — `install -m 0644 /var/iri/secrets/tls/ca.crt /var/iri/monitoring/cer
 — and the steps above no longer apply: the per-service keystores hold leaves, not the anchor. Every
 consumer (Prometheus `server_name`, the blackbox module, the edge's `proxy_ssl_name`) already checks
 the service's name, so nothing in their configuration changes; during the rollout the file briefly
-holds the CA **and** the old shared certificate, so either side verifies
+holds the CA **and** the old shared certificate, so either side verifies — production's does since
+2026-09-25 (rollout step 2), until step 4
 ([`deployment.md` → *Internal TLS*](../docs/deployment.md#internal-tls-per-service-certificates-from-a-private-ca)).
 
 **3. `certs/grafana.{crt,key}`** — Grafana's own **self-signed, per-host** leaf. `grafana.container`
 will not start without it. **Never restore it from another host's backup** (the archive carries the
 old host's pair — extract around it, or re-mint afterwards); nothing verifies that leaf, so a wrong
-one fails quietly — **unless the edge verifies it** (`EDGE_GRAFANA_UPSTREAM_VERIFY=on`,
+one fails quietly — **unless the edge verifies it**, as production's has since 2026-09-25 (`EDGE_GRAFANA_UPSTREAM_VERIFY=on`,
 [`deployment.md` → *The edge verifies Grafana*](../docs/deployment.md#the-edge-verifies-grafana)):
 then the edge pins this exact file, and after re-minting it **restart the edge as well as
 Grafana**, or the Grafana host answers `503`.
@@ -518,10 +519,11 @@ collector otherwise reports the **old** CA's expiry until the next 03:40.
 written by HotSpot and glibc outside logback and is **JVM-version-dependent**, so every bump of the
 `eclipse-temurin:25-jre-alpine` runtime digest in `docker/app/Dockerfile` owes a re-check — otherwise
 the rule keeps parsing, keeps deploying and can never fire again. It was verified on
-`…@sha256:28db6fdf…` (2026-08-29) and **re-verified on `…@sha256:3137541d…` (Temurin 25.0.4+7) on
-2026-09-22**, the digest the Dockerfiles pin: steps 1–3 below, plus the stream check on production
-(`{app=~"(backend|frontend|ingest)-stdout"}` present in Loki under the Podman journald path). The
-next digest bump owes it again.
+`…@sha256:28db6fdf…` (2026-08-29), **re-verified on `…@sha256:3137541d…` (Temurin 25.0.4+7) on
+2026-09-22** (steps 1–3 below, plus the stream check on production:
+`{app=~"(backend|frontend|ingest)-stdout"}` present in Loki under the Podman journald path) and
+**again on `…@sha256:2ca9adf4…` on 2026-09-25**, the digest `docker/app/Dockerfile` pins since #2035
+(steps 1–5; the #2035 bump itself had skipped it). The next digest bump owes it again.
 
 On a workstation, never on production:
 

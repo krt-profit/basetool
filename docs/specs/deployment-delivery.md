@@ -137,6 +137,31 @@ this run and `start` for the rest, and the wait is structural — `Notify=health
 Compose path only). A rollback that restored the record without re-materialising the drop-ins would
 roll forward into the failed release, so both move together, together with the previous unit files.
 
+**A failure before the health gate is a deploy failure too, and is recorded as one.** Between the
+signature verification and the health gate `deploy.sh` extracts the config bundle, mirrors it onto
+the host, renders `env.d`, installs the units, writes the pin and pulls the images. A failure
+anywhere in that window — a `fail`, a mirror's rsync, an errexit, a pull — must leave the same
+evidence as a failed health gate: a `FATAL` line naming the step and the exit code, the previous
+config tree, units and pin restored if the run had changed them, a bad-digest backoff record for the
+target, and `basetool_deploy_last_failure_timestamp` (`DeployFailed`). An EXIT trap armed for exactly
+that window (`on_pre_gate_exit`) is what guarantees it, because errexit ends the process without
+passing through any code that could record it. Where the cause can be seen beforehand it is refused
+**before anything changes**: every directory in a subtree the apply mirrors must be owned and
+writable by the deploy account, and the compose directory, the unit directory and `env.d` writable
+(`assert_config_tree_writable`). The pin is written only after the config delivery, so a release
+the stateful-infra gate holds back (REQ-OPS-006) leaves no pin behind. A restore that fails itself
+is reported as an inconsistent tree, and `config-apply.incomplete` stops the next tick from
+snapshotting that tree over `config-previous/`.
+
+> [!bug] Added 2026-09-25 — this path was silent until then
+> v1.11.0 met a root-owned `/var/iri/code/docker/acme`. Every tick from 12:25 to 12:35 mirrored three
+> subtrees, died on rsync exit 23 inside `mirror_dir`, and ended under `set -e` with no FATAL line, no
+> backoff record, no restore and no metric; `DeployFailed` could not fire and production stayed on
+> the old release for fifteen minutes. The second tick also snapshotted the half-mirrored tree as
+> `config-previous/` and copied the first tick's new pin over the rollback anchor. This paragraph and
+> the last three acceptance criteria were written for that incident; `scripts/deploy.test.sh` replays
+> it (`scenario_config_mirror_failure_is_recorded_and_undone` and the four scenarios after it).
+
 **Acceptance**
 
 - [ ] A `:stable` tag flip in GHCR mid-deploy cannot partially apply: the deploy applies a
@@ -153,10 +178,20 @@ roll forward into the failed release, so both move together, together with the p
   well below the 5 s HEALTHCHECK timeout — ADR-0114). A slow/stalled dependency therefore yields a
   fast, truthful `DOWN`, so the health gate and the deploy `--wait` see a real, timely signal
   instead of a probe that never completed.
+- [ ] A failure between the signature verification and the health gate writes a `FATAL` line that
+  names the step and the exit code, a bad-digest backoff record for the target, and
+  `basetool_deploy_last_failure_timestamp`; the next tick inside the backoff window skips.
+- [ ] Such a failure after part of the config tree was mirrored restores `config-previous/` and the
+  previous units, and rolls back the pin if it had been written; a failed restore is reported and
+  leaves `config-apply.incomplete`, and a tick that finds it does not re-snapshot `config-previous/`.
+- [ ] A directory the apply would mirror into that the deploy account does not own or cannot write
+  is refused before the snapshot and before any mirror, with a line naming the path; a release held
+  back by the stateful-infra gate writes no digest pin.
 
-**Enforced by:** `scripts/deploy.sh` (rollback block) · `scripts/lib/container-runtime.sh`
+**Enforced by:** `scripts/deploy.sh` (rollback block, `on_pre_gate_exit`, `assert_config_tree_writable`,
+`restore_previous_config_tree`) · `scripts/lib/container-runtime.sh`
 (`rt_pin_apply`, `rt_pin_rollback`, `rt_apply_stack`) · `frontend/src/main/resources/application.yml`
-(`spring.data.redis.timeout` / `connect-timeout`, ADR-0114) · **Runbook:** `docs/deployment.md` → *What happens on the host*
+(`spring.data.redis.timeout` / `connect-timeout`, ADR-0114) · `scripts/deploy.test.sh` · **Runbook:** `docs/deployment.md` → *What happens on the host*, *Troubleshooting*
 
 ### REQ-OPS-004 — Host configuration delivered as a promotable, digest-pinned artifact
 
@@ -308,6 +343,13 @@ and the bad target backs off (the marker is not advanced). A provider-JAR-only c
 postgres/Keycloak carve-out of REQ-OPS-006 (the image change blocks the tick until `--force`). A
 missing/unresolvable `basetool-keycloak-spi` artifact degrades to no provider-JAR change for that
 tick (the manual-staging fallback in the runbook still applies).
+
+*(Corrected 2026-09-25: "recreates **only** the keycloak container" holds under Compose's
+`--no-deps`, not under Quadlet. `backend` `Requires=` keycloak, and `frontend` and `ingest` require
+backend, so `systemctl --user restart keycloak.service` restarts all three with it — measured on
+production 2026-09-25 for a manual restart of the same unit: about two minutes of maintenance page.
+A provider-JAR delivery is therefore a short full-app restart, not a Keycloak-only one:
+`rt_recreate` leaves keycloak's *dependencies* alone, but systemd restarts its *dependents*.)*
 
 **Acceptance**
 
@@ -547,7 +589,9 @@ container at all — production runs `start` without `--import-realm`, so the fi
 **The data networks carry no egress** (since 2026-09-22, ADR-0162 as extended). `net-db-backend`,
 `net-db-keycloak` and the three `net-redis-*` networks are `Internal=true` in the Quadlet units, so
 `db-backend`, `db-keycloak` and `redis` — which are on nothing else — have no outbound path.
-**The compose file keeps all five non-internal, deliberately** (accepted by @greluc on 2026-09-22):
+*(Status 2026-09-25: applied on production — the five networks recreated `internal=true`, verified
+by the missing default route in all three containers; the testing host still runs the old networks,
+see `deployment.md` → Network changes are installed, not applied.)* **The compose file keeps all five non-internal, deliberately** (accepted by @greluc on 2026-09-22):
 it also runs the local stacks, where the `-dev` twins publish `127.0.0.1:15432`, `:15433` and `:6379`
 on these very networks for a developer's `bootRun`, and an internal network carries no DNAT — so
 `internal: true` in compose would break every local database and Redis connection with no error at
@@ -1201,7 +1245,9 @@ at exactly the same point. `IRI_TRUSTSTORE_HOST_PATH` mounts a trust store at
 `/run/secrets/truststore.p12` and `IRI_EXTRA_JAVA_OPTS` appends the `javax.net.ssl.trustStore*`
 switches that select it. Both default to no-ops: the mount resolves to the same file as the
 keystore, and with no extra options nothing reads it. Under Quadlet the mount path is baked into the
-units at that default, so a rootless host with a privately signed edge gets its truststore from a
+units — since the per-service internal TLS (REQ-SEC-070) at the CA-only
+`/var/iri/secrets/tls/truststore.p12`, so the shared keystore's private key is no longer mounted into
+every app through this path — so a rootless host with a privately signed edge gets its truststore from a
 second role-written drop-in instead (`basetool_host_jvm_truststore_path` →
 `/run/secrets/jvm-truststore.p12`, `20-jvm-truststore.conf`), and `IRI_EXTRA_JAVA_OPTS` names that
 path. Production's edge certificate is publicly signed and sets neither.
@@ -1939,11 +1985,13 @@ there.
   decision 2026-09-22, ADR-0202 amendment): `basetool-sc-extractor`'s authorization-code flow and
   its two loopback wildcard redirect URIs (`REQ-INGEST-002`); both ingest scopes on
   `basetool-android` (`REQ-INGEST-011`); `basetool-frontend`'s `http://frontend:18081` redirect URI
-  and web origin. Production keeps them until the owner applies the provisioner there.
+  and web origin. Gone from production since the owner-approved provisioner apply of 2026-09-23;
+  the testing realm keeps them until it is provisioned.
 - **`basetool-frontend` carries `baseUrl` = `<--public-origin>/`** (2026-09-25, ADR-0202
   amendment 3, `REQ-SEC-071`) — an added field, not in the 2026-09-22 production snapshot, so that
-  Keycloak's error pages for the web login link back to the app. Production gets it on the owner's
-  next apply.
+  Keycloak's error pages for the web login link back to the app. *(Updated 2026-09-25: production
+  carries it — the owner set Home URL `https://profit-base.online/` by hand in the Admin Console,
+  not through an `--apply`; it equals what the provisioner converges to.)*
 - **The DPoP write order holds** (`REQ-SEC-030`): when the Android client or the DPoP profile has to
   change, the policy is detached first and re-attached last, and both client-policy lists are merged
   by name so no other policy or profile is lost.

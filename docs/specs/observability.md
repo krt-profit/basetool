@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-23.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-25.
 > **Owner area:** OBS · **Related:** [`security-and-access.md`](security-and-access.md), [ADR-0204](../adr/0204-backend-and-ingest-call-http-through-restclient-without-webflux.md) (outbound clients of backend and ingest), [`org-unit-tenancy.md`](org-unit-tenancy.md), [ADR-0072](../adr/0072-monitoring-stack-prometheus-grafana.md), [ADR-0095](../adr/0095-ship-app-container-stdout-to-loki.md), [ADR-0162](../adr/0162-edge-is-native-nginx-with-a-separate-acme-client.md) (native edge, NPM retired), [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md) (rootless Podman), monitoring epic [#936](https://github.com/krt-profit/basetool/issues/936) · **Operator doc:** [`monitoring/README.md`](../../monitoring/README.md)
 >
 > **Runtime.** Since the 2026-09-22 cutover production runs rootless Podman under Quadlet on Rocky
@@ -99,7 +99,15 @@ routine thing an SSE endpoint experiences — and a `WARN` from Spring itself, b
 `text/event-stream`. In one 16-hour production window those two were **30 of the 50** WARN/ERROR lines
 the backend produced. `GlobalExceptionHandler.handleDisconnectedClient` takes it at `DEBUG`, and its
 `void` return type is the second half of the fix rather than an oversight: there is no socket left to
-write to, and attempting to write one is what produced the second line.
+write to, and attempting to write one is what produced the second line. **The frontend has the same
+handler since 2026-09-25**, for the notification relay (`/notifications/stream`) and for Tomcat's
+`ClientAbortException` on a plain response: its catch-all logged `ERROR` and then tried to render the
+error page into the dead response, so Tomcat added `Servlet.service() … threw exception` — 33 lines in
+two minutes after the v1.11.0 deploy. Those lines carried `userId=anonymous` and no `correlationId`
+for a logged-in member, because the async dispatch ran without the request's MDC; **since 2026-09-25
+it carries the request's fields** (see *Async dispatches keep the request's MDC* below), so in a line
+logged after that fix `anonymous` means an unauthenticated request again. **Enforced by:** backend
+`GlobalExceptionHandlerTest`, frontend `DisconnectedClientHandlingTest`.
 
 The frontend's `GlobalExceptionHandler` applies the same expected-noise demotion to **asset-shaped
 path-variable type mismatches**: when a request path whose final segment carries a filename
@@ -246,6 +254,29 @@ Both Logback text patterns (console + file, `[%X{orgUnitId:-}]` after `userId`, 
 request keeps the column as an empty bracket pair) and the prod `PiiMaskingLogstashEncoder` carry the
 field. The ingest carve-out above is unchanged: the gateway relays drafts and owns no
 squadron-scoped data.
+
+**Async dispatches keep the request's MDC (2026-09-25).** A request whose handler returns an
+`SseEmitter`, a `DeferredResult` or a `Callable` is dispatched a second time — `DispatcherType.ASYNC`,
+on another container thread — when its async result arrives, and a `OncePerRequestFilter` skips that
+pass by default. Until 2026-09-25 every line logged there (a stream's completion, an async error
+resolved by `GlobalExceptionHandler`) therefore carried **no** `correlationId`, `orgUnitId` or
+`userId` — rendered as the logback fallback `userId=anonymous` — whoever the caller was, and the
+backend's catch-all even minted a fresh id for its `ERROR` line that no other line of the request
+shared. It misattributed the frontend's `/notifications/stream` `ERROR` burst after the v1.11.0
+deploy to anonymous traffic. Now the filters that own the fields stash the values they bound as
+**request attributes** on the initial dispatch and bind them again for the async dispatch's own
+duration, removing them in that pass's own `finally`: the frontend `CorrelationIdFilter`
+(`correlationId`, `userId`) and `ActiveSquadronContextFilter` (`orgUnitId`), and the backend
+`CorrelationIdFilter` (all three). The async pass resolves **nothing** afresh — it mints no id, reads
+no header (a header is the client's; a request attribute is server-side state no client can set),
+consults neither the security context nor the session nor the database, and writes no response
+header. Without a stashed value the key stays unbound rather than invented. The frontend's
+`ActiveSquadronContext` (the outbound org-unit **scope**) is deliberately *not* restored on the
+async pass: that would be a data-scope change, not a log-attribution one. The ingest gateway has no
+async endpoint and is unchanged. **Enforced by:** frontend `AsyncDispatchMdcTest` (both real filters,
+a `DeferredResult` whose async error is logged on the async dispatch, with the security context,
+session pin and header changed in between), `CorrelationIdFilterTest`,
+`ActiveSquadronContextFilterTest`; backend `CorrelationIdFilterTest`.
 
 **A filter-level rejection names its subject.** The two backend rejections that short-circuit before
 the servlet is reached — `SecurityProblemResponseHandler` (the Spring Security 401/403) and
@@ -414,7 +445,11 @@ and `unhandledrejection` and POSTs to **`POST /internal/client-error`**
 `APP_LOGGING_CORRELATION_ID_HEADER`) or a generated UUID, and is echoed in the response
 header. The frontend's `WebClientLoggingFilter` propagates the same id to outbound backend
 calls so both modules share one id per user interaction. `userId` is the JWT `sub`, or
-`anonymous`.
+`anonymous`. **One request keeps one id across its async dispatch (2026-09-25):** the id is resolved
+once, on the initial dispatch, and an async dispatch of the same request re-binds that value from a
+request attribute — it is never minted again and the inbound header is never re-read on that pass
+(REQ-OBS-001, *Async dispatches keep the request's MDC*). The frontend also restores
+`CorrelationContext` for the async pass, so a backend call made there carries the same id outbound.
 
 All three modules bind these settings from the same `app.logging.*` keys through a `@Validated`
 `LoggingProperties` — `correlation-id-header`, `correlation-id-mdc-key`, `user-id-mdc-key`,
@@ -433,6 +468,20 @@ and echo it as the `X-Correlation-Id` response
 header themselves, because that filter never runs to echo it on a short-circuited request. Every
 error response therefore carries the header, not just the ones that reach the servlet. See
 [`api-conventions.md`](api-conventions.md) REQ-API-004 for the full producer list.
+
+**A 5xx is one correlation id in three places (2026-09-25).** For an unexpected exception (`500`) and
+a suppressed-disclosure `AppException` (`ExternalServiceException` / `ReportGenerationException`), the
+backend's `GlobalExceptionHandler` logs at `ERROR` with the request's `correlationId`, returns the
+same id in the problem body, and the request's access-log line (REQ-OBS-001) carries it too. A
+component that puts `correlationId` (or `userId`) into the MDC only for one log line hands the key
+back exactly as it found it — removes it only when it was absent, restores a prior value otherwise —
+because the key belongs to whoever set it, normally `CorrelationIdFilter` for the whole chain (and,
+on an async dispatch, for the key it re-binds there — see *Async dispatches keep the request's MDC*
+above). Until
+this date both `ERROR` branches removed the key unconditionally, so every line written after them on
+the request thread — the access line for the 5xx above all — had an empty `correlationId` and could
+not be joined to the failure. **Enforced by:** `GlobalExceptionHandlerCorrelationIdTest` (MockMvc
+through the real `CorrelationIdFilter` → `RequestLoggingFilter` order).
 
 ### REQ-OBS-003 — Prod JSON appender
 
@@ -624,10 +673,10 @@ rule — no blanket "everything is masked" claim:
   the three `<svc>-stdout` streams were measured carrying 1k–43k lines/24h on the host; and neither
   the single `older_than = "167h"` drop stage nor any of the three masking replaces can touch a fresh
   line or either phrase. The observed line is recorded verbatim beside the rule, because its wording
-  is JVM-version-dependent and a Temurin bump is the thing that would silently invalidate it. **The
-  runtime digest has moved since** (the app Dockerfile pins `…@sha256:3137541d…` as of 2026-09-22),
-  so the re-check in [`monitoring/README.md`](../../monitoring/README.md) → *After a Temurin bump* is
-  owed. A second rule consumes the same stream since 2026-09-23: **`JvmStartupCacheRejected`**
+  is JVM-version-dependent and a Temurin bump is the thing that would silently invalidate it. The
+  re-check in [`monitoring/README.md`](../../monitoring/README.md) → *After a Temurin bump* was done
+  on `…@sha256:3137541d…` (2026-09-22) and on `…@sha256:2ca9adf4…` (2026-09-25), the digest
+  `docker/app/Dockerfile` pins since #2035; every further bump owes it again. A second rule consumes the same stream since 2026-09-23: **`JvmStartupCacheRejected`**
   (warning) fires on the JVM's own `Unable to use AOT cache` / `Loading static archive failed` (and
   the AppCDS equivalents), which a JVM prints when its `JAVA_TOOL_OPTIONS` layout differs from the
   one the image's startup cache was trained with — the service starts, without the cache
@@ -818,7 +867,9 @@ not silent — so the only detector was a human reading a log export.
   then vouch for other upstreams. Behind `EDGE_GRAFANA_UPSTREAM_VERIFY` (`off` until the owner
   switches it on, [`deployment.md` → *The edge verifies Grafana*](../deployment.md#the-edge-verifies-grafana));
   `on` without the certificate, or an unknown value, refuses to start. `check-edge-nginx.sh`
-  renders and starts both shapes and asserts the anchor and the name.
+  renders and starts both shapes and asserts the anchor and the name. **On in production since
+  2026-09-25** (~15:40 UTC, owner-approved): the edge logs `Grafana's upstream certificate is
+  verified (pinned)` and Grafana's `/api/health` answers `200`.
 - The private key of the shared `keystore.p12` never leaves the four existing services — and, once
   REQ-SEC-070 is rolled out, each of those four holds only its own leaf's key; Grafana gets its
   own self-signed certificate.
