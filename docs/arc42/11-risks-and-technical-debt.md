@@ -200,6 +200,12 @@ not happened.
   was never a one-line change. It went together with that plugin's unconditional application
   (audit items BLD-PERF-04, DOC-20): refreshVersions now runs only under `-PrefreshVersions`, its
   recreated file is gitignored, and the configuration cache it was blocking is on in CI.
+- **The Discord login leaves the app origin for one hop, and cannot be made not to.** ADR-0166 put
+  Keycloak on the app origin, but Discord's authorize page stays on `discord.com`. A callback that
+  comes back in another browser context — the Discord app, an installed iOS web app's outside view,
+  a reopened history entry — finds no Keycloak cookies and ends in `cookie_not_found`. Accepted as
+  a client-side condition; `REQ-SEC-071` only makes it recoverable (message + link back), and
+  `KeycloakLoginErrorSpike` catches it if it ever becomes the norm rather than the exception.
 - **Sessions are not carried across a host move** unless somebody chooses to copy the Redis data.
   Skipping it logs everyone out at the moment of the move — a user-visible choice rather than a
   technical one. The archived cutover runbook has the copy, including the `--numeric-owner` trap.

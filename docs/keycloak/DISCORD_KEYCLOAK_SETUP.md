@@ -253,6 +253,18 @@ ambiguity (5xx / timeout / malformed / rate-limited), distinct from a clean 404 
 > kicked from the guild or stripped of KRT-Mitglied keeps access until the Track 2 role-sync
 > (planned, #726–#730) lands; until then, revoke access by disabling/removing the user in Keycloak.
 
+### 5a. `IDENTITY_PROVIDER_LOGIN_ERROR … error="cookie_not_found"` (REQ-SEC-071)
+
+The Discord callback reached `/auth/realms/iri/broker/discord/endpoint` in a browser context that
+holds none of Keycloak's login cookies, so the login started elsewhere cannot be resumed. Usual
+causes: Discord finished the authorization in the Discord app or another browser, an installed iOS
+web app's Discord hop opened outside the app, a callback URL reopened from history, blocked cookies.
+It is a client-side condition and **not** a server fault — the `state` belongs to the browser that
+started. A single event needs no action; a sustained rate trips `KeycloakLoginErrorSpike`, and then
+check the edge and `KC_HOSTNAME` first (cookies set on one host and the callback on another would
+fail every login). The member sees an explanation and *"Zurück zur Applikation"*, which appears only
+if `basetool-frontend` has a `baseUrl` — the realm provisioner sets it (ADR-0202 amendment 3).
+
 ---
 
 ## 6. Secrets & rotation

@@ -39,6 +39,12 @@
 #   - `basetool-frontend`: the compose-internal `http://frontend:18081` redirect URI and web origin
 #     are gone (the frontend serves HTTPS only on 18081, so no real login could match them).
 #
+# ONE FIELD IS ADDED RATHER THAN RETIRED (2026-09-25, ADR-0202 amendment 3, REQ-SEC-071):
+# `basetool-frontend` gets `baseUrl` = `<public origin>/`. Production has none, so every Keycloak
+# error page for this client — above all `cookie_not_found` after a Discord login — renders without
+# the "back to application" link its own message tells the member to click. It converges onto
+# production on the owner's next apply.
+#
 # Environment-specific values — the public origin in redirect URIs, web origins and the
 # post-logout list, and Grafana's origin — come from arguments. Nothing production-specific is
 # hard-coded, so running it against testing never writes a production hostname.
@@ -350,8 +356,15 @@ def client_specs(realm: str, public_origin: str, grafana_origin: str | None,
         ClientSpec(
             client_id="basetool-frontend",
             kind=frontend_kind,
-            fields=_flags(public=not frontend_confidential, standard=True,
-                          service_accounts=False, full_scope=True, frontchannel_logout=False),
+            fields={
+                **_flags(public=not frontend_confidential, standard=True,
+                         service_accounts=False, full_scope=True, frontchannel_logout=False),
+                # ADR-0202 amendment 3 (2026-09-25): production has no baseUrl, so Keycloak's error pages for this client render no
+                # "back to application" link. The `cookie_not_found` page of a Discord login that
+                # returns without Keycloak's cookies tells the member to click exactly that link,
+                # so without it the page is a dead end (REQ-SEC-071).
+                "baseUrl": f"{public_origin}/",
+            },
             unmanaged_fields=(set() if frontend_client
                               else {"publicClient", "clientAuthenticatorType"}),
             secret_env="KEYCLOAK_FRONTEND_CLIENT_SECRET" if frontend_confidential else None,

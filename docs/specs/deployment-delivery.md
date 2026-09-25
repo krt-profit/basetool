@@ -1940,6 +1940,10 @@ there.
   its two loopback wildcard redirect URIs (`REQ-INGEST-002`); both ingest scopes on
   `basetool-android` (`REQ-INGEST-011`); `basetool-frontend`'s `http://frontend:18081` redirect URI
   and web origin. Production keeps them until the owner applies the provisioner there.
+- **`basetool-frontend` carries `baseUrl` = `<--public-origin>/`** (2026-09-25, ADR-0202
+  amendment 3, `REQ-SEC-071`) — an added field, not in the 2026-09-22 production snapshot, so that
+  Keycloak's error pages for the web login link back to the app. Production gets it on the owner's
+  next apply.
 - **The DPoP write order holds** (`REQ-SEC-030`): when the Android client or the DPoP profile has to
   change, the policy is detached first and re-attached last, and both client-policy lists are merged
   by name so no other policy or profile is lost.
