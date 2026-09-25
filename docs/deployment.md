@@ -289,6 +289,14 @@ sessions survive in the AOF).
 > channel, which for a session key **is a session id**. Print the usernames and reasons only:
 > `${UPOD} exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --user admin ACL LOG 20' | awk 'p{print; p=0} /^(username|reason|context)$/{printf "%s: ", $0; p=1}'`.
 
+**No service is refused anything in normal operation — a restart included.** Under its own user
+the frontend's startup check is a `PING` and it sends no `CONFIG`; only with an empty
+`REDIS_FRONTEND_USERNAME` (i.e. as `default`) does it still run Spring Session's `CONFIG GET` /
+`CONFIG SET`. So an `ACL LOG` entry, and every `RedisAclDenials`, is a finding to chase, never
+restart noise. *(Since 2026-09-25: before that fix the frontend's `CONFIG GET` was refused on every
+start under `basetool-frontend` — the `config|get` entries production's `ACL LOG` showed after the
+rollout. They stop with the release carrying it; an older one still produces them, harmlessly.)*
+
 **Rotating a password** is `.env` + render (the `.new` + `cat` block above) + `ACL LOAD` + restarting the one service that uses it
 (`render-env-d.py` first, so its `env.d` file carries the new value). Rotating `REDIS_PASSWORD`
 touches `default`/`admin` and the redis unit's own environment: render both, `ACL LOAD`, then
