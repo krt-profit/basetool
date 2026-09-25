@@ -4,10 +4,17 @@
 
 ### Fixed
 
+- **Deploy: ein Fehler beim Einspielen der Host-Konfiguration bleibt nicht mehr stumm.** Scheitert
+  `deploy.sh` vor dem Health-Gate (Spiegeln, `env.d`, Units, Pull), schreibt es jetzt eine
+  `FATAL`-Zeile mit Schritt und Exit-Code, stellt Konfiguration und Digest-Pin wieder her, setzt den
+  Backoff und löst `DeployFailed` aus; ein nicht beschreibbares Verzeichnis wird vorab abgelehnt.
+  Wirkt erst nach einem Lauf der Ansible-Rolle (`--tags deploy,scripts`).
+  
 - **Benachrichtigungen: ein Tab mit abgelaufener Sitzung fragt den Live-Stream nicht mehr alle paar
   Sekunden an.** Er prüft die Sitzung, beendet den Stream bei einem 401 und schickt zur Anmeldung;
   wiederholte Fehlversuche warten zunehmend länger. Ein Browser, der einen offenen Stream verlässt,
   erzeugt im Log kein `ERROR` mehr.
+  
 - **Logs: Zeilen aus einem asynchronen Dispatch (z. B. Ende oder Fehler eines Live-Streams) tragen
   wieder `correlationId`, `userId` und `orgUnitId` der ursprünglichen Anfrage** statt
   `userId=anonymous` ohne Korrelations-ID — in Frontend und Backend. Es wird dabei keine neue ID
