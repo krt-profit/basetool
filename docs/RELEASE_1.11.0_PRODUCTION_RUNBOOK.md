@@ -1,0 +1,254 @@
+# Release 1.11.0 — production rollout runbook
+
+> **Doc type:** Operator runbook for **one** release — the move of production (and, through
+> `promote.yml`'s `sync-testing`, the testing host) from **v1.10.0 to v1.11.0**. Written 2026-09-25
+> from a per-PR audit of all 66 PRs between `v1.10.0` and `6076888cd` (the commit release PR #2056
+> was cut from) against the code and the docs on `main`, plus read-only reads of both hosts the same
+> day. **Historical once 1.11.0 is live**: freeze it then and let
+> [`deployment.md`](deployment.md) stay the living truth.
+>
+> **Every step that writes to a host is a production write**: it waits for @greluc's explicit yes,
+> in chat, to that exact command (CLAUDE.md → *Production host access*). Nothing here is approval.
+
+Shell conventions (`cd /`, `${UCTL}`, `${UPOD}`) are the ones in
+[`deployment.md` → Shell conventions](deployment.md#shell-conventions-used-below).
+
+---
+
+## 0. Where the hosts stand (read 2026-09-25, read-only)
+
+| | Production (`46.225.24.180`) | Testing (`10.9.0.15`) |
+|---|---|---|
+| backend / frontend / ingest | `v1.10.0` (`25ee8fd5a`) | `v1.10.0` |
+| `deploy.sh`, `backup.sh` on the host | the #2001 state (`8ba649fa1`); **not** #2034 / #2039 | not read |
+| `IRI_BACKEND_EXPECTED_AUDIENCES` in `.env` | set, `basetool-backend` (the line is there **twice**, same value — harmless) | **absent** |
+| `IRI_MONITORING_ENABLED=true` | yes | yes |
+| new optional switches in `.env` (`APP_SESSION_TYPE_ALLOW_LIST`, `KEYCLOAK_FRONTEND_CLIENT_SECRET`, `IRI_BACKEND_KEYCLOAK_JWK_SET_URI`, `EDGE_GRAFANA_UPSTREAM_VERIFY`, `REDIS_{FRONTEND,BACKEND,INGEST}_{USERNAME,PASSWORD}`, `REDIS_DEFAULT_USER`, `INTERNAL_TLS_VERIFY_HOSTNAME`) | none set — every one ships **off** | — |
+| `IRI_EXTRA_JAVA_OPTS` with `-XX:-UseCompactObjectHeaders` | no (the AOT cache will be used) | — |
+| retention overrides in `.env` | none (the #1989 floors pass on the defaults) | — |
+| `/var/iri/monitoring/certs/grafana.crt` | present, SAN `DNS:grafana`, valid to 2028-12-24; readable by `deploy` | — |
+| `/var/iri/redis/users.acl` | the hand-written file, `root:root 0644`, 2 users | — |
+| `basetool_host_reboot_required` | **1** — a kernel is pending | — |
+| `container_cleanup.prom` textfile | **missing** (last cleanup 2026-09-22, before the #2001 script) | — |
+| last backup | 2026-09-25 04:17 UTC, success | — |
+| Podman | 5.8.2 | — |
+
+Re-read the rows you rely on before you start; anything that differs from this table is a reason to
+stop and re-check the step that depends on it.
+
+---
+
+## 1. What the deploy does by itself — no action, but know it
+
+- **Every application service restarts**, `db-backend`, `db-keycloak` and `redis` included: #1992
+  changed every `quadlet/systemd/*.container` (stop grace, `RunInit`), #2023 changed `redis`'s
+  command line. No `Image=` of a stateful service changed, so the stateful-infra gate does not
+  fire. Redis keeps its data (AOF). Watch the tick rather than leaving it to the timer
+  ([`deployment.md` → Host-config and unit changes](deployment.md#host-config-and-unit-changes)).
+- **Keycloak restarts** (unit change + new provider JAR from #1990), which also loads the #2053
+  theme text.
+- **The edge is recreated** (#2021 gzip, #2039 unit mount, #1996/#1999 API allow-list).
+- **Flyway runs one migration, `V245__index_every_uncovered_foreign_key.sql`** (#2004): 38
+  `CREATE INDEX IF NOT EXISTS`, additive and idempotent, seconds on this data size, run before the
+  new backend serves. It stays harmless after a rollback.
+- **Every member is signed out once** (#2002 renames the session cookie to `__Host-SESSION`). No
+  Redis flush — the old sessions age out. Announce it (§2.1).
+- **Android builds older than 2026-09-07 (≤ v0.2.6) lose the manager's "Teilnehmer hinzufügen"**
+  (#1996 deletes the deprecated endpoint; CHANGELOG says so). v0.2.7+ are unaffected.
+- **Monitoring**: new alerts and dashboards arrive with the config bundle and Prometheus is
+  recreated (`IRI_MONITORING_ENABLED=true` is set). Two of the new/changed alerts will be **firing
+  for pre-existing reasons**, not because of the deploy — see §2.4.
+- **Session allow-list runs `report`** (#2018): it counts, it refuses nothing.
+
+---
+
+## 2. Before the promotion
+
+### 2.1 Announce (no host change)
+
+A short note to the members: one sign-in again after the update; owners of Android app versions older
+than 07.09.2026 need to update for "Teilnehmer hinzufügen".
+
+### 2.2 Read-only pre-checks on production
+
+```bash
+cd /
+grep -c '^IRI_BACKEND_EXPECTED_AUDIENCES=basetool-backend$' /var/iri/code/.env   # >= 1  (#1989: blank = backend refuses to start)
+grep -cE '^REDIS_(FRONTEND|BACKEND|INGEST)_(PASSWORD|USERNAME)=' /var/iri/code/.env   # 0  (#2023: must stay 0 until 1.11.0 is live)
+grep -cE '^IRI_MONITORING_ENABLED="?true"?$' /var/iri/code/.env               # 1  (monitoring changes load)
+grep -cE '^APP_(AUDIT|NOTIFICATIONS|REGISTRATIONS_REJECTED)_RETENTION_' /var/iri/code/.env   # 0, or values >= the #1989 floors
+sudo -u deploy test -f /var/iri/monitoring/certs/grafana.crt && echo ok        # ok (#2039 edge mount)
+systemctl show iri-backup.service -p Result -p ExecMainExitTimestamp          # success, today
+```
+
+Prints counts and states only — never a value. Any other result: stop.
+
+### 2.3 Testing host — decide **before** promoting (owner decision)
+
+`promote.yml`'s `sync-testing` job moves `:testing` to 1.11.0 together with production (testing is
+behind). Testing's `.env` has **no** `IRI_BACKEND_EXPECTED_AUDIENCES`, so the 1.11.0 backend there
+refuses to start (#1989 `JwtAudienceStartupCheck`), its `deploy.sh` rolls back and backs off, and
+`DeployRolledBack` fires for testing on every retry. Production is not affected — but it is a broken
+testing host. Pick one:
+
+- **A — provision testing first (preferred).** The owner recreates `basetool-provisioner` on testing
+  and opens a kcadm session; then the provisioner dry run and apply
+  ([`INGEST_KEYCLOAK_SETUP.md` → new or out-of-date realm](INGEST_KEYCLOAK_SETUP.md)), then
+  `IRI_BACKEND_EXPECTED_AUDIENCES=basetool-backend` into testing's `.env`. Setting the variable
+  **without** the provisioned audience mapper is worse than not setting it: the backend starts and
+  refuses every token.
+- **B — hold testing.** On testing, `systemctl stop iri-deploy.timer` before the promotion; start it
+  again only after A is done. Testing stays on 1.10.0 meanwhile.
+
+### 2.4 Alerts that will fire for reasons older than this release
+
+- **`HostRebootRequired`** (new in #1992): `basetool_host_reboot_required` is already `1`. Either
+  take the reboot as a maintenance before or after the deploy (units are `WantedBy=default.target`,
+  `iri` lingers — the stack comes back on its own), or expect the warning until you do.
+- **`ContainerCleanupStaleOrMissing`**: `container_cleanup.prom` does not exist on production (the
+  last cleanup ran 2026-09-22 16:26 with the pre-#2001 script). The v1.10.0 rule already fires on
+  that absence, and the 1.11.0 rule does too; the next scheduled cleanup (Saturday 02:00 UTC, with
+  the #2001 script installed on 2026-09-22) writes the file and clears it. A manual
+  `systemctl start iri-container-cleanup.service` is a production write.
+
+Note the firing set in Grafana → Alerting **before** the promotion, so the post-deploy comparison is
+against a baseline, not against zero.
+
+### 2.5 Install the operational scripts (role run, from WSL)
+
+`deploy.sh` and `backup.sh` on production predate #2034 and #2039, and the Redis renderer (#2023)
+and `mint-internal-tls.sh` (#2034) are not installed. The release itself would still deploy with the
+installed `deploy.sh` (every mount source the new units name exists), but the new pre-flights, the
+new backup coverage and the later rollouts need them, and the docs order it before the promotion.
+Per [`deployment.md` → Updating the operational scripts and units](deployment.md#updating-the-operational-scripts-and-units)
+and the controller caveats in [`ansible/README.md`](../ansible/README.md) — mirror `ansible/`,
+`scripts/` **and** `monitoring/` from the same `origin/main` into the WSL filesystem, then:
+
+```bash
+ansible-playbook site.yml --limit production --tags deploy,scripts --check --diff   # read the diff
+ansible-playbook site.yml --limit production --tags deploy,scripts
+```
+
+Expected changes: `deploy.sh`, `backup.sh`, `mint-internal-tls.sh`, `render-redis-acl.py`,
+`redis-users.acl.tmpl` under `/var/iri/code/scripts/`. Verify by content:
+`sha256sum /var/iri/code/scripts/deploy.sh` equals `git show origin/main:scripts/deploy.sh | sha256sum`
+(same for the other four). Installing a script changes no credential and restarts nothing. Do the
+same for testing (`--limit testing`) whichever option §2.3 took.
+
+---
+
+## 3. Cut the release
+
+1. Merge release PR **#2056** (`chore(release): v1.11.0`). *If a further PR merges to `main` first,
+   it becomes part of 1.11.0 — e.g. #2057 (Gradle 9.8.0, build only, no host step); re-check any
+   such PR against §1–§2 before promoting.*
+2. `release-publish.yml` creates the tag **with the `basetool-release` App token** — the first
+   publish since the App key was replaced on 2026-09-25 (the token itself is proven by
+   refresh-versions run 36127942075 and Release · Prepare run 36128198185). If the tag step fails:
+   the manual fallback in [`deployment.md` → Cutting a release](deployment.md#cutting-a-release).
+3. The tag run of `release-images.yml` re-tags `:sha-<release>` of all three app images plus
+   `config` and `keycloak-spi` as `:1.11.0`. Confirm all five exist before promoting (the promote's
+   own first step also refuses otherwise).
+
+## 4. Promote and watch the tick
+
+```bash
+gh workflow run promote.yml -f version=1.11.0      # vuln gate → your approval → signature → :stable
+```
+
+Within ~5 minutes `deploy.sh` picks it up. Follow it on the host (read-only):
+
+```bash
+cd / && tail -f /var/log/iri-deploy.log
+```
+
+Expected: every digest cosign-verified, the config bundle staged and `env.d/` rendered, units
+installed, application services restarted and healthy, keycloak restarted for the provider JAR,
+marker written, monitoring and edge reconciled. **Not** expected: `rolled back`, `drift`,
+`required file missing`. On a rollback the log names the service; its `${UPOD} logs --since 10m
+<svc>` names the reason — then §6.
+
+## 5. After the tick — verify (read-only)
+
+```bash
+cd /
+${UPOD} inspect backend frontend ingest --format '{{.Name}} {{index .Config.Labels "org.opencontainers.image.version"}}'   # v1.11.0 ×3
+${UPOD} logs --since 30m backend 2>&1 | grep -m1 'JWT audience check enforced'          # accepted audiences: [basetool-backend]
+${UPOD} logs --since 30m frontend 2>&1 | grep -m1 'Session type allow-list mode'        # ... REPORT
+for s in backend frontend ingest; do printf '%s ' "$s"; ${UPOD} logs --since 30m "$s" 2>&1 | grep -c 'Unable to use AOT cache'; done   # 0 ×3
+${UPOD} container inspect backend --format '{{.Config.StopTimeout}}'                    # 30  (#1992)
+${UPOD} healthcheck run redis && echo redis-healthy                                     # #2023 probe
+${UPOD} exec db-backend sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -p 15432 -Atc "SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY; SELECT version, success FROM flyway_schema_history WHERE version = '"'"'245'"'"';"'   # 245|t
+curl -s -o /dev/null -D - -H 'Accept-Encoding: gzip' https://profit-base.online/css/styles.css | grep -iE '^(content-encoding|vary)'   # gzip + Vary (#2021)
+```
+
+Then, off the host:
+
+- **Sign in** (once more, #2002), open a mission (live sync), the bank, the inventory; run one desktop
+  import through ingest.
+- **Loki, first hours**: `{app="backend-stdout"} |= "LazyInitializationException"` and
+  `|= "Fail on pagination over collection fetch"` stay empty (#2030, #2004);
+  `{app="ops-deploy"}` shows no rollback; the first UEX sync after the deploy moves
+  `basetool_scheduled_job_last_success_timestamp_seconds{task="uex_sync"}` and adds nothing to
+  `basetool_scheduled_job_step_failures_total{task="uex_sync"}` (#2009).
+- **Alerts**: compared with the §2.4 baseline, nothing new except what §2.4 predicts.
+  `IngestAudienceGateOff`, `SessionTypeOutsideAllowList`, `AppLiveSyncFramesDropped`,
+  `JvmStartupCacheRejected` stay silent.
+- **Edge deny probe**: its next run (or a dispatch) turns the `…/participants` and
+  `…/participants/by-id/slim` rows green (#1996, #1999) — they have been red since 2026-09-23
+  because production was behind `main`.
+- **Testing**: under option A, the same checks there; under B, it stays on 1.10.0 until A.
+
+## 6. Rollback
+
+A rollback is **lock-step, never per service**: `gh workflow run promote.yml -f version=1.10.0`.
+The 1.11.0 frontend calls backend endpoints 1.10.0 does not have (`/api/v1/me/layout`,
+`/users/search/references` — #2004/#2020), so a backend-only rollback breaks every page.
+`V245` stays applied and is harmless. Members are signed out once more (the cookie name changes
+back). **Before** rolling back, undo any §7 switch that pins the new release:
+the confidential frontend client (#2028 → `--frontend-client public --apply` first) and a Redis
+`REDIS_DEFAULT_USER=off` (#2023 → `default` back on first). The others are harmless under 1.10.0.
+
+---
+
+## 7. After the deploy — separate, optional, each owner-gated
+
+None of these is part of the deploy, and leaving any of them undone is safe. Each is its own
+production write with its own yes; do them one at a time, never inside the deploy.
+
+| When | What | Where it is written down |
+|---|---|---|
+| after §5 is green | **Release the Android app (basetool-android #182)** — it calls `…/participants/by-id/slim`, which exists only from 1.11.0; bump `versionCode` to 16 first | vault *Android App*; #1999 |
+| any time | **Host reboot** for the pending kernel (`HostRebootRequired`) | [`deployment.md` → Updating the operational scripts and units](deployment.md#updating-the-operational-scripts-and-units) (host patching) |
+| any time after 1.11.0 | **#2053: `baseUrl` on `basetool-frontend`** — provisioner dry run with `--public-origin https://profit-base.online` and **no** `--frontend-client`; it must plan only the `baseUrl` line; then `--apply`, a second empty dry run, delete the session and the rollback basis | [`INGEST_KEYCLOAK_SETUP.md`](INGEST_KEYCLOAK_SETUP.md) (provisioner); needs a freshly created `basetool-provisioner` (the 2026-09-23 one is deleted) |
+| ≥ 7 days after go-live, both report queries empty | **APPSEC-05: allow-list `enforce`** | [`deployment.md` → Session type allow-list](deployment.md#session-type-allow-list-report-then-enforce) |
+| after 1.11.0 | **#2038: internal JWKS for the backend** | [`deployment.md` → Internal JWKS](deployment.md#internal-jwks-for-the-backend) |
+| after 1.11.0 | **#2039: edge verifies Grafana** — precondition (SAN `DNS:grafana`) already confirmed | [`deployment.md` → The edge verifies Grafana](deployment.md#the-edge-verifies-grafana) |
+| after 1.11.0 | **APPSEC-07: confidential frontend client** — frontend secret first, Keycloak second; blocks a plain release rollback (§6) | [`OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`](OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md) |
+| after 1.11.0 | **APPSEC-04: one Redis ACL user per service** — steps 2–4 in one sitting with `iri-deploy.timer` stopped; render via `.new` + `cat`; step 5 blocks a plain release rollback (§6) | [`deployment.md` → The Redis ACL](deployment.md#the-redis-acl) (corrected 2026-09-25) |
+| after 1.11.0 | **ING-SEC-04: per-service internal TLS**, steps 1–2, then #2036 (step 3) only after step 2's files exist, then step 4 (step 0 is §2.5) | [`deployment.md` → Internal TLS](deployment.md#internal-tls-per-service-certificates-from-a-private-ca) |
+| any time, testing first | **#1992: `Internal=true` on the five internal networks** — a stop, `network rm`, restart window | [`deployment.md` → Network changes are installed, not applied](deployment.md#network-changes-are-installed-not-applied) |
+
+Optional tidy-ups found on the way, no urgency: the duplicate `IRI_BACKEND_EXPECTED_AUDIENCES` line in
+production's `.env`; the leftover `/var/iri/code/scripts/lib/container-runtime.sh.bak-2026-09-22`.
+
+---
+
+## 8. What the audit found and fixed alongside this runbook (2026-09-25)
+
+- `deployment.md` → *The Redis ACL*: the render wrote a new inode under a single-file bind mount,
+  so `ACL LOAD` would have reloaded the old rules — now `.new` + `cat`; step 2 is not inert and the
+  step-4 rollback must remove the passwords too — now said, with the timer stopped for steps 2–4.
+- `deployment.md`: two claims that the mount pre-flight refuses a release *before* applying it
+  (Grafana edge mount, internal-TLS step 3) — it reads the installed units, so the release that adds
+  the mount fails at start and is rolled back; corrected. Step 0's expected list names the Redis
+  renderer too.
+- `OAUTH2_CONFIDENTIAL_CLIENT_MIGRATION.md`: the release-rollback hazard of a confidential client.
+- `INGEST_KEYCLOAK_SETUP.md`: `clients.before.json` holds client secrets — delete the rollback basis.
+- `KEYCLOAK_HARDENING_RUNBOOK.md`, arc42 §11, `deployment-delivery.md`: the #2007 realm changes are
+  applied on production (2026-09-23), not pending.
+- `security-and-access.md` (REQ-SEC-025): the cookie rename signs everyone out at the 1.11.0 deploy,
+  which has not happened yet.
+- The Temurin runtime bump #2035 (`…@sha256:2ca9adf4…`) skipped the re-check `monitoring/README.md`
+  requires; done: `JvmNativeThreadExhaustion` and `JvmStartupCacheRejected` still match the JVM's
+  wording on the new digest, recorded in the rule file, the README and `observability.md`.

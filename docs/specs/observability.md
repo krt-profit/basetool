@@ -624,10 +624,10 @@ rule — no blanket "everything is masked" claim:
   the three `<svc>-stdout` streams were measured carrying 1k–43k lines/24h on the host; and neither
   the single `older_than = "167h"` drop stage nor any of the three masking replaces can touch a fresh
   line or either phrase. The observed line is recorded verbatim beside the rule, because its wording
-  is JVM-version-dependent and a Temurin bump is the thing that would silently invalidate it. **The
-  runtime digest has moved since** (the app Dockerfile pins `…@sha256:3137541d…` as of 2026-09-22),
-  so the re-check in [`monitoring/README.md`](../../monitoring/README.md) → *After a Temurin bump* is
-  owed. A second rule consumes the same stream since 2026-09-23: **`JvmStartupCacheRejected`**
+  is JVM-version-dependent and a Temurin bump is the thing that would silently invalidate it. The
+  re-check in [`monitoring/README.md`](../../monitoring/README.md) → *After a Temurin bump* was done
+  on `…@sha256:3137541d…` (2026-09-22) and on `…@sha256:2ca9adf4…` (2026-09-25), the digest
+  `docker/app/Dockerfile` pins since #2035; every further bump owes it again. A second rule consumes the same stream since 2026-09-23: **`JvmStartupCacheRejected`**
   (warning) fires on the JVM's own `Unable to use AOT cache` / `Loading static archive failed` (and
   the AppCDS equivalents), which a JVM prints when its `JAVA_TOOL_OPTIONS` layout differs from the
   one the image's startup cache was trained with — the service starts, without the cache
