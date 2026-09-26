@@ -99,6 +99,19 @@ class AuditReportProxyControllerTest {
   }
 
   @Test
+  void blueprintDomain_passesTheAllowlistGateOnBothPaths() {
+    ResponseStatusException download =
+        assertThrows(
+            ResponseStatusException.class,
+            () -> controller.downloadAuditLog("BLUEPRINT", FROM, TO, null));
+    assertNotEquals(HttpStatus.BAD_REQUEST, download.getStatusCode());
+    ResponseStatusException purge =
+        assertThrows(
+            ResponseStatusException.class, () -> controller.purgeAuditLog("BLUEPRINT", FROM));
+    assertNotEquals(HttpStatus.BAD_REQUEST, purge.getStatusCode());
+  }
+
+  @Test
   void knownDomain_passesTheAllowlistGate() {
     ResponseStatusException ex =
         assertThrows(

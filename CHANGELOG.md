@@ -4,6 +4,9 @@
 
 ### Added
 
+- **Audit-Log: neuer Bereich „Blueprints".** Hinzufügen, Bearbeiten, Entfernen, Import, globale
+  Freigabe, Standard-Blueprints und deren Vergabe — auch aus der App und durch Admins — landen im
+  Audit-Log; Notizen werden nie mitgeschrieben (REQ-INV-051).
 - **Audit-Log: neuer Bereich „Hangar".** Jede Änderung an Schiffen — anlegen, bearbeiten,
   löschen, Hangar leeren, Import, „Alle unfitted", Heimatstandort, auch aus der App und durch
   Admins — landet im Audit-Log (neuer Tab); wird ein Schiff gelöscht, protokolliert die Mission das

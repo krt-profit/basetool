@@ -24,13 +24,16 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.BlueprintExternalAlias;
 import de.greluc.krt.profit.basetool.backend.model.BlueprintExternalAliasSource;
 import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
@@ -68,6 +71,7 @@ class BlueprintImportServiceTest {
   @Mock private BlueprintExternalAliasRepository aliasRepository;
   @Mock private PersonalBlueprintRepository personalBlueprintRepository;
   @Mock private GameItemRepository gameItemRepository;
+  @Mock private AuditService auditService;
 
   private BlueprintImportService service;
 
@@ -81,7 +85,8 @@ class BlueprintImportServiceTest {
             new BlueprintFuzzyMatcher(),
             aliasRepository,
             personalBlueprintRepository,
-            gameItemRepository);
+            gameItemRepository,
+            auditService);
   }
 
   private static ResolvedProduct product(String key, String name) {
@@ -629,6 +634,8 @@ class BlueprintImportServiceTest {
     assertEquals(0, result.skipped());
     verify(personalBlueprintRepository, times(1)).save(any());
     verify(aliasRepository, times(1)).save(any(BlueprintExternalAlias.class));
+    verify(auditService)
+        .record(eq(AuditEventType.BLUEPRINT_IMPORTED), isNull(), isNull(), eq(SUB), any());
   }
 
   @Test
@@ -664,6 +671,7 @@ class BlueprintImportServiceTest {
     assertEquals(0, result.added());
     assertEquals(2, result.skipped());
     verify(personalBlueprintRepository, never()).save(any());
+    verifyNoInteractions(auditService);
   }
 
   @Test

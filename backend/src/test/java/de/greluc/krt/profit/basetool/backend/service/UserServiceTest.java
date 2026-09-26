@@ -22,10 +22,14 @@ package de.greluc.krt.profit.basetool.backend.service;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
@@ -47,6 +51,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class UserServiceTest {
 
   @Mock private UserRepository userRepository;
+  @Mock private AuditService auditService;
 
   @InjectMocks private UserService userService;
 
@@ -120,6 +125,21 @@ class UserServiceTest {
     assertTrue(result.isShareBlueprintsGlobally());
     verify(userRepository).saveAndFlush(user);
     verify(userRepository, never()).save(user);
+    verify(auditService)
+        .record(eq(AuditEventType.BLUEPRINT_SHARING_CHANGED), isNull(), isNull(), eq(id), any());
+  }
+
+  /** Pins that re-saving the same sharing value writes no audit event (REQ-AUDIT-001). */
+  @Test
+  void updateUserShareBlueprintsGlobally_withUnchangedValue_recordsNothing() {
+    UUID id = UUID.randomUUID();
+    User user = userWithId(id);
+    when(userRepository.findById(id)).thenReturn(Optional.of(user));
+    when(userRepository.saveAndFlush(user)).thenReturn(user);
+
+    userService.updateUserShareBlueprintsGlobally(id, false, 0L);
+
+    verifyNoInteractions(auditService);
   }
 
   /**

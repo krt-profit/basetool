@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.PersonalBlueprintMapper;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintBatchResult;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintCreateRequest;
@@ -33,11 +34,14 @@ import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintUpdateRe
 import de.greluc.krt.profit.basetool.backend.repository.GameItemRepository;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
 import de.greluc.krt.profit.basetool.backend.service.BlueprintProductService.ResolvedProduct;
+import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.OptimisticLock;
 import de.greluc.krt.profit.basetool.logging.LogSafe;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -76,6 +80,7 @@ public class PersonalBlueprintService {
   private final BlueprintProductService blueprintProductService;
   private final GameItemRepository gameItemRepository;
   private final DefaultBlueprintKeyService defaultBlueprintKeyService;
+  private final AuditService auditService;
 
   /**
    * Owner-scoped paged list of owned blueprints, optionally filtered by a case-insensitive product
@@ -119,6 +124,12 @@ public class PersonalBlueprintService {
     }
     PersonalBlueprint saved =
         repository.save(newOwned(ownerUserId, product, request.acquiredAt(), request.note()));
+    auditService.record(
+        AuditEventType.BLUEPRINT_ADDED,
+        saved.getId(),
+        product.productName(),
+        ownerUserId,
+        AuditDetails.of("product", product.productKey()));
     log.info(
         "Added personal blueprint id={} productKey='{}' ownerUserId={}",
         saved.getId(),
@@ -158,6 +169,16 @@ public class PersonalBlueprintService {
       }
       repository.save(newOwned(ownerUserId, product, null, null));
       added++;
+    }
+    if (added > 0) {
+      auditService.record(
+          AuditEventType.BLUEPRINT_BATCH_ADDED,
+          null,
+          null,
+          ownerUserId,
+          AuditDetails.of("added", added)
+              .with("alreadyOwned", alreadyOwned)
+              .with("unresolved", unresolved));
     }
     log.info(
         "Batch add for ownerUserId={}: added={} alreadyOwned={} unresolved={}",
@@ -202,6 +223,7 @@ public class PersonalBlueprintService {
     PersonalBlueprint entity = loadOwn(ownerUserId, id);
     requireRemovable(entity);
     repository.delete(entity);
+    recordRemoved(entity);
     log.info("Deleted personal blueprint id={} ownerUserId={}", id, ownerUserId);
   }
 
@@ -215,6 +237,14 @@ public class PersonalBlueprintService {
   @Transactional
   public int deleteAllOwn(@NotNull UUID ownerUserId) {
     int removed = repository.deleteRemovableByOwnerUserId(ownerUserId);
+    if (removed > 0) {
+      auditService.record(
+          AuditEventType.BLUEPRINT_ALL_REMOVED,
+          null,
+          null,
+          ownerUserId,
+          AuditDetails.of("removed", removed));
+    }
     log.info("Cleared {} personal blueprint(s) for ownerUserId={}", removed, ownerUserId);
     return removed;
   }
@@ -320,6 +350,7 @@ public class PersonalBlueprintService {
         Entities.require(repository.findById(id), () -> "PersonalBlueprint not found: " + id);
     requireRemovable(entity);
     repository.delete(entity);
+    recordRemoved(entity);
     log.info("Admin deleted blueprint id={} ownerUserId={}", id, entity.getOwnerUserId());
   }
 
@@ -332,6 +363,14 @@ public class PersonalBlueprintService {
   @Transactional
   public int deleteAllForAllUsers() {
     int removed = repository.deleteAllRemovable();
+    if (removed > 0) {
+      auditService.record(
+          AuditEventType.BLUEPRINT_PURGED_ALL_USERS,
+          null,
+          null,
+          null,
+          AuditDetails.of("removed", removed));
+    }
     log.warn("Admin cleared ALL {} removable personal blueprint(s) across every user", removed);
     return removed;
   }
@@ -351,9 +390,39 @@ public class PersonalBlueprintService {
       @NotNull PersonalBlueprint entity, @NotNull PersonalBlueprintUpdateRequest request) {
     OptimisticLock.check(
         entity.getVersion(), request.version(), PersonalBlueprint.class, entity.getId());
+    List<String> changed = new ArrayList<>();
+    if (!Objects.equals(entity.getAcquiredAt(), request.acquiredAt())) {
+      changed.add("acquiredAt");
+    }
+    if (!Objects.equals(entity.getNote(), request.note())) {
+      changed.add("note");
+    }
     entity.setAcquiredAt(request.acquiredAt());
     entity.setNote(request.note());
-    return toResponse(repository.save(entity));
+    PersonalBlueprint saved = repository.save(entity);
+    if (!changed.isEmpty()) {
+      auditService.record(
+          AuditEventType.BLUEPRINT_UPDATED,
+          saved.getId(),
+          saved.getProductName(),
+          saved.getOwnerUserId(),
+          AuditDetails.of("changed", String.join(",", changed)));
+    }
+    return toResponse(saved);
+  }
+
+  /**
+   * Records the removal of one owned blueprint in the Blueprints audit area.
+   *
+   * @param entity the blueprint just deleted
+   */
+  private void recordRemoved(@NotNull PersonalBlueprint entity) {
+    auditService.record(
+        AuditEventType.BLUEPRINT_REMOVED,
+        entity.getId(),
+        entity.getProductName(),
+        entity.getOwnerUserId(),
+        AuditDetails.of("product", entity.getProductKey()));
   }
 
   /**
