@@ -28,11 +28,17 @@ relayed writes record `client_id=none`, because the acting authentication carrie
 We will model every external client as follows.
 
 1. **One public Keycloak client per product**, device grant only (RFC 8628), `consentRequired`,
-   `fullScopeAllowed: false`, no PII mappers, no `offline_access`, the base scope
-   `exchange.connect` plus every capability scope offered as optional, and access **and** refresh
+   `fullScopeAllowed: false`, no PII mappers and none of the realm's default `profile`, `email` or
+   `roles` scopes, the base scope `exchange.connect`, `offline_access` and every capability scope
+   offered as optional, and access **and** refresh
    tokens DPoP-bound through the per-client attribute `dpop.bound.access.tokens` (RFC 9449). The
    Android client's refresh-only binding (ADR-0131) is deliberately not used: it would leave the
    access token unbound.
+   Clients request `offline_access`: a device login joins the member's browser SSO session, so
+   without an offline session every web logout would disconnect every client (observed on
+   Keycloak 26.7.4 on 2026-09-26, WP 0.4; owner decision the same day). The offline session
+   survives a web logout; removing the consent deletes it, and an admin logout of the member
+   makes its tokens stale — both at once, also observed.
 2. **DPoP is required** on every exchange route (new gateway code; `REQ-INGEST-012` amended).
 3. **Installations.** A member may connect the same product from several PCs. An installation is
    identified by the thumbprint of its DPoP key (`cnf.jkt`) and labelled by the client (at most 40
@@ -43,7 +49,8 @@ We will model every external client as follows.
    `iat` comparison alone would expire with the access token while the installation's refresh token
    mints fresh ones. Disconnecting **a whole client** removes its Keycloak consent (for a
    first-party client without consent: ends its client sessions) and stores a revocation
-   timestamp; tokens issued before it are refused. The gateway reads both uncached.
+   timestamp; tokens issued before it are refused. The gateway reads both uncached. A departing
+   member is logged out by the admin API, which also makes offline tokens stale.
 5. **Reduced authentication.** On exchange paths the acting member holds an exchange role, the
    capability authorities of the token and the memberships the demand feed needs — never the
    member's full stored roles. An ArchUnit rule forbids exchange services from calling

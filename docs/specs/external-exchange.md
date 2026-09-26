@@ -126,9 +126,11 @@ only by property.
 ### REQ-XCH-005 — Every third-party client is a public, consent-gated device-grant client
 
 Each product has its own public Keycloak client: device grant only, `consentRequired`,
-`fullScopeAllowed` off, no PII protocol mappers, no `offline_access`, `exchange.connect` and every
-capability scope optional, the device code living 600 s at a pinned polling interval, and
-`dpop.bound.access.tokens` on. Consent is shown in German, per capability. The consent and device
+`fullScopeAllowed` off, no PII protocol mappers and none of the realm's default `profile`, `email`
+or `roles` scopes, `exchange.connect`, `offline_access` and every capability scope optional, the
+device code living 600 s at a pinned polling interval, and `dpop.bound.access.tokens` on. Clients
+request `offline_access`, because a device login joins the member's browser SSO session and a web
+logout would otherwise disconnect every client (owner decision 2026-09-26). Consent is shown in German, per capability. The consent and device
 pages use the Basetool theme; the device page warns to enter only codes created on one's own PC.
 The clients are created by `scripts/provision-keycloak-realm.py`, never by hand.
 
@@ -137,8 +139,15 @@ The clients are created by `scripts/provision-keycloak-realm.py`, never by hand.
 - [ ] The provisioner's self-test covers the third-party template and the SC Extractor's exchange
   scopes, and removes `extractor-ingest` from the extractor client only after its migration.
 - [ ] The theme renders both pages with the phishing warning.
+- [x] Keycloak 26.7.4's behaviour is observed (WP 0.4, 2026-09-26, a throwaway local Keycloak of the
+  pinned image, owner decision to observe locally): a device login joins the browser SSO session
+  (same `sid`); a web logout ends it and the next refresh fails `invalid_grant` unless the client
+  holds an offline session; removing the consent removes the client from the session, or deletes
+  its offline session, at once; an admin logout makes offline tokens stale; the device flow shows
+  the consent page on every login, also when consent exists; access and refresh tokens carry
+  `cnf.jkt`, and a refresh without a DPoP proof is refused.
 
-**Status:** planned — WP 0.4 and WP 2.2 (#2081)
+**Status:** behaviour observed — WP 0.4; provisioning planned — WP 2.2 (#2081)
 
 ### REQ-XCH-006 — DPoP is required on every exchange route
 
@@ -173,10 +182,11 @@ Disconnecting **one installation** puts its key thumbprint on a persistent deny 
 mirrored to Redis, kept at least as long as a client session can live); every token bound to that
 key is refused (`401 INSTALLATION_REVOKED`) whatever its `iat`, and reconnecting needs a new key.
 Disconnecting **a whole client** removes the member's Keycloak consent for it (for a first-party
-client without consent: ends its client sessions) and stores a revocation timestamp per (client,
+client without consent: ends its client and offline sessions) and stores a revocation timestamp per (client,
 member); a token issued before it is refused (`401 CLIENT_REVOKED`), and a new connection afterwards
 works at once. When a member leaves the org (disabled, deleted, membership lost), their exchange
-sessions and consents end and revocations are written at once, not at the next roster sync. The
+sessions and consents end — an admin logout, which also makes offline tokens stale — and
+revocations are written at once, not at the next roster sync. The
 gateway reads the deny list and the timestamps per request, bypassing its cache.
 
 **Acceptance**
