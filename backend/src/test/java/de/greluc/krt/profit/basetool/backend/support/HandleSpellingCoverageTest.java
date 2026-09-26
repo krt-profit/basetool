@@ -101,13 +101,18 @@ class HandleSpellingCoverageTest {
     user.setUsername("spelling-username");
     user.setDisplayName("spelling-display-name");
     user.setDiscordGuildNickname("spelling-guild-nickname");
+    user.setRsiHandle("spelling-rsi-handle");
 
     List<String> yielded = HandleSpellings.of(user).toList();
 
     assertThat(yielded)
         .as("one value per declared column")
         .hasSameSizeAs(HandleSpellings.COLUMNS)
-        .containsExactly("spelling-username", "spelling-display-name", "spelling-guild-nickname");
+        .containsExactly(
+            "spelling-username",
+            "spelling-display-name",
+            "spelling-guild-nickname",
+            "spelling-rsi-handle");
   }
 
   /** Nulls are passed through, because the two callers drop them on different terms. */
@@ -118,6 +123,6 @@ class HandleSpellingCoverageTest {
 
     assertThat(HandleSpellings.of(user).toList())
         .as("a null column is still a slot; the caller decides what to do with it")
-        .containsExactly("only-a-username", null, null);
+        .containsExactly("only-a-username", null, null, null);
   }
 }

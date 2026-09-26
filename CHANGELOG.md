@@ -7,36 +7,55 @@
 - **Mein Lager: Einheit eines persönlichen Eintrags ändern.** Pro Eintrag und für eine Auswahl
   lässt sich die Einheit eigener persönlicher Einträge nachträglich wechseln — auf eine eigene
   Mitgliedschaft oder „Keine Einheit"; der Dialog sagt, wer den Eintrag dann sieht (REQ-INV-052).
+- **Profil: optionales RSI-Handle.** Mitglieder können ihr RSI-Handle im Profil hinterlegen; es ist
+  nur für sie selbst und Admins sichtbar, eindeutig über alle Konten und dient später verbundenen
+  Anwendungen zur Prüfung, ob ein Spiel-Log zum Konto gehört (REQ-SEC-072, Migration `V246`).
 - **Audit-Log: neuer Bereich „Blueprints".** Hinzufügen, Bearbeiten, Entfernen, Import, globale
   Freigabe, Standard-Blueprints und deren Vergabe — auch aus der App und durch Admins — landen im
   Audit-Log; Notizen werden nie mitgeschrieben (REQ-INV-051).
+  
 - **Audit-Log: neuer Bereich „Hangar".** Jede Änderung an Schiffen — anlegen, bearbeiten,
   löschen, Hangar leeren, Import, „Alle unfitted", Heimatstandort, auch aus der App und durch
   Admins — landet im Audit-Log (neuer Tab); wird ein Schiff gelöscht, protokolliert die Mission das
   Lösen aus ihren Einheiten (REQ-HANGAR-004).
+  
 - **Neue Seite „Star-Citizen-Links" (`/sc-links`) für alle Mitglieder.** 19 hilfreiche externe
   Websites (u. a. UEX, Erkul, SCMDB, FleetYards, KRT OpSec) mit Logo und kurzer Beschreibung, nach
   Themen gruppiert; erreichbar über die neue Navigationsgruppe „Ressourcen".
 
 ### Changed
 
+- **Keycloak: Vorlage für freigegebene Drittanwendungen (Exchange-API).** Der Realm-Provisioner legt
+  die zehn `exchange.*`-Scopes und jede Anwendung aus `scripts/keycloak/external-clients.json` nach einer
+  Vorlage an (Gerätelogin, Einwilligung, DPoP, 30/90 Tage Offline-Sitzung); das Login-Theme bekommt eine
+  eigene Einwilligungs- und Geräte-Seite mit Phishing-Warnung (REQ-XCH-005).
+
+- **Redis: 768 MB Speichergrenze in einem 1024-MB-Container (vorher 384 / 512 MB).** Platz für den
+  begrenzten Speicherbereich der geplanten Exchange-Schnittstelle (höchstens 64 MB), ohne dass
+  Sitzungen enger werden (ADR-0221). Wirkt auf Produktion erst mit dem Release und seinen
+  Quadlet-Units.
+  
 - **Blueprint-Import: Namen mit Klassen-Kürzeln eines Sprachpakets werden direkt zugeordnet.**
   Sprachpakete wie StarStrings oder das deutsche Paket schreiben Klasse, Größe und Grad in den
   Item-Namen („Sth/2/C Cirrus", „[STH-S2-C] Cirrus", „Cirrus (S2 C Stealth)"). Der Import entfernt
   genau diese belegten Formen und versucht Name und Alias erneut, statt nur einen Vorschlag
   anzubieten; gespeicherte Produkt-Schlüssel bleiben unverändert (REQ-INV-050).
+  
 - **CI: ein Dependabot-Image-Bump in den Compose-Dateien bringt seine Quadlet-Units selbst mit.**
   `dependabot-compose.yml` löst die Digests neu auf, erzeugt `quadlet/` neu und committet das Ergebnis
   auf den Dependabot-Branch, sodass kein Bump mehr mit veralteten Units gemergt wird (ADR-0215).
+  
 - **Deploy: ein Release mit neuem Keycloak-Provider-JAR kostet nur noch eine Downtime statt zwei.**
   `deploy.sh` spielt das JAR zusammen mit den App-Images ein und startet jeden Dienst genau einmal
   neu (auch Frontend und Ingest nicht mehr doppelt); scheitert das Health-Gate, gehen Images,
   Konfiguration und JAR gemeinsam zurück (ADR-0213). Wirkt erst nach einem Lauf der Ansible-Rolle
   (`--tags deploy,scripts`).
+  
 - **Deploy: die Selbstheilung startet jeden betroffenen Dienst genau einmal und meldet erst Erfolg,
   wenn alle wieder laufen.** Ein ungesunder Dienst wird mit allem, was ihn per `Requires=` braucht,
   einmal gestoppt und in Reihenfolge wieder gestartet, statt einzeln neu gestartet (ungesundes
   Frontend: nur Frontend). Wirkt erst nach einem Lauf der Ansible-Rolle (`--tags deploy,scripts`).
+  
 - **Deploy: `deploy.sh --reapply` spielt das laufende Release erneut ein, ohne die Rollback-Anker zu
   verschieben** — ersetzt das Löschen von `last-deployed.digests`. Ein gescheitertes Re-Apply wird
   nach 5 Minuten (verdoppelnd bis 1 h) statt nach 10 Minuten (bis 6 h) wiederholt. Wirkt erst nach
@@ -44,14 +63,24 @@
 
 ### Fixed
 
+- **Keycloak-Provisioner: ein frischer Realm ist nach dem ersten Lauf in Form.** Keycloak 26 übergeht
+  beim Anlegen eines Clients `backchannel.logout.session.required`; der Provisioner setzt das Attribut
+  jetzt direkt danach, statt erst beim zweiten Lauf (REQ-OPS-033).
+
+- **Audit-Log der Materialbörse: der PDF-Export scheiterte.** Der Titel des PDFs fehlte in allen
+  drei Backend-Sprachdateien, sodass der Export des Materialbörse-Tabs mit einem Fehler abbrach; ein
+  Test verlangt den Titel jetzt für jeden Audit-Bereich (REQ-AUDIT-003).
+  
 - **Frontend: Meldungen und Formulardaten nach einer Weiterleitung gehen nicht mehr verloren.** Die
   Session-Allow-List (`enforce`) verwarf die `CopyOnWriteArrayList`, in der Spring die Flash-Attribute
   ablegt; die Klasse steht jetzt namentlich auf der Liste (REQ-SEC-067).
+  
 - **Deploy: ein neues Keycloak-Provider-JAR meldet erst Erfolg, wenn die ganze App wieder läuft.**
   Der Keycloak-Neustart startet über `Requires=` Backend, Frontend und Ingest mit neu; `deploy.sh`
   wartet jetzt auf alle und stellt sonst das vorige JAR wieder her (`DeployFailed`), statt Erfolg zu
   melden, während Frontend und Ingest noch ohne Container sind. Wirkt erst nach einem Lauf der
   Ansible-Rolle (`--tags deploy,scripts`).
+  
 - **Deploy: ein Drift-Re-Apply überschreibt den Rollback-Anker nicht mehr.** Stellt `deploy.sh`
   dasselbe Release wieder her (z. B. „frontend: no container"), bleiben voriger Pin, `config-previous/`
   und voriges JAR beim Vorgänger; scheitert es, wird nichts zurückgerollt und

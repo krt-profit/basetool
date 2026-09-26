@@ -143,6 +143,15 @@ public class User extends AbstractEntity<UUID> {
   private String discordGuildNickname;
 
   /**
+   * The member's optional RSI account handle, entered on their own profile and unique across
+   * members case-insensitively (REQ-SEC-072). Visible to the member and {@code ADMIN} only.
+   */
+  @Nullable
+  @ToString.Exclude
+  @Column(name = "rsi_handle", length = 60)
+  private String rsiHandle;
+
+  /**
    * Account approval lifecycle (REQ-SEC-017). Every new non-admin registration is set to {@link
    * ApprovalStatus#PENDING} by {@link UserService} and holds only {@code ROLE_PENDING_APPROVAL}
    * until an admin approves; the field default {@link ApprovalStatus#ACTIVE} covers admin bootstrap

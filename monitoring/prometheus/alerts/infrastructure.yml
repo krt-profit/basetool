@@ -377,7 +377,7 @@ groups:
           severity: warning
         annotations:
           summary: "Redis memory >85% of maxmemory"
-          description: "Redis has used more than 85% of its 384mb maxmemory for 10 minutes. Under noeviction, hitting the ceiling makes NEW session writes / logins fail (existing sessions survive) — investigate session growth or a leak before it does."
+          description: "Redis has used more than 85% of its 768mb maxmemory for 10 minutes. Under noeviction, hitting the ceiling makes NEW session writes / logins fail (existing sessions survive) — investigate session growth or a leak before it does."
 
       - alert: RedisConnectionsRejected
         expr: increase(redis_rejected_connections_total[15m]) > 0

@@ -51,6 +51,12 @@ jobs:
             > backend/build/contract-baseline/openapi.json \
             || { echo "$tag carries no openapi.json; the schema diff will skip"; \
                  rm -f backend/build/contract-baseline/openapi.json; }
+          schemas=ingest/src/main/resources/exchange/v1/schemas
+          mkdir -p ingest/build/exchange-baseline
+          git ls-tree --name-only "$tag" "$schemas/" | while IFS= read -r file; do
+            git show "$tag:$file" > "ingest/build/exchange-baseline/${file##*/}"
+          done
+          echo "exchange schemas in $tag: $(find ingest/build/exchange-baseline -name '*.json' | wc -l)"
           exit 0
 
       - name: Build, run tests and lint

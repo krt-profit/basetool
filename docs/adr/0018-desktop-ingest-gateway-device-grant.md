@@ -8,7 +8,7 @@
   has the gateway call the backend under its own service account and name the member in
   `X-Ingest-On-Behalf-Of`. Everything else — the dedicated gateway, the device grant, the
   forward-only two-endpoint surface, the Redis handoff — stands.
-  The relay route list and two gateway-asserted headers are proposed to be extended by
+  The relay route list and two gateway-asserted headers are extended by
   [ADR-0216](0216-the-exchange-api-is-a-separate-contract-on-the-ingest-gateway.md) (epic #2078).
 - **Date:** 2026-06-16
 - **Deciders:** Lucas Greuloch (@greluc)

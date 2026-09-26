@@ -35,6 +35,7 @@ The exchange API is served by the ingest gateway at `/exchange/v1/**`
 | --- | --- | --- |
 | `GET /exchange/v1` | `exchange.connect` | service document: API version, capabilities granted to this token, limits, deprecations, docs URL, minimum client version |
 | `GET /exchange/v1/openapi.json` | anonymous | the committed OpenAPI 3.1 document, served as a static file |
+| `GET /exchange/v1/schemas/<name>.schema.json` | anonymous | the committed JSON Schemas, served at their `$id` (REQ-XCH-011) |
 | `POST /exchange/v1/me/installation` | `exchange.connect` | label this installation (REQ-XCH-007) |
 | `POST /exchange/v1/me/account-check` | `exchange.connect` | RSI-handle check (REQ-XCH-031) |
 | `POST /exchange/v1/catalog/resolve` | any exchange scope | resolve item references (REQ-XCH-012) |
@@ -125,19 +126,31 @@ only by property.
 ### REQ-XCH-005 — Every third-party client is a public, consent-gated device-grant client
 
 Each product has its own public Keycloak client: device grant only, `consentRequired`,
-`fullScopeAllowed` off, no PII protocol mappers, no `offline_access`, `exchange.connect` and every
-capability scope optional, the device code living 600 s at a pinned polling interval, and
-`dpop.bound.access.tokens` on. Consent is shown in German, per capability. The consent and device
+`fullScopeAllowed` off, no PII protocol mappers and none of the realm's default `profile`, `email`
+or `roles` scopes, `exchange.connect`, `offline_access` and every capability scope optional, the
+device code living 600 s at a pinned polling interval, and `dpop.bound.access.tokens` on. Clients
+request `offline_access`, because a device login joins the member's browser SSO session and a web
+logout would otherwise disconnect every client (owner decision 2026-09-26). Consent is shown in German, per capability. The consent and device
 pages use the Basetool theme; the device page warns to enter only codes created on one's own PC.
 The clients are created by `scripts/provision-keycloak-realm.py`, never by hand.
 
 **Acceptance**
 
-- [ ] The provisioner's self-test covers the third-party template and the SC Extractor's exchange
-  scopes, and removes `extractor-ingest` from the extractor client only after its migration.
-- [ ] The theme renders both pages with the phishing warning.
+- [x] The provisioner's self-test covers the third-party template (withheld scopes removed from an
+  existing client too, 30/90-day offline session, owner decision 2026-09-26) and the SC Extractor's
+  exchange scopes (`scripts/provision-keycloak-realm.test.sh`, sections 13–15).
+- [ ] The extractor client loses `extractor-ingest` once the extractor has migrated (WP 5.1 / go-live).
+- [x] The theme renders both pages with the phishing warning (`login-oauth-grant.ftl`,
+  `login-oauth2-device-verify-user-code.ftl`).
+- [x] Keycloak 26.7.4's behaviour is observed (WP 0.4, 2026-09-26, a throwaway local Keycloak of the
+  pinned image, owner decision to observe locally): a device login joins the browser SSO session
+  (same `sid`); a web logout ends it and the next refresh fails `invalid_grant` unless the client
+  holds an offline session; removing the consent removes the client from the session, or deletes
+  its offline session, at once; an admin logout makes offline tokens stale; the device flow shows
+  the consent page on every login, also when consent exists; access and refresh tokens carry
+  `cnf.jkt`, and a refresh without a DPoP proof is refused.
 
-**Status:** planned — WP 0.4 and WP 2.2 (#2081)
+**Status:** behaviour observed — WP 0.4; template, scopes and theme pages — WP 2.2 (#2081); the extractor's `extractor-ingest` removal — WP 5.1
 
 ### REQ-XCH-006 — DPoP is required on every exchange route
 
@@ -157,25 +170,31 @@ An installation is one client on one PC, identified by the thumbprint of its DPo
 labels it with `POST /exchange/v1/me/installation {label}`. The label has at most 40 characters of
 letters, digits, space, `-`, `_` and `.`, is never logged and never written to audit details, and
 is always shown after the registered client name. The backend keeps `exchange_installation`
-(client, member, thumbprint, label, first and last seen).
+(client, member, thumbprint, label, first and last seen) and gives each installation an opaque id —
+never the thumbprint — which the installation response and the service document return, so a
+client recognises its own removals in a tombstone's `removedBy.installationId` (asked by the VerseKit
+author, owner decision 2026-09-26).
 
 **Acceptance**
 
 - [ ] Label validation tests, including control, bidi and homoglyph-only input.
 - [ ] Log-capture test: the label never appears in any log line.
+- [ ] The installation response and the service document carry the same `installationId`, and a
+  tombstone written by that installation names it.
 
 **Status:** planned — WP 3.2 (#2082), WP 3.3 (#2083)
 
 ### REQ-XCH-008 — Revocation takes effect on the next request
 
 Disconnecting **one installation** puts its key thumbprint on a persistent deny list (database,
-mirrored to Redis, kept at least as long as a client session can live); every token bound to that
+mirrored to Redis, kept at least as long as a client session can live — 90 days, ADR-0217 amendment); every token bound to that
 key is refused (`401 INSTALLATION_REVOKED`) whatever its `iat`, and reconnecting needs a new key.
 Disconnecting **a whole client** removes the member's Keycloak consent for it (for a first-party
-client without consent: ends its client sessions) and stores a revocation timestamp per (client,
+client without consent: ends its client and offline sessions) and stores a revocation timestamp per (client,
 member); a token issued before it is refused (`401 CLIENT_REVOKED`), and a new connection afterwards
 works at once. When a member leaves the org (disabled, deleted, membership lost), their exchange
-sessions and consents end and revocations are written at once, not at the next roster sync. The
+sessions and consents end — an admin logout, which also makes offline tokens stale — and
+revocations are written at once, not at the next roster sync. The
 gateway reads the deny list and the timestamps per request, bypassing its cache.
 
 **Acceptance**
@@ -223,7 +242,10 @@ is live before the first registry entry exists.
 
 ### REQ-XCH-011 — The v1 data formats are published JSON Schemas
 
-The formats are JSON Schema 2020-12 files under `docs/exchange/schemas/v1/` with stable `$id`s:
+The formats are JSON Schema 2020-12 files. Their source is
+`ingest/src/main/resources/exchange/v1/schemas/`; the gateway serves each one anonymously at its
+permanent `$id`, `https://ingest.profit-base.online/exchange/v1/schemas/<name>.schema.json` (owner
+decision 2026-09-26), and a `$id` is never changed once published. The schemas are:
 `item-ref` (precedence `bt` › `scRecord` › `scGuid` › `uexId` › `locKey` › `name` + `nameLocale`),
 `quantity` (`{amount, unit: SCU|PIECE}`, SCU ≤ 3 decimals, PIECE whole), `quality` (integer
 0–1000; trade goods fixed 0), `location-ref`, `provenance` (`log|manual|import|default|other`,
@@ -237,11 +259,12 @@ offline-file `envelope` (`format`, `formatVersion`, `generator`, `generatedAt`, 
 
 **Acceptance**
 
-- [ ] CI validates every conformance fixture in `docs/exchange/examples/v1/` against its schema and
-  the OpenAPI document.
-- [ ] A test fails when a served route and the OpenAPI document diverge.
+- [x] CI validates every conformance fixture in `docs/exchange/examples/v1/` against its schema, and
+  every schema the OpenAPI document names exists and has valid and invalid fixtures.
+- [ ] A test fails when a served route and the OpenAPI document diverge (with the routes, WP 3.2).
 
-**Status:** planned — WP 0.2 (#2080)
+**Enforced by:** `ExchangeContractTest` · **Status:** schemas, OpenAPI document and fixtures
+committed and validated — WP 0.2 (#2080); served by the gateway with WP 3.2 (#2082)
 
 ### REQ-XCH-012 — Names resolve through the web import's own matching
 
@@ -433,7 +456,9 @@ Every error is RFC 9457 problem+json with a `code` from the registry in `docs/ex
 each with its HTTP status and the client action it requires. Codes are never reused or repurposed;
 the gateway-side codes are the `reason` labels of the exchange metrics.
 
-**Status:** planned — WP 0.2 (#2080)
+**Enforced by:** `ExchangeContractTest` (the registry's codes are unique and carry error
+statuses) · **Status:** registry published — WP 0.2 (#2080); the metric labels follow with the
+gateway, WP 3.2 (#2082)
 
 ### REQ-XCH-026 — The contract grows additively under `/exchange/v1`
 
@@ -444,9 +469,14 @@ open, extensions are namespaced, identifiers and cursors are opaque (ADR-0219).
 
 **Acceptance**
 
-- [ ] A contract test fails a change that removes or narrows anything in a v1 schema.
+- [x] A contract test fails a change that removes or narrows anything in a v1 schema: CI copies
+  the latest release's schemas to `ingest/build/exchange-baseline/` and
+  `ExchangeContractTest.theSchemasOnlyGrewSinceThePreviousRelease` compares them with
+  `SchemaCompatibility`, whose rules `SchemaCompatibilityTest` pins. Until a release carries the
+  v1 schemas the comparison has nothing to compare and is skipped.
 
-**Status:** planned — WP 0.2 (#2080)
+**Enforced by:** `ExchangeContractTest`, `SchemaCompatibilityTest` · **Status:** implemented —
+WP 0.2 (#2080)
 
 ### REQ-XCH-027 — Approved clients meet the client security requirements
 
@@ -487,7 +517,7 @@ offers changed).
 ### REQ-XCH-031 — The account check answers match, mismatch or unknown — never the handle
 
 `POST /exchange/v1/me/account-check {handle}` compares the handle with the optional RSI handle on
-the member's profile, case-insensitively, and answers `match`, `mismatch` or `unknown` (no handle
+the member's profile (REQ-SEC-072, stored since WP 1.4), case-insensitively, and answers `match`, `mismatch` or `unknown` (no handle
 stored). It never returns or logs the stored handle and is rate-limited tightly.
 
 **Status:** planned — WP 3.4 (#2106)

@@ -1,6 +1,6 @@
 # ADR-0129 — The ingest gateway is a trusted subsystem, not a token relay
 
-- **Status:** Accepted — **supersedes the bearer-relay half of [ADR-0018](0018-desktop-ingest-gateway-device-grant.md)** decision 1, and amends ADR-0127's relay premise (see below); the relay route list and two gateway-asserted headers are proposed to be extended by [ADR-0216](0216-the-exchange-api-is-a-separate-contract-on-the-ingest-gateway.md) (epic #2078)
+- **Status:** Accepted — **supersedes the bearer-relay half of [ADR-0018](0018-desktop-ingest-gateway-device-grant.md)** decision 1, and amends ADR-0127's relay premise (see below); the relay route list and two gateway-asserted headers are extended by [ADR-0216](0216-the-exchange-api-is-a-separate-contract-on-the-ingest-gateway.md) (epic #2078)
 - **Date:** 2026-08-04
 - **Related:** spec `REQ-INGEST-001`, `REQ-INGEST-002`, `REQ-INGEST-011`, `REQ-INGEST-012`
   ([`desktop-ingest.md`](../specs/desktop-ingest.md)) · supersedes the relay decision in

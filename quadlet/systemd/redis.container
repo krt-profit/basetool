@@ -17,13 +17,13 @@ Network=net-redis-backend.network
 Volume=/var/iri/redis:/data
 Volume=/var/iri/redis/users.acl:/etc/redis/users.acl:ro
 EnvironmentFile=/var/iri/code/env.d/redis.env
-Exec=redis-server --save "60 1" --appendonly yes --appendfsync everysec --maxmemory 384mb --maxmemory-policy noeviction --notify-keyspace-events Egx --loglevel notice --aclfile /etc/redis/users.acl
+Exec=redis-server --save "60 1" --appendonly yes --appendfsync everysec --maxmemory 768mb --maxmemory-policy noeviction --notify-keyspace-events Egx --loglevel notice --aclfile /etc/redis/users.acl
 HealthCmd=redis-cli ping 2>&1 | grep -q -e PONG -e NOAUTH
 HealthInterval=5s
 HealthTimeout=5s
 HealthRetries=5
 Notify=healthy
-Memory=512M
+Memory=1024M
 PidsLimit=512
 PodmanArgs=--cpus=1.0
 StopTimeout=30

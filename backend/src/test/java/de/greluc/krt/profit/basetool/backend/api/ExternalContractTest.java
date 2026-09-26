@@ -1423,6 +1423,13 @@ class ExternalContractTest {
               Set.of("shareBlueprintsGlobally", "version"),
               Set.of("shareBlueprintsGlobally", "version")),
           new ContractOperation(
+              "/api/v1/users/me/rsi-handle", "get", Set.of("rsiHandle", "version")),
+          new ContractOperation(
+              "/api/v1/users/me/rsi-handle",
+              "put",
+              Set.of("rsiHandle", "version"),
+              Set.of("version")),
+          new ContractOperation(
               "/api/v1/users/me/read-announcement/{announcementId}",
               "put",
               Set.of("lastReadAnnouncementId")),

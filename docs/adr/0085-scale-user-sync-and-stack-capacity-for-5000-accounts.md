@@ -1,6 +1,6 @@
 # ADR-0085 — Scale the Keycloak user sync and stack capacity for 5000 accounts / 200 concurrent
 
-- **Status:** Accepted — its Redis ceiling (`maxmemory 384mb` / 512 MB) is proposed to rise to 768 MB / 1024 MB by [ADR-0221](0221-redis-grows-to-768-mb-and-holds-a-bounded-exchange-partition.md) (epic #2078)
+- **Status:** Accepted — its Redis ceiling (`maxmemory 384mb` / 512 MB) rises to 768 MB / 1024 MB by [ADR-0221](0221-redis-grows-to-768-mb-and-holds-a-bounded-exchange-partition.md) (epic #2078); the owner accepted on 2026-09-26 that this takes the sum of all container memory limits to 14 512 MiB, above this ADR's ~14 GB review trigger (`deployment-delivery.md`, sizing rule 7)
 - **Date:** 2026-07-09
 - **Deciders:** @greluc
 - **Related:** `KeycloakService` · `UserSyncService` · `UserSyncTask` · `KeycloakSyncProperties` · `UserRepository.findIdsWithDiscordLink` · `RoleRepository.findAllNames` · `docker-compose.yml` (keycloak / db-keycloak / db-backend / redis) · REQ-SEC-043 · REQ-DATA-006 · ADR-0036 · ADR-0078 · ADR-0079 · the 2026-07-09 native-thread exhaustion incident
