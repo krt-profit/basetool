@@ -185,7 +185,7 @@ class ExchangeContractTest {
     Set<String> codes = new TreeSet<>();
     while (matcher.find()) {
       assertThat(codes.add(matcher.group(1))).as("duplicate " + matcher.group(1)).isTrue();
-      assertThat(Integer.parseInt(matcher.group(2))).isBetween(400, 599);
+      assertThat(matcher.group(2)).as(matcher.group(1)).matches("[45]\\d\\d");
     }
     assertThat(codes)
         .contains(
