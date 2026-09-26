@@ -618,7 +618,46 @@ public enum AuditEventType {
   HANGAR_AUDIT_EXPORTED(AuditDomain.HANGAR),
 
   /** Hangar audit rows older than an admin-chosen cutoff were purged (retention). */
-  HANGAR_AUDIT_PURGED(AuditDomain.HANGAR);
+  HANGAR_AUDIT_PURGED(AuditDomain.HANGAR),
+
+  /** A blueprint was added to a member's set, by the member or by an admin. */
+  BLUEPRINT_ADDED(AuditDomain.BLUEPRINT),
+
+  /** Several blueprints were added to a member's set in one request. */
+  BLUEPRINT_BATCH_ADDED(AuditDomain.BLUEPRINT),
+
+  /** An owned blueprint's acquisition date or note was edited. */
+  BLUEPRINT_UPDATED(AuditDomain.BLUEPRINT),
+
+  /** An owned blueprint was removed. */
+  BLUEPRINT_REMOVED(AuditDomain.BLUEPRINT),
+
+  /** A member removed every removable blueprint of their own set (REQ-INV-023). */
+  BLUEPRINT_ALL_REMOVED(AuditDomain.BLUEPRINT),
+
+  /** A blueprint export was imported into a member's set (REQ-INV-049). */
+  BLUEPRINT_IMPORTED(AuditDomain.BLUEPRINT),
+
+  /** A member turned global blueprint sharing on or off (REQ-INV-018). */
+  BLUEPRINT_SHARING_CHANGED(AuditDomain.BLUEPRINT),
+
+  /** An admin removed every removable blueprint of every member (REQ-INV-024). */
+  BLUEPRINT_PURGED_ALL_USERS(AuditDomain.BLUEPRINT),
+
+  /** A product joined the default blueprint set (REQ-INV-017). */
+  BLUEPRINT_DEFAULT_ADDED(AuditDomain.BLUEPRINT),
+
+  /** A product left the default blueprint set (REQ-INV-017). */
+  BLUEPRINT_DEFAULT_REMOVED(AuditDomain.BLUEPRINT),
+
+  /** Default blueprints were granted to members who lacked them; one event per provisioning run. */
+  BLUEPRINT_DEFAULTS_GRANTED(AuditDomain.BLUEPRINT),
+
+  /** The blueprint audit log was exported as a PDF or JSON for a period. */
+  BLUEPRINT_AUDIT_EXPORTED(AuditDomain.BLUEPRINT),
+
+  /** Blueprint audit rows older than an admin-chosen cutoff were purged (retention). */
+  BLUEPRINT_AUDIT_PURGED(AuditDomain.BLUEPRINT);
 
   /** The functional area this event type belongs to; pins the persisted {@code domain} column. */
   private final @NotNull AuditDomain domain;

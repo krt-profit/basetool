@@ -20,9 +20,14 @@
 package de.greluc.krt.profit.basetool.backend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.repository.PersonalBlueprintRepository;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -39,6 +44,7 @@ class DefaultBlueprintProvisioningServiceTest {
   private static final UUID SUB_1 = UUID.fromString("0e000001-0000-4000-8000-000000000001");
 
   @Mock private PersonalBlueprintRepository repository;
+  @Mock private AuditService auditService;
   @InjectMocks private DefaultBlueprintProvisioningService service;
 
   @Test
@@ -47,6 +53,18 @@ class DefaultBlueprintProvisioningServiceTest {
 
     assertEquals(3, service.grantDefaultsToUser(SUB_1));
     verify(repository).grantDefaultBlueprintsToUser(SUB_1);
+    verify(auditService)
+        .record(
+            eq(AuditEventType.BLUEPRINT_DEFAULTS_GRANTED), isNull(), isNull(), eq(SUB_1), any());
+  }
+
+  @Test
+  void grantDefaultsToUser_thatGrantedNothing_recordsNothing() {
+    when(repository.grantDefaultBlueprintsToUser(SUB_1)).thenReturn(0);
+
+    service.grantDefaultsToUser(SUB_1);
+
+    verifyNoInteractions(auditService);
   }
 
   @Test
@@ -55,5 +73,7 @@ class DefaultBlueprintProvisioningServiceTest {
 
     assertEquals(12, service.grantDefaultsToAllUsers());
     verify(repository).grantDefaultBlueprintsToAllUsers();
+    verify(auditService)
+        .record(eq(AuditEventType.BLUEPRINT_DEFAULTS_GRANTED), isNull(), isNull(), isNull(), any());
   }
 }
