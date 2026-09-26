@@ -561,6 +561,57 @@ public class UserController {
   }
 
   /**
+   * Returns the calling member's own RSI handle and the user-row version, backing the profile
+   * page's RSI-handle card (REQ-SEC-072).
+   *
+   * @param jwt caller's JWT; never {@code null} thanks to the {@code @PreAuthorize}.
+   * @return the stored handle, {@code null} when none is stored, plus the user-row version.
+   */
+  @NotNull
+  @GetMapping("/me/rsi-handle")
+  @PreAuthorize("isAuthenticated()")
+  @Transactional(readOnly = true)
+  public MyRsiHandleResponse getMyRsiHandle(@AuthenticationPrincipal Jwt jwt) {
+    User me = userService.findById(userService.getUserIdFromJwt(jwt));
+    return new MyRsiHandleResponse(me.getRsiHandle(), me.getVersion());
+  }
+
+  /**
+   * Sets or clears the calling member's own RSI handle (REQ-SEC-072), guarded by the
+   * optimistic-lock version; a blank handle clears it.
+   *
+   * @param jwt caller's JWT; never {@code null} thanks to the {@code @PreAuthorize}.
+   * @param request the new handle plus the expected version.
+   * @return the persisted handle and the new version.
+   */
+  @NotNull
+  @PutMapping("/me/rsi-handle")
+  @PreAuthorize("isAuthenticated()")
+  public MyRsiHandleResponse updateMyRsiHandle(
+      @AuthenticationPrincipal Jwt jwt, @NotNull @RequestBody @Valid MyRsiHandleRequest request) {
+    User me =
+        userService.updateUserRsiHandle(
+            userService.getUserIdFromJwt(jwt), request.rsiHandle(), request.version());
+    return new MyRsiHandleResponse(me.getRsiHandle(), me.getVersion());
+  }
+
+  /**
+   * Returns a member's RSI handle for the admin member page, read-only (REQ-SEC-072).
+   *
+   * @param id the member
+   * @return the stored handle, {@code null} when none is stored
+   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the member is
+   *     unknown
+   */
+  @NotNull
+  @GetMapping("/{id}/rsi-handle")
+  @PreAuthorize(Roles.HAS_ROLE_ADMIN)
+  @Transactional(readOnly = true)
+  public UserRsiHandleResponse getUserRsiHandle(@PathVariable @NotNull UUID id) {
+    return new UserRsiHandleResponse(userService.findById(id).getRsiHandle());
+  }
+
+  /**
    * Records that the calling user has read the given announcement (clears the unread badge).
    *
    * @param announcementId announcement just read
@@ -742,6 +793,34 @@ public class UserController {
   public record MyBlueprintSharingRequest(
       @jakarta.validation.constraints.NotNull Boolean shareBlueprintsGlobally,
       @jakarta.validation.constraints.NotNull Long version) {}
+
+  /**
+   * Response for {@link #getMyRsiHandle} / {@link #updateMyRsiHandle}: the member's own RSI handle
+   * and the user-row optimistic-lock version the card echoes back on save.
+   *
+   * @param rsiHandle the stored handle, or {@code null} when none is stored.
+   * @param version the user row's current {@code @Version}.
+   */
+  public record MyRsiHandleResponse(@Nullable String rsiHandle, Long version) {}
+
+  /**
+   * Body for {@link #updateMyRsiHandle}: the new handle and the expected optimistic-lock version.
+   *
+   * @param rsiHandle the new handle; {@code null} or blank clears it, otherwise 3 to 60 letters,
+   *     digits, underscores or hyphens.
+   * @param version the {@code @Version} of the user row the caller last read; never {@code null}.
+   */
+  public record MyRsiHandleRequest(
+      @Nullable @jakarta.validation.constraints.Size(max = 60) String rsiHandle,
+      @jakarta.validation.constraints.NotNull Long version) {}
+
+  /**
+   * Response for {@link #getUserRsiHandle}: a member's RSI handle as the admin member page shows
+   * it.
+   *
+   * @param rsiHandle the stored handle, or {@code null} when none is stored.
+   */
+  public record UserRsiHandleResponse(@Nullable String rsiHandle) {}
 
   /**
    * Reduces a user DTO to the peer shape for callers below logistician; logisticians and above get

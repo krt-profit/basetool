@@ -19,7 +19,10 @@
 
 package de.greluc.krt.profit.basetool.backend.service;
 
+import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
+import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.User;
@@ -27,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipFlagsPatchRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject;
 import de.greluc.krt.profit.basetool.backend.support.HandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
@@ -39,10 +43,12 @@ import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -66,7 +72,14 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class UserService {
 
+  /** The shape of an RSI handle: letters, digits, underscore and hyphen, 3 to 60 characters. */
+  public static final Pattern RSI_HANDLE_PATTERN = Pattern.compile("^[A-Za-z0-9_-]{3,60}$");
+
+  /** The i18n key of the refusal when another account already answers to the handle. */
+  private static final String RSI_HANDLE_TAKEN = "error.user.rsiHandle.taken";
+
   private final UserRepository userRepository;
+  private final AuditService auditService;
   private final AuthHelperService authHelperService;
   private final OwnerScopeService ownerScopeService;
   private final OrgUnitMembershipService orgUnitMembershipService;
@@ -224,6 +237,47 @@ public class UserService {
   }
 
   /**
+   * Sets or clears the caller's RSI handle (REQ-SEC-072); a blank value clears it.
+   *
+   * <p>The handle is refused when another account already answers to it as username, display name
+   * or RSI handle, because the erasure scrubs every spelling of a member (REQ-SEC-062). The handle
+   * never appears in the error or in a log line.
+   *
+   * @param id the caller's id from the JWT
+   * @param rsiHandle the new handle, already format-validated, or {@code null} / blank to clear it
+   * @param version the version the caller last read; {@code null} skips the check
+   * @return the persisted user
+   * @throws de.greluc.krt.profit.basetool.backend.exception.NotFoundException when the user is
+   *     unknown
+   * @throws BadRequestException when the handle does not have the shape of an RSI handle
+   * @throws DuplicateEntityException when another account already answers to the handle
+   * @throws ObjectOptimisticLockingFailureException when the supplied version is stale
+   */
+  @Transactional
+  public User updateUserRsiHandle(
+      @NotNull UUID id, @Nullable String rsiHandle, @Nullable Long version) {
+    User user = Entities.require(userRepository.findById(id), "User not found");
+    OptimisticLock.checkOptionalClient(user.getVersion(), version, User.class, id);
+    String candidate = rsiHandle == null ? "" : rsiHandle.trim();
+    if (candidate.isEmpty()) {
+      user.setRsiHandle(null);
+      return userRepository.saveAndFlush(user);
+    }
+    if (!RSI_HANDLE_PATTERN.matcher(candidate).matches()) {
+      throw new BadRequestException("error.user.rsiHandle.invalid");
+    }
+    if (userRepository.existsOtherAccountWithName(candidate.toLowerCase(Locale.ROOT), id)) {
+      throw new DuplicateEntityException(RSI_HANDLE_TAKEN);
+    }
+    user.setRsiHandle(candidate);
+    try {
+      return userRepository.saveAndFlush(user);
+    } catch (DataIntegrityViolationException e) {
+      throw new DuplicateEntityException(RSI_HANDLE_TAKEN);
+    }
+  }
+
+  /**
    * Sets the caller's opt-in for global blueprint sharing, which counts their blueprints in the
    * availability views of every org unit (REQ-INV-018).
    *
@@ -240,8 +294,18 @@ public class UserService {
       @NotNull UUID id, boolean shareBlueprintsGlobally, @Nullable Long version) {
     User user = Entities.require(userRepository.findById(id), "User not found");
     OptimisticLock.checkOptionalClient(user.getVersion(), version, User.class, id);
+    boolean changed = user.isShareBlueprintsGlobally() != shareBlueprintsGlobally;
     user.setShareBlueprintsGlobally(shareBlueprintsGlobally);
-    return userRepository.saveAndFlush(user);
+    User saved = userRepository.saveAndFlush(user);
+    if (changed) {
+      auditService.record(
+          AuditEventType.BLUEPRINT_SHARING_CHANGED,
+          null,
+          null,
+          id,
+          AuditDetails.of("enabled", shareBlueprintsGlobally));
+    }
+    return saved;
   }
 
   /**

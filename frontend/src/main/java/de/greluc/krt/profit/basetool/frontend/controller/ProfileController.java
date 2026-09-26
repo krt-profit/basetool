@@ -24,6 +24,7 @@ import de.greluc.krt.profit.basetool.frontend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.frontend.model.form.ProfileBlueprintSharingForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.ProfileDescriptionForm;
 import de.greluc.krt.profit.basetool.frontend.model.form.ProfilePayoutPreferenceForm;
+import de.greluc.krt.profit.basetool.frontend.model.form.ProfileRsiHandleForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.support.MapPayloadValues;
 import jakarta.validation.Valid;
@@ -157,6 +158,17 @@ public class ProfileController {
     }
     model.addAttribute("shareBlueprintsGlobally", shareBlueprintsGlobally);
 
+    String rsiHandle = null;
+    try {
+      Map<String, Object> handle =
+          backendApiClient.get("/api/v1/users/me/rsi-handle", STRING_OBJECT_MAP_TYPE);
+      if (handle != null && handle.get("rsiHandle") != null) {
+        rsiHandle = String.valueOf(handle.get("rsiHandle"));
+      }
+    } catch (Exception e) {
+      log.debug("Could not load the RSI handle; the field starts empty", e);
+    }
+
     model.addAttribute("keycloakAccountUrl", issuerUri + "/account");
 
     Map<String, Object> deletionRequest = null;
@@ -198,6 +210,13 @@ public class ProfileController {
       model.addAttribute(
           "profileBlueprintSharingForm",
           new ProfileBlueprintSharingForm(shareBlueprintsGlobally, version != null ? version : 0L));
+    }
+
+    if (!model.containsAttribute("profileRsiHandleForm")) {
+      Long version = (Long) model.getAttribute("version");
+      model.addAttribute(
+          "profileRsiHandleForm",
+          new ProfileRsiHandleForm(rsiHandle, version != null ? version : 0L));
     }
 
     return "profile";
@@ -507,6 +526,55 @@ public class ProfileController {
     body.put("version", refreshedUserVersion(form.version()));
     body.put("shareBlueprintsGlobally", form.shareBlueprintsGlobally());
     return ResponseEntity.ok(body);
+  }
+
+  /**
+   * Handles the RSI-handle form post without JavaScript (REQ-SEC-072); the page's script sends the
+   * same form to {@link ProfileRsiHandleProxyController} instead.
+   *
+   * @param form validated handle payload
+   * @param bindingResult validation errors carrier
+   * @param model model used when re-rendering inline
+   * @param principal authenticated OIDC user
+   * @param redirectAttributes flash attributes carrier for the result toast
+   * @return the inline {@code profile} view on validation failure, otherwise a redirect to {@code
+   *     /profile}
+   */
+  @NotNull
+  @PostMapping("/profile/rsi-handle")
+  public String updateRsiHandle(
+      @Valid @ModelAttribute("profileRsiHandleForm") ProfileRsiHandleForm form,
+      BindingResult bindingResult,
+      Model model,
+      @AuthenticationPrincipal OidcUser principal,
+      RedirectAttributes redirectAttributes) {
+    if (bindingResult.hasErrors()) {
+      return profile(model, principal);
+    }
+    try {
+      backendApiClient.put(
+          "/api/v1/users/me/rsi-handle",
+          Map.of(
+              "rsiHandle",
+              form.rsiHandle() == null ? "" : form.rsiHandle().trim(),
+              "version",
+              form.version() == null ? 0L : form.version()),
+          Void.class);
+      redirectAttributes.addFlashAttribute("successToast", "notification.success.save");
+    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      log.debug("RSI handle update failed", e);
+      if (e.getStatusCode() == 409 && "concurrency-conflict".equals(e.getProblemType())) {
+        redirectAttributes.addFlashAttribute("errorToast", "error.concurrency.conflict");
+      } else if (e.getStatusCode() == 409) {
+        redirectAttributes.addFlashAttribute("errorToast", "profile.rsiHandle.taken");
+      } else {
+        redirectAttributes.addFlashAttribute("errorToast", "error.profile.update.failed");
+      }
+    } catch (Exception e) {
+      log.error("RSI handle update failed", e);
+      redirectAttributes.addFlashAttribute("errorToast", "error.profile.update.failed");
+    }
+    return "redirect:/profile";
   }
 
   /**

@@ -996,6 +996,14 @@ class ApiVhostAnonymousSurfaceTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"shareBlueprintsGlobally\":true,\"version\":0}"))
         .andExpect(status().isUnauthorized());
+    mockMvc.perform(get("/api/v1/users/me/rsi-handle")).andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            put("/api/v1/users/me/rsi-handle")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"rsiHandle\":\"Some_Handle\",\"version\":0}"))
+        .andExpect(status().isUnauthorized());
     mockMvc
         .perform(put("/api/v1/users/me/read-announcement/" + ABSENT_OPERATION).with(csrf()))
         .andExpect(status().isUnauthorized());

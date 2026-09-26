@@ -282,7 +282,9 @@ truststore, and a TLS failure simply fails open.
 ### REQ-SEC-026 — Admin-mediated linking of a Discord registration to an existing account
 
 > [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
-> The account merge carries every new member-linked table of the exchange and the optional RSI handle; when both accounts carry a different handle, the surviving account's wins (owner decision 2026-09-26). Ships with WP 1.4 (#2106) and WP 3.1–3.3 (#2083).
+> The account merge carries every new member-linked table of the exchange. Ships with WP 3.1–3.3 (#2083).
+>
+> *The RSI handle part shipped with WP 1.4 (#2106, REQ-SEC-072, 2026-09-26): the source's handle moves onto a survivor without one; when both carry one, the survivor's wins and the source's is dropped.*
 
 A member who already has a Basetool account but signs in via Discord **can slip past the fail-open
 collision precheck (REQ-SEC-022)** and land in the PENDING approval queue as a seemingly-new

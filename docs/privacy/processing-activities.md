@@ -34,6 +34,8 @@ requires it and duplicating it into further files spreads personal data for no g
 - **Purpose:** operate a member account; authenticate; decide on admission.
 - **Data:** e-mail address, username / player handle (Star Citizen handle), optional self-written
   description, rank, join date; for Discord logins the Discord account id and the guild nickname;
+  the optional RSI handle the member enters on their own profile (visible to the member and admins
+  only, REQ-SEC-072);
   approval status with the deciding admin and timestamp, and the free-text reason on a refusal.
   **No first or last name is collected.**
 - **Legal basis:** Art. 6(1)(b) (providing the requested service) and Art. 6(1)(f) (operating the

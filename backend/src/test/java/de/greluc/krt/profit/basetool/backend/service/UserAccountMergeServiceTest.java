@@ -100,6 +100,62 @@ class UserAccountMergeServiceTest {
   }
 
   /**
+   * A handle only the source carries moves onto the survivor and leaves the source (REQ-SEC-072).
+   */
+  @Test
+  @DisplayName("the source's RSI handle moves onto a target that has none")
+  void merge_carriesTheRsiHandleOntoATargetWithoutOne() {
+    UUID source = account("merge-src-" + UUID.randomUUID());
+    UUID target = account("merge-tgt-" + UUID.randomUUID());
+    UUID admin = account("merge-admin-" + UUID.randomUUID());
+    String handle = rsiHandle();
+    setRsiHandle(source, handle);
+
+    mergeService.merge(source, target, admin);
+
+    assertThat(userRepository.findById(target).orElseThrow().getRsiHandle()).isEqualTo(handle);
+    assertThat(userRepository.findById(source).orElseThrow().getRsiHandle()).isNull();
+  }
+
+  /** When both accounts carry a handle, the survivor's wins and the source's is dropped. */
+  @Test
+  @DisplayName("the target's RSI handle wins and the source's is dropped")
+  void merge_keepsTheTargetsRsiHandleAndDropsTheSources() {
+    UUID source = account("merge-src-" + UUID.randomUUID());
+    UUID target = account("merge-tgt-" + UUID.randomUUID());
+    UUID admin = account("merge-admin-" + UUID.randomUUID());
+    String sourceHandle = rsiHandle();
+    String targetHandle = rsiHandle();
+    setRsiHandle(source, sourceHandle);
+    setRsiHandle(target, targetHandle);
+
+    mergeService.merge(source, target, admin);
+
+    assertThat(userRepository.findById(target).orElseThrow().getRsiHandle())
+        .isEqualTo(targetHandle);
+    assertThat(userRepository.findById(source).orElseThrow().getRsiHandle()).isNull();
+  }
+
+  /**
+   * Returns a fresh handle in the RSI shape, unique per call.
+   *
+   * @return a handle no other account carries
+   */
+  private static String rsiHandle() {
+    return "Rsi_" + UUID.randomUUID().toString().substring(0, 8);
+  }
+
+  /**
+   * Stores an RSI handle on an account.
+   *
+   * @param userId the account
+   * @param handle the handle to store
+   */
+  private void setRsiHandle(UUID userId, String handle) {
+    jdbc.update("UPDATE app_user SET rsi_handle = ? WHERE id = ?", handle, userId);
+  }
+
+  /**
    * A member may legitimately own the same blueprint on both accounts, and the unique constraint
    * over {@code (owner_user_id, product_key)} would reject the move. The source's duplicate is
    * dropped rather than re-pointed — safe precisely because the two accounts are one person, so the

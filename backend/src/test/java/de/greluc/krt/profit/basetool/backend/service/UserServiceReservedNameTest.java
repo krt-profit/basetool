@@ -56,7 +56,7 @@ class UserServiceReservedNameTest {
   @BeforeEach
   void setUp() {
     userRepository = mock(UserRepository.class);
-    service = new UserService(userRepository, null, null, null, null);
+    service = new UserService(userRepository, null, null, null, null, null);
     self = new User();
     self.setId(SELF);
     self.setUsername("TheirOwnLogin");

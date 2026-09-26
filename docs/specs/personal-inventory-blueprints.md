@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-26.
 > **Owner area:** INV/UI · **Related ADRs:** [ADR-0017](../adr/0017-default-blueprints-admin-curated-materialized.md), [ADR-0024](../adr/0024-opt-in-global-blueprint-sharing.md), [ADR-0035](../adr/0035-blueprint-craftability-from-own-stock.md), [ADR-0046](../adr/0046-blueprint-craftability-bridges-piece-item-ingredients.md)
 
 # Personal inventory — "Meine Blueprints" master-detail (V3)
@@ -566,3 +566,26 @@ and search for it.
 
 **Code links:** [`personal-inventory-blueprints.html`](../../frontend/src/main/resources/templates/personal-inventory-blueprints.html),
 [`PersonalInventoryBlueprintsPageControllerMvcTest`](../../frontend/src/test/java/de/greluc/krt/profit/basetool/frontend/controller/PersonalInventoryBlueprintsPageControllerMvcTest.java).
+
+### REQ-INV-051 — Every blueprint mutation is audited
+
+Every change to blueprints writes exactly one event to the **Blueprints** audit area
+(`AuditDomain.BLUEPRINT`, REQ-AUDIT-001), whichever channel made it — the web, the app, an admin on
+another member's set, the import, the sharing opt-in, the default set and its provisioning — and
+later the exchange API (epic #2078). A run that changed nothing records nothing; provisioning writes
+one summary event per run, never one per granted row. The subject is the blueprint labelled by its
+catalogue product name; the details hold the product key, counts and changed field names, never the
+member's note.
+
+**Acceptance**
+
+- [x] Add, batch add, edit, remove, remove all, import, sharing change, global purge, default add and
+  remove and provisioning each record one event, and only when they changed something.
+- [x] The Blueprints tab in the admin audit viewer lists, filters, exports and purges the area.
+
+**Enforced by:** `PersonalBlueprintServiceTest`, `BlueprintImportServiceTest`,
+`DefaultBlueprintServiceTest`, `DefaultBlueprintProvisioningServiceTest`, `UserServiceTest`,
+`AuditReportServiceTest`, `AdminAuditLogPageControllerTest`, `AuditReportProxyControllerTest` ·
+**Code:** `PersonalBlueprintService`, `BlueprintImportService`, `DefaultBlueprintService`,
+`DefaultBlueprintProvisioningService`, `UserService#updateUserShareBlueprintsGlobally` · **Issues:**
+#2098 (epic #2078).

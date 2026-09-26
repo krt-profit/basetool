@@ -71,5 +71,13 @@ public enum AuditDomain {
    * another member's hangar. The subject is the ship with its ship-type name as label, never the
    * free-text ship name; the owner is the target.
    */
-  HANGAR
+  HANGAR,
+
+  /**
+   * Personal blueprints (Blueprints): a member's own blueprint set, its import and sharing opt-in,
+   * the admin paths on another member's set, the default set and its provisioning. The subject is
+   * the owned or default blueprint with its catalogue product name as label; the owner is the
+   * target.
+   */
+  BLUEPRINT
 }
