@@ -57,7 +57,8 @@ public final class SessionTypeAllowList {
   /**
    * Direct members of {@code java.util} and {@code java.time}, nested classes included, and nothing
    * from a subpackage. Matched against the whole name, so {@code java.util.concurrent.X} and {@code
-   * java.util.logging.FileHandler} do not match.
+   * java.util.logging.FileHandler} do not match; a subpackage class a session holds is listed in
+   * {@link #ALLOWED_EXACT_NAMES}.
    */
   static final Pattern JDK_VALUE_TYPES = Pattern.compile("java\\.(?:util|time)\\.[\\w$]+");
 
@@ -88,11 +89,13 @@ public final class SessionTypeAllowList {
   /**
    * Individually allowed class names, matched exactly so a class sharing a prefix is not allowed by
    * accident: the boxed scalars, {@code BigDecimal} / {@code BigInteger}, {@code URL} / {@code
-   * URI}, the flash-map classes and the Nimbus claim and token-response maps.
+   * URI}, the flash-map classes with the {@code CopyOnWriteArrayList} {@code
+   * SessionFlashMapManager} stores them in, and the Nimbus claim and token-response maps.
    */
   static final @Unmodifiable List<String> ALLOWED_EXACT_NAMES =
       List.of(
           "org.springframework.web.servlet.FlashMap",
+          "java.util.concurrent.CopyOnWriteArrayList",
           "org.springframework.util.LinkedMultiValueMap",
           "java.math.BigDecimal",
           "java.math.BigInteger",

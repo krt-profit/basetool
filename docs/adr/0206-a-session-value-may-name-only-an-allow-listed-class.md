@@ -4,6 +4,7 @@
 - **Date:** 2026-09-23
 - **Deciders:** @greluc
 - **Requirement:** [REQ-SEC-067](../specs/security-and-access.md)
+- **Amended:** 2026-09-23 (final types in containers), 2026-09-26 (the flash-map list)
 - **Related:** [ADR-0154](0154-a-container-written-final-session-value-gets-a-forced-type-id.md)
   (the one container class that needed a forced type id, now an allow-list entry too),
   [ADR-0157](0157-a-dropped-session-value-is-repaired-on-the-request-that-found-it.md) (what happens
@@ -104,6 +105,15 @@ The list gains the boxed scalars of `java.lang` (by exact name, never the packag
 real decoder instead of a hand-written claims map, which is what hid the gap. `URL`'s `hashCode`
 resolves its host; a writer able to plant that could forge a security context outright, so the DNS
 query is accepted rather than refusing every ID token.
+
+## Amendment 2 — 2026-09-26: the flash-map list
+
+`AbstractFlashMapManager#saveOutputFlashMap` creates the session's flash-map list as a
+`java.util.concurrent.CopyOnWriteArrayList`, and the `java.util` entry deliberately stops at direct
+members. The parity test held its flash maps in an `ArrayList`, so it proved a shape production never
+writes. Production, on `enforce` since 2026-09-25, refused the list and dropped the flash attributes
+of every redirect. `CopyOnWriteArrayList` joins the list by exact name — never `java.util.concurrent`
+as a package — and the parity sample now lets `SessionFlashMapManager` write its flash maps itself.
 
 ## Alternatives rejected
 
