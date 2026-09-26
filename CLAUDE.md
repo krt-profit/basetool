@@ -371,8 +371,36 @@ the Boot-managed version, because `lombok.config` is a single shared file at the
 - Keep the **arc42 architecture documentation** ([`docs/arc42/`](docs/arc42/README.md)) current whenever a change affects it — the binding *"the arc42 architecture documentation moves with the change"* rule from the Requirements section above, restated here for the same reason. The chapter map is in that folder's `README.md`; §5, §7, §8 and §11 are the ones a code change usually touches.
 - **Javadoc is mandatory** on every class, interface, enum, record, and public/protected method — no exceptions, including trivial getters/setters and Lombok-generated members documented at the field level. Javadoc must describe the *actual* behavior, parameters, return values, side effects, thrown exceptions, and non-obvious invariants of the specific code it annotates. **Generic boilerplate is forbidden** — phrases like "Gets the value", "Returns the result", "Does something", "Helper method", or restating the method name in prose are not acceptable. If you cannot write a concrete, code-specific sentence, read the implementation again until you can.
 - **Javadoc is gate-enforced.** Checkstyle fails the build on missing or malformed Javadoc (presence, summary period, placement, paragraphs, at-clause order) — there is no warn-only grace period. Note it only checks *form*: the quality bar above is on you.
-- **No comments besides Javadoc** ([ADR-0214](docs/adr/0214-code-carries-no-comments-besides-javadoc.md)) — in every language the repository holds: no `//` or `/* */` in Java, JS or CSS, no `<!-- -->` or `<!--/* */-->` in templates, no `#` in YAML, shell, Python, properties, nginx, systemd or Dockerfiles, no `--` in SQL. What stays: Javadoc (and JSDoc / Python docstrings), the licence header, and tool directives with no prose after them (`// @ts-check`, `/* global */`, `/* exported */`, `eslint-disable…`, `# shellcheck disable=`, `# hadolint ignore=`, `# noqa`, `# image-pin-gate: ignore-file`, Thymeleaf `/*[[…]]*/` and `<!--/*/ … /*/-->`). An empty `catch` names its variable `ignored` or `expected` instead of carrying a comment.
-- **Javadoc is short, precise and carries no history.** One summary sentence, a contract sentence only when a caller needs it, then the tags. No dates, PR or issue numbers, "previously" / "now" / "used to", migration or incident stories, rationale essays or pointers to other comments; a bare `REQ-…` / `ADR-…` pointer is fine. **The reasoning goes into the commit message and the PR body**, durable facts into the spec, ADR, runbook or knowledge base.
+- **Code comments and Javadoc length** follow the HARD RULE below.
+
+## Code comments (HARD RULE — no comments besides Javadoc)
+
+**The code carries no comments besides proper Javadoc, the Javadoc is short and precise, and no
+history is kept in either.** Binding on every change and every agent, in every file of the
+repository — main, test and e2e sources alike ([ADR-0214](docs/adr/0214-code-carries-no-comments-besides-javadoc.md)).
+
+- **No comments.** No `//` or `/* */` in Java, JS or CSS, no `<!-- -->` or `<!--/* */-->` in
+  templates, no `#` in YAML, shell, Python, properties, nginx, systemd, Dockerfiles or TOML, no `--`
+  in SQL, no commented-out code or config. An empty `catch` names its variable `ignored` or
+  `expected` instead of carrying a comment.
+- **What stays:** Javadoc (and, under the same rules, JSDoc and Python docstrings), the licence
+  header, and tool directives with no prose after them (`// @ts-check`, `/* global */`,
+  `/* exported */`, `eslint-disable…`, `# shellcheck disable=|source=|shell=`, `# hadolint ignore=`,
+  `# noqa`, `# image-pin-gate: ignore-file`, Thymeleaf `/*[[…]]*/` and `<!--/*/ … /*/-->`).
+- **Javadoc is short, precise and carries no history.** One summary sentence, a contract sentence
+  only when a caller needs it, then the tags. No dates, PR or issue numbers, "previously" / "now" /
+  "used to", migration or incident stories, rationale essays or pointers to other comments; a bare
+  `REQ-…` / `ADR-…` pointer is fine.
+- **The reasoning goes into the commit message and the PR body** — that is where a reviewer and a
+  later `git blame` find it. A durable fact a later change needs goes into the spec, the ADR, the
+  runbook or the knowledge base, never into a comment.
+- **Out of scope:** applied Flyway migrations (their checksum covers the comments), generated files
+  (`openapi.json`, SBOMs, `verification-metadata.xml`, the units and templates
+  `generate-quadlet.py` writes), vendored `gradlew`, Markdown, and test fixtures whose comments are
+  the data under test.
+- **Mind live syntax.** A comment can carry something that is not prose — an envsubst placeholder
+  at the end of a comment line in a rendered template, a marker a gate reads. Check what a removed
+  line held before deleting it.
 
 ## Git
 
