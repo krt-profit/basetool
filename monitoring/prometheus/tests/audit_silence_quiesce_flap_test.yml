@@ -19,8 +19,8 @@ tests:
               severity: warning
               domain: JOB_ORDER
             exp_annotations:
-              summary: "Audit domain silent 14d (JOB_ORDER)"
-              description: "The JOB_ORDER audit domain recorded zero events in 14 days while the backend is up — this domain may have lost its audit wiring (REQ-AUDIT-001) even though other domains are still active."
+              summary: "Audit domain silent 30d (JOB_ORDER)"
+              description: "The JOB_ORDER audit domain recorded zero events in 30 days while the backend is up — this domain may have lost its audit wiring (REQ-AUDIT-001) even though other domains are still active."
       - eval_time: 202m
         alertname: AuditDomainSilenceAnomaly
         exp_alerts:
@@ -28,8 +28,8 @@ tests:
               severity: warning
               domain: JOB_ORDER
             exp_annotations:
-              summary: "Audit domain silent 14d (JOB_ORDER)"
-              description: "The JOB_ORDER audit domain recorded zero events in 14 days while the backend is up — this domain may have lost its audit wiring (REQ-AUDIT-001) even though other domains are still active."
+              summary: "Audit domain silent 30d (JOB_ORDER)"
+              description: "The JOB_ORDER audit domain recorded zero events in 30 days while the backend is up — this domain may have lost its audit wiring (REQ-AUDIT-001) even though other domains are still active."
       - eval_time: 210m
         alertname: AuditDomainSilenceAnomaly
         exp_alerts:
@@ -37,8 +37,8 @@ tests:
               severity: warning
               domain: JOB_ORDER
             exp_annotations:
-              summary: "Audit domain silent 14d (JOB_ORDER)"
-              description: "The JOB_ORDER audit domain recorded zero events in 14 days while the backend is up — this domain may have lost its audit wiring (REQ-AUDIT-001) even though other domains are still active."
+              summary: "Audit domain silent 30d (JOB_ORDER)"
+              description: "The JOB_ORDER audit domain recorded zero events in 30 days while the backend is up — this domain may have lost its audit wiring (REQ-AUDIT-001) even though other domains are still active."
 
   - name: resolves - a sustained outage still suppresses AuditDomainSilenceAnomaly
     interval: 1m

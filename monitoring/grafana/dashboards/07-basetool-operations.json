@@ -1173,7 +1173,7 @@
         "y": 64
       },
       "type": "table",
-      "title": "Audit events (last 14d) by domain",
+      "title": "Audit events (last 30d) by domain",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1190,7 +1190,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (domain) (increase(basetool_audit_events_total[14d]))",
+          "expr": "sum by (domain) (increase(basetool_audit_events_total[30d]))",
           "refId": "A",
           "instant": true,
           "format": "table",

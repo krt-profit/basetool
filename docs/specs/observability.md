@@ -1577,14 +1577,18 @@ the boot run carries the last run's values over and re-reads only the reboot fla
   (`domain` = the `AuditDomain` values, including `MARKET` since the Materialbörse). Silence
   detection is two-tier: `AuditSilenceAnomaly` (no audited mutation anywhere for 5 d while the
   backend is up) plus, since #1041 item 10, `AuditDomainSilenceAnomaly` (a single domain silent for
-  14 d while others stay active — the domain-lost-its-wiring failure mode the global sum masks).
-  Four domains are excluded from the per-domain rule and never notify at any horizon: `PROMOTION`,
-  `PERSONAL_INVENTORY`, `MARKET`, and — since 2026-08-16 — `ROLE`. `ROLE` covers
+  **30 d** while others stay active — the domain-lost-its-wiring failure mode the global sum masks).
+  Six domains are excluded from the per-domain rule and never notify at any horizon: `PROMOTION`,
+  `PERSONAL_INVENTORY`, `MARKET`, — since 2026-08-16 — `ROLE`, and — since 2026-09-26 — `HANGAR` and
+  `BLUEPRINT`. *(Changed 2026-09-26 by owner decision: the window was 14 d and the two new areas were
+  alerted by default. Production over the preceding 180 days, read-only: ship changes happened on 40
+  days with one pause of 15.1 days, blueprint changes on 64 days with a longest pause of 10.9 days —
+  a 14-day window would have fired on the hangar once in half a year, on an ordinary quiet stretch.)* `ROLE` covers
   role/membership admin, Kommando groups and user deletion, all admin actions rather than daily
   traffic, so a fortnight without one is an ordinary quiet period; while it was still alerted it
   fired through every such period and, the condition being a level rather than an event, re-notified
   on the Alertmanager `repeat_interval` until somebody changed a role. Their volume is reviewed on
-  the operations dashboard's per-domain tables (14 d and 60 d) instead of paged — a deliberate
+  the operations dashboard's per-domain tables (30 d and 60 d) instead of paged — a deliberate
   trade of coverage for signal. Everything not named there is alerted, so a newly added
   `AuditDomain` is covered by default and exempting one is a deliberate edit rather than an
   omission. The rule, its exclusions and the `up` guard are pinned by promtool unit tests in

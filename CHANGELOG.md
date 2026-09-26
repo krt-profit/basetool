@@ -23,6 +23,10 @@
 
 ### Changed
 
+- **Monitoring: ein Audit-Bereich alarmiert erst nach 30 statt 14 Tagen Stille; Hangar und Blueprints
+  sind wie Materialbörse und Rollen ausgenommen.** Auf Produktion gab es beim Hangar eine echte Pause
+  von gut 15 Tagen; beide Bereiche werden über die 30-/60-Tage-Tabellen im Betriebs-Dashboard
+  beobachtet (`AuditDomainSilenceAnomaly`, REQ-OBS-011).
 - **Keycloak: Vorlage für freigegebene Drittanwendungen (Exchange-API).** Der Realm-Provisioner legt
   die zehn `exchange.*`-Scopes und jede Anwendung aus `scripts/keycloak/external-clients.json` nach einer
   Vorlage an (Gerätelogin, Einwilligung, DPoP, 30/90 Tage Offline-Sitzung); das Login-Theme bekommt eine
