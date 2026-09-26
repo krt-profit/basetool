@@ -343,7 +343,9 @@ entry does no harm).
   resolution before it, which is what the writer needs, has already run. Check
   the additions against Maven Central as above.
 - **Dependabot** only manages GitHub Actions, Docker images and the frontend's
-  npm packages here, none of which Gradle resolves. A Dependabot *security
+  npm packages here, none of which Gradle resolves. A compose image bump is
+  completed on its branch by `dependabot-compose.yml`, which commits the
+  regenerated Quadlet units (ADR-0215). A Dependabot *security
   update* for a Gradle dependency, should one ever be opened, fails verification
   until a maintainer pushes the regenerated file to its branch.
 - `refresh-versions.yml` changes no version and needs nothing; the PR that
@@ -565,7 +567,7 @@ runs on every pull request and verifies that every commit in the PR
 carries a `Signed-off-by` trailer whose name and email match the
 commit's author (case-insensitive on the email). Merge commits (two
 or more parents) and commits authored by well-known bots (Dependabot,
-refreshVersions, GitHub Actions, Renovate) are skipped; the exact bot
+refreshVersions, GitHub Actions, Renovate, the `basetool-release` App) are skipped; the exact bot
 addresses are the `bot_emails` list in the workflow.
 
 If the check fails:

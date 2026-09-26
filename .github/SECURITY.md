@@ -198,7 +198,9 @@ before reporting a finding against it:
   the ability to create the ref it names. A repository ruleset restricts
   creating, updating and deleting `v*` tags to two actors: the
   `basetool-release` GitHub App, which the release workflow uses, and the
-  maintainer (ADR-0201).
+  maintainer (ADR-0201). The same App commits the regenerated units onto
+  Dependabot compose-bump branches with a token scoped to `contents: write`
+  (ADR-0215).
 - **Provenance (in the registry)** — SLSA build provenance
   (`provenance: mode=max`) is attached as an OCI attestation to every
   published manifest.

@@ -41,8 +41,8 @@ the user namespace ([`docs/backup.md`](../backup.md)) — and why both the desti
 Quadlet `.container`, `.network` and `.volume` files — eighteen containers, eighteen networks and
 three volumes, plus one `env.d` template per container — are generated from the compose files by
 [`scripts/generate-quadlet.py`](../../scripts/generate-quadlet.py), committed under
-[`quadlet/`](../../quadlet/), kept honest by the `quadlet-drift` CI job, and shipped in the config
-bundle; `systemd` renders them into services. The generator refuses to emit anything it cannot
+[`quadlet/`](../../quadlet/), kept honest by the `quadlet-drift` CI job — a Dependabot compose bump
+regenerates them on its own branch (ADR-0215) — and shipped in the config bundle; `systemd` renders them into services. The generator refuses to emit anything it cannot
 translate faithfully rather than quietly dropping it — an unrecognised compose key or a service with
 no recorded disposition is an error, not a warning. The compose files stay the source, and the local
 and test stacks still run on them.

@@ -10,6 +10,9 @@
 
 ### Changed
 
+- **CI: ein Dependabot-Image-Bump in den Compose-Dateien bringt seine Quadlet-Units selbst mit.**
+  `dependabot-compose.yml` löst die Digests neu auf, erzeugt `quadlet/` neu und committet das Ergebnis
+  auf den Dependabot-Branch, sodass kein Bump mehr mit veralteten Units gemergt wird (ADR-0215).
 - **Deploy: ein Release mit neuem Keycloak-Provider-JAR kostet nur noch eine Downtime statt zwei.**
   `deploy.sh` spielt das JAR zusammen mit den App-Images ein und startet jeden Dienst genau einmal
   neu (auch Frontend und Ingest nicht mehr doppelt); scheitert das Health-Gate, gehen Images,
