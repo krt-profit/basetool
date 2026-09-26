@@ -163,10 +163,37 @@ deployed one rotates them. A drift re-apply of the deployed release (REQ-OPS-013
 and on a host whose unit files are gone the config too, but it saves no pin, takes no snapshot and
 writes no `config-apply.incomplete`. A re-apply that fails — at its health gate or before it — rolls
 nothing back, because its target *is* the deployed release: it leaves the release and the anchors
-where they are, records the failure in the bad-digest backoff (keyed to the deployed target), and
-stamps `basetool_deploy_last_health_restart_failed_timestamp` (`DeployHealthRestartFailing`, "the
-running release could not be restored") rather than a deploy outcome. `DeployRolledBack` therefore
-means a rollback to a different release, always.
+where they are, records the failure in its **own** backoff record, `reapply-failed.digests` (keyed to
+the deployed target), and stamps `basetool_deploy_last_health_restart_failed_timestamp`
+(`DeployHealthRestartFailing`, "the running release could not be restored") rather than a deploy
+outcome. A re-apply that succeeds is not a deploy outcome either: it stamps the stack-health
+heartbeat, not `basetool_deploy_last_success_timestamp`, which would clear a `DeployRolledBack` or
+`DeployFailed` raised by a different release that has still not shipped. `DeployRolledBack`
+therefore means a rollback to a different release, always.
+
+**An operator re-applies the deployed release with `deploy.sh --reapply`** (since 2026-09-26). The
+target is read from `last-deployed.digests` — never resolved from a tag, which may already name a
+newer release — and the run is a re-apply in every respect above: it re-delivers the release's config
+bundle and units, rewrites its pin, re-stages its provider JAR and swaps it in only when the live one
+differs (a byte-identical JAR restarts nothing), passes the health gate, rotates no anchor and rolls
+nothing back. It is refused, before any registry call and without a metric or a failure record, on a
+host with no deployed release (no marker), together with `--tag`, and when the pin record names an
+app digest the marker does not. It bypasses the re-apply backoff — the backoff throttles the timer,
+and an operator who asks for a re-apply now has chosen to spend the restart window now — but leaves
+the bad-digest backoff (`failed.digests`) and the stateful-infra marker alone, because those may
+belong to the newer target the tag names; clearing them would let the next tick retry a release that
+just rolled back. **Deleting `last-deployed.digests`** is not a re-apply: the run then cannot tell
+that its target is the deployed release, takes the release path, and rotates all three anchors onto
+the release that is already deployed.
+
+**Backoff durations.** A failed **release** (a new target) is retried after `IRI_BACKOFF_BASE`
+(600 s), doubling per consecutive failure, capped at `IRI_BACKOFF_MAX` (6 h), from
+`failed.digests`. A failed **re-apply** of the deployed release — drift or `--reapply` — uses the
+self-heal's durations, `IRI_HEALTH_RESTART_BASE` (300 s) doubling to `IRI_HEALTH_RESTART_MAX` (1 h),
+from `reapply-failed.digests` (the owner's decision of 2026-09-26): it restores the release
+production is on, like the heal, and a missing container should not stay missing for six hours. The
+record is kept apart from the heal's `health-restart.digests`, so a failed heal of one service never
+holds back the re-apply of another service's missing container. `--force` bypasses either backoff.
 
 > [!bug] Added 2026-09-25 — a re-apply rotated the anchors until then
 > The pin save ran on every apply, so a drift re-apply ("drift: frontend: no container") copied the
@@ -214,11 +241,23 @@ means a rollback to a different release, always.
   re-delivery — leaves `previous-digest-pin.yml`, `config-previous/` and
   `keycloak-spi-previous.jar` naming the release before it, and writes no `config-apply.incomplete`.
 - [ ] A failed drift re-apply restores nothing, writes neither `basetool_deploy_last_rollback_timestamp`
-  nor `basetool_deploy_last_failure_timestamp`, records the deployed target in the bad-digest backoff
-  and stamps `basetool_deploy_last_health_restart_failed_timestamp`. A later release rotates the
-  anchor to the deployed release, and its rollback lands there.
+  nor `basetool_deploy_last_failure_timestamp`, records the deployed target in
+  `reapply-failed.digests` and stamps `basetool_deploy_last_health_restart_failed_timestamp`. A later
+  release rotates the anchor to the deployed release, and its rollback lands there.
+- [ ] A failed re-apply is backed off 300 s, doubling, capped at 1 h (`IRI_HEALTH_RESTART_*`); a
+  failed release 600 s, doubling, capped at 6 h (`IRI_BACKOFF_*`). Neither writes the other's record.
+- [ ] `deploy.sh --reapply` re-applies the release `last-deployed.digests` names, whatever the tag
+  names, and resolves no tag; it rotates no anchor, restarts keycloak only for a live provider JAR
+  that differs from the deployed one, stamps no `basetool_deploy_last_success_timestamp`, and leaves
+  `failed.digests` of another target as it was. When it fails it behaves like a failed drift
+  re-apply.
+- [ ] `deploy.sh --reapply` is refused — exit 1, no registry call, no metric, no failure record — on a
+  host with no `last-deployed.digests`, together with `--tag`, and when `current-digest-pin.yml`
+  names an app digest the marker does not.
+- [ ] Deleting `last-deployed.digests` still makes the next run a release that rotates all three
+  anchors onto the deployed release (documented, not a way to re-apply).
 
-**Enforced by:** `scripts/deploy.sh` (rollback block, `on_pre_gate_exit`, `REAPPLY` / `record_reapply_failure`, `assert_config_tree_writable`,
+**Enforced by:** `scripts/deploy.sh` (rollback block, `on_pre_gate_exit`, `REAPPLY` / `record_reapply_failure`, `--reapply`, `backoff_seconds`, `assert_config_tree_writable`,
 `restore_previous_config_tree`) · `scripts/lib/container-runtime.sh`
 (`rt_pin_apply`, `rt_pin_rollback`, `rt_apply_stack`) · `frontend/src/main/resources/application.yml`
 (`spring.data.redis.timeout` / `connect-timeout`, ADR-0114) · `scripts/deploy.test.sh` · **Runbook:** `docs/deployment.md` → *What happens on the host*, *Troubleshooting*
@@ -461,11 +500,14 @@ reported as such first. The run logs one `drift: <service>: <reason>` line per f
 distinguishes two classes, and the case where both occur:
 
 - **Structural** — a missing container, or one on a non-target image: the release is wrong, so the
-  run falls through to the normal apply path (verify, pin, pull, apply), still honouring the
-  bad-digest backoff so a persistently-failing target does not flap every tick. It re-applies the
-  **same** release, so it is not a release: it rotates no rollback anchor, and a re-apply that fails
-  rolls nothing back — it is recorded in that backoff and as `DeployHealthRestartFailing`, never as
-  `DeployRolledBack` or `DeployFailed` (REQ-OPS-003, since 2026-09-25).
+  run falls through to the normal apply path (verify, pin, pull, apply), still honouring a backoff
+  so a persistently-failing re-apply does not flap every tick. It re-applies the **same** release,
+  so it is not a release: it rotates no rollback anchor, and a re-apply that fails rolls nothing
+  back — it is recorded as `DeployHealthRestartFailing`, never as `DeployRolledBack` or
+  `DeployFailed` (REQ-OPS-003, since 2026-09-25). Its backoff is the self-heal's durations (300 s
+  doubling to 1 h) from its own record, `reapply-failed.digests`, since 2026-09-26 — until then it
+  was the release backoff (600 s doubling to 6 h) in `failed.digests`. An operator forces the same
+  re-apply over a converged stack with `deploy.sh --reapply` (REQ-OPS-003).
 - **Health only** — every divergent container is on the target image but not healthy: the release
   is right and the runtime is sick, so `deploy.sh` restarts **only** those services, with no pull,
   no signature re-verification and no release rollback, throttled by its own backoff
@@ -581,9 +623,9 @@ reconcile is a silent no-op — nothing scrapes the textfile there anyway.
 - [ ] A missing container is brought back by a `start` — never a `restart` of a running unit it
   requires — and a drift re-apply that leaves an unhealthy at-target container alone stamps no
   healthy heartbeat.
-- [ ] A drift re-apply of a target inside the bad-digest backoff window is skipped like any
-  other re-apply of that target; a failed drift re-apply records the failure for the backoff,
-  stamps the `deploy-health.prom` failure gauge, and does not roll back (REQ-OPS-003).
+- [ ] A drift re-apply of a target inside the re-apply backoff window (`reapply-failed.digests`,
+  300 s doubling to 1 h) is skipped; a failed drift re-apply records the failure there, stamps the
+  `deploy-health.prom` failure gauge, and does not roll back (REQ-OPS-003).
 - [ ] `deploy.sh --check-only` over a drifted stack reports "would re-apply" and applies
   nothing.
 - [ ] A container inside its healthcheck start period does not trigger a drift re-apply (but a

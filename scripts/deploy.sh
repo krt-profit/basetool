@@ -45,6 +45,8 @@
 #   sudo -u deploy /var/iri/code/scripts/deploy.sh --tag 1.4.2      # pin a specific version
 #   sudo -u deploy /var/iri/code/scripts/deploy.sh --check-only     # dry-run
 #   sudo -u deploy /var/iri/code/scripts/deploy.sh --force          # retry a backed-off target now
+#   sudo -u deploy /var/iri/code/scripts/deploy.sh --reapply        # re-apply the DEPLOYED release
+#                                                                   # (no anchor rotates, no rollback)
 #
 # State files (rewritten on every deploy):
 #   /var/lib/iri/current-digest-pin.yml    the record of the live backend/
@@ -55,8 +57,9 @@
 #                                          running stack underneath us.
 #   /var/lib/iri/previous-digest-pin.yml   the prior pin, restored on rollback.
 #                                          Rotated ONLY by a change of target: a
-#                                          drift re-apply of the already-deployed
-#                                          target leaves it (and config-previous/
+#                                          re-apply of the already-deployed
+#                                          target (drift or --reapply) leaves it
+#                                          (and config-previous/
 #                                          and keycloak-spi-previous.jar) alone,
 #                                          so it keeps naming the release BEFORE
 #                                          the deployed one.
@@ -74,17 +77,26 @@
 #                                          keycloak-spi digests are part of the
 #                                          marker so a config-only change (e.g. a
 #                                          redis pin bump) or a provider-JAR-only
-#                                          change is NOT skipped.
+#                                          change is NOT skipped. `--reapply`
+#                                          reads its target from here; deleting
+#                                          it turns the deployed release into a
+#                                          new one and rotates every anchor.
 #   /var/lib/iri/failed.digests            a digest set whose health check
 #                                          failed, plus a failure counter, so
 #                                          the SAME broken target is retried
-#                                          with exponential backoff instead of
-#                                          on every tick. Cleared on a
-#                                          successful deploy or when a new
-#                                          digest is promoted to the tag. A
-#                                          record keyed to the DEPLOYED target is
-#                                          a failed drift re-apply, which never
-#                                          rolls back (see the re-apply below).
+#                                          with exponential backoff (BACKOFF_*)
+#                                          instead of on every tick. Cleared on
+#                                          a successful release or when a new
+#                                          digest is promoted to the tag. Only a
+#                                          new target writes it.
+#   /var/lib/iri/reapply-failed.digests    the same record for a failed re-apply
+#                                          of the DEPLOYED release (a drift
+#                                          re-apply or --reapply), which never
+#                                          rolls back. Backed off with the heal's
+#                                          shorter durations (HEALTH_RESTART_*),
+#                                          and kept apart from failed.digests so
+#                                          a re-apply never touches the backoff
+#                                          of a release that rolled back.
 #   /var/lib/iri/health-restart.digests    backoff bookkeeping for the
 #                                          runtime-health targeted restart: when
 #                                          the running stack is already at the
@@ -289,8 +301,11 @@ COSIGN_SEARCH_PATH="${IRI_COSIGN_SEARCH_PATH:-/usr/local/bin:/usr/bin:/opt/cosig
 VERIFY_LAST_ERROR=""
 
 TARGET_TAG=stable
+TAG_GIVEN=false
 CHECK_ONLY=false
 FORCE=false
+# --reapply: the target is the release last-deployed.digests records, not a tag (see REAPPLY).
+REAPPLY_REQUESTED=false
 
 # Bad-digest backoff: after a health-check failure the SAME target digest pair
 # is retried with an exponential backoff (BACKOFF_BASE seconds, doubling per
@@ -306,6 +321,14 @@ BACKOFF_MAX="${IRI_BACKOFF_MAX:-21600}"
 # stack back. This backoff throttles that targeted restart so a container that
 # will not recover is not force-recreated every tick — shorter than the deploy
 # backoff above, because a targeted restart is cheap and recovery is urgent.
+#
+# A failed RE-APPLY of the deployed release (a drift re-apply, or --reapply) is
+# backed off with these same durations since 2026-09-26 (the owner's decision):
+# it restores the release production is already on, so it is the same kind of
+# recovery, and waiting up to six hours to retry it would leave a missing
+# container missing for that long. It keeps its OWN record file, though
+# (reapply-failed.digests): a failed heal of one service must not hold back the
+# re-apply of another service's missing container, nor the other way round.
 HEALTH_RESTART_BASE="${IRI_HEALTH_RESTART_BASE:-300}"
 HEALTH_RESTART_MAX="${IRI_HEALTH_RESTART_MAX:-3600}"
 
@@ -315,6 +338,7 @@ while [[ $# -gt 0 ]]; do
     --tag)
       [[ -n "${2:-}" ]] || { echo "FATAL: --tag requires a value" >&2; exit 1; }
       TARGET_TAG="$2"
+      TAG_GIVEN=true
       shift 2
       ;;
     --check-only)
@@ -325,18 +349,36 @@ while [[ $# -gt 0 ]]; do
       FORCE=true
       shift
       ;;
+    --reapply)
+      REAPPLY_REQUESTED=true
+      shift
+      ;;
     -h|--help)
       cat <<'USAGE'
-Usage: deploy.sh [--tag <ref>] [--check-only] [--force]
+Usage: deploy.sh [--tag <ref> | --reapply] [--check-only] [--force]
 
 Options:
   --tag <ref>     Image tag/ref to deploy. Default: stable
                   Examples: stable, latest, 1.4.2, sha-abc1234
+  --reapply       Re-apply the release that is DEPLOYED — the one
+                  /var/lib/iri/last-deployed.digests records — instead of
+                  resolving a tag: re-delivers its config bundle and units,
+                  rewrites its digest pin, re-stages its provider JAR (swapped in
+                  only if the live one differs) and runs the health gate. Rotates
+                  no rollback anchor and, if it fails, rolls nothing back (the
+                  failure is backed off like a failed drift re-apply). Bypasses
+                  the re-apply backoff, never a rolled-back release's backoff.
+                  Refused on a host with no deployed release, and with --tag.
+                  Use it instead of deleting last-deployed.digests, which turns
+                  the deployed release into a new one and rotates every anchor.
   --check-only    Resolve digests + cosign-verify them, but do not apply
                   (dry-run / signature preflight). Exits non-zero if a signature
-                  does not verify; writes no deploy metric.
-  --force         Bypass the bad-digest backoff and retry a previously failed
-                  target now (e.g. after fixing an environmental cause).
+                  does not verify; writes no deploy metric. With --reapply, the
+                  deployed release's digests.
+  --force         Bypass the bad-digest backoff (and the re-apply backoff) and
+                  retry a previously failed target now (e.g. after fixing an
+                  environmental cause); also applies an operator-gated
+                  stateful-infra change.
   -h, --help      Show this help.
 
 Environment overrides (all optional, sensible defaults shown):
@@ -348,8 +390,10 @@ Environment overrides (all optional, sensible defaults shown):
   IRI_BACKOFF_BASE=600     (first retry delay after a failed target, seconds)
   IRI_BACKOFF_MAX=21600    (cap for the exponential backoff, seconds)
   IRI_HEALTH_RESTART_BASE=300   (first delay before re-restarting an unhealthy
-                                 at-target service — the runtime-health path — seconds)
-  IRI_HEALTH_RESTART_MAX=3600   (cap for the health-restart backoff, seconds)
+                                 at-target service — the runtime-health path —
+                                 and before retrying a failed re-apply, seconds)
+  IRI_HEALTH_RESTART_MAX=3600   (cap for the health-restart and re-apply
+                                 backoffs, seconds)
   IRI_REGISTRY=ghcr.io
   IRI_IMAGE_NAMESPACE=krt-profit
   IRI_GHCR_USERNAME=deploy-bot
@@ -374,6 +418,13 @@ USAGE
       ;;
   esac
 done
+
+# --reapply names its target (the deployed release) and --tag names another one; together they
+# contradict each other, and neither silently winning is acceptable.
+if [[ "${REAPPLY_REQUESTED}" == "true" && "${TAG_GIVEN}" == "true" ]]; then
+  echo "FATAL: --reapply re-applies the deployed release and cannot be combined with --tag (try --help)" >&2
+  exit 1
+fi
 
 # --- Helpers ----------------------------------------------------------------
 # log and fail are lib/common.sh's.
@@ -1011,6 +1062,16 @@ stage_keycloak_spi_jar() {
 }
 
 swap_in_keycloak_spi_jar() {
+  if [[ "${REAPPLY}" == "true" ]]; then
+    # --reapply puts the DEPLOYED release's JAR back over a live one that differs from it. The live
+    # one is not a release anchor, and keycloak-spi-previous.jar names the release before the deployed
+    # one, so nothing is snapshotted -- and nothing is marked for a restore, because a failed re-apply
+    # restores nothing (on_pre_gate_exit, the re-apply branch after the gate).
+    install -D -m 0644 "${KEYCLOAK_SPI_STAGE_JAR}" "${KEYCLOAK_SPI_JAR}"
+    rm -f "${KEYCLOAK_SPI_STAGE_JAR}"
+    rt_note_changed keycloak
+    return 0
+  fi
   if [[ -f "${KEYCLOAK_SPI_JAR}" ]]; then
     cp -a "${KEYCLOAK_SPI_JAR}" "${KEYCLOAK_SPI_PREVIOUS_JAR}"
     KEYCLOAK_SPI_HAD_PREVIOUS=true
@@ -1259,6 +1320,9 @@ PIN_FILE_CURRENT="${STATE_DIR}/current-digest-pin.yml"
 PIN_FILE_PREVIOUS="${STATE_DIR}/previous-digest-pin.yml"
 LAST_DEPLOYED_FILE="${STATE_DIR}/last-deployed.digests"
 FAILED_FILE="${STATE_DIR}/failed.digests"
+# The backoff record of a failed re-apply of the deployed release — same `marker count epoch` format
+# as failed.digests, the heal's durations (see HEALTH_RESTART_* and REAPPLY).
+REAPPLY_FAILED_FILE="${STATE_DIR}/reapply-failed.digests"
 CONFIG_STAGE_DIR="${STATE_DIR}/config-stage"
 CONFIG_PREVIOUS_DIR="${STATE_DIR}/config-previous"
 # Per-service persisted snapshot of the monitoring config subtree each bind-mounted component
@@ -1435,19 +1499,33 @@ write_stack_health_metric() {
   } | write_textfile "$(basename "${f}")" || true
 }
 
-# record_target_failure — count one more failure of EXPECTED_MARKER in ${FAILED_FILE}, which is what
-# the bad-digest backoff reads. Sets FAIL_COUNT. The count restarts at 1 when the record belongs to a
-# different target, so a freshly promoted release is never throttled by its predecessor's failures.
+# record_target_failure [file] — count one more failure of EXPECTED_MARKER in <file> (default
+# ${FAILED_FILE}, which the bad-digest backoff reads; a re-apply passes ${REAPPLY_FAILED_FILE}). Sets
+# FAIL_COUNT. The count restarts at 1 when the record belongs to a different target, so a freshly
+# promoted release is never throttled by its predecessor's failures.
 record_target_failure() {
-  local prev_marker="" prev_count=""
+  local file="${1:-${FAILED_FILE}}" prev_marker="" prev_count=""
   FAIL_COUNT=1
-  if [[ -f "${FAILED_FILE}" ]]; then
-    read -r prev_marker prev_count _ < "${FAILED_FILE}" || true
+  if [[ -f "${file}" ]]; then
+    read -r prev_marker prev_count _ < "${file}" || true
     if [[ "${prev_marker}" == "${EXPECTED_MARKER}" ]] && [[ "${prev_count}" =~ ^[0-9]+$ ]]; then
       FAIL_COUNT=$(( 10#${prev_count} + 1 ))
     fi
   fi
-  printf '%s %d %d\n' "${EXPECTED_MARKER}" "${FAIL_COUNT}" "$(date +%s)" > "${FAILED_FILE}"
+  printf '%s %d %d\n' "${EXPECTED_MARKER}" "${FAIL_COUNT}" "$(date +%s)" > "${file}"
+}
+
+# backoff_seconds <base> <max> <count> — the wait after <count> consecutive failures: <base> doubling
+# per failure, capped at <max>. A count past 20 is the cap outright, so the power cannot overflow.
+backoff_seconds() {
+  local base="$1" max="$2" count="$3" b
+  if (( 10#${count} > 20 )); then
+    echo "${max}"
+    return 0
+  fi
+  b=$(( base * (2 ** (10#${count} - 1)) ))
+  (( b > max )) && b="${max}"
+  echo "${b}"
 }
 
 # release_parts — one line naming what this release changes: the app images whose pin moves, the
@@ -1547,20 +1625,37 @@ APP_IMAGES_CHANGED=""
 #
 # So a failed re-apply rolls nothing back: the deployed release stays, the anchors keep pointing at
 # the one before it, and the failure is recorded as "the running release could not be restored":
-# failed.digests for the backoff (the one the drift path has always honoured), and the heal's
-# DeployHealthRestartFailing signal rather than a promotion outcome (record_reapply_failure).
+# reapply-failed.digests for the backoff, and the heal's DeployHealthRestartFailing signal rather than
+# a promotion outcome (record_reapply_failure). A successful one is not a promotion outcome either:
+# it stamps the stack-health heartbeat, not basetool_deploy_last_success_timestamp, which would clear
+# a DeployRolledBack or DeployFailed that a DIFFERENT, still unshipped release raised.
+#
+# Two ways in, one path (2026-09-26):
+#   - the drift re-apply: the target resolved from the tag IS the last-deployed release and the
+#     running stack drifted from it;
+#   - `--reapply`: the operator asks for it. The target is read from last-deployed.digests, never
+#     resolved from a tag, and the config bundle is re-delivered and the provider JAR re-staged (put
+#     back only when the live one differs). It replaces deleting the marker, which made the run take
+#     the deployed release for a new one and rotate all three anchors onto it.
+#
+# The backoff after a failed re-apply uses the heal's durations (HEALTH_RESTART_*: 300 s doubling to
+# 1 h), not the release's (600 s doubling to 6 h) — the owner's decision of 2026-09-26: it restores
+# the release production is on, like the heal. Its record is its own file, apart from the heal's and
+# from failed.digests: a failed heal of one service must not block the re-apply of another's missing
+# container, and a --reapply of the deployed release must not reset or overwrite the backoff of a
+# newer release that failed and rolled back — the next tick would retry that release at once.
 REAPPLY=false
 
-# record_reapply_failure <what> — a drift re-apply of the deployed release did not bring it back.
-# Counts it in failed.digests (keyed to the deployed target, so the re-apply backs off like any
-# failed target and a new promotion clears it) and stamps the runtime-health failure gauge that
-# DeployHealthRestartFailing reads. Not write_deploy_metric: rollback and failure there mean "a
-# promoted release did not ship", and this one had shipped.
+# record_reapply_failure <what> — a re-apply of the deployed release did not bring it back.
+# Counts it in reapply-failed.digests (keyed to the deployed target, so a new release clears it) and
+# stamps the runtime-health failure gauge that DeployHealthRestartFailing reads. Not
+# write_deploy_metric: rollback and failure there mean "a promoted release did not ship", and this
+# one had shipped.
 record_reapply_failure() {
   local what="$1"
-  record_target_failure
+  record_target_failure "${REAPPLY_FAILED_FILE}"
   log "${what} — re-apply of the deployed release failed (#${FAIL_COUNT}); nothing is rolled back: the target IS the deployed release, and the rollback anchors keep naming the release before it"
-  log "recorded re-apply failure #${FAIL_COUNT} for the deployed target; the next attempt backs off (--force retries now)"
+  log "recorded re-apply failure #${FAIL_COUNT} for the deployed target; the next automatic attempt backs off $(backoff_seconds "${HEALTH_RESTART_BASE}" "${HEALTH_RESTART_MAX}" "${FAIL_COUNT}")s (deploy.sh --reapply or --force retries now)"
   write_stack_health_metric restart_failed
 }
 
@@ -1626,6 +1721,49 @@ if ! flock -n 200; then
   exit 0
 fi
 
+# --- --reapply: the target is the deployed release --------------------------
+# Read under the lock, before anything reaches a registry, so a refusal costs nothing and records
+# nothing: a usage error is not a deploy failure, and must not page DeployFailed.
+#
+# last-deployed.digests is THE deployed release — written only after a health gate passed, and what
+# every drift check compares the running stack against. A host without it has never completed a
+# deploy (or had it deleted), so there is nothing to re-apply, and treating a tag as the target would
+# be a release, not a re-apply. The pin record is the other half of "deployed": a record that names a
+# different app digest means the two disagree about what runs, which no code path leaves behind — so
+# this refuses rather than guessing which of them the operator meant.
+REAPPLY_BACKEND="" REAPPLY_FRONTEND="" REAPPLY_INGEST="" REAPPLY_CONFIG="" REAPPLY_KCSPI=""
+if [[ "${REAPPLY_REQUESTED}" == "true" ]]; then
+  if [[ ! -s "${LAST_DEPLOYED_FILE}" ]]; then
+    fail "--reapply: no deployed release on this host — ${LAST_DEPLOYED_FILE} is missing or empty, so there is nothing to re-apply. Deploy a release instead: deploy.sh (or deploy.sh --tag <ref>)"
+  fi
+  reapply_extra=""
+  IFS='|' read -r REAPPLY_BACKEND REAPPLY_FRONTEND REAPPLY_INGEST REAPPLY_CONFIG REAPPLY_KCSPI reapply_extra \
+    < "${LAST_DEPLOYED_FILE}" || true
+  for reapply_field in REAPPLY_BACKEND REAPPLY_FRONTEND REAPPLY_INGEST REAPPLY_CONFIG REAPPLY_KCSPI; do
+    case "${reapply_field}" in
+      # The app digests are always recorded; config and keycloak-spi are best-effort (an empty field).
+      REAPPLY_BACKEND | REAPPLY_FRONTEND | REAPPLY_INGEST) reapply_optional=false ;;
+      *) reapply_optional=true ;;
+    esac
+    if [[ -z "${!reapply_field}" && "${reapply_optional}" == "true" ]]; then
+      continue
+    fi
+    [[ "${!reapply_field}" =~ ^sha256:[0-9a-f]{64}$ ]] \
+      || fail "--reapply: ${LAST_DEPLOYED_FILE} is not a deployed-release record (field ${reapply_field#REAPPLY_} is '${!reapply_field}') — refusing to guess the deployed release"
+  done
+  [[ -z "${reapply_extra}" ]] \
+    || fail "--reapply: ${LAST_DEPLOYED_FILE} has more than five fields — refusing to guess the deployed release"
+  if [[ -f "${PIN_FILE_CURRENT}" ]]; then
+    for reapply_pair in "backend=${REAPPLY_BACKEND}" "frontend=${REAPPLY_FRONTEND}" "ingest=${REAPPLY_INGEST}"; do
+      reapply_pinned="$(grep -oE "/basetool-${reapply_pair%%=*}@sha256:[0-9a-f]{64}" "${PIN_FILE_CURRENT}" | head -n 1 || true)"
+      if [[ -n "${reapply_pinned}" && "${reapply_pinned#*@}" != "${reapply_pair#*=}" ]]; then
+        fail "--reapply: ${PIN_FILE_CURRENT} pins ${reapply_pair%%=*} to ${reapply_pinned#*@}, but ${LAST_DEPLOYED_FILE} records ${reapply_pair#*=} — the host disagrees about what is deployed; refusing to guess. Check both, then deploy a release (deploy.sh --tag <ref>)"
+      fi
+    done
+  fi
+  unset reapply_extra reapply_field reapply_optional reapply_pair reapply_pinned
+fi
+
 # --- Authenticate to GHCR ---------------------------------------------------
 log "logging in to ${REGISTRY} as ${GHCR_USERNAME}"
 if ! rt_login "${REGISTRY}" "${GHCR_USERNAME}" "${TOKEN_FILE}" >/dev/null 2>&1; then
@@ -1650,25 +1788,36 @@ resolve_digest() {
   rt_resolve_digest "$1"
 }
 
-log "resolving ${TARGET_TAG} → digest"
-BACKEND_DIGEST="$(resolve_digest "${BACKEND_IMAGE}:${TARGET_TAG}")" \
-  || fail "cannot resolve ${BACKEND_IMAGE}:${TARGET_TAG} (tag missing or no GHCR access)"
-FRONTEND_DIGEST="$(resolve_digest "${FRONTEND_IMAGE}:${TARGET_TAG}")" \
-  || fail "cannot resolve ${FRONTEND_IMAGE}:${TARGET_TAG} (tag missing or no GHCR access)"
-INGEST_DIGEST="$(resolve_digest "${INGEST_IMAGE}:${TARGET_TAG}")" \
-  || fail "cannot resolve ${INGEST_IMAGE}:${TARGET_TAG} (tag missing or no GHCR access)"
+if [[ "${REAPPLY_REQUESTED}" == "true" ]]; then
+  # No tag is resolved: `:stable` may already point at a newer release (one that failed and rolled
+  # back, say), and re-applying THAT would be a release. The digests are the deployed release's.
+  log "--reapply: target is the deployed release recorded in ${LAST_DEPLOYED_FILE} (no tag is resolved)"
+  BACKEND_DIGEST="${REAPPLY_BACKEND}"
+  FRONTEND_DIGEST="${REAPPLY_FRONTEND}"
+  INGEST_DIGEST="${REAPPLY_INGEST}"
+  CONFIG_DIGEST="${REAPPLY_CONFIG}"
+  KEYCLOAK_SPI_DIGEST="${REAPPLY_KCSPI}"
+else
+  log "resolving ${TARGET_TAG} → digest"
+  BACKEND_DIGEST="$(resolve_digest "${BACKEND_IMAGE}:${TARGET_TAG}")" \
+    || fail "cannot resolve ${BACKEND_IMAGE}:${TARGET_TAG} (tag missing or no GHCR access)"
+  FRONTEND_DIGEST="$(resolve_digest "${FRONTEND_IMAGE}:${TARGET_TAG}")" \
+    || fail "cannot resolve ${FRONTEND_IMAGE}:${TARGET_TAG} (tag missing or no GHCR access)"
+  INGEST_DIGEST="$(resolve_digest "${INGEST_IMAGE}:${TARGET_TAG}")" \
+    || fail "cannot resolve ${INGEST_IMAGE}:${TARGET_TAG} (tag missing or no GHCR access)"
 
-# Config artifact is resolved BEST-EFFORT: a host running this script before the
-# first config:stable promotion (or a transient hiccup on just this one tag) must
-# not brick the app deploy loop. When absent, fall back to the legacy app-only
-# behaviour for this tick (3-field marker, no config staging).
-CONFIG_DIGEST="$(resolve_digest "${CONFIG_IMAGE}:${TARGET_TAG}")" || CONFIG_DIGEST=""
+  # Config artifact is resolved BEST-EFFORT: a host running this script before the
+  # first config:stable promotion (or a transient hiccup on just this one tag) must
+  # not brick the app deploy loop. When absent, fall back to the legacy app-only
+  # behaviour for this tick (3-field marker, no config staging).
+  CONFIG_DIGEST="$(resolve_digest "${CONFIG_IMAGE}:${TARGET_TAG}")" || CONFIG_DIGEST=""
 
-# The Keycloak provider-JAR artifact is resolved BEST-EFFORT too (same rationale
-# as the config bundle): a host running before the first keycloak-spi:stable
-# promotion, or a transient hiccup on just this tag, must not brick the deploy
-# loop. When absent, this tick simply makes no provider-JAR change.
-KEYCLOAK_SPI_DIGEST="$(resolve_digest "${KEYCLOAK_SPI_IMAGE}:${TARGET_TAG}")" || KEYCLOAK_SPI_DIGEST=""
+  # The Keycloak provider-JAR artifact is resolved BEST-EFFORT too (same rationale
+  # as the config bundle): a host running before the first keycloak-spi:stable
+  # promotion, or a transient hiccup on just this tag, must not brick the deploy
+  # loop. When absent, this tick simply makes no provider-JAR change.
+  KEYCLOAK_SPI_DIGEST="$(resolve_digest "${KEYCLOAK_SPI_IMAGE}:${TARGET_TAG}")" || KEYCLOAK_SPI_DIGEST=""
+fi
 
 log "target backend  ${BACKEND_DIGEST}"
 log "target frontend ${FRONTEND_DIGEST}"
@@ -1711,6 +1860,16 @@ if [[ -n "${CONFIG_DIGEST}" ]] && [[ "${CONFIG_DIGEST}" != "${LAST_CONFIG_DIGEST
 fi
 KEYCLOAK_SPI_CHANGED=false
 if [[ -n "${KEYCLOAK_SPI_DIGEST}" ]] && [[ "${KEYCLOAK_SPI_DIGEST}" != "${LAST_KEYCLOAK_SPI_DIGEST}" ]]; then
+  KEYCLOAK_SPI_CHANGED=true
+fi
+# --reapply re-delivers what deleting the marker used to: the config bundle (its tree and its units)
+# and the provider JAR. Both digests are the deployed ones, so nothing here is a new release — the
+# config apply snapshots nothing over config-previous/, and the JAR is swapped in only when the live
+# one differs from the deployed release's (swap_in_keycloak_spi_jar, the swap below).
+if [[ "${REAPPLY_REQUESTED}" == "true" && -n "${CONFIG_DIGEST}" ]]; then
+  CONFIG_CHANGED=true
+fi
+if [[ "${REAPPLY_REQUESTED}" == "true" && -n "${KEYCLOAK_SPI_DIGEST}" ]]; then
   KEYCLOAK_SPI_CHANGED=true
 fi
 
@@ -1824,7 +1983,29 @@ NOOP=false
 HEALTH_DRIFT=false
 # Services a structural re-apply leaves unhealthy (see the drift split below).
 HEALTH_LEFT_OVER=""
-if [[ -f "${LAST_DEPLOYED_FILE}" ]] \
+if [[ "${REAPPLY_REQUESTED}" == "true" ]]; then
+  # Asked for, so it happens whatever the running stack looks like — no fast exit on a converged one,
+  # and no targeted heal instead of it. The drift is still reported, because it is what the operator
+  # wants to read next to the result, and an unhealthy container is left to the heal exactly as a
+  # drift re-apply leaves it: its unit is active, so the re-apply's start does not recreate it.
+  DRIFT_REPORT="$(running_stack_drift)"
+  if [[ -n "${DRIFT_REPORT}" ]]; then
+    while IFS= read -r drift_line; do
+      log "drift: ${drift_line#* }"
+    done <<< "${DRIFT_REPORT}"
+  else
+    log "--reapply: the running stack matches the deployed release — re-applying it anyway, as asked"
+  fi
+  DRIFTED=true
+  REAPPLY=true
+  log "--reapply: re-applying the deployed release — the rollback anchors keep naming the release before it"
+  HEALTH_LEFT_OVER="$(grep '^health ' <<< "${DRIFT_REPORT}" \
+    | sed -E 's/^health ([a-z]+):.*/\1/' | sort -u | tr '\n' ' ' || true)"
+  HEALTH_LEFT_OVER="${HEALTH_LEFT_OVER% }"
+  if [[ -n "${HEALTH_LEFT_OVER}" ]]; then
+    log "drift: [${HEALTH_LEFT_OVER}] unhealthy on the deployed image — not recreated by this re-apply, left for the targeted heal"
+  fi
+elif [[ -f "${LAST_DEPLOYED_FILE}" ]] \
    && grep -qFx "${EXPECTED_MARKER}" "${LAST_DEPLOYED_FILE}"; then
   DRIFT_REPORT="$(running_stack_drift)"
   if [[ -z "${DRIFT_REPORT}" ]]; then
@@ -1884,7 +2065,9 @@ if [[ -f "${LAST_DEPLOYED_FILE}" ]] \
 fi
 
 if [[ "${CHECK_ONLY}" == "true" ]]; then
-  if [[ "${NOOP}" == "true" ]]; then
+  if [[ "${REAPPLY_REQUESTED}" == "true" ]]; then
+    log "check-only: would re-apply the deployed release (--reapply; no anchor rotates, no rollback)"
+  elif [[ "${NOOP}" == "true" ]]; then
     log "check-only: no change (already at target digests, running stack verified)"
   elif [[ "${HEALTH_DRIFT}" == "true" ]]; then
     log "check-only: would restart unhealthy at-target service(s) (runtime-health drift, not a release rollback)"
@@ -2000,9 +2183,37 @@ fi
 # window. We back off exponentially per consecutive failure of the SAME digest
 # pair; promoting a new (fixed) image changes EXPECTED_MARKER, clears the record
 # and deploys at once, so only re-attempts of the known-bad pair are throttled.
-# A drift re-apply that failed is throttled here too: its record is keyed to the
-# deployed target (record_reapply_failure).
-if [[ -f "${FAILED_FILE}" ]]; then
+#
+# A re-apply of the deployed release (REAPPLY) is throttled by its own record,
+# reapply-failed.digests, with the heal's shorter durations, and does not read or
+# touch failed.digests at all: under --reapply that file may hold a newer release
+# that rolled back, and dropping it as "a different target" would let the next tick
+# retry that release at once (see REAPPLY). --reapply itself is not held back — the
+# backoff throttles the timer, and an operator who asks for a re-apply now has
+# decided to spend the restart window now; --force keeps bypassing both.
+if [[ "${REAPPLY}" == "true" ]]; then
+  if [[ -f "${REAPPLY_FAILED_FILE}" ]]; then
+    read -r REC_MARKER REC_COUNT REC_EPOCH _ < "${REAPPLY_FAILED_FILE}" || true
+    if [[ "${REC_MARKER:-}" != "${EXPECTED_MARKER}" ]] \
+       || ! [[ "${REC_COUNT:-}" =~ ^[0-9]+$ ]] \
+       || ! [[ "${REC_EPOCH:-}" =~ ^[0-9]+$ ]]; then
+      # Recorded against a release that is no longer the deployed one, or corrupt.
+      rm -f "${REAPPLY_FAILED_FILE}"
+    elif [[ "${FORCE}" == "true" ]]; then
+      log "re-apply of the deployed release previously failed ${REC_COUNT}x; --force given — retrying now"
+    elif [[ "${REAPPLY_REQUESTED}" == "true" ]]; then
+      log "re-apply of the deployed release previously failed ${REC_COUNT}x; --reapply asked for it — retrying now"
+    else
+      backoff="$(backoff_seconds "${HEALTH_RESTART_BASE}" "${HEALTH_RESTART_MAX}" "${REC_COUNT}")"
+      elapsed=$(( $(date +%s) - 10#${REC_EPOCH} ))
+      if (( elapsed < backoff )); then
+        log "re-apply of the deployed release failed ${REC_COUNT}x; in backoff window (${elapsed}s/${backoff}s) — skipping this tick (deploy.sh --reapply or --force retries now)"
+        exit 0
+      fi
+      log "re-apply of the deployed release failed ${REC_COUNT}x; backoff of ${backoff}s elapsed — retrying"
+    fi
+  fi
+elif [[ -f "${FAILED_FILE}" ]]; then
   read -r REC_MARKER REC_COUNT REC_EPOCH _ < "${FAILED_FILE}" || true
   if [[ "${REC_MARKER:-}" != "${EXPECTED_MARKER}" ]] \
      || ! [[ "${REC_COUNT:-}" =~ ^[0-9]+$ ]] \
@@ -2013,14 +2224,7 @@ if [[ -f "${FAILED_FILE}" ]]; then
   elif [[ "${FORCE}" == "true" ]]; then
     log "target previously failed ${REC_COUNT}x; --force given — retrying now"
   else
-    if (( 10#${REC_COUNT} > 20 )); then
-      backoff="${BACKOFF_MAX}"
-    else
-      backoff=$(( BACKOFF_BASE * (2 ** (10#${REC_COUNT} - 1)) ))
-      if (( backoff > BACKOFF_MAX )); then
-        backoff="${BACKOFF_MAX}"
-      fi
-    fi
+    backoff="$(backoff_seconds "${BACKOFF_BASE}" "${BACKOFF_MAX}" "${REC_COUNT}")"
     elapsed=$(( $(date +%s) - 10#${REC_EPOCH} ))
     if (( elapsed < backoff )); then
       log "target failed ${REC_COUNT}x; in backoff window (${elapsed}s/${backoff}s) — skipping this tick (promote a fixed image or pass --force)"
@@ -2061,7 +2265,11 @@ PRE_GATE_GUARD=true
 # as the last step before the apply, so keycloak restarts on it inside the release's own restart
 # window (ADR-0213).
 if [[ "${KEYCLOAK_SPI_CHANGED}" == "true" ]]; then
-  log "keycloak-spi changed → staging ${KEYCLOAK_SPI_IMAGE}@${KEYCLOAK_SPI_DIGEST} (applied with this release, one restart)"
+  if [[ "${REAPPLY_REQUESTED}" == "true" ]]; then
+    log "--reapply: re-staging the deployed provider JAR ${KEYCLOAK_SPI_IMAGE}@${KEYCLOAK_SPI_DIGEST} (swapped in only if the live one differs)"
+  else
+    log "keycloak-spi changed → staging ${KEYCLOAK_SPI_IMAGE}@${KEYCLOAK_SPI_DIGEST} (applied with this release, one restart)"
+  fi
   DEPLOY_STEP="extract the keycloak-spi provider JAR"
   stage_keycloak_spi_jar "${KEYCLOAK_SPI_IMAGE}@${KEYCLOAK_SPI_DIGEST}"
 fi
@@ -2073,7 +2281,11 @@ fi
 # Only (re)stage them when the promoted config digest actually moved, so an
 # app-only promotion stays byte-for-byte the legacy path.
 if [[ "${CONFIG_CHANGED}" == "true" ]]; then
-  log "config changed → staging ${CONFIG_IMAGE}@${CONFIG_DIGEST}"
+  if [[ "${REAPPLY_REQUESTED}" == "true" ]]; then
+    log "--reapply: re-delivering the deployed config bundle ${CONFIG_IMAGE}@${CONFIG_DIGEST}"
+  else
+    log "config changed → staging ${CONFIG_IMAGE}@${CONFIG_DIGEST}"
+  fi
   DEPLOY_STEP="extract the config bundle"
   extract_config_bundle "${CONFIG_IMAGE}@${CONFIG_DIGEST}" "${CONFIG_STAGE_DIR}"
   DEPLOY_STEP="check the staged config bundle"
@@ -2125,10 +2337,12 @@ if [[ "${CONFIG_CHANGED}" == "true" ]]; then
     # CARVE-OUT alert + blocked metric as if it were the first encounter. The marker
     # is cleared only on a SUCCESSFUL apply (the success block below).
     log "stateful-infra upgrade forced (--force) — applying the gated change"
-  else
+  elif [[ "${REAPPLY}" != "true" ]]; then
     # No stateful-infra change for this target: clear any stale block marker (e.g.
     # left by a previous, now-superseded gated target) so a lingering marker cannot
-    # keep the basetool_deploy_config_blocked metric stuck at 1.
+    # keep the basetool_deploy_config_blocked metric stuck at 1. Not on a re-apply:
+    # under --reapply the marker may name the NEWER target the tag points at, which
+    # is still gated, and clearing it would re-fire that target's CARVE-OUT alert.
     rm -f "${CONFIG_BLOCKED_FILE}"
   fi
 
@@ -2247,10 +2461,24 @@ RT_PIN_FILE="${PIN_FILE_CURRENT}" rt_pull \
 # A Keycloak IMAGE change is not this path: it arrives with the config bundle and is operator-gated
 # by the infra_image_pins carve-out above, so a combined image+JAR change never gets here without
 # --force.
+#
+# Under --reapply the staged JAR is the DEPLOYED release's. When the live one is byte-identical there
+# is nothing to put back, and restarting keycloak for it would take the whole application down for
+# nothing — so the swap, and with it the keycloak restart, happens only when they differ.
+if [[ "${KEYCLOAK_SPI_CHANGED}" == "true" && "${REAPPLY}" == "true" && -f "${KEYCLOAK_SPI_JAR}" ]] \
+   && [[ "$(sha256sum < "${KEYCLOAK_SPI_STAGE_JAR}")" == "$(sha256sum < "${KEYCLOAK_SPI_JAR}")" ]]; then
+  rm -f "${KEYCLOAK_SPI_STAGE_JAR}"
+  KEYCLOAK_SPI_CHANGED=false
+  log "--reapply: the live provider JAR is the deployed release's — not swapped, keycloak is not restarted for it"
+fi
 if [[ "${KEYCLOAK_SPI_CHANGED}" == "true" ]]; then
   DEPLOY_STEP="swap in the keycloak-spi provider JAR"
   swap_in_keycloak_spi_jar
-  log "provider JAR swapped in — keycloak restarts on it with this release"
+  if [[ "${REAPPLY}" == "true" ]]; then
+    log "--reapply: the live provider JAR differed from the deployed release's — put back, keycloak restarts on it (${KEYCLOAK_SPI_PREVIOUS_JAR} is left alone)"
+  else
+    log "provider JAR swapped in — keycloak restarts on it with this release"
+  fi
 fi
 
 log "release parts: $(release_parts)"
@@ -2271,9 +2499,24 @@ if rt_apply_stack; then
   fi
 
   echo "${EXPECTED_MARKER}" > "${LAST_DEPLOYED_FILE}"
-  rm -f "${FAILED_FILE}" "${CONFIG_BLOCKED_FILE}"
-  log "deploy successful"
-  write_deploy_metric success
+  if [[ "${REAPPLY}" == "true" ]]; then
+    # The deployed release is back. Its own re-apply record goes; the release backoff and the
+    # stateful-infra marker stay, because under --reapply they may belong to the newer target the tag
+    # points at. A failed.digests record keyed to THIS target can only be left over from before
+    # 2026-09-26, when a failed re-apply was recorded there, and goes too.
+    rm -f "${REAPPLY_FAILED_FILE}"
+    if [[ -f "${FAILED_FILE}" ]] && grep -qF "${EXPECTED_MARKER} " "${FAILED_FILE}"; then
+      rm -f "${FAILED_FILE}"
+    fi
+    # Not write_deploy_metric success: a re-apply is not a promotion outcome (see REAPPLY). Stamping
+    # success would clear a DeployRolledBack or DeployFailed raised by a release that still has not
+    # shipped. The stack-health heartbeat below is this run's success signal.
+    log "deploy successful — the deployed release is re-applied (the promotion-outcome metrics are left as they were)"
+  else
+    rm -f "${FAILED_FILE}" "${CONFIG_BLOCKED_FILE}" "${REAPPLY_FAILED_FILE}"
+    log "deploy successful"
+    write_deploy_metric success
+  fi
   if [[ -z "${HEALTH_LEFT_OVER}" ]]; then
     # A fresh successful deploy is a healthy stack — refresh the runtime-health heartbeat so any
     # prior health-restart-failed signal clears, and drop the heal's backoff record with it.
