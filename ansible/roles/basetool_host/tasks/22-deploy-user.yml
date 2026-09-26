@@ -1,5 +1,4 @@
 ---
-
 - name: Read the service user's uid
   ansible.builtin.getent:
     database: passwd

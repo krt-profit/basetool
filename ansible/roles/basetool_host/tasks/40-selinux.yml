@@ -1,5 +1,4 @@
 ---
-
 - name: Label the data tree for container access
   community.general.sefcontext:
     target: "{{ basetool_host_root_dir }}(/.*)?"

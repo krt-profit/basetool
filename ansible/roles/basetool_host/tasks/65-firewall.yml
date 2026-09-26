@@ -1,5 +1,4 @@
 ---
-
 - name: Read the service state without shelling out to systemctl
   ansible.builtin.service_facts:
 

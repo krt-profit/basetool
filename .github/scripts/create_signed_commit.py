@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import contextlib
 import json
 import os
 import sys
@@ -26,10 +27,8 @@ import urllib.error
 import urllib.request
 
 for _stream in (sys.stdout, sys.stderr):
-    try:
+    with contextlib.suppress(AttributeError, ValueError):
         _stream.reconfigure(encoding="utf-8")
-    except (AttributeError, ValueError):
-        pass
 
 GRAPHQL_ENDPOINT = "https://api.github.com/graphql"
 

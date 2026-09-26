@@ -1477,7 +1477,7 @@ def run_checks(ctx: Context, selected: Sequence[str] | None) -> list[Result]:
             results.append(Result(check.name, check.requirement, "skip", str(exc)))
         except CheckFailed as exc:
             results.append(Result(check.name, check.requirement, "fail", str(exc)))
-        except Exception as exc:  # noqa: BLE001 - a broken check is a finding, not a crash
+        except Exception as exc:  # noqa: BLE001
             results.append(Result(check.name, check.requirement, "fail",
                                   f"{type(exc).__name__}: {exc}"))
     return results

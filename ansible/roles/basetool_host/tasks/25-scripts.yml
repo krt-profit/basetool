@@ -1,5 +1,4 @@
 ---
-
 - name: Create the script directory
   ansible.builtin.file:
     path: "{{ basetool_host_root_dir }}/code/scripts/lib"

@@ -33,6 +33,7 @@ failed, ``2`` bad invocation.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import os
 import subprocess
 import sys
@@ -242,10 +243,8 @@ def write_atomically(target: str, content: str) -> None:
             os.fsync(handle.fileno())
         os.replace(tmp, target)
     except OSError as exc:
-        try:
+        with contextlib.suppress(OSError):
             os.unlink(tmp)
-        except OSError:
-            pass
         raise CollectorError(f"cannot write {target}: {exc}") from exc
 
 

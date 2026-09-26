@@ -21,16 +21,15 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import os
 import re
 import subprocess
 import sys
 
 for _stream in (sys.stdout, sys.stderr):
-    try:
+    with contextlib.suppress(AttributeError, ValueError):
         _stream.reconfigure(encoding="utf-8")
-    except (AttributeError, ValueError):
-        pass
 
 TYPE_BUCKETS: dict[str, str] = {
     "feat": "NEU (feat) -- new features, usually user-facing",
@@ -258,7 +257,7 @@ TRACK_CMD = ".claude/skills/release-notes/scripts/track_release_notes.py"
 def load_state_module():
     """Import the sibling ``release_state`` helper, or return ``None`` if absent."""
     try:
-        import release_state  # noqa: PLC0415 -- sibling script, same directory
+        import release_state  # noqa: PLC0415
         return release_state
     except ImportError:
         return None

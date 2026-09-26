@@ -70,6 +70,7 @@ public class MonitoringScrapeSecurityConfig {
   public SecurityFilterChain monitoringScrapeFilterChain(@NotNull HttpSecurity http)
       throws Exception {
     http.securityMatcher(PROMETHEUS_PATH)
+        // lgtm[java/spring-disabled-csrf-protection]
         .csrf(AbstractHttpConfigurer::disable)
         .requestCache(RequestCacheConfigurer::disable)
         .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS));

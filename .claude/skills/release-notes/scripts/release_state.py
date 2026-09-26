@@ -9,6 +9,7 @@ records the last covered commit, its date and the newest release tag reachable f
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import re
@@ -17,10 +18,8 @@ import sys
 from datetime import datetime, timezone
 
 for _stream in (sys.stdout, sys.stderr):
-    try:
+    with contextlib.suppress(AttributeError, ValueError):
         _stream.reconfigure(encoding="utf-8")
-    except (AttributeError, ValueError):
-        pass
 
 STATE_FILENAME = ".release-notes-state.json"
 STATE_SCHEMA = 1
@@ -59,7 +58,7 @@ def is_git_repo(repo: str) -> bool:
 def version_key(tag: str) -> tuple[int, int, int]:
     """Return the ``(major, minor, patch)`` sort key for a ``vN.N.N`` tag."""
     match = VERSION_TAG_RE.match(tag)
-    if not match:  # pragma: no cover - callers pre-filter with VERSION_TAG_RE
+    if not match:  # pragma: no cover
         raise ValueError(f"not a version tag: {tag!r}")
     return tuple(int(part) for part in match.groups())  # type: ignore[return-value]
 

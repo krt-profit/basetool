@@ -184,7 +184,7 @@ def run_query(host: str, sql: str) -> dict[str, Decimal]:
         label, _, value = line.partition("|")
         try:
             figures[label.strip()] = Decimal(value.strip())
-        except Exception:  # noqa: BLE001 - a non-numeric row is never expected here
+        except Exception:  # noqa: BLE001
             sys.exit(f"Unparsable row from psql: {line!r}")
     if not figures:
         sys.exit("psql returned no rows — is the query or the container name right?")

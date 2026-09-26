@@ -26,6 +26,7 @@ Exit codes: ``0`` clean, ``1`` a refusal or (under ``--check``) drift, ``2`` bad
 from __future__ import annotations
 
 import argparse
+import contextlib
 import os
 import sys
 from typing import Sequence
@@ -243,10 +244,8 @@ def _write_env_file(path: str, content: str, mode: int) -> None:
         os.chmod(tmp, mode)
         os.replace(tmp, path)
     except OSError:
-        try:
+        with contextlib.suppress(OSError):
             os.unlink(tmp)
-        except OSError:
-            pass
         raise
 
 

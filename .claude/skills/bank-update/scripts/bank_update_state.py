@@ -11,6 +11,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import subprocess
 import sys
@@ -22,15 +23,13 @@ FILENAME = ".bank-update-state.json"
 
 def marker_path() -> Path:
     """Return the marker's location, preferring the shared git directory."""
-    try:
+    with contextlib.suppress(Exception):
         common = subprocess.run(
             ["git", "rev-parse", "--git-common-dir"],
             capture_output=True, text=True, check=True,
         ).stdout.strip()
         if common:
             return (Path(common).resolve() / FILENAME)
-    except Exception:  # noqa: BLE001 - outside a repo the fallback below is correct
-        pass
     return Path.cwd() / FILENAME
 
 
@@ -60,7 +59,7 @@ def main() -> None:
     if path.exists():
         try:
             stored = json.loads(path.read_text(encoding="utf-8")).get("last_month")
-        except Exception:  # noqa: BLE001 - a corrupt marker is treated as absent
+        except Exception:  # noqa: BLE001
             stored = None
 
     if args.show:

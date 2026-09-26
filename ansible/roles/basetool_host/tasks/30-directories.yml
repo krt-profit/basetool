@@ -1,5 +1,4 @@
 ---
-
 - name: Look for the host environment file
   ansible.builtin.stat:
     path: "{{ basetool_host_root_dir }}/code/.env"

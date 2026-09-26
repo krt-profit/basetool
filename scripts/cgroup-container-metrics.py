@@ -22,6 +22,7 @@ Exit codes: ``0`` wrote (or would have written) a file, ``1`` nothing matched or
 from __future__ import annotations
 
 import argparse
+import contextlib
 import math
 import os
 import re
@@ -338,10 +339,8 @@ def write_atomically(target: str, content: str) -> None:
             os.fsync(handle.fileno())
         os.replace(tmp, target)
     except OSError as exc:
-        try:
+        with contextlib.suppress(OSError):
             os.unlink(tmp)
-        except OSError:
-            pass
         raise CollectorError(f"could not write {target}: {exc}") from exc
 
 

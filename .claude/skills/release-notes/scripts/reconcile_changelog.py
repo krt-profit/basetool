@@ -15,16 +15,15 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import os
 import re
 import subprocess
 import sys
 
 for _stream in (sys.stdout, sys.stderr):
-    try:
+    with contextlib.suppress(AttributeError, ValueError):
         _stream.reconfigure(encoding="utf-8")
-    except (AttributeError, ValueError):
-        pass
 
 VERSION_TAG_RE = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
 PORCELAIN_HEADER_RE = re.compile(r"^(?P<sha>[0-9a-f]{40}) \d+ (?P<final>\d+)")
@@ -52,7 +51,7 @@ def run_git(repo: str, args: list[str]) -> str:
 def version_key(tag: str) -> tuple[int, int, int]:
     """Return the ``(major, minor, patch)`` sort key for a well-formed ``vN.N.N`` tag."""
     match = VERSION_TAG_RE.match(tag)
-    if not match:  # pragma: no cover - callers pre-filter, this is a guard
+    if not match:  # pragma: no cover
         raise ValueError(f"not a version tag: {tag!r}")
     return tuple(int(part) for part in match.groups())  # type: ignore[return-value]
 

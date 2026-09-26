@@ -1,5 +1,4 @@
 ---
-
 - name: Install the hardening content and scanner
   ansible.builtin.dnf:
     name:

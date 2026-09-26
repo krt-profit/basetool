@@ -14,14 +14,13 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import re
 import sys
 
 for _stream in (sys.stdout, sys.stderr):
-    try:
+    with contextlib.suppress(AttributeError, ValueError):
         _stream.reconfigure(encoding="utf-8")
-    except (AttributeError, ValueError):
-        pass
 
 RUBRIC: dict[str, str] = {
     "Added": "Neu",

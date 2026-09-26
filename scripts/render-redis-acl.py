@@ -23,6 +23,7 @@ Exit codes: ``0`` clean, ``1`` a refusal or (under ``--check``) drift, ``2`` bad
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import os
 import re
@@ -193,31 +194,21 @@ def selftest() -> int:
         ({**env, "SVC_PASSWORD": ""}, "empty variable refuses"),
         ({**env, "REDIS_DEFAULT_USER": "maybe"}, "invalid state refuses"),
     ):
-        try:
+        with contextlib.suppress(Refusal):
             render(template, broken)
             failures.append(label)
-        except Refusal:
-            pass
-    try:
+    with contextlib.suppress(Refusal):
         render("user svc on {{hash:SVC_PASSWORD}} -@all\n", env)
         failures.append("missing default refuses")
-    except Refusal:
-        pass
-    try:
+    with contextlib.suppress(Refusal):
         render(template + "user default on nopass\n", env)
         failures.append("two defaults refuse")
-    except Refusal:
-        pass
-    try:
+    with contextlib.suppress(Refusal):
         render("default on\n", env)
         failures.append("a non-user line refuses")
-    except Refusal:
-        pass
-    try:
+    with contextlib.suppress(Refusal):
         render(template.replace("{{hash:SVC_PASSWORD}}", "{{secret:SVC_PASSWORD}}"), env)
         failures.append("an unknown placeholder refuses")
-    except Refusal:
-        pass
     with tempfile.TemporaryDirectory() as scratch:
         target = os.path.join(scratch, "users.acl")
         write_atomically(target, out)

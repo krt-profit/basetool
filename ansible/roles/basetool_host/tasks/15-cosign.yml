@@ -1,5 +1,4 @@
 ---
-
 - name: Read the installed cosign version, if there is one
   ansible.builtin.command: "{{ basetool_host_cosign_path }} version --json"
   register: basetool_host_cosign_installed

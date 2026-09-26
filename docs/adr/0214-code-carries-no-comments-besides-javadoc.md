@@ -29,7 +29,7 @@ We keep no comments in code. What stays:
 - **Licence headers** (the GPL notice with `SPDX-License-Identifier`; Spotless enforces it on Java).
 - **Tool directives** that are syntax for a tool, not prose: `// @ts-check`, `/* global */`,
   `/* exported */`, `eslint-disable…`, `stylelint-disable…`, `# shellcheck disable=|source=|shell=`,
-  `# hadolint ignore=`, `# noqa`, `# image-pin-gate: ignore-file`, shebangs, Thymeleaf natural
+  `# hadolint ignore=`, `# noqa`, `# pragma: no cover`, `# zizmor: ignore[…]`, `// lgtm[…]` (CodeQL), `# image-pin-gate: ignore-file`, shebangs, Thymeleaf natural
   templates `/*[[…]]*/` and prototype-only `<!--/*/ … /*/-->`. A directive carries no explanation
   after it.
 

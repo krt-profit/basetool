@@ -1,5 +1,4 @@
 ---
-
 - name: Preflight -- the host is what this role assumes
   ansible.builtin.import_tasks: 00-preflight.yml
   tags: [preflight]

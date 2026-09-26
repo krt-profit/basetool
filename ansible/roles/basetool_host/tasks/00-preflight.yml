@@ -1,5 +1,4 @@
 ---
-
 - name: Assert the host is an EL 10 derivative
   ansible.builtin.assert:
     that:

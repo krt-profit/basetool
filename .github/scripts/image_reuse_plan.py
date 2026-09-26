@@ -38,7 +38,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from app_version import newest_changelog_version  # noqa: E402  (sibling module, path set above)
+from app_version import newest_changelog_version  # noqa: E402
 
 APP_DOCKERFILE = "docker/app/Dockerfile"
 MODULES = ("backend", "frontend", "ingest")
