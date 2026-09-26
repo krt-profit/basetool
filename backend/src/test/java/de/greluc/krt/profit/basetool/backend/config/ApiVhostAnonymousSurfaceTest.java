@@ -878,6 +878,20 @@ class ApiVhostAnonymousSurfaceTest {
         .andExpect(status().isUnauthorized());
     mockMvc
         .perform(
+            post("/api/v1/inventory/bulk-org-unit")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"itemIds\":[]}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
+            post("/api/v1/inventory/" + ABSENT_OPERATION + "/org-unit")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isUnauthorized());
+    mockMvc
+        .perform(
             post("/api/v1/inventory/" + ABSENT_OPERATION + "/allocation")
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)

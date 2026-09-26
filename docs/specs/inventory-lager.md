@@ -272,7 +272,7 @@ there is no equivalent on the squadron-wide `/all` view.
 ### REQ-INV-007 — Personal-marker rebooking (Umbuchung) is an append-only split
 
 > [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
-> A personal row's org unit becomes changeable after the booking, in web and app, which gives or takes access for that unit's editors (WP 1.2, #2107). Personal rows booked in through the exchange carry no org unit.
+> A personal row's org unit is changeable after the booking since WP 1.2 (REQ-INV-052, web; the app follows with #2097). Personal rows booked in through the exchange carry no org unit.
 
 A user may **rebook** (Umbuchung) part or all of one of their inventory rows between their personal
 pool and the shared squadron pool by toggling its `personal` marker. The direction is derived from
@@ -846,7 +846,7 @@ already known at storage time.
 ### REQ-INV-036 — "Markierte umbuchen": the bulk bar moves the whole selection, skipping already-at-target rows
 
 > [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
-> The bulk bar's moves carry the „gestohlen“ marker and the org-unit re-stamp action (WP 1.2 / 1.3).
+> The bulk bar also offers „Markierte: Einheit ändern“ since WP 1.2 (REQ-INV-052); its moves carry the „gestohlen“ marker with WP 1.3.
 
 The "Mein Lager" bulk bar (`/inventory/my`, both the Material and the Items view) offers
 **"Markierte umbuchen"** next to "Markierte ausbuchen", acting on the **same** marked selection
@@ -1254,6 +1254,48 @@ themselves are not yet pinned by a test · **Code:**
 `InventoryItemController#deleteAllGlobalInventory`, `InventoryCheckoutService#deleteAllGlobalInventory`,
 `InventoryItemRepository#deleteAllNonPersonal`, `InventoryDeleteAllProxyController`,
 `templates/inventory-admin.html`, `static/js/inventory-admin.js` · **Issues:** — · **ADR:** —
+
+### REQ-INV-052 — A member can change the org unit of their own personal row afterwards
+
+A member can set the owning org unit of one of their **own personal** rows to one of their direct
+memberships of any of the four kinds, or to **„Keine Einheit"**, after the booking — per row
+(`POST /api/v1/inventory/{id}/org-unit`, optimistic `version`) and for a selection from the bulk bar
+(`POST /api/v1/inventory/bulk-org-unit`, rows locked pessimistically in sorted id order, no
+versions, like REQ-INV-036). Stock booked in through the exchange carries no unit (REQ-XCH-016), and
+this is how it gets one; before, a personal row's unit changed only as a side effect of a rebooking,
+and a `TRANSFER` may not change it alone (REQ-INV-025).
+
+- **Personal rows of the caller only.** A shared row's unit is its pool and moves by rebooking; a
+  selection that contains a shared or a foreign row is refused as a whole.
+- **The unit decides who else may see and edit the row** (REQ-ORG-004): without a unit only the owner
+  (and an unpinned admin) reaches it; with a unit that unit's editors do too. The dialog says so
+  before the member confirms.
+- Unlike the rebooking pickers (#1328), this picker **has** a „Keine Einheit" option, because no
+  unit is exactly what it may set; it is preset to the row's current unit.
+- The row then follows the write-time merge rules (REQ-INV-026): a `PIECE` or game-item row merges
+  into an existing stack of the new unit, an `SCU` row only on the per-action opt-in; rows backing a
+  Materialbörse offer never merge.
+- Leaving the unit unchanged writes nothing. Otherwise the row records
+  `INVENTORY_ORG_UNIT_CHANGED` (from / to as `kind:id` or `none`), a selection one
+  `INVENTORY_BULK_ORG_UNIT_CHANGED` summary (REQ-AUDIT-001).
+- The page re-renders in place and tells peers through live sync (`inventory` / `stock`,
+  REQ-FE-001); the Android app reaches both routes through the `api.*` allowlist (ADR-0135) and gets
+  the action with #2097.
+
+**Acceptance**
+
+- [x] Own personal rows move to a membership and back to no unit, singly and as a selection; shared
+  or foreign rows and a unit that is not a membership are refused.
+- [x] `PIECE` rows merge into the new unit's stack, `SCU` rows only with the opt-in.
+- [x] An unchanged unit records nothing; a change records one event, a selection one summary.
+- [x] The web action and bulk-bar button update the page in place.
+
+**Enforced by:** `InventoryOrgUnitChangeServiceTest`, `InventoryItemControllerTest`,
+`InventoryOrgUnitChangeAjaxControllerTest`, `InventoryPageControllerMvcTest`,
+`InventoryOperationsE2eTest.changingAPersonalRowsOrgUnitWorksBothWaysInPlace`,
+`ExternalContractTest`, `ApiVhostAnonymousSurfaceTest` · **Code:** `InventoryOrgUnitChangeService`,
+`InventoryItemController`, `InventoryOrgUnitChangeProxyController`, `inventory-my.js` · **Issues:** #2107
+(epic #2078).
 
 ## Out of scope
 

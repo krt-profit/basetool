@@ -186,6 +186,8 @@ jobs:
 
           probe POST /api/v1/inventory/bulk-checkout 401
           probe POST /api/v1/inventory/bulk-rebook 401
+          probe POST /api/v1/inventory/bulk-org-unit 401
+          probe POST "/api/v1/inventory/$nil/org-unit" 401
           probe POST "/api/v1/inventory/$nil/allocation" 401
           probe PATCH "/api/v1/inventory/$nil/allocation" 401
           probe DELETE "/api/v1/inventory/$nil/allocation" 401

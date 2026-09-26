@@ -95,6 +95,8 @@ declare const MSG_UNIT_SCU: string;
 declare const bulkI18n: KrtI18nDict;
 /** Injected by the page bootstrap (declared in inventory-my.html). */
 declare const bulkRebookI18n: KrtI18nDict;
+/** Injected by the page bootstrap (declared in inventory-my.html). */
+declare const orgUnitChangeI18n: KrtI18nDict;
 
 /** Injected by the page bootstrap (declared in inventory-admin.html). */
 declare const noteI18n: KrtI18nDict;

@@ -22,6 +22,8 @@ package de.greluc.krt.profit.basetool.backend.controller;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedInventoryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkCheckoutRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.BulkOrgUnitChangeRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.BulkOrgUnitChangeResultDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkRebookRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkRebookResultDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto;
@@ -32,6 +34,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemBookOutDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemNoteUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemOrgUnitChangeDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemPersonalRebookDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest;
@@ -39,6 +42,7 @@ import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryAggregationService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryItemCatalogService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryItemService;
+import de.greluc.krt.profit.basetool.backend.service.InventoryOrgUnitChangeService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import de.greluc.krt.profit.basetool.backend.support.Roles;
 import de.greluc.krt.profit.basetool.backend.web.PaginationUtil;
@@ -114,6 +118,7 @@ public class InventoryItemController {
   private static final Set<String> ITEM_AGGREGATED_SORT_FIELDS = Set.of("amount", "gameItem.name");
 
   private final InventoryItemService inventoryItemService;
+  private final InventoryOrgUnitChangeService inventoryOrgUnitChangeService;
   private final InventoryAggregationService inventoryAggregationService;
   private final InventoryItemCatalogService inventoryItemCatalogService;
   private final UserService userService;
@@ -757,6 +762,71 @@ public class InventoryItemController {
   public void bulkCheckout(
       @AuthenticationPrincipal Jwt jwt, @RequestBody @Valid BulkCheckoutRequest request) {
     inventoryItemService.bulkCheckout(request, userService.getUserIdFromJwt(jwt));
+  }
+
+  /**
+   * Changes the owning org unit of one of the caller's own personal rows (REQ-INV-052): to one of
+   * the caller's direct memberships, or to no unit. The row then merges into an existing stack of
+   * the new unit where the merge rules allow; the version is checked optimistically.
+   *
+   * @param jwt the caller's token
+   * @param id the row
+   * @param dto the version, the target unit or {@code null}, and the merge opt-in
+   * @return the row after the change, or the stack row it was merged into
+   */
+  @Operation(
+      summary = "Change a personal row's org unit",
+      description =
+          "Sets the owning org unit of one of the caller's own personal rows to one of the"
+              + " caller's direct memberships, or to none. Merges into an existing stack of the new"
+              + " unit per the stock-merge rules; applies optimistic locking via the version"
+              + " field.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Changed; the resulting row is returned"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "Not a personal row, or the unit is not one of the caller's memberships"),
+    @ApiResponse(responseCode = "403", description = "Access denied - row of another member"),
+    @ApiResponse(responseCode = "404", description = "Inventory item not found"),
+    @ApiResponse(responseCode = "409", description = "Optimistic locking conflict")
+  })
+  @PostMapping("/{id}/org-unit")
+  @PreAuthorize("isAuthenticated() and @ownerScopeService.canEditInventoryItem(#id)")
+  public InventoryItemDto changeOrgUnit(
+      @AuthenticationPrincipal Jwt jwt,
+      @PathVariable @NotNull UUID id,
+      @RequestBody @Valid InventoryItemOrgUnitChangeDto dto) {
+    return inventoryOrgUnitChangeService.changeOrgUnit(id, dto, userService.getUserIdFromJwt(jwt));
+  }
+
+  /**
+   * Changes the owning org unit of a selection of the caller's own personal rows (REQ-INV-052) in
+   * one transaction; rows already carrying the target unit are skipped and counted.
+   *
+   * @param jwt the caller's token
+   * @param request the selection, the target unit or {@code null}, and the merge opt-in
+   * @return the changed and skipped counts
+   */
+  @Operation(
+      summary = "Bulk change personal rows' org unit",
+      description =
+          "Sets the owning org unit of every listed personal row of the caller to one of the"
+              + " caller's direct memberships, or to none. Rows already carrying it are skipped;"
+              + " an unknown id, a foreign or a shared row aborts the whole action.")
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Changed; changed/skipped counts returned"),
+    @ApiResponse(
+        responseCode = "400",
+        description = "Empty list, a shared row, or a unit that is not one of the memberships"),
+    @ApiResponse(responseCode = "403", description = "Access denied - row of another member"),
+    @ApiResponse(responseCode = "404", description = "One or more rows not found")
+  })
+  @PostMapping("/bulk-org-unit")
+  @PreAuthorize("isAuthenticated()")
+  public BulkOrgUnitChangeResultDto bulkChangeOrgUnit(
+      @AuthenticationPrincipal Jwt jwt, @RequestBody @Valid BulkOrgUnitChangeRequest request) {
+    return inventoryOrgUnitChangeService.bulkChangeOrgUnit(
+        request, userService.getUserIdFromJwt(jwt));
   }
 
   /**

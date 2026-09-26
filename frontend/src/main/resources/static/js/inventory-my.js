@@ -18,7 +18,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* global bulkI18n, bulkRebookI18n, inventoryConflictI18n, umbuchenI18n, assocI18n, showInventoryToast, openNoteModal, closeNoteModal, updateNoteCounter, saveNote, removeNote */
+/* global bulkI18n, bulkRebookI18n, orgUnitChangeI18n, inventoryConflictI18n, umbuchenI18n, assocI18n, showInventoryToast, openNoteModal, closeNoteModal, updateNoteCounter, saveNote, removeNote */
 
 const myLager = /** @type {KrtInventoryApi} */ (window.krtInventory).createLager({
     triggerPrefix: 'inv-my',
@@ -108,6 +108,10 @@ function updateBulkCheckoutState() {
     const countSpan = document.getElementById('bulkCheckoutCount');
     if (btn) btn.disabled = count === 0;
     if (rebookBtn) rebookBtn.disabled = count === 0;
+    const orgUnitBtn = /** @type {HTMLButtonElement | null} */ (
+        document.getElementById('bulkOrgUnitBtn')
+    );
+    if (orgUnitBtn) orgUnitBtn.disabled = count === 0;
     if (countSpan) countSpan.textContent = count > 0 ? '(' + count + ')' : '';
     /** @type {NodeListOf<HTMLInputElement>} */ (
         document.querySelectorAll('.group-select-all')
@@ -1175,6 +1179,184 @@ function submitUmbuchen(event) {
         });
 }
 
+/**
+ * The row being re-stamped, or the selection when {@code itemIds} is set (REQ-INV-052).
+ *
+ * @type {{ id: string | null, version: number | null, itemIds: string[] | null }}
+ */
+let orgUnitChangeTarget = { id: null, version: null, itemIds: null };
+let orgUnitChangeInFlight = false;
+
+/**
+ * Fills the org-unit change picker with "no unit" plus the caller's direct memberships of all four
+ * kinds, preset to the row's current unit.
+ *
+ * @param {string | null} currentOrgUnitId the row's current unit, or null
+ */
+function fillOrgUnitChangePicker(currentOrgUnitId) {
+    const select = /** @type {HTMLSelectElement | null} */ (
+        document.getElementById('orgUnitChangeTarget')
+    );
+    if (!select) return;
+    select.innerHTML = '';
+    const none = document.createElement('option');
+    none.value = '';
+    none.textContent = orgUnitChangeI18n.none;
+    select.appendChild(none);
+    const me = currentInventoryUserId();
+    if (!me) return;
+    fetch('/users/' + encodeURIComponent(me) + '/memberships?allKinds=true', {
+        headers: { Accept: 'application/json' },
+        credentials: 'same-origin',
+    })
+        .then(function (r) {
+            return r.ok ? r.json() : [];
+        })
+        .then(function (memberships) {
+            if (!Array.isArray(memberships)) return;
+            memberships.forEach(function (opt) {
+                const o = document.createElement('option');
+                o.value = opt.orgUnitId;
+                o.textContent = opt.orgUnitName;
+                select.appendChild(o);
+            });
+            select.value =
+                currentOrgUnitId &&
+                memberships.some(function (m) {
+                    return m.orgUnitId === currentOrgUnitId;
+                })
+                    ? currentOrgUnitId
+                    : '';
+        })
+        .catch(function () {
+            select.value = '';
+        });
+}
+
+/**
+ * Opens the org-unit change dialog for one personal row.
+ *
+ * @param {Element} el the row's action button
+ */
+function openOrgUnitChangeModal(el) {
+    const version = parseInt(el.getAttribute('data-version') || '', 10);
+    orgUnitChangeTarget = {
+        id: el.getAttribute('data-id'),
+        version: Number.isNaN(version) ? null : version,
+        itemIds: null,
+    };
+    const msgEl = document.getElementById('orgUnitChangeMessage');
+    if (msgEl) msgEl.textContent = orgUnitChangeI18n.messageSingle;
+    const mergeRow = document.getElementById('orgUnitChangeMergeRow');
+    if (mergeRow) {
+        mergeRow.style.display = el.getAttribute('data-quantity-type') === 'SCU' ? '' : 'none';
+    }
+    resetOrgUnitChangeMerge();
+    fillOrgUnitChangePicker(el.getAttribute('data-owning-org-unit-id') || null);
+    setMyDisplay('orgUnitChangeModal', 'flex');
+}
+
+/** Opens the org-unit change dialog for the marked rows. */
+function openBulkOrgUnitChangeModal() {
+    const ids = getCheckedItemIds();
+    if (ids.length === 0) {
+        showBulkRebookError(orgUnitChangeI18n.errorEmpty);
+        return;
+    }
+    orgUnitChangeTarget = { id: null, version: null, itemIds: ids };
+    const msgEl = document.getElementById('orgUnitChangeMessage');
+    if (msgEl) msgEl.textContent = orgUnitChangeI18n.messageBulk.replace('{0}', String(ids.length));
+    const mergeRow = document.getElementById('orgUnitChangeMergeRow');
+    if (mergeRow) mergeRow.style.display = '';
+    resetOrgUnitChangeMerge();
+    fillOrgUnitChangePicker(null);
+    setMyDisplay('orgUnitChangeModal', 'flex');
+}
+
+function resetOrgUnitChangeMerge() {
+    const merge = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('orgUnitChangeMergeStock')
+    );
+    if (merge) merge.checked = false;
+}
+
+function closeOrgUnitChangeModal() {
+    setMyDisplay('orgUnitChangeModal', 'none');
+}
+
+/**
+ * Reports a bulk org-unit change's counts as a toast.
+ *
+ * @param {{ changed?: number, skipped?: number } | null} body the result counts
+ */
+function reportBulkOrgUnitOutcome(body) {
+    const changed = body && typeof body.changed === 'number' ? body.changed : 0;
+    const skipped = body && typeof body.skipped === 'number' ? body.skipped : 0;
+    if (changed === 0) {
+        showBulkRebookError(orgUnitChangeI18n.noneChanged);
+        return;
+    }
+    const message =
+        skipped > 0
+            ? orgUnitChangeI18n.successBulkPartial
+                  .replace('{0}', String(changed))
+                  .replace('{1}', String(skipped))
+            : orgUnitChangeI18n.successBulk.replace('{0}', String(changed));
+    if (typeof window.showFrontendSuccessToast === 'function') {
+        window.showFrontendSuccessToast(message);
+    }
+}
+
+/**
+ * Submits the org-unit change for the one row or the marked selection, then re-renders the list in
+ * place and tells peers.
+ *
+ * @param {Event} event the form submit
+ */
+function submitOrgUnitChange(event) {
+    if (event) event.preventDefault();
+    if (orgUnitChangeInFlight || !window.krtFetch) return;
+    const orgUnitId = myFieldValue('orgUnitChangeTarget') || null;
+    const merge = /** @type {HTMLInputElement | null} */ (
+        document.getElementById('orgUnitChangeMergeStock')
+    );
+    const mergeStock = !!(merge && merge.checked);
+    const bulk = Array.isArray(orgUnitChangeTarget.itemIds);
+    if (!bulk && !orgUnitChangeTarget.id) return;
+    const url = bulk
+        ? '/inventory/bulk-org-unit'
+        : '/inventory/' + orgUnitChangeTarget.id + '/org-unit';
+    const payload = bulk
+        ? { itemIds: orgUnitChangeTarget.itemIds, targetOwningOrgUnitId: orgUnitId, mergeStock }
+        : { version: orgUnitChangeTarget.version, targetOwningOrgUnitId: orgUnitId, mergeStock };
+    const submitBtn = /** @type {HTMLButtonElement | null} */ (
+        document.getElementById('orgUnitChangeSubmitBtn')
+    );
+    orgUnitChangeInFlight = true;
+    if (submitBtn) submitBtn.disabled = true;
+    window.krtFetch
+        .write({
+            method: 'POST',
+            url,
+            payload,
+            toast: !bulk,
+            successMessage: orgUnitChangeI18n.success,
+            errorMessage: orgUnitChangeI18n.error,
+            conflict: inventoryConflictI18n,
+            onSuccess(body) {
+                closeOrgUnitChangeModal();
+                if (bulk) reportBulkOrgUnitOutcome(body);
+                filterMyInventory();
+                broadcastInventoryChanged();
+                myLager.broadcastBoardChanged();
+            },
+        })
+        .then(function () {
+            orgUnitChangeInFlight = false;
+            if (submitBtn) submitBtn.disabled = false;
+        });
+}
+
 if (window.krtEvents && typeof window.krtEvents.on === 'function') {
     window.krtEvents.on('click', 'inv-my-toggle-multi', function (el) {
         myLager.toggleMultiSelect(el.getAttribute('data-multi-target'));
@@ -1239,6 +1421,9 @@ if (window.krtEvents && typeof window.krtEvents.on === 'function') {
         'inv-my-bulk-rebook-user-changed',
         refreshBulkRebookOrgUnitPicker,
     );
+    window.krtEvents.on('click', 'inv-my-org-unit', openOrgUnitChangeModal);
+    window.krtEvents.on('click', 'inv-my-open-bulk-org-unit', openBulkOrgUnitChangeModal);
+    window.krtEvents.on('click', 'inv-my-close-org-unit', closeOrgUnitChangeModal);
 }
 
 const umbuchenFormEl = document.getElementById('umbuchenForm');
@@ -1248,6 +1433,10 @@ if (umbuchenFormEl) {
 const bulkRebookFormEl = document.getElementById('bulkRebookForm');
 if (bulkRebookFormEl) {
     bulkRebookFormEl.addEventListener('submit', submitBulkRebook);
+}
+const orgUnitChangeFormEl = document.getElementById('orgUnitChangeForm');
+if (orgUnitChangeFormEl) {
+    orgUnitChangeFormEl.addEventListener('submit', submitOrgUnitChange);
 }
 
 myLager.bind();

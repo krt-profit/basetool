@@ -77,6 +77,9 @@ Coverage is **complete**, including the cross-area writers and the system/automa
   **bulk rebooking** (Massen-Umbuchen — `INVENTORY_BULK_REBOOKED`, one summary event per action
   carrying the mode and the moved/skipped counts, REQ-INV-036; the individual moves are not audited
   separately, and a run that moved nothing records no event because it mutated no state) /
+  a personal row's org-unit change (`INVENTORY_ORG_UNIT_CHANGED`, from / to as `kind:id` or `none`;
+  a selection writes one `INVENTORY_BULK_ORG_UNIT_CHANGED` summary; an unchanged unit records
+  nothing, REQ-INV-052) /
   global wipe; plus the cross-area writers (refinery store → `INVENTORY_RECEIVED_FROM_REFINERY`,
   job-order handover — material handover **and** item delivery consuming the order's earmarked item
   stock, REQ-ORDERS-030 → `INVENTORY_HANDED_OVER`, job-order item-production consumption →
