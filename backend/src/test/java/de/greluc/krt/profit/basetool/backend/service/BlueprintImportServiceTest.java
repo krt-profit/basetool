@@ -163,6 +163,64 @@ class BlueprintImportServiceTest {
   }
 
   @Test
+  void preview_matchesAPackTaggedNameByItsUntaggedName() {
+    when(blueprintProductService.allProducts())
+        .thenReturn(List.of(product("cirrus", "Cirrus"), product("citadel", "Citadel")));
+
+    BlueprintImportPreviewDto preview =
+        service.previewImport(
+            SUB,
+            upload(
+                "{\"blueprints\":[{\"productName\":\"Sth/2/C Cirrus\"},"
+                    + "{\"productName\":\"Citadel (S2 B Industrial)\"}]}"));
+
+    assertEquals(2, preview.matched());
+    assertEquals(
+        List.of("cirrus", "citadel"),
+        preview.entries().stream().map(BlueprintImportEntryDto::productKey).sorted().toList());
+    assertEquals(
+        List.of("Citadel (S2 B Industrial)", "Sth/2/C Cirrus"),
+        preview.entries().stream().map(BlueprintImportEntryDto::externalName).sorted().toList());
+  }
+
+  @Test
+  void preview_matchesAPackTaggedNameThroughTheAliasOfItsUntaggedName() {
+    when(blueprintProductService.allProducts())
+        .thenReturn(List.of(product("arclight pistol", "Arclight Pistol")));
+    BlueprintExternalAlias alias = new BlueprintExternalAlias();
+    alias.setSourceSystem(SCMDB);
+    alias.setExternalName("Arc-Light Pistol");
+    alias.setProductKey("arclight pistol");
+    alias.setProductName("Arclight Pistol");
+    when(aliasRepository.findBySourceSystemAndExternalNameIgnoreCase(SCMDB, "Arc-Light Pistol"))
+        .thenReturn(Optional.of(alias));
+    when(aliasRepository.findBySourceSystemAndExternalNameIgnoreCase(
+            SCMDB, "Mil/1/A Arc-Light Pistol"))
+        .thenReturn(Optional.empty());
+
+    BlueprintImportPreviewDto preview =
+        service.previewImport(
+            SUB, upload("{\"blueprints\":[{\"productName\":\"Mil/1/A Arc-Light Pistol\"}]}"));
+
+    assertEquals(BlueprintImportStatus.MATCHED_BY_ALIAS, preview.entries().get(0).status());
+    assertEquals("arclight pistol", preview.entries().get(0).productKey());
+  }
+
+  @Test
+  void preview_aTaggedNameWithoutAnUntaggedMatchIsSuggestedFromTheUntaggedName() {
+    when(blueprintProductService.allProducts())
+        .thenReturn(List.of(product("calico legs tactical", "Calico Legs Tactical")));
+
+    BlueprintImportPreviewDto preview =
+        service.previewImport(
+            SUB, upload("{\"blueprints\":[{\"productName\":\"Mil/1/A Calico Legs Tacticl\"}]}"));
+
+    BlueprintImportEntryDto entry = preview.entries().get(0);
+    assertEquals(BlueprintImportStatus.SUGGESTED, entry.status());
+    assertEquals("calico legs tactical", entry.suggestions().get(0).productKey());
+  }
+
+  @Test
   void preview_fuzzySuggestsForCloseTypo() {
     when(blueprintProductService.allProducts())
         .thenReturn(List.of(product("calico legs tactical", "Calico Legs Tactical")));
