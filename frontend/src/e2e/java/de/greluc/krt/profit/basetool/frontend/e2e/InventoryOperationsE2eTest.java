@@ -708,10 +708,6 @@ class InventoryOperationsE2eTest {
   }
 
   /**
-   * A partial in-place book-out keeps the expanded group and stack open, with the leaf row visible
-   * again without manual re-expansion (REQ-INV-002).
-   */
-  /**
    * <em>Einheit ändern</em> (REQ-INV-052). Moves a personal row to „Keine Einheit" and back to the
    * member's Staffel through the row action, each in place, and checks the stack's owning unit
    * through the API after each step.
@@ -735,6 +731,10 @@ class InventoryOperationsE2eTest {
         });
   }
 
+  /**
+   * A partial in-place book-out keeps the expanded group and stack open, with the leaf row visible
+   * again without manual re-expansion (REQ-INV-002).
+   */
   @Test
   void inPlaceBookOutKeepsTheExpandedTreeState() {
     runFlow(
