@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Deploy: ein Release mit neuem Keycloak-Provider-JAR kostet nur noch eine Downtime statt zwei.**
+  `deploy.sh` spielt das JAR zusammen mit den App-Images ein und startet jeden Dienst genau einmal
+  neu (auch Frontend und Ingest nicht mehr doppelt); scheitert das Health-Gate, gehen Images,
+  Konfiguration und JAR gemeinsam zurück (ADR-0213). Wirkt erst nach einem Lauf der Ansible-Rolle
+  (`--tags deploy,scripts`).
+- **Deploy: die Selbstheilung startet jeden betroffenen Dienst genau einmal und meldet erst Erfolg,
+  wenn alle wieder laufen.** Ein ungesunder Dienst wird mit allem, was ihn per `Requires=` braucht,
+  einmal gestoppt und in Reihenfolge wieder gestartet, statt einzeln neu gestartet (ungesundes
+  Frontend: nur Frontend). Wirkt erst nach einem Lauf der Ansible-Rolle (`--tags deploy,scripts`).
+- **Deploy: `deploy.sh --reapply` spielt das laufende Release erneut ein, ohne die Rollback-Anker zu
+  verschieben** — ersetzt das Löschen von `last-deployed.digests`. Ein gescheitertes Re-Apply wird
+  nach 5 Minuten (verdoppelnd bis 1 h) statt nach 10 Minuten (bis 6 h) wiederholt. Wirkt erst nach
+  einem Lauf der Ansible-Rolle (`--tags deploy,scripts`).
+
 ### Fixed
 
 - **Deploy: ein neues Keycloak-Provider-JAR meldet erst Erfolg, wenn die ganze App wieder läuft.**
@@ -9,6 +25,11 @@
   wartet jetzt auf alle und stellt sonst das vorige JAR wieder her (`DeployFailed`), statt Erfolg zu
   melden, während Frontend und Ingest noch ohne Container sind. Wirkt erst nach einem Lauf der
   Ansible-Rolle (`--tags deploy,scripts`).
+- **Deploy: ein Drift-Re-Apply überschreibt den Rollback-Anker nicht mehr.** Stellt `deploy.sh`
+  dasselbe Release wieder her (z. B. „frontend: no container"), bleiben voriger Pin, `config-previous/`
+  und voriges JAR beim Vorgänger; scheitert es, wird nichts zurückgerollt und
+  `DeployHealthRestartFailing` statt eines falschen `DeployRolledBack` gemeldet. Wirkt erst nach einem
+  Lauf der Ansible-Rolle (`--tags deploy,scripts`).
 
 ## [v1.12.0](https://github.com/krt-profit/basetool/releases/tag/v1.12.0) - 2026-09-25
 

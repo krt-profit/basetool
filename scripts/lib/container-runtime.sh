@@ -26,6 +26,8 @@ RT_HOST_SYSTEMCTL="${RT_HOST_SYSTEMCTL:-}"
 
 RT_CHANGED_SERVICES="${RT_CHANGED_SERVICES:-}"
 
+RT_FAILED_SERVICES=""
+
 rt_die() {
   if declare -F fail >/dev/null 2>&1; then
     fail "$*"
@@ -202,11 +204,27 @@ rt_apply_stack() {
     read -ra svcs <<< "${RT_STACK_SERVICES:?RT_STACK_SERVICES is unset and no services were named}"
     set -- "${svcs[@]}"
   fi
+  local -a redefined=()
   for svc in "$@"; do
     case " ${RT_CHANGED_SERVICES} " in
-      *" ${svc} "*) ${RT_SYSTEMCTL} restart "${svc}.service" || rc=1 ;;
-      *)            ${RT_SYSTEMCTL} start   "${svc}.service" || rc=1 ;;
+      *" ${svc} "*) redefined+=("${svc}.service") ;;
     esac
+  done
+  if (( ${#redefined[@]} > 0 )); then
+    ${RT_SYSTEMCTL} stop "${redefined[@]}" || rc=1
+  fi
+  rt_await_stack "$@" || rc=1
+  return "${rc}"
+}
+
+rt_heal_stack() {
+  local svc rc=0
+  for svc in "$@"; do
+    rt_note_changed "${svc}"
+  done
+  rt_apply_stack || rc=1
+  for svc in "$@"; do
+    rt_forget_changed "${svc}"
   done
   return "${rc}"
 }
@@ -218,19 +236,19 @@ rt_recreate() {
 
 rt_await_stack() {
   local svc rc=0
+  RT_FAILED_SERVICES=""
   if [[ $# -eq 0 ]]; then
     local -a svcs=()
     read -ra svcs <<< "${RT_STACK_SERVICES:?RT_STACK_SERVICES is unset and no services were named}"
     set -- "${svcs[@]}"
   fi
   for svc in "$@"; do
-    ${RT_SYSTEMCTL} start "${svc}.service" || rc=1
+    if ! ${RT_SYSTEMCTL} start "${svc}.service"; then
+      rc=1
+      RT_FAILED_SERVICES="${RT_FAILED_SERVICES}${RT_FAILED_SERVICES:+ }${svc}"
+    fi
   done
   return "${rc}"
-}
-
-rt_restart() {
-  ${RT_SYSTEMCTL} restart "$1.service"
 }
 
 rt_exec() {

@@ -1,5 +1,5 @@
 > **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-23.
-> **Owner area:** OPS · **Related ADRs:** [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md), [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md), [ADR-0075](../adr/0075-host-side-cosign-signature-verification.md), [ADR-0079](../adr/0079-redis-session-store-aof-and-maxmemory-noeviction.md), [ADR-0083](../adr/0083-deploy-bot-health-drift-targeted-restart.md), [ADR-0145](../adr/0145-build-provenance-anchored-outside-the-registry.md), [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md), [ADR-0169](../adr/0169-the-e2e-concurrency-group-is-keyed-on-the-gates-own-verdict.md), [ADR-0187](../adr/0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md), [ADR-0188](../adr/0188-the-host-bootstrap-is-an-ansible-role.md), [ADR-0189](../adr/0189-stateful-containers-run-as-their-own-uid.md), [ADR-0190](../adr/0190-every-container-but-keycloak-runs-read-only.md), [ADR-0196](../adr/0196-a-rootless-host-aliases-its-own-public-names-to-the-container-gateway.md)
+> **Owner area:** OPS · **Related ADRs:** [ADR-0049](../adr/0049-config-as-promotable-oci-artifact.md), [ADR-0055](../adr/0055-keycloak-spi-jar-as-promotable-oci-artifact.md), [ADR-0213](../adr/0213-a-release-that-moves-the-provider-jar-costs-one-outage.md), [ADR-0075](../adr/0075-host-side-cosign-signature-verification.md), [ADR-0079](../adr/0079-redis-session-store-aof-and-maxmemory-noeviction.md), [ADR-0083](../adr/0083-deploy-bot-health-drift-targeted-restart.md), [ADR-0145](../adr/0145-build-provenance-anchored-outside-the-registry.md), [ADR-0163](../adr/0163-the-container-runtime-becomes-rootless-podman-on-debian-13.md), [ADR-0169](../adr/0169-the-e2e-concurrency-group-is-keyed-on-the-gates-own-verdict.md), [ADR-0187](../adr/0187-the-edge-learns-the-client-address-from-a-proxy-protocol-front-end.md), [ADR-0188](../adr/0188-the-host-bootstrap-is-an-ansible-role.md), [ADR-0189](../adr/0189-stateful-containers-run-as-their-own-uid.md), [ADR-0190](../adr/0190-every-container-but-keycloak-runs-read-only.md), [ADR-0196](../adr/0196-a-rootless-host-aliases-its-own-public-names-to-the-container-gateway.md)
 
 # Deployment delivery & promotion
 
@@ -131,8 +131,11 @@ The pin has a record and, under Quadlet, a binding. The record is
 `/var/lib/iri/current-digest-pin.yml` (its predecessor is the rollback anchor); Compose reads it
 directly as an override (`up -d --wait --wait-timeout`). Quadlet reads unit files, so the binding
 is one drop-in per app service, `<svc>.container.d/10-digest-pin.conf`, whose `Image=` replaces
-the unit's tag; the apply is `systemctl --user restart` for every service whose pin or unit changed
-this run and `start` for the rest, and the wait is structural — `Notify=healthy` makes the unit
+the unit's tag; the apply is one `systemctl --user stop` naming every service whose pin or unit
+changed this run (keycloak too when the provider JAR moved, REQ-OPS-007), which takes what requires
+them down with them, followed by a `start` of every stack unit in dependency order — so each affected
+unit stops once and starts once. It was a per-service `restart` until 2026-09-25: a restart travels
+along `Requires=`, and the restarts that followed ran the dependents again (ADR-0213). The wait is structural — `Notify=healthy` makes the unit
 `Type=notify`, bounded by its generated `TimeoutStartSec=` (so `IRI_HEALTH_TIMEOUT` governs the
 Compose path only). A rollback that restored the record without re-materialising the drop-ins would
 roll forward into the failed release, so both move together, together with the previous unit files.
@@ -152,6 +155,53 @@ writable by the deploy account, and the compose directory, the unit directory an
 the stateful-infra gate holds back (REQ-OPS-006) leaves no pin behind. A restore that fails itself
 is reported as an inconsistent tree, and `config-apply.incomplete` stops the next tick from
 snapshotting that tree over `config-previous/`.
+
+**The rollback anchors move only with the target.** `previous-digest-pin.yml`, `config-previous/`
+(the previous units with it) and `keycloak-spi-previous.jar` name the release *before* the deployed
+one, and nothing else on the host remembers it. Only a run whose target differs from the last
+deployed one rotates them. A drift re-apply of the deployed release (REQ-OPS-013) rewrites the pin,
+and on a host whose unit files are gone the config too, but it saves no pin, takes no snapshot and
+writes no `config-apply.incomplete`. A re-apply that fails — at its health gate or before it — rolls
+nothing back, because its target *is* the deployed release: it leaves the release and the anchors
+where they are, records the failure in its **own** backoff record, `reapply-failed.digests` (keyed to
+the deployed target), and stamps `basetool_deploy_last_health_restart_failed_timestamp`
+(`DeployHealthRestartFailing`, "the running release could not be restored") rather than a deploy
+outcome. A re-apply that succeeds is not a deploy outcome either: it stamps the stack-health
+heartbeat, not `basetool_deploy_last_success_timestamp`, which would clear a `DeployRolledBack` or
+`DeployFailed` raised by a different release that has still not shipped. `DeployRolledBack`
+therefore means a rollback to a different release, always.
+
+**An operator re-applies the deployed release with `deploy.sh --reapply`** (since 2026-09-26). The
+target is read from `last-deployed.digests` — never resolved from a tag, which may already name a
+newer release — and the run is a re-apply in every respect above: it re-delivers the release's config
+bundle and units, rewrites its pin, re-stages its provider JAR and swaps it in only when the live one
+differs (a byte-identical JAR restarts nothing), passes the health gate, rotates no anchor and rolls
+nothing back. It is refused, before any registry call and without a metric or a failure record, on a
+host with no deployed release (no marker), together with `--tag`, and when the pin record names an
+app digest the marker does not. It bypasses the re-apply backoff — the backoff throttles the timer,
+and an operator who asks for a re-apply now has chosen to spend the restart window now — but leaves
+the bad-digest backoff (`failed.digests`) and the stateful-infra marker alone, because those may
+belong to the newer target the tag names; clearing them would let the next tick retry a release that
+just rolled back. **Deleting `last-deployed.digests`** is not a re-apply: the run then cannot tell
+that its target is the deployed release, takes the release path, and rotates all three anchors onto
+the release that is already deployed.
+
+**Backoff durations.** A failed **release** (a new target) is retried after `IRI_BACKOFF_BASE`
+(600 s), doubling per consecutive failure, capped at `IRI_BACKOFF_MAX` (6 h), from
+`failed.digests`. A failed **re-apply** of the deployed release — drift or `--reapply` — uses the
+self-heal's durations, `IRI_HEALTH_RESTART_BASE` (300 s) doubling to `IRI_HEALTH_RESTART_MAX` (1 h),
+from `reapply-failed.digests` (the owner's decision of 2026-09-26): it restores the release
+production is on, like the heal, and a missing container should not stay missing for six hours. The
+record is kept apart from the heal's `health-restart.digests`, so a failed heal of one service never
+holds back the re-apply of another service's missing container. `--force` bypasses either backoff.
+
+> [!bug] Added 2026-09-25 — a re-apply rotated the anchors until then
+> The pin save ran on every apply, so a drift re-apply ("drift: frontend: no container") copied the
+> deployed pin over `previous-digest-pin.yml`, and a host with no unit files snapshotted the deployed
+> tree over `config-previous/`. If that re-apply then failed its gate, the „rollback" restored the
+> release it was already on, fired `DeployRolledBack` for a release that had shipped, and the real
+> previous release was gone as an anchor. Replayed by `scripts/deploy.test.sh`
+> (`scenario_reapply_that_fails_keeps_the_anchors_and_rolls_nothing_back` and the three after it).
 
 > [!bug] Added 2026-09-25 — this path was silent until then
 > v1.11.0 met a root-owned `/var/iri/code/docker/acme`. Every tick from 12:25 to 12:35 mirrored three
@@ -187,8 +237,27 @@ snapshotting that tree over `config-previous/`.
 - [ ] A directory the apply would mirror into that the deploy account does not own or cannot write
   is refused before the snapshot and before any mirror, with a line naming the path; a release held
   back by the stateful-infra gate writes no digest pin.
+- [ ] A drift re-apply of the deployed release — successful or not, with or without a config
+  re-delivery — leaves `previous-digest-pin.yml`, `config-previous/` and
+  `keycloak-spi-previous.jar` naming the release before it, and writes no `config-apply.incomplete`.
+- [ ] A failed drift re-apply restores nothing, writes neither `basetool_deploy_last_rollback_timestamp`
+  nor `basetool_deploy_last_failure_timestamp`, records the deployed target in
+  `reapply-failed.digests` and stamps `basetool_deploy_last_health_restart_failed_timestamp`. A later
+  release rotates the anchor to the deployed release, and its rollback lands there.
+- [ ] A failed re-apply is backed off 300 s, doubling, capped at 1 h (`IRI_HEALTH_RESTART_*`); a
+  failed release 600 s, doubling, capped at 6 h (`IRI_BACKOFF_*`). Neither writes the other's record.
+- [ ] `deploy.sh --reapply` re-applies the release `last-deployed.digests` names, whatever the tag
+  names, and resolves no tag; it rotates no anchor, restarts keycloak only for a live provider JAR
+  that differs from the deployed one, stamps no `basetool_deploy_last_success_timestamp`, and leaves
+  `failed.digests` of another target as it was. When it fails it behaves like a failed drift
+  re-apply.
+- [ ] `deploy.sh --reapply` is refused — exit 1, no registry call, no metric, no failure record — on a
+  host with no `last-deployed.digests`, together with `--tag`, and when `current-digest-pin.yml`
+  names an app digest the marker does not.
+- [ ] Deleting `last-deployed.digests` still makes the next run a release that rotates all three
+  anchors onto the deployed release (documented, not a way to re-apply).
 
-**Enforced by:** `scripts/deploy.sh` (rollback block, `on_pre_gate_exit`, `assert_config_tree_writable`,
+**Enforced by:** `scripts/deploy.sh` (rollback block, `on_pre_gate_exit`, `REAPPLY` / `record_reapply_failure`, `--reapply`, `backoff_seconds`, `assert_config_tree_writable`,
 `restore_previous_config_tree`) · `scripts/lib/container-runtime.sh`
 (`rt_pin_apply`, `rt_pin_rollback`, `rt_apply_stack`) · `frontend/src/main/resources/application.yml`
 (`spring.data.redis.timeout` / `connect-timeout`, ADR-0114) · `scripts/deploy.test.sh` · **Runbook:** `docs/deployment.md` → *What happens on the host*, *Troubleshooting*
@@ -250,7 +319,8 @@ Behind the PROXY-protocol front end the tunnel arrives as the host loopback, whi
   down+up (not an in-place `up`) on both apply and rollback, so name resolution is not stranded; a
   `networks:`-unchanged config bump keeps the in-place `up`.
 - [ ] Under Quadlet, a config change renders `env.d/` before any unit reloads, installs changed
-  units, restarts exactly the application services whose unit or pin changed, stops a retired unit
+  units, recreates (stop, then start) exactly the application services whose unit or pin changed
+  and what requires them, each once, stops a retired unit
   before removing it, and leaves every `.container.d/` drop-in in place. A changed monitoring or
   `acme` unit is restarted too (since 2026-09-22 — see REQ-OPS-013).
 - [ ] `generate-quadlet.py --check` fails CI when `quadlet/` no longer matches the compose files.
@@ -333,22 +403,45 @@ because REQ-OPS-005 bars `keycloak/providers/` JARs from the config bundle — t
 config bundle, not on automated provider delivery. The JAR is architecture-independent Java-21
 bytecode (it must load under Keycloak's JDK), built once and cosign-signed like the app images.
 
-When the promoted `keycloak-spi` digest moves, `deploy.sh` (after the app stack is healthy) stages
-the JAR into `keycloak/providers/keycloak-spi.jar` and recreates the keycloak container
-(`systemctl --user restart keycloak.service`, whose `--replace` makes a restart a recreate) so its
-`start` re-runs the provider build and loads the new JAR. systemd restarts **backend, frontend and
-ingest** with it (`Requires=`), so the step is **health-gated on the whole application stack**, not
-on keycloak: after keycloak is healthy, every application service is started — never restarted
-again — and waited for (`rt_await_stack`), and the run records success only once all of them are
-healthy. If keycloak **or** any application service does not return to health, the previous JAR is
-restored, keycloak is recreated and the stack is waited for again, the run is recorded as failed
-(`DeployFailed`), and the bad target backs off (the marker is not advanced). **Expected outage:** one
-keycloak start, then one backend start, then the slower of frontend and ingest — about two minutes
-on production — on top of the app apply's own when both move in one release. A provider-JAR-only change
-**auto-applies**; a combined Keycloak-**image** + provider-JAR change stays operator-gated by the
-postgres/Keycloak carve-out of REQ-OPS-006 (the image change blocks the tick until `--force`). A
-missing/unresolvable `basetool-keycloak-spi` artifact degrades to no provider-JAR change for that
-tick (the manual-staging fallback in the runbook still applies).
+**A release costs one restart window, the provider JAR included** ([ADR-0213](../adr/0213-a-release-that-moves-the-provider-jar-costs-one-outage.md),
+the owner's decision of 2026-09-25). When the promoted `keycloak-spi` digest moves, `deploy.sh`:
+
+1. **extracts** the JAR into the state directory (`keycloak-spi-stage.jar`) before anything on the
+   host changes — a failure there is a pre-gate failure under REQ-OPS-003: a `FATAL … step 'extract
+   the keycloak-spi provider JAR'` line, the backoff record and `DeployFailed`, with nothing to undo;
+2. after the config delivery, the pin and the pull, as the **last step before the apply**, snapshots
+   the live `keycloak/providers/keycloak-spi.jar` (`keycloak-spi-previous.jar`), installs the new one
+   and marks keycloak as re-defined;
+3. applies the release **once**: one `systemctl --user stop` takes down every re-defined unit —
+   keycloak, the re-pinned app services, the units the config replaced — and, through `Requires=`,
+   what requires them; then every stack unit is **started** in dependency order and waited for
+   (`Notify=healthy`). Keycloak's start re-runs the provider build on the new JAR before backend
+   starts. **One health gate** covers the app images, the units and the JAR, and the run records
+   success only when every stack unit is healthy.
+
+If the gate fails, **everything the release changed is rolled back together** — the digest pin
+(record and drop-ins), the config tree and units, and the previous JAR — and applied the same way; the
+run is recorded as rolled back (`DeployRolledBack`) with the bad-digest backoff, and the marker is not
+advanced. New app images never run on the old JAR, nor old images on the new one. The log names what
+the release changed (`release parts: app images […] · unit definitions […] · config bundle: … ·
+provider JAR: …`) and, on a failed gate, the units that did not come up in start order; when keycloak
+is the first of them and the JAR is the only change to keycloak, it says the JAR is the likely cause
+(the cause, when the JAR is the release's only change). Exact blame between a JAR and an app image is
+not possible in one gate, and the log says so rather than guessing. **Expected outage:** one keycloak
+start, then one backend start, then the slower of frontend and ingest — about two minutes on
+production — for the whole release, JAR or not. A provider-JAR-only change **auto-applies** and is
+exactly this apply with only keycloak re-defined; a combined Keycloak-**image** + provider-JAR change
+stays operator-gated by the postgres/Keycloak carve-out of REQ-OPS-006 (the image change blocks the
+tick until `--force`). A missing/unresolvable `basetool-keycloak-spi` artifact degrades to no
+provider-JAR change for that tick (the manual-staging fallback in the runbook still applies).
+
+*(Corrected 2026-09-25, third time — a changed requirement, not a wording fix: until ADR-0213 the
+JAR was staged only **after** the app apply had passed its gate, and a failed JAR was reverted alone
+while the app release stayed. That cost a second full-app outage for every JAR-moving release (v1.12.0:
+about two of the ~five minutes of maintenance page), and the app apply itself restarted re-defined
+units one by one, so a `restart` of backend followed by `restart`s of ingest and frontend restarted
+those two twice. A failed JAR extraction after the gate recorded no failure. All three are gone; the
+two corrections below describe the step as it was.)*
 
 *(Corrected 2026-09-25: "recreates **only** the keycloak container" holds under Compose's
 `--no-deps`, not under Quadlet. `backend` `Requires=` keycloak, and `frontend` and `ingest` require
@@ -371,16 +464,21 @@ step waits for the whole stack and records success only after it; see the paragr
   in its own job (`keycloak-spi-jar`, `contents: read`, no Gradle cache) and handed over as a
   run-scoped artifact; the job that pushes and signs (`build-keycloak-spi`) runs no Gradle.
 - [ ] `promote.yml` promotes `keycloak-spi` in lock-step with the four other artifacts.
-- [ ] `deploy.sh` resolves + cosign-trusts the `keycloak-spi:stable` digest, stages the JAR into
-  `keycloak/providers/`, and recreates keycloak when the digest changes, gated on keycloak **and**
-  every application service its restart takes down being healthy again.
-- [ ] A provider-JAR-only promotion auto-applies; a combined Keycloak-image + JAR promotion is
-  gated until `--force`.
-- [ ] A keycloak — or an application service — that does not return to health after the recreate
-  restores the previous JAR, brings the stack back, records the failure for backoff and never
-  reports success.
+- [ ] `deploy.sh` resolves + cosign-trusts the `keycloak-spi:stable` digest and, when it changes,
+  swaps the JAR into `keycloak/providers/` before the release apply, so keycloak starts on the new
+  JAR **inside** the release's single restart window and the single health gate covers it.
+- [ ] A release that moves the JAR and the app images starts keycloak, backend, ingest and frontend
+  **once each**; no stack unit is `restart`ed, and the re-defined units go down in one `stop`.
+- [ ] A release that re-pins app services without moving the JAR does not stop or restart keycloak.
+- [ ] A provider-JAR-only promotion auto-applies as that same apply (one window); a combined
+  Keycloak-image + JAR promotion is gated until `--force`.
+- [ ] A failed health gate restores the previous digest pin, config tree, units **and** JAR together,
+  applies them once, records the rollback for backoff and never reports success; the log names what
+  the release changed and what did not come up.
+- [ ] A JAR that cannot be extracted is a recorded pre-gate failure (`FATAL`, backoff,
+  `DeployFailed`) and changes nothing on the host.
 
-**Enforced by:** `.github/workflows/release-images.yml` (`keycloak-spi-jar`, `build-keycloak-spi`) · `.github/workflows/promote.yml` (matrix) · `docker/keycloak-spi/Dockerfile` · `scripts/deploy.sh` (`extract_keycloak_spi_jar`, the 5-field marker, the keycloak-recreate + stack wait + JAR rollback) · `scripts/lib/container-runtime.sh` (`rt_await_stack`) · `scripts/deploy.test.sh` (`scenario_spi_*`) · **Runbook:** `docs/deployment.md` → *Keycloak provider JAR* · **Decision:** ADR-0055
+**Enforced by:** `.github/workflows/release-images.yml` (`keycloak-spi-jar`, `build-keycloak-spi`) · `.github/workflows/promote.yml` (matrix) · `docker/keycloak-spi/Dockerfile` · `scripts/deploy.sh` (`stage_keycloak_spi_jar`, `swap_in_keycloak_spi_jar`, `restore_previous_keycloak_spi_jar`, `explain_gate_failure`, the 5-field marker, the rollback block) · `scripts/lib/container-runtime.sh` (`rt_apply_stack`, `rt_await_stack`) · `scripts/deploy.test.sh` (`scenario_spi_*`, `scenario_apps_only_restart_each_unit_once`) · `scripts/container-runtime.test.sh` · **Runbook:** `docs/deployment.md` → *Keycloak provider JAR* · **Decisions:** ADR-0055, ADR-0213
 
 ### REQ-OPS-013 — Idempotence fast-exit only over a verified running stack
 
@@ -399,17 +497,36 @@ healthy (a container without a healthcheck counts as healthy, mirroring `up --wa
 from an image whose RepoDigest equals the target digest. Under Quadlet the containers are found by
 the `PODMAN_SYSTEMD_UNIT` label rather than by a compose project, and a host with no unit files is
 reported as such first. The run logs one `drift: <service>: <reason>` line per finding and then
-distinguishes two classes:
+distinguishes two classes, and the case where both occur:
 
 - **Structural** — a missing container, or one on a non-target image: the release is wrong, so the
-  run falls through to the normal apply path (verify, pin, pull, apply), still honouring the
-  bad-digest backoff so a persistently-failing target does not flap every tick.
+  run falls through to the normal apply path (verify, pin, pull, apply), still honouring a backoff
+  so a persistently-failing re-apply does not flap every tick. It re-applies the **same** release,
+  so it is not a release: it rotates no rollback anchor, and a re-apply that fails rolls nothing
+  back — it is recorded as `DeployHealthRestartFailing`, never as `DeployRolledBack` or
+  `DeployFailed` (REQ-OPS-003, since 2026-09-25). Its backoff is the self-heal's durations (300 s
+  doubling to 1 h) from its own record, `reapply-failed.digests`, since 2026-09-26 — until then it
+  was the release backoff (600 s doubling to 6 h) in `failed.digests`. An operator forces the same
+  re-apply over a converged stack with `deploy.sh --reapply` (REQ-OPS-003).
 - **Health only** — every divergent container is on the target image but not healthy: the release
   is right and the runtime is sick, so `deploy.sh` restarts **only** those services, with no pull,
   no signature re-verification and no release rollback, throttled by its own backoff
   (`IRI_HEALTH_RESTART_BASE` / `_MAX`, 300 s doubling to 1 h). A restart that does not restore
   health is recorded in `deploy-health.prom` and raises `DeployHealthRestartFailing`, never a false
   `DeployRolledBack` ([ADR-0083](../adr/0083-deploy-bot-health-drift-targeted-restart.md)).
+  **Since 2026-09-25 the restart is one restart window** (ADR-0083's amendment, the release apply's
+  shape from [ADR-0213](../adr/0213-a-release-that-moves-the-provider-jar-costs-one-outage.md)):
+  one `systemctl --user stop` naming the unhealthy services — which takes down with them what
+  `Requires=` them and nothing they require — then a `start` of every stack unit in order, each
+  waited for until healthy. Each affected unit starts exactly once; an unhealthy frontend never
+  touches backend or keycloak. The heal is reported resolved, and the healthy heartbeat stamped,
+  only when every one of those starts returned healthy; until then a `restart` per service returned
+  once the named unit was up, so an unhealthy backend was reported resolved while ingest and
+  frontend still had no container, and a frontend unhealthy beside it was started twice.
+- **Both** — a structural finding outranks a health one, so the run re-applies. The re-apply does
+  not recreate the unhealthy container (its unit is active, and a `start` of it is a no-op); the
+  next tick finds it health-only and heals it. Such a re-apply therefore neither stamps the healthy
+  heartbeat nor clears the heal's backoff record.
 
 `--check-only` reports the pending re-apply or restart without acting. Two deliberate exclusions keep the check free of false positives:
 a container still inside its healthcheck **start period** (`running/starting`) counts as
@@ -499,15 +616,23 @@ reconcile is a silent no-op — nothing scrapes the textfile there anyway.
   restarting triggers a targeted restart of only those services — no pull, no re-verify, no
   rollback — throttled by the health-restart backoff; a failed restart updates `deploy-health.prom`
   and writes no deploy-outcome metric.
-- [ ] A drift re-apply of a target inside the bad-digest backoff window is skipped like any
-  other re-apply of that target; a failed drift re-apply records the failure for the backoff.
+- [ ] That restart is one `stop` of the unhealthy services followed by an ordered `start` of the
+  stack, never a `restart`: every unit the stop took down (the unhealthy ones and what `Requires=`
+  them) starts exactly once, every other unit zero times, and „resolved" and the healthy heartbeat
+  are written only after all of them are up; otherwise the log names what did not come up.
+- [ ] A missing container is brought back by a `start` — never a `restart` of a running unit it
+  requires — and a drift re-apply that leaves an unhealthy at-target container alone stamps no
+  healthy heartbeat.
+- [ ] A drift re-apply of a target inside the re-apply backoff window (`reapply-failed.digests`,
+  300 s doubling to 1 h) is skipped; a failed drift re-apply records the failure there, stamps the
+  `deploy-health.prom` failure gauge, and does not roll back (REQ-OPS-003).
 - [ ] `deploy.sh --check-only` over a drifted stack reports "would re-apply" and applies
   nothing.
 - [ ] A container inside its healthcheck start period does not trigger a drift re-apply (but a
   non-target image digest does, even during the start period); a one-off `compose run`
   container never does.
 
-**Enforced by:** `scripts/deploy.sh` (`running_stack_drift`, idempotence check, the health-drift branch, `reconcile_monitoring_reload(s)`) · `scripts/lib/container-runtime.sh` (`rt_service_container_ids`, `rt_monitoring_recreate`) · `scripts/deploy.test.sh` (self-tests, run by `.github/workflows/deploy-script.yml`) · **Runbook:** `docs/deployment.md` → *What happens on the host*, *Driving the stack*
+**Enforced by:** `scripts/deploy.sh` (`running_stack_drift`, idempotence check, the health-drift branch, `reconcile_monitoring_reload(s)`) · `scripts/lib/container-runtime.sh` (`rt_service_container_ids`, `rt_heal_stack`, `rt_monitoring_recreate`) · `scripts/deploy.test.sh` (self-tests, run by `.github/workflows/deploy-script.yml`) · **Runbook:** `docs/deployment.md` → *What happens on the host*, *Driving the stack*
 
 ### REQ-OPS-014 — Every prod service runs with a hardened runtime baseline
 

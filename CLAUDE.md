@@ -158,28 +158,10 @@ Specs: [`docs/specs/ui-design-system.md`](docs/specs/ui-design-system.md),
 
 Always use the Gradle wrapper. **Never** use the IDE test runner or the harness `run_test` tool — Gradle is the only sanctioned test path. This is a hard project rule and applies even when iterating on a single test.
 
-```bash
-./gradlew :backend:test                                    # backend tests
-./gradlew :frontend:test                                   # frontend tests (also produces JaCoCo report)
-./gradlew test                                             # all tests
-./gradlew :backend:test --tests "FullyQualifiedClassName"  # single test class
-./gradlew :backend:test --tests "ClassName.methodName"     # single test method
-./gradlew :backend:bootRun                                 # backend on https://localhost:11261 (dev profile)
-./gradlew :frontend:bootRun                                # frontend on http://localhost:18081 (dev profile)
-./gradlew :backend:cyclonedxBom                            # SBOM into backend/docs/
-./gradlew :frontend:cyclonedxBom                           # SBOM into frontend/docs/
-./gradlew :ingest:cyclonedxBom                             # SBOM into ingest/docs/
-./gradlew :keycloak-spi:cyclonedxBom                       # SBOM into keycloak-spi/docs/
-./gradlew check                                            # full static analysis: Checkstyle (Google Java Style) + SpotBugs + tests
-./gradlew :backend:checkstyleMain :backend:spotbugsMain    # backend lint only
-./gradlew :frontend:checkstyleMain :frontend:spotbugsMain  # frontend lint only
-```
-
 Tests force `spring.profiles.active=test`; `bootRun` forces `dev`. The `test` profile (`application-test.yml`) lives in each module's **`src/test/resources`**, never in `src/main/resources` — the `jar`/`bootJar` tasks fail when a shipped jar contains one (SEC-17). Both `Test` and `BootRun` set `--enable-native-access=ALL-UNNAMED`; `Test` additionally attaches the Mockito agent (`-Xshare:off -javaagent:<mockito-core>`). The `ingest` app runs the same way (`./gradlew :ingest:bootRun`, https://localhost:11262).
 
 ## Linting / static analysis
 
-- **Checkstyle** (Google Java Style, `config/checkstyle/google_checks.xml`) and **SpotBugs** (`spotbugsMain`, wired into `check`) run against the `main` source set of every Java module (`backend`, `frontend`, `ingest`; `keycloak-spi` runs Checkstyle). Reports land under `<module>/build/reports/{checkstyle,spotbugs}/main.{html,xml}`.
 - **Every new or modified piece of code must be linted before the task is considered done.** Run at least `./gradlew :<module>:checkstyleMain :<module>:spotbugsMain` (or `./gradlew check` for the full sweep) and read the reports.
 - **All Checkstyle and SpotBugs errors *and* warnings introduced or touched by your change must be fixed.** Do not silence findings with `@SuppressWarnings`, `@SuppressFBWarnings`, or Checkstyle suppression files unless the rule is genuinely wrong for that specific call site — and in that case the reason goes into `@SuppressFBWarnings(justification = "…")` where the annotation has that attribute, otherwise into the commit message and the PR, never into a code comment (ADR-0214).
 - Pre-existing findings in code you did not touch are out of scope; do not opportunistically clean them up in an unrelated change. But never *add* a new finding on top of them.
@@ -323,12 +305,11 @@ every related DOM element after an AJAX update) is in [`frontend/CLAUDE.md`](fro
 
 Moved to [`docs/specs/api-conventions.md`](docs/specs/api-conventions.md) (`REQ-API-*`): versioned `/api/v1` paths + `@ApiDeprecation`, DTO-only boundaries with MapStruct + Jakarta validation, `@Valid` on writes, RFC 7807 `problem+json` errors, `Pageable`/`PageResponse` with whitelisted sort fields, UTC time, and SpringDoc/`openapi.json` upkeep.
 
-### Frontend resilience & config
+### Configuration
 
-- **WebClient** is centrally configured (base URL, default headers, connect/read/write timeouts).
-- **Resilience4j** wraps every backend call (Timeout, Retry, CircuitBreaker, Bulkhead). State transitions are logged via `ResilienceEventLogger` so `SERVICE_UNAVAILABLE` / `BACKEND_TIMEOUT` always have a matching log line.
-- **Reactor context propagation is mandatory for any new `ThreadLocal` you want to see inside `WebClient` exchange filters.** `WebClient.exchange()` runs on a Reactor-Netty worker thread, not the servlet thread; classic `ThreadLocal` values are not copied across threads. Register a `ThreadLocalAccessor` on `ContextRegistry.getInstance()` in [`ReactorContextPropagationConfig`](frontend/src/main/java/de/greluc/krt/profit/basetool/frontend/config/ReactorContextPropagationConfig.java) (which also enables `Hooks.enableAutomaticContextPropagation()` at startup). The existing accessors cover `ActiveSquadronContext` (active-OrgUnit pin → `X-Active-Org-Unit-Id` outbound header) and `CorrelationContext` (correlation id propagation). Forgetting the accessor means the holder is invisible on the worker thread and the outbound call silently drops whatever it carried.
-- Use `MockWebServer` / WireMock to test error paths.
+The frontend's WebClient / Resilience4j / Reactor context-propagation rules live in
+[`frontend/CLAUDE.md`](frontend/CLAUDE.md) and load when you work under `frontend/`.
+
 - **Type-safe configuration** — relevant `application-*.yml` settings live in `@ConfigurationProperties` classes with `@Validated` (Keycloak URIs, backend URLs, limits). Constraints: `@NotBlank`, `@URL`, `@Min`/`@Max`. Test misconfiguration during startup (`test` profile). See `*Properties` classes under `config/`.
 
 ### Logging

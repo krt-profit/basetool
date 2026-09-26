@@ -10,7 +10,7 @@ groups:
           severity: critical
         annotations:
           summary: "Deploy rolled back (health gate reverted a promoted release)"
-          description: "The last deploy outcome was a rollback newer than the last successful deploy (or a rollback with no successful deploy on record) — the health gate reverted a promoted release. Read WHY in Grafana -> Explore -> Loki over the last 6h: `{app=\"ops-deploy\"} |~ \"rolling back|SECURITY: cosign|health check failed|FATAL\"`, then widen to the bare `{app=\"ops-deploy\"}` for the surrounding run. That line is what separates a health-gate timeout from a cosign signature rejection, a missing previous digest pin, or a rollback that itself failed. `journalctl -u iri-deploy.service` shows NONE of this — the unit appends stdout/stderr to /var/log/iri-deploy.log instead of journald."
+          description: "The last deploy outcome was a rollback newer than the last successful deploy (or a rollback with no successful deploy on record) — the health gate reverted a promoted release to the one deployed before it. Only a change of target can roll back: a failed drift re-apply of the release already deployed never does, and pages DeployHealthRestartFailing instead. Read WHY in Grafana -> Explore -> Loki over the last 6h: `{app=\"ops-deploy\"} |~ \"rolling back|SECURITY: cosign|health check failed|FATAL\"`, then widen to the bare `{app=\"ops-deploy\"}` for the surrounding run. That line is what separates a health-gate timeout from a cosign signature rejection, a missing previous digest pin, or a rollback that itself failed. `journalctl -u iri-deploy.service` shows NONE of this — the unit appends stdout/stderr to /var/log/iri-deploy.log instead of journald."
 
       - alert: DeployFailed
         expr: >-
@@ -31,8 +31,8 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Deploy-bot cannot restart an unhealthy at-target service"
-          description: "A container is running the current target image but is unhealthy, and deploy.sh's targeted restart did not restore it — the runtime is broken on the deployed release (not a rollback). Investigate the app (threads/memory/dependencies) via the container + JVM dashboards. `{app=\"ops-deploy\"} |~ \"health drift\"` in Grafana -> Explore -> Loki names the affected service(s) and the restart-attempt count; `journalctl -u iri-deploy.service` does not (stdout/stderr are appended to /var/log/iri-deploy.log)."
+          summary: "Deploy-bot cannot restore the deployed release (targeted restart or drift re-apply failed)"
+          description: "The running release could not be restored, and nothing was rolled back. Either a container runs the current target image but is unhealthy and deploy.sh's targeted restart did not bring it back (`health drift`), or the running stack drifted from the deployed release — a missing container, a wrong image — and re-applying that same release did not bring it back (`re-apply`). The runtime is broken on the deployed release; the rollback anchors still name the release before it. Investigate the app (threads/memory/dependencies) via the container + JVM dashboards. `{app=\"ops-deploy\"} |~ \"health drift|re-appl|did not come up\"` in Grafana -> Explore -> Loki names the affected service(s) and the attempt count; `journalctl -u iri-deploy.service` does not (stdout/stderr are appended to /var/log/iri-deploy.log)."
 
       - alert: DeployConfigBlocked
         expr: basetool_deploy_config_blocked == 1

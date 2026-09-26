@@ -548,13 +548,58 @@ mon() { printf 'export RT_MONITORING_SERVICES=%q;' "prometheus loki grafana"; }
 
 # shellcheck disable=SC2016
 # shellcheck disable=SC2016
-expect_call "a service this run re-pinned is RESTARTED, not started" podman   'RT_PIN_FILE="${WORK}/pin.yml" RT_UNIT_DIR="${WORK}/units" rt_pin_apply "backend=ghcr.io/x/backend@sha256:aaaa"; RT_STACK_SERVICES="backend db-backend" rt_apply_stack'   'restart backend.service'
+expect_call "a service this run re-pinned is STOPPED, so the start that follows creates it anew" podman   'RT_PIN_FILE="${WORK}/pin.yml" RT_UNIT_DIR="${WORK}/units" rt_pin_apply "backend=ghcr.io/x/backend@sha256:aaaa"; RT_STACK_SERVICES="backend db-backend" rt_apply_stack'   'systemctl --user stop backend.service'
+# shellcheck disable=SC2016
+expect_call "...and then started" podman   'RT_PIN_FILE="${WORK}/pin.yml" RT_UNIT_DIR="${WORK}/units" rt_pin_apply "backend=ghcr.io/x/backend@sha256:abab"; RT_STACK_SERVICES="backend db-backend" rt_apply_stack'   'systemctl --user start backend.service'
 # shellcheck disable=SC2016
 expect_call "...and one it did not is merely started, so the databases stay up" podman   'RT_PIN_FILE="${WORK}/pin.yml" RT_UNIT_DIR="${WORK}/units" rt_pin_apply "backend=ghcr.io/x/backend@sha256:bbbb"; RT_STACK_SERVICES="backend db-backend" rt_apply_stack'   'start db-backend.service'
 # shellcheck disable=SC2016
-expect_no_call "...and the database is never restarted for somebody else's change" podman   'RT_PIN_FILE="${WORK}/pin.yml" RT_UNIT_DIR="${WORK}/units" rt_pin_apply "backend=ghcr.io/x/backend@sha256:cccc"; RT_STACK_SERVICES="backend db-backend" rt_apply_stack'   'restart db-backend.service'
+expect_out "...and the database is never stopped for somebody else's change" podman   'RT_PIN_FILE="${WORK}/pin.yml" RT_UNIT_DIR="${WORK}/units" rt_pin_apply "backend=ghcr.io/x/backend@sha256:cccc"; RT_STACK_SERVICES="backend db-backend" rt_apply_stack; echo "stops-naming-db=$(grep " stop " "${LOG}" | grep -c db-backend);"'   'stops-naming-db=0;'
 # shellcheck disable=SC2016
-expect_no_call "an unchanged pin does not restart anything" podman   'RT_PIN_FILE="${WORK}/pin2.yml" RT_UNIT_DIR="${WORK}/units2" rt_pin_apply "backend=ghcr.io/x/backend@sha256:dddd"; RT_CHANGED_SERVICES=""; rt_pin_apply "backend=ghcr.io/x/backend@sha256:dddd"; RT_STACK_SERVICES="backend" rt_apply_stack'   'restart backend.service'
+expect_no_call "...nor restarted" podman   'RT_PIN_FILE="${WORK}/pin.yml" RT_UNIT_DIR="${WORK}/units" rt_pin_apply "backend=ghcr.io/x/backend@sha256:cdcd"; RT_STACK_SERVICES="backend db-backend" rt_apply_stack'   'restart'
+# shellcheck disable=SC2016
+expect_no_call "an unchanged pin does not stop anything" podman   'RT_PIN_FILE="${WORK}/pin2.yml" RT_UNIT_DIR="${WORK}/units2" rt_pin_apply "backend=ghcr.io/x/backend@sha256:dddd"; RT_CHANGED_SERVICES=""; rt_pin_apply "backend=ghcr.io/x/backend@sha256:dddd"; RT_STACK_SERVICES="backend" rt_apply_stack'   ' stop '
+
+say ""
+say "== one restart window: every re-defined unit goes down in ONE stop, then the stack starts in order =="
+stack5='RT_STACK_SERVICES="db-backend keycloak backend ingest frontend"'
+expect_call "all re-defined units are named in one stop call" podman \
+  "RT_CHANGED_SERVICES='keycloak backend frontend'; ${stack5} rt_apply_stack" \
+  'systemctl --user stop keycloak.service backend.service frontend.service'
+expect_out "...exactly one" podman \
+  "RT_CHANGED_SERVICES='keycloak backend frontend'; ${stack5} rt_apply_stack; grep -c ' stop ' \"\${LOG}\"" '1'
+expect_no_call "...and no unit is restarted" podman \
+  "RT_CHANGED_SERVICES='keycloak backend frontend'; ${stack5} rt_apply_stack" 'restart'
+expect_out "the stop comes first, then every stack unit is started in stack order" podman \
+  "RT_CHANGED_SERVICES='backend'; ${stack5} rt_apply_stack; grep -oE '(stop|start) [a-z-]+' \"\${LOG}\" | tr '\n' ' '" \
+  'stop backend start db-backend start keycloak start backend start ingest start frontend '
+expect_out "a failed stop fails the apply (the unit would keep its old definition)" podman \
+  "export STUB_FAIL='stop_backend.service'; RT_CHANGED_SERVICES='backend'; ${stack5} rt_apply_stack; echo \"rc=\$?;\"" 'rc=1;'
+expect_call "...but the start pass still runs, so nothing the stop took down stays down" podman \
+  "export STUB_FAIL='stop_backend.service'; RT_CHANGED_SERVICES='backend'; ${stack5} rt_apply_stack" 'systemctl --user start frontend.service'
+expect_out "what did not come up is named, in start order" podman \
+  "STUB_FAIL='start_keycloak.service start_backend.service' ${stack5} rt_await_stack; echo \"failed=[\${RT_FAILED_SERVICES}]\"" \
+  'failed=[keycloak backend]'
+expect_out "...and cleared by the next wait" podman \
+  "STUB_FAIL='start_keycloak.service' ${stack5} rt_await_stack; STUB_FAIL=''; ${stack5} rt_await_stack; echo \"failed=[\${RT_FAILED_SERVICES}]\"" \
+  'failed=[]'
+
+say ""
+say "== the runtime-health heal is the same window: one stop of the sick units, then the stack in order =="
+expect_call "the sick units go down in one stop" podman \
+  "${stack5} rt_heal_stack backend frontend" 'systemctl --user stop backend.service frontend.service'
+expect_out "...first, then every stack unit is started in stack order" podman \
+  "${stack5} rt_heal_stack backend frontend; grep -oE '(stop|start) [a-z-]+' \"\${LOG}\" | tr '\n' ' '" \
+  'stop backend start db-backend start keycloak start backend start ingest start frontend '
+expect_no_call "...and nothing is restarted" podman \
+  "${stack5} rt_heal_stack keycloak" 'restart'
+expect_out "a sick keycloak is the one unit stopped -- systemd, not the heal, takes what requires it" podman \
+  "${stack5} rt_heal_stack keycloak; grep ' stop ' \"\${LOG}\" | sed 's/.* stop \(.*\)$/stopped=[\1]/'" 'stopped=[keycloak.service]'
+expect_out "the healed units are forgotten afterwards, so a later apply does not recreate them again" podman \
+  "RT_CHANGED_SERVICES='ingest'; ${stack5} rt_heal_stack backend; echo \"changed=[\${RT_CHANGED_SERVICES}]\"" 'changed=[ingest]'
+expect_out "a unit that does not come back fails the heal, and is named" podman \
+  "STUB_FAIL='start_backend.service' ${stack5} rt_heal_stack backend; echo \"rc=\$?; failed=[\${RT_FAILED_SERVICES}]\"" \
+  'rc=1; failed=[backend]'
 
 say ""
 say "== waiting out a restart that travelled along Requires= =="

@@ -165,16 +165,39 @@ until then the risk is bounded, named and watched, which is the most this layer 
   healthy, before its dependents are, and the provider-JAR step trusted exactly that: on 2026-09-25
   it logged success while frontend and ingest had no container. **Fixed in the repository** the same
   day — the step now waits for the whole stack (`REQ-OPS-007`); it reaches a host with the role's
-  `--tags deploy,scripts` run. What remains is the cost: a release that moves the
-  JAR takes two full-app outages, the app apply's and the JAR's, because the JAR is swapped only
-  after the app passed its gate (ADR-0055, amendment of 2026-09-25, which records why merging them
-  was not done inside the fix).
+  `--tags deploy,scripts` run. **The second outage is closed in the repository** (ADR-0213,
+  2026-09-25): a release that moves the JAR used to take two full-app outages, the app apply's and
+  the JAR's; the JAR now rides the release apply, which stops every re-defined unit once and starts
+  the stack once, so it is one — and ingest and frontend are no longer restarted twice per release.
+  It reaches a host with the role's `--tags deploy,scripts` run. **What remains, by decision:** a
+  failed gate cannot prove whether the JAR or an app image broke it, and a bad JAR rolls back an app
+  release that would have been healthy alone; the deploy log narrows what it can. The runtime-health
+  restart (ADR-0083) had the same `Requires=` shape — a `restart` per unhealthy service, reported
+  resolved while the dependents it had restarted were still stopped, and a second unhealthy
+  dependent started twice. **Closed in the repository** the same day (ADR-0083 amended): the heal is
+  the release apply's one stop and one ordered start, resolved only when every unit is up; it
+  reaches a host with the same role run. **Still open, not decided:** keycloak, the databases and
+  redis are outside the drift check, so an unhealthy keycloak is healed by nobody — and healing it
+  automatically would be a full-app restart on one failed probe.
 - **A configured Discord precheck can fail open with nobody noticing.** The account-existence
   precheck (REQ-SEC-022) is fail-open by design, and its only witness is a Keycloak `WARN`. On
   production the truststore `.env` named never existed and the warning repeated at every start for
   at least seven days before a rollout step found it (2026-09-25, fixed the same day). No alert reads
   that line — `KeycloakErrorRateHigh`, whose description names this very path, counts `ERROR` lines, and
   this is one `WARN` per start. The runbook's verify step now reads it; an alert is not built.
+- **A drift re-apply could destroy the only rollback anchor.** A re-apply of the deployed release
+  ("drift: frontend: no container") saved the deployed pin over `previous-digest-pin.yml` — and, with
+  the unit files gone, the deployed tree over `config-previous/`. Had that re-apply failed its gate,
+  the „rollback" would have restored the same release, paged `DeployRolledBack`, and the release
+  before it would have been unreachable by any automatic path. No failed re-apply has happened on
+  production; the 2026-09-25 17:43 re-apply succeeded, but by the code it ran it also copied the
+  v1.12.0 pin over the anchor (not read on the host). **Fixed in the
+  repository** (ADR-0083 amended 2026-09-25, `REQ-OPS-003`): a re-apply rotates no anchor, and a
+  failed one rolls nothing back and pages `DeployHealthRestartFailing`. **Closes** when the role's
+  `--tags deploy,scripts` run has put it on production. Until the next release after that, the host's
+  `previous-digest-pin.yml` may still name v1.12.0 itself rather than v1.11.0 — read it before relying
+  on an automatic rollback, and see the `promote.yml` rollback in
+  [`deployment.md`](../deployment.md) for going back further.
 
 ## 11.7 Security hardening decided but not yet carried out
 

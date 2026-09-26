@@ -40,8 +40,10 @@ COSIGN_SEARCH_PATH="${IRI_COSIGN_SEARCH_PATH:-/usr/local/bin:/usr/bin:/opt/cosig
 VERIFY_LAST_ERROR=""
 
 TARGET_TAG=stable
+TAG_GIVEN=false
 CHECK_ONLY=false
 FORCE=false
+REAPPLY_REQUESTED=false
 
 BACKOFF_BASE="${IRI_BACKOFF_BASE:-600}"
 BACKOFF_MAX="${IRI_BACKOFF_MAX:-21600}"
@@ -54,6 +56,7 @@ while [[ $# -gt 0 ]]; do
     --tag)
       [[ -n "${2:-}" ]] || { echo "FATAL: --tag requires a value" >&2; exit 1; }
       TARGET_TAG="$2"
+      TAG_GIVEN=true
       shift 2
       ;;
     --check-only)
@@ -64,18 +67,36 @@ while [[ $# -gt 0 ]]; do
       FORCE=true
       shift
       ;;
+    --reapply)
+      REAPPLY_REQUESTED=true
+      shift
+      ;;
     -h|--help)
       cat <<'USAGE'
-Usage: deploy.sh [--tag <ref>] [--check-only] [--force]
+Usage: deploy.sh [--tag <ref> | --reapply] [--check-only] [--force]
 
 Options:
   --tag <ref>     Image tag/ref to deploy. Default: stable
                   Examples: stable, latest, 1.4.2, sha-abc1234
+  --reapply       Re-apply the release that is DEPLOYED — the one
+                  /var/lib/iri/last-deployed.digests records — instead of
+                  resolving a tag: re-delivers its config bundle and units,
+                  rewrites its digest pin, re-stages its provider JAR (swapped in
+                  only if the live one differs) and runs the health gate. Rotates
+                  no rollback anchor and, if it fails, rolls nothing back (the
+                  failure is backed off like a failed drift re-apply). Bypasses
+                  the re-apply backoff, never a rolled-back release's backoff.
+                  Refused on a host with no deployed release, and with --tag.
+                  Use it instead of deleting last-deployed.digests, which turns
+                  the deployed release into a new one and rotates every anchor.
   --check-only    Resolve digests + cosign-verify them, but do not apply
                   (dry-run / signature preflight). Exits non-zero if a signature
-                  does not verify; writes no deploy metric.
-  --force         Bypass the bad-digest backoff and retry a previously failed
-                  target now (e.g. after fixing an environmental cause).
+                  does not verify; writes no deploy metric. With --reapply, the
+                  deployed release's digests.
+  --force         Bypass the bad-digest backoff (and the re-apply backoff) and
+                  retry a previously failed target now (e.g. after fixing an
+                  environmental cause); also applies an operator-gated
+                  stateful-infra change.
   -h, --help      Show this help.
 
 Environment overrides (all optional, sensible defaults shown):
@@ -87,8 +108,10 @@ Environment overrides (all optional, sensible defaults shown):
   IRI_BACKOFF_BASE=600     (first retry delay after a failed target, seconds)
   IRI_BACKOFF_MAX=21600    (cap for the exponential backoff, seconds)
   IRI_HEALTH_RESTART_BASE=300   (first delay before re-restarting an unhealthy
-                                 at-target service — the runtime-health path — seconds)
-  IRI_HEALTH_RESTART_MAX=3600   (cap for the health-restart backoff, seconds)
+                                 at-target service — the runtime-health path —
+                                 and before retrying a failed re-apply, seconds)
+  IRI_HEALTH_RESTART_MAX=3600   (cap for the health-restart and re-apply
+                                 backoffs, seconds)
   IRI_REGISTRY=ghcr.io
   IRI_IMAGE_NAMESPACE=krt-profit
   IRI_GHCR_USERNAME=deploy-bot
@@ -113,6 +136,11 @@ USAGE
       ;;
   esac
 done
+
+if [[ "${REAPPLY_REQUESTED}" == "true" && "${TAG_GIVEN}" == "true" ]]; then
+  echo "FATAL: --reapply re-applies the deployed release and cannot be combined with --tag (try --help)" >&2
+  exit 1
+fi
 
 require_file() {
   [[ -f "$1" ]] || fail "required file missing: $1"
@@ -439,14 +467,42 @@ reconcile_monitoring_reloads() {
   write_prometheus_config_applied_metric
 }
 
-extract_keycloak_spi_jar() {
-  local ref="$1" dest_jar="$2" stage
-  stage="${STATE_DIR}/keycloak-spi-stage.jar"
-  rm -f "${stage}"
-  rt_extract_from_image "${ref}" /providers/keycloak-spi.jar "${stage}" /bundle \
+stage_keycloak_spi_jar() {
+  local ref="$1"
+  rm -f "${KEYCLOAK_SPI_STAGE_JAR}"
+  rt_extract_from_image "${ref}" /providers/keycloak-spi.jar "${KEYCLOAK_SPI_STAGE_JAR}" /bundle \
     || fail "cannot extract /providers/keycloak-spi.jar from ${ref}"
-  install -D -m 0644 "${stage}" "${dest_jar}"
-  rm -f "${stage}"
+  [[ -s "${KEYCLOAK_SPI_STAGE_JAR}" ]] \
+    || fail "the provider JAR extracted from ${ref} is empty"
+}
+
+swap_in_keycloak_spi_jar() {
+  if [[ "${REAPPLY}" == "true" ]]; then
+    install -D -m 0644 "${KEYCLOAK_SPI_STAGE_JAR}" "${KEYCLOAK_SPI_JAR}"
+    rm -f "${KEYCLOAK_SPI_STAGE_JAR}"
+    rt_note_changed keycloak
+    return 0
+  fi
+  if [[ -f "${KEYCLOAK_SPI_JAR}" ]]; then
+    cp -a "${KEYCLOAK_SPI_JAR}" "${KEYCLOAK_SPI_PREVIOUS_JAR}"
+    KEYCLOAK_SPI_HAD_PREVIOUS=true
+  else
+    rm -f "${KEYCLOAK_SPI_PREVIOUS_JAR}"
+    KEYCLOAK_SPI_HAD_PREVIOUS=false
+  fi
+  KEYCLOAK_SPI_TOUCHED=true
+  install -D -m 0644 "${KEYCLOAK_SPI_STAGE_JAR}" "${KEYCLOAK_SPI_JAR}"
+  rm -f "${KEYCLOAK_SPI_STAGE_JAR}"
+  rt_note_changed keycloak
+}
+
+restore_previous_keycloak_spi_jar() {
+  if [[ "${KEYCLOAK_SPI_HAD_PREVIOUS}" == "true" ]]; then
+    install -D -m 0644 "${KEYCLOAK_SPI_PREVIOUS_JAR}" "${KEYCLOAK_SPI_JAR}" || return 1
+  else
+    rm -f "${KEYCLOAK_SPI_JAR}" || return 1
+  fi
+  return 0
 }
 
 verify_signature() {
@@ -562,6 +618,7 @@ PIN_FILE_CURRENT="${STATE_DIR}/current-digest-pin.yml"
 PIN_FILE_PREVIOUS="${STATE_DIR}/previous-digest-pin.yml"
 LAST_DEPLOYED_FILE="${STATE_DIR}/last-deployed.digests"
 FAILED_FILE="${STATE_DIR}/failed.digests"
+REAPPLY_FAILED_FILE="${STATE_DIR}/reapply-failed.digests"
 CONFIG_STAGE_DIR="${STATE_DIR}/config-stage"
 CONFIG_PREVIOUS_DIR="${STATE_DIR}/config-previous"
 MON_RELOAD_STATE_DIR="${STATE_DIR}/monitoring-reload"
@@ -569,6 +626,7 @@ EDGE_STATE_DIR="${STATE_DIR}/edge"
 CONFIG_BLOCKED_FILE="${STATE_DIR}/config-blocked.marker"
 CONFIG_APPLY_INCOMPLETE_FILE="${STATE_DIR}/config-apply.incomplete"
 KEYCLOAK_SPI_JAR="${COMPOSE_DIR}/keycloak/providers/keycloak-spi.jar"
+KEYCLOAK_SPI_STAGE_JAR="${STATE_DIR}/keycloak-spi-stage.jar"
 KEYCLOAK_SPI_PREVIOUS_JAR="${STATE_DIR}/keycloak-spi-previous.jar"
 HEALTH_RESTART_FILE="${STATE_DIR}/health-restart.digests"
 
@@ -667,22 +725,72 @@ write_stack_health_metric() {
     echo "# HELP basetool_deploy_last_stack_healthy_timestamp Unix time deploy.sh last observed the running app stack at target and healthy."
     echo "# TYPE basetool_deploy_last_stack_healthy_timestamp gauge"
     echo "basetool_deploy_last_stack_healthy_timestamp ${prev_healthy}"
-    echo "# HELP basetool_deploy_last_health_restart_failed_timestamp Unix time a targeted restart of an unhealthy at-target service last failed to restore health."
+    echo "# HELP basetool_deploy_last_health_restart_failed_timestamp Unix time deploy.sh last failed to restore the deployed release: a targeted restart of an unhealthy at-target service, or a drift re-apply."
     echo "# TYPE basetool_deploy_last_health_restart_failed_timestamp gauge"
     echo "basetool_deploy_last_health_restart_failed_timestamp ${prev_failed}"
   } | write_textfile "$(basename "${f}")" || true
 }
 
 record_target_failure() {
-  local prev_marker="" prev_count=""
+  local file="${1:-${FAILED_FILE}}" prev_marker="" prev_count=""
   FAIL_COUNT=1
-  if [[ -f "${FAILED_FILE}" ]]; then
-    read -r prev_marker prev_count _ < "${FAILED_FILE}" || true
+  if [[ -f "${file}" ]]; then
+    read -r prev_marker prev_count _ < "${file}" || true
     if [[ "${prev_marker}" == "${EXPECTED_MARKER}" ]] && [[ "${prev_count}" =~ ^[0-9]+$ ]]; then
       FAIL_COUNT=$(( 10#${prev_count} + 1 ))
     fi
   fi
-  printf '%s %d %d\n' "${EXPECTED_MARKER}" "${FAIL_COUNT}" "$(date +%s)" > "${FAILED_FILE}"
+  printf '%s %d %d\n' "${EXPECTED_MARKER}" "${FAIL_COUNT}" "$(date +%s)" > "${file}"
+}
+
+backoff_seconds() {
+  local base="$1" max="$2" count="$3" b
+  if (( 10#${count} > 20 )); then
+    echo "${max}"
+    return 0
+  fi
+  b=$(( base * (2 ** (10#${count} - 1)) ))
+  (( b > max )) && b="${max}"
+  echo "${b}"
+}
+
+release_parts() {
+  local config=no jar=no
+  [[ "${CONFIG_CHANGED}" == "true" ]] && config=yes
+  [[ "${KEYCLOAK_SPI_CHANGED}" == "true" ]] && jar=yes
+  printf 'app images [%s] · unit definitions [%s] · config bundle: %s · provider JAR: %s' \
+    "${APP_IMAGES_CHANGED:-none}" "${UNITS_REDEFINED:-none}" "${config}" "${jar}"
+}
+
+explain_gate_failure() {
+  local first="${RT_FAILED_SERVICES%% *}" img=no kc_redefined=false
+  case " ${UNITS_REDEFINED} " in *" keycloak "*) kc_redefined=true ;; esac
+  log "health gate: did not come up, in start order: [${RT_FAILED_SERVICES:-none reported}]"
+  log "health gate: this release changed: $(release_parts)"
+  if [[ -z "${first}" ]]; then
+    log "health gate: every unit started, so it was the stop of the re-defined units that failed (above) — their new definition may not have reached the containers"
+    return 0
+  fi
+  if [[ "${first}" == "keycloak" ]]; then
+    if [[ "${KEYCLOAK_SPI_CHANGED}" == "true" && "${kc_redefined}" != "true" ]]; then
+      if [[ -z "${APP_IMAGES_CHANGED}${UNITS_REDEFINED}" && "${CONFIG_CHANGED}" != "true" ]]; then
+        log "health gate: KEYCLOAK did not come up, and the provider JAR is the ONLY change in this release — the JAR is the cause"
+      else
+        log "health gate: KEYCLOAK did not come up, and the provider JAR is the only part of this release that changed keycloak — the JAR is the likely cause; what failed after keycloak requires it"
+      fi
+    elif [[ "${KEYCLOAK_SPI_CHANGED}" == "true" ]]; then
+      log "health gate: KEYCLOAK did not come up; this release changed both its unit and its provider JAR — either can be the cause"
+    else
+      log "health gate: KEYCLOAK did not come up; its provider JAR did not change in this release"
+    fi
+    return 0
+  fi
+  case " ${APP_IMAGES_CHANGED} " in *" ${first} "*) img=yes ;; esac
+  if [[ "${KEYCLOAK_SPI_CHANGED}" == "true" && " ${RT_FAILED_SERVICES} " != *" keycloak "* ]]; then
+    log "health gate: keycloak is up on the new provider JAR; the first unit that did not come up is ${first} (its image changed: ${img}). A new app image and a new JAR fail the same gate, so this cannot tell which of them it was (ADR-0213) — both are rolled back"
+  else
+    log "health gate: the first unit that did not come up is ${first} (its image changed: ${img})"
+  fi
 }
 
 DEPLOY_STEP=""
@@ -690,6 +798,20 @@ PRE_GATE_GUARD=false
 CONFIG_TREE_TOUCHED=false
 PIN_TOUCHED=false
 PIN_HAD_PREVIOUS=false
+KEYCLOAK_SPI_TOUCHED=false
+KEYCLOAK_SPI_HAD_PREVIOUS=false
+UNITS_REDEFINED=""
+APP_IMAGES_CHANGED=""
+
+REAPPLY=false
+
+record_reapply_failure() {
+  local what="$1"
+  record_target_failure "${REAPPLY_FAILED_FILE}"
+  log "${what} — re-apply of the deployed release failed (#${FAIL_COUNT}); nothing is rolled back: the target IS the deployed release, and the rollback anchors keep naming the release before it"
+  log "recorded re-apply failure #${FAIL_COUNT} for the deployed target; the next automatic attempt backs off $(backoff_seconds "${HEALTH_RESTART_BASE}" "${HEALTH_RESTART_MAX}" "${FAIL_COUNT}")s (deploy.sh --reapply or --force retries now)"
+  write_stack_health_metric restart_failed
+}
 
 # shellcheck disable=SC2317
 on_pre_gate_exit() {
@@ -699,6 +821,11 @@ on_pre_gate_exit() {
   PRE_GATE_GUARD=false
   set +e
   log "FATAL: deploy aborted before the health gate — step '${DEPLOY_STEP:-unknown}' failed (exit ${rc})"
+
+  if [[ "${REAPPLY}" == "true" ]]; then
+    record_reapply_failure "step '${DEPLOY_STEP:-unknown}' failed"
+    exit "${rc}"
+  fi
 
   if [[ "${CONFIG_TREE_TOUCHED}" == "true" ]]; then
     restore_previous_config_tree
@@ -721,6 +848,14 @@ on_pre_gate_exit() {
     fi
   fi
 
+  if [[ "${KEYCLOAK_SPI_TOUCHED}" == "true" ]]; then
+    if restore_previous_keycloak_spi_jar; then
+      log "provider JAR restored to the previous one"
+    else
+      log "WARNING: could not restore the previous provider JAR from ${KEYCLOAK_SPI_PREVIOUS_JAR}"
+    fi
+  fi
+
   record_target_failure
   log "recorded pre-gate failure #${FAIL_COUNT} for this target; the next attempt backs off (--force retries now)"
   write_deploy_metric failure
@@ -731,6 +866,38 @@ exec 200>"${LOCKFILE}"
 if ! flock -n 200; then
   log "another deploy is in progress (lock: ${LOCKFILE}); exiting"
   exit 0
+fi
+
+REAPPLY_BACKEND="" REAPPLY_FRONTEND="" REAPPLY_INGEST="" REAPPLY_CONFIG="" REAPPLY_KCSPI=""
+if [[ "${REAPPLY_REQUESTED}" == "true" ]]; then
+  if [[ ! -s "${LAST_DEPLOYED_FILE}" ]]; then
+    fail "--reapply: no deployed release on this host — ${LAST_DEPLOYED_FILE} is missing or empty, so there is nothing to re-apply. Deploy a release instead: deploy.sh (or deploy.sh --tag <ref>)"
+  fi
+  reapply_extra=""
+  IFS='|' read -r REAPPLY_BACKEND REAPPLY_FRONTEND REAPPLY_INGEST REAPPLY_CONFIG REAPPLY_KCSPI reapply_extra \
+    < "${LAST_DEPLOYED_FILE}" || true
+  for reapply_field in REAPPLY_BACKEND REAPPLY_FRONTEND REAPPLY_INGEST REAPPLY_CONFIG REAPPLY_KCSPI; do
+    case "${reapply_field}" in
+      REAPPLY_BACKEND | REAPPLY_FRONTEND | REAPPLY_INGEST) reapply_optional=false ;;
+      *) reapply_optional=true ;;
+    esac
+    if [[ -z "${!reapply_field}" && "${reapply_optional}" == "true" ]]; then
+      continue
+    fi
+    [[ "${!reapply_field}" =~ ^sha256:[0-9a-f]{64}$ ]] \
+      || fail "--reapply: ${LAST_DEPLOYED_FILE} is not a deployed-release record (field ${reapply_field#REAPPLY_} is '${!reapply_field}') — refusing to guess the deployed release"
+  done
+  [[ -z "${reapply_extra}" ]] \
+    || fail "--reapply: ${LAST_DEPLOYED_FILE} has more than five fields — refusing to guess the deployed release"
+  if [[ -f "${PIN_FILE_CURRENT}" ]]; then
+    for reapply_pair in "backend=${REAPPLY_BACKEND}" "frontend=${REAPPLY_FRONTEND}" "ingest=${REAPPLY_INGEST}"; do
+      reapply_pinned="$(grep -oE "/basetool-${reapply_pair%%=*}@sha256:[0-9a-f]{64}" "${PIN_FILE_CURRENT}" | head -n 1 || true)"
+      if [[ -n "${reapply_pinned}" && "${reapply_pinned#*@}" != "${reapply_pair#*=}" ]]; then
+        fail "--reapply: ${PIN_FILE_CURRENT} pins ${reapply_pair%%=*} to ${reapply_pinned#*@}, but ${LAST_DEPLOYED_FILE} records ${reapply_pair#*=} — the host disagrees about what is deployed; refusing to guess. Check both, then deploy a release (deploy.sh --tag <ref>)"
+      fi
+    done
+  fi
+  unset reapply_extra reapply_field reapply_optional reapply_pair reapply_pinned
 fi
 
 log "logging in to ${REGISTRY} as ${GHCR_USERNAME}"
@@ -750,17 +917,26 @@ resolve_digest() {
   rt_resolve_digest "$1"
 }
 
-log "resolving ${TARGET_TAG} → digest"
-BACKEND_DIGEST="$(resolve_digest "${BACKEND_IMAGE}:${TARGET_TAG}")" \
-  || fail "cannot resolve ${BACKEND_IMAGE}:${TARGET_TAG} (tag missing or no GHCR access)"
-FRONTEND_DIGEST="$(resolve_digest "${FRONTEND_IMAGE}:${TARGET_TAG}")" \
-  || fail "cannot resolve ${FRONTEND_IMAGE}:${TARGET_TAG} (tag missing or no GHCR access)"
-INGEST_DIGEST="$(resolve_digest "${INGEST_IMAGE}:${TARGET_TAG}")" \
-  || fail "cannot resolve ${INGEST_IMAGE}:${TARGET_TAG} (tag missing or no GHCR access)"
+if [[ "${REAPPLY_REQUESTED}" == "true" ]]; then
+  log "--reapply: target is the deployed release recorded in ${LAST_DEPLOYED_FILE} (no tag is resolved)"
+  BACKEND_DIGEST="${REAPPLY_BACKEND}"
+  FRONTEND_DIGEST="${REAPPLY_FRONTEND}"
+  INGEST_DIGEST="${REAPPLY_INGEST}"
+  CONFIG_DIGEST="${REAPPLY_CONFIG}"
+  KEYCLOAK_SPI_DIGEST="${REAPPLY_KCSPI}"
+else
+  log "resolving ${TARGET_TAG} → digest"
+  BACKEND_DIGEST="$(resolve_digest "${BACKEND_IMAGE}:${TARGET_TAG}")" \
+    || fail "cannot resolve ${BACKEND_IMAGE}:${TARGET_TAG} (tag missing or no GHCR access)"
+  FRONTEND_DIGEST="$(resolve_digest "${FRONTEND_IMAGE}:${TARGET_TAG}")" \
+    || fail "cannot resolve ${FRONTEND_IMAGE}:${TARGET_TAG} (tag missing or no GHCR access)"
+  INGEST_DIGEST="$(resolve_digest "${INGEST_IMAGE}:${TARGET_TAG}")" \
+    || fail "cannot resolve ${INGEST_IMAGE}:${TARGET_TAG} (tag missing or no GHCR access)"
 
-CONFIG_DIGEST="$(resolve_digest "${CONFIG_IMAGE}:${TARGET_TAG}")" || CONFIG_DIGEST=""
+  CONFIG_DIGEST="$(resolve_digest "${CONFIG_IMAGE}:${TARGET_TAG}")" || CONFIG_DIGEST=""
 
-KEYCLOAK_SPI_DIGEST="$(resolve_digest "${KEYCLOAK_SPI_IMAGE}:${TARGET_TAG}")" || KEYCLOAK_SPI_DIGEST=""
+  KEYCLOAK_SPI_DIGEST="$(resolve_digest "${KEYCLOAK_SPI_IMAGE}:${TARGET_TAG}")" || KEYCLOAK_SPI_DIGEST=""
+fi
 
 log "target backend  ${BACKEND_DIGEST}"
 log "target frontend ${FRONTEND_DIGEST}"
@@ -789,6 +965,12 @@ if [[ -n "${CONFIG_DIGEST}" ]] && [[ "${CONFIG_DIGEST}" != "${LAST_CONFIG_DIGEST
 fi
 KEYCLOAK_SPI_CHANGED=false
 if [[ -n "${KEYCLOAK_SPI_DIGEST}" ]] && [[ "${KEYCLOAK_SPI_DIGEST}" != "${LAST_KEYCLOAK_SPI_DIGEST}" ]]; then
+  KEYCLOAK_SPI_CHANGED=true
+fi
+if [[ "${REAPPLY_REQUESTED}" == "true" && -n "${CONFIG_DIGEST}" ]]; then
+  CONFIG_CHANGED=true
+fi
+if [[ "${REAPPLY_REQUESTED}" == "true" && -n "${KEYCLOAK_SPI_DIGEST}" ]]; then
   KEYCLOAK_SPI_CHANGED=true
 fi
 
@@ -855,7 +1037,26 @@ running_stack_drift() {
 DRIFTED=false
 NOOP=false
 HEALTH_DRIFT=false
-if [[ -f "${LAST_DEPLOYED_FILE}" ]] \
+HEALTH_LEFT_OVER=""
+if [[ "${REAPPLY_REQUESTED}" == "true" ]]; then
+  DRIFT_REPORT="$(running_stack_drift)"
+  if [[ -n "${DRIFT_REPORT}" ]]; then
+    while IFS= read -r drift_line; do
+      log "drift: ${drift_line#* }"
+    done <<< "${DRIFT_REPORT}"
+  else
+    log "--reapply: the running stack matches the deployed release — re-applying it anyway, as asked"
+  fi
+  DRIFTED=true
+  REAPPLY=true
+  log "--reapply: re-applying the deployed release — the rollback anchors keep naming the release before it"
+  HEALTH_LEFT_OVER="$(grep '^health ' <<< "${DRIFT_REPORT}" \
+    | sed -E 's/^health ([a-z]+):.*/\1/' | sort -u | tr '\n' ' ' || true)"
+  HEALTH_LEFT_OVER="${HEALTH_LEFT_OVER% }"
+  if [[ -n "${HEALTH_LEFT_OVER}" ]]; then
+    log "drift: [${HEALTH_LEFT_OVER}] unhealthy on the deployed image — not recreated by this re-apply, left for the targeted heal"
+  fi
+elif [[ -f "${LAST_DEPLOYED_FILE}" ]] \
    && grep -qFx "${EXPECTED_MARKER}" "${LAST_DEPLOYED_FILE}"; then
   DRIFT_REPORT="$(running_stack_drift)"
   if [[ -z "${DRIFT_REPORT}" ]]; then
@@ -873,7 +1074,14 @@ if [[ -f "${LAST_DEPLOYED_FILE}" ]] \
     done <<< "${DRIFT_REPORT}"
     if grep -q '^structural ' <<< "${DRIFT_REPORT}"; then
       DRIFTED=true
+      REAPPLY=true
       log "running stack does not match the last-deployed target — re-applying"
+      HEALTH_LEFT_OVER="$(grep '^health ' <<< "${DRIFT_REPORT}" \
+        | sed -E 's/^health ([a-z]+):.*/\1/' | sort -u | tr '\n' ' ' || true)"
+      HEALTH_LEFT_OVER="${HEALTH_LEFT_OVER% }"
+      if [[ -n "${HEALTH_LEFT_OVER}" ]]; then
+        log "drift: [${HEALTH_LEFT_OVER}] unhealthy on the target image — not part of this re-apply, left for the targeted heal of the next tick"
+      fi
     else
       HEALTH_DRIFT=true
       log "running stack is at the target release but a container is unhealthy — targeted restart (not a release rollback)"
@@ -882,7 +1090,9 @@ if [[ -f "${LAST_DEPLOYED_FILE}" ]] \
 fi
 
 if [[ "${CHECK_ONLY}" == "true" ]]; then
-  if [[ "${NOOP}" == "true" ]]; then
+  if [[ "${REAPPLY_REQUESTED}" == "true" ]]; then
+    log "check-only: would re-apply the deployed release (--reapply; no anchor rotates, no rollback)"
+  elif [[ "${NOOP}" == "true" ]]; then
     log "check-only: no change (already at target digests, running stack verified)"
   elif [[ "${HEALTH_DRIFT}" == "true" ]]; then
     log "check-only: would restart unhealthy at-target service(s) (runtime-health drift, not a release rollback)"
@@ -938,16 +1148,17 @@ if [[ "${HEALTH_DRIFT}" == "true" ]]; then
 
   cd "${COMPOSE_DIR}"
   log "health drift: restarting unhealthy service(s) [${UNHEALTHY_SVCS}] (targeted; no pull, no signature re-verify, no release rollback)"
+  log "health drift: one restart window — stopping [${UNHEALTHY_SVCS}] and what requires them, then starting the stack in order"
   HR_RC=0
-  for hr_svc in ${UNHEALTHY_SVCS}; do
-    rt_recreate "${hr_svc}" || HR_RC=1
-  done
+  # shellcheck disable=SC2086
+  rt_heal_stack ${UNHEALTHY_SVCS} || HR_RC=1
   if [[ "${HR_RC}" -eq 0 ]]; then
     rm -f "${HEALTH_RESTART_FILE}"
-    log "health drift resolved — service(s) [${UNHEALTHY_SVCS}] healthy again after targeted restart"
+    log "health drift resolved — service(s) [${UNHEALTHY_SVCS}] healthy again after targeted restart, and every unit that requires them is up"
     write_stack_health_metric healthy
     exit 0
   fi
+  log "health drift: did not come up, in start order: [${RT_FAILED_SERVICES:-none reported}]"
 
   HR_COUNT=1
   if [[ -f "${HEALTH_RESTART_FILE}" ]]; then
@@ -962,7 +1173,28 @@ if [[ "${HEALTH_DRIFT}" == "true" ]]; then
   exit 1
 fi
 
-if [[ -f "${FAILED_FILE}" ]]; then
+if [[ "${REAPPLY}" == "true" ]]; then
+  if [[ -f "${REAPPLY_FAILED_FILE}" ]]; then
+    read -r REC_MARKER REC_COUNT REC_EPOCH _ < "${REAPPLY_FAILED_FILE}" || true
+    if [[ "${REC_MARKER:-}" != "${EXPECTED_MARKER}" ]] \
+       || ! [[ "${REC_COUNT:-}" =~ ^[0-9]+$ ]] \
+       || ! [[ "${REC_EPOCH:-}" =~ ^[0-9]+$ ]]; then
+      rm -f "${REAPPLY_FAILED_FILE}"
+    elif [[ "${FORCE}" == "true" ]]; then
+      log "re-apply of the deployed release previously failed ${REC_COUNT}x; --force given — retrying now"
+    elif [[ "${REAPPLY_REQUESTED}" == "true" ]]; then
+      log "re-apply of the deployed release previously failed ${REC_COUNT}x; --reapply asked for it — retrying now"
+    else
+      backoff="$(backoff_seconds "${HEALTH_RESTART_BASE}" "${HEALTH_RESTART_MAX}" "${REC_COUNT}")"
+      elapsed=$(( $(date +%s) - 10#${REC_EPOCH} ))
+      if (( elapsed < backoff )); then
+        log "re-apply of the deployed release failed ${REC_COUNT}x; in backoff window (${elapsed}s/${backoff}s) — skipping this tick (deploy.sh --reapply or --force retries now)"
+        exit 0
+      fi
+      log "re-apply of the deployed release failed ${REC_COUNT}x; backoff of ${backoff}s elapsed — retrying"
+    fi
+  fi
+elif [[ -f "${FAILED_FILE}" ]]; then
   read -r REC_MARKER REC_COUNT REC_EPOCH _ < "${FAILED_FILE}" || true
   if [[ "${REC_MARKER:-}" != "${EXPECTED_MARKER}" ]] \
      || ! [[ "${REC_COUNT:-}" =~ ^[0-9]+$ ]] \
@@ -971,14 +1203,7 @@ if [[ -f "${FAILED_FILE}" ]]; then
   elif [[ "${FORCE}" == "true" ]]; then
     log "target previously failed ${REC_COUNT}x; --force given — retrying now"
   else
-    if (( 10#${REC_COUNT} > 20 )); then
-      backoff="${BACKOFF_MAX}"
-    else
-      backoff=$(( BACKOFF_BASE * (2 ** (10#${REC_COUNT} - 1)) ))
-      if (( backoff > BACKOFF_MAX )); then
-        backoff="${BACKOFF_MAX}"
-      fi
-    fi
+    backoff="$(backoff_seconds "${BACKOFF_BASE}" "${BACKOFF_MAX}" "${REC_COUNT}")"
     elapsed=$(( $(date +%s) - 10#${REC_EPOCH} ))
     if (( elapsed < backoff )); then
       log "target failed ${REC_COUNT}x; in backoff window (${elapsed}s/${backoff}s) — skipping this tick (promote a fixed image or pass --force)"
@@ -1000,8 +1225,22 @@ export RT_PIN_FILE_PREVIOUS="${PIN_FILE_PREVIOUS}"
 trap on_pre_gate_exit EXIT
 PRE_GATE_GUARD=true
 
+if [[ "${KEYCLOAK_SPI_CHANGED}" == "true" ]]; then
+  if [[ "${REAPPLY_REQUESTED}" == "true" ]]; then
+    log "--reapply: re-staging the deployed provider JAR ${KEYCLOAK_SPI_IMAGE}@${KEYCLOAK_SPI_DIGEST} (swapped in only if the live one differs)"
+  else
+    log "keycloak-spi changed → staging ${KEYCLOAK_SPI_IMAGE}@${KEYCLOAK_SPI_DIGEST} (applied with this release, one restart)"
+  fi
+  DEPLOY_STEP="extract the keycloak-spi provider JAR"
+  stage_keycloak_spi_jar "${KEYCLOAK_SPI_IMAGE}@${KEYCLOAK_SPI_DIGEST}"
+fi
+
 if [[ "${CONFIG_CHANGED}" == "true" ]]; then
-  log "config changed → staging ${CONFIG_IMAGE}@${CONFIG_DIGEST}"
+  if [[ "${REAPPLY_REQUESTED}" == "true" ]]; then
+    log "--reapply: re-delivering the deployed config bundle ${CONFIG_IMAGE}@${CONFIG_DIGEST}"
+  else
+    log "config changed → staging ${CONFIG_IMAGE}@${CONFIG_DIGEST}"
+  fi
   DEPLOY_STEP="extract the config bundle"
   extract_config_bundle "${CONFIG_IMAGE}@${CONFIG_DIGEST}" "${CONFIG_STAGE_DIR}"
   DEPLOY_STEP="check the staged config bundle"
@@ -1021,6 +1260,7 @@ if [[ "${CONFIG_CHANGED}" == "true" ]]; then
       if [[ -f "${CONFIG_BLOCKED_FILE}" ]] && grep -qFx "${EXPECTED_MARKER}" "${CONFIG_BLOCKED_FILE}"; then
         log "stateful-infra upgrade still operator-gated for this target; skipping tick (run the manual upgrade then --force)"
         PRE_GATE_GUARD=false
+        rm -f "${KEYCLOAK_SPI_STAGE_JAR}"
         exit 0
       fi
       echo "${EXPECTED_MARKER}" > "${CONFIG_BLOCKED_FILE}"
@@ -1030,23 +1270,28 @@ if [[ "${CONFIG_CHANGED}" == "true" ]]; then
       log "  perform the documented manual upgrade (docs/deployment.md → Stateful-infra upgrades), then: deploy.sh --force"
       write_deploy_metric blocked
       PRE_GATE_GUARD=false
+      rm -f "${KEYCLOAK_SPI_STAGE_JAR}"
       exit 3
     fi
     log "stateful-infra upgrade forced (--force) — applying the gated change"
-  else
+  elif [[ "${REAPPLY}" != "true" ]]; then
     rm -f "${CONFIG_BLOCKED_FILE}"
   fi
 
   assert_config_tree_writable "${CONFIG_STAGE_DIR}"
 
-  if [[ -f "${CONFIG_APPLY_INCOMPLETE_FILE}" && -d "${CONFIG_PREVIOUS_DIR}" ]]; then
+  if [[ "${REAPPLY}" == "true" ]]; then
+    log "re-applying the deployed release's config — ${CONFIG_PREVIOUS_DIR} keeps the previous release as the rollback anchor"
+  elif [[ -f "${CONFIG_APPLY_INCOMPLETE_FILE}" && -d "${CONFIG_PREVIOUS_DIR}" ]]; then
     log "an earlier config apply did not complete and was not undone — keeping ${CONFIG_PREVIOUS_DIR} as the rollback anchor instead of snapshotting a half-applied tree"
   else
     DEPLOY_STEP="snapshot the live config tree into ${CONFIG_PREVIOUS_DIR}"
     snapshot_config_tree "${CONFIG_PREVIOUS_DIR}"
   fi
   DEPLOY_STEP="apply the config tree"
-  echo "${EXPECTED_MARKER}" > "${CONFIG_APPLY_INCOMPLETE_FILE}"
+  if [[ "${REAPPLY}" != "true" ]]; then
+    echo "${EXPECTED_MARKER}" > "${CONFIG_APPLY_INCOMPLETE_FILE}"
+  fi
   CONFIG_TREE_TOUCHED=true
   apply_config_tree "${CONFIG_STAGE_DIR}" "${COMPOSE_DIR}"
   DEPLOY_STEP="check ${COMPOSE_DIR}/.env after the swap"
@@ -1057,11 +1302,26 @@ if [[ "${CONFIG_CHANGED}" == "true" ]]; then
   log "config applied"
 fi
 
+UNITS_REDEFINED="${RT_CHANGED_SERVICES}"
+APP_IMAGES_CHANGED=""
+for img_pair in "backend=${BACKEND_IMAGE}@${BACKEND_DIGEST}" \
+                "frontend=${FRONTEND_IMAGE}@${FRONTEND_DIGEST}" \
+                "ingest=${INGEST_IMAGE}@${INGEST_DIGEST}"; do
+  img_bound="$(sed -n 's/^Image=//p' "$(rt_pin_path "${img_pair%%=*}")" 2>/dev/null || true)"
+  if [[ "${img_bound}" != "${img_pair#*=}" ]]; then
+    APP_IMAGES_CHANGED="${APP_IMAGES_CHANGED}${APP_IMAGES_CHANGED:+ }${img_pair%%=*}"
+  fi
+done
+unset img_pair img_bound
 DEPLOY_STEP="write the digest pin"
 PIN_HAD_PREVIOUS=false
 [[ -f "${PIN_FILE_CURRENT}" ]] && PIN_HAD_PREVIOUS=true
 PIN_TOUCHED=true
-rt_pin_save
+if [[ "${REAPPLY}" == "true" ]]; then
+  log "re-applying the deployed release's digest pin — ${PIN_FILE_PREVIOUS} keeps the previous release as the rollback anchor"
+else
+  rt_pin_save
+fi
 rt_pin_apply \
   "backend=${BACKEND_IMAGE}@${BACKEND_DIGEST}" \
   "frontend=${FRONTEND_IMAGE}@${FRONTEND_DIGEST}" \
@@ -1077,60 +1337,52 @@ RT_PIN_FILE="${PIN_FILE_CURRENT}" rt_pull \
   "frontend=${FRONTEND_IMAGE}@${FRONTEND_DIGEST}" \
   "ingest=${INGEST_IMAGE}@${INGEST_DIGEST}"
 
+if [[ "${KEYCLOAK_SPI_CHANGED}" == "true" && "${REAPPLY}" == "true" && -f "${KEYCLOAK_SPI_JAR}" ]] \
+   && [[ "$(sha256sum < "${KEYCLOAK_SPI_STAGE_JAR}")" == "$(sha256sum < "${KEYCLOAK_SPI_JAR}")" ]]; then
+  rm -f "${KEYCLOAK_SPI_STAGE_JAR}"
+  KEYCLOAK_SPI_CHANGED=false
+  log "--reapply: the live provider JAR is the deployed release's — not swapped, keycloak is not restarted for it"
+fi
+if [[ "${KEYCLOAK_SPI_CHANGED}" == "true" ]]; then
+  DEPLOY_STEP="swap in the keycloak-spi provider JAR"
+  swap_in_keycloak_spi_jar
+  if [[ "${REAPPLY}" == "true" ]]; then
+    log "--reapply: the live provider JAR differed from the deployed release's — put back, keycloak restarts on it (${KEYCLOAK_SPI_PREVIOUS_JAR} is left alone)"
+  else
+    log "provider JAR swapped in — keycloak restarts on it with this release"
+  fi
+fi
+
+log "release parts: $(release_parts)"
+if [[ -n "${RT_CHANGED_SERVICES}" ]]; then
+  log "one restart window: stopping [${RT_CHANGED_SERVICES}] and what requires them, then starting the stack in order"
+fi
+
 PRE_GATE_GUARD=false
 log "applying (timeout ${HEALTH_TIMEOUT}s)"
 if rt_apply_stack; then
-
   if [[ "${KEYCLOAK_SPI_CHANGED}" == "true" ]]; then
-    log "keycloak-spi changed → staging provider JAR + recreating keycloak (backend, ingest and frontend restart with it: Requires=)"
-    if [[ -f "${KEYCLOAK_SPI_JAR}" ]]; then
-      cp -a "${KEYCLOAK_SPI_JAR}" "${KEYCLOAK_SPI_PREVIOUS_JAR}"
-      KEYCLOAK_SPI_HAD_PREVIOUS=true
-    else
-      rm -f "${KEYCLOAK_SPI_PREVIOUS_JAR}"
-      KEYCLOAK_SPI_HAD_PREVIOUS=false
-    fi
-    extract_keycloak_spi_jar "${KEYCLOAK_SPI_IMAGE}@${KEYCLOAK_SPI_DIGEST}" "${KEYCLOAK_SPI_JAR}"
-
-    KEYCLOAK_SPI_FAILURE=""
-    if ! rt_recreate keycloak; then
-      KEYCLOAK_SPI_FAILURE="keycloak did not become healthy with the new provider JAR"
-    else
-      log "keycloak healthy on the new provider JAR — waiting for the application services systemd restarted with it"
-      if ! rt_await_stack; then
-        KEYCLOAK_SPI_FAILURE="keycloak is healthy with the new provider JAR, but the application stack it restarted did not return to health"
-      fi
-    fi
-
-    if [[ -n "${KEYCLOAK_SPI_FAILURE}" ]]; then
-      log "${KEYCLOAK_SPI_FAILURE} — rolling back the JAR"
-      if [[ "${KEYCLOAK_SPI_HAD_PREVIOUS}" == "true" ]]; then
-        install -D -m 0644 "${KEYCLOAK_SPI_PREVIOUS_JAR}" "${KEYCLOAK_SPI_JAR}"
-      else
-        rm -f "${KEYCLOAK_SPI_JAR}"
-      fi
-      KEYCLOAK_SPI_ROLLBACK_OK=true
-      rt_recreate keycloak || KEYCLOAK_SPI_ROLLBACK_OK=false
-      rt_await_stack || KEYCLOAK_SPI_ROLLBACK_OK=false
-      if [[ "${KEYCLOAK_SPI_ROLLBACK_OK}" == "true" ]]; then
-        log "keycloak and the application stack are healthy again on the previous provider JAR"
-      else
-        log "WARNING: the application stack did not return to health on the previous provider JAR — manual check needed"
-      fi
-
-      record_target_failure
-      log "recorded keycloak-spi health-check failure #${FAIL_COUNT} for this target"
-      write_deploy_metric failure
-      exit 1
-    fi
-    log "keycloak-spi provider JAR applied — keycloak and the application stack are healthy"
+    log "keycloak-spi provider JAR applied with the release — keycloak and the application stack are healthy on it"
   fi
 
   echo "${EXPECTED_MARKER}" > "${LAST_DEPLOYED_FILE}"
-  rm -f "${FAILED_FILE}" "${CONFIG_BLOCKED_FILE}" "${HEALTH_RESTART_FILE}"
-  log "deploy successful"
-  write_deploy_metric success
-  write_stack_health_metric healthy
+  if [[ "${REAPPLY}" == "true" ]]; then
+    rm -f "${REAPPLY_FAILED_FILE}"
+    if [[ -f "${FAILED_FILE}" ]] && grep -qF "${EXPECTED_MARKER} " "${FAILED_FILE}"; then
+      rm -f "${FAILED_FILE}"
+    fi
+    log "deploy successful — the deployed release is re-applied (the promotion-outcome metrics are left as they were)"
+  else
+    rm -f "${FAILED_FILE}" "${CONFIG_BLOCKED_FILE}" "${REAPPLY_FAILED_FILE}"
+    log "deploy successful"
+    write_deploy_metric success
+  fi
+  if [[ -z "${HEALTH_LEFT_OVER}" ]]; then
+    rm -f "${HEALTH_RESTART_FILE}"
+    write_stack_health_metric healthy
+  else
+    log "stack-health heartbeat NOT stamped: [${HEALTH_LEFT_OVER}] was unhealthy before this re-apply and was not recreated by it"
+  fi
 
   if [[ "${IRI_MONITORING_ENABLED:-false}" == "true" ]] && rt_monitoring_configured; then
     log "applying monitoring stack (non-gating)"
@@ -1151,7 +1403,16 @@ if rt_apply_stack; then
   exit 0
 fi
 
+if [[ "${REAPPLY}" == "true" ]]; then
+  log "health check failed within ${HEALTH_TIMEOUT}s on a re-apply of the deployed release — not rolling back"
+  log "health gate: did not come up, in start order: [${RT_FAILED_SERVICES:-none reported}]"
+  record_reapply_failure "the running release could not be restored"
+  exit 1
+fi
+
 log "health check failed within ${HEALTH_TIMEOUT}s — rolling back"
+explain_gate_failure
+FORWARD_FAILED_SERVICES="${RT_FAILED_SERVICES}"
 
 record_target_failure
 log "recorded health-check failure #${FAIL_COUNT} for this target; next retry backs off"
@@ -1167,6 +1428,19 @@ if [[ "${CONFIG_CHANGED}" == "true" ]]; then
   fi
 fi
 
+ROLLBACK_PARTS="app digests"
+if [[ "${CONFIG_CHANGED}" == "true" ]]; then
+  ROLLBACK_PARTS="${ROLLBACK_PARTS} + config tree and units"
+fi
+if [[ "${KEYCLOAK_SPI_TOUCHED}" == "true" ]]; then
+  if restore_previous_keycloak_spi_jar; then
+    ROLLBACK_PARTS="${ROLLBACK_PARTS} + provider JAR"
+    log "provider JAR restored to the previous one"
+  else
+    log "WARNING: could not restore the previous provider JAR from ${KEYCLOAK_SPI_PREVIOUS_JAR} — keycloak comes back on the failed release's JAR"
+  fi
+fi
+
 if [[ ! -f "${PIN_FILE_PREVIOUS}" ]]; then
   log "no previous pin available — manual intervention required"
   write_deploy_metric failure
@@ -1176,9 +1450,9 @@ fi
 rt_pin_rollback
 
 if rt_apply_stack; then
-  log "rolled back to previous digest pin successfully"
+  log "rolled back to previous digest pin successfully — the previous ${ROLLBACK_PARTS} are live again and the stack is healthy"
 else
-  log "rollback ALSO failed — one or more target digests broken or environment problem"
+  log "rollback ALSO failed — did not come up: [${RT_FAILED_SERVICES:-none reported}] (the forward apply: [${FORWARD_FAILED_SERVICES:-none reported}]); one or more target digests broken or environment problem"
 fi
 
 write_deploy_metric rollback
