@@ -27,4 +27,4 @@ import org.jetbrains.annotations.Nullable;
  * @param rsiHandle the stored handle, or {@code null} when none is stored
  * @param version the user row's current optimistic-lock version
  */
-public record MyRsiHandleDto(@Nullable String rsiHandle, Long version) {}
+public record MyRsiHandleResponse(@Nullable String rsiHandle, Long version) {}

@@ -38,7 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.MyRsiHandleDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MyRsiHandleResponse;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import de.greluc.krt.profit.basetool.frontend.service.BackendServiceException;
 import java.util.List;
@@ -93,8 +93,8 @@ class ProfileRsiHandleMvcTest {
   @SuppressWarnings("unchecked")
   @Test
   void anAjaxSaveRelaysTheTrimmedHandleAndAnswersWithTheStoredOne() throws Exception {
-    when(backendApiClient.put(eq(BACKEND), any(), eq(MyRsiHandleDto.class)))
-        .thenReturn(new MyRsiHandleDto("New_Handle", 5L));
+    when(backendApiClient.put(eq(BACKEND), any(), eq(MyRsiHandleResponse.class)))
+        .thenReturn(new MyRsiHandleResponse("New_Handle", 5L));
 
     mockMvc
         .perform(
@@ -109,7 +109,7 @@ class ProfileRsiHandleMvcTest {
         .andExpect(jsonPath("$.version").value(5));
 
     ArgumentCaptor<Map<String, Object>> body = ArgumentCaptor.forClass(Map.class);
-    verify(backendApiClient).put(eq(BACKEND), body.capture(), eq(MyRsiHandleDto.class));
+    verify(backendApiClient).put(eq(BACKEND), body.capture(), eq(MyRsiHandleResponse.class));
     assertThat(body.getValue())
         .containsEntry("rsiHandle", "New_Handle")
         .containsEntry("version", 4L);
@@ -128,12 +128,12 @@ class ProfileRsiHandleMvcTest {
         .andExpect(status().isUnprocessableContent())
         .andExpect(jsonPath("$.code").value("VALIDATION"));
 
-    verify(backendApiClient, never()).put(anyString(), any(), eq(MyRsiHandleDto.class));
+    verify(backendApiClient, never()).put(anyString(), any(), eq(MyRsiHandleResponse.class));
   }
 
   @Test
   void aTakenHandleRelaysTheBackendConflictAndItsCode() throws Exception {
-    when(backendApiClient.put(eq(BACKEND), any(), eq(MyRsiHandleDto.class)))
+    when(backendApiClient.put(eq(BACKEND), any(), eq(MyRsiHandleResponse.class)))
         .thenThrow(
             new BackendServiceException(
                 "taken", null, 409, "DUPLICATE_ENTITY", null, List.of(), "Already taken."));

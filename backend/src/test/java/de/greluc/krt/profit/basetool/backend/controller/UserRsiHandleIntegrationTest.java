@@ -30,9 +30,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import de.greluc.krt.profit.basetool.backend.model.User;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import javax.sql.DataSource;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -66,11 +69,19 @@ class UserRsiHandleIntegrationTest {
 
   private MockMvc mockMvc;
   private JdbcTemplate jdbc;
+  private final List<UUID> created = new ArrayList<>();
 
   @BeforeEach
   void setUp() {
     mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     jdbc = new JdbcTemplate(dataSource);
+  }
+
+  /** Removes the accounts this test created; the test database is shared by every test class. */
+  @AfterEach
+  void removeCreatedAccounts() {
+    created.forEach(id -> jdbc.update("DELETE FROM app_user WHERE id = ?", id));
+    created.clear();
   }
 
   /**
@@ -82,7 +93,9 @@ class UserRsiHandleIntegrationTest {
     User user = new User();
     user.setId(UUID.randomUUID());
     user.setUsername("rsi-" + UUID.randomUUID());
-    return userRepository.saveAndFlush(user).getId();
+    UUID id = userRepository.saveAndFlush(user).getId();
+    created.add(id);
+    return id;
   }
 
   /**

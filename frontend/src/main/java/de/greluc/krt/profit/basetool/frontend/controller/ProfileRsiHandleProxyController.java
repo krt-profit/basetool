@@ -21,7 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.controller;
 
 import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorResponses.relay;
 
-import de.greluc.krt.profit.basetool.frontend.model.dto.MyRsiHandleDto;
+import de.greluc.krt.profit.basetool.frontend.model.dto.MyRsiHandleResponse;
 import de.greluc.krt.profit.basetool.frontend.model.form.ProfileRsiHandleForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
 import java.util.LinkedHashMap;
@@ -88,8 +88,9 @@ public class ProfileRsiHandleProxyController {
         log,
         "updating the RSI handle (ajax)",
         () -> {
-          MyRsiHandleDto saved =
-              backendApiClient.put("/api/v1/users/me/rsi-handle", payload, MyRsiHandleDto.class);
+          MyRsiHandleResponse saved =
+              backendApiClient.put(
+                  "/api/v1/users/me/rsi-handle", payload, MyRsiHandleResponse.class);
           return ResponseEntity.ok(saved);
         });
   }
