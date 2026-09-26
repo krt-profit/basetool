@@ -1,6 +1,6 @@
 # ADR-0152 — The audit row records which client a mutation came through
 
-- **Status:** Accepted — client attribution on the ingest relay hop is proposed to be amended by [ADR-0217](0217-third-party-clients-are-public-device-grant-clients-in-a-db-registry.md) (epic #2078)
+- **Status:** Accepted — client attribution on the ingest relay hop is amended by [ADR-0217](0217-third-party-clients-are-public-device-grant-clients-in-a-db-registry.md) (epic #2078)
 - **Date:** 2026-09-02
 - **Deciders:** @greluc
 - **Requirement:** [REQ-AUDIT-005](../specs/audit.md)

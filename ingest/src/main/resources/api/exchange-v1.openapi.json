@@ -1,0 +1,912 @@
+{
+  "openapi": "3.1.0",
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "info": {
+    "title": "Profit Basetool exchange API",
+    "version": "1.0",
+    "summary": "Capability-scoped sync of a member's own data for approved external clients.",
+    "description": "Approved clients only (docs/legal/approved-clients.md). Every member route requires a DPoP-bound access token of the member (RFC 9449) from the client's own public Keycloak client via the device grant (RFC 8628). Within v1 the contract only grows additively; readers must be tolerant (REQ-XCH-026).",
+    "license": {
+      "name": "GPL-3.0-only",
+      "identifier": "GPL-3.0-only"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://ingest.profit-base.online",
+      "description": "production"
+    },
+    {
+      "url": "https://localhost:11262",
+      "description": "local sandbox"
+    }
+  ],
+  "paths": {
+    "/exchange/v1": {
+      "get": {
+        "operationId": "service_document",
+        "summary": "What this token may do and what the server expects.",
+        "tags": [
+          "service"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.connect"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/service-document.schema.json"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          }
+        ]
+      }
+    },
+    "/exchange/v1/openapi.json": {
+      "get": {
+        "operationId": "contract_openapi",
+        "summary": "This document.",
+        "tags": [
+          "contract"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/exchange/v1/schemas/{name}.schema.json": {
+      "get": {
+        "operationId": "contract_schema",
+        "summary": "One published JSON Schema, served at its $id.",
+        "tags": [
+          "contract"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/schema+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z-]+$"
+            }
+          }
+        ]
+      }
+    },
+    "/exchange/v1/me/installation": {
+      "post": {
+        "operationId": "installation_label",
+        "summary": "Label this installation.",
+        "tags": [
+          "installation"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.connect"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/installation.schema.json"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "description": "An installation is identified by the thumbprint of the DPoP key; the label is shown after the registered client name.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/installation.schema.json"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/exchange/v1/me/account-check": {
+      "post": {
+        "operationId": "account_check",
+        "summary": "Does this RSI handle belong to the signed-in member?",
+        "tags": [
+          "account"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.connect"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/account-check-response.schema.json"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/account-check-request.schema.json"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/exchange/v1/catalog/resolve": {
+      "post": {
+        "operationId": "catalog_resolve",
+        "summary": "Resolve item references to Basetool keys.",
+        "tags": [
+          "catalog"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.blueprints.read",
+              "exchange.blueprints.write",
+              "exchange.stock.read",
+              "exchange.stock.write",
+              "exchange.hangar.read",
+              "exchange.hangar.write",
+              "exchange.demand.read"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/resolve-response.schema.json"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "description": "Any one exchange capability suffices.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/resolve-request.schema.json"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/exchange/v1/catalog/locations": {
+      "get": {
+        "operationId": "catalog_locations",
+        "summary": "The Lager's non-hidden locations.",
+        "tags": [
+          "catalog"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.blueprints.read",
+              "exchange.blueprints.write",
+              "exchange.stock.read",
+              "exchange.stock.write",
+              "exchange.hangar.read",
+              "exchange.hangar.write",
+              "exchange.demand.read"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/location-list.schema.json"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "description": "Any one exchange capability suffices.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          }
+        ]
+      }
+    },
+    "/exchange/v1/me/blueprints": {
+      "get": {
+        "operationId": "blueprints_read",
+        "summary": "The member's blueprints: snapshot or changes since a cursor.",
+        "tags": [
+          "blueprints"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.blueprints.read"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/page.schema.json#/$defs/blueprintPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "Opaque feed position from a previous page. Without it the response is a snapshot. A cursor older than the tombstones answers 410 CURSOR_EXPIRED.",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 500
+            }
+          }
+        ]
+      }
+    },
+    "/exchange/v1/me/blueprints/changes": {
+      "post": {
+        "operationId": "blueprints_write",
+        "summary": "Add or remove blueprints.",
+        "tags": [
+          "blueprints"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.blueprints.write"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/change-result.schema.json"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/change-set.schema.json#/$defs/blueprintChangeSet"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/exchange/v1/me/stock": {
+      "get": {
+        "operationId": "stock_read",
+        "summary": "The member's personal stock lots: snapshot or changes since a cursor.",
+        "tags": [
+          "stock"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.stock.read"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/page.schema.json#/$defs/stockPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "Opaque feed position from a previous page. Without it the response is a snapshot. A cursor older than the tombstones answers 410 CURSOR_EXPIRED.",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 500
+            }
+          }
+        ]
+      }
+    },
+    "/exchange/v1/me/stock/changes": {
+      "post": {
+        "operationId": "stock_write",
+        "summary": "Set lot quantities, booked in or out like the web.",
+        "tags": [
+          "stock"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.stock.write"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/change-result.schema.json"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/change-set.schema.json#/$defs/stockChangeSet"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/exchange/v1/me/ships": {
+      "get": {
+        "operationId": "ships_read",
+        "summary": "The member's own ships: snapshot or changes since a cursor.",
+        "tags": [
+          "ships"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.hangar.read"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/page.schema.json#/$defs/shipPage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "Opaque feed position from a previous page. Without it the response is a snapshot. A cursor older than the tombstones answers 410 CURSOR_EXPIRED.",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 500
+            }
+          }
+        ]
+      }
+    },
+    "/exchange/v1/me/ships/changes": {
+      "post": {
+        "operationId": "ships_write",
+        "summary": "Link, upsert or remove ships; link before the first create.",
+        "tags": [
+          "ships"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.hangar.write"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/change-result.schema.json"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/change-set.schema.json#/$defs/shipChangeSet"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/exchange/v1/me/org-demand": {
+      "get": {
+        "operationId": "demand_read",
+        "summary": "Anonymised open demand of the member's own units.",
+        "tags": [
+          "demand"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.demand.read"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/org-demand.schema.json"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          }
+        ]
+      }
+    },
+    "/exchange/v1/me/drafts/blueprints": {
+      "post": {
+        "operationId": "drafts_blueprints",
+        "summary": "Stage blueprints for review in the browser.",
+        "tags": [
+          "drafts"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.drafts.blueprints"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/draft-result.schema.json"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/blueprint-draft.schema.json"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/exchange/v1/me/drafts/refinery-orders": {
+      "post": {
+        "operationId": "drafts_refinery",
+        "summary": "Stage refinery work orders for review in the browser.",
+        "tags": [
+          "drafts"
+        ],
+        "security": [
+          {
+            "memberToken": [
+              "exchange.drafts.refinery"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/draft-result.schema.json"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "An RFC 9457 problem with a `code` from the error registry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/problem.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/DPoP"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "https://ingest.profit-base.online/exchange/v1/schemas/refinery-draft.schema.json"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "memberToken": {
+        "type": "openIdConnect",
+        "openIdConnectUrl": "https://profit-base.online/auth/realms/iri/.well-known/openid-configuration",
+        "description": "The member's access token from the client's own public Keycloak client, device grant, sent as `Authorization: DPoP <token>` with a `DPoP` proof. Scopes are the capabilities; `exchange.connect` is the base scope."
+      }
+    },
+    "parameters": {
+      "DPoP": {
+        "name": "DPoP",
+        "in": "header",
+        "required": true,
+        "description": "The DPoP proof JWT for this request (RFC 9449). Required on every member route.",
+        "schema": {
+          "type": "string",
+          "maxLength": 4096
+        }
+      },
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "description": "A fresh key per logical write, kept 24 h per client and member. A replay returns the first result.",
+        "schema": {
+          "type": "string",
+          "minLength": 16,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        }
+      }
+    }
+  }
+}

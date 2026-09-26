@@ -1,6 +1,6 @@
 # ADR-0135 — The mobile API is exposed through a dedicated public vhost, not through a gateway
 
-- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since v1.7.7 (2026-09-09) at the latest; the vhost was rolled out 2026-08-21 → 2026-09-09 ([`API_VHOST_ROLLOUT_RUNBOOK.md`](../archive/API_VHOST_ROLLOUT_RUNBOOK.md)) and its allow-list now lives in `docker/edge/include/api-allowlist.conf` (ADR-0162). Narrowed (proposed) by [ADR-0216](0216-the-exchange-api-is-a-separate-contract-on-the-ingest-gateway.md): the exchange and connected-apps paths never join the allowlist (epic #2078).
+- **Status:** Accepted — implemented. *Status corrected 2026-09-22:* it read "Proposed", but the change it decides has been on `main` since v1.7.7 (2026-09-09) at the latest; the vhost was rolled out 2026-08-21 → 2026-09-09 ([`API_VHOST_ROLLOUT_RUNBOOK.md`](../archive/API_VHOST_ROLLOUT_RUNBOOK.md)) and its allow-list now lives in `docker/edge/include/api-allowlist.conf` (ADR-0162). Narrowed by [ADR-0216](0216-the-exchange-api-is-a-separate-contract-on-the-ingest-gateway.md): the exchange and connected-apps paths never join the allowlist (epic #2078).
 - **Date:** 2026-08-18
 - **Related:** [ADR-0129](0129-ingest-gateway-is-a-trusted-subsystem-not-a-token-relay.md) (the
   rejected alternative's own reasoning) · [ADR-0131](0131-mobile-auth-refresh-only-dpop-binding.md) ·

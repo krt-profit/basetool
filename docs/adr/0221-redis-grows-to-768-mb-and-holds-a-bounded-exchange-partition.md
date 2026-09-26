@@ -1,7 +1,7 @@
 # ADR-0221 — Redis grows to 768 MB and holds a bounded exchange partition
 
-- **Status:** Proposed — epic [#2078](https://github.com/krt-profit/basetool/issues/2078); nothing
-  built yet. Amends [ADR-0085](0085-scale-user-sync-and-stack-capacity-for-5000-accounts.md) (the
+- **Status:** Accepted — owner gate G0 of epic [#2078](https://github.com/krt-profit/basetool/issues/2078),
+  taken with the merge of #2111 and #2112 (2026-09-26); implementation pending. Amends [ADR-0085](0085-scale-user-sync-and-stack-capacity-for-5000-accounts.md) (the
   Redis ceiling) and [ADR-0207](0207-each-service-reaches-redis-as-its-own-acl-user.md) (two new key
   families in the ACL).
 - **Date:** 2026-09-26
