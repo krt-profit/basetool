@@ -765,14 +765,6 @@ public class InventoryItemController {
   }
 
   /**
-   * Rebooks a list of the caller's own inventory rows in one transaction (Massen-Umbuchen,
-   * REQ-INV-036) — to another location/owner or across the personal marker. Every row moves in
-   * full. Owner-scoped from the JWT like {@link #bulkCheckout}: the caller can only ever move their
-   * own stock, so no logistician escalation applies.
-   *
-   * @return how many rows were moved and how many were skipped as already-at-target
-   */
-  /**
    * Changes the owning org unit of one of the caller's own personal rows (REQ-INV-052): to one of
    * the caller's direct memberships, or to no unit. The row then merges into an existing stack of
    * the new unit where the merge rules allow; the version is checked optimistically.
@@ -837,6 +829,14 @@ public class InventoryItemController {
         request, userService.getUserIdFromJwt(jwt));
   }
 
+  /**
+   * Rebooks a list of the caller's own inventory rows in one transaction (Massen-Umbuchen,
+   * REQ-INV-036) — to another location/owner or across the personal marker. Every row moves in
+   * full. Owner-scoped from the JWT like {@link #bulkCheckout}: the caller can only ever move their
+   * own stock, so no logistician escalation applies.
+   *
+   * @return how many rows were moved and how many were skipped as already-at-target
+   */
   @Operation(
       summary = "Bulk rebook",
       description =
