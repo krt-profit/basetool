@@ -326,7 +326,23 @@ public class AdminAuditLogPageController {
                   "HANGAR_FITTED_RESET",
                   "HANGAR_HOME_LOCATION_SET",
                   "HANGAR_AUDIT_EXPORTED",
-                  "HANGAR_AUDIT_PURGED")));
+                  "HANGAR_AUDIT_PURGED")),
+          Map.entry(
+              "BLUEPRINT",
+              List.of(
+                  "BLUEPRINT_ADDED",
+                  "BLUEPRINT_BATCH_ADDED",
+                  "BLUEPRINT_UPDATED",
+                  "BLUEPRINT_REMOVED",
+                  "BLUEPRINT_ALL_REMOVED",
+                  "BLUEPRINT_IMPORTED",
+                  "BLUEPRINT_SHARING_CHANGED",
+                  "BLUEPRINT_PURGED_ALL_USERS",
+                  "BLUEPRINT_DEFAULT_ADDED",
+                  "BLUEPRINT_DEFAULT_REMOVED",
+                  "BLUEPRINT_DEFAULTS_GRANTED",
+                  "BLUEPRINT_AUDIT_EXPORTED",
+                  "BLUEPRINT_AUDIT_PURGED")));
 
   /**
    * Response type for one page of the bank audit trail ({@code /api/v1/bank/admin/audit}), read for
