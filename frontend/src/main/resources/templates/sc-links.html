@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="de">
+<head th:replace="~{fragments/head :: head(titleContent=~{::title}, additionalLinks=~{::extraLinks})}">
+    <title th:text="#{scLinks.title} + ' - ' + ${appTitle}">Star-Citizen-Links - Profit Basetool</title>
+    <th:block th:fragment="extraLinks">
+<link rel="stylesheet" th:href="@{/css/pages/sc-links.css}">
+    </th:block>
+</head>
+<body>
+<th:block th:replace="~{fragments/sidebar :: sidebar}" />
+
+<header>
+    <nav>
+        <button id="hamburger" class="hamburger-btn" type="button" th:aria-label="#{a11y.nav.menu}">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <a th:href="@{/}" class="brand">
+            <img th:src="@{/logos/basetool-logo.svg}" alt="" height="50">
+            <span class="logo-text" th:text="${appTitle}">Profit Basetool</span>
+        </a>
+    </nav>
+</header>
+<main>
+    <div class="hud-box mt-2">
+        <h1 th:text="#{scLinks.title}">Star-Citizen-Links</h1>
+        <p th:text="#{scLinks.intro}">Hilfreiche Websites rund um Star Citizen.</p>
+
+        <section class="sc-links-section" th:each="category : ${scLinkCategories}"
+                 th:attr="data-testid='sc-links-' + ${category.key}">
+            <h2 class="section-title" th:text="#{${'scLinks.category.' + category.key}}">Organisation</h2>
+            <ul class="sc-links-grid">
+                <li th:each="link : ${category.links()}">
+                    <a class="card sc-link-card" th:href="${link.url}"
+                       target="_blank" rel="noopener noreferrer"
+                       th:attr="data-testid='sc-link-' + ${link.key}">
+                        <img class="sc-link-logo" th:src="@{'/images/sc-links/' + ${link.icon}}"
+                             alt="" width="48" height="48" loading="lazy" decoding="async">
+                        <span class="sc-link-text">
+                            <span class="sc-link-name" th:text="#{${'scLinks.link.' + link.key + '.name'}}">DAS KARTELL</span>
+                            <span class="sc-link-host" th:text="${link.displayHost()}">das-kartell.org</span>
+                            <span class="sc-link-description" th:text="#{${'scLinks.link.' + link.key + '.description'}}">Beschreibung</span>
+                        </span>
+                        <span class="visually-hidden" th:text="#{scLinks.newTab}">(&ouml;ffnet in neuem Tab)</span>
+                    </a>
+                </li>
+            </ul>
+        </section>
+
+        <p class="sc-links-disclaimer" th:text="#{scLinks.disclaimer}">Externe Angebote Dritter.</p>
+    </div>
+</main>
+</body>
+</html>

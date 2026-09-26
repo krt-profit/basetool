@@ -93,6 +93,12 @@
                         <a th:href="@{/org-unit-bank}" sec:authorize="hasAnyRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).ADMIN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).OFFICER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).LOGISTICIAN,T(de.greluc.krt.profit.basetool.frontend.support.Roles).MISSION_MANAGER,T(de.greluc.krt.profit.basetool.frontend.support.Roles).KRT_MEMBER)" data-testid="nav-org-unit-bank" th:text="#{nav.bank.myOrgUnit}">Org-Einheits-Bank</a>
                     </div>
                 </details>
+                <details class="sidebar-group" data-group-key="resources">
+                    <summary th:text="#{nav.section.resources}">Ressourcen</summary>
+                    <div class="sidebar-sublinks">
+                        <a th:href="@{/sc-links}" data-testid="nav-sc-links" th:text="#{nav.scLinks}">Star-Citizen-Links</a>
+                    </div>
+                </details>
                 <details class="sidebar-group" data-group-key="bank" sec:authorize="hasRole(T(de.greluc.krt.profit.basetool.frontend.support.Roles).BANK_EMPLOYEE)">
                     <summary th:text="#{nav.section.bank}">Bank</summary>
                     <div class="sidebar-sublinks">

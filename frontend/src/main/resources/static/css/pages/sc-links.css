@@ -1,0 +1,72 @@
+@layer base, components, page, migration, utilities;
+
+@layer page {
+    .sc-links-section {
+        margin-top: var(--space-6);
+    }
+    .sc-links-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+        gap: var(--space-4);
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+    .sc-links-grid > li {
+        display: flex;
+    }
+    .sc-link-card {
+        display: flex;
+        flex: 1;
+        align-items: flex-start;
+        gap: var(--space-4);
+        color: var(--color-gray-1);
+        text-decoration: none;
+        transition:
+            border-color 0.15s ease,
+            background-color 0.15s ease;
+    }
+    .sc-link-card:hover,
+    .sc-link-card:focus-visible {
+        border-color: var(--color-primary);
+        background-color: rgb(231 126 35 / 6%);
+    }
+    .sc-link-logo {
+        flex: none;
+        width: 48px;
+        height: 48px;
+        object-fit: contain;
+    }
+    .sc-link-text {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-1);
+        min-width: 0;
+    }
+    .sc-link-name {
+        font-family: var(--font-headline);
+        font-weight: var(--fw-bold);
+        font-size: var(--fs-body);
+        color: var(--color-white);
+        text-transform: uppercase;
+        letter-spacing: var(--tracking-display);
+    }
+    .sc-link-card:hover .sc-link-name,
+    .sc-link-card:focus-visible .sc-link-name {
+        color: var(--color-primary);
+    }
+    .sc-link-host {
+        font-size: var(--fs-xs);
+        color: var(--color-gray-2-text);
+        overflow-wrap: anywhere;
+    }
+    .sc-link-description {
+        font-size: var(--fs-sm);
+        line-height: 1.45;
+    }
+    .sc-links-disclaimer {
+        margin-top: var(--space-8);
+        font-size: var(--fs-xs);
+        color: var(--color-gray-2-text);
+    }
+}
