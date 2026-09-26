@@ -232,6 +232,8 @@ if verb == "create":
         rep = {k: v for k, v in body.items()
                if k not in ("defaultClientScopes", "optionalClientScopes")}
         rep["id"] = uuid
+        if "backchannel.logout.session.required" in (rep.get("attributes") or {}):
+            rep["attributes"] = {**rep["attributes"], "backchannel.logout.session.required": "true"}
         if rep.get("publicClient") is False:
             rep["secret"] = os.environ.get("STUB_SECRET", "STUB-GENERATED-SECRET-must-never-be-printed")
         data["clients"].append(rep)

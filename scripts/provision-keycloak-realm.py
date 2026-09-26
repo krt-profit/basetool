@@ -919,8 +919,23 @@ class Planner:
         if spec.value_env and os.environ.get(spec.value_env):
             payload["secret"] = os.environ[spec.value_env]
         self.kc.write("create", "clients", payload, f"client '{spec.client_id}' created")
+        self._write_attributes_ignored_on_creation(spec)
         if spec.env_vars_to_fill and not (spec.value_env and os.environ.get(spec.value_env)):
             print(f"  NOTE: {self._confidential_client_note(spec)}")
+
+    def _write_attributes_ignored_on_creation(self, spec: ClientSpec) -> None:
+        """Update the attributes a create did not store; Keycloak 26 keeps its own
+        `backchannel.logout.session.required` on creation."""
+        created = self.find_client(spec.client_id)
+        if created is None:
+            return
+        stored = created.get("attributes") or {}
+        ignored = {k: v for k, v in spec.attributes.items() if not _equal(v, stored.get(k))}
+        if ignored:
+            self.kc.write("update", f"clients/{created['id']}",
+                          _redact({**created, "attributes": {**stored, **ignored}}),
+                          f"client '{spec.client_id}': {', '.join(sorted(ignored))} set after "
+                          f"creation")
 
     def _update_client(self, spec: ClientSpec, planned_live: dict) -> None:
         live = self.find_client(spec.client_id) or planned_live
