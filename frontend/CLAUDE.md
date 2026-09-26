@@ -211,6 +211,13 @@ debt rather than anything TS 7 introduced.
   repo — `{@code …}`, `{@link …}`, `@param name {shape}` — are parsed as type syntax and are hard
   errors. Convert them when you opt a file in.
 
+## Backend calls: resilience & context propagation
+
+- **WebClient** is centrally configured (base URL, default headers, connect/read/write timeouts).
+- **Resilience4j** wraps every backend call (Timeout, Retry, CircuitBreaker, Bulkhead). State transitions are logged via `ResilienceEventLogger` so `SERVICE_UNAVAILABLE` / `BACKEND_TIMEOUT` always have a matching log line.
+- **Reactor context propagation is mandatory for any new `ThreadLocal` you want to see inside `WebClient` exchange filters.** `WebClient.exchange()` runs on a Reactor-Netty worker thread, not the servlet thread; classic `ThreadLocal` values are not copied across threads. Register a `ThreadLocalAccessor` on `ContextRegistry.getInstance()` in [`ReactorContextPropagationConfig`](src/main/java/de/greluc/krt/profit/basetool/frontend/config/ReactorContextPropagationConfig.java) (which also enables `Hooks.enableAutomaticContextPropagation()` at startup). The existing accessors cover `ActiveSquadronContext` (active-OrgUnit pin → `X-Active-Org-Unit-Id` outbound header), `CorrelationContext` (correlation id propagation), Spring's `LocaleContextHolder` (user locale) and `ClientIpContext`. Forgetting the accessor means the holder is invisible on the worker thread and the outbound call silently drops whatever it carried.
+- Use `MockWebServer` / WireMock to test error paths.
+
 ## Concurrency — the frontend half
 
 - **Frontend DOM version sync** — when an entity is updated via AJAX (dropdown change, row reorder, etc.), the new `version` must propagate to **every** related DOM element in the same context (edit/action buttons, modals inside the same `<tr>` or container). A missed `data-version` attribute → 409 on the user's next click. A reload on success is **not** an escape hatch here: the Live update rule above forbids it, so a tangled update is re-rendered through a fragment swap instead.
