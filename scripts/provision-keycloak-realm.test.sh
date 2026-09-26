@@ -421,8 +421,8 @@ for cid in basetool-frontend backend-service basetool-ingest-gateway basetool-sc
   assert_eq "$(query "$state" "client('${cid}') is not None")" "True" "client ${cid} exists"
 done
 assert_eq "$(query "$state" "client('grafana') is None")" "True" "grafana is left alone without --grafana-origin"
-assert_eq "$(query "$state" "sorted(m['config']['included.custom.audience'] for s in d['scopes'] for m in d['scope_mappers'].get(s['id'], []))")" \
-  "['basetool-backend', 'basetool-ingest']" "both audience mappers exist"
+assert_eq "$(query "$state" "sorted(set(m['config']['included.custom.audience'] for s in d['scopes'] for m in d['scope_mappers'].get(s['id'], [])))")" \
+  "['basetool-backend', 'basetool-ingest']" "both audiences have their mappers"
 assert_eq "$(query "$state" "next(s for s in d['scopes'] if s['name']=='extractor-ingest-only')['attributes']['include.in.token.scope']")" \
   "true" "extractor-ingest-only puts its name in the scope claim"
 assert_eq "$(query "$state" "next(s for s in d['scopes'] if s['name']=='extractor-ingest')['attributes']['include.in.token.scope']")" \
@@ -700,6 +700,77 @@ output="$(run_provisioner "$state" --frontend-client public --apply)"
 assert_eq "$(cat "${state}/rc")" "0" "the rollback applies and verifies clean"
 assert_eq "$(query "$state" "client('basetool-frontend')['publicClient']")" "True" "the frontend is public again"
 assert_eq "$([[ -f "${state}/SECRET_SENT_BACK" ]] && echo sent || echo none)" "none" "no secret travels on the rollback"
+rm -rf "$state"
+
+echo "13. the exchange scopes, the third-party template and the extractor's exchange scopes (REQ-XCH-005)"
+state="$(mktemp -d)"
+make_stub "$state" empty
+output="$(run_provisioner "$state" --apply)"
+assert_eq "$(cat "${state}/rc")" "0" "the apply succeeds and verifies clean"
+EXCHANGE="['exchange.blueprints.read', 'exchange.blueprints.write', 'exchange.connect', 'exchange.demand.read', 'exchange.drafts.blueprints', 'exchange.drafts.refinery', 'exchange.hangar.read', 'exchange.hangar.write', 'exchange.stock.read', 'exchange.stock.write']"
+assert_eq "$(query "$state" "sorted(s['name'] for s in d['scopes'] if s['name'].startswith('exchange.'))")" \
+  "$EXCHANGE" "all ten exchange scopes exist"
+assert_eq "$(query "$state" "sorted({s['attributes']['include.in.token.scope'] for s in d['scopes'] if s['name'].startswith('exchange.')})")" \
+  "['true']" "each puts its name in the scope claim"
+assert_eq "$(query "$state" "sorted({m['config']['included.custom.audience'] for s in d['scopes'] if s['name'].startswith('exchange.') for m in d['scope_mappers'].get(s['id'], [])})")" \
+  "['basetool-ingest']" "each carries the ingest audience and no other"
+assert_eq "$(query "$state" "next(s for s in d['scopes'] if s['name']=='exchange.stock.write')['attributes']['consent.screen.text']")" \
+  "\${xchConsentStockWrite}" "the consent text is a theme message key"
+assert_eq "$(query "$state" "client('versekit') is not None")" "True" "the listed third-party client is created"
+assert_eq "$(query "$state" "[client('versekit')[k] for k in ('publicClient', 'consentRequired', 'fullScopeAllowed', 'standardFlowEnabled', 'directAccessGrantsEnabled', 'implicitFlowEnabled', 'serviceAccountsEnabled')]")" \
+  "[True, True, False, False, False, False, False]" "public, consent required, no full scope, no other flow"
+assert_eq "$(query "$state" "[client('versekit')['attributes'][k] for k in ('oauth2.device.authorization.grant.enabled', 'dpop.bound.access.tokens', 'client.offline.session.idle.timeout', 'client.offline.session.max.lifespan', 'login_theme')]")" \
+  "['true', 'true', '2592000', '7776000', 'krt-theme']" "device grant, DPoP-bound tokens, 30/90-day offline session, the Basetool theme"
+assert_eq "$(query "$state" "client('versekit')['name']")" "VerseKit" "the consent page names the product"
+assert_eq "$(query "$state" "scope_names('default', 'versekit')")" "['basic']" "the only default scope is basic"
+assert_eq "$(query "$state" "scope_names('optional', 'versekit')")" \
+  "$(printf '%s' "$EXCHANGE" | sed "s/\]$/, 'offline_access']/")" "every exchange scope and offline_access are optional"
+assert_eq "$(query "$state" "mappers('versekit')")" "[]" "no protocol mapper on the client"
+assert_eq "$(query "$state" "sorted(set(scope_names('optional', 'basetool-sc-extractor')) & set(${EXCHANGE}))")" \
+  "['exchange.blueprints.read', 'exchange.blueprints.write', 'exchange.connect', 'exchange.drafts.blueprints', 'exchange.drafts.refinery']" \
+  "the extractor gets its exchange scopes as optional"
+assert_eq "$(query "$state" "'extractor-ingest' in scope_names('default', 'basetool-sc-extractor')")" \
+  "True" "the extractor keeps extractor-ingest until its migration"
+assert_eq "$(query "$state" "[d['realm'].get(k) for k in ('oauth2DeviceCodeLifespan', 'oauth2DevicePollingInterval', 'loginTheme')]")" \
+  "[600, 5, 'krt-theme']" "the device code lifespan, polling interval and login theme are pinned"
+output="$(run_provisioner "$state" --apply)"
+assert_contains "$output" "No changes" "a second run changes nothing"
+rm -rf "$state"
+
+echo "14. an existing third-party client loses what the template never offers"
+state="$(mktemp -d)"
+make_stub "$state" empty
+run_provisioner "$state" --apply >/dev/null
+STUB_STATE="$state" "$PYTHON" -c '
+import json, os, pathlib
+path = pathlib.Path(os.environ["STUB_STATE"]) / "state.json"
+d = json.loads(path.read_text(encoding="utf-8"))
+vk = next(c for c in d["clients"] if c["clientId"] == "versekit")
+ids = {s["name"]: s["id"] for s in d["scopes"]}
+d["client_default_scopes"][vk["id"]] += [ids["profile"], ids["email"], ids["extractor-ingest"]]
+vk["consentRequired"] = False
+path.write_text(json.dumps(d), encoding="utf-8")
+'
+output="$(run_provisioner "$state")"
+assert_contains "$output" "- default scope 'profile' withheld" "the dry run plans to remove profile"
+assert_contains "$output" "~ consentRequired: false -> true" "and to require consent again"
+output="$(run_provisioner "$state" --apply)"
+assert_eq "$(cat "${state}/rc")" "0" "the apply succeeds and verifies clean"
+assert_eq "$(query "$state" "scope_names('default', 'versekit')")" "['basic']" "only basic is left as a default scope"
+assert_eq "$(query "$state" "client('versekit')['consentRequired']")" "True" "consent is required again"
+rm -rf "$state"
+
+echo "15. a malformed third-party client list is refused before anything is read"
+state="$(mktemp -d)"
+make_stub "$state" empty
+printf '[{"clientId": "basetool-frontend", "name": "Impostor"}]' >"${state}/bad.json"
+output="$(run_provisioner "$state" --external-clients "$(to_child_path "${state}/bad.json")")"
+assert_eq "$(cat "${state}/rc")" "1" "a reserved clientId exits 1"
+assert_contains "$output" "reserved or listed twice" "and says why"
+assert_eq "$(writes_in "$state")" "0" "nothing is written"
+printf '[{"clientId": "somebody"}]' >"${state}/bad.json"
+output="$(run_provisioner "$state" --external-clients "$(to_child_path "${state}/bad.json")")"
+assert_contains "$output" "needs a name for the consent page" "a client without a name is refused"
 rm -rf "$state"
 
 echo

@@ -40,7 +40,7 @@ BUILTIN_CLIENTS = frozenset({
 
 AUDIENCE_SCOPES = ("extractor-ingest", "extractor-ingest-only")
 
-REALM_SETTINGS: dict[str, bool | int] = {
+REALM_SETTINGS: dict[str, bool | int | str] = {
     "revokeRefreshToken": False,
     "refreshTokenMaxReuse": 5,
     "accessTokenLifespan": 300,
@@ -53,7 +53,32 @@ REALM_SETTINGS: dict[str, bool | int] = {
     "clientOfflineSessionIdleTimeout": 0,
     "clientOfflineSessionMaxLifespan": 0,
     "oauth2DeviceCodeLifespan": 600,
+    "oauth2DevicePollingInterval": 5,
+    "loginTheme": "krt-theme",
 }
+
+EXTERNAL_CLIENTS_FILE = Path(__file__).resolve().parent / "keycloak" / "external-clients.json"
+
+EXCHANGE_OFFLINE_SESSION_IDLE_SECONDS = 2592000
+EXCHANGE_OFFLINE_SESSION_MAX_SECONDS = 7776000
+
+EXCHANGE_SCOPES: list[tuple[str, str]] = [
+    ("exchange.connect", "xchConsentConnect"),
+    ("exchange.blueprints.read", "xchConsentBlueprintsRead"),
+    ("exchange.blueprints.write", "xchConsentBlueprintsWrite"),
+    ("exchange.stock.read", "xchConsentStockRead"),
+    ("exchange.stock.write", "xchConsentStockWrite"),
+    ("exchange.hangar.read", "xchConsentHangarRead"),
+    ("exchange.hangar.write", "xchConsentHangarWrite"),
+    ("exchange.demand.read", "xchConsentDemandRead"),
+    ("exchange.drafts.blueprints", "xchConsentDraftsBlueprints"),
+    ("exchange.drafts.refinery", "xchConsentDraftsRefinery"),
+]
+EXCHANGE_SCOPE_NAMES = [name for name, _ in EXCHANGE_SCOPES]
+
+EXTRACTOR_EXCHANGE_SCOPES = ["exchange.connect", "exchange.blueprints.read",
+                             "exchange.blueprints.write", "exchange.drafts.blueprints",
+                             "exchange.drafts.refinery"]
 
 AUDIENCE_MAPPER_CONFIG = {
     "access.token.claim": "true",
@@ -98,6 +123,16 @@ SCOPES = [
             "config": {**AUDIENCE_MAPPER_CONFIG, "included.custom.audience": "basetool-ingest"},
         }],
     ),
+    *[ScopeSpec(
+        name=name,
+        attributes={**_SCOPE_ATTRIBUTES_COMMON, "include.in.token.scope": "true",
+                    "consent.screen.text": "${" + key + "}", "gui.order": str(order)},
+        mappers=[{
+            "name": "aud-basetool-ingest",
+            "protocolMapper": "oidc-audience-mapper",
+            "config": {**AUDIENCE_MAPPER_CONFIG, "included.custom.audience": "basetool-ingest"},
+        }],
+    ) for order, (name, key) in enumerate(EXCHANGE_SCOPES, 1)],
 ]
 
 
@@ -136,7 +171,7 @@ class ClientSpec:
 
 
 def _flags(*, public: bool, standard: bool, service_accounts: bool, full_scope: bool,
-           frontchannel_logout: bool) -> dict:
+           frontchannel_logout: bool, consent: bool = False) -> dict:
     """The scalar client fields every Basetool client pins; the flows that differ are arguments."""
     fields = {
         "enabled": True,
@@ -147,7 +182,7 @@ def _flags(*, public: bool, standard: bool, service_accounts: bool, full_scope: 
         "implicitFlowEnabled": False,
         "directAccessGrantsEnabled": False,
         "serviceAccountsEnabled": service_accounts,
-        "consentRequired": False,
+        "consentRequired": consent,
         "fullScopeAllowed": full_scope,
         "frontchannelLogout": frontchannel_logout,
     }
@@ -197,11 +232,13 @@ def validate_origin(value: str, flag: str) -> str:
 
 
 def client_specs(realm: str, public_origin: str, grafana_origin: str | None,
-                 frontend_client: str | None = None) -> list[ClientSpec]:
+                 frontend_client: str | None = None,
+                 external_clients: list[dict] | None = None) -> list[ClientSpec]:
     """Every Basetool client in its production shape, with the environment's origins filled in.
 
-    The Android client comes last. `frontend_client` is `public`, `confidential` or None; None
-    leaves an existing frontend client's type unmanaged (ADR-0001).
+    The approved third-party clients follow the first-party ones and the Android client comes
+    last. `frontend_client` is `public`, `confidential` or None; None leaves an existing frontend
+    client's type unmanaged (ADR-0001).
     """
     frontend_confidential = frontend_client == "confidential"
     if frontend_client is None:
@@ -362,7 +399,7 @@ def client_specs(realm: str, public_origin: str, grafana_origin: str | None,
             redirect_uris=[],
             web_origins=[],
             default_scopes=[*_STANDARD_DEFAULT, "extractor-ingest", "extractor-ingest-only"],
-            optional_scopes=list(_STANDARD_OPTIONAL),
+            optional_scopes=[*_STANDARD_OPTIONAL, *EXTRACTOR_EXCHANGE_SCOPES],
             withheld_redirect_uris=["http://127.0.0.1/*", "http://localhost/*"],
             withheld_reason="unused authorization-code flow retired 2026-09-22",
         ),
@@ -401,8 +438,73 @@ def client_specs(realm: str, public_origin: str, grafana_origin: str | None,
             env_vars_to_fill=["GRAFANA_OAUTH_CLIENT_SECRET"],
             env_doc_hint=" (Grafana's generic_oauth login reads it)",
         ))
+    specs.extend(external_client_spec(entry) for entry in (external_clients or []))
     specs.append(android_spec(public_origin))
     return specs
+
+
+def load_external_clients(path: Path) -> list[dict]:
+    """Read and check the approved third-party clients, one `{clientId, name, description}` each."""
+    try:
+        entries = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise SystemExit(f"cannot read the third-party client list {path}: {error}") from error
+    if not isinstance(entries, list):
+        raise SystemExit(f"{path}: expected a JSON list of clients")
+    reserved = BUILTIN_CLIENTS | {"basetool-frontend", "backend-service", "basetool-ingest-gateway",
+                                  "basetool-sc-extractor", "grafana", mobile.CLIENT_ID}
+    seen: set[str] = set()
+    for entry in entries:
+        client_id = entry.get("clientId") if isinstance(entry, dict) else None
+        if not isinstance(client_id, str) or not re.fullmatch(r"[a-z0-9][a-z0-9-]{1,62}",
+                                                               client_id):
+            raise SystemExit(f"{path}: every client needs a clientId of lower-case letters, "
+                             f"digits and hyphens (got {client_id!r})")
+        if client_id in reserved or client_id in seen:
+            raise SystemExit(f"{path}: clientId '{client_id}' is reserved or listed twice")
+        if not isinstance(entry.get("name"), str) or not entry["name"].strip():
+            raise SystemExit(f"{path}: client '{client_id}' needs a name for the consent page")
+        seen.add(client_id)
+    return entries
+
+
+def external_client_spec(entry: dict) -> ClientSpec:
+    """The template every approved third-party client follows (REQ-XCH-005, ADR-0217)."""
+    return ClientSpec(
+        client_id=entry["clientId"],
+        kind="public, device grant, consent, DPoP-bound tokens (an approved third-party client)",
+        fields={
+            **_flags(public=True, standard=False, service_accounts=False, full_scope=False,
+                     frontchannel_logout=True, consent=True),
+            "name": entry["name"],
+            "description": entry.get("description", ""),
+        },
+        attributes={
+            "access.token.header.type.rfc9068": "false",
+            "backchannel.logout.revoke.offline.tokens": "false",
+            "backchannel.logout.session.required": "true",
+            "client.offline.session.idle.timeout": str(EXCHANGE_OFFLINE_SESSION_IDLE_SECONDS),
+            "client.offline.session.max.lifespan": str(EXCHANGE_OFFLINE_SESSION_MAX_SECONDS),
+            "client.use.lightweight.access.token.enabled": "false",
+            "display.on.consent.screen": "false",
+            "dpop.bound.access.tokens": "true",
+            "frontchannel.logout.session.required": "true",
+            "login_theme": "krt-theme",
+            "oauth2.device.authorization.grant.enabled": "true",
+            "oauth2.jwt.authorization.grant.enabled": "false",
+            "oidc.ciba.grant.enabled": "false",
+            "standard.token.exchange.enabled": "false",
+            "use.refresh.tokens": "true",
+        },
+        redirect_uris=[],
+        web_origins=[],
+        default_scopes=["basic"],
+        optional_scopes=[*EXCHANGE_SCOPE_NAMES, "offline_access"],
+        withheld_scopes=["acr", "address", "email", "extractor-ingest", "extractor-ingest-only",
+                         "microprofile-jwt", "organization", "phone", "profile", "roles",
+                         "web-origins"],
+        withheld_reason="never offered to a third-party client, REQ-XCH-005",
+    )
 
 
 def android_spec(public_origin: str) -> ClientSpec:
@@ -1163,6 +1265,9 @@ def main() -> int:
                              "type of an existing client is left as it is. `confidential` needs "
                              "KEYCLOAK_FRONTEND_CLIENT_SECRET in the environment when it switches "
                              "a public client")
+    parser.add_argument("--external-clients", type=Path, default=EXTERNAL_CLIENTS_FILE,
+                        help="the approved third-party clients to create from the template "
+                             "(default: scripts/keycloak/external-clients.json)")
     parser.add_argument("--apply", action="store_true",
                         help="write the planned changes (default: dry run, writes nothing)")
     parser.add_argument("--container", default="keycloak",
@@ -1178,7 +1283,8 @@ def main() -> int:
     prefix = (shlex.split(args.kcadm_command) if args.kcadm_command
               else ["docker", "exec", "-i", args.container, "/opt/keycloak/bin/kcadm.sh"])
     kc = RealmKcadm(prefix, args.realm, dry_run=False)
-    specs = client_specs(args.realm, public_origin, grafana_origin, args.frontend_client)
+    specs = client_specs(args.realm, public_origin, grafana_origin, args.frontend_client,
+                         load_external_clients(args.external_clients))
 
     mode = "APPLY" if args.apply else "DRY RUN — nothing is written"
     print(f"Keycloak realm '{args.realm}' -> production shape, public origin {public_origin} "
