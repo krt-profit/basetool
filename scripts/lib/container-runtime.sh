@@ -91,9 +91,10 @@ RT_HOST_SERVICES="${RT_HOST_SERVICES:-alloy}"
 # /etc/sudoers.d/basetool-deploy, which names that one unit with no wildcard.
 RT_HOST_SYSTEMCTL="${RT_HOST_SYSTEMCTL:-}"
 
-# The services whose DEFINITION this run changed -- a new digest pin, or a unit file the release
-# replaced. Space separated, appended to by rt_pin_write and install_quadlet_units, and read by
-# rt_apply_stack to decide `restart` instead of `start`.
+# The services whose DEFINITION this run changed -- a new digest pin, a unit file the release
+# replaced, or (keycloak) a provider JAR the release swapped in. Space separated, appended to by
+# rt_pin_write, install_quadlet_units and deploy.sh's provider-JAR swap, and read by rt_apply_stack
+# to decide which units are stopped before the stack is started.
 #
 # WHY IT HAS TO EXIST. `systemctl start` on a unit that is ALREADY ACTIVE is a no-op: it returns 0
 # immediately and does not re-read anything. Measured on the testing host 2026-09-18 -- the pin was
@@ -105,6 +106,12 @@ RT_HOST_SYSTEMCTL="${RT_HOST_SYSTEMCTL:-}"
 # Compose has no equivalent because `up -d` recreates a container whose definition changed and
 # leaves the rest alone. Under Quadlet that comparison is ours to make.
 RT_CHANGED_SERVICES="${RT_CHANGED_SERVICES:-}"
+
+# The units the last rt_await_stack (and so the last rt_apply_stack) could not bring up, in the
+# order they were started -- stack order, so the first one is usually the cause and the rest failed
+# because they require it. Not configuration: deploy.sh reads it to say which part of a failed
+# release did not come up.
+RT_FAILED_SERVICES=""
 
 # Defers to the caller's own `fail` when it has one, so a sourcing script keeps
 # its logging and its exit path instead of dying differently depending on which
@@ -572,6 +579,40 @@ rt_pull() {
 # Type=notify, bounded by the generated `TimeoutStartSec=`. Passing
 # RT_HEALTH_TIMEOUT to systemd would fight that value, which is derived per
 # service from its own health numbers, so it is deliberately not forwarded.
+#
+# TWO PASSES, and never a `restart` (since 2026-09-25, ADR-0213):
+#
+#   1. ONE `systemctl stop` naming every unit this run re-defined (RT_CHANGED_SERVICES).
+#      systemd stops, with each, every unit that `Requires=` it, in reverse dependency
+#      order, and returns when all of them are down. The container goes with the unit
+#      (the generated ExecStart carries --rm), so the next start creates a new one from
+#      the current definition -- the recreate a changed pin or unit needs. `start` alone
+#      would not do: on an already-active unit it returns 0 and re-reads nothing (see
+#      RT_CHANGED_SERVICES above for the measurement).
+#   2. rt_await_stack: `start` every stack unit in stack order and wait for each.
+#      What pass 1 took down comes up once, on its new definition; what it did not touch
+#      is already active, and the start returns at once.
+#
+# WHY NOT `restart` PER UNIT, which this did until 2026-09-25. systemd propagates a
+# restart to every unit that `Requires=` the one restarted, and `systemctl restart`
+# returns when the NAMED unit is up -- while the dependents' start jobs are still
+# queued or running. A restart of a unit whose start job is RUNNING is not merged
+# into it: systemd patches the running job into a restart and runs it again (a
+# restart is the one job type that cannot join a running start). A unit that is
+# already back up is simply restarted a second time. So a release that re-pinned
+# backend, ingest and frontend restarted backend -- which restarted ingest and
+# frontend with it -- and then restarted ingest and frontend AGAIN, one after the
+# other; with the provider JAR it was keycloak, then everything below it once more.
+# A `stop` has no such case: it cancels a pending start and merges with a pending
+# stop, so one stop transaction takes each affected unit down exactly once, and the
+# start pass brings each up exactly once.
+#
+# Everything else is left alone deliberately. Stopping the whole stack on every deploy would
+# take the databases down for a change that never touched them.
+#
+# Called with no arguments by deploy.sh, which is what it is for: a named subset would stop a
+# redefined unit's dependents without starting them again, because the start pass covers only the
+# names given.
 # -----------------------------------------------------------------------------
 rt_apply_stack() {
   ${RT_SYSTEMCTL} daemon-reload || return 1
@@ -583,30 +624,28 @@ rt_apply_stack() {
     read -ra svcs <<< "${RT_STACK_SERVICES:?RT_STACK_SERVICES is unset and no services were named}"
     set -- "${svcs[@]}"
   fi
+  local -a redefined=()
   for svc in "$@"; do
-    # RESTART what this run re-defined, START what it did not. `start` on an already-active unit
-    # returns 0 without re-reading anything, so a changed pin would never reach the running
-    # container -- see RT_CHANGED_SERVICES at the top of this file for the measurement. A restart IS
-    # a recreate here: the generated ExecStart carries --replace, so the old container goes and a
-    # new one is created from the current unit.
-    #
-    # Everything else is left alone deliberately. Restarting the whole stack on every deploy would
-    # take the databases down for a change that never touched them.
     case " ${RT_CHANGED_SERVICES} " in
-      *" ${svc} "*) ${RT_SYSTEMCTL} restart "${svc}.service" || rc=1 ;;
-      *)            ${RT_SYSTEMCTL} start   "${svc}.service" || rc=1 ;;
+      *" ${svc} "*) redefined+=("${svc}.service") ;;
     esac
   done
+  if (( ${#redefined[@]} > 0 )); then
+    # A stop that fails leaves a unit on its OLD definition, and the start pass would then find it
+    # active and return 0 -- a release reported healthy that never reached the container. So it
+    # fails the apply; the start pass still runs, so nothing the stop did take down stays down.
+    ${RT_SYSTEMCTL} stop "${redefined[@]}" || rc=1
+  fi
+  rt_await_stack "$@" || rc=1
   return "${rc}"
 }
 
 # -----------------------------------------------------------------------------
 # rt_recreate <service>
 #
-# Replace one service's container and wait for IT to be healthy. This is the
-# Keycloak provider-JAR path: the JAR is staged on the host and only `kc.sh start`
-# re-running the provider build picks it up, so the container has to be recreated
-# rather than restarted in place.
+# Replace one service's container and wait for IT to be healthy: the edge
+# reconcile and the runtime-health restart. (It was also the Keycloak provider-JAR
+# path until 2026-09-25; the JAR now rides the release apply, rt_apply_stack.)
 #
 # A restart IS a recreate: the generated ExecStart carries `--replace --rm`, so
 # the old container is removed and a new one is created from the current unit on
@@ -648,16 +687,23 @@ rt_recreate() {
 # restart failed with the unit it requires is started again. A `restart` here
 # would be wrong: on an active unit it stops what just came up (the same
 # reproduction started such a unit twice).
+#
+# It is also the second pass of every release apply (rt_apply_stack), and it names
+# what did not come up in RT_FAILED_SERVICES, in the order it tried them.
 # -----------------------------------------------------------------------------
 rt_await_stack() {
   local svc rc=0
+  RT_FAILED_SERVICES=""
   if [[ $# -eq 0 ]]; then
     local -a svcs=()
     read -ra svcs <<< "${RT_STACK_SERVICES:?RT_STACK_SERVICES is unset and no services were named}"
     set -- "${svcs[@]}"
   fi
   for svc in "$@"; do
-    ${RT_SYSTEMCTL} start "${svc}.service" || rc=1
+    if ! ${RT_SYSTEMCTL} start "${svc}.service"; then
+      rc=1
+      RT_FAILED_SERVICES="${RT_FAILED_SERVICES}${RT_FAILED_SERVICES:+ }${svc}"
+    fi
   done
   return "${rc}"
 }
@@ -917,8 +963,11 @@ rt_monitoring_up() {
     set -- "${msvcs[@]}"
   fi
   for svc in "$@"; do
-    # RESTART what this run re-defined, START the rest -- the same rule, for the same measured
-    # reason, as rt_apply_stack. Until 2026-09-22 this only ever said `start`, and `start` on an
+    # RESTART what this run re-defined, START the rest -- the rule rt_apply_stack followed until
+    # 2026-09-25, for the same measured reason. A per-unit restart is safe HERE and no longer there:
+    # no monitoring unit `Requires=` another (only backend, frontend, ingest and keycloak carry
+    # Requires=), so no restart travels to a unit this loop restarts again after it. If that ever
+    # changes, this loop needs rt_apply_stack's stop-then-start. Until 2026-09-22 this only ever said `start`, and `start` on an
     # active unit is a no-op: a release that changed prometheus.container (an image bump, a memory
     # limit, a new mount) installed the new unit, daemon-reloaded, and left the old container
     # running the old definition until something else happened to restart it.

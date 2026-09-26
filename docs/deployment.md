@@ -552,32 +552,44 @@ Within about five minutes the timer fires `deploy.sh`, which:
    wrong image) is logged as `drift: …` and re-applied. A sick container on the **right** image gets
    a targeted restart of that service only, never a release rollback (ADR-0083);
 3. otherwise **cosign-verifies every digest** (REQ-OPS-015) — a failure aborts before anything is
-   pulled or staged;
+   pulled or staged; then, if the provider-JAR digest moved, **extracts the JAR** into
+   `/var/lib/iri/keycloak-spi-stage.jar`, before anything on the host changes;
 4. if the config digest moved: extracts the bundle, asserts it carries no secret, applies the
    stateful-infra gate (below), **checks that `deploy` owns and can write every directory it is
    about to mirror into** (and the compose directory, the unit directory and `env.d/`), snapshots
    the live tree to `config-previous/`, mirrors the new tree into `/var/iri/code`, **renders
    `env.d/`**, installs changed units and stops-then-removes units the release no longer names;
 5. writes the digest-pin record and the per-service pin drop-ins — after the config, so a release
-   the stateful-infra gate holds back leaves no pin behind — pulls the three app images, restarts
-   every application service whose pin or unit changed, starts the rest of the application stack,
-   and waits for health; then stages a moved provider JAR and restarts keycloak — which, through
-   `Requires=`, restarts backend, frontend and ingest with it (see
-   [Driving the stack](#driving-the-stack); *corrected 2026-09-25*, this said "keycloak alone") —
-   and waits until every application service is healthy again before it counts as a success; a
-   stack that does not come back puts the previous JAR back (see
-   [Keycloak provider JAR](#keycloak-provider-jar));
+   the stateful-infra gate holds back leaves no pin behind — pulls the three app images, swaps a
+   moved provider JAR into `keycloak/providers/` (the previous one kept as
+   `keycloak-spi-previous.jar`), logs `release parts: …`, and applies the release in **one restart
+   window**: one `systemctl --user stop` of every unit it re-defined — re-pinned app services, units
+   the config replaced, keycloak for a moved JAR — which takes what `Requires=` them down with them,
+   then a `start` of every stack unit in dependency order, each waited for until healthy. Keycloak
+   comes up on the new JAR before backend starts, and one health gate covers everything (ADR-0213,
+   since 2026-09-25 — until then the JAR was swapped only after this gate, and its keycloak restart
+   took the app down a second time; see [Keycloak provider JAR](#keycloak-provider-jar));
 6. on success writes the marker, clears the failure records, reconciles the monitoring units and
    the edge (config drift or renewed certificates → edge recreate), and prunes dangling images older
    than 30 days;
-7. on a health failure restores the previous config tree, the previous units **and** the previous
-   pin drop-ins, restarts, records an exponential backoff for that target (600 s doubling, capped
-   at 6 h; `--force` bypasses it) and exits non-zero — `DeployRolledBack` / `DeployFailed`.
+7. on a health failure logs which units did not come up and what the release changed, restores the
+   previous config tree, the previous units, the previous pin drop-ins **and the previous provider
+   JAR** — together, never one without the other — applies them the same way, records an
+   exponential backoff for that target (600 s doubling, capped at 6 h; `--force` bypasses it) and
+   exits non-zero — `DeployRolledBack` / `DeployFailed`.
 
-A failure in steps 4–5 **before** the health gate — the pre-flight, the extraction, a mirror, the
-`env.d` render, the unit install, the pull — is recorded the same way: a `FATAL: deploy aborted
-before the health gate — step '…' failed (exit N)` line, the previous config tree, units and pin put
-back if this run had changed them, the same backoff record, and `basetool_deploy_last_failure_timestamp`
+**Expected outage per release:** the units the release re-defined and everything that requires them
+are down from the one `stop` until their start completes — for a release that moves an app image or
+the JAR, about two minutes of maintenance page on production, **once**, whatever the release moves.
+Each unit restarts once: until 2026-09-25 the apply restarted re-defined units one by one, and a
+`restart` of backend followed by `restart`s of ingest and frontend restarted those two twice
+([Driving the stack](#driving-the-stack) explains why a restart does that).
+
+A failure in steps 3–5 **before** the health gate — the pre-flight, an extraction (the config bundle
+or the provider JAR), a mirror, the `env.d` render, the unit install, the pull — is recorded the same
+way: a `FATAL: deploy aborted
+before the health gate — step '…' failed (exit N)` line, the previous config tree, units, pin and
+provider JAR put back if this run had changed them, the same backoff record, and `basetool_deploy_last_failure_timestamp`
 (`DeployFailed`). Nothing has been restarted at that point, so the stack keeps running the previous
 release. If the restore itself fails the log says the tree is **INCONSISTENT**, and
 `/var/lib/iri/config-apply.incomplete` stays, which stops the next tick from snapshotting the
@@ -689,6 +701,17 @@ ${UPOD} exec -it db-backend sh                       # a shell in a running cont
 > ```bash
 > ${UCTL} restart keycloak.service
 > ${UCTL} start backend.service ingest.service frontend.service   # returns once all three are healthy
+> ```
+>
+> **Restarting several units, restart none of them.** A `restart` of a unit whose start job is
+> already running is not merged into it — systemd runs it again — so `restart backend` followed by
+> `restart frontend` restarts frontend twice. Stop them all in one call, then start in order; a stop
+> merges with anything pending, and each unit goes down and comes up once. This is what `deploy.sh`
+> does for a release since 2026-09-25 (ADR-0213):
+>
+> ```bash
+> ${UCTL} stop keycloak.service backend.service       # also stops ingest and frontend: Requires=
+> ${UCTL} start keycloak.service backend.service ingest.service frontend.service
 > ```
 
 The application stack, in dependency order, is `db-backend db-keycloak redis keycloak backend ingest
@@ -941,34 +964,62 @@ failure back, but catching it in review is cheaper.
 
 ### Keycloak provider JAR
 
-Delivered automatically (REQ-OPS-007, ADR-0055): when `basetool-keycloak-spi:stable` moves,
-`deploy.sh` stages `keycloak-spi.jar` into `/var/iri/code/keycloak/providers/` after the stack is
-healthy and restarts keycloak; a failure restores the previous JAR. *(Corrected 2026-09-25: this
-said "restarts keycloak alone". The restart is `systemctl --user restart keycloak.service`, and
-backend, frontend and ingest `Requires=` keycloak, so they restart with it — see
-[Driving the stack](#driving-the-stack).)*
+Delivered automatically (REQ-OPS-007, ADR-0055, ADR-0213): when `basetool-keycloak-spi:stable`
+moves, `deploy.sh` applies the new `keycloak-spi.jar` **as part of the release**, in the same restart
+window as the app images the release moves:
 
-**It is gated on the whole application stack, not on keycloak** (since 2026-09-25). Once keycloak
-is healthy on the new JAR, `deploy.sh` starts every application service and waits for each; only
-then does it write the marker and log `deploy successful`. If keycloak or any of them does not come
-back, it restores the previous JAR, restarts keycloak, waits for the stack again, and records the
-run as failed (`DeployFailed`, backoff). The deploy log reads:
+1. before anything on the host changes, it extracts the JAR to `/var/lib/iri/keycloak-spi-stage.jar`
+   — a failure there is a recorded pre-gate failure (`FATAL … step 'extract the keycloak-spi provider
+   JAR'`, backoff, `DeployFailed`) with nothing to undo;
+2. as the last step before the apply, it copies the live JAR to
+   `/var/lib/iri/keycloak-spi-previous.jar` and installs the new one into
+   `/var/iri/code/keycloak/providers/`;
+3. the release apply stops keycloak together with every other re-defined unit — and, through
+   `Requires=`, backend, frontend and ingest — in one `systemctl --user stop`, then starts the stack
+   in order: keycloak on the new JAR first, then backend, ingest, frontend, each waited for. Only when
+   every stack unit is healthy does it write the marker and log `deploy successful`.
+
+If the gate fails, the previous JAR goes back **with** the previous app digests, config tree and
+units, and the stack is applied once more the same way — one rollback, `DeployRolledBack`, backoff.
+A JAR-only release is the same apply with only keycloak re-defined. The deploy log of a release
+that moves the JAR and the images reads:
 
 ```text
-keycloak-spi changed → staging provider JAR + recreating keycloak (backend, ingest and frontend restart with it: Requires=)
-keycloak healthy on the new provider JAR — waiting for the application services systemd restarted with it
-keycloak-spi provider JAR applied — keycloak and the application stack are healthy
+keycloak-spi changed → staging ghcr.io/…/basetool-keycloak-spi@sha256:… (applied with this release, one restart)
+…
+provider JAR swapped in — keycloak restarts on it with this release
+release parts: app images [backend frontend ingest] · unit definitions [none] · config bundle: no · provider JAR: yes
+one restart window: stopping [backend frontend ingest keycloak] and what requires them, then starting the stack in order
+applying (timeout 180s)
+keycloak-spi provider JAR applied with the release — keycloak and the application stack are healthy on it
 deploy successful
 ```
 
+and a failed gate, for example a keycloak that does not start on the new JAR:
+
+```text
+health check failed within 180s — rolling back
+health gate: did not come up, in start order: [keycloak backend ingest frontend]
+health gate: this release changed: app images [backend frontend ingest] · unit definitions [none] · config bundle: no · provider JAR: yes
+health gate: KEYCLOAK did not come up, and the provider JAR is the only part of this release that changed keycloak — the JAR is the likely cause; what failed after keycloak requires it
+provider JAR restored to the previous one
+rolled back to previous digest pin successfully — the previous app digests + provider JAR are live again and the stack is healthy
+```
+
+**Blame is weaker than it was, by decision** (ADR-0213). One gate covers the JAR and the images, so
+when an **app** unit is the first that fails, the log says keycloak came up on the new JAR and that it
+cannot tell a bad image from a bad JAR — a frontend that cannot log in through the new JAR fails the
+same way as a broken frontend image. Read `${UPOD} logs --since 10m <unit>` for the unit it names. The
+one case it narrows: keycloak itself failing when the JAR is its only change.
+
 **Expected outage:** one keycloak start, then one backend start, then the slower of frontend and
-ingest — about two minutes of maintenance page — **in addition to** the app apply's own when the
-release moves both, because the JAR is swapped only after the app apply passed its gate (ADR-0055).
-Until this fix the step trusted keycloak's restart alone: on 2026-09-25 the v1.12.0 deploy logged
-`deploy successful` at 17:43:17 while frontend and ingest still had no container, and only the next
-tick (`drift: frontend: no container`) re-applied. The JAR is Java-21
-bytecode for Keycloak's JVM. The Discord realm setup is a one-time step in
-[`keycloak/DISCORD_KEYCLOAK_SETUP.md`](keycloak/DISCORD_KEYCLOAK_SETUP.md).
+ingest — about two minutes of maintenance page — **for the whole release**. Until ADR-0213 the JAR
+was swapped only after the app apply had passed its gate, so a release that moved both paid this
+**twice**: v1.12.0 on 2026-09-25 served maintenance-page 5xx from 17:39 to 17:43 UTC, about two
+minutes of it the JAR step's. (That step also once logged `deploy successful` at 17:43:17 while
+frontend and ingest still had no container — #2072 fixed the wait; ADR-0213 removed the second
+restart.) The JAR is Java-21 bytecode for Keycloak's JVM. The Discord realm setup is a one-time step
+in [`keycloak/DISCORD_KEYCLOAK_SETUP.md`](keycloak/DISCORD_KEYCLOAK_SETUP.md).
 
 Manual fallback only:
 
@@ -1851,7 +1902,8 @@ goes.
 | nothing answers on 80/443 | `systemctl status haproxy`, `firewall-cmd --list-all` | haproxy not started (fresh host), or a firewall layer — probe from a third machine |
 | Stack comes back after a manual stop | `drift:` lines in the deploy log | the drift check (REQ-OPS-013); stop the timer first |
 | `CARVE-OUT: postgres/Keycloak image pin changed` | the deploy log, `config-blocked.marker` | a gated upgrade — see [Stateful-infra upgrades](#stateful-infra-upgrades) |
-| `keycloak did not become healthy with the new provider JAR` or `… the application stack it restarted did not return to health — rolling back the JAR`; `DeployFailed` fires | the deploy log, `${UPOD} logs --since 10m keycloak`, `${UCTL} status backend.service frontend.service ingest.service` | the new provider JAR broke keycloak or what logs in through it; the previous JAR is live again and the target backs off. If the log then says `WARNING: the application stack did not return to health on the previous provider JAR`, something else is wrong — `${UCTL} start backend.service ingest.service frontend.service` waits for them without restarting anything. See [Keycloak provider JAR](#keycloak-provider-jar) |
+| `health gate: did not come up, in start order: […]` with `provider JAR: yes` in the `this release changed:` line; `DeployRolledBack` fires | the `health gate:` lines of the deploy log, `${UPOD} logs --since 10m <first unit named>`, `${UCTL} status keycloak.service backend.service frontend.service ingest.service` | one release moved the JAR (and possibly images), and the whole of it — pin, config, units, JAR — was rolled back together (ADR-0213); the target backs off. `KEYCLOAK did not come up … the JAR is the likely cause` narrows it to the JAR; `keycloak is up on the new provider JAR; the first unit that did not come up is …` cannot tell a bad image from a bad JAR — read that unit's log. If it then says `rollback ALSO failed — did not come up: […]`, something outside the release is wrong — `${UCTL} start backend.service ingest.service frontend.service` waits for them without restarting anything. *(Before 2026-09-25 the JAR had its own post-gate step, logging `keycloak did not become healthy with the new provider JAR` and `DeployFailed`.)* See [Keycloak provider JAR](#keycloak-provider-jar) |
+| `FATAL: deploy aborted before the health gate — step 'extract the keycloak-spi provider JAR' failed`; `DeployFailed` fires | the deploy log; `skopeo inspect docker://ghcr.io/<owner>/basetool-keycloak-spi:stable` as `deploy` | the promoted provider-JAR image could not be read or carries no `/providers/keycloak-spi.jar`; nothing on the host was changed and the target backs off. Until 2026-09-25 this failed after the gate and recorded nothing |
 | Deploy stuck on a config apply: `PRE-FLIGHT: … is not owned or not writable by deploy`, or `FATAL: deploy aborted before the health gate — step 'mirror …' failed (exit 23)` after an `rsync: … mkstemp … Permission denied (13)`; `DeployFailed` fires, then `target failed Nx; in backoff window` | the deploy log, `find /var/iri/code/{docker,keycloak-theme,monitoring,quadlet} ! -user deploy` | a release-owned subtree (here `docker/acme`, 2026-09-25) was created or copied as root. Fix the owner — `chown -R deploy:deploy /var/iri/code/docker` (or the subtree named), or the role with `--tags directories` — then `sudo -u deploy /var/iri/code/scripts/deploy.sh --force` to skip the backoff. If the log also says **INCONSISTENT**, the restore failed too: the same fix, then `--force`; `config-previous/` was kept |
 | A promoted unit change is ignored | `ls ~iri/.config/containers/systemd/` | a hand-placed unit of the same name shadows the delivered one |
 | Monitoring config changes never load | the deploy log (`IRI_MONITORING_ENABLED != 'true'`) | set `IRI_MONITORING_ENABLED=true` in `.env`; `MonitoringReconcileDisabled` fires meanwhile |

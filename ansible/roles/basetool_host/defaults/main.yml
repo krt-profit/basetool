@@ -178,8 +178,9 @@ basetool_host_deploy_user_dirs:
   # and is in no host group. Group membership cannot help here; world-readable is the mechanism,
   # and it is what the Docker host has always used.
   - code
-  # The deploy stages the promoted provider JAR here. If it is missing the deploy fails at the LAST
-  # step, after every container is already healthy, which reads like a glitch.
+  # The deploy swaps the promoted provider JAR in here, as the last step before the release apply
+  # (ADR-0213). If it cannot write here the release fails before the health gate and is put back --
+  # a recorded failure, but one that blocks every JAR-moving release until this directory exists.
   - code/keycloak/providers
 
 

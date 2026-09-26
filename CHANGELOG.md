@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Deploy: ein Release mit neuem Keycloak-Provider-JAR kostet nur noch eine Downtime statt zwei.**
+  `deploy.sh` spielt das JAR zusammen mit den App-Images ein und startet jeden Dienst genau einmal
+  neu (auch Frontend und Ingest nicht mehr doppelt); scheitert das Health-Gate, gehen Images,
+  Konfiguration und JAR gemeinsam zurück (ADR-0213). Wirkt erst nach einem Lauf der Ansible-Rolle
+  (`--tags deploy,scripts`).
+
 ### Fixed
 
 - **Deploy: ein neues Keycloak-Provider-JAR meldet erst Erfolg, wenn die ganze App wieder läuft.**
