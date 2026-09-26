@@ -122,7 +122,7 @@ non-admins see the union of their memberships unless they pin one.
 ### REQ-ORG-004 — Create-time OrgUnit stamping
 
 > [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
-> A personal Lager row may be stamped with **no** org unit through an explicit stamping path of its own (exchange book-ins, REQ-XCH-016), and re-stamped later by the member; re-stamping gives or takes access for that unit's editors, and the dialog says so (WP 1.2, #2107).
+> Since WP 1.2 a member may re-stamp their own personal Lager row onto one of their direct memberships or onto **no** unit (REQ-INV-052); re-stamping gives or takes access for that unit's editors, and the dialog says so. Exchange book-ins will use the no-unit case (REQ-XCH-016).
 
 Stamp the OrgUnit via the central picker resolvers on `OwnerScopeService` — never read
 `user.getSquadron()` directly. Two variants share the §5.5.1 picker matrix (1 + no output →

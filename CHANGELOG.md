@@ -4,6 +4,9 @@
 
 ### Added
 
+- **Mein Lager: Einheit eines persönlichen Eintrags ändern.** Pro Eintrag und für eine Auswahl
+  lässt sich die Einheit eigener persönlicher Einträge nachträglich wechseln — auf eine eigene
+  Mitgliedschaft oder „Keine Einheit"; der Dialog sagt, wer den Eintrag dann sieht (REQ-INV-052).
 - **Audit-Log: neuer Bereich „Blueprints".** Hinzufügen, Bearbeiten, Entfernen, Import, globale
   Freigabe, Standard-Blueprints und deren Vergabe — auch aus der App und durch Admins — landen im
   Audit-Log; Notizen werden nie mitgeschrieben (REQ-INV-051).
