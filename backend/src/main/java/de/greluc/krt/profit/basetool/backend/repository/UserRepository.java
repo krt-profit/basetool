@@ -365,8 +365,8 @@ public interface UserRepository
   boolean existsByLowerUsernameOrDisplayNameIn(@Param("lowerNames") Collection<String> lowerNames);
 
   /**
-   * Checks whether another account already uses this name as username or display name, compared
-   * case-insensitively (REQ-SEC-062). The account being edited is excluded.
+   * Checks whether another account already uses this name as username, display name or RSI handle,
+   * compared case-insensitively (REQ-SEC-062, REQ-SEC-072). The account being edited is excluded.
    *
    * @param lowerName the candidate name, lower-cased and trimmed
    * @param selfId the account being edited, excluded from the comparison
@@ -376,7 +376,8 @@ public interface UserRepository
       """
       SELECT (COUNT(u) > 0) FROM User u
       WHERE u.id <> :selfId
-        AND (LOWER(u.username) = :lowerName OR LOWER(u.displayName) = :lowerName)
+        AND (LOWER(u.username) = :lowerName OR LOWER(u.displayName) = :lowerName
+             OR LOWER(u.rsiHandle) = :lowerName)
       """)
   boolean existsOtherAccountWithName(
       @Param("lowerName") String lowerName, @Param("selfId") UUID selfId);

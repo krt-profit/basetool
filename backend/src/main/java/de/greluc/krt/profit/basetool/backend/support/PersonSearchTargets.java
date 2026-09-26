@@ -83,6 +83,7 @@ public final class PersonSearchTargets {
           new Target("MEMBER", "app_user", "username", "id", LINK_MEMBER),
           new Target("MEMBER", "app_user", "display_name", "id", LINK_MEMBER),
           new Target("MEMBER", "app_user", "discord_guild_nickname", "id", LINK_MEMBER),
+          new Target("MEMBER", "app_user", "rsi_handle", "id", LINK_MEMBER),
           new Target("MEMBER", "app_user", "description", "id", LINK_MEMBER),
           new Target("MEMBER", "app_user", "email", "id", LINK_MEMBER),
           new Target("REGISTRATION", "user_approval_event", "reason", "id", null),

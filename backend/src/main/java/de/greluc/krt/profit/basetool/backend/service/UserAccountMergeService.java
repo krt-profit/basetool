@@ -184,11 +184,13 @@ public class UserAccountMergeService {
     if (sourceUserId.equals(targetUserId)) {
       throw new BusinessConflictException("An account cannot be merged into itself");
     }
-    Entities.require(userRepository.findById(sourceUserId), "Source account not found");
+    final User source =
+        Entities.require(userRepository.findById(sourceUserId), "Source account not found");
     final User target =
         Entities.require(userRepository.findById(targetUserId), "Target account not found");
 
     assertLedgersDoNotCollide(sourceUserId, targetUserId);
+    carryRsiHandle(source, target);
 
     entityManager.flush();
 
@@ -218,6 +220,26 @@ public class UserAccountMergeService {
         moved.size(),
         adminId);
     return target;
+  }
+
+  /**
+   * Moves the source's RSI handle onto the target when the target has none, and clears it on the
+   * source either way, so the survivor's handle wins and the handle stays unique (REQ-SEC-072).
+   *
+   * @param source the account being emptied
+   * @param target the account being kept
+   */
+  private void carryRsiHandle(@NotNull User source, @NotNull User target) {
+    String handle = source.getRsiHandle();
+    if (handle == null) {
+      return;
+    }
+    source.setRsiHandle(null);
+    userRepository.saveAndFlush(source);
+    if (target.getRsiHandle() == null) {
+      target.setRsiHandle(handle);
+      userRepository.saveAndFlush(target);
+    }
   }
 
   /**

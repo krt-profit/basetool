@@ -66,7 +66,7 @@ public final class DataExportSections {
               "Provided at registration and on the profile page.",
               """
               SELECT id, username, display_name, email, description, user_rank, join_date,
-                     discord_user_id, discord_guild_nickname, default_payout_preference,
+                     discord_user_id, discord_guild_nickname, rsi_handle, default_payout_preference,
                      share_blueprints_globally, approval_status, approved_at, created_at, updated_at
               FROM app_user WHERE id = :userId
               """),
@@ -390,6 +390,7 @@ public final class DataExportSections {
           Map.entry(
               "account.discord_guild_nickname",
               "The subject's own nickname; see account.username."),
+          Map.entry("account.rsi_handle", "The subject's own RSI handle; see account.username."),
           Map.entry(
               "bankHolderRegistration.handle",
               "The subject's own custodian handle -- the registration is theirs, and the column is"
