@@ -1,0 +1,264 @@
+{
+  "schemaVersion": 1,
+  "tool": "Basetool anonymised corpus",
+  "toolVersion": "1",
+  "generatedAt": "2026-01-01T10:00:00Z",
+  "logFilesScanned": 12,
+  "blueprintCount": 31,
+  "players": [
+    {
+      "handle": "PLAYER_A",
+      "blueprintCount": 31
+    }
+  ],
+  "blueprints": [
+    {
+      "productName": "Monde Legs Delta Camo",
+      "receivedAt": "2026-01-01T10:00:00.000Z",
+      "player": "PLAYER_A",
+      "notificationId": 36,
+      "queueSize": 2,
+      "gameBuild": "11429312"
+    },
+    {
+      "productName": "Monde Arms Hemlock Camo",
+      "receivedAt": "2026-01-01T11:00:00.000Z",
+      "player": "PLAYER_A",
+      "notificationId": 43,
+      "queueSize": 2,
+      "gameBuild": "11445650"
+    },
+    {
+      "productName": "Monde Core Hemlock Camo",
+      "receivedAt": "2026-01-01T12:00:00.000Z",
+      "player": "PLAYER_A",
+      "notificationId": 112,
+      "queueSize": 3,
+      "gameBuild": "11445650"
+    },
+    {
+      "productName": "R97 RGHT Shotgun",
+      "receivedAt": "2026-01-01T13:00:00.000Z",
+      "player": "PLAYER_A",
+      "notificationId": 47,
+      "queueSize": 2,
+      "gameBuild": "11450623"
+    },
+    {
+      "productName": "R97 KS Shotgun",
+      "receivedAt": "2026-01-01T14:00:00.000Z",
+      "player": "PLAYER_A",
+      "notificationId": 127,
+      "queueSize": 3,
+      "gameBuild": "11450623"
+    },
+    {
+      "productName": "Strata Arms Levski Edition",
+      "receivedAt": "2026-01-01T15:00:00.000Z",
+      "player": "PLAYER_A",
+      "notificationId": 81,
+      "queueSize": 2,
+      "gameBuild": "12232306"
+    },
+    {
+      "productName": "Strata Helmet Levski Edition",
+      "receivedAt": "2026-01-01T16:00:00.000Z",
+      "player": "PLAYER_A",
+      "notificationId": 105,
+      "queueSize": 3,
+      "gameBuild": "12232306"
+    },
+    {
+      "productName": "Pitman Mining Laser",
+      "receivedAt": "2026-01-01T17:00:00.000Z",
+      "player": "PLAYER_A",
+      "notificationId": 118,
+      "queueSize": 3,
+      "gameBuild": "12232306"
+    },
+    {
+      "productName": "Strata Backpack Levski Edition",
+      "receivedAt": "2026-01-01T18:00:00.000Z",
+      "player": "PLAYER_A",
+      "notificationId": 139,
+      "queueSize": 4,
+      "gameBuild": "12232306"
+    },
+    {
+      "productName": "Strata Core Levski Edition",
+      "receivedAt": "2026-01-01T19:00:00.000Z",
+      "player": "PLAYER_A",
+      "notificationId": 164,
+      "queueSize": 3,
+      "gameBuild": "12232306"
+    },
+    {
+      "productName": "Strata Legs Levski Edition",
+      "receivedAt": "2026-01-01T20:00:00.000Z",
+      "player": "PLAYER_A",
+      "notificationId": 185,
+      "queueSize": 5,
+      "gameBuild": "12232306"
+    },
+    {
+      "productName": "Hofstede-S1 Mining Laser",
+      "receivedAt": "2026-01-01T21:00:00.000Z",
+      "player": "PLAYER_A",
+      "notificationId": 452,
+      "queueSize": 2,
+      "gameBuild": "12232306"
+    },
+    {
+      "productName": "[E-S3] CF-337 Panther \"Hazard-Zone\" Repeater",
+      "receivedAt": "2026-01-01T22:00:00.000Z",
+      "player": "PLAYER_A",
+      "notificationId": 480,
+      "queueSize": 2,
+      "gameBuild": "12232306"
+    },
+    {
+      "productName": "CQ7 Rifle",
+      "receivedAt": "2026-01-01T23:00:00.000Z",
+      "player": "PLAYER_A",
+      "notificationId": 481,
+      "queueSize": 3,
+      "gameBuild": "12232306"
+    },
+    {
+      "productName": "[E-S2] CF-227 Badger \"Hazard-Zone\" Repeater",
+      "receivedAt": "2026-01-02T00:00:00.000Z",
+      "player": "PLAYER_A",
+      "notificationId": 35,
+      "queueSize": 2,
+      "gameBuild": "12248363"
+    },
+    {
+      "productName": "Abrade Scraper Module",
+      "receivedAt": "2026-01-02T01:00:00.000Z",
+      "player": "PLAYER_A",
+      "notificationId": 61,
+      "queueSize": 2,
+      "gameBuild": "12248363"
+    },
+    {
+      "productName": "[E-S1] CF-117 Bulldog \"Hazard-Zone\" Repeater",
+      "receivedAt": "2026-01-02T02:00:00.000Z",
+      "player": "PLAYER_A",
+      "notificationId": 82,
+      "queueSize": 2,
+      "gameBuild": "12248363"
+    },
+    {
+      "productName": "Defiance Core Tactical",
+      "receivedAt": "2026-01-02T03:00:00.000Z",
+      "player": "PLAYER_A",
+      "notificationId": 214,
+      "queueSize": 2,
+      "gameBuild": "12248363"
+    },
+    {
+      "productName": "Bellator Shirt and Waistcoat",
+      "receivedAt": "2026-01-02T04:00:00.000Z",
+      "player": "PLAYER_A",
+      "notificationId": 215,
+      "queueSize": 3,
+      "gameBuild": "12248363"
+    },
+    {
+      "productName": "Lynx Arms",
+      "receivedAt": "2026-01-02T05:00:00.000Z",
+      "player": "PLAYER_A",
+      "notificationId": 225,
+      "queueSize": 2,
+      "gameBuild": "12248363"
+    },
+    {
+      "productName": "Bellator Trousers",
+      "receivedAt": "2026-01-02T06:00:00.000Z",
+      "player": "PLAYER_A",
+      "notificationId": 226,
+      "queueSize": 3,
+      "gameBuild": "12248363"
+    },
+    {
+      "productName": "Oracle Helmet",
+      "receivedAt": "2026-01-02T07:00:00.000Z",
+      "player": "PLAYER_A",
+      "notificationId": 239,
+      "queueSize": 2,
+      "gameBuild": "12248363"
+    },
+    {
+      "productName": "Bellator Jacket",
+      "receivedAt": "2026-01-02T08:00:00.000Z",
+      "player": "PLAYER_A",
+      "notificationId": 240,
+      "queueSize": 3,
+      "gameBuild": "12248363"
+    },
+    {
+      "productName": "Spettro Shoes",
+      "receivedAt": "2026-01-02T09:00:00.000Z",
+      "player": "PLAYER_A",
+      "notificationId": 265,
+      "queueSize": 2,
+      "gameBuild": "12248363"
+    },
+    {
+      "productName": "BUL-H4 Helmet",
+      "receivedAt": "2026-01-02T10:00:00.000Z",
+      "player": "PLAYER_A",
+      "notificationId": 21,
+      "queueSize": 2,
+      "gameBuild": "12519617"
+    },
+    {
+      "productName": "BUL-H4 Armor",
+      "receivedAt": "2026-01-02T11:00:00.000Z",
+      "player": "PLAYER_A",
+      "notificationId": 5,
+      "queueSize": 2,
+      "gameBuild": "12519617"
+    },
+    {
+      "productName": "TH-01 Propulsor",
+      "receivedAt": "2026-01-02T12:00:00.000Z",
+      "player": "PLAYER_A",
+      "notificationId": 11,
+      "queueSize": 3,
+      "gameBuild": "12660092"
+    },
+    {
+      "productName": "Vendetta \"Snow Camo\" HMG",
+      "receivedAt": "2026-01-02T13:00:00.000Z",
+      "player": "PLAYER_A",
+      "notificationId": 70,
+      "queueSize": 6,
+      "gameBuild": "12660092"
+    },
+    {
+      "productName": "H4-PBF Ammo Carrier Snow Camo",
+      "receivedAt": "2026-01-02T14:00:00.000Z",
+      "player": "PLAYER_A",
+      "notificationId": 83,
+      "queueSize": 8,
+      "gameBuild": "12660092"
+    },
+    {
+      "productName": "BUL-H4 Armor Snow Camo",
+      "receivedAt": "2026-01-02T15:00:00.000Z",
+      "player": "PLAYER_A",
+      "notificationId": 84,
+      "queueSize": 9,
+      "gameBuild": "12660092"
+    },
+    {
+      "productName": "BUL-H4 Helmet Snow Camo",
+      "receivedAt": "2026-01-02T16:00:00.000Z",
+      "player": "PLAYER_A",
+      "notificationId": 85,
+      "queueSize": 10,
+      "gameBuild": "12660092"
+    }
+  ]
+}
