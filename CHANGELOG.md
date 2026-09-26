@@ -34,6 +34,9 @@
 
 ### Fixed
 
+- **Audit-Log der Materialbörse: der PDF-Export scheiterte.** Der Titel des PDFs fehlte in allen
+  drei Backend-Sprachdateien, sodass der Export des Materialbörse-Tabs mit einem Fehler abbrach; ein
+  Test verlangt den Titel jetzt für jeden Audit-Bereich (REQ-AUDIT-003).
 - **Frontend: Meldungen und Formulardaten nach einer Weiterleitung gehen nicht mehr verloren.** Die
   Session-Allow-List (`enforce`) verwarf die `CopyOnWriteArrayList`, in der Spring die Flash-Attribute
   ablegt; die Klasse steht jetzt namentlich auf der Liste (REQ-SEC-067).
