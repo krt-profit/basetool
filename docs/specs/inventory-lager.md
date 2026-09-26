@@ -1294,7 +1294,7 @@ and a `TRANSFER` may not change it alone (REQ-INV-025).
 `InventoryOrgUnitChangeAjaxControllerTest`, `InventoryPageControllerMvcTest`,
 `InventoryOperationsE2eTest.changingAPersonalRowsOrgUnitWorksBothWaysInPlace`,
 `ExternalContractTest`, `ApiVhostAnonymousSurfaceTest` · **Code:** `InventoryOrgUnitChangeService`,
-`InventoryItemController`, `InventoryWriteController`, `inventory-my.js` · **Issues:** #2107
+`InventoryItemController`, `InventoryOrgUnitChangeProxyController`, `inventory-my.js` · **Issues:** #2107
 (epic #2078).
 
 ## Out of scope
