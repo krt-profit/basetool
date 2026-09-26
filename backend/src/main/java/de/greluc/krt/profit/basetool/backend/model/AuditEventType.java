@@ -126,6 +126,12 @@ public enum AuditEventType {
   /** A user's inventory rows were re-stamped onto/off an org unit on a membership change. */
   INVENTORY_ORG_RESTAMPED(AuditDomain.INVENTORY),
 
+  /** A member changed the org unit of one of their own personal rows (REQ-INV-052). */
+  INVENTORY_ORG_UNIT_CHANGED(AuditDomain.INVENTORY),
+
+  /** A member changed the org unit of a selection of their own personal rows (REQ-INV-052). */
+  INVENTORY_BULK_ORG_UNIT_CHANGED(AuditDomain.INVENTORY),
+
   /**
    * A deleted user's inventory rows were bulk-reassigned to the fallback admin.
    *

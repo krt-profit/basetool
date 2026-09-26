@@ -32,6 +32,8 @@ import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.model.BulkRebookMode;
 import de.greluc.krt.profit.basetool.backend.model.dto.AggregatedInventoryDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkCheckoutRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.BulkOrgUnitChangeRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.BulkOrgUnitChangeResultDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkRebookRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.BulkRebookResultDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.GroupedInventoryDto;
@@ -43,6 +45,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemBookOutDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemCreateDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemNoteUpdateRequest;
+import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemOrgUnitChangeDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.InventoryItemPersonalRebookDto;
 import de.greluc.krt.profit.basetool.backend.model.dto.PageResponse;
 import de.greluc.krt.profit.basetool.backend.model.dto.UpdateDeliveredRequest;
@@ -50,6 +53,7 @@ import de.greluc.krt.profit.basetool.backend.service.AuthHelperService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryAggregationService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryItemCatalogService;
 import de.greluc.krt.profit.basetool.backend.service.InventoryItemService;
+import de.greluc.krt.profit.basetool.backend.service.InventoryOrgUnitChangeService;
 import de.greluc.krt.profit.basetool.backend.service.UserService;
 import java.util.List;
 import java.util.UUID;
@@ -88,6 +92,7 @@ class InventoryItemControllerTest {
   @Mock private InventoryItemCatalogService inventoryItemCatalogService;
   @Mock private UserService userService;
   @Mock private AuthHelperService authHelperService;
+  @Mock private InventoryOrgUnitChangeService inventoryOrgUnitChangeService;
 
   @InjectMocks private InventoryItemController controller;
 
@@ -1110,6 +1115,32 @@ class InventoryItemControllerTest {
     assertThat(result).isSameAs(expected);
     verify(inventoryItemService).bulkRebook(request, ownerId);
     verify(authHelperService, never()).isLogisticianOrAbove();
+  }
+
+  @Test
+  void changeOrgUnit_passesTheCallerToTheService() {
+    Jwt jwt = jwt("alice-sub");
+    UUID ownerId = UUID.randomUUID();
+    UUID itemId = UUID.randomUUID();
+    InventoryItemOrgUnitChangeDto dto = new InventoryItemOrgUnitChangeDto(1L, null, Boolean.TRUE);
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
+
+    controller.changeOrgUnit(jwt, itemId, dto);
+
+    verify(inventoryOrgUnitChangeService).changeOrgUnit(itemId, dto, ownerId);
+  }
+
+  @Test
+  void bulkChangeOrgUnit_returnsTheServiceCounts() {
+    Jwt jwt = jwt("alice-sub");
+    UUID ownerId = UUID.randomUUID();
+    BulkOrgUnitChangeRequest request =
+        new BulkOrgUnitChangeRequest(List.of(UUID.randomUUID()), UUID.randomUUID(), null);
+    BulkOrgUnitChangeResultDto expected = new BulkOrgUnitChangeResultDto(1, 0);
+    when(userService.getUserIdFromJwt(jwt)).thenReturn(ownerId);
+    when(inventoryOrgUnitChangeService.bulkChangeOrgUnit(request, ownerId)).thenReturn(expected);
+
+    assertThat(controller.bulkChangeOrgUnit(jwt, request)).isSameAs(expected);
   }
 
   @Test
