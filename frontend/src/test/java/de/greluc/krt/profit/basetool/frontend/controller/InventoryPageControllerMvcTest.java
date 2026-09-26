@@ -336,6 +336,29 @@ class InventoryPageControllerMvcTest {
 
   @Test
   @WithMockUser(roles = "KRT_MEMBER")
+  void viewMyInventory_rendersTheOrgUnitChangeButtonAndDialog() throws Exception {
+    when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
+    when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))
+        .thenReturn(Collections.emptyList());
+
+    mockMvc
+        .perform(get("/inventory/my"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("id=\"bulkOrgUnitBtn\"")))
+        .andExpect(content().string(containsString("data-trigger=\"inv-my-open-bulk-org-unit\"")))
+        .andExpect(content().string(containsString("id=\"orgUnitChangeModal\"")))
+        .andExpect(content().string(containsString("id=\"orgUnitChangeForm\"")))
+        .andExpect(content().string(containsString("id=\"orgUnitChangeTarget\"")))
+        .andExpect(content().string(containsString("var orgUnitChangeI18n")))
+        .andExpect(
+            content()
+                .string(
+                    stringContainsInOrder(
+                        List.of("id=\"bulkRebookBtn\"", "id=\"bulkOrgUnitBtn\""))));
+  }
+
+  @Test
+  @WithMockUser(roles = "KRT_MEMBER")
   void viewMyInventory_umbuchenLocationPickerCarriesComboboxMarker() throws Exception {
     when(backendApiClient.get(anyString(), anyTypeRef())).thenReturn(Collections.emptyList());
     when(backendApiClient.getCached(any(CachedCatalog.class), anyTypeRef()))

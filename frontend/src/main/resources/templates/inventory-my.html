@@ -226,6 +226,10 @@
             <button type="button" id="bulkRebookBtn" class="btn btn-ghost" disabled
                     th:text="#{inventory.bulk.rebook.btn}"
                     data-trigger="inv-my-open-bulk-rebook">Markierte umbuchen</button>
+            <button type="button" id="bulkOrgUnitBtn" class="btn btn-ghost" disabled
+                    th:text="#{inventory.orgUnitChange.bulk.btn}"
+                    data-testid="bulk-org-unit-open"
+                    data-trigger="inv-my-open-bulk-org-unit">Markierte: Einheit &auml;ndern</button>
             <span id="bulkCheckoutCount" class="krtm-color-var-color-gray-2-font-size-0-9rem-cdef"></span>
         </div>
 
@@ -628,6 +632,32 @@
     </th:block>
 </th:block>
 
+<th:block th:replace="~{fragments/modal-wrapper :: modal(modalId='orgUnitChangeModal', titleKey='inventory.orgUnitChange.modal.title', variant='krt-modal--wide', closeTrigger='inv-my-close-org-unit', body=~{::orgUnitChangeModal-body})}">
+    <th:block th:ref="orgUnitChangeModal-body">
+        <form id="orgUnitChangeForm">
+        <div class="krt-modal-body">
+            <p id="orgUnitChangeMessage" class="krtm-color-var-color-gray-1-font-family-lato-sans-e55d"></p>
+            <div class="form-group mb-1">
+                <label for="orgUnitChangeTarget" class="form-label" th:text="#{inventory.orgUnitChange.target}">Einheit</label>
+                <select id="orgUnitChangeTarget" class="w-full" data-testid="org-unit-change-target"></select>
+                <p class="form-hint" th:text="#{inventory.orgUnitChange.visibility}">Mitglieder mit Bearbeitungsrecht in dieser Einheit k&ouml;nnen den Eintrag dann sehen und &auml;ndern.</p>
+            </div>
+            <div id="orgUnitChangeMergeRow" class="form-group check-row mb-1">
+                <input type="checkbox" id="orgUnitChangeMergeStock">
+                <div>
+                    <label for="orgUnitChangeMergeStock" th:text="#{inventory.merge.label}">Mit vorhandenem Bestand zusammenf&uuml;hren</label>
+                    <p class="form-hint" th:text="#{inventory.merge.help}">F&uuml;gt diese Menge mit vorhandenem, gleichartigem Bestand zu einem Eintrag zusammen.</p>
+                </div>
+            </div>
+        </div>
+        <div class="krt-modal-foot">
+            <button type="button" class="btn btn-ghost" data-trigger="inv-my-close-org-unit" th:text="#{inventory.orgUnitChange.cancel}">Abbrechen</button>
+            <button type="submit" id="orgUnitChangeSubmitBtn" class="btn btn--cta" data-testid="org-unit-change-submit" th:text="#{inventory.orgUnitChange.confirm}">Einheit &auml;ndern</button>
+        </div>
+        </form>
+    </th:block>
+</th:block>
+
 <th:block th:replace="~{fragments/toast :: toast}" />
 <th:block th:replace="~{fragments/materialboerse-modal :: releaseModal}"/>
 <script th:inline="javascript" th:attr="nonce=${cspNonce}">
@@ -657,6 +687,18 @@
         errorNoTarget: /*[[#{inventory.bulk.rebook.error.noTarget}]]*/ 'Bitte einen Ziel-Ort oder Ziel-Nutzer ausw\u00e4hlen.',
         hintPersonalize: /*[[#{inventory.bulk.rebook.hint.personalize}]]*/ 'Alle markierten Eintr\u00e4ge werden als pers\u00f6nlich markiert.',
         hintDepersonalize: /*[[#{inventory.bulk.rebook.hint.depersonalize}]]*/ 'Alle markierten Eintr\u00e4ge werden ins gemeinsame Lager umgebucht.'
+    };
+
+    var orgUnitChangeI18n = {
+        messageSingle: /*[[#{inventory.orgUnitChange.modal.message.single}]]*/ 'Welcher Einheit soll dieser pers\u00f6nliche Eintrag zugeordnet sein?',
+        messageBulk: /*[[#{inventory.orgUnitChange.modal.message.bulk}]]*/ 'Welcher Einheit sollen die {0} markierten Eintr\u00e4ge zugeordnet sein?',
+        none: /*[[#{inventory.orgUnitChange.none}]]*/ 'Keine Einheit',
+        success: /*[[#{inventory.orgUnitChange.success}]]*/ 'Einheit ge\u00e4ndert.',
+        successBulk: /*[[#{inventory.orgUnitChange.bulk.success}]]*/ 'Einheit bei {0} Eintr\u00e4gen ge\u00e4ndert.',
+        successBulkPartial: /*[[#{inventory.orgUnitChange.bulk.success.partial}]]*/ 'Einheit bei {0} Eintr\u00e4gen ge\u00e4ndert, {1} hatten sie bereits.',
+        noneChanged: /*[[#{inventory.orgUnitChange.bulk.none}]]*/ 'Keine \u00c4nderung.',
+        error: /*[[#{inventory.orgUnitChange.error}]]*/ 'Die Einheit konnte nicht ge\u00e4ndert werden.',
+        errorEmpty: /*[[#{inventory.orgUnitChange.error.empty}]]*/ 'Bitte mindestens einen Eintrag ausw\u00e4hlen.'
     };
 
     var inventoryConflictI18n = {

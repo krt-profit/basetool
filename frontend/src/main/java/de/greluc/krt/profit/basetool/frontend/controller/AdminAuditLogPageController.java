@@ -154,6 +154,8 @@ public class AdminAuditLogPageController {
                   "INVENTORY_HANDED_OVER",
                   "INVENTORY_CONSUMED_BY_PRODUCTION",
                   "INVENTORY_ORG_RESTAMPED",
+                  "INVENTORY_ORG_UNIT_CHANGED",
+                  "INVENTORY_BULK_ORG_UNIT_CHANGED",
                   "INVENTORY_OWNER_REASSIGNED",
                   "INVENTORY_PURGED_ON_USER_DELETION",
                   "INVENTORY_AUDIT_EXPORTED",

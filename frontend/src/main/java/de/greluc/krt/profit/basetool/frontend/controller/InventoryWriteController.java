@@ -24,6 +24,8 @@ import static de.greluc.krt.profit.basetool.frontend.support.BackendErrorRespons
 import de.greluc.krt.profit.basetool.frontend.config.UsesLayoutModel;
 import de.greluc.krt.profit.basetool.frontend.logging.BackendErrorLogging;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BulkCheckoutRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BulkOrgUnitChangeRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.BulkOrgUnitChangeResultDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BulkRebookRequest;
 import de.greluc.krt.profit.basetool.frontend.model.dto.BulkRebookResultDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryAllocationInput;
@@ -32,6 +34,7 @@ import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemBookOutDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemCreateDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemNoteUpdateRequest;
+import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemOrgUnitChangeDto;
 import de.greluc.krt.profit.basetool.frontend.model.dto.InventoryItemPersonalRebookDto;
 import de.greluc.krt.profit.basetool.frontend.model.form.InventoryForm;
 import de.greluc.krt.profit.basetool.frontend.service.BackendApiClient;
@@ -463,6 +466,67 @@ public class InventoryWriteController {
     } catch (Exception e) {
       log.error("Failed to rebook inventory item", e);
       return org.springframework.http.ResponseEntity.status(500).build();
+    }
+  }
+
+  /**
+   * AJAX proxy that changes the org unit of one of the caller's own personal rows (REQ-INV-052),
+   * forwarding to {@code POST /api/v1/inventory/{id}/org-unit}.
+   *
+   * @param id the row
+   * @param dto the version, the target unit or {@code null}, and the merge opt-in
+   * @return {@code 200} with the resulting row, or the propagated backend error
+   */
+  @PostMapping("/{id}/org-unit")
+  @ResponseBody
+  public org.springframework.http.ResponseEntity<Object> changeInventoryItemOrgUnit(
+      @PathVariable @NotNull UUID id, @RequestBody InventoryItemOrgUnitChangeDto dto) {
+    if (dto == null) {
+      return inventoryValidationError("VALIDATION");
+    }
+    try {
+      InventoryItemDto result =
+          backendApiClient.post(
+              "/api/v1/inventory/" + id + "/org-unit", dto, InventoryItemDto.class);
+      return org.springframework.http.ResponseEntity.ok(result);
+    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      log.debug(
+          "Failed to change inventory item org unit: status={}, {}",
+          e.getStatusCode(),
+          e.getMessage());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Failed to change inventory item org unit", e);
+      return org.springframework.http.ResponseEntity.status(500).build();
+    }
+  }
+
+  /**
+   * AJAX proxy that changes the org unit of a selection of the caller's own personal rows
+   * (REQ-INV-052), forwarding to {@code POST /api/v1/inventory/bulk-org-unit}. An empty selection
+   * is rejected here with a 422 {@code problem+json}.
+   *
+   * @param request the selection, the target unit or {@code null}, and the merge opt-in
+   * @return {@code 200} with the changed/skipped counts, otherwise the propagated backend error
+   */
+  @PostMapping("/bulk-org-unit")
+  @ResponseBody
+  public org.springframework.http.ResponseEntity<Object> bulkChangeOrgUnit(
+      @RequestBody BulkOrgUnitChangeRequest request) {
+    if (request == null || request.itemIds() == null || request.itemIds().isEmpty()) {
+      return inventoryValidationError("VALIDATION");
+    }
+    try {
+      BulkOrgUnitChangeResultDto result =
+          backendApiClient.post(
+              "/api/v1/inventory/bulk-org-unit", request, BulkOrgUnitChangeResultDto.class);
+      return org.springframework.http.ResponseEntity.ok(result);
+    } catch (de.greluc.krt.profit.basetool.frontend.service.BackendServiceException e) {
+      log.debug("Failed to bulk-change inventory org units (ajax): {}", e.getMessage());
+      return propagateBackendError(e);
+    } catch (Exception e) {
+      log.error("Failed to bulk-change inventory org units (ajax)", e);
+      return org.springframework.http.ResponseEntity.internalServerError().build();
     }
   }
 

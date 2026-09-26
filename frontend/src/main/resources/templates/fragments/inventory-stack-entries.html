@@ -184,6 +184,17 @@
                         th:title="#{inventory.rebook.action}" th:aria-label="#{inventory.rebook.action}">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-rebook"/></svg>
                 </button>
+                <button type="button" class="btn btn-outline btn-xs btn-icon"
+                        th:if="${entry.personal}"
+                        th:data-id="${entry.id}"
+                        th:data-version="${entry.version}"
+                        th:data-quantity-type="${entry.material.quantityType}"
+                        th:data-owning-org-unit-id="${entry.owningSquadron != null ? entry.owningSquadron.id : null}"
+                        data-trigger="inv-my-org-unit"
+                        data-testid="org-unit-change-open"
+                        th:title="#{inventory.orgUnitChange.action}" th:aria-label="#{inventory.orgUnitChange.action}">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-users"/></svg>
+                </button>
                 <button type="button" class="btn btn-xs btn-icon inventory-note-btn"
                         th:classappend="${entry.note != null and !#strings.isEmpty(entry.note)} ? 'btn-outline has-note' : 'btn-ghost'"
                         th:data-id="${entry.id}"
@@ -320,6 +331,16 @@
                         data-trigger="inv-my-umbuchen"
                         th:title="#{inventory.rebook.action}" th:aria-label="#{inventory.rebook.action}">
                     <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-rebook"/></svg>
+                </button>
+                <button type="button" class="btn btn-outline btn-xs btn-icon"
+                        th:if="${entry.personal}"
+                        th:data-id="${entry.id}"
+                        th:data-version="${entry.version}"
+                        th:data-owning-org-unit-id="${entry.owningSquadron != null ? entry.owningSquadron.id : null}"
+                        data-trigger="inv-my-org-unit"
+                        data-testid="org-unit-change-open"
+                        th:title="#{inventory.orgUnitChange.action}" th:aria-label="#{inventory.orgUnitChange.action}">
+                    <svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-users"/></svg>
                 </button>
                 <button type="button" class="btn btn-xs btn-icon inventory-note-btn"
                         th:classappend="${entry.note != null and !#strings.isEmpty(entry.note)} ? 'btn-outline has-note' : 'btn-ghost'"

@@ -1384,6 +1384,38 @@ public final class BackendSeeder {
   }
 
   /**
+   * Creates a personal inventory item of the test user via {@code POST /api/v1/inventory} and
+   * returns its id; the owning org unit is stamped from the user's membership.
+   *
+   * @param username the Keycloak username of the test user (must be an org-unit member)
+   * @param password the Keycloak password of the test user
+   * @param materialId the id of the material the item holds
+   * @param locationId the id of the storage location of the item
+   * @param quality the quality of the held material ({@code 0..1000})
+   * @param amount the amount held
+   * @return the created inventory item's id
+   */
+  public String createPersonalInventoryItem(
+      String username,
+      String password,
+      String materialId,
+      String locationId,
+      int quality,
+      double amount) {
+    String body =
+        "{\"materialId\":\""
+            + materialId
+            + "\",\"locationId\":\""
+            + locationId
+            + "\",\"quality\":"
+            + quality
+            + ",\"amount\":"
+            + amount
+            + ",\"personal\":true}";
+    return seedEntity(username, password, "/api/v1/inventory", body);
+  }
+
+  /**
    * Creates a non-personal inventory item linked to neither a job order nor a mission via {@code
    * POST /api/v1/inventory} and returns its id.
    *

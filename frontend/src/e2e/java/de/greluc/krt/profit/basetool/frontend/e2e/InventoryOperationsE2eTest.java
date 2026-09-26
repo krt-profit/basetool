@@ -21,6 +21,7 @@ package de.greluc.krt.profit.basetool.frontend.e2e;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -117,6 +118,8 @@ class InventoryOperationsE2eTest {
   private static String overbookItemId;
   private static String sameLocMatId;
   private static String sameLocItemId;
+  private static String orgUnitMatId;
+  private static String orgUnitItemId;
   private static String viewStateMatId;
   private static String viewStateItemId;
 
@@ -214,6 +217,11 @@ class InventoryOperationsE2eTest {
     sameLocItemId =
         seeder.createInventoryItem(
             USERNAME, PASSWORD, sameLocMatId, refineryHubLocId, SEED_QUALITY, 50);
+
+    orgUnitMatId = seeder.createRefineryMaterial(USERNAME, PASSWORD, "E2E Inv Org Unit Mat");
+    orgUnitItemId =
+        seeder.createPersonalInventoryItem(
+            USERNAME, PASSWORD, orgUnitMatId, opsHubLocId, SEED_QUALITY, 40);
 
     viewStateMatId = seeder.createRefineryMaterial(USERNAME, PASSWORD, "E2E Inv View State Mat");
     viewStateItemId =
@@ -703,6 +711,30 @@ class InventoryOperationsE2eTest {
    * A partial in-place book-out keeps the expanded group and stack open, with the leaf row visible
    * again without manual re-expansion (REQ-INV-002).
    */
+  /**
+   * <em>Einheit ändern</em> (REQ-INV-052). Moves a personal row to „Keine Einheit" and back to the
+   * member's Staffel through the row action, each in place, and checks the stack's owning unit
+   * through the API after each step.
+   */
+  @Test
+  void changingAPersonalRowsOrgUnitWorksBothWaysInPlace() {
+    runFlow(
+        "inventory-org-unit-change",
+        page -> {
+          openMyInventoryToEntry(page, orgUnitMatId, orgUnitItemId);
+          submitOrgUnitChange(page, orgUnitItemId, "");
+          assertTrue(
+              owningUnitIdsOf(stacksForMaterial(orgUnitMatId)).contains("none"),
+              "the row carries no unit");
+
+          openMyInventoryToEntry(page, orgUnitMatId, orgUnitItemId);
+          submitOrgUnitChange(page, orgUnitItemId, IRIDIUM_ID);
+          assertTrue(
+              owningUnitIdsOf(stacksForMaterial(orgUnitMatId)).contains(IRIDIUM_ID),
+              "the row carries the Staffel again");
+        });
+  }
+
   @Test
   void inPlaceBookOutKeepsTheExpandedTreeState() {
     runFlow(
@@ -932,6 +964,52 @@ class InventoryOperationsE2eTest {
     }
     throw new IllegalStateException(
         "No transfer-target location distinct from the source was offered in the dropdown");
+  }
+
+  /**
+   * Opens the org-unit change dialog of a personal row, picks {@code orgUnitId} (empty for no
+   * unit), submits it, waits for {@code POST /inventory/{id}/org-unit} and asserts no page reload.
+   *
+   * @param page the authenticated page expanded to the entry
+   * @param itemId the personal row
+   * @param orgUnitId the unit to pick, or {@code ""} for no unit
+   */
+  private static void submitOrgUnitChange(Page page, String itemId, String orgUnitId) {
+    page.locator("button[data-trigger='inv-my-org-unit'][data-id='" + itemId + "']").click();
+    assertThat(page.locator("#orgUnitChangeModal")).isVisible();
+    Locator select = page.locator("#orgUnitChangeTarget");
+    assertThat(select.locator("option[value='" + IRIDIUM_ID + "']")).hasCount(1);
+    select.selectOption(orgUnitId);
+    page.evaluate("window.__krtNoReload = true;");
+    page.evaluate(
+        "() => { const f = document.querySelector('.krt-footer'); if (f) { f.style.display ="
+            + " 'none'; } }");
+    page.waitForResponse(
+        r -> r.url().contains("/org-unit") && "POST".equals(r.request().method()),
+        () -> page.locator("#orgUnitChangeSubmitBtn").click());
+    assertEquals(
+        Boolean.TRUE,
+        page.evaluate("window.__krtNoReload === true"),
+        "the in-place org-unit change must not reload the page");
+  }
+
+  /**
+   * Collects the owning-unit ids of the given stacks, {@code none} for a stack without one.
+   *
+   * @param stacks the stacks of one material
+   * @return the owning-unit ids
+   */
+  private static java.util.Set<String> owningUnitIdsOf(JsonArray stacks) {
+    java.util.Set<String> ids = new java.util.HashSet<>();
+    stacks.forEach(
+        s -> {
+          com.google.gson.JsonElement unit = s.getAsJsonObject().get("owningSquadron");
+          ids.add(
+              unit == null || unit.isJsonNull()
+                  ? "none"
+                  : unit.getAsJsonObject().get("id").getAsString());
+        });
+    return ids;
   }
 
   /**
