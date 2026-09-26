@@ -1,0 +1,117 @@
+name: Dependabot Compose Follow-up
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'docker-compose*.yml'
+
+concurrency:
+  group: dependabot-compose-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  complete-bump:
+    name: Complete the compose bump
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]'
+      && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout the PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Ensure PyYAML
+        run: |
+          set -eu
+          if ! python3 -c "import yaml" >/dev/null 2>&1; then
+            pip3 install --disable-pip-version-check 'pyyaml==6.0.3'
+          fi
+          python3 -c "import yaml; print('PyYAML', yaml.__version__)"
+
+      - name: Refuse a branch that is more than a Dependabot compose bump
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          python3 .github/scripts/dependabot_compose_followup.py --selftest
+          python3 .github/scripts/dependabot_compose_followup.py guard --base "${BASE_SHA}"
+
+      - name: Re-resolve the bumped digests
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: python3 .github/scripts/dependabot_compose_followup.py refresh-digests --base "${BASE_SHA}"
+
+      - name: Regenerate the Quadlet units and the documented monitoring pins
+        run: |
+          set -euo pipefail
+          python3 scripts/generate-quadlet.py
+          bash scripts/check-monitoring-image-pins.sh --fix
+          python3 scripts/generate-quadlet.py --check
+          bash scripts/check-monitoring-image-pins.sh
+
+      - name: Detect what the regeneration changed
+        id: diff
+        run: |
+          set -euo pipefail
+          mapfile -t entries < <(git status --porcelain --untracked-files=all)
+          if [ "${#entries[@]}" -eq 0 ]; then
+            echo "The branch already carries its regenerated units; nothing to commit."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          for entry in "${entries[@]}"; do
+            if [ "${entry:0:2}" != " M" ]; then
+              echo "::error title=dependabot-compose-followup::'${entry}' is not a modification; an image bump must not add or remove a file (ADR-0215)"
+              exit 1
+            fi
+          done
+          printf '%s\n' "${entries[@]}"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Refuse to continue without the release App's key
+        if: steps.diff.outputs.changed == 'true'
+        env:
+          HAS_KEY: ${{ secrets.RELEASE_APP_PRIVATE_KEY != '' }}
+        run: |
+          if [ "${HAS_KEY}" != "true" ]; then
+            echo "::error::secret RELEASE_APP_PRIVATE_KEY is not set as a Dependabot secret -- committing the regenerated units needs the basetool-release GitHub App (ADR-0215); a Dependabot-triggered run reads Dependabot secrets only"
+            exit 1
+          fi
+
+      - name: Mint a basetool-release App token
+        id: app
+        if: steps.diff.outputs.changed == 'true'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
+        with:
+          client-id: Iv23liHT1h5peKsDnrUD
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+
+      - name: Commit onto the Dependabot branch (GitHub-signed via API)
+        if: steps.diff.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          APP_EMAIL: "332641749+basetool-release[bot]@users.noreply.github.com"
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(git diff --name-only HEAD)
+          python3 .github/scripts/create_signed_commit.py \
+            --repo "${GITHUB_REPOSITORY}" \
+            --branch "${HEAD_REF}" \
+            --expected-head-oid "${HEAD_SHA}" \
+            --message "chore(compose): regenerate the Quadlet units for this image bump" \
+            --trailer "Signed-off-by: basetool-release[bot] <${APP_EMAIL}>" \
+            "${files[@]}"

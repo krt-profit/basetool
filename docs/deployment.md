@@ -426,7 +426,8 @@ python scripts/generate-quadlet.py --list     # each service's disposition and w
 ```
 
 `repo-lint.yml`'s `quadlet-drift` check runs `--check` and the translation self-test
-(`generate-quadlet.test.sh`). Dispositions: `node-exporter` and `alloy` become host services, the
+(`generate-quadlet.test.sh`). A Dependabot compose bump regenerates the units on its own branch —
+see [Dependabot image bumps](#dependabot-image-bumps). Dispositions: `node-exporter` and `alloy` become host services, the
 podman exporter is a user unit the role installs; every other service is a container. (`cadvisor`
 and `socket-proxy` were deleted by the translation and removed from the compose file on 2026-09-22.) The edge's six network addresses are pinned by the generator and must
 equal the role's `basetool_host_edge_trusted_proxies`; the generator refuses the build otherwise.
@@ -518,7 +519,8 @@ skipped commit has no `:sha-<short>` tag. A release commit's run never skips. Th
 GitHub App** (ADR-0201), minted from the secret `RELEASE_APP_PRIVATE_KEY`: the tag ruleset "Version"
 lets only that App and @greluc create `v*` tags, and an App token's events trigger
 `release-images.yml` where `GITHUB_TOKEN`'s would not. There is no fallback — without the key the
-publish job stops with an error. The manual path is @greluc creating the tag at the release PR's
+publish job stops with an error. The same key is also a Dependabot secret for
+[Dependabot image bumps](#dependabot-image-bumps); a rotation updates both. The manual path is @greluc creating the tag at the release PR's
 merge commit and re-running the failed publish job, which then skips the tag and publishes the
 rest.
 
@@ -820,6 +822,30 @@ theme, `monitoring/` or `quadlet/` rides the same path as an app release: regene
 compose changed (`generate-quadlet.py`), merge, cut a release, promote. The next tick stages the
 bundle, installs the changed units and restarts exactly the application services whose definition
 moved. Dependabot's image-pin bumps take this path too.
+
+### Dependabot image bumps
+
+Dependabot edits `docker-compose*.yml` only. `.github/workflows/dependabot-compose.yml` completes each
+compose bump on its branch (ADR-0215, REQ-OPS-035): it re-resolves the digests the bump pins, runs
+`generate-quadlet.py` and `check-monitoring-image-pins.sh --fix`, and commits the changed files as
+`basetool-release[bot]`. The required checks then run again on that head and should be green.
+
+| What you see on the PR | What to do |
+| --- | --- |
+| A `basetool-release[bot]` commit, checks green | Review the diff — the digest may differ from the PR title when the tag was rebuilt — and merge. |
+| `Refuse a branch that is more than a Dependabot compose bump` failed | Someone pushed to the branch or used *Update branch*. Comment `@dependabot recreate`; the workflow runs again on the fresh branch. |
+| `Refuse to continue without the release App's key` failed | The Dependabot secret is missing — see below. |
+| `Mint a basetool-release App token` failed | The Dependabot copy of the key is stale or malformed — see below. |
+| A warning `could not resolve the tag` | The registry could not be read; the digest is Dependabot's. Re-resolve it by hand before merging: `docker buildx imagetools inspect <repo>:<tag> --format '{{json .Manifest}}'`. |
+| No run at all | The PR touches no `docker-compose*.yml`, or it is not Dependabot's. Regenerate by hand: `python scripts/generate-quadlet.py && scripts/check-monitoring-image-pins.sh --fix`, commit, push. |
+
+**The App key lives in two secret stores.** A Dependabot-triggered run reads Dependabot secrets only,
+so `RELEASE_APP_PRIVATE_KEY` is set both under *Settings → Secrets and variables → Actions* and under
+*→ Dependabot*, with the same PEM. Rotating the App's key updates **both**; the release workflows
+fail on a stale Actions copy, this workflow on a stale Dependabot copy.
+
+A `postgres` or `redis` digest bump recreates that stateful container on the next deploy tick after
+promotion; merging such a PR is the operator's decision to take that restart.
 
 The subtrees a release owns — `docker/` (edge, acme, maintenance), `keycloak-theme/`, `monitoring/`
 and `quadlet/` under `/var/iri/code` — must be owned by `deploy` all the way down, because the mirror

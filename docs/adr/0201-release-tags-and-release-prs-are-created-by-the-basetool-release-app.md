@@ -91,3 +91,14 @@ pushes the branch) and `pull-requests: write`, and stops with an explicit error 
   the variable `RELEASE_APP_ID` it can be deleted once a refreshVersions run has opened its PR
   through the App; deleting it is left to the owner.
 - No workflow in the repository reads a personal access token any more.
+
+## Amendment 2 (2026-09-26) — the App completes Dependabot compose bumps
+
+`dependabot-compose.yml` mints a `basetool-release` token scoped to `contents: write` and commits
+the regenerated Quadlet units onto a Dependabot compose-bump branch ([ADR-0215](0215-a-dependabot-compose-bump-carries-its-regenerated-units.md)).
+Unlike the release commit, this one **is App-authored**: it is created through `createCommitOnBranch`
+so GitHub signs it, and it must trigger the PR's required checks, which a `GITHUB_TOKEN` commit does
+not. `dco.yml` therefore lists `basetool-release[bot]` among its bot authors.
+
+- A Dependabot-triggered run reads **Dependabot secrets** only, so `RELEASE_APP_PRIVATE_KEY` is also
+  stored there. Rotating the key updates both the Actions and the Dependabot secret.
