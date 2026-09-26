@@ -96,9 +96,11 @@ The renderer refuses, naming every missing variable, rather than writing a half-
 `scripts/provision-keycloak-realm.py` ([ADR-0202](adr/0202-a-realm-is-brought-to-the-production-shape-by-a-provisioner-that-never-deletes.md),
 `REQ-OPS-033`) brings a realm to the **production shape** of everything the Basetool owns: the five
 clients (`basetool-frontend`, `backend-service`, `basetool-ingest-gateway`, `basetool-sc-extractor`,
-`basetool-android`; `grafana` with `--grafana-origin`), both ingest scopes and their audience mappers,
-every client's scope assignments, the Android client's role scope and marker role, the DPoP profile
-and policy, the service-account roles, and the realm's token and session settings. The values are
+`basetool-android`; `grafana` with `--grafana-origin`) and the approved third-party clients of
+`scripts/keycloak/external-clients.json` ([below](#onboarding-a-new-approved-client)), both ingest
+scopes and the ten `exchange.*` scopes with their audience mappers, every client's scope assignments, the Android client's role scope and marker role, the DPoP profile
+and policy, the service-account roles, and the realm's token and session settings — including the
+device code's 600 s lifespan, its 5 s polling interval and the `krt-theme` login theme. The values are
 production's, read on 2026-09-22 with `scripts/keycloak-config-snapshot.sql`. Steps 1–9 below stay
 as the explanation of those values; they are not the procedure any more.
 
@@ -205,35 +207,46 @@ DPoP policy alone is the safe partial rollback for the Android client.
 
 ## Onboarding a new approved client
 
-Only for client software the owner has explicitly approved (box above). The gateway's gates are
-built for more than one client: the allowlist and the tool list are comma-separated, the required
-scope is one shared scope, and the per-client counter labels every allowlisted id separately.
+Only for client software the owner has explicitly approved. A third-party client talks to the
+**exchange API** (`/exchange/v1/**`, [`external-exchange.md`](specs/external-exchange.md)) and
+nothing else; it never gets an ingest scope, and the legacy `/v1/*` routes end at the exchange's
+go-live (`REQ-XCH-033`). Every such client follows one template (`REQ-XCH-005`,
+[ADR-0217](adr/0217-third-party-clients-are-public-device-grant-clients-in-a-db-registry.md)), and
+the provisioner creates it — never the Admin Console.
 
-1. **Register a dedicated Keycloak client** for it — never reuse `basetool-sc-extractor`'s id.
-   A desktop or other native app is **public** (no secret, which it could not keep), uses the
-   **device authorization grant**, and has direct access grants, service accounts, the standard flow
-   and web origins **off** — the step 1 table, with its own client id. Set `fullScopeAllowed: false`
-   and map only the realm roles its members need (hardening runbook step 8 shows how).
-2. **Give it the ingest scope, and nothing broader.** Assign `extractor-ingest-only` as a
-   **Default** client scope — that is what puts `basetool-ingest` in its `aud` and
-   `extractor-ingest-only` in its `scope`, the two things the gateway checks. It does **not** need
-   `extractor-ingest` (the backend audience): since ADR-0129 its token is consumed at the gateway,
-   which calls the backend under its own identity. Never give `extractor-ingest-only` to a browser
-   client.
-3. **Verify a real token** from the new client, decoded locally (5b): `aud` contains
-   `basetool-ingest`, `scope` contains `extractor-ingest-only`, `azp` is the new id.
-4. **Allowlist it on the gateway**: append the id to `IRI_INGEST_ALLOWED_CLIENT_IDS` and, when
-   `IRI_INGEST_ALLOWED_TOOLS` is set, the `tool` value(s) the client writes into its payload; apply
-   ([above](#applying-an-env-change-on-the-production-host)).
-5. **Watch** `basetool_ingest_client_total{client_id="<new id>"}` carry its traffic and
-   `basetool_ingest_client_rejected_total` stay flat. Traffic landing on `client_id="other"` means
-   the `azp` is not the id you allowlisted.
-6. **Record it**: the client in this document's *Configured state*, the realm reference on its next
+1. **List it** in [`scripts/keycloak/external-clients.json`](../scripts/keycloak/external-clients.json):
+   a `clientId` of lower-case letters, digits and hyphens, the `name` the consent page shows, and a
+   `description`. A reserved or duplicate id, or a missing name, stops the run before it reads the
+   realm.
+2. **Run the provisioner** — dry run, read, `--apply` ([above](#new-or-out-of-date-realm-run-the-provisioner)).
+   It creates the client from the template:
+   - public, device authorization grant only; standard, implicit and direct flows and service
+     accounts off; `fullScopeAllowed: false`; **consent required**;
+   - access **and** refresh tokens DPoP-bound (`dpop.bound.access.tokens`), not the Android
+     client's refresh-only policy;
+   - an offline session of at most **30 days idle and 90 days** in total (owner decision 2026-09-26);
+     clients request `offline_access` so a web logout does not disconnect them;
+   - `basic` as the only default scope (the `sub` claim), the ten `exchange.*` capability scopes and
+     `offline_access` as optional scopes, no protocol mapper;
+   - `profile`, `email`, `roles`, `web-origins` and both ingest scopes are **withheld** — removed
+     from an existing client of the list too;
+   - the `krt-theme` login theme, whose consent page names every requested capability and whose
+     device page warns to enter only codes created on one's own PC.
+
+   Each exchange scope carries the `basetool-ingest` audience and a consent text that is a theme
+   message key (`xchConsent…`, DE and EN in `keycloak-theme/krt-theme/login/messages`).
+3. **Register it in the backend's client registry** („Verbundene Anwendungen" → admin page, WP 4.5,
+   #2087) with the capabilities it may use. Keycloak offers every scope; the registry decides.
+4. **Verify a real token** from a device login, decoded locally: the consent page lists exactly the
+   requested capabilities; `aud` contains `basetool-ingest`, `azp` is the new id, `scope` holds only
+   exchange scopes (and `offline_access`), `cnf.jkt` is present, and there is no `email`, `name`,
+   `preferred_username` or Discord claim.
+5. **Record it**: the client in this document's *Configured state*, the realm reference on its next
    regeneration ([`docs/keycloak/README.md`](keycloak/README.md)), and the vault.
 
-**Revoking** a client is step 4 in reverse — remove its id from the allowlist and apply. Tokens it
-already holds stop working at once at the gateway; disabling the Keycloak client additionally stops
-new ones being issued.
+**Revoking** a client is the registry's suspend switch (#2087); disabling the Keycloak client also
+stops new tokens being issued. Removing it from the list does **not** delete it — the provisioner
+never deletes and reports it as *only on this realm* from then on.
 
 ## What this sets up
 

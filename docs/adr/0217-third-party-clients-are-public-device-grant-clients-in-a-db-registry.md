@@ -93,3 +93,13 @@ We will model every external client as follows.
 - **A Keycloak scope ceiling per client as a third check.** Rejected by the owner for the same
   reason: one place decides.
 - **Open source only.** Rejected: approval is case by case.
+
+## Amendment — 2026-09-26: how long a connection lives
+
+Owner decision while building the Keycloak template (WP 2.2, #2081): a third-party client's
+**offline session lives at most 30 days idle and 90 days in total** — the realm's own offline
+bounds, pinned per client (`client.offline.session.idle.timeout`,
+`client.offline.session.max.lifespan`) so a later realm change cannot lengthen them. A member
+therefore re-connects a client after 30 days without use, and at the latest every 90 days. The
+installation deny list of decision 4 keeps an entry **at least 90 days**. Shorter windows (14/30,
+7/30 days) were offered and not chosen.
