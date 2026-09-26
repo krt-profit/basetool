@@ -1,7 +1,7 @@
 # ADR-0216 — The exchange API is a separate, capability-scoped contract on the ingest gateway
 
-- **Status:** Proposed — epic [#2078](https://github.com/krt-profit/basetool/issues/2078); nothing
-  built yet. Amends [ADR-0018](0018-desktop-ingest-gateway-device-grant.md) and
+- **Status:** Accepted — owner gate G0 of epic [#2078](https://github.com/krt-profit/basetool/issues/2078),
+  taken with the merge of #2111 and #2112 (2026-09-26); implementation pending. Amends [ADR-0018](0018-desktop-ingest-gateway-device-grant.md) and
   [ADR-0129](0129-ingest-gateway-is-a-trusted-subsystem-not-a-token-relay.md) (the relay route
   list and two new trusted headers) and narrows
   [ADR-0135](0135-public-api-vhost-not-a-gateway.md) (exchange paths never join its allowlist).

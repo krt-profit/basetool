@@ -1,7 +1,7 @@
 # ADR-0220 — External clients see only the anonymised demand of the member's own units and the Lager's location list
 
-- **Status:** Proposed — epic [#2078](https://github.com/krt-profit/basetool/issues/2078); nothing
-  built yet.
+- **Status:** Accepted — owner gate G0 of epic [#2078](https://github.com/krt-profit/basetool/issues/2078),
+  taken with the merge of #2111 and #2112 (2026-09-26); implementation pending.
 - **Date:** 2026-09-26
 - **Deciders:** @greluc
 - **Related:** spec [`external-exchange.md`](../specs/external-exchange.md) ·

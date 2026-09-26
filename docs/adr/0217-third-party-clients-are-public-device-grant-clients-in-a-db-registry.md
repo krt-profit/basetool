@@ -1,7 +1,7 @@
 # ADR-0217 — Third-party clients are public device-grant clients, bound by DPoP and consent, approved in a database registry
 
-- **Status:** Proposed — epic [#2078](https://github.com/krt-profit/basetool/issues/2078); nothing
-  built yet. Amends [ADR-0152](0152-the-audit-row-records-which-client-a-mutation-came-through.md)
+- **Status:** Accepted — owner gate G0 of epic [#2078](https://github.com/krt-profit/basetool/issues/2078),
+  taken with the merge of #2111 and #2112 (2026-09-26); implementation pending. Amends [ADR-0152](0152-the-audit-row-records-which-client-a-mutation-came-through.md)
   (client attribution on the relay hop).
 - **Date:** 2026-09-26
 - **Deciders:** @greluc
