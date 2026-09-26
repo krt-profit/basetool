@@ -241,11 +241,12 @@ offline-file `envelope` (`format`, `formatVersion`, `generator`, `generatedAt`, 
 
 **Acceptance**
 
-- [ ] CI validates every conformance fixture in `docs/exchange/examples/v1/` against its schema and
-  the OpenAPI document.
-- [ ] A test fails when a served route and the OpenAPI document diverge.
+- [x] CI validates every conformance fixture in `docs/exchange/examples/v1/` against its schema, and
+  every schema the OpenAPI document names exists and has valid and invalid fixtures.
+- [ ] A test fails when a served route and the OpenAPI document diverge (with the routes, WP 3.2).
 
-**Status:** planned — WP 0.2 (#2080)
+**Enforced by:** `ExchangeContractTest` · **Status:** schemas, OpenAPI document and fixtures
+committed and validated — WP 0.2 (#2080); served by the gateway with WP 3.2 (#2082)
 
 ### REQ-XCH-012 — Names resolve through the web import's own matching
 
@@ -437,7 +438,9 @@ Every error is RFC 9457 problem+json with a `code` from the registry in `docs/ex
 each with its HTTP status and the client action it requires. Codes are never reused or repurposed;
 the gateway-side codes are the `reason` labels of the exchange metrics.
 
-**Status:** planned — WP 0.2 (#2080)
+**Enforced by:** `ExchangeContractTest` (the registry's codes are unique and carry error
+statuses) · **Status:** registry published — WP 0.2 (#2080); the metric labels follow with the
+gateway, WP 3.2 (#2082)
 
 ### REQ-XCH-026 — The contract grows additively under `/exchange/v1`
 
@@ -448,9 +451,14 @@ open, extensions are namespaced, identifiers and cursors are opaque (ADR-0219).
 
 **Acceptance**
 
-- [ ] A contract test fails a change that removes or narrows anything in a v1 schema.
+- [x] A contract test fails a change that removes or narrows anything in a v1 schema: CI copies
+  the latest release's schemas to `ingest/build/exchange-baseline/` and
+  `ExchangeContractTest.theSchemasOnlyGrewSinceThePreviousRelease` compares them with
+  `SchemaCompatibility`, whose rules `SchemaCompatibilityTest` pins. Until a release carries the
+  v1 schemas the comparison has nothing to compare and is skipped.
 
-**Status:** planned — WP 0.2 (#2080)
+**Enforced by:** `ExchangeContractTest`, `SchemaCompatibilityTest` · **Status:** implemented —
+WP 0.2 (#2080)
 
 ### REQ-XCH-027 — Approved clients meet the client security requirements
 
