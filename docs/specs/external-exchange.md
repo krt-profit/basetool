@@ -76,6 +76,9 @@ need no new consent (REQ-SEC-028).
 - [ ] `docs/legal/approved-clients.md` exists, is linked from the terms clause (REQ-SEC-027) and
   lists client id, product, maintainer contact, capabilities and the approval issue and PR.
 - [ ] `docs/exchange/onboarding.md` states the criteria, the issue template and the fix deadline.
+- [ ] The privacy notice (the frontend's `privacy.*` keys, DE and EN) states which data flows to an
+  approved client on the member's own device, that the client's own privacy statement governs it
+  there, and how to disconnect and undo; it changes with the go-live.
 
 **Status:** planned — WP 4.6 (#2090), WP 6 (#2092)
 

@@ -1317,6 +1317,9 @@ minted when absent) · **Code:** `RedisSessionConfig#sessionRepositoryCustomizer
 
 ### REQ-SEC-027 — Approved client software is a contractual obligation, not only a gate
 
+> [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
+> At the go-live (WP 6, #2092) the clause `terms.list_4_1_5` in all three backend bundles changes once: it links the versioned `docs/legal/approved-clients.md` and no longer says third-party software is unsupported for approved clients (REQ-XCH-002).
+
 (REQ-SEC-026 — linking a pending Discord registration onto an existing account — is carried by
 [`discord-integration.md`](discord-integration.md); this requirement continues the series at the
 next free number.)
@@ -1367,6 +1370,9 @@ cannot exist in one locale only) · **Text:** `terms.list_4_1_5` in the **backen
 ([`desktop-ingest.md`](desktop-ingest.md)), ADR-0018
 
 ### REQ-SEC-028 — Terms-of-Use consent is recorded, versioned and enforced
+
+> [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
+> That one clause change moves the terms hash (`generateTermsVersion` over the German bundle's `terms.*` keys) once and re-prompts every member, and pauses every extractor until the member has accepted. The approved-client list sits outside those keys, so later list changes need no consent.
 
 Using the platform requires **recorded consent** to the Terms-of-Use wording currently in force.
 Before this, the terms took effect merely on access (section intro) and section 12 treated
@@ -1577,6 +1583,9 @@ ADR-0047), `support.TermsGateHandoff` (the leaf that does the same for the front
 `basetool_livesync_socket_rejected_total{reason="terms_gate"}` · **Decision:** ADR-0128
 
 ### REQ-SEC-029 — A path-scoped filter matches the DECODED path, never the raw request URI
+
+> [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
+> Unchanged in substance; it also governs the new exchange route list (REQ-XCH-001).
 
 Any servlet filter whose scope is a path — "apply to `/api/**`", "skip unless `/v1/**`", "cap these
 configured paths" — MUST decide that on the **decoded** path, by matching a parsed `PathPattern`
@@ -2174,6 +2183,9 @@ converges the same list in both directions), `UserReconciliationService#syncUser
 [ADR-0131](../adr/0131-mobile-auth-refresh-only-dpop-binding.md), and the 2026-09-02 reversal above
 
 ### REQ-SEC-036 — A client's role claim is authoritative only if its scope is complete
+
+> [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
+> The per-client narrowing extends to the acting member on exchange paths: an exchange role, the capability authorities and the memberships the demand feed needs, never the stored roles (REQ-XCH-009, ADR-0217). Ships with WP 3.1 (#2083).
 
 `UserReconciliationService#syncUser(Jwt)` mirrors a member's realm roles into `app_user` on **every**
 authentication, and it does so by **replacement**: `user.setRoles(mapRoles(realm_access.roles))`.
@@ -3926,6 +3938,9 @@ one event type.
 
 ### REQ-SEC-058 — Art. 15 / Art. 20 data export
 
+> [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
+> The export gains the exchange's member-linked tables (installations, journal, deny list, external refs, revocations, change sequence), the „gestohlen“ marker of Lager rows and the optional RSI handle. Ships with WP 1.3, 1.4 and 3.1–3.3.
+
 Every member MUST be able to export their own data from the application, and an admin MUST be able
 to export another account's for a request from somebody who cannot sign in.
 
@@ -4265,6 +4280,9 @@ legitimate while an admin is mid-task and the roster sync is nightly.
 
 ### REQ-SEC-060 — Admin Personensuche across every free-text surface
 
+> [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
+> The person search's coverage guard must serve every new member-linked table; the RSI handle is deliberately **not** searchable. Ships with WP 1.4 and 3.1–3.3.
+
 An admin MUST be able to find **every** place a given name appears, case-insensitively, across every
 free-text surface of the application.
 
@@ -4364,6 +4382,9 @@ aggregates.
 **Record:** [`docs/privacy/data-subject-requests.md`](../privacy/data-subject-requests.md)
 
 ### REQ-SEC-061 — Self-service deletion is a request an admin decides
+
+> [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
+> Erasure covers the exchange's member-linked tables and the RSI handle. Ships with WP 1.4 and 3.1–3.3.
 
 A member MUST be able to ask, in the application, for their account to be erased (Art. 17 GDPR).
 The request lands in an admin queue; it is **never** carried out by the member's own click.
@@ -4468,6 +4489,9 @@ from a statute rather than from operational taste.
 **Record:** [`docs/privacy/data-subject-requests.md`](../privacy/data-subject-requests.md)
 
 ### REQ-SEC-062 — A granted Art. 17 request anonymises the surviving handle snapshots
+
+> [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
+> Anonymisation covers the exchange's member-linked tables and the RSI handle. Ships with WP 1.4 and 3.1–3.3.
 
 When an admin grants the member's wish, the member's handle MUST be replaced by a sentinel in
 **every** place a handle snapshot survives an account deletion. Rows are **not** removed and no fact
@@ -4674,6 +4698,9 @@ template is the reference) · **Code:** `keycloak-theme/krt-theme/login/login.ft
 2026-09 improvement audit
 
 ### REQ-SEC-068 — Each service reaches Redis as its own least-privilege ACL user
+
+> [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
+> Two key families join the ACL (ADR-0221): the backend writes `exchange:*` (registry mirror, global switch, revocations, deny list); ingest reads `exchange:*` and uses `GET`, `SET` with `NX`, `INCR`, `EXPIRE` and the sorted-set commands on `ingest:xch:*`. The mirror never sits under `ingest:*`. Rendering the new ACL on production is a gated write before the first exchange release (WP 2.1, #2092).
 
 Redis holds the frontend's sessions — OAuth2 access **and refresh** tokens included — the live-sync
 and notification fan-out, and the ingest handoff. Backend, frontend and ingest used to reach it as

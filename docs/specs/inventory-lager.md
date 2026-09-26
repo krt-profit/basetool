@@ -46,6 +46,9 @@ The **stock identity** ("stack key") is the inventory **physical** natural key: 
 
 ### REQ-INV-001 — Inventory is append-only by default (merge is the scoped exception)
 
+> [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
+> A Lager row gains the „gestohlen“ marker, which every append, transfer and split carries (WP 1.3, #2096). Exchange stock writes are book-ins and book-outs through the same services (REQ-XCH-016).
+
 A write path does **not** fold a new or edited `InventoryItem` into a different existing row
 **unless the scoped stock merge of [REQ-INV-026](#req-inv-026--write-time-stock-merge-for-piece-auto-and-scu-per-action-opt-in)
 applies** — a `PIECE` material always, an `SCU` material only on the caller's per-action opt-in.
@@ -78,6 +81,9 @@ path (REQ-INV-026).
 `InventoryCheckoutService`, `RefineryOrderService` · **Issues:** #466, #1182
 
 ### REQ-INV-002 — Group-on-read display: Material → Stack
+
+> [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
+> The stack identity gains the „gestohlen“ marker in every place the Lager computes one, so a merge never folds stolen goods into a legitimate stack (WP 1.3, #2096). The exchange's lot is material + location + quality + stolen across org-unit pools (ADR-0218).
 
 The grouped Lager views (`/inventory/my`, `/inventory/all`) present each material as a group
 whose stacks are computed **in SQL** (a `GROUP BY` over the stock identity) at read time. The
@@ -265,6 +271,9 @@ there is no equivalent on the squadron-wide `/all` view.
 
 ### REQ-INV-007 — Personal-marker rebooking (Umbuchung) is an append-only split
 
+> [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
+> A personal row's org unit becomes changeable after the booking, in web and app, which gives or takes access for that unit's editors (WP 1.2, #2107). Personal rows booked in through the exchange carry no org unit.
+
 A user may **rebook** (Umbuchung) part or all of one of their inventory rows between their personal
 pool and the shared squadron pool by toggling its `personal` marker. The direction is derived from
 the source row's current flag, never from the client:
@@ -335,6 +344,9 @@ There is no "keep home unit" placeholder: the picker always carries a concrete p
 
 ### REQ-INV-025 — Book-out validates the CheckoutType; a target-less TRANSFER is rejected
 
+> [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
+> An exchange book-out uses `CheckoutType.DISCARD` with the reason the exchange records; `CheckoutType` is not pinned by `ExternalContractTest`, so the exchange contract never exposes it (WP 4.2, #2085).
+
 Book-out (`POST /api/v1/inventory/{id}/book-out`) resolves the `CheckoutType` before mutating the
 row. An **absent** `type` is inferred — `TRANSFER` when the request carries a target user or
 location, otherwise `DISCARD`. An **explicit** `type = TRANSFER` is *not* re-inferred, so a
@@ -363,6 +375,9 @@ audit event, consistent with the audit contract that only committed state mutati
 `InventoryItemService#bookOutInventoryItem`) · **Issues:** —
 
 ### REQ-INV-026 — Write-time stock merge for PIECE (auto) and SCU (per-action opt-in)
+
+> [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
+> The merge keys gain the „gestohlen“ marker (WP 1.3, #2096).
 
 A write that lands a row whose material's quantity type is **`PIECE`** (Stück) is merged into a
 single Lager entry with every existing row that shares its stock identity; a write whose material is
@@ -633,6 +648,9 @@ pages share), `inventory-my.js` / `inventory-admin.js`,
 
 ### REQ-INV-028 — Aggregated per-material overview shows average and maximum quality
 
+> [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
+> The aggregated overview makes no distinction for the „gestohlen“ marker (owner decision); trade goods booked through the exchange at quality 0 lower the average and maximum shown here — accepted (ADR-0218).
+
 The per-material Lager overview (`GET /inventory`, `AggregatedInventoryDto`) rolls the in-scope
 non-personal stock up to one row per material, showing the total amount, the **amount-weighted
 average** quality and the **maximum** available quality (the best single entry's quality). The three
@@ -826,6 +844,9 @@ already known at storage time.
 **ADR:** —
 
 ### REQ-INV-036 — "Markierte umbuchen": the bulk bar moves the whole selection, skipping already-at-target rows
+
+> [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
+> The bulk bar's moves carry the „gestohlen“ marker and the org-unit re-stamp action (WP 1.2 / 1.3).
 
 The "Mein Lager" bulk bar (`/inventory/my`, both the Material and the Items view) offers
 **"Markierte umbuchen"** next to "Markierte ausbuchen", acting on the **same** marked selection
