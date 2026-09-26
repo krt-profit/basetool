@@ -183,6 +183,7 @@ public class AuditReportService {
       case ROLE -> AuditEventType.ROLE_AUDIT_EXPORTED;
       case PROMOTION -> AuditEventType.PROMOTION_AUDIT_EXPORTED;
       case MARKET -> AuditEventType.MARKET_AUDIT_EXPORTED;
+      case HANGAR -> AuditEventType.HANGAR_AUDIT_EXPORTED;
     };
   }
 

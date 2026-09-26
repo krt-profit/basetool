@@ -591,7 +591,34 @@ public enum AuditEventType {
   MARKET_AUDIT_EXPORTED(AuditDomain.MARKET),
 
   /** Materialbörse audit rows older than an admin-chosen cutoff were purged (retention). */
-  MARKET_AUDIT_PURGED(AuditDomain.MARKET);
+  MARKET_AUDIT_PURGED(AuditDomain.MARKET),
+
+  /** A ship was added to a hangar, by its owner or by an admin. */
+  HANGAR_SHIP_CREATED(AuditDomain.HANGAR),
+
+  /** A ship's type, name, insurance, fitted flag or location was edited. */
+  HANGAR_SHIP_UPDATED(AuditDomain.HANGAR),
+
+  /** A ship was deleted; mission units it crewed were detached first. */
+  HANGAR_SHIP_DELETED(AuditDomain.HANGAR),
+
+  /** A member emptied their own hangar in one go. */
+  HANGAR_EMPTIED(AuditDomain.HANGAR),
+
+  /** A hangar or Fleetview export was imported and created ships. */
+  HANGAR_IMPORTED(AuditDomain.HANGAR),
+
+  /** The fitted flag was cleared on every ship in the caller's scope. */
+  HANGAR_FITTED_RESET(AuditDomain.HANGAR),
+
+  /** A member set one home location on every ship they own. */
+  HANGAR_HOME_LOCATION_SET(AuditDomain.HANGAR),
+
+  /** The hangar audit log was exported as a PDF or JSON for a period. */
+  HANGAR_AUDIT_EXPORTED(AuditDomain.HANGAR),
+
+  /** Hangar audit rows older than an admin-chosen cutoff were purged (retention). */
+  HANGAR_AUDIT_PURGED(AuditDomain.HANGAR);
 
   /** The functional area this event type belongs to; pins the persisted {@code domain} column. */
   private final @NotNull AuditDomain domain;

@@ -4,6 +4,10 @@
 
 ### Added
 
+- **Audit-Log: neuer Bereich „Hangar".** Jede Änderung an Schiffen — anlegen, bearbeiten,
+  löschen, Hangar leeren, Import, „Alle unfitted", Heimatstandort, auch aus der App und durch
+  Admins — landet im Audit-Log (neuer Tab); wird ein Schiff gelöscht, protokolliert die Mission das
+  Lösen aus ihren Einheiten (REQ-HANGAR-004).
 - **Neue Seite „Star-Citizen-Links" (`/sc-links`) für alle Mitglieder.** 19 hilfreiche externe
   Websites (u. a. UEX, Erkul, SCMDB, FleetYards, KRT OpSec) mit Logo und kurzer Beschreibung, nach
   Themen gruppiert; erreichbar über die neue Navigationsgruppe „Ressourcen".

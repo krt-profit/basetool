@@ -64,5 +64,12 @@ public enum AuditDomain {
    * interest registrations. The subject is the offer and the anbieter the target; interested
    * members are recorded only as counts.
    */
-  MARKET
+  MARKET,
+
+  /**
+   * Personal hangar (Hangar): a member's own ships, the hangar import and the admin paths on
+   * another member's hangar. The subject is the ship with its ship-type name as label, never the
+   * free-text ship name; the owner is the target.
+   */
+  HANGAR
 }
