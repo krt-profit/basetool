@@ -238,6 +238,8 @@ class InventoryOrgUnitChangeServiceTest {
   void bulkRefusesTheWholeSelectionWhenOneRowIsShared() {
     InventoryItem personal = row(CALLER, true, null);
     InventoryItem shared = row(CALLER, false, null);
+    personal.setId(new UUID(0L, 1L));
+    shared.setId(new UUID(0L, 2L));
     stubRow(personal);
     stubRow(shared);
 
