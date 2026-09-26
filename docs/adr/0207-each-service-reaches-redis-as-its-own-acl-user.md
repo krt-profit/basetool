@@ -1,6 +1,6 @@
 # ADR-0207 — Each service reaches Redis as its own ACL user
 
-- **Status:** Accepted — shipped inert; rolled out on production 2026-09-25 (steps 2–5, `default` off); two exchange key families proposed by [ADR-0221](0221-redis-grows-to-768-mb-and-holds-a-bounded-exchange-partition.md) (epic #2078)
+- **Status:** Accepted — shipped inert; rolled out on production 2026-09-25 (steps 2–5, `default` off); two exchange key families added by [ADR-0221](0221-redis-grows-to-768-mb-and-holds-a-bounded-exchange-partition.md) (epic #2078)
 - **Date:** 2026-09-23
 - **Deciders:** @greluc
 - **Requirement:** [REQ-SEC-068](../specs/security-and-access.md)
