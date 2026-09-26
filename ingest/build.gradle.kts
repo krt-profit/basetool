@@ -56,3 +56,22 @@ tasks.javadoc {
   options { (this as CoreJavadocOptions).addStringOption("Xdoclint:none", "-quiet") }
   destinationDir = project.file("docs/javadoc")
 }
+
+val exchangeBaseline = layout.buildDirectory.dir("exchange-baseline")
+
+tasks.test {
+  inputs
+    .dir(layout.projectDirectory.dir("../docs/exchange"))
+    .withPropertyName("exchangeContractFixtures")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
+  inputs
+    .files(exchangeBaseline)
+    .withPropertyName("exchangeContractBaseline")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
+  val baseline = exchangeBaseline
+  jvmArgumentProviders.add(
+    CommandLineArgumentProvider {
+      listOf("-Dexchange.baseline=" + baseline.get().asFile.absolutePath)
+    }
+  )
+}
