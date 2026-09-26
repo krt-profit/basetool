@@ -28,9 +28,11 @@ We will hold the exchange contract to these rules.
 3. **Namespaced extensions.** Client-specific data travels in
    `extensions: {"<reverse-DNS id>": {…}}` and is never interpreted unless registered.
 4. **Opaque identifiers and cursors.** Clients never parse them.
-5. **Formats are schemas.** JSON Schema 2020-12 under `docs/exchange/schemas/v1/`, one OpenAPI 3.1
-   file, both committed and published; the offline file envelope carries `format` and
-   `formatVersion` (`major.minor`).
+5. **Formats are schemas.** JSON Schema 2020-12, one OpenAPI 3.1 file, both committed and served
+   by the gateway; each schema's `$id` is its permanent URL,
+   `https://ingest.profit-base.online/exchange/v1/schemas/<name>.schema.json`, on our own domain
+   rather than a hosting provider's, and never changes once published. The offline file envelope
+   carries `format` and `formatVersion` (`major.minor`).
 6. **Stable errors.** RFC 9457 problem+json with a `code` from a registry; codes are never reused
    or repurposed.
 

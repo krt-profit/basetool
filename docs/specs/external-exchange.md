@@ -35,6 +35,7 @@ The exchange API is served by the ingest gateway at `/exchange/v1/**`
 | --- | --- | --- |
 | `GET /exchange/v1` | `exchange.connect` | service document: API version, capabilities granted to this token, limits, deprecations, docs URL, minimum client version |
 | `GET /exchange/v1/openapi.json` | anonymous | the committed OpenAPI 3.1 document, served as a static file |
+| `GET /exchange/v1/schemas/<name>.schema.json` | anonymous | the committed JSON Schemas, served at their `$id` (REQ-XCH-011) |
 | `POST /exchange/v1/me/installation` | `exchange.connect` | label this installation (REQ-XCH-007) |
 | `POST /exchange/v1/me/account-check` | `exchange.connect` | RSI-handle check (REQ-XCH-031) |
 | `POST /exchange/v1/catalog/resolve` | any exchange scope | resolve item references (REQ-XCH-012) |
@@ -223,7 +224,10 @@ is live before the first registry entry exists.
 
 ### REQ-XCH-011 — The v1 data formats are published JSON Schemas
 
-The formats are JSON Schema 2020-12 files under `docs/exchange/schemas/v1/` with stable `$id`s:
+The formats are JSON Schema 2020-12 files. Their source is
+`ingest/src/main/resources/exchange/v1/schemas/`; the gateway serves each one anonymously at its
+permanent `$id`, `https://ingest.profit-base.online/exchange/v1/schemas/<name>.schema.json` (owner
+decision 2026-09-26), and a `$id` is never changed once published. The schemas are:
 `item-ref` (precedence `bt` › `scRecord` › `scGuid` › `uexId` › `locKey` › `name` + `nameLocale`),
 `quantity` (`{amount, unit: SCU|PIECE}`, SCU ≤ 3 decimals, PIECE whole), `quality` (integer
 0–1000; trade goods fixed 0), `location-ref`, `provenance` (`log|manual|import|default|other`,
