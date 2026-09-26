@@ -55,6 +55,15 @@
             </div>
 
             <div class="form-group">
+                <label for="memberRsiHandle" th:text="#{members.rsiHandle.label}">RSI-Handle</label>
+                <input type="text" id="memberRsiHandle" readonly
+                       data-testid="member-rsi-handle"
+                       th:value="${memberRsiHandle}"
+                       th:placeholder="#{members.rsiHandle.none}" />
+                <p class="form-hint" th:text="#{members.rsiHandle.hint}">Vom Mitglied im Profil gepflegt; hier nur lesbar.</p>
+            </div>
+
+            <div class="form-group">
                 <label th:text="#{profile.description}">Beschreibung</label>
                 <textarea name="description" rows="5" th:text="*{description}"></textarea>
                 <div class="field-error" data-error-for="description"

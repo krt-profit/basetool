@@ -170,12 +170,17 @@ An installation is one client on one PC, identified by the thumbprint of its DPo
 labels it with `POST /exchange/v1/me/installation {label}`. The label has at most 40 characters of
 letters, digits, space, `-`, `_` and `.`, is never logged and never written to audit details, and
 is always shown after the registered client name. The backend keeps `exchange_installation`
-(client, member, thumbprint, label, first and last seen).
+(client, member, thumbprint, label, first and last seen) and gives each installation an opaque id —
+never the thumbprint — which the installation response and the service document return, so a
+client recognises its own removals in a tombstone's `removedBy.installationId` (asked by the VerseKit
+author, owner decision 2026-09-26).
 
 **Acceptance**
 
 - [ ] Label validation tests, including control, bidi and homoglyph-only input.
 - [ ] Log-capture test: the label never appears in any log line.
+- [ ] The installation response and the service document carry the same `installationId`, and a
+  tombstone written by that installation names it.
 
 **Status:** planned — WP 3.2 (#2082), WP 3.3 (#2083)
 
@@ -512,7 +517,7 @@ offers changed).
 ### REQ-XCH-031 — The account check answers match, mismatch or unknown — never the handle
 
 `POST /exchange/v1/me/account-check {handle}` compares the handle with the optional RSI handle on
-the member's profile, case-insensitively, and answers `match`, `mismatch` or `unknown` (no handle
+the member's profile (REQ-SEC-072, stored since WP 1.4), case-insensitively, and answers `match`, `mismatch` or `unknown` (no handle
 stored). It never returns or logs the stored handle and is rate-limited tightly.
 
 **Status:** planned — WP 3.4 (#2106)

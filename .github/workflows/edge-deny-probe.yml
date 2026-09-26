@@ -155,7 +155,8 @@ jobs:
 
           probe PATCH "/api/v1/users/$nil/memberships" 405
 
-          for p in /api/v1/users/me/payout-preference /api/v1/users/me/blueprint-sharing; do
+          for p in /api/v1/users/me/payout-preference /api/v1/users/me/blueprint-sharing \
+            /api/v1/users/me/rsi-handle; do
             probe GET "$p" 401
             probe PUT "$p" 401
           done

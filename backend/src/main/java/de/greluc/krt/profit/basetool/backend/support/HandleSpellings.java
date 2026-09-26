@@ -43,7 +43,7 @@ public final class HandleSpellings {
    * physical names: {@link PersonSearchTargets} searches columns, not properties.
    */
   public static final List<String> COLUMNS =
-      List.of("username", "display_name", "discord_guild_nickname");
+      List.of("username", "display_name", "discord_guild_nickname", "rsi_handle");
 
   /**
    * The other {@code app_user} text columns the person search registers, keyed by physical column
@@ -69,9 +69,13 @@ public final class HandleSpellings {
    * <p>Nulls and blanks are passed through; filtering is up to the caller.
    *
    * @param user the member
-   * @return their username, display name and Discord guild nickname, nulls included
+   * @return their username, display name, Discord guild nickname and RSI handle, nulls included
    */
   public static @NotNull Stream<String> of(@NotNull User user) {
-    return Stream.of(user.getUsername(), user.getDisplayName(), user.getDiscordGuildNickname());
+    return Stream.of(
+        user.getUsername(),
+        user.getDisplayName(),
+        user.getDiscordGuildNickname(),
+        user.getRsiHandle());
   }
 }

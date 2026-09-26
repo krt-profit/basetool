@@ -115,6 +115,26 @@
                 </div>
             </form>
 
+            <form id="profile-rsi-handle-form" class="card" th:action="@{/profile/rsi-handle}" method="post" th:object="${profileRsiHandleForm}">
+                <input type="hidden" name="version" th:field="*{version}">
+                <div class="card-head">
+                    <h2 class="card-title" th:text="#{profile.rsiHandle.label}">RSI-Handle</h2>
+                </div>
+                <div class="form-group mb-0">
+                    <label for="rsiHandle" class="form-label" th:text="#{profile.rsiHandle.field}">Dein RSI-Handle</label>
+                    <input type="text" th:field="*{rsiHandle}" class="w-full" maxlength="60"
+                           pattern="[A-Za-z0-9_\-]{3,60}" autocomplete="off" spellcheck="false"
+                           th:placeholder="#{profile.rsiHandle.placeholder}"
+                           data-testid="profile-rsi-handle-input"
+                           th:classappend="${#fields.hasErrors('rsiHandle')} ? 'input-error'" />
+                    <div th:if="${#fields.hasErrors('rsiHandle')}" th:errors="*{rsiHandle}" class="field-error"></div>
+                    <p class="form-hint"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-info"/></svg> <span th:text="#{profile.rsiHandle.hint}">Optional.</span></p>
+                </div>
+                <div class="card-foot">
+                    <button type="submit" class="btn btn--cta" data-testid="profile-rsi-handle-save"><svg class="krt-icon" aria-hidden="true"><use href="#krt-icon-save"/></svg> <span th:text="#{profile.rsiHandle.save}">Save</span></button>
+                </div>
+            </form>
+
             <div class="card card--inset">
                 <div class="card-head">
                     <h2 class="card-title" th:text="#{profile.security.title}">Access &amp; Security</h2>

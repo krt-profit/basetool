@@ -26,7 +26,7 @@ preference.
 | 2 | **Correctness of shared, concurrent state** | Several people edit the same mission, the same stock, the same order. A lost update is a wrong number in a ledger, not a cosmetic glitch. | Optimistic locking with per-section counters (§8), `ObjectOptimisticLockingFailureException` → HTTP 409 |
 | 3 | **Recoverability** | The organisation's records exist in one place. Losing them is not survivable by re-entering them. | [`backup-recovery.md`](../specs/backup-recovery.md) `REQ-OPS-008…011`, the nightly restic backup and the weekly restore drill that proves it |
 | 4 | **Operability by one person** | There is one maintainer. Anything that needs a second pair of hands at 03:40 is a design fault. | Runbooks under `docs/`, a host rebuilt by the Ansible role, the conformance suite, alerting that names the artefact rather than the symptom |
-| 5 | **Auditability** | Who changed what, in the areas where that question is asked after the fact. | `REQ-AUDIT-001`, [`audit.md`](../specs/audit.md) — an append-only trail across eleven audited areas |
+| 5 | **Auditability** | Who changed what, in the areas where that question is asked after the fact. | `REQ-AUDIT-001`, [`audit.md`](../specs/audit.md) — an append-only trail across twelve audited areas |
 | 6 | **Responsiveness of shared surfaces** | A change a peer makes appears without a reload; a page never blanks because one backend call was slow. | `REQ-FE-001…010`, Resilience4j around every backend call, the `/ws/sync` fanout |
 
 **Performance at scale is deliberately not on this list.** The organisation is in the hundreds of

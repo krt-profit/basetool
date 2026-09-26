@@ -320,6 +320,39 @@ class MemberManagementControllerTest {
   class EditMemberTests {
 
     @Test
+    void showsTheMembersRsiHandleReadOnly() {
+      UUID id = UUID.randomUUID();
+      Model model = new ConcurrentModel();
+      when(backendApiClient.get(eq("/api/v1/users/" + id), eq(UserDto.class)))
+          .thenReturn(newUser("alice"));
+      when(backendApiClient.get(
+              eq("/api/v1/users/" + id + "/rsi-handle"),
+              de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef()))
+          .thenReturn(java.util.Map.of("rsiHandle", "Alice_RSI"));
+
+      controller.editMember(id, null, model, redirectAttributes);
+
+      assertEquals("Alice_RSI", model.getAttribute("memberRsiHandle"));
+    }
+
+    @Test
+    void anUnreadableRsiHandleStillRendersThePage() {
+      UUID id = UUID.randomUUID();
+      Model model = new ConcurrentModel();
+      when(backendApiClient.get(eq("/api/v1/users/" + id), eq(UserDto.class)))
+          .thenReturn(newUser("alice"));
+      when(backendApiClient.get(
+              eq("/api/v1/users/" + id + "/rsi-handle"),
+              de.greluc.krt.profit.basetool.frontend.support.ResponseTypeMatchers.anyTypeRef()))
+          .thenThrow(new IllegalStateException("backend down"));
+
+      String view = controller.editMember(id, null, model, redirectAttributes);
+
+      assertEquals("member-edit", view);
+      assertNull(model.getAttribute("memberRsiHandle"));
+    }
+
+    @Test
     void happyPath_setsUserAndPrefilledForm() {
       UUID id = UUID.randomUUID();
       UserDto user = newUser("alice");

@@ -77,7 +77,8 @@ class AdminAuditLogPageControllerTest {
           "ROLE",
           "PROMOTION",
           "MARKET",
-          "HANGAR");
+          "HANGAR",
+          "BLUEPRINT");
 
   private BackendApiClient backendApiClient;
   private AdminAuditLogPageController controller;
