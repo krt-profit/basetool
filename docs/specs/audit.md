@@ -8,16 +8,16 @@ Area: `AUDIT` · Related: [`bank.md`](bank.md) (the bank's own audit trail, REQ-
 ## Context
 
 The Kartell bank already keeps an immutable, admin-only audit trail (REQ-BANK-012). The same
-guarantee is extended to nine more areas — **Lagerverwaltung** (`InventoryItem`),
+guarantee is extended to ten more areas — **Lagerverwaltung** (`InventoryItem`),
 **Auftragsverwaltung** (`JobOrder`), **Raffinerieverwaltung** (`RefineryOrder`), **Mein
 Inventar** (`PersonalInventoryItem`), **Missionen** (`Mission`), **Operationen** (`Operation`),
 **Rollen & Mitglieder** (`org_unit_membership`, epic #800), **Beförderung** (the promotion
-catalogue + member gradings) and **Materialbörse** (`MaterialExchangeOffer` /
-`MaterialExchangeInterest`). Every activity in each area is captured into a separate, admin-only
-log; all ten logs (the nine here plus the bank's) are read on one page with a tab switcher, and
+catalogue + member gradings), **Materialbörse** (`MaterialExchangeOffer` /
+`MaterialExchangeInterest`) and **Hangar** (`Ship`). Every activity in each area is captured into a separate, admin-only
+log; all eleven logs (the ten here plus the bank's) are read on one page with a tab switcher, and
 each can be exported as a PDF or JSON for a chosen period.
 
-The nine areas share **one** physical table (`audit_event`) with a `domain` discriminator; the
+The generic areas share **one** physical table (`audit_event`) with a `domain` discriminator; the
 bank keeps its own `bank_audit_event` table (it has bank-specific reference columns and shipped
 first). The storage choice and the unified-viewer architecture are recorded in
 [ADR-0037](../adr/0037-shared-multi-domain-activity-audit-log.md).
@@ -27,9 +27,9 @@ first). The storage choice and the unified-viewer architecture are recorded in
 ### REQ-AUDIT-001 — Immutable, complete, admin-only activity audit log
 
 > [!note] Planned amendment — external client exchange (epic #2078, [`external-exchange.md`](external-exchange.md))
-> Three `AuditDomain` values join the nine: „Verbundene Anwendungen“ (registry changes, revocations, undo, mass-change confirmations), **Blueprints** and **Hangar** (every channel). The viewer, which also shows the Bank, grows from ten tabs to thirteen, and CLAUDE.md's audited-area list follows. Ships with WP 1.1 (#2098) and WP 3.1 (#2083).
+> **Hangar** is audited since WP 1.1 (#2098, the coverage list below). Still to come: **Blueprints** (WP 1.1) and „Verbundene Anwendungen“ (registry changes, revocations, undo, mass-change confirmations; WP 3.1, #2083) — the viewer then shows thirteen tabs, and CLAUDE.md's audited-area list follows each.
 
-Every state-mutating activity in the nine areas writes exactly **one** row to an **append-only**
+Every state-mutating activity in the generic areas writes exactly **one** row to an **append-only**
 audit table (`audit_event`, modeled after `bank_audit_event` — no `@Version`, never updated except
 by the Art. 17 handle anonymisation of REQ-SEC-062, which overwrites the name snapshots in place;
 rows are deleted only by the admin purge, REQ-AUDIT-004, and the retention ceiling, REQ-AUDIT-006,
@@ -179,6 +179,18 @@ Coverage is **complete**, including the cross-area writers and the system/automa
   details carry only bounded facts — the request `kind`, the material id or blueprint `product` key,
   the `minQuality`, the desired `amt` / `qty`, and the description **length** — never the description
   body, the requester/supplier handle, or any location.
+- **Hangar** (`Ship`, `AuditDomain.HANGAR`, every channel — web, app and later the exchange) — ship
+  create (`HANGAR_SHIP_CREATED`), edit (`HANGAR_SHIP_UPDATED`, only when a field changed; the
+  details name the changed fields, never their values), delete (`HANGAR_SHIP_DELETED`, with the
+  number of mission units detached), empty own hangar (`HANGAR_EMPTIED`), import of a hangar or
+  Fleetview export (`HANGAR_IMPORTED`, only when it created ships; created / already present /
+  unmatched counts), the officer's fitted reset (`HANGAR_FITTED_RESET`, only when it cleared a
+  flag; count and whether all units were in scope) and a member's home location for every ship
+  (`HANGAR_HOME_LOCATION_SET`, subject the location). The admin paths on another member's hangar
+  write the same events. The subject is the ship, labelled by its **ship-type name** — never the
+  ship's own name, which is free text — and the owner is the target. Detaching a deleted ship
+  from a mission unit additionally writes `MISSION_UNIT_UPDATED` in the **Missionen** area, one
+  per unit, which closed a gap in that area's coverage.
 - **Datenschutz / Betroffenenrechte** (`AuditDomain.ROLE`, REQ-SEC-058 / -060 / -061 / -062) — the
   data-subject-rights surfaces, added 2026-09-16. Eight event types, and two of them audit a
   **read** (the deliberate exception above). This sentence said "Six" while listing seven
@@ -303,7 +315,7 @@ in `AdminAuditLogPageController.EVENT_TYPES_BY_DOMAIN` and the `admin.audit.even
 (`admin.bank.audit.event.<TYPE>` for the bank trail's `BankAuditEventType`) in all three message
 bundles are the two mirror points, and `AdminAuditLogPageControllerTest` pins them
 by reading the `AuditEventDto.eventType` enum out of the committed `openapi.json` and asserting that
-**every** produced type is offered by one of the ten tabs *and* carries a label.
+**every** produced type is offered by one of the tabs *and* carries a label.
 
 **Enforced by:** `AuditServiceTest`, `AuditQueryIntegrationTest`, `AuditAdminControllerSecurityTest`,
 `RoleServiceTest`, `AdminAuditLogPageControllerTest`,
@@ -313,10 +325,10 @@ per-domain emission assertions in the service tests · **Code:** `service/AuditS
 
 ### REQ-AUDIT-002 — Unified admin audit viewer
 
-All ten logs are read on **one** admin page (`/admin/audit-log`) with a **ten-way tab switcher**
+All eleven logs are read on **one** admin page (`/admin/audit-log`) with a **tab switcher**
 (Bank · Lager · Aufträge · Raffinerie · Mein Inventar · Missionen · Operationen · Rollen ·
-Beförderung · Materialbörse) built from the design-system `.tab-nav` component. The bank tab reads
-the existing `/api/v1/bank/admin/audit` endpoint; the nine area tabs read `/api/v1/audit/{domain}`;
+Beförderung · Materialbörse · Hangar) built from the design-system `.tab-nav` component. The bank tab reads
+the existing `/api/v1/bank/admin/audit` endpoint; the generic area tabs read `/api/v1/audit/{domain}`;
 both DTO
 shapes are adapted into one uniform row view so a single
 template renders every tab. Each tab is paginated and filterable by **period** (the
@@ -328,7 +340,7 @@ redirects here with the bank tab preselected.
 
 **Acceptance**
 
-- [ ] An admin sees ten tabs; switching a tab loads that area's log; filtering/paging stays in place.
+- [ ] An admin sees one tab per audited area (eleven); switching a tab loads that area's log; filtering/paging stays in place.
 - [ ] `/admin/bank-audit` redirects to `/admin/audit-log?domain=BANK`.
 - [x] The client filter is offered on **every** tab, the bank included; selecting it reaches the
   backend as a query parameter and survives paging.
@@ -372,7 +384,7 @@ forwarding (defense-in-depth).
 
 Each log can be **pruned** by an admin: a per-log action deletes that log's entries **older than an
 admin-chosen cutoff** (`occurredAt < before`). It is available **separately for every log**,
-including the bank — the nine generic areas via `DELETE /api/v1/audit/{domain}`, the bank via
+including the bank — the generic areas via `DELETE /api/v1/audit/{domain}`, the bank via
 `DELETE /api/v1/bank/admin/audit`, both gated to `hasRole('ADMIN')` at the URL matcher (and a
 method-level `@PreAuthorize` on the generic controller). The purge is scoped to the selected log
 only — purging one area never touches another.
@@ -486,7 +498,7 @@ than a feature, so the viewer offers the identical list everywhere.
 - [x] On **both** trails: two rows differing only in their client are separable by the viewer's
   filter, and a blank filter value means "no filter" rather than "matches nothing".
 - [x] The bounded vocabulary is the same object the `client_id` metric label uses.
-- [x] The filter is offered on all ten tabs and every offered value carries a DE/EN label.
+- [x] The filter is offered on every tab and every offered value carries a DE/EN label.
 
 **Enforced by:** `AuditServiceTest`, `BankAuditServiceTest`, `ClientAttributionTest`,
 `AuditQueryIntegrationTest`, `BankAuditQueryIntegrationTest`, `AdminAuditLogPageControllerTest`,

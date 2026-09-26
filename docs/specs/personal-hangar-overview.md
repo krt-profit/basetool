@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-22.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-26.
 > **Owner area:** HANGAR/UI · **Related ADRs:** none
 
 # Personal hangar overview — pagination & server-side sort/filter
@@ -80,6 +80,28 @@ on **all** the caller's ships (not the current page), so their count reflects th
 `HangarPageController#viewHangar`, `frontend/src/main/resources/templates/hangar.html`,
 `frontend/src/main/resources/templates/fragments/pagination.html` · **Issues:** #773 (performance
 audit item 10), #772 (orders/refinery pagination).
+
+### REQ-HANGAR-004 — Every hangar mutation is audited
+
+Every change to a hangar writes exactly one event to the **Hangar** audit area
+(`AuditDomain.HANGAR`, REQ-AUDIT-001), whichever channel made it — the web, the app, an admin on
+another member's hangar, the file or Fleetview import, the officer's fitted reset — and later the
+exchange API (epic #2078). A run that changed nothing records nothing. The subject is the ship,
+labelled by its ship type, never by its free-text name; details hold ids, counts and changed field
+names, never values. Deleting a ship first detaches it from mission units and records
+`MISSION_UNIT_UPDATED` in the Missionen area for each.
+
+**Acceptance**
+
+- [x] Create, edit (only with a changed field), delete, empty, import (only when ships were
+  created), fitted reset (only when a flag was cleared) and home location each record one event.
+- [x] A deleted ship's mission units are detached and each detachment is recorded.
+- [x] The Hangar tab in the admin audit viewer lists, filters, exports and purges the area.
+
+**Enforced by:** `HangarServiceTest`, `HangarImportServiceTest`, `AuditReportServiceTest`,
+`AdminAuditLogPageControllerTest`, `AuditReportProxyControllerTest`, `AuditPdfTitleKeysTest` ·
+**Code:** `HangarService`, `HangarImportService`, `AuditEventType.HANGAR_*` · **Issues:** #2098
+(epic #2078).
 
 ## Out of scope
 
