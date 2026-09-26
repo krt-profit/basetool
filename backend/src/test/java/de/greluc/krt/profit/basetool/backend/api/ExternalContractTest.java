@@ -1529,6 +1529,15 @@ class ExternalContractTest {
               Set.of("rebooked", "skipped"),
               Set.of("itemIds", "mode")),
           new ContractOperation(
+              "/api/v1/inventory/bulk-org-unit",
+              "post",
+              Set.of("changed", "skipped"),
+              Set.of("itemIds")),
+          new ContractOperation(
+              "/api/v1/inventory/{id}/org-unit",
+              "post",
+              Set.of("id", "material", "location", "amount", "personal")),
+          new ContractOperation(
               "/api/v1/inventory/{id}/allocation",
               "post",
               INVENTORY_ROW,
