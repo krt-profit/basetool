@@ -1,4 +1,4 @@
-> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-23.
+> **Doc type:** Living spec — kept in sync with `main`. Last reviewed: 2026-09-26.
 > **Owner area:** UI · **Related ADRs:**
 > [0053](../adr/0053-standardize-user-selection-on-searchable-combobox.md) (searchable user pickers, REQ-UI-012) ·
 > [0093](../adr/0093-eliminate-inline-style-attributes-csp-style-src-attr-none.md) (no inline `style=""`, REQ-UI-013) ·
@@ -11,7 +11,7 @@
 > [0177](../adr/0177-the-app-has-exactly-one-dialog-shape.md) (REQ-UI-013) ·
 > [0197](../adr/0197-shipped-dependencies-pass-a-gpl-compatible-licence-gate-and-are-listed-on-a-public-page.md) (REQ-UI-021) ·
 > [0212](../adr/0212-every-stylesheet-sits-in-a-cascade-layer.md) (REQ-UI-024) ·
-> **Next free id:** `REQ-UI-025` · **Visual source of truth:** the design
+> **Next free id:** `REQ-UI-026` · **Visual source of truth:** the design
 > skill [`.claude/skills/das-kartell-design/README.md`](../../.claude/skills/das-kartell-design/README.md)
 > (+ [`colors_and_type.css`](../../.claude/skills/das-kartell-design/colors_and_type.css)).
 
@@ -1275,6 +1275,46 @@ knock-on of one; no declaration changed hands between the design system and a pa
 **Enforced by:** `CascadeLayerOrderTest` (the order line and the layer of every file) ·
 `SingleModalShapeTest` and `TouchClassLayoutE2eTest` read rules inside `@layer` blocks ·
 **Related:** ADR-0212, ADR-0093, ADR-0176, REQ-UI-023
+
+### REQ-UI-025 — Members find helpful Star Citizen websites on a „Star-Citizen-Links" page
+
+The org's members use a set of community websites alongside the Basetool — trade data, loadouts,
+ship databases, crafting, the org's own sites. The Basetool lists them in one place so nobody has to
+collect the addresses from Discord.
+
+- **Where.** `/sc-links`, titled „Star-Citizen-Links" / "Star Citizen links". Reached from the
+  sidebar group „Ressourcen" / "Resources", placed after „Organisation" as the last group every
+  member sees. **Every signed-in account** may open it (class-level `@PreAuthorize("isAuthenticated()")`);
+  since every account is at least a member, that is „every member". Not on the public surface: an
+  anonymous caller is sent to the login like on every other page.
+- **What.** Nineteen links in five sections, in this order:
+  - **Organisation** — das-kartell.org, krt-opsec.de
+  - **Handel & Fracht** — uexcorp.space, sc-cargo.space, sc-hauling.tools, hauler.thespacecoder.space
+  - **Schiffe & Ausrüstung** — erkul.games/calculator, spviewer.eu, fleetyards.net, ccugame.app,
+    maps.adi.sc
+  - **Datenbanken & Crafting** — cstone.space, scmdb.net, sc-craft.tools, xharig.github.io/VerseKit
+  - **Universum & Community** — verseguide.com, ueexi.com, star-citizen-characters.com,
+    daymarrally.com
+- **How a link reads.** A `.card` per site: the site's own logo (48 px), its name, the host it leads
+  to, and a one- or two-sentence description in the UI language. The whole card is the link; it opens
+  in a new tab with `rel="noopener noreferrer"`, and says so to screen readers. A closing line states
+  that the sites are run by third parties and their names and logos belong to them.
+- **Logos are local copies.** Each site's favicon or touch icon is stored under
+  `static/images/sc-links/` — PNGs normalised to 96 × 96 on a transparent square, two sites as
+  their original SVG. The CSP's `img-src 'self' data:` forbids hotlinking, and a hotlinked logo would
+  also send every member's address to nineteen third parties on each visit. A shipped SVG carries no
+  script, event handler, `foreignObject` or external reference.
+- **The catalogue is code.** `ScLink` (key, address, logo, section) and `ScLinkCategory` are enums;
+  names and descriptions are i18n keys `scLinks.link.<key>.name` / `.description`. Changing the list
+  is a code change with its copy in all three bundles.
+- **No data, no backend call, nothing mutates** — so no live-update wiring (`REQ-FE-001…010` do not
+  apply), no audit event and no business metric.
+
+**Enforced by:** `ScLinkCatalogTest` (unique HTTPS addresses, every logo shipped and none unused,
+SVG hygiene, the copy in every bundle, every section non-empty) · `ScLinksPageControllerMvcTest`
+(renders every card with its logo and address in DE and EN, the sidebar entry under „Ressourcen") ·
+`AnonymousSurfaceSweepMvcTest` (anonymous navigation is sent to the login) ·
+**Related:** REQ-UI-018, REQ-SEC-052
 
 ## Out of scope
 

@@ -76,6 +76,7 @@ public final class FrontendPageRoutes {
           "/personal-inventory/blueprints",
           "/notifications",
           "/org-chart",
+          "/sc-links",
           "/profile",
           "/promotion/overview",
           "/promotion/my-evaluations",
@@ -198,6 +199,7 @@ public final class FrontendPageRoutes {
           "/ship-data",
           "/blueprint-overview",
           "/org-chart",
+          "/sc-links",
           "/notifications",
           "/personal-inventory",
           "/personal-inventory/blueprints");

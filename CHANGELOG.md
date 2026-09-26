@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Neue Seite „Star-Citizen-Links" (`/sc-links`) für alle Mitglieder.** 19 hilfreiche externe
+  Websites (u. a. UEX, Erkul, SCMDB, FleetYards, KRT OpSec) mit Logo und kurzer Beschreibung, nach
+  Themen gruppiert; erreichbar über die neue Navigationsgruppe „Ressourcen".
+
 ### Changed
 
 - **CI: ein Dependabot-Image-Bump in den Compose-Dateien bringt seine Quadlet-Units selbst mit.**
