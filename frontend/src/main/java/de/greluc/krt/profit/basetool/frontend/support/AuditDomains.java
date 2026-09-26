@@ -45,7 +45,8 @@ public final class AuditDomains {
           "OPERATION",
           "ROLE",
           "PROMOTION",
-          "MARKET");
+          "MARKET",
+          "HANGAR");
 
   /** Non-instantiable holder of the shared tab list. */
   private AuditDomains() {}

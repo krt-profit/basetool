@@ -87,6 +87,18 @@ class AuditReportProxyControllerTest {
   }
 
   @Test
+  void hangarDomain_passesTheAllowlistGateOnBothPaths() {
+    ResponseStatusException download =
+        assertThrows(
+            ResponseStatusException.class,
+            () -> controller.downloadAuditLog("HANGAR", FROM, TO, null));
+    assertNotEquals(HttpStatus.BAD_REQUEST, download.getStatusCode());
+    ResponseStatusException purge =
+        assertThrows(ResponseStatusException.class, () -> controller.purgeAuditLog("HANGAR", FROM));
+    assertNotEquals(HttpStatus.BAD_REQUEST, purge.getStatusCode());
+  }
+
+  @Test
   void knownDomain_passesTheAllowlistGate() {
     ResponseStatusException ex =
         assertThrows(
