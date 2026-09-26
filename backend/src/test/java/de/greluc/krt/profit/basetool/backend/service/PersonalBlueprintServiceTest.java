@@ -27,8 +27,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import ch.qos.logback.classic.Logger;
@@ -38,6 +40,7 @@ import de.greluc.krt.profit.basetool.backend.exception.BusinessConflictException
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.NotFoundException;
 import de.greluc.krt.profit.basetool.backend.mapper.PersonalBlueprintMapper;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.GameItem;
 import de.greluc.krt.profit.basetool.backend.model.PersonalBlueprint;
 import de.greluc.krt.profit.basetool.backend.model.dto.PersonalBlueprintBatchResult;
@@ -80,6 +83,7 @@ class PersonalBlueprintServiceTest {
   @Mock private BlueprintProductService blueprintProductService;
   @Mock private GameItemRepository gameItemRepository;
   @Mock private DefaultBlueprintKeyService defaultBlueprintKeyService;
+  @Mock private AuditService auditService;
 
   private PersonalBlueprintService service;
 
@@ -91,7 +95,8 @@ class PersonalBlueprintServiceTest {
             mapper,
             blueprintProductService,
             gameItemRepository,
-            defaultBlueprintKeyService);
+            defaultBlueprintKeyService,
+            auditService);
   }
 
   private static PersonalBlueprintResponse sampleResponse() {
@@ -144,6 +149,8 @@ class PersonalBlueprintServiceTest {
     assertEquals("Arclight Pistol", saved.getProductName());
     assertEquals(acquired, saved.getAcquiredAt());
     assertEquals("note", saved.getNote());
+    verify(auditService)
+        .record(eq(AuditEventType.BLUEPRINT_ADDED), any(), eq("Arclight Pistol"), eq(SUB), any());
   }
 
   @Test
@@ -239,6 +246,8 @@ class PersonalBlueprintServiceTest {
     assertEquals(2, result.skippedAlreadyOwned());
     assertEquals(2, result.skippedUnresolved());
     verify(repository, org.mockito.Mockito.times(1)).save(any());
+    verify(auditService)
+        .record(eq(AuditEventType.BLUEPRINT_BATCH_ADDED), isNull(), isNull(), eq(SUB), any());
   }
 
   @Test
@@ -262,6 +271,31 @@ class PersonalBlueprintServiceTest {
     assertEquals(acquired, entity.getAcquiredAt());
     assertEquals("edited", entity.getNote());
     verify(repository).save(entity);
+    verify(auditService)
+        .record(eq(AuditEventType.BLUEPRINT_UPDATED), eq(id), eq("N"), eq(SUB), any());
+  }
+
+  @Test
+  void update_withNothingChanged_recordsNothing() {
+    UUID id = UUID.randomUUID();
+    Instant acquired = Instant.parse("2026-03-04T00:00:00Z");
+    PersonalBlueprint entity =
+        PersonalBlueprint.builder()
+            .id(id)
+            .ownerUserId(SUB)
+            .productKey("k")
+            .productName("N")
+            .acquiredAt(acquired)
+            .note("same")
+            .build();
+    entity.setVersion(3L);
+    when(repository.findByIdAndOwnerUserId(id, SUB)).thenReturn(Optional.of(entity));
+    when(repository.save(entity)).thenReturn(entity);
+    when(mapper.toResponse(eq(entity), anyBoolean())).thenReturn(sampleResponse());
+
+    service.update(SUB, id, new PersonalBlueprintUpdateRequest(acquired, "same", 3L));
+
+    verifyNoInteractions(auditService);
   }
 
   @Test
@@ -296,6 +330,8 @@ class PersonalBlueprintServiceTest {
     service.delete(SUB, id);
 
     verify(repository).delete(entity);
+    verify(auditService)
+        .record(eq(AuditEventType.BLUEPRINT_REMOVED), eq(id), any(), eq(SUB), any());
   }
 
   @Test
@@ -316,6 +352,7 @@ class PersonalBlueprintServiceTest {
 
     assertThrows(BusinessConflictException.class, () -> service.delete(SUB, id));
     verify(repository, never()).delete(any());
+    verifyNoInteractions(auditService);
   }
 
   @Test
@@ -326,6 +363,17 @@ class PersonalBlueprintServiceTest {
 
     assertEquals(4, removed);
     verify(repository).deleteRemovableByOwnerUserId(SUB);
+    verify(auditService)
+        .record(eq(AuditEventType.BLUEPRINT_ALL_REMOVED), isNull(), isNull(), eq(SUB), any());
+  }
+
+  @Test
+  void deleteAllOwn_thatRemovedNothing_recordsNothing() {
+    when(repository.deleteRemovableByOwnerUserId(SUB)).thenReturn(0);
+
+    service.deleteAllOwn(SUB);
+
+    verifyNoInteractions(auditService);
   }
 
   @Test
@@ -453,5 +501,7 @@ class PersonalBlueprintServiceTest {
 
     assertEquals(7, removed);
     verify(repository).deleteAllRemovable();
+    verify(auditService)
+        .record(eq(AuditEventType.BLUEPRINT_PURGED_ALL_USERS), isNull(), isNull(), isNull(), any());
   }
 }

@@ -22,6 +22,7 @@ package de.greluc.krt.profit.basetool.backend.service;
 import de.greluc.krt.profit.basetool.backend.exception.BadRequestException;
 import de.greluc.krt.profit.basetool.backend.exception.DuplicateEntityException;
 import de.greluc.krt.profit.basetool.backend.exception.Entities;
+import de.greluc.krt.profit.basetool.backend.model.AuditEventType;
 import de.greluc.krt.profit.basetool.backend.model.OrgUnitMembership;
 import de.greluc.krt.profit.basetool.backend.model.PayoutPreference;
 import de.greluc.krt.profit.basetool.backend.model.User;
@@ -29,6 +30,7 @@ import de.greluc.krt.profit.basetool.backend.model.dto.MembershipDeltaRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.MembershipFlagsPatchRequest;
 import de.greluc.krt.profit.basetool.backend.model.dto.UserReferenceDto;
 import de.greluc.krt.profit.basetool.backend.repository.UserRepository;
+import de.greluc.krt.profit.basetool.backend.support.AuditDetails;
 import de.greluc.krt.profit.basetool.backend.support.AuthenticatedSubject;
 import de.greluc.krt.profit.basetool.backend.support.HandleAnonymisation;
 import de.greluc.krt.profit.basetool.backend.support.LikePatterns;
@@ -77,6 +79,7 @@ public class UserService {
   private static final String RSI_HANDLE_TAKEN = "error.user.rsiHandle.taken";
 
   private final UserRepository userRepository;
+  private final AuditService auditService;
   private final AuthHelperService authHelperService;
   private final OwnerScopeService ownerScopeService;
   private final OrgUnitMembershipService orgUnitMembershipService;
@@ -291,8 +294,18 @@ public class UserService {
       @NotNull UUID id, boolean shareBlueprintsGlobally, @Nullable Long version) {
     User user = Entities.require(userRepository.findById(id), "User not found");
     OptimisticLock.checkOptionalClient(user.getVersion(), version, User.class, id);
+    boolean changed = user.isShareBlueprintsGlobally() != shareBlueprintsGlobally;
     user.setShareBlueprintsGlobally(shareBlueprintsGlobally);
-    return userRepository.saveAndFlush(user);
+    User saved = userRepository.saveAndFlush(user);
+    if (changed) {
+      auditService.record(
+          AuditEventType.BLUEPRINT_SHARING_CHANGED,
+          null,
+          null,
+          id,
+          AuditDetails.of("enabled", shareBlueprintsGlobally));
+    }
+    return saved;
   }
 
   /**

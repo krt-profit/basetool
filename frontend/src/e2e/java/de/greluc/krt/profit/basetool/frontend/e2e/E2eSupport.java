@@ -29,6 +29,7 @@ import com.microsoft.playwright.PlaywrightException;
 import com.microsoft.playwright.Request;
 import com.microsoft.playwright.Response;
 import com.microsoft.playwright.TimeoutError;
+import com.microsoft.playwright.options.LoadState;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -48,6 +49,15 @@ final class E2eSupport {
 
   /** Number of attempts for the Keycloak login flow before a timeout propagates. */
   private static final int LOGIN_MAX_ATTEMPTS = 3;
+
+  /** Number of clicks {@link #submitKeycloakLogin} spends on getting the credential POST out. */
+  private static final int KEYCLOAK_SUBMIT_ATTEMPTS = 2;
+
+  /** Time, in milliseconds, one submit click has to put the credential POST on the wire. */
+  private static final double KEYCLOAK_SUBMIT_TIMEOUT_MILLIS = 10_000;
+
+  /** Path fragment of the Keycloak login form's action URL. */
+  private static final String KEYCLOAK_AUTHENTICATE_PATH = "/login-actions/authenticate";
 
   /** Number of attempts for {@link #navigate}; the last attempt runs uncaught. */
   private static final int NAVIGATE_MAX_ATTEMPTS = 3;
@@ -122,8 +132,8 @@ final class E2eSupport {
   }
 
   /**
-   * Launches headless Firefox with HTTP/2 and keep-alive disabled, and for the ephemeral stack maps
-   * {@code host.docker.internal} to the loopback.
+   * Launches headless Firefox with HTTP/2, keep-alive and the insecure-login field warning
+   * disabled, and for the ephemeral stack maps {@code host.docker.internal} to the loopback.
    *
    * @param playwright the Playwright entry point
    * @param managesStack whether the ephemeral stack is in play (enables the local-domain remap)
@@ -133,6 +143,7 @@ final class E2eSupport {
     Map<String, Object> prefs = new HashMap<>();
     prefs.put("network.http.http2.enabled", false);
     prefs.put("network.http.keep-alive", false);
+    prefs.put("security.insecure_field_warning.contextual.enabled", false);
     if (managesStack) {
       prefs.put("network.dns.localDomains", "host.docker.internal");
     }
@@ -217,18 +228,80 @@ final class E2eSupport {
    * @param baseUrl the frontend origin
    * @param username Keycloak username
    * @param password Keycloak password
-   * @throws TimeoutError if the form never appears or the redirect back to {@code baseUrl} does not
-   *     arrive within 30 s
+   * @throws TimeoutError if the form never appears, no credential POST leaves ({@link
+   *     #submitKeycloakLogin}), or the redirect back to {@code baseUrl} does not arrive within 30 s
    */
   private static void attemptLogin(Page page, String baseUrl, String username, String password) {
     page.navigate(baseUrl + "/oauth2/authorization/keycloak");
-    page.waitForSelector("#username");
-    page.fill("#username", username);
-    page.fill("#password", password);
-    page.click("#kc-login");
+    submitKeycloakLogin(page, username, password);
     page.waitForURL(
         url -> url.startsWith(baseUrl), new Page.WaitForURLOptions().setTimeout(30_000));
     acceptTermsIfPrompted(page, baseUrl);
+  }
+
+  /**
+   * Fills and submits the Keycloak login form, and returns once the credential POST to {@code
+   * login-actions/authenticate} has left the browser.
+   *
+   * <p>The form page must reach its {@code load} state and show {@code #kc-login} first. A click
+   * that sends no POST within {@link #KEYCLOAK_SUBMIT_TIMEOUT_MILLIS} is repeated, up to {@link
+   * #KEYCLOAK_SUBMIT_ATTEMPTS} clicks in all, refilling any field that no longer holds its value.
+   *
+   * @param page the page showing the Keycloak login form, or navigating to it
+   * @param username Keycloak username
+   * @param password Keycloak password
+   * @return the number of clicks it took until the POST left, at least 1
+   * @throws TimeoutError if the form does not render, or no POST leaves after {@link
+   *     #KEYCLOAK_SUBMIT_ATTEMPTS} clicks
+   */
+  static int submitKeycloakLogin(Page page, String username, String password) {
+    page.waitForLoadState(LoadState.LOAD);
+    Locator submit = page.locator("#kc-login");
+    submit.waitFor();
+    for (int attempt = 1; ; attempt++) {
+      fillUnlessHeld(page.locator("#username"), username);
+      fillUnlessHeld(page.locator("#password"), password);
+      try {
+        page.waitForRequest(
+            E2eSupport::isKeycloakCredentialPost,
+            new Page.WaitForRequestOptions().setTimeout(KEYCLOAK_SUBMIT_TIMEOUT_MILLIS),
+            submit::click);
+        return attempt;
+      } catch (TimeoutError noPost) {
+        if (attempt >= KEYCLOAK_SUBMIT_ATTEMPTS) {
+          throw noPost;
+        }
+        System.out.printf(
+            "[E2E][login] submit click %d/%d sent no POST to %s within %.0f ms; clicking again%n",
+            attempt,
+            KEYCLOAK_SUBMIT_ATTEMPTS,
+            KEYCLOAK_AUTHENTICATE_PATH,
+            KEYCLOAK_SUBMIT_TIMEOUT_MILLIS);
+      }
+    }
+  }
+
+  /**
+   * Fills {@code field} with {@code value} unless it already holds exactly that value, so a retry
+   * does not refocus a field whose content survived.
+   *
+   * @param field the text or password input
+   * @param value the value it must hold
+   */
+  private static void fillUnlessHeld(Locator field, String value) {
+    if (!value.equals(field.inputValue())) {
+      field.fill(value);
+    }
+  }
+
+  /**
+   * Reports whether {@code request} is the Keycloak login form's credential POST.
+   *
+   * @param request a request the page issued
+   * @return {@code true} for a POST whose URL contains {@link #KEYCLOAK_AUTHENTICATE_PATH}
+   */
+  private static boolean isKeycloakCredentialPost(Request request) {
+    return "POST".equals(request.method()) && request.url().contains(KEYCLOAK_AUTHENTICATE_PATH);
   }
 
   /**

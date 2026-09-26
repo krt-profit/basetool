@@ -71,6 +71,14 @@ class DtoOpenApiContractTest {
   private static final int MIN_MATCHED_ENUMS = 1;
 
   /**
+   * Frontend enums in the DTO package that mirror another module than the backend, so no backend
+   * schema is theirs: {@code HandoffKind} mirrors the ingest gateway's staged-handoff kind. Without
+   * this list the superset fallback below pairs such an enum with whichever backend enum happens to
+   * contain its values.
+   */
+  private static final Set<String> NOT_BACKEND_MIRRORS = Set.of("HandoffKind");
+
+  /**
    * Allowlist of known mirror drifts (frontend components the schema does not declare); currently
    * empty, and it must never grow.
    */
@@ -136,6 +144,9 @@ class DtoOpenApiContractTest {
     int matched = 0;
 
     for (Class<?> type : frontendDtoEnums()) {
+      if (NOT_BACKEND_MIRRORS.contains(type.getSimpleName())) {
+        continue;
+      }
       Set<String> mirror = enumConstantNames(type);
       Set<String> backend =
           backendEnums.stream()
