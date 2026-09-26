@@ -172,7 +172,13 @@ until then the risk is bounded, named and watched, which is the most this layer 
   It reaches a host with the role's `--tags deploy,scripts` run. **What remains, by decision:** a
   failed gate cannot prove whether the JAR or an app image broke it, and a bad JAR rolls back an app
   release that would have been healthy alone; the deploy log narrows what it can. The runtime-health
-  restart (ADR-0083) still restarts unhealthy services one by one and has the same `Requires=` shape.
+  restart (ADR-0083) had the same `Requires=` shape — a `restart` per unhealthy service, reported
+  resolved while the dependents it had restarted were still stopped, and a second unhealthy
+  dependent started twice. **Closed in the repository** the same day (ADR-0083 amended): the heal is
+  the release apply's one stop and one ordered start, resolved only when every unit is up; it
+  reaches a host with the same role run. **Still open, not decided:** keycloak, the databases and
+  redis are outside the drift check, so an unhealthy keycloak is healed by nobody — and healing it
+  automatically would be a full-app restart on one failed probe.
 - **A configured Discord precheck can fail open with nobody noticing.** The account-existence
   precheck (REQ-SEC-022) is fail-open by design, and its only witness is a Keycloak `WARN`. On
   production the truststore `.env` named never existed and the warning repeated at every start for

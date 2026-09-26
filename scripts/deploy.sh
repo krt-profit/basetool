@@ -88,7 +88,9 @@
 #                                          recover is not force-recreated every
 #                                          tick. Cleared on a restart that
 #                                          restores health or a successful
-#                                          deploy. Drives the distinct
+#                                          deploy (not by a drift re-apply that
+#                                          left an unhealthy container alone).
+#                                          Drives the distinct
 #                                          DeployHealthRestartFailing alert (via
 #                                          deploy-health.prom), NEVER a false
 #                                          DeployRolledBack (ADR-0083).
@@ -1765,6 +1767,8 @@ running_stack_drift() {
 DRIFTED=false
 NOOP=false
 HEALTH_DRIFT=false
+# Services a structural re-apply leaves unhealthy (see the drift split below).
+HEALTH_LEFT_OVER=""
 if [[ -f "${LAST_DEPLOYED_FILE}" ]] \
    && grep -qFx "${EXPECTED_MARKER}" "${LAST_DEPLOYED_FILE}"; then
   DRIFT_REPORT="$(running_stack_drift)"
@@ -1805,6 +1809,16 @@ if [[ -f "${LAST_DEPLOYED_FILE}" ]] \
     if grep -q '^structural ' <<< "${DRIFT_REPORT}"; then
       DRIFTED=true
       log "running stack does not match the last-deployed target — re-applying"
+      # A `health` finding beside a structural one is NOT healed by the re-apply: its unit is active,
+      # and the re-apply's start of an active unit is a no-op. ADR-0083 keeps it that way (a wrong
+      # release is corrected before health is judged), so the next tick finds it health-only and heals
+      # it. What this run must not do is stamp that stack healthy, or reset the heal's backoff.
+      HEALTH_LEFT_OVER="$(grep '^health ' <<< "${DRIFT_REPORT}" \
+        | sed -E 's/^health ([a-z]+):.*/\1/' | sort -u | tr '\n' ' ' || true)"
+      HEALTH_LEFT_OVER="${HEALTH_LEFT_OVER% }"
+      if [[ -n "${HEALTH_LEFT_OVER}" ]]; then
+        log "drift: [${HEALTH_LEFT_OVER}] unhealthy on the target image — not part of this re-apply, left for the targeted heal of the next tick"
+      fi
     else
       HEALTH_DRIFT=true
       log "running stack is at the target release but a container is unhealthy — targeted restart (not a release rollback)"
@@ -1848,8 +1862,10 @@ fi
 # The running stack is at the target release (right image) but one or more app
 # containers are unhealthy — a RUNTIME fault (e.g. the 2026-07-09 native-thread
 # exhaustion), not a wrong release. Rolling the stack back to the same image
-# cannot fix that and would fire a false DeployRolledBack, so restart ONLY the
-# affected service(s) (a unit restart, which recreates the container), bounded by a short backoff
+# cannot fix that and would fire a false DeployRolledBack, so recreate ONLY the
+# affected service(s) — and, because systemd cannot do otherwise, what `Requires=` them — in one
+# restart window (rt_heal_stack: one stop, then a start of the stack in order, each waited for),
+# bounded by a short backoff
 # so a container that will not recover is not force-recreated every tick. A
 # persistent failure is recorded as a distinct health-restart signal, never a
 # deploy `rollback`, so the promotion-outcome alerts stay truthful. This path
@@ -1885,18 +1901,27 @@ if [[ "${HEALTH_DRIFT}" == "true" ]]; then
 
   cd "${COMPOSE_DIR}"
   log "health drift: restarting unhealthy service(s) [${UNHEALTHY_SVCS}] (targeted; no pull, no signature re-verify, no release rollback)"
-  # The targeted restart recreates ONLY the sick services, at the release they
-  # are already on — no pull, no signature re-verify, no rollback (ADR-0083).
+  log "health drift: one restart window — stopping [${UNHEALTHY_SVCS}] and what requires them, then starting the stack in order"
+  # The targeted restart recreates ONLY the sick services — and what `Requires=` them, which systemd
+  # takes down with them — at the release they are already on: no pull, no signature re-verify, no
+  # rollback (ADR-0083). ONE stop, then a start of the stack in order, each unit waited for until
+  # healthy; resolved only when all of it is up (ADR-0083, amended 2026-09-25).
+  #
+  # Until 2026-09-25 this was `rt_recreate` per service: a `restart`, which re-ran ingest and frontend
+  # through backend's `Requires=` and returned once BACKEND was up. So an unhealthy backend was
+  # reported resolved -- and the healthy heartbeat stamped -- while ingest and frontend had no
+  # container yet, and a frontend that was unhealthy beside it was started a second time by its own
+  # restart after backend's had already brought it back.
   HR_RC=0
-  for hr_svc in ${UNHEALTHY_SVCS}; do
-    rt_recreate "${hr_svc}" || HR_RC=1
-  done
+  # shellcheck disable=SC2086  # UNHEALTHY_SVCS is a space-separated list of service names, split on purpose
+  rt_heal_stack ${UNHEALTHY_SVCS} || HR_RC=1
   if [[ "${HR_RC}" -eq 0 ]]; then
     rm -f "${HEALTH_RESTART_FILE}"
-    log "health drift resolved — service(s) [${UNHEALTHY_SVCS}] healthy again after targeted restart"
+    log "health drift resolved — service(s) [${UNHEALTHY_SVCS}] healthy again after targeted restart, and every unit that requires them is up"
     write_stack_health_metric healthy
     exit 0
   fi
+  log "health drift: did not come up, in start order: [${RT_FAILED_SERVICES:-none reported}]"
 
   HR_COUNT=1
   if [[ -f "${HEALTH_RESTART_FILE}" ]]; then
@@ -2170,12 +2195,20 @@ if rt_apply_stack; then
   fi
 
   echo "${EXPECTED_MARKER}" > "${LAST_DEPLOYED_FILE}"
-  rm -f "${FAILED_FILE}" "${CONFIG_BLOCKED_FILE}" "${HEALTH_RESTART_FILE}"
+  rm -f "${FAILED_FILE}" "${CONFIG_BLOCKED_FILE}"
   log "deploy successful"
   write_deploy_metric success
-  # A fresh successful deploy is by definition a healthy stack — refresh the
-  # runtime-health heartbeat so any prior health-restart-failed signal clears.
-  write_stack_health_metric healthy
+  if [[ -z "${HEALTH_LEFT_OVER}" ]]; then
+    # A fresh successful deploy is a healthy stack — refresh the runtime-health heartbeat so any
+    # prior health-restart-failed signal clears, and drop the heal's backoff record with it.
+    rm -f "${HEALTH_RESTART_FILE}"
+    write_stack_health_metric healthy
+  else
+    # Except after a drift re-apply that left an unhealthy container alone: every start returned 0
+    # because that unit was already active, not because it is healthy. Until 2026-09-25 this stamped
+    # the heartbeat anyway, which cleared an active DeployHealthRestartFailing over a sick container.
+    log "stack-health heartbeat NOT stamped: [${HEALTH_LEFT_OVER}] was unhealthy before this re-apply and was not recreated by it"
+  fi
 
   # --- Non-gating monitoring apply (epic #936, ADR-0072) ---------------------
   # Reconcile the monitoring units AFTER the app stack is verified healthy — this NEVER gates the

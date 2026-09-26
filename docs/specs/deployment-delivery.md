@@ -431,7 +431,7 @@ healthy (a container without a healthcheck counts as healthy, mirroring `up --wa
 from an image whose RepoDigest equals the target digest. Under Quadlet the containers are found by
 the `PODMAN_SYSTEMD_UNIT` label rather than by a compose project, and a host with no unit files is
 reported as such first. The run logs one `drift: <service>: <reason>` line per finding and then
-distinguishes two classes:
+distinguishes two classes, and the case where both occur:
 
 - **Structural** — a missing container, or one on a non-target image: the release is wrong, so the
   run falls through to the normal apply path (verify, pin, pull, apply), still honouring the
@@ -442,6 +442,19 @@ distinguishes two classes:
   (`IRI_HEALTH_RESTART_BASE` / `_MAX`, 300 s doubling to 1 h). A restart that does not restore
   health is recorded in `deploy-health.prom` and raises `DeployHealthRestartFailing`, never a false
   `DeployRolledBack` ([ADR-0083](../adr/0083-deploy-bot-health-drift-targeted-restart.md)).
+  **Since 2026-09-25 the restart is one restart window** (ADR-0083's amendment, the release apply's
+  shape from [ADR-0213](../adr/0213-a-release-that-moves-the-provider-jar-costs-one-outage.md)):
+  one `systemctl --user stop` naming the unhealthy services — which takes down with them what
+  `Requires=` them and nothing they require — then a `start` of every stack unit in order, each
+  waited for until healthy. Each affected unit starts exactly once; an unhealthy frontend never
+  touches backend or keycloak. The heal is reported resolved, and the healthy heartbeat stamped,
+  only when every one of those starts returned healthy; until then a `restart` per service returned
+  once the named unit was up, so an unhealthy backend was reported resolved while ingest and
+  frontend still had no container, and a frontend unhealthy beside it was started twice.
+- **Both** — a structural finding outranks a health one, so the run re-applies. The re-apply does
+  not recreate the unhealthy container (its unit is active, and a `start` of it is a no-op); the
+  next tick finds it health-only and heals it. Such a re-apply therefore neither stamps the healthy
+  heartbeat nor clears the heal's backoff record.
 
 `--check-only` reports the pending re-apply or restart without acting. Two deliberate exclusions keep the check free of false positives:
 a container still inside its healthcheck **start period** (`running/starting`) counts as
@@ -531,6 +544,13 @@ reconcile is a silent no-op — nothing scrapes the textfile there anyway.
   restarting triggers a targeted restart of only those services — no pull, no re-verify, no
   rollback — throttled by the health-restart backoff; a failed restart updates `deploy-health.prom`
   and writes no deploy-outcome metric.
+- [ ] That restart is one `stop` of the unhealthy services followed by an ordered `start` of the
+  stack, never a `restart`: every unit the stop took down (the unhealthy ones and what `Requires=`
+  them) starts exactly once, every other unit zero times, and „resolved" and the healthy heartbeat
+  are written only after all of them are up; otherwise the log names what did not come up.
+- [ ] A missing container is brought back by a `start` — never a `restart` of a running unit it
+  requires — and a drift re-apply that leaves an unhealthy at-target container alone stamps no
+  healthy heartbeat.
 - [ ] A drift re-apply of a target inside the bad-digest backoff window is skipped like any
   other re-apply of that target; a failed drift re-apply records the failure for the backoff.
 - [ ] `deploy.sh --check-only` over a drifted stack reports "would re-apply" and applies
@@ -539,7 +559,7 @@ reconcile is a silent no-op — nothing scrapes the textfile there anyway.
   non-target image digest does, even during the start period); a one-off `compose run`
   container never does.
 
-**Enforced by:** `scripts/deploy.sh` (`running_stack_drift`, idempotence check, the health-drift branch, `reconcile_monitoring_reload(s)`) · `scripts/lib/container-runtime.sh` (`rt_service_container_ids`, `rt_monitoring_recreate`) · `scripts/deploy.test.sh` (self-tests, run by `.github/workflows/deploy-script.yml`) · **Runbook:** `docs/deployment.md` → *What happens on the host*, *Driving the stack*
+**Enforced by:** `scripts/deploy.sh` (`running_stack_drift`, idempotence check, the health-drift branch, `reconcile_monitoring_reload(s)`) · `scripts/lib/container-runtime.sh` (`rt_service_container_ids`, `rt_heal_stack`, `rt_monitoring_recreate`) · `scripts/deploy.test.sh` (self-tests, run by `.github/workflows/deploy-script.yml`) · **Runbook:** `docs/deployment.md` → *What happens on the host*, *Driving the stack*
 
 ### REQ-OPS-014 — Every prod service runs with a hardened runtime baseline
 

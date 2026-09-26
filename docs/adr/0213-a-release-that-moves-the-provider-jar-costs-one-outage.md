@@ -71,7 +71,8 @@ A Keycloak **image** change stays operator-gated by REQ-OPS-006; this decision d
   JAR change, or with a fixed JAR, is the way forward in that case.
 - **Follow-up:** the runtime-health restart (ADR-0083) still restarts unhealthy services one by one
   with `restart` and waits only for the named unit; it shares the `Requires=` shape and is not
-  changed here.
+  changed here. *Closed 2026-09-25 by ADR-0083's amendment: the heal now uses this decision's restart
+  window (`rt_heal_stack`).*
 
 ## Alternatives considered
 
