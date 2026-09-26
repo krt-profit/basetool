@@ -38,7 +38,8 @@ even though they are style rules on paper:
   `@JBossLog`; every other logging annotation is a compile error, and a hand-written logger or a
   console write in `src/main` fails a CI job (ADR-0193).
 - **Javadoc is mandatory and gate-enforced** on every type and public member. Checkstyle enforces
-  the form; the substance is on the author.
+  the form; the substance is on the author. A misplaced or orphaned Javadoc fails the build in
+  every source set, `test` and `e2e` included (ADR-0222).
 - **No comments besides Javadoc** (ADR-0214). Javadoc is short and carries no history; reasoning
   goes into the commit message and the PR, durable facts into the spec, the ADR or the knowledge
   base. Nothing gates this beyond review.

@@ -673,6 +673,10 @@ that — promotion to `:stable` and the host rollout — is in
   `@SuppressFBWarnings(justification = "...")` where the annotation has
   that attribute, otherwise into the commit message and the PR — never
   into a code comment.
+- **Test and e2e sources** get one Checkstyle rule only,
+  `InvalidJavadocPosition` (`config/checkstyle/javadoc_position.xml`,
+  ADR-0222): a Javadoc directly above another Javadoc fails `check`.
+  Move the orphaned block back onto the member it describes.
 - **No comments besides Javadoc** (ADR-0214). Javadoc is short, precise
   and carries no history; the reasoning behind a change goes into the
   commit message and the PR.

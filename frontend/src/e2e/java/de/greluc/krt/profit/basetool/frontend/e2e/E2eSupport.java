@@ -526,15 +526,15 @@ final class E2eSupport {
     }
   }
 
+  /** How long to wait for a filter panel to become reachable after the toggle click. */
+  private static final double FILTER_PANEL_TIMEOUT_MS = 10_000;
+
   /**
    * Expands the page's collapsed filter panel (REQ-FE-021) and waits until its controls are
    * reachable; a no-op when the page has no collapsible panel.
    *
    * @param page the page under test
    */
-  /** How long to wait for a filter panel to become reachable after the toggle click. */
-  private static final double FILTER_PANEL_TIMEOUT_MS = 10_000;
-
   static void openFilterPanel(Page page) {
     Locator toggle = page.locator(".filter-toggle").first();
     if (toggle.count() == 0) {

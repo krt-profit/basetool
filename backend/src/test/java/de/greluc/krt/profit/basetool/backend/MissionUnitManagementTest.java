@@ -260,12 +260,6 @@ class MissionUnitManagementTest {
     assertEquals(ship.getId(), reloaded.getShip().getId());
   }
 
-  /**
-   * Persists a ship owned by a freshly created user who is not a participant of the mission under
-   * test, reusing the {@code ship} field's ship type so the ship-to-type match still holds.
-   *
-   * @return the saved ship whose owner is absent from the mission roster
-   */
   /** A blank display name derives the stored unit name from the assigned ship (mock: optional). */
   @Test
   void testAddUnit_BlankName_DerivesNameFromShip() {
@@ -363,6 +357,12 @@ class MissionUnitManagementTest {
     assertEquals(null, reloaded.getNote(), "blank note must collapse to null");
   }
 
+  /**
+   * Persists a ship owned by a freshly created user who is not a participant of the mission under
+   * test, reusing the {@code ship} field's ship type so the ship-to-type match still holds.
+   *
+   * @return the saved ship whose owner is absent from the mission roster
+   */
   private Ship shipOwnedByNonParticipant() {
     User outsider = new User();
     outsider.setId(UUID.randomUUID());
