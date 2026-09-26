@@ -1,6 +1,6 @@
 # ADR-0083 — Deploy-bot distinguishes runtime-health drift from release drift (targeted restart, not rollback)
 
-- **Status:** Accepted — amended 2026-09-25 twice (the heal is one restart window; a failed structural re-apply does not roll back — see the amendments below)
+- **Status:** Accepted — amended 2026-09-25 twice (the heal is one restart window; a failed structural re-apply does not roll back) and 2026-09-26 (`deploy.sh --reapply`; a failed re-apply backs off with the heal's durations) — see the amendments below
 - **Date:** 2026-07-09
 - **Deciders:** @greluc
 - **Related:** `scripts/deploy.sh` · REQ-OPS-016 (`docs/specs/observability.md`) · ADR-0072 (deploy textfile metrics) · ADR-0084 (readiness health-group) · the 2026-07-09 native-thread exhaustion incident
@@ -179,7 +179,9 @@ one — while the real previous release was lost as a rollback target. Found in 
 Only a change of target rotates the anchors and can roll back, so `DeployRolledBack` is again what
 this ADR's first consequence says it is. A structural re-apply's backoff stays the bad-digest one
 (600 s doubling to 6 h), separate from the heal's — sharing the heal's record would let a failed heal
-of one service hold back the re-apply of another service's missing container.
+of one service hold back the re-apply of another service's missing container. *(Superseded on
+2026-09-26: the re-apply keeps a record of its own, still apart from the heal's, with the heal's
+durations — see the next amendment.)*
 
 **Consequences.** A failed re-apply leaves production where it was, pages the runtime signal, and
 retries after the backoff (or at once with `--force`); the next release rolls back to the deployed
@@ -189,3 +191,44 @@ release, not past it. Tested by `scripts/deploy.test.sh`
 `scenario_release_after_a_reapply_rotates_the_anchor_to_the_deployed_release`,
 `scenario_reapply_of_lost_units_keeps_config_previous`); against the deployer before it the first,
 second and fourth fail. Specified by REQ-OPS-003 and REQ-OPS-013.
+
+## Amendment — 2026-09-26: `--reapply`, and a failed re-apply backs off like the heal
+
+**Context.** Two things were left over by the amendment above. The documented way for an operator to
+force a full re-apply was to delete `last-deployed.digests` — which takes away exactly what makes a
+run a re-apply, so that run took the deployed release for a new one and rotated all three anchors
+onto it (the loss the amendment above fixed for the drift path). And a failed re-apply was backed off
+by the release durations, 600 s doubling to 6 h, from `failed.digests`: a missing container on the
+release production is already on could stay missing for hours, and — once an operator can trigger a
+re-apply while the tag names a newer release that rolled back — sharing `failed.digests` meant the
+re-apply's record would overwrite that release's, or its success delete it, and the next tick would
+retry the release at once.
+
+**Decision** (@greluc, 2026-09-26).
+
+1. **`deploy.sh --reapply`** re-applies the deployed release on request. Its target is read from
+   `last-deployed.digests`, never resolved from a tag; it takes the re-apply path of the amendment
+   above in full — no anchor rotated, nothing rolled back on failure, `DeployHealthRestartFailing`
+   rather than a deploy outcome — and re-delivers the config bundle and units and re-stages the
+   provider JAR, swapping it in only when the live JAR differs (so a re-apply of an intact stack
+   restarts nothing it does not have to). It is refused on a host with no marker, with `--tag`, and
+   when the pin record disagrees with the marker. It bypasses the re-apply backoff: that backoff
+   throttles the timer, and an operator asking now has chosen to spend the restart window now.
+   Deleting the marker is no longer documented as a way to re-apply.
+2. **A failed re-apply — drift or `--reapply` — backs off with the self-heal's durations**
+   (`IRI_HEALTH_RESTART_BASE` 300 s doubling to `IRI_HEALTH_RESTART_MAX` 1 h), from **its own**
+   record, `reapply-failed.digests`. Still not the heal's record, for the reason given above; and no
+   longer `failed.digests`, which keeps the release backoff (600 s doubling to 6 h) for releases only
+   and is left untouched by any re-apply.
+3. **A successful re-apply is not a deploy outcome either.** It stamps the stack-health heartbeat,
+   not `basetool_deploy_last_success_timestamp`, which would clear a `DeployRolledBack` or
+   `DeployFailed` that a different, still unshipped release raised.
+
+**Consequences.** One command replaces a recipe that destroyed the rollback anchors. A missing
+container that a re-apply could not bring back is retried after five minutes instead of ten, and
+after at most an hour instead of six. A failed re-apply record from before this amendment (in
+`failed.digests`, keyed to the deployed target) is ignored by the re-apply and dropped by the next
+successful re-apply or the next release. Tested by `scripts/deploy.test.sh`
+(`scenario_reapply_flag_*`, `scenario_failed_drift_reapply_backs_off_with_the_heal_durations`; the
+guards `scenario_deleting_the_marker_still_rotates_the_anchors` and
+`scenario_failed_release_keeps_the_long_backoff`). Specified by REQ-OPS-003 and REQ-OPS-013.

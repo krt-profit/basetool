@@ -13,6 +13,10 @@
   wenn alle wieder laufen.** Ein ungesunder Dienst wird mit allem, was ihn per `Requires=` braucht,
   einmal gestoppt und in Reihenfolge wieder gestartet, statt einzeln neu gestartet (ungesundes
   Frontend: nur Frontend). Wirkt erst nach einem Lauf der Ansible-Rolle (`--tags deploy,scripts`).
+- **Deploy: `deploy.sh --reapply` spielt das laufende Release erneut ein, ohne die Rollback-Anker zu
+  verschieben** — ersetzt das Löschen von `last-deployed.digests`. Ein gescheitertes Re-Apply wird
+  nach 5 Minuten (verdoppelnd bis 1 h) statt nach 10 Minuten (bis 6 h) wiederholt. Wirkt erst nach
+  einem Lauf der Ansible-Rolle (`--tags deploy,scripts`).
 
 ### Fixed
 

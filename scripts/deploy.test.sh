@@ -908,8 +908,10 @@ scenario_check_only_drift() {
 }
 
 # ---------------------------------------------------------------------------
-# Scenario 7: drifted stack whose target is in the bad-digest backoff window.
+# Scenario 7: drifted stack whose target is in the re-apply backoff window.
 # The drift re-apply must respect the backoff instead of flapping every tick.
+# Since 2026-09-26 a failed re-apply is recorded in reapply-failed.digests, not
+# failed.digests (the re-apply backoff scenarios near the bottom).
 # ---------------------------------------------------------------------------
 scenario_drift_respects_backoff() {
   echo "Scenario: drifted stack, target in backoff window (must skip)"
@@ -917,7 +919,7 @@ scenario_drift_respects_backoff() {
   tmp="$(mktmp)"
   setup_host "${tmp}"
   write_marker "${MARKER}"
-  printf '%s 1 %d\n' "${MARKER}" "$(date +%s)" > "${T_STATE_DIR}/failed.digests"
+  printf '%s 1 %d\n' "${MARKER}" "$(date +%s)" > "${T_STATE_DIR}/reapply-failed.digests"
   mapfile -t fake < <(converged_env)
   run_deploy -- "${fake[@]}" "FAKE_PS_backend=" || rc=$?
   assert_exit 0 "$rc" "backed-off drift tick exits 0"
@@ -944,10 +946,15 @@ scenario_drift_reapply_fails() {
   assert_exit 1 "$rc" "a failed drift re-apply exits non-zero"
   assert_contains "health check failed" "the health-gate failure is reported"
   assert_contains "recorded re-apply failure #1" "the failure feeds the backoff"
-  if grep -qF "${MARKER} 1 " "${T_STATE_DIR}/failed.digests" 2>/dev/null; then
-    record 1 "failed.digests records the target marker with count 1"
+  if grep -qF "${MARKER} 1 " "${T_STATE_DIR}/reapply-failed.digests" 2>/dev/null; then
+    record 1 "reapply-failed.digests records the target marker with count 1"
   else
-    record 0 "failed.digests records the target marker with count 1"
+    record 0 "reapply-failed.digests records the target marker with count 1"
+  fi
+  if [[ ! -f "${T_STATE_DIR}/failed.digests" ]]; then
+    record 1 "failed.digests, the release backoff, is not written by a re-apply"
+  else
+    record 0 "failed.digests, the release backoff, is not written by a re-apply ($(cat "${T_STATE_DIR}/failed.digests"))"
   fi
   rm -rf "${tmp}"
 }
@@ -3400,6 +3407,16 @@ assert_failed_record() {
   fi
 }
 
+# assert_reapply_record <marker> <count> <description> -- reapply-failed.digests, the re-apply's own
+# backoff record (since 2026-09-26), holds that target and count.
+assert_reapply_record() {
+  if grep -qF "${1} ${2} " "${T_STATE_DIR}/reapply-failed.digests" 2>/dev/null; then
+    record 1 "$3"
+  else
+    record 0 "$3 (reapply-failed.digests: $(cat "${T_STATE_DIR}/reapply-failed.digests" 2>/dev/null || echo '<none>'))"
+  fi
+}
+
 scenario_reapply_that_fails_keeps_the_anchors_and_rolls_nothing_back() {
   echo "Scenario: a drift re-apply that fails its gate keeps the anchors on N-1, rolls nothing back, pages no DeployRolledBack"
   local tmp rc=0
@@ -3432,7 +3449,7 @@ scenario_reapply_that_fails_keeps_the_anchors_and_rolls_nothing_back() {
     "re-apply fails: the gauge DeployHealthRestartFailing reads is stamped"
   assert_health_stamp basetool_deploy_last_stack_healthy_timestamp no "re-apply fails: the healthy heartbeat is not stamped"
   assert_contains "recorded re-apply failure #1" "re-apply fails: the failure is recorded"
-  assert_failed_record "${MARKER}" 1 "re-apply fails: the backoff record is keyed to the deployed target"
+  assert_reapply_record "${MARKER}" 1 "re-apply fails: the backoff record is keyed to the deployed target"
 
   # Five minutes later, inside the backoff: a quiet skip, not another attempt.
   : > "${T_DOCKER_LOG}"
@@ -3493,7 +3510,9 @@ scenario_release_after_a_reapply_rotates_the_anchor_to_the_deployed_release() {
   assert_pin_binds backend "${DIG_BACKEND}" "release after re-apply: the rollback lands on N, not on N-1 and not on N+1"
   assert_metric_set basetool_deploy_last_rollback_timestamp "release after re-apply: a real rollback does page DeployRolledBack"
   assert_failed_record "${dig_next}|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG}|${DIG_KCSPI}" 1 \
-    "release after re-apply: the backoff now holds N+1, and the re-apply's record is gone"
+    "release after re-apply: the release backoff holds N+1"
+  assert_contains "recorded health-check failure #1" \
+    "release after re-apply: N+1 starts at failure #1 — the re-apply's record is not its count"
   rm -rf "${tmp}"
 }
 
@@ -3531,7 +3550,7 @@ scenario_reapply_of_lost_units_keeps_config_previous() {
   assert_no_deploy_stamp basetool_deploy_last_failure_timestamp "lost units, failed: no DeployFailed stamp"
   assert_health_stamp basetool_deploy_last_health_restart_failed_timestamp yes \
     "lost units, failed: the restore-failed gauge is stamped"
-  assert_failed_record "${MARKER}" 1 "lost units, failed: the backoff record is keyed to the deployed target"
+  assert_reapply_record "${MARKER}" 1 "lost units, failed: the backoff record is keyed to the deployed target"
 
   # The operator fixes the owner and retries now.
   : > "${T_DOCKER_LOG}"
@@ -3544,13 +3563,307 @@ scenario_reapply_of_lost_units_keeps_config_previous() {
     record 0 "lost units, forced: the units are back"
   fi
   assert_anchors_keep_previous "lost units, forced"
-  if [[ ! -f "${T_STATE_DIR}/config-apply.incomplete" && ! -f "${T_STATE_DIR}/failed.digests" ]]; then
+  if [[ ! -f "${T_STATE_DIR}/config-apply.incomplete" && ! -f "${T_STATE_DIR}/failed.digests" \
+        && ! -f "${T_STATE_DIR}/reapply-failed.digests" ]]; then
     record 1 "lost units, forced: no incomplete-apply marker and no failure record remain"
   else
     record 0 "lost units, forced: no incomplete-apply marker and no failure record remain"
   fi
   rm -rf "${tmp}"
 }
+
+# ---------------------------------------------------------------------------
+# `deploy.sh --reapply` and the re-apply backoff (the owner's decisions of 2026-09-26).
+#
+# Until then the documented way to force a full re-apply was deleting last-deployed.digests, which
+# made the run take the deployed release N for a new one: it copied N's pin over
+# previous-digest-pin.yml, N's tree over config-previous/ and N's JAR over keycloak-spi-previous.jar,
+# and N-1 was gone as a rollback anchor. --reapply re-applies N as a re-apply: from the marker, never
+# from the tag, no anchor rotated, nothing rolled back on failure. A failed re-apply (drift or
+# --reapply) now backs off with the heal's durations -- 300 s doubling to 1 h -- from its own record,
+# reapply-failed.digests; a failed release keeps 600 s doubling to 6 h in failed.digests.
+#
+# Against the deployer before this change every --reapply scenario fails at the first assertion
+# (`unknown argument: --reapply`, exit 1), and so does the short-backoff scenario (the re-apply was
+# backed off 600 s from failed.digests). The marker-deletion and release-backoff scenarios guard what
+# did not change, and pass on both.
+#
+# reapply_host <tmp> -- anchor_host (N deployed and converged, anchors on N-1, live JAR "OLD jar")
+# plus a live config tree and a promoted bundle that are both N, so --reapply can re-deliver the
+# bundle. The bundle directory is T_BUNDLE.
+# ---------------------------------------------------------------------------
+reapply_host() {
+  anchor_host "$1"
+  write_rsync_stub
+  seed_release_tree "${T_COMPOSE_DIR}" "N"
+  T_BUNDLE="$1/bundle"
+  seed_release_tree "${T_BUNDLE}" "N"
+  echo "# promoted compose" > "${T_BUNDLE}/docker-compose.yml"
+}
+
+# The release after N, which the tag has moved to in the scenarios where it matters.
+DIG_BACKEND_NEXT="$(hexdig beef5)"
+MARKER_NEXT="${DIG_BACKEND_NEXT}|${DIG_FRONTEND}|${DIG_INGEST}|${DIG_CONFIG}|${DIG_KCSPI}"
+
+# seed_rolled_back_next -- N+1 was promoted, failed its gate and rolled back to N a minute ago: its
+# release backoff record, and the DeployRolledBack state in deploy.prom (rollback newer than success).
+seed_rolled_back_next() {
+  local now
+  now="$(date +%s)"
+  printf '%s 1 %d\n' "${MARKER_NEXT}" "$(( now - 60 ))" > "${T_STATE_DIR}/failed.digests"
+  mkdir -p "${T_STATE_DIR}/textfile"
+  printf '%s\n' \
+    "basetool_deploy_last_success_timestamp 1000" \
+    "basetool_deploy_last_rollback_timestamp $(( now - 60 ))" \
+    "basetool_deploy_last_failure_timestamp 0" \
+    "basetool_deploy_last_blocked_timestamp 0" > "${T_STATE_DIR}/textfile/deploy.prom"
+}
+
+scenario_reapply_flag_reapplies_the_deployed_release_and_rotates_nothing() {
+  echo "Scenario: --reapply re-applies the deployed release N from the marker -- not the tag's N+1 -- and every anchor stays on N-1"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  reapply_host "${tmp}"
+  seed_rolled_back_next
+  # An earlier re-apply of N failed a moment ago: the timer would wait, an explicit --reapply does not.
+  printf '%s 1 %d\n' "${MARKER}" "$(date +%s)" > "${T_STATE_DIR}/reapply-failed.digests"
+  mapfile -t fake < <(spi_env)
+  # The tag already names N+1; the live JAR is N's own.
+  run_deploy --reapply -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${T_BUNDLE}" "FAKE_KCSPI_JAR=OLD jar" \
+    "FAKE_REMOTE_BACKEND=${DIG_BACKEND_NEXT}" || rc=$?
+  assert_exit 0 "$rc" "--reapply: the run succeeds"
+  assert_contains "--reapply: target is the deployed release recorded in" "--reapply: the target is read from the marker"
+  assert_no_docker "basetool-backend:stable" "--reapply: no tag is resolved (the tag names N+1)"
+  assert_contains "the running stack matches the deployed release — re-applying it anyway" \
+    "--reapply: a converged stack is re-applied anyway, not a fast exit"
+  assert_contains "--reapply asked for it — retrying now" "--reapply: the re-apply backoff does not hold back an explicit --reapply"
+  assert_docker "cosign verify ghcr.io/krt-profit/basetool-backend@${DIG_BACKEND}" \
+    "--reapply: the deployed digests are signature-verified like any apply"
+  assert_contains "--reapply: re-delivering the deployed config bundle" "--reapply: the config bundle is re-delivered"
+  assert_contains "${T_STATE_DIR}/config-previous keeps the previous release as the rollback anchor" \
+    "--reapply: the live tree is not snapshotted over config-previous/"
+  assert_contains "--reapply: the live provider JAR is the deployed release's — not swapped" \
+    "--reapply: an identical live JAR is not swapped"
+  assert_starts keycloak 0 "--reapply: ...and keycloak is not restarted for it"
+  # The edge is left out: reconcile_edge after a success recreates it on its own config snapshot,
+  # which this fixture does not seed -- not part of the release apply under test.
+  assert_count '^systemctl --user (stop|restart) (db-backend|db-keycloak|redis|keycloak|backend|ingest|frontend)\.service' 0 \
+    "--reapply: no stack unit that already matches is stopped or restarted"
+  assert_anchors_keep_previous "--reapply"
+  assert_pin_binds backend "${DIG_BACKEND}" "--reapply: backend stays bound to N, not to the tag's N+1"
+  assert_marker "${MARKER}" "--reapply: the marker still names N"
+  assert_contains "deploy successful — the deployed release is re-applied" "--reapply: success is reported as a re-apply"
+  assert_health_stamp basetool_deploy_last_stack_healthy_timestamp yes "--reapply: the stack-health heartbeat is stamped"
+  if grep -qx 'basetool_deploy_last_success_timestamp 1000' "${T_STATE_DIR}/textfile/deploy.prom" 2>/dev/null; then
+    record 1 "--reapply: no success stamp, so N+1's DeployRolledBack keeps firing"
+  else
+    record 0 "--reapply: no success stamp, so N+1's DeployRolledBack keeps firing ($(grep success "${T_STATE_DIR}/textfile/deploy.prom" 2>/dev/null))"
+  fi
+  assert_failed_record "${MARKER_NEXT}" 1 "--reapply: N+1's release backoff is left as it was"
+  if [[ ! -f "${T_STATE_DIR}/reapply-failed.digests" ]]; then
+    record 1 "--reapply: the re-apply's own failure record is cleared"
+  else
+    record 0 "--reapply: the re-apply's own failure record is cleared"
+  fi
+  rm -rf "${tmp}"
+}
+
+scenario_reapply_flag_puts_back_a_differing_jar_without_rotating_its_anchor() {
+  echo "Scenario: --reapply puts the deployed JAR back over a live one that differs, restarts keycloak once, and keeps keycloak-spi-previous.jar on N-1"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  reapply_host "${tmp}"
+  mapfile -t fake < <(spi_env)
+  # The deployed release's JAR ("NEW jar") is not what is live ("OLD jar").
+  run_deploy --reapply -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${T_BUNDLE}" || rc=$?
+  assert_exit 0 "$rc" "--reapply jar: the run succeeds"
+  assert_contains "the live provider JAR differed from the deployed release's — put back" "--reapply jar: the swap is reported"
+  assert_file_says "${T_COMPOSE_DIR}/keycloak/providers/keycloak-spi.jar" "NEW jar" "--reapply jar: the deployed JAR is live"
+  assert_docker "keycloak-jar-at-start NEW jar" "--reapply jar: keycloak starts on it"
+  assert_starts keycloak 1 "--reapply jar: keycloak is started once"
+  assert_nothing_down "--reapply jar: nothing is left stopped"
+  assert_anchors_keep_previous "--reapply jar"
+  rm -rf "${tmp}"
+}
+
+scenario_reapply_flag_that_fails_rolls_nothing_back_and_backs_off_short() {
+  echo "Scenario: a --reapply whose gate fails rolls nothing back, records a re-apply failure with the short backoff, and leaves N+1's backoff alone"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  reapply_host "${tmp}"
+  seed_rolled_back_next
+  printf 'frontend\n' > "${T_DOWN}"
+  mapfile -t fake < <(spi_env)
+  run_deploy --reapply -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${T_BUNDLE}" "FAKE_KCSPI_JAR=OLD jar" \
+    "FAKE_REMOTE_BACKEND=${DIG_BACKEND_NEXT}" \
+    "FAKE_PS_frontend=" "FAKE_STUCK_UNITS=frontend" "FAKE_STUCK_WITH_JAR=OLD jar" || rc=$?
+  assert_exit 1 "$rc" "--reapply fails: the run fails"
+  assert_contains "drift: frontend: no container" "--reapply fails: the drift is reported"
+  assert_contains "on a re-apply of the deployed release — not rolling back" "--reapply fails: nothing is rolled back"
+  assert_excludes "rolled back to previous digest pin" "--reapply fails: no rollback to itself is claimed"
+  assert_excludes "rollback ALSO failed" "--reapply fails: ...and none is attempted"
+  assert_anchors_keep_previous "--reapply fails"
+  assert_pin_binds backend "${DIG_BACKEND}" "--reapply fails: backend stays bound to N"
+  assert_marker "${MARKER}" "--reapply fails: the marker still names N"
+  assert_contains "recorded re-apply failure #1" "--reapply fails: the failure is recorded as a re-apply failure"
+  assert_contains "the next automatic attempt backs off 300s" "--reapply fails: ...with the heal's first backoff, not the release's 600 s"
+  assert_reapply_record "${MARKER}" 1 "--reapply fails: the re-apply record is keyed to N"
+  assert_failed_record "${MARKER_NEXT}" 1 "--reapply fails: N+1's release backoff is not overwritten"
+  assert_health_stamp basetool_deploy_last_health_restart_failed_timestamp yes \
+    "--reapply fails: the gauge DeployHealthRestartFailing reads is stamped"
+  assert_health_stamp basetool_deploy_last_stack_healthy_timestamp no "--reapply fails: the healthy heartbeat is not stamped"
+  if grep -qx 'basetool_deploy_last_failure_timestamp 0' "${T_STATE_DIR}/textfile/deploy.prom" 2>/dev/null; then
+    record 1 "--reapply fails: no DeployFailed stamp (the release had shipped)"
+  else
+    record 0 "--reapply fails: no DeployFailed stamp (the release had shipped)"
+  fi
+
+  # The next timer tick, with the tag back on N (a drift re-apply): inside the SHORT window, a quiet skip.
+  : > "${T_DOCKER_LOG}"
+  rc=0
+  run_deploy -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${T_BUNDLE}" "FAKE_KCSPI_JAR=OLD jar" \
+    "FAKE_PS_frontend=" "FAKE_STUCK_UNITS=frontend" "FAKE_STUCK_WITH_JAR=OLD jar" || rc=$?
+  assert_exit 0 "$rc" "--reapply fails, next tick: a quiet skip"
+  assert_contains "s/300s) — skipping this tick" "--reapply fails, next tick: backed off by the 300 s window"
+  assert_count '^systemctl --user (start|restart|stop) ' 0 "--reapply fails, next tick: nothing is started while backing off"
+  rm -rf "${tmp}"
+}
+
+scenario_reapply_flag_is_refused_without_a_deployed_release() {
+  echo "Scenario: --reapply is refused on a host with no deployed release, with --tag, and when the pin disagrees with the marker -- before any registry call"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  setup_host "${tmp}"
+  mapfile -t fake < <(converged_env)
+  run_deploy --reapply -- "${fake[@]}" || rc=$?
+  assert_exit 1 "$rc" "fresh host: --reapply is refused"
+  assert_contains "FATAL: --reapply: no deployed release on this host" "fresh host: the refusal says why"
+  assert_contains "Deploy a release instead" "fresh host: ...and what to do instead"
+  assert_no_docker "podman login" "fresh host: the registry is not contacted"
+  assert_no_docker "skopeo" "fresh host: no tag is resolved"
+  assert_no_apply "fresh host: nothing is started"
+  if [[ ! -e "${T_STATE_DIR}/textfile/deploy.prom" && ! -e "${T_STATE_DIR}/failed.digests" \
+        && ! -e "${T_STATE_DIR}/reapply-failed.digests" ]]; then
+    record 1 "fresh host: no metric and no failure record -- a refusal is not a deploy failure"
+  else
+    record 0 "fresh host: no metric and no failure record -- a refusal is not a deploy failure"
+  fi
+
+  write_marker "${MARKER}"
+  : > "${T_DOCKER_LOG}"
+  rc=0
+  run_deploy --reapply --tag 1.2.3 -- "${fake[@]}" || rc=$?
+  assert_exit 1 "$rc" "with --tag: --reapply is refused"
+  assert_contains "cannot be combined with --tag" "with --tag: the refusal says why"
+  assert_no_docker "podman login" "with --tag: the registry is not contacted"
+
+  printf 'services:\n  backend:\n    image: ghcr.io/krt-profit/basetool-backend@%s\n' "${DIG_BACKEND_OLD}" \
+    > "${T_STATE_DIR}/current-digest-pin.yml"
+  : > "${T_DOCKER_LOG}"
+  rc=0
+  run_deploy --reapply -- "${fake[@]}" || rc=$?
+  assert_exit 1 "$rc" "pin disagrees: --reapply is refused"
+  assert_contains "the host disagrees about what is deployed; refusing to guess" "pin disagrees: the refusal says why"
+  assert_no_apply "pin disagrees: nothing is started"
+  rm -rf "${tmp}"
+}
+
+scenario_deleting_the_marker_still_rotates_the_anchors() {
+  echo "Scenario: deleting last-deployed.digests still turns N into a new release and rotates all three anchors onto it (documented; use --reapply)"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  reapply_host "${tmp}"
+  rm -f "${T_STATE_DIR}/last-deployed.digests"
+  mapfile -t fake < <(spi_env)
+  run_deploy -- "${fake[@]}" "FAKE_CONFIG_BUNDLE=${T_BUNDLE}" || rc=$?
+  assert_exit 0 "$rc" "marker deleted: the run succeeds"
+  assert_excludes "re-applying" "marker deleted: it is not a re-apply"
+  if grep -q "@${DIG_BACKEND}\$" "${T_STATE_DIR}/previous-digest-pin.yml" 2>/dev/null; then
+    record 1 "marker deleted: previous-digest-pin.yml now names N, the deployed release"
+  else
+    record 0 "marker deleted: previous-digest-pin.yml now names N, the deployed release"
+  fi
+  assert_file_says "${T_STATE_DIR}/config-previous/docker/edge/nginx.conf" "N edge" \
+    "marker deleted: config-previous/ now holds N"
+  assert_file_says "${T_STATE_DIR}/keycloak-spi-previous.jar" "OLD jar" \
+    "marker deleted: keycloak-spi-previous.jar now holds N's JAR"
+  rm -rf "${tmp}"
+}
+
+scenario_failed_drift_reapply_backs_off_with_the_heal_durations() {
+  echo "Scenario: a failed drift re-apply backs off 300 s, doubling, capped at 1 h -- the heal's durations"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  anchor_host "${tmp}"
+  printf 'frontend\n' > "${T_DOWN}"
+  mapfile -t fake < <(spi_env)
+  local -a stuck=("FAKE_PS_frontend=" "FAKE_STUCK_UNITS=frontend" "FAKE_STUCK_WITH_JAR=OLD jar")
+  run_deploy -- "${fake[@]}" "${stuck[@]}" || rc=$?
+  assert_exit 1 "$rc" "short backoff: the first re-apply fails"
+  assert_contains "the next automatic attempt backs off 300s" "short backoff: failure #1 waits 300 s"
+  assert_reapply_record "${MARKER}" 1 "short backoff: recorded in reapply-failed.digests"
+
+  : > "${T_DOCKER_LOG}"; rc=0
+  run_deploy -- "${fake[@]}" "${stuck[@]}" || rc=$?
+  assert_exit 0 "$rc" "short backoff: the next tick is a quiet skip"
+  assert_contains "s/300s) — skipping this tick" "short backoff: the first window is 300 s, not the release's 600 s"
+
+  # Past 300 s (and still inside what the release backoff would be): the re-apply is retried.
+  printf '%s 1 %d\n' "${MARKER}" "$(( $(date +%s) - 400 ))" > "${T_STATE_DIR}/reapply-failed.digests"
+  : > "${T_DOCKER_LOG}"; rc=0
+  run_deploy -- "${fake[@]}" "${stuck[@]}" || rc=$?
+  assert_exit 1 "$rc" "short backoff: after 400 s the re-apply is retried (and fails again)"
+  assert_contains "backoff of 300s elapsed — retrying" "short backoff: ...because the 300 s window has passed"
+  assert_contains "recorded re-apply failure #2" "short backoff: the count goes on"
+  assert_contains "the next automatic attempt backs off 600s" "short backoff: failure #2 waits 600 s (doubling)"
+
+  : > "${T_DOCKER_LOG}"; rc=0
+  run_deploy -- "${fake[@]}" "${stuck[@]}" || rc=$?
+  assert_contains "s/600s) — skipping this tick" "short backoff: the second window is 600 s"
+
+  printf '%s 9 %d\n' "${MARKER}" "$(date +%s)" > "${T_STATE_DIR}/reapply-failed.digests"
+  : > "${T_DOCKER_LOG}"; rc=0
+  run_deploy -- "${fake[@]}" "${stuck[@]}" || rc=$?
+  assert_contains "s/3600s) — skipping this tick" "short backoff: capped at 3600 s, not the release's 21600 s"
+  rm -rf "${tmp}"
+}
+
+scenario_failed_release_keeps_the_long_backoff() {
+  echo "Scenario: a failed RELEASE still backs off 600 s, doubling -- the re-apply durations do not leak into it"
+  local tmp rc=0
+  tmp="$(mktmp)"
+  heal_host "${tmp}"
+  mapfile -t fake < <(spi_env)
+  local -a next=("FAKE_REMOTE_BACKEND=${DIG_BACKEND_NEXT}" "FAKE_UNHEALTHY_DIGEST=${DIG_BACKEND_NEXT}")
+  run_deploy -- "${fake[@]}" "${next[@]}" || rc=$?
+  assert_exit 1 "$rc" "long backoff: the release fails and rolls back"
+  assert_contains "rolled back to previous digest pin successfully" "long backoff: ...to N"
+  assert_failed_record "${MARKER_NEXT}" 1 "long backoff: recorded in failed.digests"
+  if [[ ! -f "${T_STATE_DIR}/reapply-failed.digests" ]]; then
+    record 1 "long backoff: a release failure writes no re-apply record"
+  else
+    record 0 "long backoff: a release failure writes no re-apply record"
+  fi
+
+  : > "${T_DOCKER_LOG}"; rc=0
+  run_deploy -- "${fake[@]}" "${next[@]}" || rc=$?
+  assert_exit 0 "$rc" "long backoff: the next tick is a quiet skip"
+  assert_contains "s/600s) — skipping this tick" "long backoff: the first window is 600 s"
+
+  printf '%s 2 %d\n' "${MARKER_NEXT}" "$(date +%s)" > "${T_STATE_DIR}/failed.digests"
+  : > "${T_DOCKER_LOG}"; rc=0
+  run_deploy -- "${fake[@]}" "${next[@]}" || rc=$?
+  assert_contains "s/1200s) — skipping this tick" "long backoff: the second window is 1200 s"
+  rm -rf "${tmp}"
+}
+
+scenario_reapply_flag_reapplies_the_deployed_release_and_rotates_nothing
+scenario_reapply_flag_puts_back_a_differing_jar_without_rotating_its_anchor
+scenario_reapply_flag_that_fails_rolls_nothing_back_and_backs_off_short
+scenario_reapply_flag_is_refused_without_a_deployed_release
+scenario_deleting_the_marker_still_rotates_the_anchors
+scenario_failed_drift_reapply_backs_off_with_the_heal_durations
+scenario_failed_release_keeps_the_long_backoff
 
 scenario_spi_and_apps_move_in_one_restart_window
 scenario_apps_only_restart_each_unit_once
